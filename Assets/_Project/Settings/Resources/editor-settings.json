@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "application": {
+    "displayName": "OMSI Map Editor",
+    "defaultWindowWidth": 1600,
+    "defaultWindowHeight": 900,
+    "minimumWindowWidth": 1100,
+    "minimumWindowHeight": 700,
+    "startMaximized": false
+  },
+  "interface": {
+    "defaultLocale": "en",
+    "scale": 1.0
+  }
+}

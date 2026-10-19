@@ -1,0 +1,14 @@
+{
+  "name": "Editor.Geometry",
+  "rootNamespace": "OmsiMapEditor.Geometry",
+  "references": ["Editor.Core"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

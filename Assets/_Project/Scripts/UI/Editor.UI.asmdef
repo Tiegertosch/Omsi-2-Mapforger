@@ -1,0 +1,14 @@
+{
+  "name": "Editor.UI",
+  "rootNamespace": "OmsiMapEditor.UI",
+  "references": ["Editor.Core", "Editor.OMSI"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
