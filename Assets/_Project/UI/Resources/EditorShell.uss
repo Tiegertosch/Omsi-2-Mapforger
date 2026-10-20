@@ -28,12 +28,10 @@
 .browser-tile-entry-missing { color: rgb(240, 164, 154); }
 .viewport { flex-grow: 1; min-width: 0; min-height: 0; flex-direction: column; background-color: rgb(20, 24, 29); overflow: hidden; }
 .map-header { flex-shrink: 0; padding: 14px 20px 0; background-color: rgb(20, 24, 29); }
-.map-content { flex-grow: 1; min-width: 0; min-height: 0; align-items: flex-start; justify-content: flex-start; padding: 12px 20px 20px; }
 .primary-button { margin-top: 20px; height: 36px; padding-left: 16px; padding-right: 16px; background-color: rgb(45, 100, 142); color: white; border-width: 0; }
 .map-title { align-self: flex-start; margin-bottom: 8px; font-size: 20px; -unity-font-style: bold; }
 .map-counts { align-self: flex-start; margin-bottom: 8px; color: rgb(183, 197, 211); }
 .map-description { align-self: flex-start; margin-bottom: 14px; color: rgb(153, 165, 178); white-space: normal; }
-.map-hint { align-self: flex-start; margin: 2px 0 8px; font-size: 12px; color: rgb(153, 165, 178); }
 .map-legend { align-self: flex-start; flex-direction: row; margin-bottom: 8px; }
 .map-legend-spline { margin-right: 16px; color: rgb(242, 181, 77); }
 .map-legend-object { color: rgb(143, 209, 240); }
@@ -42,21 +40,6 @@
 .map-control-button:hover { background-color: rgb(55, 67, 78); }
 .map-zoom-button { min-width: 30px; padding-left: 6px; padding-right: 6px; -unity-text-align: middle-center; }
 .zoom-label { min-width: 42px; margin-right: 6px; -unity-text-align: middle-center; font-size: 11px; color: rgb(183, 197, 211); }
-.map-grid { position: relative; flex-shrink: 0; align-self: flex-start; margin-bottom: 4px; }
-.map-tile { position: absolute; overflow: hidden; background-color: rgb(31, 42, 51); border-width: 1px; border-color: rgb(69, 87, 101); }
-.map-tile:hover { border-color: rgb(225, 194, 137); }
-.map-tile-selected { border-width: 3px; border-color: rgb(242, 181, 77); }
-.map-tile-missing { background-color: rgb(53, 35, 37); border-color: rgb(118, 64, 64); }
-.map-tile-title { position: absolute; left: 7px; top: 5px; padding: 2px 4px; background-color: rgba(22, 27, 33, 0.9); -unity-font-style: bold; color: rgb(225, 194, 137); }
-.map-tile-title-compact { left: 4px; top: 4px; padding: 1px 3px; font-size: 10px; }
-.map-tile-counts { position: absolute; left: 7px; top: 27px; padding: 2px 4px; background-color: rgba(22, 27, 33, 0.9); font-size: 10px; color: rgb(220, 226, 233); }
-.map-tile-terrain { position: absolute; left: 7px; bottom: 5px; padding: 2px 4px; background-color: rgba(22, 27, 33, 0.9); font-size: 10px; color: rgb(183, 197, 211); }
-.tile-grid { align-self: stretch; flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
-.tile-card { width: 150px; min-height: 84px; margin: 5px; padding: 9px; background-color: rgb(40, 53, 64); border-width: 1px; border-color: rgb(69, 87, 101); }
-.tile-card-missing { background-color: rgb(76, 42, 42); border-color: rgb(118, 64, 64); }
-.tile-title { margin-bottom: 5px; -unity-font-style: bold; color: rgb(225, 194, 137); }
-.map-warning { align-self: flex-start; margin-top: 6px; color: rgb(238, 190, 110); white-space: normal; }
-.map-source { align-self: flex-start; margin-top: 12px; color: rgb(128, 139, 151); white-space: normal; }
 .viewport-label { margin-bottom: 8px; font-size: 12px; -unity-font-style: bold; color: rgb(133, 157, 180); }
 .inspector-title { margin-bottom: 10px; -unity-font-style: bold; color: rgb(225, 194, 137); }
 .inspector-property { margin-bottom: 7px; }
@@ -88,3 +71,9 @@
 .dialog-primary { background-color: rgb(45, 100, 142); border-color: rgb(45, 100, 142); color: white; }
 .inspector-edit-field .unity-base-text-field__input, .dialog-field .unity-base-text-field__input { background-color: rgb(24, 28, 34); color: rgb(226, 231, 237); border-color: rgb(69, 87, 101); }
 .inspector-edit-field .unity-base-text-field__input:focus, .dialog-field .unity-base-text-field__input:focus { border-color: rgb(225, 175, 83); }
+.map-view { flex-grow: 1; min-height: 0; margin: 0 20px 12px; position: relative; overflow: hidden; background-color: rgb(15, 18, 22); border-width: 1px; border-color: rgb(45, 53, 62); }
+.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.map-overlay { position: absolute; left: 8px; bottom: 6px; padding: 2px 6px; font-size: 10px; color: rgb(183, 197, 211); background-color: rgba(15, 18, 22, 0.85); }
+.map-warnings { align-self: flex-start; margin-bottom: 8px; font-size: 11px; color: rgb(238, 190, 110); white-space: normal; }
+.map-hint { margin-left: 10px; font-size: 10px; color: rgb(139, 154, 169); white-space: normal; flex-shrink: 1; }
+.map-legend-selected { margin-left: 16px; color: rgb(255, 92, 107); }

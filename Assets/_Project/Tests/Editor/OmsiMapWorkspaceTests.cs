@@ -166,6 +166,43 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(10.0, reopened.Read().Tiles[0].Objects[0].LocalX, 1e-12);
         }
 
+        [Test]
+        public void SavingContentEqualToTheOriginalRemovesTheWorkspaceCopy()
+        {
+            var workspace = new OmsiMapWorkspace(original, workspaceFolder);
+            var tile = OmsiRecordFile.Parse(workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
+            var item = OmsiTileRecords.Of<OmsiObjectView>(tile).Single();
+            item.X = 11;
+            workspace.Save("tile_0_0.map", tile);
+            Assert.IsTrue(workspace.IsModified("tile_0_0.map"));
+
+            item.X = 10;
+            workspace.Save("tile_0_0.map", tile);
+
+            Assert.IsFalse(workspace.IsModified("tile_0_0.map"));
+            CollectionAssert.IsEmpty(workspace.ModifiedFiles());
+        }
+
+        [Test]
+        public void SessionUpdatesTheObjectInTheReadSummary()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects[0];
+
+            Assert.IsTrue(session.UpdateObject(tile, item, 10.123456789012345678, 21, 0.5, 45));
+
+            Assert.AreEqual(10.1234567890123, item.LocalX, 1e-15);
+            Assert.AreEqual(21.0, item.LocalY, 1e-12);
+            Assert.AreEqual(0.5, item.Height, 1e-12);
+            Assert.AreEqual(45.0, item.HeadingDegrees, 1e-12);
+            Assert.AreEqual(item.LocalX, session.Read().Tiles[0].Objects[0].LocalX, 0.0);
+
+            Assert.IsTrue(session.UpdateObject(tile, item, 10, 20, 0, 0));
+            Assert.IsFalse(session.IsTileModified("tile_0_0.map"));
+        }
+
         private static void Write(string folder, string name, params string[] lines)
         {
             File.WriteAllBytes(Path.Combine(folder, name),

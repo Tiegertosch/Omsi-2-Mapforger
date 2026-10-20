@@ -9,35 +9,45 @@ using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
 {
-    /// <summary>Creates the initial UI Toolkit shell when the player starts.</summary>
+    /// <summary>Creates the UI Toolkit shell when the player starts and connects it to the opened map.</summary>
     public sealed class EditorShellBootstrap : MonoBehaviour
     {
+        /// <summary>One object edit; tile coordinates and ID find the object again after the map is re-read.</summary>
+        private sealed class ObjectEditStep
+        {
+            public int TileX;
+            public int TileY;
+            public int ObjectId;
+            public double[] Before;
+            public double[] After;
+        }
+
+        private const int HistoryLimit = 200;
+
         private OmsiMapSummary currentSummary;
-        private OmsiSplineTileIndex splineIndex;
-        private readonly Dictionary<OmsiTileSummary, MapTileVisualElement> tileVisuals = new Dictionary<OmsiTileSummary, MapTileVisualElement>();
         private readonly Dictionary<OmsiTileSummary, Button> browserEntries = new Dictionary<OmsiTileSummary, Button>();
+        private readonly List<ObjectEditStep> undoSteps = new List<ObjectEditStep>();
+        private readonly List<ObjectEditStep> redoSteps = new List<ObjectEditStep>();
         private Label statusLabel;
         private Label mapStateLabel;
         private Label mapTitleLabel;
         private Label mapCountsLabel;
         private Label mapDescriptionLabel;
+        private Label mapWarningsLabel;
+        private Label mapHintLabel;
         private Label zoomLabel;
+        private Label mapOverlayLabel;
         private Button emptyStateOpenButton;
         private Button toolsButton;
         private VisualElement mapLegend;
         private VisualElement mapControls;
         private VisualElement projectPanel;
         private VisualElement inspectorPanel;
-        private ScrollView mapContent;
+        private MapCanvasElement mapCanvas;
         private OmsiTileSummary selectedTile;
-        private MapTileVisualElement selectedTileVisual;
-        private float zoomScale = 1f;
-        private bool fitMapToViewport = true;
-        private Vector2 lastMapViewportSize = new Vector2(-1f, -1f);
-        private float renderedTilePixels = -1f;
+        private OmsiObjectRecord selectedObject;
         private string currentProjectName = string.Empty;
         private OmsiMapSession session;
-        private int? selectedObjectId;
         private VisualElement exportDialog;
         private TextField exportFolderField;
         private TextField exportNameField;
@@ -82,16 +92,13 @@ namespace OmsiMapEditor.UI
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
             emptyStateOpenButton = root.Q<Button>("empty-state-open-button");
-            mapContent = root.Q<ScrollView>("map-content");
-            // Measure the scroll view itself, not its inner viewport: the viewport shrinks whenever a scrollbar
-            // appears, which would change the fitted tile size and re-render the map in an endless loop.
-            if (mapContent != null)
-                mapContent.RegisterCallback<GeometryChangedEvent>(OnMapViewportGeometryChanged);
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
             mapTitleLabel = root.Q<Label>("map-title");
             mapCountsLabel = root.Q<Label>("map-counts");
             mapDescriptionLabel = root.Q<Label>("map-description");
+            mapWarningsLabel = root.Q<Label>("map-warnings");
+            mapHintLabel = root.Q<Label>("map-hint");
             mapLegend = root.Q<VisualElement>("map-legend");
             mapControls = root.Q<VisualElement>("map-controls");
             zoomLabel = root.Q<Label>("zoom-label");
@@ -106,6 +113,25 @@ namespace OmsiMapEditor.UI
             var zoomOutButton = root.Q<Button>("zoom-out-button");
             var zoomInButton = root.Q<Button>("zoom-in-button");
             var centerSelectionButton = root.Q<Button>("center-selection-button");
+
+            var mapView = root.Q<VisualElement>("map-view");
+            if (mapView != null)
+            {
+                mapCanvas = new MapCanvasElement();
+                mapCanvas.ObjectSelected += (tile, item) => SelectObject(tile, item, false);
+                mapCanvas.TileClicked += tile => SelectTile(tile, false);
+                mapCanvas.ObjectEdited += OnObjectDragged;
+                mapCanvas.PointerInfoChanged += text =>
+                {
+                    if (mapOverlayLabel != null)
+                        mapOverlayLabel.text = text;
+                    UpdateZoomLabel();
+                };
+                mapView.Add(mapCanvas);
+                mapOverlayLabel = new Label { pickingMode = PickingMode.Ignore };
+                mapOverlayLabel.AddToClassList("map-overlay");
+                mapView.Add(mapOverlayLabel);
+            }
 
             if (fileButton != null)
                 fileButton.clicked += () => TogglePopup(fileMenu, helpMenu);
@@ -144,11 +170,11 @@ namespace OmsiMapEditor.UI
             if (fitMapButton != null)
                 fitMapButton.clicked += FitMap;
             if (zoomOutButton != null)
-                zoomOutButton.clicked += () => ChangeZoom(1f / 1.25f);
+                zoomOutButton.clicked += () => ChangeZoom(1f / 1.5f);
             if (zoomInButton != null)
-                zoomInButton.clicked += () => ChangeZoom(1.25f);
+                zoomInButton.clicked += () => ChangeZoom(1.5f);
             if (centerSelectionButton != null)
-                centerSelectionButton.clicked += CenterSelectedTile;
+                centerSelectionButton.clicked += CenterSelection;
 
             if (viewButton != null)
                 viewButton.clicked += () => ToggleSidePanels(projectPanel, inspectorPanel);
@@ -163,6 +189,9 @@ namespace OmsiMapEditor.UI
                 helpButton.clicked += () => TogglePopup(helpMenu, fileMenu);
             if (helpCloseButton != null)
                 helpCloseButton.clicked += () => HidePopup(helpMenu);
+
+            // Undo and redo work anywhere except inside a text field, which keeps its own text undo.
+            root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
 
             CreateBackgroundCamera();
         }
@@ -250,7 +279,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <param name="projectFilePath">The project whose workspace is used; null opens the map read-only.</param>
-        /// <param name="keepView">Keeps zoom, selected tile and selected object, for example after an edit.</param>
+        /// <param name="keepView">Keeps the view, selected tile and selected object, for example after reverting a tile.</param>
         private void LoadMap(string globalConfigPath, string projectName, string projectFilePath, bool keepView)
         {
             var newSession = string.IsNullOrEmpty(projectFilePath)
@@ -258,25 +287,29 @@ namespace OmsiMapEditor.UI
                 : OmsiMapSession.OpenProject(globalConfigPath, projectFilePath);
             var summary = newSession.Read();
             var previousTile = selectedTile;
+            var previousObjectId = selectedObject?.Id;
 
             session = newSession;
-            splineIndex = OmsiSplineTileIndex.Build(summary);
             currentSummary = summary;
             currentProjectName = projectName ?? string.Empty;
+            undoSteps.Clear();
+            redoSteps.Clear();
             selectedTile = null;
+            selectedObject = null;
             if (keepView && previousTile != null)
                 selectedTile = summary.Tiles.Find(tile => tile.X == previousTile.X && tile.Y == previousTile.Y);
+            if (selectedTile != null && previousObjectId.HasValue)
+                selectedObject = selectedTile.Objects.Find(item => item.Id == previousObjectId.Value);
             if (selectedTile == null)
                 selectedTile = summary.Tiles.Count > 0 ? summary.Tiles[0] : null;
-            if (!keepView)
-            {
-                selectedObjectId = null;
-                fitMapToViewport = true;
-                zoomScale = 1f;
-            }
 
+            if (mapCanvas != null)
+            {
+                mapCanvas.AllowEditing = session.CanEdit;
+                mapCanvas.SetMap(summary, keepView);
+                mapCanvas.SetSelection(selectedTile, selectedObject);
+            }
             UpdateMapHeader();
-            RenderMapSummary();
             RenderProjectBrowser();
             RenderInspector();
             UpdateMapStateLabel();
@@ -286,52 +319,170 @@ namespace OmsiMapEditor.UI
                 toolsButton.SetEnabled(true);
         }
 
-        /// <summary>Reads the map again through the same session, keeping the view, after an edit.</summary>
+        /// <summary>Reads the map again through the same session, keeping the view.</summary>
         private void ReloadMap()
         {
             LoadMap(session.GlobalConfigPath, currentProjectName, session.ProjectFilePath, true);
         }
 
-        private void SelectObject(int objectId)
+        private void SelectObject(OmsiTileSummary tile, OmsiObjectRecord item, bool centerView)
         {
-            selectedObjectId = objectId;
-            selectedTileVisual?.SetSelectedObject(objectId);
+            if (tile == null || item == null)
+                return;
+
+            var previousTile = selectedTile;
+            selectedTile = tile;
+            selectedObject = item;
+            if (!ReferenceEquals(previousTile, tile))
+            {
+                SetTileHighlight(previousTile, false);
+                SetTileHighlight(tile, true);
+                ScrollBrowserTo(tile);
+            }
+            mapCanvas?.SetSelection(tile, item);
+            if (centerView)
+                mapCanvas?.CenterOn(tile, item);
             RenderInspector();
-            SetStatus("Selected object #" + objectId + (session != null && session.CanEdit ? "" : " (read-only; save a project to edit)"));
+            SetStatus("Selected object #" + item.Id + " (" + item.AssetPath + ")" +
+                      (session != null && session.CanEdit ? "" : " - read-only; save a project to edit"));
         }
 
-        private void SelectObjectFromMap(OmsiTileSummary tile, int objectId)
+        private void SelectTile(OmsiTileSummary tile, bool centerView)
         {
-            if (ReferenceEquals(tile, selectedTile))
-                SelectObject(objectId);
+            if (tile == null || currentSummary == null)
+                return;
+
+            var previousTile = selectedTile;
+            selectedTile = tile;
+            selectedObject = null;
+            SetTileHighlight(previousTile, false);
+            SetTileHighlight(tile, true);
+            ScrollBrowserTo(tile);
+            mapCanvas?.SetSelection(tile, null);
+            if (centerView)
+                mapCanvas?.CenterOn(tile, null);
+            RenderInspector();
+            SetStatus("Selected tile " + tile.X + ", " + tile.Y);
         }
 
-        private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField)
+        private void OnObjectDragged(MapObjectEdit edit)
         {
-            if (session == null || !session.CanEdit || selectedTile == null)
+            if (edit?.Tile == null || edit.Record == null)
+                return;
+            CommitObjectEdit(edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Record.Height, edit.HeadingDegrees);
+        }
+
+        /// <summary>Saves an object change into the workspace, updates the view and records it for undo.</summary>
+        private void CommitObjectEdit(OmsiTileSummary tile, OmsiObjectRecord item, double x, double y, double z, double heading)
+        {
+            if (session == null || !session.CanEdit)
             {
                 SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to edit it.");
                 return;
             }
-            if (!TryParseField(xField, "X", out var x) || !TryParseField(yField, "Y", out var y) ||
-                !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading))
-                return;
 
+            var before = Values(item);
             try
             {
-                if (!session.UpdateObject(selectedTile.FileName, item.Id, x, y, z, heading))
+                if (!session.UpdateObject(tile, item, x, y, z, heading))
                 {
                     SetStatus("Object #" + item.Id + " is unchanged.");
                     return;
                 }
-                ReloadMap();
-                SetStatus("Object #" + item.Id + " saved to the project workspace (" + selectedTile.FileName + ").");
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
                 SetStatus("Could not save object #" + item.Id + ": " + exception.Message);
+                return;
             }
+
+            undoSteps.Add(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
+            if (undoSteps.Count > HistoryLimit)
+                undoSteps.RemoveAt(0);
+            redoSteps.Clear();
+            AfterObjectChanged(tile, item);
+            SetStatus("Object #" + item.Id + " saved to the project workspace (" + tile.FileName + "). Ctrl+Z undoes it.");
+        }
+
+        private static double[] Values(OmsiObjectRecord item)
+        {
+            return new[] { item.LocalX, item.LocalY, item.Height, item.HeadingDegrees };
+        }
+
+        private void AfterObjectChanged(OmsiTileSummary tile, OmsiObjectRecord item)
+        {
+            selectedTile = tile;
+            selectedObject = item;
+            mapCanvas?.SetSelection(tile, item);
+            UpdateBrowserEntry(tile);
+            RenderInspector();
+            UpdateMapStateLabel();
+        }
+
+        private void OnShortcut(KeyDownEvent evt)
+        {
+            if (!(evt.ctrlKey || evt.commandKey))
+                return;
+            var focused = evt.target as VisualElement;
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null)
+                return;
+
+            if (evt.keyCode == KeyCode.Z && !evt.shiftKey)
+            {
+                StepHistory(undoSteps, redoSteps, true);
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.Y || (evt.keyCode == KeyCode.Z && evt.shiftKey))
+            {
+                StepHistory(redoSteps, undoSteps, false);
+                evt.StopPropagation();
+            }
+        }
+
+        private void StepHistory(List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)
+        {
+            if (session == null || !session.CanEdit || from.Count == 0)
+            {
+                SetStatus(undo ? "Nothing to undo." : "Nothing to redo.");
+                return;
+            }
+
+            var step = from[from.Count - 1];
+            from.RemoveAt(from.Count - 1);
+            var tile = currentSummary.Tiles.Find(candidate => candidate.X == step.TileX && candidate.Y == step.TileY);
+            var item = tile?.Objects.Find(candidate => candidate.Id == step.ObjectId);
+            if (item == null)
+            {
+                SetStatus("The object of this step no longer exists.");
+                return;
+            }
+
+            var target = undo ? step.Before : step.After;
+            try
+            {
+                session.UpdateObject(tile, item, target[0], target[1], target[2], target[3]);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not " + (undo ? "undo" : "redo") + ": " + exception.Message);
+                return;
+            }
+
+            to.Add(step);
+            AfterObjectChanged(tile, item);
+            SetStatus((undo ? "Undid" : "Redid") + " the change of object #" + item.Id + ".");
+        }
+
+        private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField)
+        {
+            if (selectedTile == null)
+                return;
+            if (!TryParseField(xField, "X", out var x) || !TryParseField(yField, "Y", out var y) ||
+                !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading))
+                return;
+            CommitObjectEdit(selectedTile, item, x, y, z, heading);
         }
 
         private bool TryParseField(TextField field, string name, out double value)
@@ -352,7 +503,7 @@ namespace OmsiMapEditor.UI
             {
                 session.RevertTile(selectedTile.FileName);
                 ReloadMap();
-                SetStatus("Edits of " + selectedTile.FileName + " were discarded; the original tile is shown again.");
+                SetStatus("Edits of " + selectedTile.FileName + " were discarded; the original tile is shown again. The undo history was cleared.");
             }
             catch (Exception exception)
             {
@@ -501,7 +652,7 @@ namespace OmsiMapEditor.UI
             var continuity = OmsiSplineContinuity.Check(currentSummary);
             var worstGap = continuity.Gaps.Count > 0 ? continuity.Gaps[0] : null;
             if (worstGap != null)
-                SelectTile(worstGap.Tile);
+                SelectTile(worstGap.Tile, true);
 
             SetStatus(DescribeMapCheck(currentSummary, continuity));
         }
@@ -510,7 +661,7 @@ namespace OmsiMapEditor.UI
         {
             var importPart = summary.Warnings.Count == 0
                 ? "no import warnings"
-                : summary.Warnings.Count + " import warning(s), see the map overview";
+                : summary.Warnings.Count + " import warning(s), see the map header";
             var splinePart = continuity.ConnectedCount + " of " + continuity.LinkCount + " spline links meet";
             if (continuity.Gaps.Count > 0)
             {
@@ -544,42 +695,24 @@ namespace OmsiMapEditor.UI
             camera.useOcclusionCulling = false;
         }
 
-        private void SelectTile(OmsiTileSummary tile)
-        {
-            if (tile == null || currentSummary == null)
-                return;
-
-            var previousTile = selectedTile;
-            if (!ReferenceEquals(previousTile, tile))
-            {
-                selectedObjectId = null;
-                selectedTileVisual?.SetSelectedObject(null);
-            }
-            selectedTile = tile;
-            SetTileHighlight(previousTile, false);
-            SetTileHighlight(tile, true);
-            selectedTileVisual = tileVisuals.TryGetValue(tile, out var visual) ? visual : null;
-            var scrollTarget = selectedTileVisual;
-            if (scrollTarget != null && mapContent != null)
-                mapContent.schedule.Execute(() => ScrollToIfAttached(mapContent, scrollTarget));
-            if (browserEntries.TryGetValue(tile, out var browserEntry))
-            {
-                var tileList = browserEntry.GetFirstAncestorOfType<ScrollView>();
-                tileList?.schedule.Execute(() => ScrollToIfAttached(tileList, browserEntry));
-            }
-            RenderInspector();
-            SetStatus("Selected tile " + tile.X + ", " + tile.Y);
-        }
-
-        /// <summary>Toggles the selection style on the existing map tile and browser entry without rebuilding them.</summary>
+        /// <summary>Toggles the selection style of a tile list entry without rebuilding the list.</summary>
         private void SetTileHighlight(OmsiTileSummary tile, bool isSelected)
         {
-            if (tile == null)
-                return;
-            if (tileVisuals.TryGetValue(tile, out var visual))
-                visual.SetSelected(isSelected);
-            if (browserEntries.TryGetValue(tile, out var entry))
+            if (tile != null && browserEntries.TryGetValue(tile, out var entry))
                 entry.EnableInClassList("browser-tile-entry-selected", isSelected);
+        }
+
+        private void ScrollBrowserTo(OmsiTileSummary tile)
+        {
+            if (!browserEntries.TryGetValue(tile, out var entry))
+                return;
+            var tileList = entry.GetFirstAncestorOfType<ScrollView>();
+            tileList?.schedule.Execute(() =>
+            {
+                // The list may have been rebuilt meanwhile; only scroll to an entry that is still part of it.
+                if (tileList.contentContainer.Contains(entry))
+                    tileList.ScrollTo(entry);
+            });
         }
 
         private static MapforgeEditorSettings LoadSettings()
@@ -607,45 +740,28 @@ namespace OmsiMapEditor.UI
 
         private void FitMap()
         {
-            fitMapToViewport = true;
-            zoomScale = 1f;
+            mapCanvas?.FitToMap();
             UpdateZoomLabel();
-            RenderMapSummary();
-            SetStatus("Map fitted to viewport");
+            SetStatus("Map fitted to the view");
         }
 
         private void ChangeZoom(float factor)
         {
-            if (currentSummary == null)
+            if (currentSummary == null || mapCanvas == null)
                 return;
-
-            if (fitMapToViewport)
-            {
-                fitMapToViewport = false;
-                zoomScale = 1f;
-            }
-            zoomScale = Mathf.Clamp(zoomScale * factor, 0.5f, 3f);
+            mapCanvas.Zoom(factor);
             UpdateZoomLabel();
-            RenderMapSummary();
-            SetStatus("Map zoom " + Mathf.RoundToInt(zoomScale * 100f) + "%");
         }
 
-        private void CenterSelectedTile()
+        private void CenterSelection()
         {
-            if (selectedTileVisual == null || mapContent == null || selectedTile == null)
+            if (selectedTile == null || mapCanvas == null)
                 return;
-
-            var target = selectedTileVisual;
-            mapContent.schedule.Execute(() =>
-            {
-                var tileBounds = target.worldBound;
-                var viewportBounds = mapContent.contentViewport.worldBound;
-                var currentOffset = mapContent.scrollOffset;
-                mapContent.scrollOffset = currentOffset + new Vector2(
-                    tileBounds.center.x - viewportBounds.center.x,
-                    tileBounds.center.y - viewportBounds.center.y);
-            });
-            SetStatus("Centered tile " + selectedTile.X + ", " + selectedTile.Y);
+            mapCanvas.CenterOn(selectedTile, selectedObject);
+            UpdateZoomLabel();
+            SetStatus(selectedObject != null
+                ? "Centered object #" + selectedObject.Id
+                : "Centered tile " + selectedTile.X + ", " + selectedTile.Y);
         }
 
         private void UpdateMapHeader()
@@ -679,6 +795,22 @@ namespace OmsiMapEditor.UI
                     ? DisplayStyle.None
                     : DisplayStyle.Flex;
             }
+            if (mapWarningsLabel != null)
+            {
+                var warnings = currentSummary.Warnings;
+                mapWarningsLabel.text = warnings.Count == 0
+                    ? string.Empty
+                    : warnings.Count + " import warning(s): " + warnings[0] + (warnings.Count > 1 ? "  (hover for all)" : string.Empty);
+                mapWarningsLabel.tooltip = string.Join("\n", warnings.GetRange(0, Math.Min(warnings.Count, 40)));
+                mapWarningsLabel.style.display = warnings.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+            if (mapHintLabel != null)
+            {
+                mapHintLabel.text = session != null && session.CanEdit
+                    ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+Z / Ctrl+Y: undo / redo"
+                    : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
+                mapHintLabel.style.display = DisplayStyle.Flex;
+            }
             if (mapLegend != null)
                 mapLegend.style.display = DisplayStyle.Flex;
             if (mapControls != null)
@@ -690,125 +822,14 @@ namespace OmsiMapEditor.UI
 
         private void UpdateZoomLabel()
         {
-            if (zoomLabel != null)
-                zoomLabel.text = fitMapToViewport ? "Fit" : Mathf.RoundToInt(zoomScale * 100f) + "%";
-        }
-
-        private void OnMapViewportGeometryChanged(GeometryChangedEvent evt)
-        {
-            var size = evt.newRect.size;
-            if ((size - lastMapViewportSize).sqrMagnitude < 4f)
+            if (zoomLabel == null || mapCanvas == null)
                 return;
-
-            lastMapViewportSize = size;
-            if (fitMapToViewport && currentSummary != null && mapContent != null)
-                mapContent.schedule.Execute(() => RenderMapSummary(true));
+            var metersPerPixel = mapCanvas.MetersPerPixel;
+            zoomLabel.text = metersPerPixel >= 1f
+                ? metersPerPixel.ToString("0.#") + " m/px"
+                : (1f / metersPerPixel).ToString("0.#") + " px/m";
         }
 
-        private static void ScrollToIfAttached(ScrollView view, VisualElement target)
-        {
-            // A scheduled scroll can run after the map was rebuilt; the old tile is then no longer in the view.
-            if (view != null && target != null && view.contentContainer.Contains(target))
-                view.ScrollTo(target);
-        }
-
-        private void RenderMapSummary()
-        {
-            RenderMapSummary(false);
-        }
-
-        /// <summary>Rebuilds the map view; with <paramref name="onlyIfTileSizeChanged"/> it keeps the current view when the fitted tile size is unchanged.</summary>
-        private void RenderMapSummary(bool onlyIfTileSizeChanged)
-        {
-            var container = mapContent;
-            var summary = currentSummary;
-            if (container == null || summary == null)
-                return;
-
-            const float tileGap = 10f;
-            int minX = 0, maxX = 0, minY = 0, maxY = 0;
-            var tilePixels = -1f;
-            if (summary.Tiles.Count > 0)
-            {
-                minX = maxX = summary.Tiles[0].X;
-                minY = maxY = summary.Tiles[0].Y;
-                foreach (var tile in summary.Tiles)
-                {
-                    minX = Math.Min(minX, tile.X);
-                    maxX = Math.Max(maxX, tile.X);
-                    minY = Math.Min(minY, tile.Y);
-                    maxY = Math.Max(maxY, tile.Y);
-                }
-                tilePixels = GetTilePixelSize(maxX - minX + 1, maxY - minY + 1, tileGap);
-            }
-
-            if (onlyIfTileSizeChanged && Mathf.Abs(tilePixels - renderedTilePixels) < 0.5f)
-                return;
-
-            renderedTilePixels = tilePixels;
-            container.Clear();
-            tileVisuals.Clear();
-            selectedTileVisual = null;
-            if (summary.Tiles.Count > 0)
-            {
-                var columns = maxX - minX + 1;
-                var rows = maxY - minY + 1;
-                var mapGrid = new VisualElement();
-                mapGrid.AddToClassList("map-grid");
-                mapGrid.style.width = columns * (tilePixels + tileGap) - tileGap;
-                mapGrid.style.height = rows * (tilePixels + tileGap) - tileGap;
-                foreach (var tile in summary.Tiles)
-                {
-                    var visualTile = new MapTileVisualElement(tile, splineIndex?.GetSegments(tile.X, tile.Y), summary.TileSizeMeters, tilePixels >= 112f,
-                        ReferenceEquals(tile, selectedTile), SelectTile, SelectObjectFromMap);
-                    if (ReferenceEquals(tile, selectedTile))
-                        visualTile.SetSelectedObject(selectedObjectId);
-                    visualTile.style.left = (tile.X - minX) * (tilePixels + tileGap);
-                    visualTile.style.top = (maxY - tile.Y) * (tilePixels + tileGap);
-                    visualTile.style.width = tilePixels;
-                    visualTile.style.height = tilePixels;
-                    mapGrid.Add(visualTile);
-                    tileVisuals[tile] = visualTile;
-                    if (ReferenceEquals(tile, selectedTile))
-                        selectedTileVisual = visualTile;
-                }
-                container.Add(mapGrid);
-                var scrollTarget = selectedTileVisual;
-                if (scrollTarget != null)
-                    container.schedule.Execute(() => ScrollToIfAttached(container, scrollTarget));
-            }
-
-            foreach (var warning in summary.Warnings)
-            {
-                var warningLabel = new Label(warning);
-                warningLabel.AddToClassList("map-warning");
-                container.Add(warningLabel);
-            }
-
-            var source = new Label("Source: " + summary.RootPath);
-            source.AddToClassList("map-source");
-            container.Add(source);
-        }
-
-        private float GetTilePixelSize(int columns, int rows, float tileGap)
-        {
-            const float padding = 48f;
-            // Room for a scrollbar, so the fitted size does not depend on whether one is currently shown.
-            const float scrollbarReserve = 16f;
-            const float maximum = 200f;
-            const float minimum = 56f;
-            var availableWidth = mapContent.resolvedStyle.width - padding - scrollbarReserve;
-            var availableHeight = mapContent.resolvedStyle.height - padding - scrollbarReserve;
-            if (float.IsNaN(availableWidth) || availableWidth <= 0f)
-                availableWidth = minimum * columns;
-            if (float.IsNaN(availableHeight) || availableHeight <= 0f)
-                availableHeight = minimum * rows;
-
-            var widthFit = (availableWidth - tileGap * (columns - 1)) / columns;
-            var heightFit = (availableHeight - tileGap * (rows - 1)) / rows;
-            var fitSize = Mathf.Clamp(Mathf.Min(maximum, widthFit, heightFit), minimum, maximum);
-            return fitMapToViewport ? fitSize : Mathf.Clamp(fitSize * zoomScale, minimum, maximum * 2f);
-        }
         private void RenderProjectBrowser()
         {
             if (projectPanel == null)
@@ -852,22 +873,28 @@ namespace OmsiMapEditor.UI
             foreach (var tile in currentSummary.Tiles)
             {
                 var capturedTile = tile;
-                var entry = new Button(() => SelectTile(capturedTile))
-                {
-                    text = "Tile " + tile.X + ", " + tile.Y + "     " + tile.ObjectCount + " obj  /  " + tile.SplineCount + " spl" +
-                           (IsTileEdited(tile) ? "  • edited" : string.Empty)
-                };
+                var entry = new Button(() => SelectTile(capturedTile, true));
                 entry.AddToClassList("browser-tile-entry");
-                if (IsTileEdited(tile))
-                    entry.AddToClassList("browser-tile-entry-edited");
                 if (ReferenceEquals(tile, selectedTile))
                     entry.AddToClassList("browser-tile-entry-selected");
                 if (!tile.IsAvailable)
                     entry.AddToClassList("browser-tile-entry-missing");
                 tileList.Add(entry);
                 browserEntries[tile] = entry;
+                UpdateBrowserEntry(tile);
             }
             projectPanel.Add(tileList);
+        }
+
+        /// <summary>Refreshes one tile list entry, for example its edited marker, without rebuilding the list.</summary>
+        private void UpdateBrowserEntry(OmsiTileSummary tile)
+        {
+            if (!browserEntries.TryGetValue(tile, out var entry))
+                return;
+            var edited = IsTileEdited(tile);
+            entry.text = "Tile " + tile.X + ", " + tile.Y + "     " + tile.ObjectCount + " obj  /  " + tile.SplineCount + " spl" +
+                         (edited ? "  • edited" : string.Empty);
+            entry.EnableInClassList("browser-tile-entry-edited", edited);
         }
 
         private void RenderInspector()
@@ -905,7 +932,6 @@ namespace OmsiMapEditor.UI
             // The object editor scrolls together with the record lists, so neither squeezes the other.
             var records = new ScrollView(ScrollViewMode.Vertical);
             records.AddToClassList("inspector-records");
-            var selectedObject = selectedObjectId.HasValue ? selectedTile.Objects.Find(item => item.Id == selectedObjectId.Value) : null;
             if (selectedObject != null)
                 AddObjectEditor(records, selectedObject);
             else if (IsTileEdited(selectedTile))
@@ -923,9 +949,9 @@ namespace OmsiMapEditor.UI
                               "  H " + item.Height.ToString("F1") + " m  •  " + item.HeadingDegrees.ToString("F1") + "°";
                 var record = AddInspectorRecord(records, details, "inspector-record");
                 record.AddToClassList("inspector-record-clickable");
-                record.EnableInClassList("inspector-record-selected", item.Id == selectedObjectId);
-                var objectId = item.Id;
-                record.RegisterCallback<ClickEvent>(_ => SelectObject(objectId));
+                record.EnableInClassList("inspector-record-selected", ReferenceEquals(item, selectedObject));
+                var capturedItem = item;
+                record.RegisterCallback<ClickEvent>(_ => SelectObject(selectedTile, capturedItem, true));
             }
 
             var splinesHeading = new Label("SPLINE PLACEMENTS");

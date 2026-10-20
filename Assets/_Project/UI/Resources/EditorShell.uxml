@@ -21,21 +21,23 @@
                     <ui:Label name="map-title" text="MAP VIEW" class="viewport-label" />
                     <ui:Label name="map-counts" class="map-counts" style="display: none;" />
                     <ui:Label name="map-description" text="Open an OMSI map to inspect its tiles and records." class="map-description muted" />
+                    <ui:Label name="map-warnings" class="map-warnings" style="display: none;" />
                     <ui:VisualElement name="map-legend" class="map-legend" style="display: none;">
                         <ui:Label text="Splines" class="map-legend-spline" />
                         <ui:Label text="Objects" class="map-legend-object" />
+                        <ui:Label text="Selected" class="map-legend-selected" />
                     </ui:VisualElement>
                     <ui:VisualElement name="map-controls" class="map-controls" style="display: none;">
                         <ui:Button name="fit-map-button" text="Fit map" class="map-control-button" />
                         <ui:Button name="zoom-out-button" text="-" class="map-control-button map-zoom-button" />
                         <ui:Label name="zoom-label" text="Fit" class="zoom-label" />
                         <ui:Button name="zoom-in-button" text="+" class="map-control-button map-zoom-button" />
-                        <ui:Button name="center-selection-button" text="Center selected tile" class="map-control-button" />
+                        <ui:Button name="center-selection-button" text="Center selection" class="map-control-button" />
+                        <ui:Label name="map-hint" class="map-hint" style="display: none;" />
                     </ui:VisualElement>
                     <ui:Button name="empty-state-open-button" text="Open OMSI map..." class="primary-button" />
                 </ui:VisualElement>
-                <ui:ScrollView name="map-content" class="map-content" mode="VerticalAndHorizontal">
-                </ui:ScrollView>
+                <ui:VisualElement name="map-view" class="map-view" />
             </ui:VisualElement>
             <ui:VisualElement name="inspector-panel" class="side-panel inspector">
                 <ui:Label text="INSPECTOR" class="panel-heading" />

@@ -96,6 +96,33 @@ namespace OmsiMapEditor.OMSI
             return changed;
         }
 
+        /// <summary>
+        /// Same as <see cref="UpdateObject(string,int,double,double,double,double)"/> and also updates the object in a
+        /// summary read from this session, so the map does not have to be read again. The record receives the values
+        /// as written to the file.
+        /// </summary>
+        public bool UpdateObject(OmsiTileSummary tile, OmsiObjectRecord record, double x, double y, double z, double headingDegrees)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+
+            if (!UpdateObject(tile.FileName, record.Id, x, y, z, headingDegrees))
+                return false;
+            record.LocalX = AsWritten(x);
+            record.LocalY = AsWritten(y);
+            record.Height = AsWritten(z);
+            record.HeadingDegrees = AsWritten(headingDegrees);
+            return true;
+        }
+
+        private static double AsWritten(double value)
+        {
+            return double.Parse(OmsiNumberFormat.Format(value), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         /// <summary>Discards the workspace copy of a tile, so the original is shown again.</summary>
         public void RevertTile(string tileFileName)
         {

@@ -80,11 +80,21 @@ namespace OmsiMapEditor.OMSI
             return result;
         }
 
-        /// <summary>Saves an edited file into the workspace. The original map is not touched.</summary>
+        /// <summary>
+        /// Saves an edited file into the workspace. The original map is not touched. Content identical to the
+        /// original removes the workspace copy instead, so undoing every edit leaves nothing behind.
+        /// </summary>
         public void Save(string relativePath, byte[] bytes)
         {
             if (bytes == null)
                 throw new ArgumentNullException(nameof(bytes));
+
+            var original = OmsiRelativePath.Resolve(RootPath, relativePath);
+            if (File.Exists(original) && SameBytes(File.ReadAllBytes(original), bytes))
+            {
+                Revert(relativePath);
+                return;
+            }
 
             var target = WorkspaceFile(relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(target));
@@ -109,6 +119,16 @@ namespace OmsiMapEditor.OMSI
             var edited = WorkspaceFile(relativePath);
             if (File.Exists(edited))
                 File.Delete(edited);
+        }
+
+        private static bool SameBytes(byte[] first, byte[] second)
+        {
+            if (first.Length != second.Length)
+                return false;
+            for (var index = 0; index < first.Length; index++)
+                if (first[index] != second[index])
+                    return false;
+            return true;
         }
 
         private string WorkspaceFile(string relativePath)
