@@ -82,8 +82,8 @@ namespace OmsiMapEditor.OMSI
         public double RadiusMeters { get; internal set; }
 
         /// <summary>
-        /// True when the record comes from a [spline_h] section. It shares the leading fields of [spline] and has at
-        /// least one more field at the end whose meaning is not confirmed yet.
+        /// True when the record comes from a [spline_h] section. It shares the leading fields of [spline] and inserts
+        /// the height difference between start and end as field 13; cant, skew and alignment move back by one.
         /// </summary>
         public bool IsSplineH { get; internal set; }
     }

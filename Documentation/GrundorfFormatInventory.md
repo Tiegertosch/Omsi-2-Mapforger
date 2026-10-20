@@ -22,7 +22,7 @@ Der Batch-Mode kann denselben Parser aufrufen. Setze `OMSI_MAP_CONFIG` auf die `
 
 ## Weitere installierte Karten
 
-Am 19. Oktober 2026 wurde derselbe Leser lesend gegen die beiden anderen Karten der lokalen Installation geprüft. In allen drei Karten kommen innerhalb der gelesenen Objekt- und Splinefelder keine Leerzeilen vor; alle gezählten Objekte und Splines wurden dekodiert. Seit dem 20. Oktober 2026 liest der Leser auch `[spline_h]`-Abschnitte. Sie haben dieselben ersten elf Felder wie `[spline]` und mindestens ein weiteres Feld am Ende, dessen Bedeutung noch offen ist. Die Spline-Zahlen unten schließen sie ein.
+Am 19. Oktober 2026 wurde derselbe Leser lesend gegen die beiden anderen Karten der lokalen Installation geprüft. In allen drei Karten kommen innerhalb der gelesenen Objekt- und Splinefelder keine Leerzeilen vor; alle gezählten Objekte und Splines wurden dekodiert. Seit dem 20. Oktober 2026 liest der Leser auch `[spline_h]`-Abschnitte. Sie haben dieselben ersten elf Felder wie `[spline]` und zusätzlich den Höhenunterschied als Feld 13 (siehe [TileRecordInventory.md](TileRecordInventory.md)). Die Spline-Zahlen unten schließen sie ein.
 
 | Karte | Kacheln | Objekte | Splines | Anbindungen | Terrain | Hinweise |
 |---|---|---|---|---|---|---|

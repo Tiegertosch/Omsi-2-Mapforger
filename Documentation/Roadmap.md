@@ -40,6 +40,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Exakte Kachelgeometrie von `[worldcoordinates]`-Karten aus der Kachelnummer ableiten; die feste Kante weicht bis etwa 0,35 m ab
 - Objekte darstellen, die OMSI mit Koordinaten außerhalb ihrer eigenen Kachel speichert (18 in Berlin-Spandau)
 - Spline-Datensätze vor Kachelversion 11 dekodieren
+- [x] Vollständige Kachel-Datensätze und `global.cfg` untersuchen (siehe [TileRecordInventory.md](TileRecordInventory.md))
+- Kachel-Datensätze verlustfrei lesen und unverändert zurückschreiben können
+- Neue IDs aus `[NextIDCode]` und höchster vorhandener ID vergeben
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
 - Haltestellen und Linienverläufe in der Kartenübersicht darstellen
 - Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern
