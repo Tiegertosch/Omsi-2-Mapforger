@@ -23,12 +23,26 @@ namespace OmsiMapEditor.OMSI
             if (!File.Exists(fullConfigPath))
                 throw new FileNotFoundException("The selected global.cfg file does not exist.", fullConfigPath);
 
-            var rootPath = Path.GetDirectoryName(fullConfigPath);
-            var sections = ReadSections(fullConfigPath, OmsiGlobalConfigLayouts.Instance);
+            return Read(new OmsiFolderSource(Path.GetDirectoryName(fullConfigPath)), Path.GetFileName(fullConfigPath));
+        }
+
+        /// <summary>
+        /// Reads a map through a file source, for example a project workspace that overlays edited files on the
+        /// original map. <see cref="OmsiMapSummary.RootPath"/> stays the original map folder.
+        /// </summary>
+        public static OmsiMapSummary Read(IOmsiFileSource source, string globalConfigRelativePath = "global.cfg")
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            if (!source.FileExists(globalConfigRelativePath))
+                throw new FileNotFoundException("The map has no " + globalConfigRelativePath + ".",
+                    Path.Combine(source.RootPath, globalConfigRelativePath));
+
+            var sections = ReadSections(source, globalConfigRelativePath, OmsiGlobalConfigLayouts.Instance);
             var summary = new OmsiMapSummary
             {
-                RootPath = rootPath,
-                GlobalConfigPath = fullConfigPath,
+                RootPath = source.RootPath,
+                GlobalConfigPath = OmsiRelativePath.Resolve(source.RootPath, globalConfigRelativePath),
                 Name = FirstValue(sections, "name"),
                 FriendlyName = FirstValue(sections, "friendlyname"),
                 Description = SectionText(sections, "description")
@@ -53,10 +67,12 @@ namespace OmsiMapEditor.OMSI
                     continue;
                 }
 
-                var relativeTilePath = values[2].Replace('\\', Path.DirectorySeparatorChar)
-                    .Replace('/', Path.DirectorySeparatorChar);
-                var fullTilePath = Path.GetFullPath(Path.Combine(rootPath, relativeTilePath));
-                if (!IsWithinDirectory(rootPath, fullTilePath))
+                string relativeTilePath;
+                try
+                {
+                    relativeTilePath = OmsiRelativePath.Normalize(values[2]);
+                }
+                catch (ArgumentException)
                 {
                     summary.Warnings.Add("Ignored a tile path outside the selected map folder: " + values[2]);
                     continue;
@@ -67,12 +83,12 @@ namespace OmsiMapEditor.OMSI
                     X = tileX,
                     Y = tileY,
                     FileName = values[2],
-                    IsAvailable = File.Exists(fullTilePath)
+                    IsAvailable = source.FileExists(relativeTilePath)
                 };
 
                 if (tile.IsAvailable)
                 {
-                    ReadTile(fullTilePath, tile, summary);
+                    ReadTile(source, relativeTilePath, tile, summary);
                     summary.ObjectCount += tile.ObjectCount;
                     summary.SplineCount += tile.SplineCount;
                     summary.AttachmentCount += tile.AttachmentCount;
@@ -102,9 +118,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Oldest tile version whose [spline] records carry separate previous and next IDs.</summary>
         private const int FirstVersionWithSplineNeighbourIds = 11;
 
-        private static void ReadTile(string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
+        private static void ReadTile(IOmsiFileSource source, string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
         {
-            var sections = ReadSections(tilePath, OmsiTileRecordLayouts.Instance);
+            var sections = ReadSections(source, tilePath, OmsiTileRecordLayouts.Instance);
             var version = ReadTileVersion(sections);
             var decodeSplines = version < 0 || version >= FirstVersionWithSplineNeighbourIds;
             var skippedOldSplines = 0;
@@ -141,7 +157,7 @@ namespace OmsiMapEditor.OMSI
                                      " spline(s) use an older field layout and were counted but not decoded.");
 
             var terrainPath = tilePath + ".terrain";
-            if (TryReadTerrainRange(terrainPath, out var minHeight, out var maxHeight))
+            if (source.FileExists(terrainPath) && TryReadTerrainRange(source.ReadAllBytes(terrainPath), out var minHeight, out var maxHeight))
             {
                 tile.HasTerrain = true;
                 tile.TerrainMinHeight = minHeight;
@@ -234,7 +250,7 @@ namespace OmsiMapEditor.OMSI
             return true;
         }
 
-        private static bool TryReadTerrainRange(string path, out float minHeight, out float maxHeight)
+        private static bool TryReadTerrainRange(byte[] bytes, out float minHeight, out float maxHeight)
         {
             minHeight = 0f;
             maxHeight = 0f;
@@ -243,10 +259,7 @@ namespace OmsiMapEditor.OMSI
             const int terrainValueCount = terrainResolution * terrainResolution;
             const int expectedLength = sizeof(int) + terrainValueCount * sizeof(float);
 
-            if (!File.Exists(path))
-                return false;
-
-            using (var stream = File.OpenRead(path))
+            using (var stream = new MemoryStream(bytes, false))
             using (var reader = new BinaryReader(stream))
             {
                 if (stream.Length != expectedLength || reader.ReadInt32() != terrainHeader)
@@ -276,9 +289,9 @@ namespace OmsiMapEditor.OMSI
         /// Reads a file's sections through <see cref="OmsiRecordFile"/>. With tile layouts, records are read
         /// positionally, so a label that looks like a section header stays part of its record.
         /// </summary>
-        private static List<Section> ReadSections(string path, IOmsiRecordLayouts layouts = null)
+        private static List<Section> ReadSections(IOmsiFileSource source, string relativePath, IOmsiRecordLayouts layouts)
         {
-            var file = OmsiRecordFile.Load(path, layouts);
+            var file = OmsiRecordFile.Parse(source.ReadAllBytes(relativePath), layouts);
             var result = new List<Section>(file.Records.Count);
             foreach (var record in file.Records)
             {
@@ -334,13 +347,6 @@ namespace OmsiMapEditor.OMSI
             foreach (var rawLine in section.Lines)
                 result.Add(rawLine.Trim());
             return result;
-        }
-
-        private static bool IsWithinDirectory(string directory, string path)
-        {
-            var root = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                + Path.DirectorySeparatorChar;
-            return path.StartsWith(root, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

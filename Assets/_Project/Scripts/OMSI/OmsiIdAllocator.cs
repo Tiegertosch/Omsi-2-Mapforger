@@ -82,8 +82,18 @@ namespace OmsiMapEditor.OMSI
         public static OmsiIdAllocator ForMap(string globalConfigPath)
         {
             var configPath = Path.GetFullPath(globalConfigPath);
-            var root = Path.GetDirectoryName(configPath);
-            var config = OmsiRecordFile.Load(configPath, OmsiGlobalConfigLayouts.Instance);
+            return ForMap(new OmsiFolderSource(Path.GetDirectoryName(configPath)), Path.GetFileName(configPath));
+        }
+
+        /// <summary>
+        /// Same as <see cref="ForMap(string)"/> through a file source, so a workspace's edited tiles count. Chrono
+        /// tiles are always read from the original map folder because the workspace does not list them.
+        /// </summary>
+        public static OmsiIdAllocator ForMap(IOmsiFileSource source, string globalConfigRelativePath = "global.cfg")
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            var config = OmsiRecordFile.Parse(source.ReadAllBytes(globalConfigRelativePath), OmsiGlobalConfigLayouts.Instance);
 
             var nextIdCode = 0;
             var tileFiles = new List<string>();
@@ -92,20 +102,28 @@ namespace OmsiMapEditor.OMSI
                 if (string.Equals(record.Name, "NextIDCode", StringComparison.OrdinalIgnoreCase) && record.TryGetInt(0, out var value))
                     nextIdCode = value;
                 else if (string.Equals(record.Name, "map", StringComparison.OrdinalIgnoreCase) && record.Fields.Count == 3)
-                    tileFiles.Add(Path.GetFullPath(Path.Combine(root, record.GetField(2).Replace('\\', Path.DirectorySeparatorChar))));
+                    tileFiles.Add(record.GetField(2));
             }
 
-            var chronoFolder = Path.Combine(root, "Chrono");
+            var chronoFolder = Path.Combine(source.RootPath, "Chrono");
             if (Directory.Exists(chronoFolder))
-                tileFiles.AddRange(Directory.GetFiles(chronoFolder, "tile_*.map", SearchOption.AllDirectories));
+                foreach (var path in Directory.GetFiles(chronoFolder, "tile_*.map", SearchOption.AllDirectories))
+                    tileFiles.Add(path.Substring(source.RootPath.Length).TrimStart(Path.DirectorySeparatorChar));
 
             var ids = new List<int>();
-            var rootPrefix = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             foreach (var tile in tileFiles)
             {
-                if (!tile.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) || !File.Exists(tile))
+                string relative;
+                try
+                {
+                    relative = OmsiRelativePath.Normalize(tile);
+                }
+                catch (ArgumentException)
+                {
                     continue;
-                ids.AddRange(OmsiTileRecords.DefinedIds(OmsiRecordFile.Load(tile, OmsiTileRecordLayouts.Instance)));
+                }
+                if (source.FileExists(relative))
+                    ids.AddRange(OmsiTileRecords.DefinedIds(OmsiRecordFile.Parse(source.ReadAllBytes(relative), OmsiTileRecordLayouts.Instance)));
             }
 
             return new OmsiIdAllocator(nextIdCode, ids);
