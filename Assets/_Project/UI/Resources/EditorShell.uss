@@ -34,7 +34,7 @@
 .map-description { align-self: flex-start; margin-bottom: 14px; color: rgb(153, 165, 178); white-space: normal; }
 .map-legend { align-self: flex-start; flex-direction: row; margin-bottom: 8px; }
 .map-legend-spline { margin-right: 16px; color: rgb(242, 181, 77); }
-.map-legend-object { color: rgb(143, 209, 240); }
+.map-legend-object { margin-right: 0; color: rgb(143, 209, 240); }
 .map-controls { flex-direction: row; align-items: center; margin-bottom: 8px; }
 .map-control-button { height: 28px; margin-right: 6px; padding-left: 10px; padding-right: 10px; color: rgb(218, 225, 233); background-color: rgb(40, 48, 57); border-width: 1px; border-color: rgb(63, 75, 87); }
 .map-control-button:hover { background-color: rgb(55, 67, 78); }
@@ -77,3 +77,4 @@
 .map-warnings { align-self: flex-start; margin-bottom: 8px; font-size: 11px; color: rgb(238, 190, 110); white-space: normal; }
 .map-hint { margin-left: 10px; font-size: 10px; color: rgb(139, 154, 169); white-space: normal; flex-shrink: 1; }
 .map-legend-selected { margin-left: 16px; color: rgb(255, 92, 107); }
+.map-legend-tree { margin-left: 16px; color: rgb(115, 199, 128); }

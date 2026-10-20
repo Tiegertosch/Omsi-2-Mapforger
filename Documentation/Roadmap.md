@@ -50,6 +50,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Erste Bearbeitung in der App: Objekte auswählen, Position und Richtung ändern, in der Arbeitskopie speichern, Kachel zurücksetzen und als eigene Karte exportieren
 - [x] Exportierte Karte in OMSI laden und die geänderten Objekte im Spiel prüfen (20. Oktober 2026: verschobene Scheune in Grundorf im Spiel sichtbar)
 - [x] Durchgehende 2D-Draufsicht mit Zoom und Verschieben; Objekte per Ziehen verschieben, am Griff drehen und Änderungen rückgängig machen
+- [x] `.sco`- und `.o3d`-Dateien analysieren und Objekte mit ihren Umrissen darstellen (siehe [SceneryObjectInventory.md](SceneryObjectInventory.md))
+- Genauere, nicht konvexe Umrisse für L-förmige Gebäude, große Kreuzungen und Plätze
 - Mehrere Objekte gleichzeitig auswählen und verschieben
 - Objekte beim Verschieben über eine Kachelgrenze in die neue Kachel übernehmen; bisher behalten sie ihre Kachel mit Koordinaten außerhalb davon
 - Objekte in der App anlegen und löschen; die Bausteine dafür stehen in `OmsiTileEditing`

@@ -36,6 +36,24 @@ namespace OmsiMapEditor.UI
         private static readonly Color32 ObjectColor = new Color(0.56f, 0.82f, 0.94f, 0.95f);
         private static readonly Color HeadingColor = new Color(0.56f, 0.82f, 0.94f, 0.55f);
         private static readonly Color SelectedObjectColor = new Color(1f, 0.36f, 0.42f, 1f);
+        private static readonly Color OutlineFillColor = new Color(0.42f, 0.55f, 0.66f, 0.38f);
+        private static readonly Color OutlineStrokeColor = new Color(0.62f, 0.78f, 0.9f, 0.85f);
+        private static readonly Color TreeFillColor = new Color(0.32f, 0.62f, 0.36f, 0.32f);
+        private static readonly Color TreeStrokeColor = new Color(0.45f, 0.78f, 0.5f, 0.7f);
+
+        /// <summary>Outlines are drawn from this scale on; further out the map shows markers only.</summary>
+        private const float OutlineMetersPerPixel = 1.5f;
+
+        /// <summary>An outline in the object frame with its extent, for culling and picking.</summary>
+        private sealed class Footprint
+        {
+            public Vector2[] Points;
+            public float Radius;
+            public float Area;
+            public bool IsTree;
+        }
+
+        private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
         private enum DragMode { None, Pan, MovePending, Move, Rotate }
 
@@ -127,6 +145,49 @@ namespace OmsiMapEditor.UI
         public void Refresh()
         {
             MarkDirtyRepaint();
+        }
+
+        /// <summary>Object outlines by asset path, as the outline catalog computed them; null clears them.</summary>
+        public void SetOutlines(IReadOnlyDictionary<string, OmsiObjectOutline> outlines)
+        {
+            footprints.Clear();
+            if (outlines != null)
+            {
+                foreach (var pair in outlines)
+                {
+                    var points = pair.Value?.Points;
+                    if (points == null || points.Length < 2)
+                        continue;
+                    var footprint = new Footprint { Points = new Vector2[points.Length], IsTree = pair.Value.Source == OmsiOutlineSource.Tree };
+                    for (var index = 0; index < points.Length; index++)
+                    {
+                        footprint.Points[index] = new Vector2((float)points[index].X, (float)points[index].Y);
+                        footprint.Radius = Mathf.Max(footprint.Radius, footprint.Points[index].magnitude);
+                    }
+                    footprint.Area = Mathf.Abs(PolygonArea(footprint.Points));
+                    footprints[pair.Key] = footprint;
+                }
+            }
+            MarkDirtyRepaint();
+        }
+
+        public int OutlineCount => footprints.Count;
+
+        private static float PolygonArea(Vector2[] points)
+        {
+            var area = 0f;
+            for (int index = 0, previous = points.Length - 1; index < points.Length; previous = index++)
+                area += points[previous].x * points[index].y - points[index].x * points[previous].y;
+            return area * 0.5f;
+        }
+
+        /// <summary>
+        /// Object frame to map: OMSI headings turn clockwise, so a local point (x right, y forward) rotates by
+        /// -heading around the object position.
+        /// </summary>
+        private static Vector2 ObjectToMap(Vector2 local, Vector2 position, float sin, float cos)
+        {
+            return new Vector2(position.x + local.x * cos + local.y * sin, position.y - local.x * sin + local.y * cos);
         }
 
         public void FitToMap()
@@ -257,6 +318,7 @@ namespace OmsiMapEditor.UI
             var visible = VisibleMapRect(16f);
             var painter = context.painter2D;
             DrawTiles(painter, visible);
+            DrawOutlines(painter, visible);
             DrawSplines(painter, visible);
             DrawObjects(context, painter, visible);
             DrawSelection(painter);
@@ -302,6 +364,56 @@ namespace OmsiMapEditor.UI
                 AddRect(painter, TileRect(selectedTile));
                 painter.Stroke();
             }
+        }
+
+        private void DrawOutlines(Painter2D painter, Rect visible)
+        {
+            if (footprints.Count == 0 || metersPerPixel > OutlineMetersPerPixel)
+                return;
+
+            // Two passes so trees and other objects can be filled in one path each.
+            for (var pass = 0; pass < 2; pass++)
+            {
+                var trees = pass == 0;
+                painter.fillColor = trees ? TreeFillColor : OutlineFillColor;
+                painter.strokeColor = trees ? TreeStrokeColor : OutlineStrokeColor;
+                painter.lineWidth = 1f;
+                painter.BeginPath();
+                var any = false;
+                foreach (var tile in summary.Tiles)
+                {
+                    foreach (var item in tile.Objects)
+                    {
+                        if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.IsTree != trees)
+                            continue;
+                        var dragging = ReferenceEquals(item, selectedObject) && IsDraggingObject();
+                        var position = dragging ? ToMap(tile, previewLocalX, previewLocalY) : ToMap(tile, item.LocalX, item.LocalY);
+                        if (footprint.Radius / metersPerPixel < 1.5f ||
+                            position.x + footprint.Radius < visible.xMin || position.x - footprint.Radius > visible.xMax ||
+                            position.y + footprint.Radius < visible.yMin || position.y - footprint.Radius > visible.yMax)
+                            continue;
+                        AddFootprint(painter, footprint, position, dragging ? previewHeading : item.HeadingDegrees);
+                        any = true;
+                    }
+                }
+                if (any)
+                {
+                    painter.Fill();
+                    painter.Stroke();
+                }
+            }
+        }
+
+        private void AddFootprint(Painter2D painter, Footprint footprint, Vector2 position, double headingDegrees)
+        {
+            var heading = (float)(headingDegrees * Math.PI / 180.0);
+            var sin = Mathf.Sin(heading);
+            var cos = Mathf.Cos(heading);
+            painter.MoveTo(MapToScreen(ObjectToMap(footprint.Points[0], position, sin, cos)));
+            for (var index = 1; index < footprint.Points.Length; index++)
+                painter.LineTo(MapToScreen(ObjectToMap(footprint.Points[index], position, sin, cos)));
+            if (footprint.Points.Length > 2)
+                painter.ClosePath();
         }
 
         private void AddRect(Painter2D painter, Rect rect)
@@ -417,6 +529,15 @@ namespace OmsiMapEditor.UI
             var handle = HandleScreen(screen);
             painter.strokeColor = SelectedObjectColor;
             painter.lineWidth = 2f;
+            if (footprints.TryGetValue(selectedObject.AssetPath, out var selectedFootprint))
+            {
+                var dragging = IsDraggingObject();
+                painter.BeginPath();
+                AddFootprint(painter, selectedFootprint,
+                    dragging ? ToMap(selectedTile, previewLocalX, previewLocalY) : ToMap(selectedTile, selectedObject.LocalX, selectedObject.LocalY),
+                    dragging ? previewHeading : selectedObject.HeadingDegrees);
+                painter.Stroke();
+            }
             painter.BeginPath();
             painter.Arc(screen, 7f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
             painter.Stroke();
@@ -665,7 +786,47 @@ namespace OmsiMapEditor.UI
                     }
                 }
             }
+            if (pickedItem != null || footprints.Count == 0 || metersPerPixel > OutlineMetersPerPixel)
+                return pickedItem != null;
+
+            // No marker nearby: take the smallest outline that contains the point.
+            var smallest = float.MaxValue;
+            foreach (var tile in summary.Tiles)
+            {
+                foreach (var item in tile.Objects)
+                {
+                    if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.Area >= smallest)
+                        continue;
+                    var position = ToMap(tile, item.LocalX, item.LocalY);
+                    if (Mathf.Abs(position.x - map.x) > footprint.Radius || Mathf.Abs(position.y - map.y) > footprint.Radius)
+                        continue;
+                    var heading = (float)(item.HeadingDegrees * Math.PI / 180.0);
+                    // Map to object frame: the inverse rotation of ObjectToMap.
+                    var dx = map.x - position.x;
+                    var dy = map.y - position.y;
+                    var local = new Vector2(dx * Mathf.Cos(heading) - dy * Mathf.Sin(heading), dx * Mathf.Sin(heading) + dy * Mathf.Cos(heading));
+                    if (footprint.Points.Length > 2 && Contains(footprint.Points, local))
+                    {
+                        smallest = footprint.Area;
+                        pickedTile = tile;
+                        pickedItem = item;
+                    }
+                }
+            }
             return pickedItem != null;
+        }
+
+        private static bool Contains(Vector2[] polygon, Vector2 point)
+        {
+            var inside = false;
+            for (int index = 0, previous = polygon.Length - 1; index < polygon.Length; previous = index++)
+            {
+                if ((polygon[index].y > point.y) != (polygon[previous].y > point.y) &&
+                    point.x < (polygon[previous].x - polygon[index].x) * (point.y - polygon[index].y) /
+                    (polygon[previous].y - polygon[index].y) + polygon[index].x)
+                    inside = !inside;
+            }
+            return inside;
         }
 
         private OmsiTileSummary TileAt(Vector2 map)

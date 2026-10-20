@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using OmsiMapEditor.Core;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
@@ -53,6 +54,11 @@ namespace OmsiMapEditor.UI
         private TextField exportNameField;
         private Label exportTargetLabel;
         private Button exportConfirmButton;
+
+        // Object outlines are computed in the background and kept per OMSI installation.
+        private readonly Dictionary<string, OmsiObjectOutline> outlineCache = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
+        private string outlineInstallationRoot;
+        private int outlineBuildGeneration;
 
         private void Awake()
         {
@@ -309,6 +315,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.SetMap(summary, keepView);
                 mapCanvas.SetSelection(selectedTile, selectedObject);
             }
+            StartOutlineBuild(summary);
             UpdateMapHeader();
             RenderProjectBrowser();
             RenderInspector();
@@ -317,6 +324,71 @@ namespace OmsiMapEditor.UI
                       (session.CanEdit ? " through the project workspace" : " read-only from the OMSI installation"));
             if (toolsButton != null)
                 toolsButton.SetEnabled(true);
+        }
+
+        /// <summary>
+        /// Computes the outlines of every object kind the map uses on a worker thread; meshes are read from the OMSI
+        /// installation. The map stays usable meanwhile and shows outlines once they are ready.
+        /// </summary>
+        private void StartOutlineBuild(OmsiMapSummary summary)
+        {
+            if (mapCanvas == null)
+                return;
+
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
+            if (!string.Equals(root, outlineInstallationRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                outlineCache.Clear();
+                outlineInstallationRoot = root;
+            }
+
+            var missing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var kinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tile in summary.Tiles)
+                foreach (var item in tile.Objects)
+                    if (kinds.Add(item.AssetPath) && !outlineCache.ContainsKey(item.AssetPath))
+                        missing.Add(item.AssetPath);
+            if (missing.Count == 0)
+            {
+                mapCanvas.SetOutlines(outlineCache);
+                return;
+            }
+
+            var generation = ++outlineBuildGeneration;
+            var task = Task.Run(() =>
+            {
+                var catalog = new OmsiObjectOutlineCatalog(root);
+                var result = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
+                foreach (var assetPath in missing)
+                    result[assetPath] = catalog.Get(assetPath);
+                return result;
+            });
+
+            IVisualElementScheduledItem poll = null;
+            poll = mapCanvas.schedule.Execute(() =>
+            {
+                if (!task.IsCompleted)
+                    return;
+                poll.Pause();
+                // A newer map replaced this one while the outlines were computed.
+                if (generation != outlineBuildGeneration)
+                    return;
+                if (task.IsFaulted)
+                {
+                    Debug.LogException(task.Exception);
+                    SetStatus("Object outlines could not be computed: " + task.Exception?.GetBaseException().Message);
+                    return;
+                }
+
+                foreach (var pair in task.Result)
+                    outlineCache[pair.Key] = pair.Value;
+                mapCanvas.SetOutlines(outlineCache);
+                var withOutline = 0;
+                foreach (var kind in kinds)
+                    if (outlineCache.TryGetValue(kind, out var outline) && outline.Points.Length >= 2)
+                        withOutline++;
+                SetStatus("Object outlines ready for " + withOutline + " of " + kinds.Count + " object kinds. Zoom in to see them.");
+            }).Every(150);
         }
 
         /// <summary>Reads the map again through the same session, keeping the view.</summary>

@@ -25,6 +25,7 @@
                     <ui:VisualElement name="map-legend" class="map-legend" style="display: none;">
                         <ui:Label text="Splines" class="map-legend-spline" />
                         <ui:Label text="Objects" class="map-legend-object" />
+                        <ui:Label text="Trees" class="map-legend-tree" />
                         <ui:Label text="Selected" class="map-legend-selected" />
                     </ui:VisualElement>
                     <ui:VisualElement name="map-controls" class="map-controls" style="display: none;">
