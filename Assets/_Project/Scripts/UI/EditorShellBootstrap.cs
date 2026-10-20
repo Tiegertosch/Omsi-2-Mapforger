@@ -33,6 +33,7 @@ namespace OmsiMapEditor.UI
         private float zoomScale = 1f;
         private bool fitMapToViewport = true;
         private Vector2 lastMapViewportSize = new Vector2(-1f, -1f);
+        private float renderedTilePixels = -1f;
         private string currentProjectName = string.Empty;
 
         private void Awake()
@@ -67,8 +68,10 @@ namespace OmsiMapEditor.UI
             var helpMenu = root.Q<VisualElement>("help-menu");
             emptyStateOpenButton = root.Q<Button>("empty-state-open-button");
             mapContent = root.Q<ScrollView>("map-content");
+            // Measure the scroll view itself, not its inner viewport: the viewport shrinks whenever a scrollbar
+            // appears, which would change the fitted tile size and re-render the map in an endless loop.
             if (mapContent != null)
-                mapContent.contentViewport.RegisterCallback<GeometryChangedEvent>(OnMapViewportGeometryChanged);
+                mapContent.RegisterCallback<GeometryChangedEvent>(OnMapViewportGeometryChanged);
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
             mapTitleLabel = root.Q<Label>("map-title");
@@ -331,7 +334,7 @@ namespace OmsiMapEditor.UI
             selectedTileVisual = tileVisuals.TryGetValue(tile, out var visual) ? visual : null;
             var scrollTarget = selectedTileVisual;
             if (scrollTarget != null && mapContent != null)
-                mapContent.schedule.Execute(() => mapContent.ScrollTo(scrollTarget));
+                mapContent.schedule.Execute(() => ScrollToIfAttached(mapContent, scrollTarget));
             RenderInspector();
             SetStatus("Selected tile " + tile.X + ", " + tile.Y);
         }
@@ -464,26 +467,36 @@ namespace OmsiMapEditor.UI
 
             lastMapViewportSize = size;
             if (fitMapToViewport && currentSummary != null && mapContent != null)
-                mapContent.schedule.Execute(RenderMapSummary);
+                mapContent.schedule.Execute(() => RenderMapSummary(true));
+        }
+
+        private static void ScrollToIfAttached(ScrollView view, VisualElement target)
+        {
+            // A scheduled scroll can run after the map was rebuilt; the old tile is then no longer in the view.
+            if (view != null && target != null && view.contentContainer.Contains(target))
+                view.ScrollTo(target);
         }
 
         private void RenderMapSummary()
+        {
+            RenderMapSummary(false);
+        }
+
+        /// <summary>Rebuilds the map view; with <paramref name="onlyIfTileSizeChanged"/> it keeps the current view when the fitted tile size is unchanged.</summary>
+        private void RenderMapSummary(bool onlyIfTileSizeChanged)
         {
             var container = mapContent;
             var summary = currentSummary;
             if (container == null || summary == null)
                 return;
 
-            container.Clear();
-            tileVisuals.Clear();
-            selectedTileVisual = null;
+            const float tileGap = 10f;
+            int minX = 0, maxX = 0, minY = 0, maxY = 0;
+            var tilePixels = -1f;
             if (summary.Tiles.Count > 0)
             {
-                const float tileGap = 10f;
-                var minX = summary.Tiles[0].X;
-                var maxX = minX;
-                var minY = summary.Tiles[0].Y;
-                var maxY = minY;
+                minX = maxX = summary.Tiles[0].X;
+                minY = maxY = summary.Tiles[0].Y;
                 foreach (var tile in summary.Tiles)
                 {
                     minX = Math.Min(minX, tile.X);
@@ -491,10 +504,20 @@ namespace OmsiMapEditor.UI
                     minY = Math.Min(minY, tile.Y);
                     maxY = Math.Max(maxY, tile.Y);
                 }
+                tilePixels = GetTilePixelSize(maxX - minX + 1, maxY - minY + 1, tileGap);
+            }
 
+            if (onlyIfTileSizeChanged && Mathf.Abs(tilePixels - renderedTilePixels) < 0.5f)
+                return;
+
+            renderedTilePixels = tilePixels;
+            container.Clear();
+            tileVisuals.Clear();
+            selectedTileVisual = null;
+            if (summary.Tiles.Count > 0)
+            {
                 var columns = maxX - minX + 1;
                 var rows = maxY - minY + 1;
-                var tilePixels = GetTilePixelSize(columns, rows, tileGap);
                 var mapGrid = new VisualElement();
                 mapGrid.AddToClassList("map-grid");
                 mapGrid.style.width = columns * (tilePixels + tileGap) - tileGap;
@@ -515,7 +538,7 @@ namespace OmsiMapEditor.UI
                 container.Add(mapGrid);
                 var scrollTarget = selectedTileVisual;
                 if (scrollTarget != null)
-                    container.schedule.Execute(() => container.ScrollTo(scrollTarget));
+                    container.schedule.Execute(() => ScrollToIfAttached(container, scrollTarget));
             }
 
             foreach (var warning in summary.Warnings)
@@ -533,15 +556,16 @@ namespace OmsiMapEditor.UI
         private float GetTilePixelSize(int columns, int rows, float tileGap)
         {
             const float padding = 48f;
+            // Room for a scrollbar, so the fitted size does not depend on whether one is currently shown.
+            const float scrollbarReserve = 16f;
             const float maximum = 200f;
             const float minimum = 56f;
-            var viewport = mapContent.contentViewport.resolvedStyle;
-            var availableWidth = viewport.width - padding;
-            var availableHeight = viewport.height - padding;
+            var availableWidth = mapContent.resolvedStyle.width - padding - scrollbarReserve;
+            var availableHeight = mapContent.resolvedStyle.height - padding - scrollbarReserve;
             if (float.IsNaN(availableWidth) || availableWidth <= 0f)
-                availableWidth = mapContent.resolvedStyle.width - padding;
+                availableWidth = minimum * columns;
             if (float.IsNaN(availableHeight) || availableHeight <= 0f)
-                availableHeight = mapContent.resolvedStyle.height - padding;
+                availableHeight = minimum * rows;
 
             var widthFit = (availableWidth - tileGap * (columns - 1)) / columns;
             var heightFit = (availableHeight - tileGap * (rows - 1)) / rows;
