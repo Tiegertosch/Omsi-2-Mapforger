@@ -5,7 +5,7 @@
 | Werkzeug | Befund |
 |---|---|
 | Betriebssystem | Windows x64; PowerShell verfuegbar. Die CIM-Abfrage der Windows-Version wurde durch Berechtigungen verweigert. |
-| Git | Git 2.56.0.windows.2 installiert; Repository initialisiert, noch ohne Commit. |
+| Git | Git 2.56.0.windows.2 installiert; Repository mit erstem Commit auf `main`. |
 | Unity Hub / Unity Editor | Unity Hub installiert; Editor `6000.6.6f1` unter `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. |
 | Visual Studio | Visual Studio Build Tools 2026, Version 18.11.12306.390, installiert. Die vollstaendige IDE und die Unity-Workload wurden nicht nachgewiesen. |
 | JetBrains Rider | An den ueblichen Installationsorten und ueber PATH nicht gefunden. |
@@ -41,12 +41,12 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | UI Toolkit-Ressource | Erfolgreich: `EditorShell` zur Laufzeit geladen |
 | App-Kartenladen | Erfolgreich gebaut: klickbares **File > Open OMSI map...** und zentrale Schaltfläche lesen eine externe `global.cfg` im Windows-Player |
 | Windows-Build | Erfolgreich: `Builds/Windows/OMSIMapEditor.exe`; Unity meldete `Build Finished, Result: Success` |
-| Player-Inhaltsgrenze | Erfolgreich beim letzten Build: `Editor.OMSI.dll` ist enthalten, `Editor.OMSI.Editor.dll` und OMSI-Quelldateiformate fehlen. Seit ADR 005 ohne Freigabeliste; der Bytevergleich mit der Installation bleibt. Ein neuer Build nach dieser Änderung steht noch aus |
+| Player-Inhaltsgrenze | Erfolgreich: Build vom 20. Oktober 2026 nach ADR 005 ohne Freigabeliste; `Editor.OMSI.dll` ist enthalten, `Editor.OMSI.Editor.dll` und OMSI-Quelldateiformate fehlen, der Bytevergleich mit der Installation meldete keinen Treffer |
 | Grundorf-Import | Erfolgreich: 19 Kacheln, 1.095 Objekte, 60 Splines, 37 Anbindungen und 19 Terrain-Felder per Unity Batch-Mode eingelesen |
 | Weitere Karten | Erfolgreich: Stadtückheim und Berlin-Spandau lesend eingelesen, alle gezählten Objekte und Splines dekodiert |
 | Portable Unit-Tests | Erfolgreich: 19 Tests für Dekodierung, Leser und Geometrie ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
-| Unity Test Runner | Noch nicht durchgefuehrt; die Einstellungs-Tests benoetigen Unity |
+| Unity Test Runner | Erfolgreich: alle 24 EditMode-Tests am 20. Oktober 2026 per Unity Batch-Mode bestanden, inklusive der Einstellungs-Tests |
 | Editor-Playmode / visueller Player-Test | Noch nicht durchgefuehrt |
 
 ## Git-Arbeitsweise
