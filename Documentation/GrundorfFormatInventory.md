@@ -28,9 +28,25 @@ Am 19. Oktober 2026 wurde derselbe Leser lesend gegen die beiden anderen Karten 
 |---|---|---|---|---|---|---|
 | Grundorf | 19 | 1.095 | 60 | 37 | 19 | keine Warnungen |
 | Stadtückheim | 164 | 5 | 13 | 0 | 164 | keine Warnungen |
-| Berlin-Spandau | 369 | 29.450 | 1.993 | 2.520 | 329 | `[worldcoordinates]`; einige in `global.cfg` genannte Kacheln fehlen |
+| Berlin-Spandau | 369 | 29.450 | 1.993 | 2.520 | 329 | `[worldcoordinates]` mit 371,9-m-Kacheln; einige in `global.cfg` genannte Kacheln fehlen |
 
 Warm aus dem Dateicache dauert das Einlesen von Berlin-Spandau rund 0,3 s; der erste Zugriff auf die Festplatte kann deutlich länger dauern.
+
+## Spline-Verbindungen und Kachelraster
+
+Am 20. Oktober 2026 wurden Koordinatentransformation und Kurvenrichtung rechnerisch geprüft. Jeder Spline nennt in den Feldern 4 und 5 seinen Vorgänger und Nachfolger. Verbundene Splines müssen sich an ihren Endpunkten treffen; ein Nachbar kann in Gegenrichtung verlaufen. Die Prüfung `OmsiSplineContinuity` rechnet den Endpunkt exakt auf Gerade oder Kreisbogen aus und vergleicht ihn mit dem näheren Endpunkt des Nachbarn.
+
+| Karte | Kachelkante | Geprüfte Verbindungen | Innerhalb 0,5 m | Größte Lücke | Nicht geladene Nachbarn |
+|---|---|---|---|---|---|
+| Grundorf | 300 m | 36 | 36 | 0,00 m | 0 |
+| Stadtückheim | 300 m | 7 | 7 | 0,00 m | 3 |
+| Berlin-Spandau | 371,9 m | 1.055 | 1.054 | 184,04 m | 264 |
+
+- **Heading und Radius:** Heading 0 zeigt nach +Y, 90 nach +X. Ein positiver Radius dreht nach rechts. Mit umgekehrtem Vorzeichen träfen in Grundorf nur 16 von 36 Verbindungen aufeinander.
+- **Weltkoordinaten:** In Berlin-Spandau treffen sich alle Verbindungen innerhalb einer Kachel exakt, mit 300 m aber keine über Kachelgrenzen hinweg. Die gemessene Kante beträgt 371,9 m, die Restabweichung bis etwa 0,33 m (ADR 007 in [Decisions.md](Decisions.md)).
+- **Datenfehler in Berlin-Spandau:** Spline 3211903 in `tile_2407_11277.map` nennt 3211902 als Vorgänger, 3211902 verweist aber nicht zurück. Beide liegen auf derselben Geraden; dazwischen fehlen 184 m Gleis. Vermutlich wurde ein Spline im OMSI-Editor gelöscht, ohne den Verweis zu entfernen.
+- **Kachelversionen:** Alle Kacheln der drei Karten haben Version 11 bis 14. Vor Version 11 steht nur eine Nachbarzeile im Datensatz; solche Splines werden gezählt, aber mit einer Warnung nicht dekodiert.
+- **Objekte außerhalb der Kachel:** 18 der 29.450 Objekte in Berlin-Spandau liegen außerhalb des Bereichs ihrer eigenen Kachel und erscheinen in der Draufsicht noch nicht.
 
 ## Grenze für OMSI-Spielinhalte
 
@@ -42,4 +58,4 @@ Diese Build-Prüfung ist eine Schutzmaßnahme für den normalen Buildpfad. Sie g
 
 ## Grenzen und nächste Untersuchung
 
-Die aktuelle Leselogik dekodiert nur die für die Draufsicht erforderlichen Felder. Sie ist keine verlustfreie Import-/Exportimplementierung. Kurven werden aus dem Startpunkt mit konstantem Radius angenähert; Gefälle, Querneigung, Spline-Profile und Objektmodelle sind noch nicht dargestellt. Die 300-m-Annahme gilt für klassische kartesische Karten; `worldcoordinates`-Karten werden ausdrücklich als nicht unterstützt gemeldet.
+Die aktuelle Leselogik dekodiert nur die für die Draufsicht erforderlichen Felder. Sie ist keine verlustfreie Import-/Exportimplementierung. Kurven werden aus dem Startpunkt mit konstantem Radius angenähert; Gefälle, Querneigung, Spline-Profile und Objektmodelle sind noch nicht dargestellt. Klassische Karten verwenden 300-m-Kacheln, `[worldcoordinates]`-Karten die gemessene Kante von 371,9 m.

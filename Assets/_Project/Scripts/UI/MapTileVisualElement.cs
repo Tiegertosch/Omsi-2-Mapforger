@@ -42,9 +42,12 @@ namespace OmsiMapEditor.UI
                 });
             }
 
-            var title = new Label("Tile " + tile.X + ", " + tile.Y);
+            // Small tiles only have room for the coordinates; the tooltip always names the tile and its file.
+            var title = new Label(showDetails ? "Tile " + tile.X + ", " + tile.Y : CompactTitle(tile));
             title.AddToClassList("map-tile-title");
-            title.tooltip = tile.FileName;
+            if (!showDetails)
+                title.AddToClassList("map-tile-title-compact");
+            title.tooltip = "Tile " + tile.X + ", " + tile.Y + " (" + tile.FileName + ")";
             Add(title);
 
             if (showDetails)
@@ -61,6 +64,13 @@ namespace OmsiMapEditor.UI
             }
 
             generateVisualContent += DrawMapRecords;
+        }
+
+        /// <summary>Short coordinates for small tiles; long world-coordinate indices such as 2402, 11279 use two lines.</summary>
+        private static string CompactTitle(OmsiTileSummary tile)
+        {
+            var title = tile.X + ", " + tile.Y;
+            return title.Length <= 7 ? title : tile.X + ",\n" + tile.Y;
         }
 
         /// <summary>Updates the selection highlight without rebuilding the tile.</summary>

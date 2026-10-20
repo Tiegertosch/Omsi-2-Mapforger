@@ -7,7 +7,7 @@
                 <ui:Button name="file-menu-button" text="File" class="toolbar-menu-button" />
                 <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" tooltip="Map editing tools are not implemented yet." />
                 <ui:Button name="view-menu-button" text="View" class="toolbar-menu-button" />
-                <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" />
+                <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" tooltip="Check the loaded map: import warnings and whether connected splines meet." />
                 <ui:Button name="help-menu-button" text="Help" class="toolbar-menu-button" />
             </ui:VisualElement>
         </ui:VisualElement>

@@ -19,7 +19,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Kachel-Draufsicht mit Objektpunkten und angenäherten Spline-Linien implementieren
 - [x] Kacheln in der Laufzeitübersicht auswählen und Objekte, Splines sowie Terrainwerte im Inspektor anzeigen
 - [x] Kartenübersicht an den Viewport anpassen, Zoomsteuerung ergänzen und Kartenkopf beim Scrollen sichtbar halten
-- [ ] Koordinatentransformation und Kurvenrichtung an weiteren Kachelverbindungen visuell gegen OMSI prüfen
+- [x] Koordinatentransformation und Kurvenrichtung an den Kachelverbindungen prüfen: rechnerisch über die Endpunkte verbundener Splines in allen drei installierten Karten
+- [x] Spline-Verbindungsprüfung als erste Kartenvalidierung in App und Unity-Fenster anbieten
 - [ ] Chrono-Varianten und TTData getrennt untersuchen
 - [x] Tatsächliche Player-Abhängigkeiten prüfen und OMSI-Spielinhalte vom Ausliefern ausschließen; externes Lesen bleibt erlaubt
 - [x] Textdateien unabhängig von der Laufzeit-Codepage dekodieren und Datensätze streng positionell lesen
@@ -35,4 +36,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
 - Validierungsberichte und Integritätsprüfungen ergänzen
 - Freigabeschritt für Player-Assets vor einer öffentlichen Auslieferung wieder einführen (siehe ADR 005)
-- `[worldcoordinates]`-Karten wie Berlin-Spandau unterstützen
+- [x] `[worldcoordinates]`-Karten wie Berlin-Spandau mit gemessener Kachelkante darstellen (siehe ADR 007)
+- Exakte Kachelgeometrie von `[worldcoordinates]`-Karten aus der Kachelnummer ableiten; die feste Kante weicht bis etwa 0,35 m ab
+- Objekte darstellen, die OMSI mit Koordinaten außerhalb ihrer eigenen Kachel speichert (18 in Berlin-Spandau)
+- Spline-Datensätze vor Kachelversion 11 dekodieren

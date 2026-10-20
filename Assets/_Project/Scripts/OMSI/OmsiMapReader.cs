@@ -34,7 +34,10 @@ namespace OmsiMapEditor.OMSI
                 Description = SectionText(sections, "description")
             };
             if (HasSection(sections, "worldcoordinates"))
-                summary.Warnings.Add("This map uses [worldcoordinates]; the current overview supports the classic 300 m tile grid only.");
+            {
+                summary.UsesWorldCoordinates = true;
+                summary.TileSizeMeters = OmsiMapSummary.WorldCoordinateTileSizeMeters;
+            }
 
             foreach (var mapSection in sections)
             {
@@ -88,9 +91,15 @@ namespace OmsiMapEditor.OMSI
             return summary;
         }
 
+        /// <summary>Oldest tile version whose [spline] records carry separate previous and next IDs.</summary>
+        private const int FirstVersionWithSplineNeighbourIds = 11;
+
         private static void ReadTile(string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
         {
             var sections = ReadSections(tilePath);
+            var version = ReadTileVersion(sections);
+            var decodeSplines = version < 0 || version >= FirstVersionWithSplineNeighbourIds;
+            var skippedOldSplines = 0;
             foreach (var section in sections)
             {
                 if (string.Equals(section.Name, "object", StringComparison.OrdinalIgnoreCase))
@@ -104,7 +113,9 @@ namespace OmsiMapEditor.OMSI
                 else if (string.Equals(section.Name, "spline", StringComparison.OrdinalIgnoreCase))
                 {
                     tile.SplineCount++;
-                    if (TryReadSpline(section, out var splineRecord))
+                    if (!decodeSplines)
+                        skippedOldSplines++;
+                    else if (TryReadSpline(section, out var splineRecord))
                         tile.Splines.Add(splineRecord);
                     else
                         summary.Warnings.Add("Could not decode a [spline] placement in " + tile.FileName + ".");
@@ -114,6 +125,10 @@ namespace OmsiMapEditor.OMSI
                          string.Equals(section.Name, "splineAttachement_repeater", StringComparison.OrdinalIgnoreCase))
                     tile.AttachmentCount++;
             }
+
+            if (skippedOldSplines > 0)
+                summary.Warnings.Add(tile.FileName + " uses tile version " + version + "; its " + skippedOldSplines +
+                                     " spline(s) use an older field layout and were counted but not decoded.");
 
             var terrainPath = tilePath + ".terrain";
             if (TryReadTerrainRange(terrainPath, out var minHeight, out var maxHeight))
@@ -150,11 +165,29 @@ namespace OmsiMapEditor.OMSI
             return true;
         }
 
+        /// <summary>Returns the [version] value of a tile file, or -1 when the file has none.</summary>
+        private static int ReadTileVersion(List<Section> sections)
+        {
+            foreach (var section in sections)
+            {
+                if (!string.Equals(section.Name, "version", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var values = Values(section);
+                return values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var version)
+                    ? version
+                    : -1;
+            }
+
+            return -1;
+        }
+
         private static bool TryReadSpline(Section section, out OmsiSplineRecord record)
         {
             record = null;
             var values = Values(section);
             if (values.Count < 11 || !int.TryParse(values[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ||
+                !int.TryParse(values[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var previousId) ||
+                !int.TryParse(values[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out var nextId) ||
                 !TryDouble(values, 5, out var x) || !TryDouble(values, 6, out var height) ||
                 !TryDouble(values, 7, out var y) || !TryDouble(values, 8, out var heading) ||
                 !TryDouble(values, 9, out var length) || !TryDouble(values, 10, out var radius))
@@ -164,6 +197,8 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = values[1],
                 Id = id,
+                PreviousId = previousId,
+                NextId = nextId,
                 LocalX = x,
                 LocalY = y,
                 Height = height,

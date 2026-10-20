@@ -11,43 +11,62 @@ namespace OmsiMapEditor.OMSI
             return new OmsiMapPoint(tileX * tileSizeMeters + localX, tileY * tileSizeMeters + localY);
         }
 
+        /// <summary>
+        /// Samples a spline's plan-view curve in world metres. Points lie exactly on the straight line or
+        /// circular arc described by the record; gradient, cant and skew are not part of the plan view.
+        /// </summary>
         public static OmsiMapPoint[] BuildSplinePolyline(OmsiTileSummary sourceTile, OmsiSplineRecord spline,
             double tileSizeMeters)
         {
-            if (sourceTile == null || spline == null || tileSizeMeters <= 0.0 ||
-                spline.LengthMeters <= 0.0 || double.IsNaN(spline.LengthMeters) || double.IsInfinity(spline.LengthMeters))
+            if (sourceTile == null || spline == null || tileSizeMeters <= 0.0 || !HasValidLength(spline))
                 return Array.Empty<OmsiMapPoint>();
 
             var segmentCount = Math.Max(2,
                 Math.Min(256, (int)Math.Ceiling(Math.Min(spline.LengthMeters, 2048.0) / 8.0)));
-            var step = spline.LengthMeters / segmentCount;
-            var localX = spline.LocalX;
-            var localY = spline.LocalY;
-            var heading = spline.HeadingDegrees * Math.PI / 180.0;
             var points = new OmsiMapPoint[segmentCount + 1];
-            points[0] = TileLocalToWorld(sourceTile.X, sourceTile.Y, localX, localY, tileSizeMeters);
-
-            for (var index = 1; index <= segmentCount; index++)
+            for (var index = 0; index <= segmentCount; index++)
             {
-                var radius = spline.RadiusMeters;
-                if (Math.Abs(radius) > 0.001)
-                {
-                    var headingDelta = step / radius;
-                    var middleHeading = heading + headingDelta * 0.5;
-                    localX += Math.Sin(middleHeading) * step;
-                    localY += Math.Cos(middleHeading) * step;
-                    heading += headingDelta;
-                }
-                else
-                {
-                    localX += Math.Sin(heading) * step;
-                    localY += Math.Cos(heading) * step;
-                }
-
-                points[index] = TileLocalToWorld(sourceTile.X, sourceTile.Y, localX, localY, tileSizeMeters);
+                var local = GetLocalPointAt(spline, spline.LengthMeters * index / segmentCount);
+                points[index] = TileLocalToWorld(sourceTile.X, sourceTile.Y, local.X, local.Y, tileSizeMeters);
             }
 
             return points;
+        }
+
+        /// <summary>Returns the world position of a spline's start (distance 0) or end (its full length).</summary>
+        public static OmsiMapPoint GetSplineEndpoint(OmsiTileSummary sourceTile, OmsiSplineRecord spline,
+            double tileSizeMeters, bool atEnd)
+        {
+            if (sourceTile == null)
+                throw new ArgumentNullException(nameof(sourceTile));
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+
+            var distance = atEnd && HasValidLength(spline) ? spline.LengthMeters : 0.0;
+            var local = GetLocalPointAt(spline, distance);
+            return TileLocalToWorld(sourceTile.X, sourceTile.Y, local.X, local.Y, tileSizeMeters);
+        }
+
+        /// <summary>
+        /// Position in tile-local metres after <paramref name="distance"/> metres along the spline. Heading 0 runs
+        /// along +Y and 90 along +X; a positive radius turns right, so the heading grows by distance / radius.
+        /// </summary>
+        private static OmsiMapPoint GetLocalPointAt(OmsiSplineRecord spline, double distance)
+        {
+            var heading = spline.HeadingDegrees * Math.PI / 180.0;
+            var radius = spline.RadiusMeters;
+            if (Math.Abs(radius) <= 0.001)
+                return new OmsiMapPoint(spline.LocalX + Math.Sin(heading) * distance,
+                    spline.LocalY + Math.Cos(heading) * distance);
+
+            var endHeading = heading + distance / radius;
+            return new OmsiMapPoint(spline.LocalX + radius * (Math.Cos(heading) - Math.Cos(endHeading)),
+                spline.LocalY + radius * (Math.Sin(endHeading) - Math.Sin(heading)));
+        }
+
+        private static bool HasValidLength(OmsiSplineRecord spline)
+        {
+            return spline.LengthMeters > 0.0 && !double.IsNaN(spline.LengthMeters) && !double.IsInfinity(spline.LengthMeters);
         }
 
         /// <summary>Clips a world-space line to one tile and returns its endpoints in tile-local metres.</summary>

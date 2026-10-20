@@ -300,9 +300,33 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            SetStatus(currentSummary.Warnings.Count == 0
-                ? "Map check passed: " + currentSummary.Tiles.Count + " tiles read; no import warnings."
-                : "Map check found " + currentSummary.Warnings.Count + " warning(s). See the map overview.");
+            var continuity = OmsiSplineContinuity.Check(currentSummary);
+            var worstGap = continuity.Gaps.Count > 0 ? continuity.Gaps[0] : null;
+            if (worstGap != null)
+                SelectTile(worstGap.Tile);
+
+            SetStatus(DescribeMapCheck(currentSummary, continuity));
+        }
+
+        private static string DescribeMapCheck(OmsiMapSummary summary, OmsiSplineContinuityReport continuity)
+        {
+            var importPart = summary.Warnings.Count == 0
+                ? "no import warnings"
+                : summary.Warnings.Count + " import warning(s), see the map overview";
+            var splinePart = continuity.ConnectedCount + " of " + continuity.LinkCount + " spline links meet";
+            if (continuity.Gaps.Count > 0)
+            {
+                var worstGap = continuity.Gaps[0];
+                splinePart += "; " + continuity.Gaps.Count + " gap(s) above " + continuity.ToleranceMeters.ToString("0.0#") +
+                              " m, largest " + worstGap.DistanceMeters.ToString("0.00") + " m between splines " +
+                              worstGap.SplineId + " and " + worstGap.NeighbourId +
+                              (worstGap.IsMutual ? string.Empty : ", referenced from one side only") + " (selected tile)";
+            }
+            if (continuity.MissingNeighbourCount > 0)
+                splinePart += "; " + continuity.MissingNeighbourCount + " link(s) point to splines that were not loaded";
+
+            var passed = summary.Warnings.Count == 0 && continuity.Gaps.Count == 0 && continuity.MissingNeighbourCount == 0;
+            return (passed ? "Map check passed: " : "Map check: ") + importPart + "; " + splinePart + ".";
         }
 
         private void SetStatus(string message)
@@ -335,6 +359,11 @@ namespace OmsiMapEditor.UI
             var scrollTarget = selectedTileVisual;
             if (scrollTarget != null && mapContent != null)
                 mapContent.schedule.Execute(() => ScrollToIfAttached(mapContent, scrollTarget));
+            if (browserEntries.TryGetValue(tile, out var browserEntry))
+            {
+                var tileList = browserEntry.GetFirstAncestorOfType<ScrollView>();
+                tileList?.schedule.Execute(() => ScrollToIfAttached(tileList, browserEntry));
+            }
             RenderInspector();
             SetStatus("Selected tile " + tile.X + ", " + tile.Y);
         }
@@ -434,7 +463,10 @@ namespace OmsiMapEditor.UI
             {
                 mapCountsLabel.text = "Tiles: " + currentSummary.Tiles.Count + "    Objects: " + currentSummary.ObjectCount +
                                       "    Splines: " + currentSummary.SplineCount + "    Connections: " + currentSummary.AttachmentCount +
-                                      "    Terrain: " + currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count;
+                                      "    Terrain: " + currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count +
+                                      (currentSummary.UsesWorldCoordinates
+                                          ? "    World coordinates: " + currentSummary.TileSizeMeters.ToString("0.0") + " m tiles"
+                                          : string.Empty);
                 mapCountsLabel.style.display = DisplayStyle.Flex;
             }
             if (mapDescriptionLabel != null)

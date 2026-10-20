@@ -103,6 +103,36 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(0, index.GetSegments(1, 0).Count);
         }
 
+        [Test]
+        public void ArcPointsLieExactlyOnTheCircle()
+        {
+            // Quarter circle with radius 100 starting north-bound at the origin; the centre is at (100, 0).
+            var points = OmsiMapGeometry.BuildSplinePolyline(Tile(0, 0), Spline(0, 0, 0, Math.PI * 50.0, 100), TileSize);
+
+            foreach (var point in points)
+                Assert.AreEqual(100.0, Math.Sqrt(Math.Pow(point.X - 100.0, 2) + Math.Pow(point.Y, 2)), 1e-9);
+            Assert.AreEqual(100.0, points[points.Length - 1].X, 1e-9);
+            Assert.AreEqual(100.0, points[points.Length - 1].Y, 1e-9);
+        }
+
+        [Test]
+        public void NegativeRadiusTurnsLeft()
+        {
+            var end = OmsiMapGeometry.GetSplineEndpoint(Tile(0, 0), Spline(0, 0, 0, Math.PI * 50.0, -100), TileSize, true);
+
+            Assert.AreEqual(-100.0, end.X, 1e-9);
+            Assert.AreEqual(100.0, end.Y, 1e-9);
+        }
+
+        [Test]
+        public void SplineStartIsTheRecordPositionInWorldMetres()
+        {
+            var start = OmsiMapGeometry.GetSplineEndpoint(Tile(2, -1), Spline(10, 20, 45, 30, 50), TileSize, false);
+
+            Assert.AreEqual(610.0, start.X, 1e-9);
+            Assert.AreEqual(-280.0, start.Y, 1e-9);
+        }
+
         private static OmsiMapPoint BuildEnd(OmsiTileSummary tile, OmsiSplineRecord spline)
         {
             var points = OmsiMapGeometry.BuildSplinePolyline(tile, spline, TileSize);

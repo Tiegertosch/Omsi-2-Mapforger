@@ -44,10 +44,12 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Player-Inhaltsgrenze | Erfolgreich: Build vom 20. Oktober 2026 nach ADR 005 ohne Freigabeliste; `Editor.OMSI.dll` ist enthalten, `Editor.OMSI.Editor.dll` und OMSI-Quelldateiformate fehlen, der Bytevergleich mit der Installation meldete keinen Treffer |
 | Grundorf-Import | Erfolgreich: 19 Kacheln, 1.095 Objekte, 60 Splines, 37 Anbindungen und 19 Terrain-Felder per Unity Batch-Mode eingelesen |
 | Weitere Karten | Erfolgreich: Stadtückheim und Berlin-Spandau lesend eingelesen, alle gezählten Objekte und Splines dekodiert |
-| Portable Unit-Tests | Erfolgreich: 19 Tests für Dekodierung, Leser und Geometrie ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
+| Portable Unit-Tests | Erfolgreich: 32 Tests für Dekodierung, Leser, Geometrie und Spline-Verbindungen ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
 | Unity Test Runner | Erfolgreich: alle 24 EditMode-Tests am 20. Oktober 2026 per Unity Batch-Mode bestanden, inklusive der Einstellungs-Tests |
-| Editor-Playmode / visueller Player-Test | Noch nicht durchgefuehrt |
+| Spline-Verbindungen | Erfolgreich: Grundorf 36/36, Stadtückheim 7/7, Berlin-Spandau 1.054/1.055 innerhalb 0,5 m; die eine Lücke ist ein einseitiger Verweis in den Kartendaten |
+| Visueller Player-Test | Erfolgreich am 20. Oktober 2026: Grundorf und Berlin-Spandau im gebauten Player geladen, Kacheln und Liste angeklickt, Kartenprüfung über **Tools** ausgeführt; keine Ausnahmen im Player-Log |
+| Editor-Playmode | Noch nicht durchgefuehrt |
 
 ## Git-Arbeitsweise
 

@@ -67,6 +67,8 @@ namespace OmsiMapEditor.Tests
 
             var spline = tile.Splines.Single();
             Assert.AreEqual(42, spline.Id);
+            Assert.AreEqual(41, spline.PreviousId);
+            Assert.AreEqual(0, spline.NextId);
             Assert.AreEqual(18.25, spline.LocalX, 1e-9);
             Assert.AreEqual(2.5, spline.Height, 1e-9);
             Assert.AreEqual(147.0, spline.LocalY, 1e-9);
@@ -109,14 +111,44 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
-        public void WarnsAboutWorldCoordinateMaps()
+        public void ClassicMapsUseTheThreeHundredMetreGrid()
+        {
+            WriteOmsiText("global.cfg", "[map]", "0", "0", "tile_0_0.map", "");
+            WriteOmsiText("tile_0_0.map", "[version]", "14", "");
+
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+
+            Assert.IsFalse(summary.UsesWorldCoordinates);
+            Assert.AreEqual(OmsiMapSummary.ClassicTileSizeMeters, summary.TileSizeMeters, 1e-9);
+        }
+
+        [Test]
+        public void WorldCoordinateMapsUseTheWiderTileGrid()
         {
             WriteOmsiText("global.cfg", "[worldcoordinates]", "", "[map]", "0", "0", "tile_0_0.map", "");
             WriteOmsiText("tile_0_0.map", "[version]", "14", "");
 
             var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
 
-            Assert.IsTrue(summary.Warnings.Any(warning => warning.Contains("[worldcoordinates]")));
+            Assert.IsTrue(summary.UsesWorldCoordinates);
+            Assert.AreEqual(OmsiMapSummary.WorldCoordinateTileSizeMeters, summary.TileSizeMeters, 1e-9);
+            Assert.IsFalse(summary.Warnings.Any(warning => warning.Contains("worldcoordinates")));
+        }
+
+        [Test]
+        public void CountsButDoesNotDecodeSplinesOfTileVersionsBeforeEleven()
+        {
+            WriteOmsiText("global.cfg", "[map]", "0", "0", "tile_0_0.map", "");
+            // Before version 11 a spline has a single neighbour line, so the position fields sit one line earlier.
+            WriteOmsiText("tile_0_0.map",
+                "[version]", "10", "",
+                "[spline]", "0", @"Splinesoad.sli", "42", "0", "18.25", "2.5", "147", "90", "100", "0", "");
+
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+
+            Assert.AreEqual(1, summary.Tiles[0].SplineCount);
+            Assert.AreEqual(0, summary.Tiles[0].Splines.Count);
+            Assert.IsTrue(summary.Warnings.Any(warning => warning.Contains("tile version 10")));
         }
 
         [Test]

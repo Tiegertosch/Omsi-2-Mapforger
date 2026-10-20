@@ -15,6 +15,7 @@ namespace OmsiMapEditor.OMSI.Editor
 
         private OmsiMapSummary summary;
         private OmsiSplineTileIndex splineIndex;
+        private OmsiSplineContinuityReport continuity;
         private Vector2 mapScroll;
 
         [MenuItem("OMSI Map Editor/Import/Read OMSI Map...")]
@@ -47,8 +48,13 @@ namespace OmsiMapEditor.OMSI.Editor
                                       "    |    Objects: " + summary.ObjectCount +
                                       "    |    Splines: " + summary.SplineCount +
                                       "    |    Attachments: " + summary.AttachmentCount +
-                                      "    |    Terrain: " + summary.TerrainTileCount + "/" + summary.Tiles.Count,
+                                      "    |    Terrain: " + summary.TerrainTileCount + "/" + summary.Tiles.Count +
+                                      (summary.UsesWorldCoordinates
+                                          ? "    |    World coordinates: " + summary.TileSizeMeters.ToString("0.0") + " m tiles"
+                                          : string.Empty),
                 EditorStyles.wordWrappedMiniLabel);
+            if (continuity != null)
+                EditorGUILayout.LabelField(DescribeContinuity(continuity), EditorStyles.wordWrappedMiniLabel);
 
             if (!string.IsNullOrWhiteSpace(summary.Description))
             {
@@ -74,6 +80,7 @@ namespace OmsiMapEditor.OMSI.Editor
             {
                 summary = OmsiMapReader.Read(path);
                 splineIndex = OmsiSplineTileIndex.Build(summary);
+                continuity = OmsiSplineContinuity.Check(summary);
                 OmsiContentBoundary.RememberSourcePath(summary.RootPath);
                 titleContent = new GUIContent(string.IsNullOrEmpty(summary.Name) ? "OMSI Map" : summary.Name);
             }
@@ -81,9 +88,26 @@ namespace OmsiMapEditor.OMSI.Editor
             {
                 summary = null;
                 splineIndex = null;
+                continuity = null;
                 Debug.LogException(exception);
                 EditorUtility.DisplayDialog("Could not read OMSI map", exception.Message, "OK");
             }
+        }
+
+        private static string DescribeContinuity(OmsiSplineContinuityReport report)
+        {
+            var text = "Spline links: " + report.ConnectedCount + " of " + report.LinkCount + " meet within " +
+                       report.ToleranceMeters.ToString("0.0#") + " m";
+            if (report.Gaps.Count > 0)
+            {
+                var worstGap = report.Gaps[0];
+                text += "    |    Largest gap: " + worstGap.DistanceMeters.ToString("0.00") + " m between splines " +
+                        worstGap.SplineId + " and " + worstGap.NeighbourId + " in " + worstGap.Tile.FileName +
+                        (worstGap.IsMutual ? string.Empty : " (referenced from one side only)");
+            }
+            if (report.MissingNeighbourCount > 0)
+                text += "    |    Links to splines that were not loaded: " + report.MissingNeighbourCount;
+            return text;
         }
 
         private void DrawTileMap()

@@ -48,6 +48,7 @@
 .map-tile-selected { border-width: 3px; border-color: rgb(242, 181, 77); }
 .map-tile-missing { background-color: rgb(53, 35, 37); border-color: rgb(118, 64, 64); }
 .map-tile-title { position: absolute; left: 7px; top: 5px; padding: 2px 4px; background-color: rgba(22, 27, 33, 0.9); -unity-font-style: bold; color: rgb(225, 194, 137); }
+.map-tile-title-compact { left: 4px; top: 4px; padding: 1px 3px; font-size: 10px; }
 .map-tile-counts { position: absolute; left: 7px; top: 27px; padding: 2px 4px; background-color: rgba(22, 27, 33, 0.9); font-size: 10px; color: rgb(220, 226, 233); }
 .map-tile-terrain { position: absolute; left: 7px; bottom: 5px; padding: 2px 4px; background-color: rgba(22, 27, 33, 0.9); font-size: 10px; color: rgb(183, 197, 211); }
 .tile-grid { align-self: stretch; flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
