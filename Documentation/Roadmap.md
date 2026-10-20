@@ -48,7 +48,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Strukturelle Änderungen ermöglichen: Datensätze einfügen und löschen, Beschriftungsanzahl und `mirror` ändern und abhängige Indizes nachführen
 - Splines mit Nachbarn löschen und die Nachbarverweise in anderen Kacheln mitführen; bisher wird das Löschen dann verweigert
 - [x] Erste Bearbeitung in der App: Objekte auswählen, Position und Richtung ändern, in der Arbeitskopie speichern, Kachel zurücksetzen und als eigene Karte exportieren
-- Exportierte Karte in OMSI laden und die geänderten Objekte im Spiel prüfen
+- [x] Exportierte Karte in OMSI laden und die geänderten Objekte im Spiel prüfen (20. Oktober 2026: verschobene Scheune in Grundorf im Spiel sichtbar)
 - Objekte per Ziehen in der Karte verschieben und Änderungen rückgängig machen
 - Objekte in der App anlegen und löschen; die Bausteine dafür stehen in `OmsiTileEditing`
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
