@@ -96,7 +96,7 @@ namespace OmsiMapEditor.OMSI
 
         private static void ReadTile(string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
         {
-            var sections = ReadSections(tilePath);
+            var sections = ReadSections(tilePath, OmsiTileRecordLayouts.Instance);
             var version = ReadTileVersion(sections);
             var decodeSplines = version < 0 || version >= FirstVersionWithSplineNeighbourIds;
             var skippedOldSplines = 0;
@@ -249,22 +249,22 @@ namespace OmsiMapEditor.OMSI
             return double.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out result);
         }
 
-        private static List<Section> ReadSections(string path)
+        /// <summary>
+        /// Reads a file's sections through <see cref="OmsiRecordFile"/>. With tile layouts, records are read
+        /// positionally, so a label that looks like a section header stays part of its record.
+        /// </summary>
+        private static List<Section> ReadSections(string path, IOmsiRecordLayouts layouts = null)
         {
-            var result = new List<Section>();
-            Section current = null;
-            foreach (var rawLine in OmsiTextFile.ReadAllLines(path))
+            var file = OmsiRecordFile.Load(path, layouts);
+            var result = new List<Section>(file.Records.Count);
+            foreach (var record in file.Records)
             {
-                var line = rawLine.Trim();
-                if (line.Length >= 2 && line[0] == '[' && line[line.Length - 1] == ']')
-                {
-                    current = new Section { Name = line.Substring(1, line.Length - 2).Trim() };
-                    result.Add(current);
-                }
-                else if (current != null)
-                {
-                    current.Lines.Add(rawLine);
-                }
+                var section = new Section { Name = record.Name };
+                foreach (var line in record.Fields)
+                    section.Lines.Add(line.Text);
+                foreach (var line in record.Trailer)
+                    section.Lines.Add(line.Text);
+                result.Add(section);
             }
 
             return result;

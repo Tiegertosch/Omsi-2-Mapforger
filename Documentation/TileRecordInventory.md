@@ -182,7 +182,7 @@ In Grundorf und Berlin-Spandau liegt der Wert genau eins über der höchsten ID,
 
 ## Folgerungen für Mapforge
 
-1. **Verlustfrei lesen:** Der Leser sollte jeden Datensatz vollständig und positionell lesen. Unbekannte Felder müssen mitsamt Freitext und Reihenfolge erhalten bleiben. Nur so lässt sich eine Kachel unverändert zurückschreiben.
+1. **Verlustfrei lesen:** Der Leser sollte jeden Datensatz vollständig und positionell lesen. Unbekannte Felder müssen mitsamt Freitext und Reihenfolge erhalten bleiben. Nur so lässt sich eine Kachel unverändert zurückschreiben. Umgesetzt mit `OmsiRecordFile` und `OmsiTileRecordLayouts` (ADR 008).
 2. **Reihenfolge ist Teil des Formats:** Spline-Indizes, Objektindizes der Einstiegspunkte, Elternverweise und Regeln hängen an der Dateireihenfolge. Ein Editor muss diese Indizes beim Einfügen und Löschen nachführen.
 3. **IDs:** Neue IDs müssen kartenweit eindeutig sein und oberhalb des größeren Werts aus `[NextIDCode]` und höchster ID plus eins liegen. Chrono-Kacheln zählen mit.
 4. **Validierung:** Neue Prüfungen bieten sich an, etwa für verwaiste Wiederholungen, `[varparent]`-Ziele ohne Element, einen veralteten `[NextIDCode]` und Einstiegspunkte, deren Index oder Winkel nicht zum Objekt passt.

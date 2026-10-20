@@ -39,9 +39,9 @@ namespace OmsiMapEditor.Tests
                 "[map]", "1", "0", "tile_1_0.map", "");
             WriteOmsiText("tile_0_0.map",
                 "[version]", "14", "",
-                "[object]", "0", @"Sceneryobjects\Trees\tree.sco", "17", "25.5", "243.25", "1.5", "90", "0", "0", "4", "", "",
+                "[object]", "0", @"Sceneryobjects\Trees\tree.sco", "17", "25.5", "243.25", "1.5", "90", "0", "0", "0", "", "",
                 "Object Nr. 1",
-                "[spline]", "0", @"Splines\road.sli", "42", "41", "0", "18.25", "2.5", "147", "445.6", "143.18", "-120", "", "",
+                "[spline]", "0", @"Splines\road.sli", "42", "41", "0", "18.25", "2.5", "147", "445.6", "143.18", "-120", "0", "0", "0", "0", "0", "0", "0", "", "",
                 "[splineAttachement]", "0", "1", "");
             WriteTerrain("tile_0_0.map.terrain");
 
@@ -97,6 +97,21 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(1, summary.Tiles[0].ObjectCount);
             Assert.AreEqual(0, summary.Tiles[0].Objects.Count);
             Assert.IsTrue(summary.Warnings.Any(warning => warning.StartsWith("Could not decode an [object]", StringComparison.Ordinal)));
+        }
+
+        [Test]
+        public void ObjectLabelThatLooksLikeASectionHeaderIsNotReadAsASection()
+        {
+            WriteOmsiText("global.cfg", "[map]", "0", "0", "tile_0_0.map", "");
+            WriteOmsiText("tile_0_0.map",
+                "[version]", "14", "",
+                "[object]", "0", @"Sceneryobjects\sign.sco", "5", "1", "2", "0", "0", "0", "0", "1", "[spline]", "");
+
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+
+            Assert.AreEqual(1, summary.ObjectCount);
+            Assert.AreEqual(0, summary.SplineCount);
+            Assert.AreEqual(0, summary.Warnings.Count(warning => warning.StartsWith("Could not decode", StringComparison.Ordinal)));
         }
 
         [Test]

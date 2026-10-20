@@ -18,7 +18,7 @@ Die Untersuchung erfolgte lesend direkt im installierten OMSI-2-Ordner. Die Kart
 
 Im Unity-Editor unter **OMSI Map Editor > Import > Read OMSI Map...** eine Karten-`global.cfg` auswählen. Die Übersicht zeigt das 300-m-Kachelraster, Objektpunkte, aus Heading/Länge/Radius angenäherte Spline-Linien sowie die Terrain-Höhenbereiche. Fehlende oder nicht dekodierbare Datensätze werden gemeldet. Die Quelldateien werden nur gelesen und nicht in das Unity-Projekt kopiert.
 
-Der Batch-Mode kann denselben Parser aufrufen. Setze `OMSI_MAP_CONFIG` auf die `global.cfg` und starte Unity mit `-executeMethod OmsiMapEditor.OMSI.Editor.OmsiMapCli.InspectFromEnvironment`. Für Grundorf ergab der Lauf: 19 Kacheln, 1.095 Objekte, 60 Splines, 37 Anbindungen und 19 gelesene Terrain-Höhenfelder.
+Der Batch-Mode kann denselben Parser aufrufen. Setze `OMSI_MAP_CONFIG` auf die `global.cfg` und starte Unity mit `-executeMethod OmsiMapEditor.OMSI.Editor.OmsiMapCli.InspectFromEnvironment`. Für Grundorf ergab der Lauf: 19 Kacheln, 1.095 Objekte, 60 Splines, 37 Anbindungen und 19 gelesene Terrain-Höhenfelder. Mit `-executeMethod OmsiMapEditor.OMSI.Editor.OmsiMapCli.VerifyRoundTripFromEnvironment` liest Unity jede Textdatei der Karte ein und vergleicht die zurückverwandelten Bytes mit dem Original, ohne etwas zu schreiben. Im Editor steht dafür **OMSI Map Editor > Import > Verify Lossless Round Trip...** bereit.
 
 ## Weitere installierte Karten
 

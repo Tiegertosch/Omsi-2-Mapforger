@@ -44,8 +44,9 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Player-Inhaltsgrenze | Erfolgreich: Build vom 20. Oktober 2026 nach ADR 005 ohne Freigabeliste; `Editor.OMSI.dll` ist enthalten, `Editor.OMSI.Editor.dll` und OMSI-Quelldateiformate fehlen, der Bytevergleich mit der Installation meldete keinen Treffer |
 | Grundorf-Import | Erfolgreich: 19 Kacheln, 1.095 Objekte, 60 Splines, 37 Anbindungen und 19 Terrain-Felder per Unity Batch-Mode eingelesen |
 | Weitere Karten | Erfolgreich: Stadtückheim und Berlin-Spandau lesend eingelesen, alle gezählten Objekte und Splines dekodiert |
-| Portable Unit-Tests | Erfolgreich: 33 Tests für Dekodierung, Leser, Geometrie und Spline-Verbindungen ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
-| Unity Test Runner (aktuell) | Erfolgreich: 38 EditMode-Tests am 20. Oktober 2026 nach der `[spline_h]`-Ergänzung |
+| Portable Unit-Tests | Erfolgreich: 47 Tests für Kodierung, verlustfreies Dateimodell, Leser, Geometrie und Spline-Verbindungen ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
+| Unity Test Runner (aktuell) | Erfolgreich: 52 EditMode-Tests am 20. Oktober 2026 nach Einführung des verlustfreien Dateimodells |
+| Verlustfreie Rundreise | Erfolgreich: alle 1.409 Textdateien der drei installierten Karten byte-identisch, darunter 766 Kacheln mit 57.180 Datensätzen, alle mit belegtem Layout; Unity-Batch-Prüfung für Berlin-Spandau 1.172 von 1.172 |
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
 | Unity Test Runner | Erfolgreich: alle 24 EditMode-Tests am 20. Oktober 2026 per Unity Batch-Mode bestanden, inklusive der Einstellungs-Tests |
 | Spline-Verbindungen | Erfolgreich: Grundorf 36/36, Stadtückheim 17/17, Berlin-Spandau 1.464/1.467 innerhalb 0,5 m; die drei Lücken sind einseitige Verweise in den Kartendaten |

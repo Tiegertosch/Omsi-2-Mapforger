@@ -41,7 +41,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Objekte darstellen, die OMSI mit Koordinaten außerhalb ihrer eigenen Kachel speichert (18 in Berlin-Spandau)
 - Spline-Datensätze vor Kachelversion 11 dekodieren
 - [x] Vollständige Kachel-Datensätze und `global.cfg` untersuchen (siehe [TileRecordInventory.md](TileRecordInventory.md))
-- Kachel-Datensätze verlustfrei lesen und unverändert zurückschreiben können
+- [x] Kachel-Datensätze verlustfrei lesen und unverändert zurückschreiben können (ADR 008; Rundreise über alle 1.409 Textdateien byte-identisch)
+- Bearbeitungsablauf mit Speicherziel festlegen; geänderte Dateien nie unbemerkt in die OMSI-Installation schreiben
+- Typisierte Zugriffe für Objekte, Splines und Anhängungen auf dem verlustfreien Modell aufbauen
 - Neue IDs aus `[NextIDCode]` und höchster vorhandener ID vergeben
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
 - Haltestellen und Linienverläufe in der Kartenübersicht darstellen
