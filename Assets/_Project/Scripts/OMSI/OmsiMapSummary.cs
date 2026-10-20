@@ -80,5 +80,11 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Constant curve radius; 0 is straight and a positive radius turns right (clockwise in plan view).</summary>
         public double RadiusMeters { get; internal set; }
+
+        /// <summary>
+        /// True when the record comes from a [spline_h] section. It shares the leading fields of [spline] and has at
+        /// least one more field at the end whose meaning is not confirmed yet.
+        /// </summary>
+        public bool IsSplineH { get; internal set; }
     }
 }

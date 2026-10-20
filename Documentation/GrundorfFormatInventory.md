@@ -22,13 +22,13 @@ Der Batch-Mode kann denselben Parser aufrufen. Setze `OMSI_MAP_CONFIG` auf die `
 
 ## Weitere installierte Karten
 
-Am 19. Oktober 2026 wurde derselbe Leser lesend gegen die beiden anderen Karten der lokalen Installation geprüft. In allen drei Karten kommen innerhalb der gelesenen Objekt- und Splinefelder keine Leerzeilen vor; alle gezählten Objekte und Splines wurden dekodiert.
+Am 19. Oktober 2026 wurde derselbe Leser lesend gegen die beiden anderen Karten der lokalen Installation geprüft. In allen drei Karten kommen innerhalb der gelesenen Objekt- und Splinefelder keine Leerzeilen vor; alle gezählten Objekte und Splines wurden dekodiert. Seit dem 20. Oktober 2026 liest der Leser auch `[spline_h]`-Abschnitte. Sie haben dieselben ersten elf Felder wie `[spline]` und mindestens ein weiteres Feld am Ende, dessen Bedeutung noch offen ist. Die Spline-Zahlen unten schließen sie ein.
 
 | Karte | Kacheln | Objekte | Splines | Anbindungen | Terrain | Hinweise |
 |---|---|---|---|---|---|---|
 | Grundorf | 19 | 1.095 | 60 | 37 | 19 | keine Warnungen |
-| Stadtückheim | 164 | 5 | 13 | 0 | 164 | keine Warnungen |
-| Berlin-Spandau | 369 | 29.450 | 1.993 | 2.520 | 329 | `[worldcoordinates]` mit 371,9-m-Kacheln; einige in `global.cfg` genannte Kacheln fehlen |
+| Stadtückheim | 164 | 5 | 28 | 0 | 164 | keine Warnungen; 15 davon `[spline_h]` |
+| Berlin-Spandau | 369 | 29.450 | 2.486 | 2.520 | 329 | `[worldcoordinates]` mit 371,9-m-Kacheln; 493 Splines als `[spline_h]`; einige in `global.cfg` genannte Kacheln fehlen |
 
 Warm aus dem Dateicache dauert das Einlesen von Berlin-Spandau rund 0,3 s; der erste Zugriff auf die Festplatte kann deutlich länger dauern.
 
@@ -39,12 +39,13 @@ Am 20. Oktober 2026 wurden Koordinatentransformation und Kurvenrichtung rechneri
 | Karte | Kachelkante | Geprüfte Verbindungen | Innerhalb 0,5 m | Größte Lücke | Nicht geladene Nachbarn |
 |---|---|---|---|---|---|
 | Grundorf | 300 m | 36 | 36 | 0,00 m | 0 |
-| Stadtückheim | 300 m | 7 | 7 | 0,00 m | 3 |
-| Berlin-Spandau | 371,9 m | 1.055 | 1.054 | 184,04 m | 264 |
+| Stadtückheim | 300 m | 17 | 17 | 0,00 m | 0 |
+| Berlin-Spandau | 371,9 m | 1.467 | 1.464 | 264,71 m | 1 |
 
 - **Heading und Radius:** Heading 0 zeigt nach +Y, 90 nach +X. Ein positiver Radius dreht nach rechts. Mit umgekehrtem Vorzeichen träfen in Grundorf nur 16 von 36 Verbindungen aufeinander.
 - **Weltkoordinaten:** In Berlin-Spandau treffen sich alle Verbindungen innerhalb einer Kachel exakt, mit 300 m aber keine über Kachelgrenzen hinweg. Die gemessene Kante beträgt 371,9 m, die Restabweichung bis etwa 0,33 m (ADR 007 in [Decisions.md](Decisions.md)).
-- **Datenfehler in Berlin-Spandau:** Spline 3211903 in `tile_2407_11277.map` nennt 3211902 als Vorgänger, 3211902 verweist aber nicht zurück. Beide liegen auf derselben Geraden; dazwischen fehlen 184 m Gleis. Vermutlich wurde ein Spline im OMSI-Editor gelöscht, ohne den Verweis zu entfernen.
+- **Datenfehler in Berlin-Spandau:** Alle drei Lücken liegen in `tile_2407_11277.map` und sind einseitige Verweise. Spline 3211903 nennt zum Beispiel 3211902 als Vorgänger, 3211902 verweist aber nicht zurück. Beide liegen auf derselben Geraden; dazwischen fehlen 184 m Gleis. Vermutlich wurden dort Splines im OMSI-Editor gelöscht, ohne die Verweise zu entfernen.
+- **`[spline_h]`:** Bis zur Ergänzung des Lesers fehlten diese Splines. Die Prüfung meldete deshalb 264 Verweise auf nicht geladene Splines in Berlin-Spandau und 3 in Stadtückheim. Mit ihnen bleibt in Berlin-Spandau ein einziger solcher Verweis.
 - **Kachelversionen:** Alle Kacheln der drei Karten haben Version 11 bis 14. Vor Version 11 steht nur eine Nachbarzeile im Datensatz; solche Splines werden gezählt, aber mit einer Warnung nicht dekodiert.
 - **Objekte außerhalb der Kachel:** 18 der 29.450 Objekte in Berlin-Spandau liegen außerhalb des Bereichs ihrer eigenen Kachel und erscheinen in der Draufsicht noch nicht.
 

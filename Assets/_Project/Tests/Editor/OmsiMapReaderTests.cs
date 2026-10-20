@@ -111,6 +111,30 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ReadsSplineHRecordsLikeSplines()
+        {
+            WriteOmsiText("global.cfg", "[map]", "0", "0", "tile_0_0.map", "");
+            WriteOmsiText("tile_0_0.map",
+                "[version]", "14", "",
+                "[spline]", "0", @"Splines\road.sli", "1", "0", "2", "10", "0", "20", "90", "50", "0",
+                "0", "0", "0", "0", "0", "0", "0", "",
+                "[spline_h]", "0", @"Splines\rail.sli", "2", "1", "0", "60", "30", "20", "90", "7.5", "0",
+                "0", "0", "0", "0", "0", "0", "0", "0", "");
+
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+
+            Assert.AreEqual(2, summary.SplineCount);
+            var helper = summary.Tiles[0].Splines.Single(spline => spline.Id == 2);
+            Assert.IsTrue(helper.IsSplineH);
+            Assert.AreEqual(1, helper.PreviousId);
+            Assert.AreEqual(60.0, helper.LocalX, 1e-9);
+            Assert.AreEqual(30.0, helper.Height, 1e-9);
+            Assert.AreEqual(7.5, helper.LengthMeters, 1e-9);
+            Assert.IsFalse(summary.Tiles[0].Splines.Single(spline => spline.Id == 1).IsSplineH);
+            Assert.AreEqual(1, OmsiSplineContinuity.Check(summary).ConnectedCount);
+        }
+
+        [Test]
         public void ClassicMapsUseTheThreeHundredMetreGrid()
         {
             WriteOmsiText("global.cfg", "[map]", "0", "0", "tile_0_0.map", "");
@@ -142,7 +166,7 @@ namespace OmsiMapEditor.Tests
             // Before version 11 a spline has a single neighbour line, so the position fields sit one line earlier.
             WriteOmsiText("tile_0_0.map",
                 "[version]", "10", "",
-                "[spline]", "0", @"Splinesoad.sli", "42", "0", "18.25", "2.5", "147", "90", "100", "0", "");
+                "[spline]", "0", @"Splines\road.sli", "42", "0", "18.25", "2.5", "147", "90", "100", "0", "");
 
             var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
 

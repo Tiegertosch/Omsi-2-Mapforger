@@ -110,7 +110,8 @@ namespace OmsiMapEditor.OMSI
                     else
                         summary.Warnings.Add("Could not decode an [object] placement in " + tile.FileName + ".");
                 }
-                else if (string.Equals(section.Name, "spline", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(section.Name, "spline", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(section.Name, "spline_h", StringComparison.OrdinalIgnoreCase))
                 {
                     tile.SplineCount++;
                     if (!decodeSplines)
@@ -118,7 +119,7 @@ namespace OmsiMapEditor.OMSI
                     else if (TryReadSpline(section, out var splineRecord))
                         tile.Splines.Add(splineRecord);
                     else
-                        summary.Warnings.Add("Could not decode a [spline] placement in " + tile.FileName + ".");
+                        summary.Warnings.Add("Could not decode a [" + section.Name + "] placement in " + tile.FileName + ".");
                 }
                 else if (string.Equals(section.Name, "attachObj", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(section.Name, "splineAttachement", StringComparison.OrdinalIgnoreCase) ||
@@ -204,7 +205,8 @@ namespace OmsiMapEditor.OMSI
                 Height = height,
                 HeadingDegrees = heading,
                 LengthMeters = length,
-                RadiusMeters = radius
+                RadiusMeters = radius,
+                IsSplineH = string.Equals(section.Name, "spline_h", StringComparison.OrdinalIgnoreCase)
             };
             return true;
         }
