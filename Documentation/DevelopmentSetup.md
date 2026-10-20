@@ -52,10 +52,9 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Export im Spiel | Erfolgreich am 20. Oktober 2026: eine in der App verschobene Scheune erscheint in der exportierten Grundorf-Karte in OMSI an der neuen Position auf der Wendeschleife |
 | Strukturelle Änderungen | Erfolgreich im Arbeitsspeicher: nach dem Entfernen eines Objekts vor Einstiegspunkten zeigen in Grundorf 7/7 und in Berlin-Spandau 51/51 Einstiegspunkte weiter auf ihr Objekt; nach dem Entfernen eines Splines bleiben 57 Anhängungen in Berlin-Spandau auf ihrem Spline. Der Verweisindex findet 17.890 Verweise in Berlin-Spandau in etwa 0,5 s |
 | ID-Vergabe | Erfolgreich: Grundorf und Berlin-Spandau setzen bei `[NextIDCode]` fort, Stadtückheim bei 93 statt beim bereits vergebenen 92 |
-| Unity Test Runner (aktuell) | Erfolgreich: 52 EditMode-Tests am 20. Oktober 2026 nach Einführung des verlustfreien Dateimodells |
 | Verlustfreie Rundreise | Erfolgreich: alle 1.409 Textdateien der drei installierten Karten byte-identisch, darunter 766 Kacheln mit 57.180 Datensätzen, alle mit belegtem Layout; Unity-Batch-Prüfung für Berlin-Spandau 1.172 von 1.172 |
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
-| Unity Test Runner | Erfolgreich: alle 24 EditMode-Tests am 20. Oktober 2026 per Unity Batch-Mode bestanden, inklusive der Einstellungs-Tests |
+| Unity Test Runner | Erfolgreich: alle 87 EditMode-Tests am 20. Oktober 2026 per Unity Batch-Mode bestanden |
 | Spline-Verbindungen | Erfolgreich: Grundorf 36/36, Stadtückheim 17/17, Berlin-Spandau 1.464/1.467 innerhalb 0,5 m; die drei Lücken sind einseitige Verweise in den Kartendaten |
 | Visueller Player-Test | Erfolgreich am 20. Oktober 2026: Grundorf und Berlin-Spandau im gebauten Player geladen, Kacheln und Liste angeklickt, Kartenprüfung über **Tools** ausgeführt; keine Ausnahmen im Player-Log |
 | Editor-Playmode | Noch nicht durchgefuehrt |
@@ -67,8 +66,34 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 - Unity-Assets gemeinsam mit ihren `.meta`-Dateien committen. `Library`, `Temp`, Build-Ausgaben und IDE-Zwischenstaende bleiben ausgeschlossen.
 - Keine privaten absoluten Pfade, Zugangsdaten oder generierten Cachedateien committen.
 
+## Kommandozeile
+
+Alle Befehle laufen in Git Bash vom Projektordner aus. Unity braucht dafür einen geschlossenen Editor, sonst ist das Projekt gesperrt.
+
+```bash
+UNITY="/d/Unity Hub/Unity 6.6/6000.6.6f1/Editor/Unity.exe"
+
+# EditMode-Tests; das Ergebnis steht in der XML-Datei
+"$UNITY" -batchmode -nographics -projectPath "$PWD" -runTests -testPlatform EditMode -testResults /tmp/editmode.xml -logFile /tmp/editmode.log
+
+# Windows-Player nach Builds/Windows/OMSIMapEditor.exe, inklusive Prüfung der Inhaltsgrenze
+"$UNITY" -batchmode -nographics -quit -projectPath "$PWD" -executeMethod OmsiMapEditor.Editor.WindowsPlayerBuild.Build -logFile /tmp/build.log
+
+# Verlustfreie Rundreise einer Karte im Arbeitsspeicher, ohne etwas zu schreiben
+OMSI_MAP_CONFIG="D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cfg" \
+  "$UNITY" -batchmode -nographics -projectPath "$PWD" -executeMethod OmsiMapEditor.OMSI.Editor.OmsiMapCli.VerifyRoundTripFromEnvironment -logFile /tmp/roundtrip.log
+```
+
+**Bei offenem Editor:** Ordner `Assets`, `Packages`, `ProjectSettings` und `Library` in ein temporäres Verzeichnis kopieren, etwa 1,1 GB, und die Befehle dort mit `-projectPath` auf die Kopie ausführen. Die reine Logik in `Editor.Core` und `Editor.OMSI` lässt sich zusätzlich ohne Unity prüfen. Dazu kompiliert man sie mit dem Roslyn-Compiler der Visual Studio Build Tools und NUnit aus `Library/PackageCache/com.unity.ext.nunit@*/net472/unity-custom/`. Die dafür benutzten Hilfsskripte lagen nur im Arbeitsverzeichnis der Sitzung und sind nicht Teil des Repositorys.
+
+**Player-Log:** Der gebaute Player schreibt nach `%USERPROFILE%\AppData\LocalLow\OMSI Map Editor\OMSI Map Editor\Player.log`. Die Kartenansicht meldet dort Neuzeichnungen über 50 ms.
+
 ## Naechste Schritte
 
-1. Das Projekt in Unity Hub oeffnen, **OMSI Map Editor > Import > Read OMSI Map...** waehlen und Grundorfs Kacheldraufsicht visuell pruefen.
-2. Die Spline-Kurvenrichtung und Koordinaten an weiteren Kachelverbindungen visuell gegen den OMSI-Editor pruefen.
-3. Danach den schreibgeschuetzten Import erweitern, der OMSI-Dateien direkt aus der Installation liest, ohne sie als Player-Inhalte zu übernehmen.
+Die offenen Punkte stehen in der [Roadmap](Roadmap.md) unter „Später“. Zuletzt abgeschlossen sind die 2D-Draufsicht mit Bearbeiten und die Objektumrisse. Naheliegende nächste Schritte sind:
+
+1. Genauere, nicht konvexe Umrisse für L-förmige Gebäude, Kreuzungen und Plätze.
+2. Mehrfachauswahl und Übernahme von Objekten in die neue Kachel beim Verschieben über Kachelgrenzen.
+3. Objekte in der App anlegen und löschen; `OmsiTileEditing` und `OmsiReferenceIndex` stellen die Bausteine bereit.
+4. Fahrplandaten lesend importieren, Haltestellen und Linien anzeigen, Chrono-Varianten als Ebenen.
+5. Terrain und 3D-Ansicht.
