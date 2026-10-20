@@ -27,7 +27,7 @@ Am 19. Oktober 2026 wurde derselbe Leser lesend gegen die beiden anderen Karten 
 | Karte | Kacheln | Objekte | Splines | Anbindungen | Terrain | Hinweise |
 |---|---|---|---|---|---|---|
 | Grundorf | 19 | 1.095 | 60 | 37 | 19 | keine Warnungen |
-| Stadtückheim | 164 | 5 | 28 | 0 | 164 | keine Warnungen; 15 davon `[spline_h]` |
+| Stadtückheim | 164 | 5 | 28 | 0 | 164 | eine Warnung: `[NextIDCode]` 92 ist bereits vergeben; 15 Splines als `[spline_h]` |
 | Berlin-Spandau | 369 | 29.450 | 2.486 | 2.520 | 329 | `[worldcoordinates]` mit 371,9-m-Kacheln; 493 Splines als `[spline_h]`; einige in `global.cfg` genannte Kacheln fehlen |
 
 Warm aus dem Dateicache dauert das Einlesen von Berlin-Spandau rund 0,3 s; der erste Zugriff auf die Festplatte kann deutlich länger dauern.

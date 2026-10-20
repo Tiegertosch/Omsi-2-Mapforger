@@ -115,6 +115,21 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void WarnsWhenNextIdCodeIsAlreadyInUse()
+        {
+            WriteOmsiText("global.cfg", "[NextIDCode]", "92", "", "[map]", "0", "0", "tile_0_0.map", "");
+            WriteOmsiText("tile_0_0.map",
+                "[version]", "14", "",
+                "[object]", "0", @"Sceneryobjects\a.sco", "92", "1", "2", "0", "0", "0", "0", "0", "");
+
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+
+            Assert.AreEqual(92, summary.NextIdCode);
+            Assert.AreEqual(92, summary.HighestBaseTileId);
+            Assert.IsTrue(summary.Warnings.Any(warning => warning.Contains("[NextIDCode] 92") && warning.Contains("start at 93")));
+        }
+
+        [Test]
         public void IgnoresTilePathsOutsideTheMapFolder()
         {
             WriteOmsiText("global.cfg", "[map]", "0", "0", @"..\outside.map", "");

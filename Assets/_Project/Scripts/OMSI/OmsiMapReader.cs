@@ -24,7 +24,7 @@ namespace OmsiMapEditor.OMSI
                 throw new FileNotFoundException("The selected global.cfg file does not exist.", fullConfigPath);
 
             var rootPath = Path.GetDirectoryName(fullConfigPath);
-            var sections = ReadSections(fullConfigPath);
+            var sections = ReadSections(fullConfigPath, OmsiGlobalConfigLayouts.Instance);
             var summary = new OmsiMapSummary
             {
                 RootPath = rootPath,
@@ -88,6 +88,14 @@ namespace OmsiMapEditor.OMSI
             if (summary.Tiles.Count == 0)
                 summary.Warnings.Add("No valid [map] tile entries were found in global.cfg.");
 
+            if (int.TryParse(FirstValue(sections, "NextIDCode"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var nextIdCode))
+            {
+                summary.NextIdCode = nextIdCode;
+                if (nextIdCode <= summary.HighestBaseTileId)
+                    summary.Warnings.Add("global.cfg [NextIDCode] " + nextIdCode + " is not above the highest ID " +
+                                         summary.HighestBaseTileId + "; new IDs must start at " + (summary.HighestBaseTileId + 1) + ".");
+            }
+
             return summary;
         }
 
@@ -102,6 +110,7 @@ namespace OmsiMapEditor.OMSI
             var skippedOldSplines = 0;
             foreach (var section in sections)
             {
+                TrackHighestId(section, summary);
                 if (string.Equals(section.Name, "object", StringComparison.OrdinalIgnoreCase))
                 {
                     tile.ObjectCount++;
@@ -164,6 +173,20 @@ namespace OmsiMapEditor.OMSI
                 HeadingDegrees = heading
             };
             return true;
+        }
+
+        private static readonly HashSet<string> SectionsDefiningIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "object", "attachObj", "splineAttachement", "spline", "spline_h"
+        };
+
+        private static void TrackHighestId(Section section, OmsiMapSummary summary)
+        {
+            if (!SectionsDefiningIds.Contains(section.Name))
+                return;
+            var values = Values(section);
+            if (values.Count > 2 && int.TryParse(values[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+                summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, id);
         }
 
         /// <summary>Returns the [version] value of a tile file, or -1 when the file has none.</summary>

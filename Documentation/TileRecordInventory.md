@@ -180,11 +180,15 @@ Die 58 Einstiegspunkte von Grundorf und Berlin-Spandau liegen höchstens 1 m neb
 
 In Grundorf und Berlin-Spandau liegt der Wert genau eins über der höchsten ID, auch über den IDs der Chrono-Kacheln. In Stadtückheim ist er 92, und die ID 92 ist bereits vergeben. Ein Editor muss neue IDs deshalb oberhalb des größeren der beiden Werte vergeben: `[NextIDCode]` und höchste vorhandene ID plus eins.
 
+## Zahlenformat
+
+Der OMSI-Editor schreibt Kommazahlen mit höchstens 15 gültigen Ziffern und invarianter Kultur. Sehr kleine Werte schreibt er wissenschaftlich mit kurzem Exponenten, zum Beispiel `1.33514401335476E-5` oder `-3.59590604939723E-6`. Ganze Werte stehen ohne Nachkommastellen, etwa `300`. Diese Regel reproduziert 243.482 von 243.487 Kommazahlen der drei Karten zeichengenau. Die fünf Ausnahmen haben einen zweistelligen Exponenten wie `1.024455E-06` und stammen von einem anderen Werkzeug. `OmsiNumberFormat` setzt diese Regel um.
+
 ## Folgerungen für Mapforge
 
 1. **Verlustfrei lesen:** Der Leser sollte jeden Datensatz vollständig und positionell lesen. Unbekannte Felder müssen mitsamt Freitext und Reihenfolge erhalten bleiben. Nur so lässt sich eine Kachel unverändert zurückschreiben. Umgesetzt mit `OmsiRecordFile` und `OmsiTileRecordLayouts` (ADR 008).
 2. **Reihenfolge ist Teil des Formats:** Spline-Indizes, Objektindizes der Einstiegspunkte, Elternverweise und Regeln hängen an der Dateireihenfolge. Ein Editor muss diese Indizes beim Einfügen und Löschen nachführen.
-3. **IDs:** Neue IDs müssen kartenweit eindeutig sein und oberhalb des größeren Werts aus `[NextIDCode]` und höchster ID plus eins liegen. Chrono-Kacheln zählen mit.
+3. **IDs:** Neue IDs müssen kartenweit eindeutig sein und oberhalb des größeren Werts aus `[NextIDCode]` und höchster ID plus eins liegen. Chrono-Kacheln zählen mit. Umgesetzt mit `OmsiIdAllocator`; der Leser meldet einen veralteten `[NextIDCode]` als Warnung.
 4. **Validierung:** Neue Prüfungen bieten sich an, etwa für verwaiste Wiederholungen, `[varparent]`-Ziele ohne Element, einen veralteten `[NextIDCode]` und Einstiegspunkte, deren Index oder Winkel nicht zum Objekt passt.
 
 ## Offene Fragen

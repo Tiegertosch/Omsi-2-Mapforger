@@ -27,6 +27,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>True when global.cfg contains [worldcoordinates] and the wider tile grid applies.</summary>
         public bool UsesWorldCoordinates { get; internal set; }
 
+        /// <summary>The [NextIDCode] value of global.cfg, or null when it is missing.</summary>
+        public int? NextIdCode { get; internal set; }
+
+        /// <summary>Highest object, attachment or spline ID in the base tiles; chrono tiles are not read here.</summary>
+        public int HighestBaseTileId { get; internal set; }
+
         public int ObjectCount { get; internal set; }
         public int SplineCount { get; internal set; }
         public int AttachmentCount { get; internal set; }

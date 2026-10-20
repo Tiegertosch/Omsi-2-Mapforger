@@ -43,8 +43,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Vollständige Kachel-Datensätze und `global.cfg` untersuchen (siehe [TileRecordInventory.md](TileRecordInventory.md))
 - [x] Kachel-Datensätze verlustfrei lesen und unverändert zurückschreiben können (ADR 008; Rundreise über alle 1.409 Textdateien byte-identisch)
 - Bearbeitungsablauf mit Speicherziel festlegen; geänderte Dateien nie unbemerkt in die OMSI-Installation schreiben
-- Typisierte Zugriffe für Objekte, Splines und Anhängungen auf dem verlustfreien Modell aufbauen
-- Neue IDs aus `[NextIDCode]` und höchster vorhandener ID vergeben
+- [x] Typisierte Zugriffe für Objekte, Splines und Anhängungen auf dem verlustfreien Modell aufbauen
+- [x] Neue IDs aus `[NextIDCode]` und höchster vorhandener ID vergeben; ein veralteter `[NextIDCode]` wird beim Lesen gemeldet
+- Strukturelle Änderungen ermöglichen: Datensätze einfügen und löschen, Beschriftungsanzahl und `mirror` ändern und abhängige Indizes nachführen
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
 - Haltestellen und Linienverläufe in der Kartenübersicht darstellen
 - Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern
