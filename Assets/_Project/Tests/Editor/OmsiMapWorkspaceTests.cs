@@ -129,6 +129,43 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(10, OmsiIdAllocator.ForMap(Path.Combine(original, "global.cfg")).NextFreeId);
         }
 
+        [Test]
+        public void ReadOnlySessionsCannotEdit()
+        {
+            var session = OmsiMapSession.OpenReadOnly(Path.Combine(original, "global.cfg"));
+
+            Assert.IsFalse(session.CanEdit);
+            Assert.AreEqual(1, session.Read().ObjectCount);
+            Assert.Throws<InvalidOperationException>(() => session.UpdateObject("tile_0_0.map", 5, 1, 2, 0, 0));
+            Assert.IsFalse(session.IsTileModified("tile_0_0.map"));
+        }
+
+        [Test]
+        public void ProjectSessionsSaveObjectEditsIntoTheWorkspace()
+        {
+            var project = Path.Combine(testRoot, "Projects", "Test.omproj");
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), project);
+            var originalBytes = File.ReadAllBytes(Path.Combine(original, "tile_0_0.map"));
+
+            Assert.IsFalse(session.UpdateObject("tile_0_0.map", 5, 10, 20, 0, 0));
+            Assert.IsFalse(session.IsTileModified("tile_0_0.map"));
+            Assert.IsTrue(session.UpdateObject("tile_0_0.map", 5, 12.5, 20, 0, 270));
+            Assert.Throws<InvalidOperationException>(() => session.UpdateObject("tile_0_0.map", 99, 0, 0, 0, 0));
+
+            Assert.IsTrue(session.IsTileModified("tile_0_0.map"));
+            CollectionAssert.AreEqual(new[] { "tile_0_0.map" }, session.ModifiedFiles());
+            var moved = session.Read().Tiles[0].Objects[0];
+            Assert.AreEqual(12.5, moved.LocalX, 1e-12);
+            Assert.AreEqual(270.0, moved.HeadingDegrees, 1e-12);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(Path.Combine(original, "tile_0_0.map")));
+            Assert.IsTrue(File.Exists(Path.Combine(testRoot, "Projects", "Test.workspace", "tile_0_0.map")));
+
+            var reopened = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), project);
+            Assert.AreEqual(12.5, reopened.Read().Tiles[0].Objects[0].LocalX, 1e-12);
+            reopened.RevertTile("tile_0_0.map");
+            Assert.AreEqual(10.0, reopened.Read().Tiles[0].Objects[0].LocalX, 1e-12);
+        }
+
         private static void Write(string folder, string name, params string[] lines)
         {
             File.WriteAllBytes(Path.Combine(folder, name),

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using OmsiMapEditor.Core;
 using OmsiMapEditor.OMSI;
@@ -35,6 +36,13 @@ namespace OmsiMapEditor.UI
         private Vector2 lastMapViewportSize = new Vector2(-1f, -1f);
         private float renderedTilePixels = -1f;
         private string currentProjectName = string.Empty;
+        private OmsiMapSession session;
+        private int? selectedObjectId;
+        private VisualElement exportDialog;
+        private TextField exportFolderField;
+        private TextField exportNameField;
+        private Label exportTargetLabel;
+        private Button exportConfirmButton;
 
         private void Awake()
         {
@@ -64,6 +72,13 @@ namespace OmsiMapEditor.UI
             var openMapMenuItem = root.Q<Button>("open-map-menu-item");
             var openProjectMenuItem = root.Q<Button>("open-project-menu-item");
             var saveProjectMenuItem = root.Q<Button>("save-project-menu-item");
+            var exportMenuItem = root.Q<Button>("export-menu-item");
+            exportDialog = root.Q<VisualElement>("export-dialog");
+            exportFolderField = root.Q<TextField>("export-folder-field");
+            exportNameField = root.Q<TextField>("export-name-field");
+            exportTargetLabel = root.Q<Label>("export-target-label");
+            exportConfirmButton = root.Q<Button>("export-confirm-button");
+            var exportCancelButton = root.Q<Button>("export-cancel-button");
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
             emptyStateOpenButton = root.Q<Button>("empty-state-open-button");
@@ -112,6 +127,18 @@ namespace OmsiMapEditor.UI
                     HidePopup(fileMenu);
                     SaveProjectAs();
                 };
+            if (exportMenuItem != null)
+                exportMenuItem.clicked += () =>
+                {
+                    HidePopup(fileMenu);
+                    OpenExportDialog();
+                };
+            exportFolderField?.RegisterValueChangedCallback(_ => UpdateExportTarget());
+            exportNameField?.RegisterValueChangedCallback(_ => UpdateExportTarget());
+            if (exportConfirmButton != null)
+                exportConfirmButton.clicked += ExportMap;
+            if (exportCancelButton != null)
+                exportCancelButton.clicked += () => HidePopup(exportDialog);
             if (emptyStateOpenButton != null)
                 emptyStateOpenButton.clicked += OpenMap;
             if (fitMapButton != null)
@@ -148,7 +175,7 @@ namespace OmsiMapEditor.UI
                 if (string.IsNullOrEmpty(path))
                     return;
 
-                LoadMap(path, string.Empty);
+                LoadMap(path, string.Empty, null, false);
             }
             catch (Exception exception)
             {
@@ -177,7 +204,7 @@ namespace OmsiMapEditor.UI
                 var projectName = string.IsNullOrWhiteSpace(project.projectName)
                     ? Path.GetFileNameWithoutExtension(fullProjectPath)
                     : project.projectName;
-                LoadMap(project.globalConfigPath, projectName);
+                LoadMap(project.globalConfigPath, projectName, fullProjectPath, false);
             }
             catch (Exception exception)
             {
@@ -211,10 +238,9 @@ namespace OmsiMapEditor.UI
                     globalConfigPath = currentSummary.GlobalConfigPath
                 };
                 File.WriteAllText(fullProjectPath, JsonUtility.ToJson(project, true), new System.Text.UTF8Encoding(false));
-                currentProjectName = project.projectName;
-                RenderProjectBrowser();
-                UpdateMapStateLabel();
-                SetStatus("Project saved: " + fullProjectPath);
+                // From now on the map is read through the project's workspace, which also receives the edits.
+                LoadMap(currentSummary.GlobalConfigPath, project.projectName, fullProjectPath, true);
+                SetStatus("Project saved: " + fullProjectPath + ". Edits are saved to " + session.Workspace.WorkspacePath);
             }
             catch (Exception exception)
             {
@@ -223,23 +249,192 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void LoadMap(string globalConfigPath, string projectName)
+        /// <param name="projectFilePath">The project whose workspace is used; null opens the map read-only.</param>
+        /// <param name="keepView">Keeps zoom, selected tile and selected object, for example after an edit.</param>
+        private void LoadMap(string globalConfigPath, string projectName, string projectFilePath, bool keepView)
         {
-            var summary = OmsiMapReader.Read(Path.GetFullPath(globalConfigPath));
+            var newSession = string.IsNullOrEmpty(projectFilePath)
+                ? OmsiMapSession.OpenReadOnly(globalConfigPath)
+                : OmsiMapSession.OpenProject(globalConfigPath, projectFilePath);
+            var summary = newSession.Read();
+            var previousTile = selectedTile;
+
+            session = newSession;
             splineIndex = OmsiSplineTileIndex.Build(summary);
             currentSummary = summary;
             currentProjectName = projectName ?? string.Empty;
-            selectedTile = currentSummary.Tiles.Count > 0 ? currentSummary.Tiles[0] : null;
-            fitMapToViewport = true;
-            zoomScale = 1f;
+            selectedTile = null;
+            if (keepView && previousTile != null)
+                selectedTile = summary.Tiles.Find(tile => tile.X == previousTile.X && tile.Y == previousTile.Y);
+            if (selectedTile == null)
+                selectedTile = summary.Tiles.Count > 0 ? summary.Tiles[0] : null;
+            if (!keepView)
+            {
+                selectedObjectId = null;
+                fitMapToViewport = true;
+                zoomScale = 1f;
+            }
+
             UpdateMapHeader();
             RenderMapSummary();
             RenderProjectBrowser();
             RenderInspector();
             UpdateMapStateLabel();
-            SetStatus(currentSummary.Name + ": " + currentSummary.Tiles.Count + " tiles loaded from the OMSI installation");
+            SetStatus(currentSummary.Name + ": " + currentSummary.Tiles.Count + " tiles loaded" +
+                      (session.CanEdit ? " through the project workspace" : " read-only from the OMSI installation"));
             if (toolsButton != null)
                 toolsButton.SetEnabled(true);
+        }
+
+        /// <summary>Reads the map again through the same session, keeping the view, after an edit.</summary>
+        private void ReloadMap()
+        {
+            LoadMap(session.GlobalConfigPath, currentProjectName, session.ProjectFilePath, true);
+        }
+
+        private void SelectObject(int objectId)
+        {
+            selectedObjectId = objectId;
+            selectedTileVisual?.SetSelectedObject(objectId);
+            RenderInspector();
+            SetStatus("Selected object #" + objectId + (session != null && session.CanEdit ? "" : " (read-only; save a project to edit)"));
+        }
+
+        private void SelectObjectFromMap(OmsiTileSummary tile, int objectId)
+        {
+            if (ReferenceEquals(tile, selectedTile))
+                SelectObject(objectId);
+        }
+
+        private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField)
+        {
+            if (session == null || !session.CanEdit || selectedTile == null)
+            {
+                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to edit it.");
+                return;
+            }
+            if (!TryParseField(xField, "X", out var x) || !TryParseField(yField, "Y", out var y) ||
+                !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading))
+                return;
+
+            try
+            {
+                if (!session.UpdateObject(selectedTile.FileName, item.Id, x, y, z, heading))
+                {
+                    SetStatus("Object #" + item.Id + " is unchanged.");
+                    return;
+                }
+                ReloadMap();
+                SetStatus("Object #" + item.Id + " saved to the project workspace (" + selectedTile.FileName + ").");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not save object #" + item.Id + ": " + exception.Message);
+            }
+        }
+
+        private bool TryParseField(TextField field, string name, out double value)
+        {
+            var text = (field.value ?? string.Empty).Trim().Replace(',', '.');
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+                !double.IsNaN(value) && !double.IsInfinity(value))
+                return true;
+            SetStatus(name + " is not a number: '" + field.value + "'.");
+            return false;
+        }
+
+        private void RevertSelectedTile()
+        {
+            if (session == null || !session.CanEdit || selectedTile == null)
+                return;
+            try
+            {
+                session.RevertTile(selectedTile.FileName);
+                ReloadMap();
+                SetStatus("Edits of " + selectedTile.FileName + " were discarded; the original tile is shown again.");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not revert " + selectedTile.FileName + ": " + exception.Message);
+            }
+        }
+
+        private void OpenExportDialog()
+        {
+            if (session == null)
+            {
+                SetStatus("Open an OMSI map before exporting.");
+                return;
+            }
+            if (!session.CanEdit)
+            {
+                SetStatus("Exports are built from a project workspace. Save a Mapforge project first.");
+                return;
+            }
+            if (exportDialog == null || exportFolderField == null || exportNameField == null)
+                return;
+
+            var displayName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
+            exportFolderField.SetValueWithoutNotify(Path.GetFileName(OmsiMapExporter.SuggestTargetFolder(session.Workspace)));
+            exportNameField.SetValueWithoutNotify(displayName + " (Mapforge)");
+            UpdateExportTarget();
+            exportDialog.style.display = DisplayStyle.Flex;
+        }
+
+        private string ExportTargetFolder(out string problem)
+        {
+            problem = null;
+            var folderName = (exportFolderField.value ?? string.Empty).Trim();
+            if (folderName.Length == 0 || folderName == "." || folderName == ".." ||
+                folderName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                problem = "Enter a folder name without path separators or special characters.";
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(exportNameField.value))
+                problem = "Enter the name OMSI shows for the exported map.";
+            return Path.Combine(Path.GetDirectoryName(session.Workspace.RootPath), folderName);
+        }
+
+        private void UpdateExportTarget()
+        {
+            if (session == null || !session.CanEdit || exportTargetLabel == null)
+                return;
+
+            var target = ExportTargetFolder(out var problem);
+            if (problem == null && !OmsiMapExporter.CanWriteTo(session.Workspace, target, out var reason))
+                problem = reason;
+            var editedCount = session.ModifiedFiles().Count;
+            exportTargetLabel.text = problem ??
+                                     (Directory.Exists(target) ? "Replaces the earlier Mapforge export in:\n" : "Creates the map folder:\n") +
+                                     target + "\nEdited files included: " + editedCount;
+            exportTargetLabel.EnableInClassList("export-problem", problem != null);
+            exportConfirmButton?.SetEnabled(problem == null);
+        }
+
+        private void ExportMap()
+        {
+            var target = ExportTargetFolder(out var problem);
+            if (problem != null)
+            {
+                SetStatus(problem);
+                return;
+            }
+
+            try
+            {
+                var report = OmsiMapExporter.Export(session.Workspace, target, exportNameField.value);
+                HidePopup(exportDialog);
+                SetStatus("Exported to " + report.TargetFolder + ": " + report.CopiedFileCount + " files, " +
+                          report.EditedFiles.Count + " edited. Select '" + exportNameField.value.Trim() + "' in OMSI.");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Export failed: " + exception.Message);
+            }
         }
 
         private void UpdateMapStateLabel()
@@ -250,8 +445,11 @@ namespace OmsiMapEditor.UI
             var mapName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName)
                 ? currentSummary.Name
                 : currentSummary.FriendlyName;
+            var mode = session != null && session.CanEdit
+                ? session.ModifiedFiles().Count + " edited file(s)"
+                : "read-only";
             mapStateLabel.text = (string.IsNullOrWhiteSpace(currentProjectName) ? "Map: " + mapName : "Project: " + currentProjectName) +
-                                 "  |  " + currentSummary.Tiles.Count + " tiles";
+                                 "  |  " + currentSummary.Tiles.Count + " tiles  |  " + mode;
         }
 
         private static string SanitizeFileName(string value)
@@ -352,6 +550,11 @@ namespace OmsiMapEditor.UI
                 return;
 
             var previousTile = selectedTile;
+            if (!ReferenceEquals(previousTile, tile))
+            {
+                selectedObjectId = null;
+                selectedTileVisual?.SetSelectedObject(null);
+            }
             selectedTile = tile;
             SetTileHighlight(previousTile, false);
             SetTileHighlight(tile, true);
@@ -557,7 +760,9 @@ namespace OmsiMapEditor.UI
                 foreach (var tile in summary.Tiles)
                 {
                     var visualTile = new MapTileVisualElement(tile, splineIndex?.GetSegments(tile.X, tile.Y), summary.TileSizeMeters, tilePixels >= 112f,
-                        ReferenceEquals(tile, selectedTile), SelectTile);
+                        ReferenceEquals(tile, selectedTile), SelectTile, SelectObjectFromMap);
+                    if (ReferenceEquals(tile, selectedTile))
+                        visualTile.SetSelectedObject(selectedObjectId);
                     visualTile.style.left = (tile.X - minX) * (tilePixels + tileGap);
                     visualTile.style.top = (maxY - tile.Y) * (tilePixels + tileGap);
                     visualTile.style.width = tilePixels;
@@ -649,9 +854,12 @@ namespace OmsiMapEditor.UI
                 var capturedTile = tile;
                 var entry = new Button(() => SelectTile(capturedTile))
                 {
-                    text = "Tile " + tile.X + ", " + tile.Y + "     " + tile.ObjectCount + " obj  /  " + tile.SplineCount + " spl"
+                    text = "Tile " + tile.X + ", " + tile.Y + "     " + tile.ObjectCount + " obj  /  " + tile.SplineCount + " spl" +
+                           (IsTileEdited(tile) ? "  • edited" : string.Empty)
                 };
                 entry.AddToClassList("browser-tile-entry");
+                if (IsTileEdited(tile))
+                    entry.AddToClassList("browser-tile-entry-edited");
                 if (ReferenceEquals(tile, selectedTile))
                     entry.AddToClassList("browser-tile-entry-selected");
                 if (!tile.IsAvailable)
@@ -694,8 +902,15 @@ namespace OmsiMapEditor.UI
                 ? selectedTile.TerrainMinHeight.ToString("F1") + " to " + selectedTile.TerrainMaxHeight.ToString("F1") + " m"
                 : "Unavailable");
 
+            // The object editor scrolls together with the record lists, so neither squeezes the other.
             var records = new ScrollView(ScrollViewMode.Vertical);
             records.AddToClassList("inspector-records");
+            var selectedObject = selectedObjectId.HasValue ? selectedTile.Objects.Find(item => item.Id == selectedObjectId.Value) : null;
+            if (selectedObject != null)
+                AddObjectEditor(records, selectedObject);
+            else if (IsTileEdited(selectedTile))
+                AddRevertTileButton(records);
+
             var objectsHeading = new Label("OBJECT PLACEMENTS");
             objectsHeading.AddToClassList("inspector-section-heading");
             records.Add(objectsHeading);
@@ -706,7 +921,11 @@ namespace OmsiMapEditor.UI
                 var details = "#" + item.Id + "  " + item.AssetPath + "\n" +
                               "X " + item.LocalX.ToString("F1") + "  Y " + item.LocalY.ToString("F1") +
                               "  H " + item.Height.ToString("F1") + " m  •  " + item.HeadingDegrees.ToString("F1") + "°";
-                AddInspectorRecord(records, details, "inspector-record");
+                var record = AddInspectorRecord(records, details, "inspector-record");
+                record.AddToClassList("inspector-record-clickable");
+                record.EnableInClassList("inspector-record-selected", item.Id == selectedObjectId);
+                var objectId = item.Id;
+                record.RegisterCallback<ClickEvent>(_ => SelectObject(objectId));
             }
 
             var splinesHeading = new Label("SPLINE PLACEMENTS");
@@ -737,11 +956,73 @@ namespace OmsiMapEditor.UI
             inspectorPanel.Add(row);
         }
 
-        private static void AddInspectorRecord(VisualElement container, string text, string className)
+        private static Label AddInspectorRecord(VisualElement container, string text, string className)
         {
             var record = new Label(text);
             record.AddToClassList(className);
             container.Add(record);
+            return record;
+        }
+
+        private bool IsTileEdited(OmsiTileSummary tile)
+        {
+            return session != null && session.CanEdit && session.IsTileModified(tile.FileName);
+        }
+
+        /// <summary>Position and heading fields for the selected object; read-only without a project.</summary>
+        private void AddObjectEditor(VisualElement container, OmsiObjectRecord item)
+        {
+            var editor = new VisualElement();
+            editor.AddToClassList("inspector-edit");
+            var heading = new Label("SELECTED OBJECT");
+            heading.AddToClassList("inspector-section-heading");
+            editor.Add(heading);
+            var name = new Label("#" + item.Id + "  " + item.AssetPath);
+            name.AddToClassList("inspector-edit-name");
+            editor.Add(name);
+
+            var xField = AddEditField(editor, "X (m)", item.LocalX);
+            var yField = AddEditField(editor, "Y (m)", item.LocalY);
+            var zField = AddEditField(editor, "Height (m)", item.Height);
+            var headingField = AddEditField(editor, "Heading (°)", item.HeadingDegrees);
+
+            var canEdit = session != null && session.CanEdit;
+            if (canEdit)
+            {
+                var apply = new Button(() => ApplyObjectEdit(item, xField, yField, zField, headingField)) { text = "Apply" };
+                apply.AddToClassList("map-control-button");
+                apply.AddToClassList("inspector-edit-apply");
+                editor.Add(apply);
+                if (IsTileEdited(selectedTile))
+                    AddRevertTileButton(editor);
+            }
+            else
+            {
+                foreach (var field in new[] { xField, yField, zField, headingField })
+                    field.SetEnabled(false);
+                var hint = new Label("Read-only. Save a Mapforge project (File > Save map project as...) to edit this map.");
+                hint.AddToClassList("muted");
+                hint.AddToClassList("inspector-edit-hint");
+                editor.Add(hint);
+            }
+
+            container.Add(editor);
+        }
+
+        private static TextField AddEditField(VisualElement container, string label, double value)
+        {
+            var field = new TextField(label) { value = OmsiNumberFormat.Format(value) };
+            field.AddToClassList("inspector-edit-field");
+            container.Add(field);
+            return field;
+        }
+
+        private void AddRevertTileButton(VisualElement container)
+        {
+            var revert = new Button(RevertSelectedTile) { text = "Revert tile edits" };
+            revert.AddToClassList("map-control-button");
+            revert.AddToClassList("inspector-edit-revert");
+            container.Add(revert);
         }
     }
 }

@@ -45,6 +45,7 @@
         <ui:VisualElement name="file-menu" class="menu-popup file-menu">
             <ui:Button name="open-project-menu-item" text="Open Mapforge project..." class="menu-popup-item" />
             <ui:Button name="save-project-menu-item" text="Save map project as..." class="menu-popup-item" />
+            <ui:Button name="export-menu-item" text="Export to OMSI..." class="menu-popup-item" />
             <ui:Label class="menu-divider" />
             <ui:Button name="open-map-menu-item" text="Open OMSI map..." class="menu-popup-item" />
         </ui:VisualElement>
@@ -52,8 +53,23 @@
             <ui:Label text="OMSI Map Editor" class="popup-title" />
             <ui:Label text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
             <ui:Label text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
+            <ui:Label text="With a project, click an object in a tile or in the inspector list to edit its position and heading. Edits are saved to the project's workspace; the original map is not changed." class="popup-description" />
+            <ui:Label text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
             <ui:Label text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
             <ui:Button name="help-menu-close-button" text="Close" class="menu-popup-item popup-close" />
+        </ui:VisualElement>
+        <ui:VisualElement name="export-dialog" class="dialog-overlay" style="display: none;">
+            <ui:VisualElement class="dialog">
+                <ui:Label text="Export to OMSI" class="popup-title" />
+                <ui:Label text="Writes the original map plus the edits of this project as a separate map folder next to the original. The original map is not changed." class="popup-description" />
+                <ui:TextField name="export-folder-field" label="Folder name" class="dialog-field" />
+                <ui:TextField name="export-name-field" label="Name in OMSI" class="dialog-field" />
+                <ui:Label name="export-target-label" class="popup-description export-target" />
+                <ui:VisualElement class="dialog-buttons">
+                    <ui:Button name="export-cancel-button" text="Cancel" class="map-control-button" />
+                    <ui:Button name="export-confirm-button" text="Export" class="map-control-button dialog-primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement class="status-bar">
             <ui:Label name="status-message" text="Ready" />

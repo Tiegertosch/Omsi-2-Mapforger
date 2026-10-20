@@ -10,15 +10,21 @@ namespace OmsiMapEditor.UI
     internal sealed class MapTileVisualElement : VisualElement
     {
         private const float Padding = 8f;
+
+        /// <summary>A click selects the nearest object within this many pixels.</summary>
+        private const float ObjectPickRadius = 8f;
+
         private static readonly Color SplineColor = new Color(0.95f, 0.71f, 0.30f, 0.95f);
         private static readonly Color ObjectColor = new Color(0.56f, 0.82f, 0.94f, 0.95f);
+        private static readonly Color SelectedObjectColor = new Color(1f, 0.36f, 0.42f, 1f);
         private readonly OmsiTileSummary tile;
         private readonly IReadOnlyList<OmsiLineSegment> splineSegments;
         private readonly double tileSize;
+        private int? selectedObjectId;
 
         public MapTileVisualElement(OmsiTileSummary tile, IReadOnlyList<OmsiLineSegment> splineSegments, double tileSize,
             bool showDetails, bool isSelected,
-            Action<OmsiTileSummary> onSelected)
+            Action<OmsiTileSummary> onSelected, Action<OmsiTileSummary, int> onObjectPicked = null)
         {
             this.tile = tile;
             this.splineSegments = splineSegments ?? Array.Empty<OmsiLineSegment>();
@@ -32,7 +38,13 @@ namespace OmsiMapEditor.UI
 
             if (onSelected != null)
             {
-                RegisterCallback<ClickEvent>(_ => onSelected(tile));
+                RegisterCallback<ClickEvent>(evt =>
+                {
+                    onSelected(tile);
+                    var picked = PickObject(this.WorldToLocal(evt.position));
+                    if (picked != null && onObjectPicked != null)
+                        onObjectPicked(tile, picked.Id);
+                });
                 RegisterCallback<KeyDownEvent>(evt =>
                 {
                     if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter && evt.keyCode != KeyCode.Space)
@@ -77,6 +89,31 @@ namespace OmsiMapEditor.UI
         public void SetSelected(bool isSelected)
         {
             EnableInClassList("map-tile-selected", isSelected);
+        }
+
+        /// <summary>Highlights one object of this tile, or none.</summary>
+        public void SetSelectedObject(int? objectId)
+        {
+            if (selectedObjectId == objectId)
+                return;
+            selectedObjectId = objectId;
+            MarkDirtyRepaint();
+        }
+
+        private OmsiObjectRecord PickObject(Vector2 localPosition)
+        {
+            OmsiObjectRecord nearest = null;
+            var nearestDistance = ObjectPickRadius;
+            foreach (var item in tile.Objects)
+            {
+                var distance = Vector2.Distance(localPosition, ToLocalPoint(item.LocalX, item.LocalY, resolvedStyle.width, resolvedStyle.height));
+                if (distance <= nearestDistance)
+                {
+                    nearest = item;
+                    nearestDistance = distance;
+                }
+            }
+            return nearest;
         }
 
         private void DrawMapRecords(MeshGenerationContext context)
@@ -125,6 +162,28 @@ namespace OmsiMapEditor.UI
                 painter.BeginPath();
                 painter.Arc(point, 2.2f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
                 painter.Fill();
+            }
+
+            if (selectedObjectId.HasValue)
+            {
+                foreach (var item in tile.Objects)
+                {
+                    if (item.Id != selectedObjectId.Value)
+                        continue;
+                    var point = ToLocalPoint(item.LocalX, item.LocalY, resolvedStyle.width, resolvedStyle.height);
+                    // The heading line shows the direction: 0 degrees points north (up), 90 east (right).
+                    var heading = (float)(item.HeadingDegrees * Math.PI / 180.0);
+                    painter.strokeColor = SelectedObjectColor;
+                    painter.lineWidth = 2f;
+                    painter.BeginPath();
+                    painter.Arc(point, 5.5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                    painter.Stroke();
+                    painter.BeginPath();
+                    painter.MoveTo(point);
+                    painter.LineTo(point + new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading)) * 11f);
+                    painter.Stroke();
+                    break;
+                }
             }
         }
 
