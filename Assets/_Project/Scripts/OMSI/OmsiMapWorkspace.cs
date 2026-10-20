@@ -47,6 +47,16 @@ namespace OmsiMapEditor.OMSI
             return File.ReadAllBytes(File.Exists(edited) ? edited : OmsiRelativePath.Resolve(RootPath, relativePath));
         }
 
+        /// <summary>Files of the original map and the workspace together; edited copies are listed once.</summary>
+        public IReadOnlyList<string> EnumerateFiles(string relativeFolder, string searchPattern, bool recursive)
+        {
+            var result = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            OmsiRelativePath.AddFiles(RootPath, relativeFolder, searchPattern, recursive, result);
+            OmsiRelativePath.AddFiles(WorkspacePath, relativeFolder, searchPattern, recursive, result);
+            result.RemoveWhere(path => path.EndsWith(".mapforge-tmp", StringComparison.OrdinalIgnoreCase));
+            return new List<string>(result);
+        }
+
         public bool IsModified(string relativePath)
         {
             return File.Exists(WorkspaceFile(relativePath));

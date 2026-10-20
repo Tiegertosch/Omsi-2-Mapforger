@@ -45,7 +45,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Bearbeitungsablauf mit Speicherziel festlegen: Arbeitskopie im Projekt, Export als eigene OMSI-Karte (ADR 009)
 - [x] Typisierte Zugriffe für Objekte, Splines und Anhängungen auf dem verlustfreien Modell aufbauen
 - [x] Neue IDs aus `[NextIDCode]` und höchster vorhandener ID vergeben; ein veralteter `[NextIDCode]` wird beim Lesen gemeldet
-- Strukturelle Änderungen ermöglichen: Datensätze einfügen und löschen, Beschriftungsanzahl und `mirror` ändern und abhängige Indizes nachführen
+- [x] Strukturelle Änderungen ermöglichen: Datensätze einfügen und löschen, Beschriftungsanzahl und `mirror` ändern und abhängige Indizes nachführen
+- Splines mit Nachbarn löschen und die Nachbarverweise in anderen Kacheln mitführen; bisher wird das Löschen dann verweigert
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
 - Haltestellen und Linienverläufe in der Kartenübersicht darstellen
 - Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern

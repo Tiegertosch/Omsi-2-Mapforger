@@ -16,6 +16,12 @@ namespace OmsiMapEditor.OMSI
         bool FileExists(string relativePath);
 
         byte[] ReadAllBytes(string relativePath);
+
+        /// <summary>
+        /// Relative paths of the files in a folder of the map ("" for the map folder itself), sorted and without
+        /// duplicates. A missing folder yields no files.
+        /// </summary>
+        IReadOnlyList<string> EnumerateFiles(string relativeFolder, string searchPattern, bool recursive);
     }
 
     /// <summary>Reads a map folder directly.</summary>
@@ -38,6 +44,13 @@ namespace OmsiMapEditor.OMSI
         public byte[] ReadAllBytes(string relativePath)
         {
             return File.ReadAllBytes(OmsiRelativePath.Resolve(RootPath, relativePath));
+        }
+
+        public IReadOnlyList<string> EnumerateFiles(string relativeFolder, string searchPattern, bool recursive)
+        {
+            var result = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            OmsiRelativePath.AddFiles(RootPath, relativeFolder, searchPattern, recursive, result);
+            return new List<string>(result);
         }
     }
 
@@ -73,6 +86,17 @@ namespace OmsiMapEditor.OMSI
         public static string Resolve(string rootPath, string relativePath)
         {
             return Path.Combine(rootPath, Normalize(relativePath));
+        }
+
+        /// <summary>Adds the relative paths of matching files below <paramref name="root"/> to <paramref name="result"/>.</summary>
+        internal static void AddFiles(string root, string relativeFolder, string searchPattern, bool recursive, ISet<string> result)
+        {
+            var folder = string.IsNullOrEmpty(relativeFolder) ? root : Resolve(root, relativeFolder);
+            if (!Directory.Exists(folder))
+                return;
+            var prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            foreach (var path in Directory.GetFiles(folder, searchPattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly))
+                result.Add(path.Substring(prefix.Length));
         }
 
         /// <summary>True when <paramref name="path"/> is <paramref name="folder"/> or lies inside it.</summary>

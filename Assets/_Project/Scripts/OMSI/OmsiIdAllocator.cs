@@ -86,8 +86,7 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Same as <see cref="ForMap(string)"/> through a file source, so a workspace's edited tiles count. Chrono
-        /// tiles are always read from the original map folder because the workspace does not list them.
+        /// Same as <see cref="ForMap(string)"/> through a file source, so a workspace's edited tiles count.
         /// </summary>
         public static OmsiIdAllocator ForMap(IOmsiFileSource source, string globalConfigRelativePath = "global.cfg")
         {
@@ -105,10 +104,7 @@ namespace OmsiMapEditor.OMSI
                     tileFiles.Add(record.GetField(2));
             }
 
-            var chronoFolder = Path.Combine(source.RootPath, "Chrono");
-            if (Directory.Exists(chronoFolder))
-                foreach (var path in Directory.GetFiles(chronoFolder, "tile_*.map", SearchOption.AllDirectories))
-                    tileFiles.Add(path.Substring(source.RootPath.Length).TrimStart(Path.DirectorySeparatorChar));
+            tileFiles.AddRange(source.EnumerateFiles("Chrono", "tile_*.map", true));
 
             var ids = new List<int>();
             foreach (var tile in tileFiles)

@@ -18,7 +18,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The line without its ending, exactly as stored.</summary>
         public string Text { get; internal set; }
 
-        public string Ending { get; }
+        public string Ending { get; internal set; }
     }
 
     /// <summary>
@@ -55,13 +55,55 @@ namespace OmsiMapEditor.OMSI
             return Fields[index].Text.Trim();
         }
 
-        /// <summary>Replaces a field value; the line keeps its original ending.</summary>
-        public void SetField(int index, string value)
+        /// <summary>Line ending for lines added to this record: the header's, or CRLF when it has none.</summary>
+        private string NewLineEnding => Header.Ending.Length > 0 ? Header.Ending : "\r\n";
+
+        /// <summary>Inserts a field line; used for structural changes such as the optional mirror line.</summary>
+        public void InsertField(int index, string value)
+        {
+            CheckFieldText(value);
+            Fields.Insert(index, new OmsiLine(value, NewLineEnding));
+        }
+
+        public void RemoveField(int index)
+        {
+            Fields.RemoveAt(index);
+        }
+
+        /// <summary>
+        /// Replaces a count field and the lines it counts, for example an object's labels, and keeps the following
+        /// fields in place.
+        /// </summary>
+        public void ReplaceCountedLines(int countIndex, IList<string> lines)
+        {
+            if (lines == null)
+                throw new ArgumentNullException(nameof(lines));
+            if (!TryGetInt(countIndex, out var oldCount) || oldCount < 0 || countIndex + 1 + oldCount > Fields.Count)
+                throw new InvalidOperationException("Field " + countIndex + " of [" + Name + "] is not a valid count.");
+            foreach (var line in lines)
+                CheckFieldText(line);
+
+            Fields.RemoveRange(countIndex + 1, oldCount);
+            for (var index = 0; index < lines.Count; index++)
+                Fields.Insert(countIndex + 1 + index, new OmsiLine(lines[index], NewLineEnding));
+            SetField(countIndex, lines.Count.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static void CheckFieldText(string value)
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
             if (value.IndexOf('\r') >= 0 || value.IndexOf('\n') >= 0)
                 throw new ArgumentException("A field value must not contain a line break.", nameof(value));
+        }
+
+        /// <summary>The last line of the record, or the header when it has no other lines.</summary>
+        internal OmsiLine LastLine => Trailer.Count > 0 ? Trailer[Trailer.Count - 1] : Fields.Count > 0 ? Fields[Fields.Count - 1] : Header;
+
+        /// <summary>Replaces a field value; the line keeps its original ending.</summary>
+        public void SetField(int index, string value)
+        {
+            CheckFieldText(value);
             Fields[index].Text = value;
         }
 
@@ -200,6 +242,49 @@ namespace OmsiMapEditor.OMSI
 
             file.IsExactRoundTrip = ByteArraysEqual(bytes, file.ToBytes());
             return file;
+        }
+
+        /// <summary>
+        /// Creates a record that uses this file's line ending, followed by blank lines. It is not part of the file
+        /// until <see cref="InsertRecord"/> adds it.
+        /// </summary>
+        public OmsiRecord CreateRecord(string name, IEnumerable<string> fields, int blankLinesAfter = 1)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.IndexOf('[') >= 0 || name.IndexOf(']') >= 0)
+                throw new ArgumentException("Expected a section name without brackets.", nameof(name));
+            if (fields == null)
+                throw new ArgumentNullException(nameof(fields));
+
+            var record = new OmsiRecord(new OmsiLine("[" + name + "]", DefaultLineEnding), name, true);
+            foreach (var field in fields)
+            {
+                if (field == null || field.IndexOf('\r') >= 0 || field.IndexOf('\n') >= 0)
+                    throw new ArgumentException("A field value must not be null or contain a line break.", nameof(fields));
+                record.Fields.Add(new OmsiLine(field, DefaultLineEnding));
+            }
+            for (var line = 0; line < blankLinesAfter; line++)
+                record.Trailer.Add(new OmsiLine(string.Empty, DefaultLineEnding));
+            return record;
+        }
+
+        /// <summary>Inserts a record; a line before it that ended the file gets a line ending so the two stay apart.</summary>
+        public void InsertRecord(int index, OmsiRecord record)
+        {
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+            if (Records.Contains(record))
+                throw new InvalidOperationException("The record is already part of the file.");
+
+            var previous = index > 0 ? Records[index - 1].LastLine : Preamble.Count > 0 ? Preamble[Preamble.Count - 1] : null;
+            if (previous != null && previous.Ending.Length == 0)
+                previous.Ending = DefaultLineEnding;
+            Records.Insert(index, record);
+        }
+
+        public void RemoveRecord(OmsiRecord record)
+        {
+            if (!Records.Remove(record))
+                throw new InvalidOperationException("The record is not part of the file.");
         }
 
         /// <summary>Serializes the file in its original encoding, line endings and record order.</summary>

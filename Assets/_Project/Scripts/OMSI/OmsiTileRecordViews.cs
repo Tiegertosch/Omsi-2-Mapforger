@@ -84,6 +84,12 @@ namespace OmsiMapEditor.OMSI
         {
             SetCountedLine(9, index, text);
         }
+
+        /// <summary>Replaces all labels, changing their count if needed.</summary>
+        public void SetLabels(IList<string> labels)
+        {
+            Record.ReplaceCountedLines(9, labels);
+        }
     }
 
     /// <summary>An [attachObj] record (tile version 12 and later).</summary>
@@ -108,6 +114,11 @@ namespace OmsiMapEditor.OMSI
         public void SetLabel(int index, string text)
         {
             SetCountedLine(9, index, text);
+        }
+
+        public void SetLabels(IList<string> labels)
+        {
+            Record.ReplaceCountedLines(9, labels);
         }
     }
 
@@ -219,8 +230,20 @@ namespace OmsiMapEditor.OMSI
         public double AlignmentLength { get => GetDouble(alignmentIndex); set => SetDouble(alignmentIndex, value); }
 
         /// <summary>True when the optional mirror line follows; every path then lies at the negated offset.</summary>
-        public bool IsMirrored => Record.Fields.Count > alignmentIndex + 1 &&
-                                  string.Equals(Record.GetField(alignmentIndex + 1), "mirror", StringComparison.Ordinal);
+        public bool IsMirrored
+        {
+            get => Record.Fields.Count > alignmentIndex + 1 &&
+                   string.Equals(Record.GetField(alignmentIndex + 1), "mirror", StringComparison.Ordinal);
+            set
+            {
+                if (value == IsMirrored)
+                    return;
+                if (value)
+                    Record.InsertField(alignmentIndex + 1, "mirror");
+                else
+                    Record.RemoveField(alignmentIndex + 1);
+            }
+        }
 
         /// <summary>Height at the end point.</summary>
         public double EndHeight => Height + HeightDifference;
