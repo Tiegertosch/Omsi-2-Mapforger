@@ -21,7 +21,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Kartenübersicht an den Viewport anpassen, Zoomsteuerung ergänzen und Kartenkopf beim Scrollen sichtbar halten
 - [x] Koordinatentransformation und Kurvenrichtung an den Kachelverbindungen prüfen: rechnerisch über die Endpunkte verbundener Splines in allen drei installierten Karten
 - [x] Spline-Verbindungsprüfung als erste Kartenvalidierung in App und Unity-Fenster anbieten
-- [ ] Chrono-Varianten und TTData getrennt untersuchen
+- [x] Chrono-Varianten und TTData getrennt untersuchen (siehe [TimetableChronoInventory.md](TimetableChronoInventory.md))
 - [x] Tatsächliche Player-Abhängigkeiten prüfen und OMSI-Spielinhalte vom Ausliefern ausschließen; externes Lesen bleibt erlaubt
 - [x] Textdateien unabhängig von der Laufzeit-Codepage dekodieren und Datensätze streng positionell lesen
 - [x] Leser gegen Stadtückheim und Berlin-Spandau gegenprüfen
@@ -40,3 +40,6 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Exakte Kachelgeometrie von `[worldcoordinates]`-Karten aus der Kachelnummer ableiten; die feste Kante weicht bis etwa 0,35 m ab
 - Objekte darstellen, die OMSI mit Koordinaten außerhalb ihrer eigenen Kachel speichert (18 in Berlin-Spandau)
 - Spline-Datensätze vor Kachelversion 11 dekodieren
+- Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
+- Haltestellen und Linienverläufe in der Kartenübersicht darstellen
+- Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern

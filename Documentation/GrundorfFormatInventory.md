@@ -12,7 +12,7 @@ Die Untersuchung erfolgte lesend direkt im installierten OMSI-2-Ordner. Die Kart
 - Grundorf verwendet das klassische kartesische Raster mit 300 m Kantenlänge pro Kachel. Die lokale Position wird für die Übersicht als `Welt-X = Kachel-X * 300 + Objekt-X` und `Welt-Y = Kachel-Y * 300 + Objekt-Y` behandelt. [openOMSI-Formatnotizen](https://github.com/openOMSI-org/openOMSI/blob/main/docs/FORMATS.md) beschreiben diese Feldreihenfolge; sie sind Reverse-Engineering-Notizen und keine offizielle OMSI-Spezifikation.
 - Die Kachel-`.map`-Dateien sind Text mit wiederholten Abschnittsmarkern, darunter `[object]`, `[spline]`, `[rule]` und `[varparent]`. Im Version-14-Objekteintrag folgen auf Typ, Asset-Pfad und ID die lokale X/Y-Position, Höhe sowie Heading/Pitch/Bank. Ein Splineeinstieg enthält Pfad, ID, Nachbar-IDs, Startposition, Heading, Länge und Kurvenradius. Objekt- und Spline-Einträge verweisen auf externe `.sco`- beziehungsweise `.sli`-Dateien.
 - Jede der 19 Basiskacheln besitzt eine 14.888 Byte große `.terrain`-Datei. Der beobachtete Headerwert `60` wird gefolgt von 61 × 61 little-endian `float`-Höhenwerten. Der Importer liest diese Werte nur zur Min-/Max-Höhenangabe in den Arbeitsspeicher; Terrain-Meshes werden nicht erzeugt.
-- `TTData` enthält Linien-, Fahrplan-, Tour- und Haltestellendaten. `Chrono` enthält zeitabhängige Varianten, darunter eine alternative Kachel. Beides gehört noch nicht zum ersten Importumfang.
+- `TTData` enthält Linien-, Fahrplan-, Tour- und Haltestellendaten. `Chrono` enthält zeitabhängige Varianten als Änderungslisten. Beides gehört noch nicht zum Importumfang; der Formatbefund steht in [TimetableChronoInventory.md](TimetableChronoInventory.md).
 
 ## Umgesetzter erster Import
 
