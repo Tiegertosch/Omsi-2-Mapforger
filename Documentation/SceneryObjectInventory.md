@@ -59,9 +59,20 @@ Verwendet werden nur Textdateien (`xof 0303txt`). Mapforge liest Frames mit ihre
 `OmsiObjectOutlineCatalog` berechnet je Objektart einen Umriss in dieser Reihenfolge:
 
 1. **Baum:** ein Kreis mit mittlerer Höhe mal mittlerem Breitenfaktor als Durchmesser.
-2. **Modelle:** die konvexe Hülle aller Eckpunkte, die zu einem Dreieck gehören. Editor-Hilfsmodelle zählen nur, wenn das Objekt keine anderen hat. Alle Detailstufen werden zusammengefasst.
+2. **Modelle:** die Fläche, die die Dreiecke von oben bedecken. Editor-Hilfsmodelle zählen nur, wenn das Objekt keine anderen hat. Alle Detailstufen werden zusammengefasst.
 3. **Bounding Box:** ein Rechteck, wenn kein Modell lesbar ist.
-4. **Fahrspuren:** die Hülle der auf ihre Breite erweiterten Spuren.
+4. **Fahrspuren:** die Fläche der auf ihre Breite erweiterten Spuren.
+
+**Kontur statt Hülle:** `OmsiFootprintTracer` zeichnet die Dreiecke in ein Raster mit 0,2 m Zellen; Objekte über 200 m bekommen gröbere Zellen, höchstens 1.000 je Seite. Eine Zelle gilt als bedeckt, wenn ihr Mittelpunkt in einem Dreieck liegt. Dreiecke, die schmaler als eine Zelle sind, etwa Wände von oben gesehen, bedecken stattdessen die Zellen entlang ihrer Kanten. Die Ränder der bedeckten Fläche werden zu geschlossenen Konturen verbunden: außen gegen den Uhrzeigersinn, Löcher wie Innenhöfe im Uhrzeigersinn. Nur über eine Ecke verbundene Zellen bleiben getrennte Teile. Danach glättet Douglas-Peucker mit einer Zelle Toleranz die Rasterstufen. Teile unter 0,5 m² entfallen, solange es größere gibt. Die konvexe Hülle bleibt zusätzlich erhalten; die Kartenansicht nutzt sie für Sichtbarkeit und Abstand.
+
+**Senkrechte Flächen:** Pflanzen und Tiere sind oft gekreuzte senkrechte Flächen, die von oben keine Fläche haben. Ein Modell bis 20 m, dessen Dreiecke weniger als 5 % seiner Hülle bedecken, wird deshalb durch seine Hülle ersetzt. Zäune behalten ihre Linie, weil ihre Hülle selbst keine Fläche hat.
+
+| Karte | Objektarten verglichen | Fläche/Hülle im Median | unter 80 % der Hülle | unter 50 % |
+|---|---|---|---|---|
+| Grundorf | 85 | 0,98 | 4 | 1 |
+| Berlin-Spandau | 814 | 0,97 | 154 | 41 |
+
+Am stärksten weichen lange Wohnzeilen in L-, U- und Mäanderform, große Kreuzungen, Brücken und Gelände mit verstreuten Teilen ab; dort deckt die Kontur oft nur ein Fünftel bis die Hälfte der Hülle. Bäume ohne Modell und Rechtecke bleiben unverändert. Bei kleinen Objekten kann die Kontur durch das Raster um bis zu eine Zelle größer sein als die Hülle.
 
 | Karte | Objektarten | mit Umriss | aus Modellen | als Baum | Platzierungen mit Umriss |
 |---|---|---|---|---|---|
@@ -69,10 +80,11 @@ Verwendet werden nur Textdateien (`xof 0303txt`). Mapforge liest Frames mit ihre
 | Stadtückheim | 5 | 5 | 5 | 0 | 5 von 5 |
 | Berlin-Spandau | 872 | 872 | 839 | 33 | 29.450 von 29.450 |
 
-Der Katalog für Berlin-Spandau braucht samt Lesen der Karte etwa 1,4 s. Die App berechnet ihn im Hintergrund.
+Der Katalog für Berlin-Spandau braucht ohne das Lesen der Karte etwa 2,8 s, wenn die Modelldateien im Dateicache liegen. Beim ersten Lesen von der Festplatte dauerte er 36 s. Die App berechnet ihn im Hintergrund. Über alle Platzierungen von Berlin-Spandau haben die Konturen 281.000 Eckpunkte, die Hüllen 235.000.
 
 ## Grenzen
 
-- **Konvexe Hülle:** L-förmige Gebäude und große Kreuzungen oder Plätze erscheinen größer als sie sind. Eine genauere, nicht konvexe Kontur steht auf der Roadmap.
+- **Raster:** Die Kontur ist auf etwa eine Zelle genau, also 0,2 m bei Objekten bis 200 m. Überstehende Dächer zählen zur Fläche, weil die Draufsicht sie zeigt.
+- **Gemischte Modelle:** Gekreuzte Flächen, die mit flachen Teilen in einem Modell liegen, etwa Bäume in Kleingärten, bleiben dünne Kreuze.
 - **Ausgelassene Angaben:** Animationen, `[visible]`-Varianten und die Matrix `0x79` werden nicht berücksichtigt.
 - **Bäume:** OMSI wählt die Baumgröße pro Platzierung zufällig im angegebenen Bereich. Mapforge zeigt den Mittelwert.

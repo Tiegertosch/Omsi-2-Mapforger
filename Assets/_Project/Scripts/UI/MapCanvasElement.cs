@@ -58,10 +58,13 @@ namespace OmsiMapEditor.UI
         /// <summary>Outlines are drawn from this scale on; further out the map shows markers only.</summary>
         private const float OutlineMetersPerPixel = 1.5f;
 
-        /// <summary>An outline in the object frame with its extent, for culling and picking.</summary>
+        /// <summary>
+        /// An outline in the object frame with its extent, for culling and picking. Outer contours run
+        /// counter-clockwise and holes clockwise, so a non-zero fill leaves the holes open.
+        /// </summary>
         private sealed class Footprint
         {
-            public Vector2[] Points;
+            public Vector2[][] Contours;
             public float Radius;
             public float Area;
             public bool IsTree;
@@ -206,16 +209,25 @@ namespace OmsiMapEditor.UI
             {
                 foreach (var pair in outlines)
                 {
-                    var points = pair.Value?.Points;
-                    if (points == null || points.Length < 2)
+                    var hull = pair.Value?.Points;
+                    if (hull == null || hull.Length < 2)
                         continue;
-                    var footprint = new Footprint { Points = new Vector2[points.Length], IsTree = pair.Value.Source == OmsiOutlineSource.Tree };
-                    for (var index = 0; index < points.Length; index++)
+                    var contours = pair.Value.Contours.Count > 0 ? pair.Value.Contours : new[] { hull };
+                    var footprint = new Footprint { Contours = new Vector2[contours.Count][], IsTree = pair.Value.Source == OmsiOutlineSource.Tree };
+                    var signedArea = 0f;
+                    for (var contour = 0; contour < contours.Count; contour++)
                     {
-                        footprint.Points[index] = new Vector2((float)points[index].X, (float)points[index].Y);
-                        footprint.Radius = Mathf.Max(footprint.Radius, footprint.Points[index].magnitude);
+                        var points = new Vector2[contours[contour].Length];
+                        for (var index = 0; index < points.Length; index++)
+                        {
+                            points[index] = new Vector2((float)contours[contour][index].X, (float)contours[contour][index].Y);
+                            footprint.Radius = Mathf.Max(footprint.Radius, points[index].magnitude);
+                        }
+                        footprint.Contours[contour] = points;
+                        signedArea += PolygonArea(points);
                     }
-                    footprint.Area = Mathf.Abs(PolygonArea(footprint.Points));
+                    // Holes count negative, so this is the covered area.
+                    footprint.Area = Mathf.Abs(signedArea);
                     footprints[pair.Key] = footprint;
                 }
             }
@@ -461,11 +473,14 @@ namespace OmsiMapEditor.UI
             var heading = (float)(headingDegrees * Math.PI / 180.0);
             var sin = Mathf.Sin(heading);
             var cos = Mathf.Cos(heading);
-            painter.MoveTo(MapToScreen(ObjectToMap(footprint.Points[0], position, sin, cos)));
-            for (var index = 1; index < footprint.Points.Length; index++)
-                painter.LineTo(MapToScreen(ObjectToMap(footprint.Points[index], position, sin, cos)));
-            if (footprint.Points.Length > 2)
-                painter.ClosePath();
+            foreach (var points in footprint.Contours)
+            {
+                painter.MoveTo(MapToScreen(ObjectToMap(points[0], position, sin, cos)));
+                for (var index = 1; index < points.Length; index++)
+                    painter.LineTo(MapToScreen(ObjectToMap(points[index], position, sin, cos)));
+                if (points.Length > 2)
+                    painter.ClosePath();
+            }
         }
 
         private void AddRect(Painter2D painter, Rect rect)
@@ -908,7 +923,7 @@ namespace OmsiMapEditor.UI
                     var dx = map.x - position.x;
                     var dy = map.y - position.y;
                     var local = new Vector2(dx * Mathf.Cos(heading) - dy * Mathf.Sin(heading), dx * Mathf.Sin(heading) + dy * Mathf.Cos(heading));
-                    if (footprint.Points.Length > 2 && Contains(footprint.Points, local))
+                    if (Contains(footprint.Contours, local))
                     {
                         smallest = footprint.Area;
                         pickedTile = tile;
@@ -919,15 +934,21 @@ namespace OmsiMapEditor.UI
             return pickedItem != null;
         }
 
-        private static bool Contains(Vector2[] polygon, Vector2 point)
+        /// <summary>Even-odd test over all contours, so a point in a courtyard is outside.</summary>
+        private static bool Contains(Vector2[][] contours, Vector2 point)
         {
             var inside = false;
-            for (int index = 0, previous = polygon.Length - 1; index < polygon.Length; previous = index++)
+            foreach (var polygon in contours)
             {
-                if ((polygon[index].y > point.y) != (polygon[previous].y > point.y) &&
-                    point.x < (polygon[previous].x - polygon[index].x) * (point.y - polygon[index].y) /
-                    (polygon[previous].y - polygon[index].y) + polygon[index].x)
-                    inside = !inside;
+                if (polygon.Length < 3)
+                    continue;
+                for (int index = 0, previous = polygon.Length - 1; index < polygon.Length; previous = index++)
+                {
+                    if ((polygon[index].y > point.y) != (polygon[previous].y > point.y) &&
+                        point.x < (polygon[previous].x - polygon[index].x) * (point.y - polygon[index].y) /
+                        (polygon[previous].y - polygon[index].y) + polygon[index].x)
+                        inside = !inside;
+                }
             }
             return inside;
         }

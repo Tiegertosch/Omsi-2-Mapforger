@@ -145,8 +145,14 @@ namespace OmsiMapEditor.OMSI
     {
         public OmsiOutlineSource Source { get; internal set; }
 
-        /// <summary>Convex polygon, counter-clockwise; empty when no footprint could be derived.</summary>
+        /// <summary>Convex hull of the footprint, counter-clockwise; empty when no footprint could be derived.</summary>
         public OmsiMapPoint[] Points { get; internal set; } = new OmsiMapPoint[0];
+
+        /// <summary>
+        /// The footprint itself: outer contours counter-clockwise, holes such as courtyards clockwise. Trees and
+        /// bounding boxes have their single polygon here.
+        /// </summary>
+        public IReadOnlyList<OmsiMapPoint[]> Contours { get; internal set; } = new OmsiMapPoint[0][];
 
         /// <summary>Why the outline is missing or incomplete, for diagnostics; null when everything was read.</summary>
         public string Problem { get; internal set; }
@@ -160,7 +166,7 @@ namespace OmsiMapEditor.OMSI
     {
         private readonly string installationRoot;
         private readonly Dictionary<string, OmsiObjectOutline> outlines = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, List<OmsiMapPoint>> meshPoints = new Dictionary<string, List<OmsiMapPoint>>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<OmsiMapPoint>> meshTriangles = new Dictionary<string, List<OmsiMapPoint>>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> meshProblems = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public OmsiObjectOutlineCatalog(string installationRoot)
@@ -217,21 +223,21 @@ namespace OmsiMapEditor.OMSI
             var meshes = sceneryObject.Meshes.FindAll(mesh => !mesh.EditorOnly);
             if (meshes.Count == 0)
                 meshes = sceneryObject.Meshes;
-            var points = new List<OmsiMapPoint>();
+            var corners = new List<OmsiMapPoint>();
             string problem = null;
             foreach (var mesh in meshes)
             {
                 var meshPath = Path.Combine(modelFolder, mesh.FileName.Replace('\\', Path.DirectorySeparatorChar));
-                var meshResult = MeshPoints(meshPath, out var meshProblem);
+                var meshResult = MeshTriangles(meshPath, out var meshProblem);
                 if (meshResult != null)
-                    points.AddRange(meshResult);
+                    corners.AddRange(meshResult);
                 else
                     problem = meshProblem;
             }
 
-            var hull = OmsiConvexHull.Compute(points);
+            var hull = OmsiConvexHull.Compute(corners);
             if (hull.Length >= 2)
-                return new OmsiObjectOutline { Source = OmsiOutlineSource.Mesh, Points = hull, Problem = problem };
+                return new OmsiObjectOutline { Source = OmsiOutlineSource.Mesh, Points = hull, Contours = TraceOrHull(corners, hull), Problem = problem };
 
             if (sceneryObject.BoundingBox != null)
                 return BoxOutline(sceneryObject.BoundingBox, problem);
@@ -240,11 +246,21 @@ namespace OmsiMapEditor.OMSI
             return new OmsiObjectOutline { Problem = problem ?? "The object has no mesh, bounding box or path." };
         }
 
-        /// <summary>Horizontal mesh points in the object frame: x = mesh X, y = mesh Z (Direct3D Z points forward).</summary>
-        private List<OmsiMapPoint> MeshPoints(string meshPath, out string problem)
+        /// <summary>The footprint contours, or the hull when the triangles cover no area at all.</summary>
+        private static IReadOnlyList<OmsiMapPoint[]> TraceOrHull(List<OmsiMapPoint> corners, OmsiMapPoint[] hull)
+        {
+            var contours = OmsiFootprintTracer.Trace(corners);
+            return contours.Count > 0 ? (IReadOnlyList<OmsiMapPoint[]>)contours : new[] { hull };
+        }
+
+        /// <summary>
+        /// Triangles seen from above, three corners each, in the object frame: x = mesh X, y = mesh Z (Direct3D Z
+        /// points forward).
+        /// </summary>
+        private List<OmsiMapPoint> MeshTriangles(string meshPath, out string problem)
         {
             problem = null;
-            if (meshPoints.TryGetValue(meshPath, out var cached))
+            if (meshTriangles.TryGetValue(meshPath, out var cached))
                 return cached;
             if (meshProblems.TryGetValue(meshPath, out problem))
                 return null;
@@ -258,16 +274,17 @@ namespace OmsiMapEditor.OMSI
                 if (bytes.Length >= 2 && bytes[0] == 0x84 && bytes[1] == 0x19)
                 {
                     var mesh = OmsiO3dMesh.Parse(bytes);
-                    foreach (var index in UsedVertices(mesh.TriangleIndices, mesh.Vertices.Count))
+                    foreach (var index in CompleteTriangles(mesh.TriangleIndices, mesh.Vertices.Count))
                         result.Add(new OmsiMapPoint(mesh.Vertices[index].X, mesh.Vertices[index].Z));
                 }
                 else
                 {
                     var mesh = OmsiXMesh.Parse(bytes);
-                    foreach (var index in UsedVertices(mesh.TriangleIndices, mesh.Positions.Count))
+                    foreach (var index in CompleteTriangles(mesh.TriangleIndices, mesh.Positions.Count))
                         result.Add(new OmsiMapPoint(mesh.Positions[index][0], mesh.Positions[index][2]));
                 }
-                meshPoints.Add(meshPath, result);
+                result = ReplaceUprightPlanes(result);
+                meshTriangles.Add(meshPath, result);
                 return result;
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
@@ -278,16 +295,55 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        /// <summary>Vertices that belong to at least one triangle; stray vertices would distort the footprint.</summary>
-        private static IEnumerable<int> UsedVertices(List<int> triangleIndices, int vertexCount)
+        /// <summary>Largest model that counts as a plant or sprite made of upright planes.</summary>
+        private const double UprightPlaneMaxExtent = 20.0;
+
+        /// <summary>
+        /// Plants and sprites are often crossed upright planes that cover no area seen from above. A small model whose
+        /// triangles together cover less than 5 % of its hull is replaced by the hull, which matches the crown. Fences
+        /// keep their line, since their hull has no area either, and building walls are larger.
+        /// </summary>
+        private static List<OmsiMapPoint> ReplaceUprightPlanes(List<OmsiMapPoint> corners)
         {
-            var used = new bool[vertexCount];
-            foreach (var index in triangleIndices)
-                if (index >= 0 && index < vertexCount)
-                    used[index] = true;
-            for (var index = 0; index < vertexCount; index++)
-                if (used[index])
-                    yield return index;
+            var hull = OmsiConvexHull.Compute(corners);
+            if (hull.Length < 3)
+                return corners;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var point in hull)
+            {
+                minX = Math.Min(minX, point.X);
+                minY = Math.Min(minY, point.Y);
+                maxX = Math.Max(maxX, point.X);
+                maxY = Math.Max(maxY, point.Y);
+            }
+            var hullArea = OmsiFootprintTracer.SignedArea(hull);
+            if (hullArea < 0.5 || Math.Max(maxX - minX, maxY - minY) > UprightPlaneMaxExtent)
+                return corners;
+
+            var covered = 0.0;
+            for (var index = 0; index + 2 < corners.Count; index += 3)
+                covered += Math.Abs(OmsiFootprintTracer.SignedArea(new[] { corners[index], corners[index + 1], corners[index + 2] }));
+            if (covered >= 0.05 * hullArea)
+                return corners;
+
+            var fan = new List<OmsiMapPoint>();
+            for (var index = 1; index + 1 < hull.Length; index++)
+                fan.AddRange(new[] { hull[0], hull[index], hull[index + 1] });
+            return fan;
+        }
+
+        /// <summary>Vertex indices of the triangles whose three indices are valid; stray vertices are left out.</summary>
+        private static IEnumerable<int> CompleteTriangles(List<int> triangleIndices, int vertexCount)
+        {
+            for (var first = 0; first + 2 < triangleIndices.Count; first += 3)
+            {
+                int a = triangleIndices[first], b = triangleIndices[first + 1], c = triangleIndices[first + 2];
+                if (a < 0 || b < 0 || c < 0 || a >= vertexCount || b >= vertexCount || c >= vertexCount)
+                    continue;
+                yield return a;
+                yield return b;
+                yield return c;
+            }
         }
 
         /// <summary>A circle with the mean crown width: mean height times mean width-to-height ratio.</summary>
@@ -301,28 +357,24 @@ namespace OmsiMapEditor.OMSI
                 var angle = 2.0 * Math.PI * corner / corners;
                 points[corner] = new OmsiMapPoint(radius * Math.Cos(angle), radius * Math.Sin(angle));
             }
-            return new OmsiObjectOutline { Source = OmsiOutlineSource.Tree, Points = points };
+            return new OmsiObjectOutline { Source = OmsiOutlineSource.Tree, Points = points, Contours = new[] { points } };
         }
 
         private static OmsiObjectOutline BoxOutline(double[] box, string problem)
         {
             double halfX = box[0] * 0.5, halfY = box[1] * 0.5, centerX = box[3], centerY = box[4];
-            return new OmsiObjectOutline
+            var points = new[]
             {
-                Source = OmsiOutlineSource.BoundingBox,
-                Problem = problem,
-                Points = new[]
-                {
-                    new OmsiMapPoint(centerX - halfX, centerY - halfY), new OmsiMapPoint(centerX + halfX, centerY - halfY),
-                    new OmsiMapPoint(centerX + halfX, centerY + halfY), new OmsiMapPoint(centerX - halfX, centerY + halfY)
-                }
+                new OmsiMapPoint(centerX - halfX, centerY - halfY), new OmsiMapPoint(centerX + halfX, centerY - halfY),
+                new OmsiMapPoint(centerX + halfX, centerY + halfY), new OmsiMapPoint(centerX - halfX, centerY + halfY)
             };
+            return new OmsiObjectOutline { Source = OmsiOutlineSource.BoundingBox, Problem = problem, Points = points, Contours = new[] { points } };
         }
 
-        /// <summary>The hull of all paths, each widened to its lane width.</summary>
+        /// <summary>The area of all paths, each widened to its lane width.</summary>
         private static OmsiObjectOutline PathOutline(List<OmsiObjectPath> paths, string problem)
         {
-            var points = new List<OmsiMapPoint>();
+            var corners = new List<OmsiMapPoint>();
             foreach (var path in paths)
             {
                 var spline = new OmsiSplineRecord
@@ -332,6 +384,7 @@ namespace OmsiMapEditor.OMSI
                 };
                 var centerLine = OmsiMapGeometry.BuildSplinePolyline(new OmsiTileSummary(), spline, 1e9);
                 var half = Math.Max(path.WidthMeters, 0.1) * 0.5;
+                OmsiMapPoint? lastLeft = null, lastRight = null;
                 for (var index = 0; index < centerLine.Length; index++)
                 {
                     var next = centerLine[Math.Min(index + 1, centerLine.Length - 1)];
@@ -341,11 +394,17 @@ namespace OmsiMapEditor.OMSI
                     var length = Math.Sqrt(dx * dx + dy * dy);
                     if (length < 1e-9)
                         continue;
-                    points.Add(new OmsiMapPoint(centerLine[index].X - dy / length * half, centerLine[index].Y + dx / length * half));
-                    points.Add(new OmsiMapPoint(centerLine[index].X + dy / length * half, centerLine[index].Y - dx / length * half));
+                    var left = new OmsiMapPoint(centerLine[index].X - dy / length * half, centerLine[index].Y + dx / length * half);
+                    var right = new OmsiMapPoint(centerLine[index].X + dy / length * half, centerLine[index].Y - dx / length * half);
+                    // The lane piece between two centre points as two triangles.
+                    if (lastLeft.HasValue)
+                        corners.AddRange(new[] { lastLeft.Value, lastRight.Value, right, lastLeft.Value, right, left });
+                    lastLeft = left;
+                    lastRight = right;
                 }
             }
-            return new OmsiObjectOutline { Source = OmsiOutlineSource.Paths, Points = OmsiConvexHull.Compute(points), Problem = problem };
+            var hull = OmsiConvexHull.Compute(corners);
+            return new OmsiObjectOutline { Source = OmsiOutlineSource.Paths, Points = hull, Contours = TraceOrHull(corners, hull), Problem = problem };
         }
     }
 

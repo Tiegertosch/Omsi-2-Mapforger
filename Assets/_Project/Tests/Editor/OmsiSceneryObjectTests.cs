@@ -191,6 +191,107 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(0, OmsiConvexHull.Compute(new List<OmsiMapPoint>()).Length);
         }
 
+        [Test]
+        public void TracesLShapedFootprintsInsteadOfTheirHull()
+        {
+            // 10 × 4 m along x and 4 × 10 m along y: 64 m², while the hull would cover 82 m².
+            var corners = Rectangle(0, 0, 10, 4).Concat(Rectangle(0, 0, 4, 10)).ToList();
+
+            var contours = OmsiFootprintTracer.Trace(corners);
+
+            Assert.AreEqual(1, contours.Count);
+            Assert.AreEqual(64.0, OmsiFootprintTracer.SignedArea(contours[0]), 2.0);
+            Assert.AreEqual(6, contours[0].Length);
+            Assert.AreEqual(0.0, contours[0].Min(p => p.X), OmsiFootprintTracer.FinestCellSize);
+            Assert.AreEqual(10.0, contours[0].Max(p => p.Y), OmsiFootprintTracer.FinestCellSize);
+        }
+
+        [Test]
+        public void KeepsCourtyardsAsClockwiseHoles()
+        {
+            // A 20 m square around a 10 m courtyard.
+            var corners = Rectangle(0, 0, 20, 5).Concat(Rectangle(0, 15, 20, 20))
+                .Concat(Rectangle(0, 5, 5, 15)).Concat(Rectangle(15, 5, 20, 15)).ToList();
+
+            var areas = OmsiFootprintTracer.Trace(corners).Select(contour => OmsiFootprintTracer.SignedArea(contour)).OrderBy(area => area).ToList();
+
+            Assert.AreEqual(2, areas.Count);
+            Assert.AreEqual(-100.0, areas[0], 3.0);
+            Assert.AreEqual(400.0, areas[1], 3.0);
+        }
+
+        [Test]
+        public void WallsSeenFromAboveAndCornerContactsStaySeparateThinParts()
+        {
+            // A fence: two vertical triangles that collapse onto the line from (0, 0) to (10, 0) seen from above.
+            var fence = new List<OmsiMapPoint>
+            {
+                new OmsiMapPoint(0, 0), new OmsiMapPoint(10, 0), new OmsiMapPoint(10, 0),
+                new OmsiMapPoint(0, 0), new OmsiMapPoint(10, 0), new OmsiMapPoint(0, 0)
+            };
+            var touching = Rectangle(0, 0, 2, 2).Concat(Rectangle(2, 2, 4, 4)).ToList();
+
+            var fenceContours = OmsiFootprintTracer.Trace(fence);
+            var touchingContours = OmsiFootprintTracer.Trace(touching);
+
+            Assert.AreEqual(1, fenceContours.Count);
+            Assert.That(OmsiFootprintTracer.SignedArea(fenceContours[0]), Is.InRange(1.0, 10.0 * 0.5));
+            Assert.AreEqual(2, touchingContours.Count);
+            Assert.IsTrue(touchingContours.All(contour => Math.Abs(OmsiFootprintTracer.SignedArea(contour) - 4.0) < 0.5));
+            CollectionAssert.IsEmpty(OmsiFootprintTracer.Trace(new List<OmsiMapPoint>()));
+        }
+
+        [Test]
+        public void MeshAndPathOutlinesFollowTheShapeAndKeepTheHull()
+        {
+            // An L-shaped flat roof from two quads, and a crossing of two lanes without a model.
+            File.WriteAllBytes(Model("corner.o3d"), O3d(1, 0, null,
+                new[] { V(0, 3, 0), V(10, 3, 0), V(10, 3, 4), V(0, 3, 4), V(0, 3, 10), V(4, 3, 10), V(4, 3, 4) },
+                new[] { 0, 1, 2, 0, 2, 3, 0, 3, 6, 3, 4, 5, 3, 5, 6 }));
+            WriteSco("corner.sco", "[mesh]", "corner.o3d");
+            WriteSco("cross.sco",
+                "[path]", "0", "-10", "0", "0", "0", "20", "0", "0", "0", "3", "0", "0", "",
+                "[path]", "-10", "0", "0", "90", "0", "20", "0", "0", "0", "3", "0", "0");
+            var catalog = new OmsiObjectOutlineCatalog(installation);
+
+            var corner = catalog.Get(@"Sceneryobjects\Test\corner.sco");
+            var cross = catalog.Get(@"Sceneryobjects\Test\cross.sco");
+
+            Assert.AreEqual(5, corner.Points.Length);
+            Assert.AreEqual(1, corner.Contours.Count);
+            Assert.AreEqual(64.0, OmsiFootprintTracer.SignedArea(corner.Contours[0]), 2.0);
+            Assert.AreEqual(OmsiOutlineSource.Paths, cross.Source);
+            Assert.AreEqual(1, cross.Contours.Count);
+            // Two 20 × 3 m lanes crossing: 111 m², not the 20 × 20 m hull.
+            Assert.AreEqual(111.0, OmsiFootprintTracer.SignedArea(cross.Contours[0]), 4.0);
+            Assert.AreEqual(12, cross.Contours[0].Length);
+        }
+
+        [Test]
+        public void CrossedUprightPlanesOfPlantsBecomeTheirHull()
+        {
+            // Two 6 m wide, 6 m high planes crossing at the origin: a common way to model a bush.
+            File.WriteAllBytes(Model("bush.o3d"), O3d(1, 0, null,
+                new[] { V(-3, 0, 0), V(3, 0, 0), V(3, 6, 0), V(-3, 6, 0), V(0, 0, -3), V(0, 0, 3), V(0, 6, 3), V(0, 6, -3) },
+                new[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }));
+            WriteSco("bush.sco", "[mesh]", "bush.o3d");
+
+            var bush = new OmsiObjectOutlineCatalog(installation).Get(@"Sceneryobjects\Test\bush.sco");
+
+            Assert.AreEqual(1, bush.Contours.Count);
+            Assert.AreEqual(18.0, OmsiFootprintTracer.SignedArea(bush.Contours[0]), 2.0);
+        }
+
+        /// <summary>Two triangles covering the rectangle from (x0, y0) to (x1, y1).</summary>
+        private static IEnumerable<OmsiMapPoint> Rectangle(double x0, double y0, double x1, double y1)
+        {
+            return new[]
+            {
+                new OmsiMapPoint(x0, y0), new OmsiMapPoint(x1, y0), new OmsiMapPoint(x1, y1),
+                new OmsiMapPoint(x0, y0), new OmsiMapPoint(x1, y1), new OmsiMapPoint(x0, y1)
+            };
+        }
+
         private struct MeshVertex
         {
             public float X, Y, Z, NX, NY, NZ, U, V;

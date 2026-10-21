@@ -51,7 +51,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Exportierte Karte in OMSI laden und die geänderten Objekte im Spiel prüfen (20. Oktober 2026: verschobene Scheune in Grundorf im Spiel sichtbar)
 - [x] Durchgehende 2D-Draufsicht mit Zoom und Verschieben; Objekte per Ziehen verschieben, am Griff drehen und Änderungen rückgängig machen
 - [x] `.sco`- und `.o3d`-Dateien analysieren und Objekte mit ihren Umrissen darstellen (siehe [SceneryObjectInventory.md](SceneryObjectInventory.md))
-- Genauere, nicht konvexe Umrisse für L-förmige Gebäude, große Kreuzungen und Plätze
+- [x] Genauere, nicht konvexe Umrisse für L-förmige Gebäude, große Kreuzungen und Plätze: Dreiecke werden von oben gerastert und zu Konturen mit Löchern verbunden
+- Zeichenzeit großer Karten senken, etwa mit der Hülle statt der Kontur für Objekte, die nur wenige Pixel groß sind; Berlin-Spandau braucht vereinzelt etwas über 50 ms
 - Mehrere Objekte gleichzeitig auswählen und verschieben
 - Objekte beim Verschieben über eine Kachelgrenze in die neue Kachel übernehmen; bisher behalten sie ihre Kachel mit Koordinaten außerhalb davon
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
