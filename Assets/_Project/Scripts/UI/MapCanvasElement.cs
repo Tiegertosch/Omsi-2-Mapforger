@@ -54,6 +54,7 @@ namespace OmsiMapEditor.UI
         private static readonly Color TileBorderColor = new Color(0.25f, 0.31f, 0.37f, 1f);
         private static readonly Color SelectedTileColor = new Color(0.88f, 0.69f, 0.33f, 1f);
         private static readonly Color SplineColor = new Color(0.95f, 0.71f, 0.30f, 0.95f);
+        private static readonly Color QuietSplineColor = new Color(0.95f, 0.71f, 0.30f, 0.5f);
         private static readonly Color32 ObjectColor = new Color(0.56f, 0.82f, 0.94f, 0.95f);
         private static readonly Color HeadingColor = new Color(0.56f, 0.82f, 0.94f, 0.55f);
         private static readonly Color SelectedObjectColor = new Color(1f, 0.36f, 0.42f, 1f);
@@ -78,6 +79,9 @@ namespace OmsiMapEditor.UI
             public float Radius;
             public float Area;
             public bool IsTree;
+
+            /// <summary>True when the textured view draws a model of this kind, so marker and outline can stay away.</summary>
+            public bool HasModel;
         }
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
@@ -183,11 +187,33 @@ namespace OmsiMapEditor.UI
 
         public bool HasView => hasView && summary != null;
 
-        /// <summary>When false, available tiles are not filled, so a ground drawn below the view shows through.</summary>
-        public bool ShowTileFill { get; set; } = true;
+        /// <summary>
+        /// True while ground, splines and objects are drawn textured below the view. The view then leaves tiles unfilled,
+        /// draws spline lines thin and faint, and leaves out marker and outline of objects that show a model; objects
+        /// without a model keep them, and the selection is drawn as always.
+        /// </summary>
+        public bool TexturedView { get; set; }
 
-        /// <summary>When false, object outlines are only stroked, so textured objects below keep their colours.</summary>
-        public bool ShowOutlineFill { get; set; } = true;
+        /// <summary>Tells whether the textured view draws a model for an object file; null when no models are known.</summary>
+        public Func<string, bool> HasModel
+        {
+            get => hasModel;
+            set
+            {
+                hasModel = value;
+                UpdateModelFlags();
+            }
+        }
+
+        private Func<string, bool> hasModel;
+
+        /// <summary>Takes newly loaded models into account.</summary>
+        public void UpdateModelFlags()
+        {
+            foreach (var pair in footprints)
+                pair.Value.HasModel = hasModel != null && hasModel(pair.Key);
+            MarkDirtyRepaint();
+        }
 
         public bool IsPlacing => placementAsset != null;
 
@@ -279,6 +305,7 @@ namespace OmsiMapEditor.UI
                     }
                     // Holes count negative, so this is the covered area.
                     footprint.Area = Mathf.Abs(signedArea);
+                    footprint.HasModel = hasModel != null && hasModel(pair.Key);
                     footprints[pair.Key] = footprint;
                 }
             }
@@ -466,7 +493,7 @@ namespace OmsiMapEditor.UI
             foreach (var tile in summary.Tiles)
             {
                 var rect = TileRect(tile);
-                if (!rect.Overlaps(visible) || tile.IsAvailable && !ShowTileFill)
+                if (!rect.Overlaps(visible) || tile.IsAvailable && TexturedView)
                     continue;
                 painter.fillColor = tile.IsAvailable ? TileColor : MissingTileColor;
                 painter.BeginPath();
@@ -513,7 +540,8 @@ namespace OmsiMapEditor.UI
                 {
                     foreach (var item in tile.Objects)
                     {
-                        if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.IsTree != trees)
+                        if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.IsTree != trees ||
+                            TexturedView && footprint.HasModel)
                             continue;
                         var position = DrawnPosition(tile, item);
                         if (footprint.Radius / metersPerPixel < 1.5f ||
@@ -526,7 +554,7 @@ namespace OmsiMapEditor.UI
                 }
                 if (any)
                 {
-                    if (ShowOutlineFill)
+                    if (!TexturedView)
                         painter.Fill();
                     painter.Stroke();
                 }
@@ -563,8 +591,8 @@ namespace OmsiMapEditor.UI
 
         private void DrawSplines(Painter2D painter, Rect visible)
         {
-            painter.strokeColor = SplineColor;
-            painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f);
+            painter.strokeColor = TexturedView ? QuietSplineColor : SplineColor;
+            painter.lineWidth = TexturedView ? 1.5f : Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f);
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
             painter.BeginPath();
@@ -606,6 +634,8 @@ namespace OmsiMapEditor.UI
                 // Objects may lie outside their own tile, so test each object, not just the tile rectangle.
                 foreach (var item in tile.Objects)
                 {
+                    if (TexturedView && footprints.TryGetValue(item.AssetPath, out var footprint) && footprint.HasModel)
+                        continue;
                     var map = DrawnPosition(tile, item);
                     if (!visible.Contains(map))
                         continue;

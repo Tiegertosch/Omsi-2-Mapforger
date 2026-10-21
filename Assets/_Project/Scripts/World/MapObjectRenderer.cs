@@ -84,6 +84,15 @@ namespace OmsiMapEditor.World
         /// <summary>Raised on the main thread when the objects of a map are ready, with a short report.</summary>
         public event Action<string> Loaded;
 
+        /// <summary>True when objects of this file are drawn with a model or, for trees, a crown.</summary>
+        public bool HasModel(string assetPath)
+        {
+            return assetPath != null && kinds.TryGetValue(assetPath, out var kind) && kind.Mesh != null;
+        }
+
+        /// <summary>Raised when the set of kinds with a model changed, such as after reading a newly placed kind.</summary>
+        public event Action ModelsChanged;
+
         /// <summary>True while models are read or uploaded or placements wait to be updated.</summary>
         public bool IsLoading => loading != null || pending != null || placementsDirty;
 
@@ -336,6 +345,7 @@ namespace OmsiMapEditor.World
             var data = pending;
             pending = null;
             placementsDirty = true;
+            ModelsChanged?.Invoke();
             if (data.Problems.Count > 0)
                 Debug.LogWarning("Object models: " + data.Problems.Count + " problem(s)\n" + string.Join("\n", data.Problems));
             if (!reportWhenUploaded)

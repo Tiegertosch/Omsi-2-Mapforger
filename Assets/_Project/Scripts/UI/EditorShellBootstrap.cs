@@ -302,6 +302,9 @@ namespace OmsiMapEditor.UI
             objectRenderer = groundRenderer.gameObject.AddComponent<MapObjectRenderer>();
             objectRenderer.SetCamera(groundRenderer.ViewCamera);
             objectRenderer.Loaded += SetStatus;
+            objectRenderer.ModelsChanged += () => mapCanvas?.UpdateModelFlags();
+            if (mapCanvas != null)
+                mapCanvas.HasModel = objectRenderer.HasModel;
         }
 
         /// <summary>Keeps the ground camera on the screen rectangle and view of the map view.</summary>
@@ -330,8 +333,7 @@ namespace OmsiMapEditor.UI
             groundRenderer.GroundVisible = !groundRenderer.GroundVisible;
             if (objectRenderer != null)
                 objectRenderer.ObjectsVisible = groundRenderer.GroundVisible;
-            mapCanvas.ShowTileFill = !groundRenderer.GroundVisible;
-            mapCanvas.ShowOutlineFill = !groundRenderer.GroundVisible;
+            mapCanvas.TexturedView = groundRenderer.GroundVisible;
             mapCanvas.Refresh();
             if (groundToggleButton != null)
                 groundToggleButton.text = groundRenderer.GroundVisible ? "Textures: on" : "Textures: off";
@@ -532,8 +534,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.AllowEditing = session.CanEdit;
                 mapCanvas.SetMap(summary, keepView);
                 mapCanvas.SetSelection(selectedTile, selection);
-                mapCanvas.ShowTileFill = groundRenderer == null || !groundRenderer.GroundVisible;
-                mapCanvas.ShowOutlineFill = mapCanvas.ShowTileFill;
+                mapCanvas.TexturedView = groundRenderer != null && groundRenderer.GroundVisible;
                 var installationRoot = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
                 groundRenderer?.Load(summary, session.Source, Path.GetFileName(session.GlobalConfigPath), installationRoot,
                     mapCanvas.OriginX, mapCanvas.OriginY);
