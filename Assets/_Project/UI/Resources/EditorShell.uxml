@@ -34,6 +34,7 @@
                         <ui:Label name="zoom-label" text="Fit" class="zoom-label" />
                         <ui:Button name="zoom-in-button" text="+" class="map-control-button map-zoom-button" />
                         <ui:Button name="center-selection-button" text="Center selection" class="map-control-button" />
+                        <ui:Button name="ground-toggle-button" text="Textures: on" class="map-control-button" tooltip="Show the ground textures of the map, or plain tiles." />
                         <ui:Label name="map-hint" class="map-hint" style="display: none;" />
                     </ui:VisualElement>
                     <ui:Button name="empty-state-open-button" text="Open OMSI map..." class="primary-button" />

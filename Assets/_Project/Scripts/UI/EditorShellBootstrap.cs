@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using OmsiMapEditor.Core;
 using OmsiMapEditor.OMSI;
+using OmsiMapEditor.World;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -53,6 +54,9 @@ namespace OmsiMapEditor.UI
         private VisualElement projectPanel;
         private VisualElement inspectorPanel;
         private MapCanvasElement mapCanvas;
+        private MapGroundRenderer groundRenderer;
+        private VisualElement rootElement;
+        private Button groundToggleButton;
         private OmsiTileSummary selectedTile;
         private OmsiObjectRecord selectedObject;
 
@@ -109,6 +113,7 @@ namespace OmsiMapEditor.UI
             uiObject.SetActive(true);
 
             var root = document.rootVisualElement;
+            rootElement = root;
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
             root.style.height = Length.Percent(100f);
@@ -159,6 +164,7 @@ namespace OmsiMapEditor.UI
             var zoomOutButton = root.Q<Button>("zoom-out-button");
             var zoomInButton = root.Q<Button>("zoom-in-button");
             var centerSelectionButton = root.Q<Button>("center-selection-button");
+            groundToggleButton = root.Q<Button>("ground-toggle-button");
 
             var mapView = root.Q<VisualElement>("map-view");
             if (mapView != null)
@@ -224,6 +230,8 @@ namespace OmsiMapEditor.UI
                 zoomInButton.clicked += () => ChangeZoom(1.5f);
             if (centerSelectionButton != null)
                 centerSelectionButton.clicked += CenterSelection;
+            if (groundToggleButton != null)
+                groundToggleButton.clicked += ToggleGround;
 
             if (viewButton != null)
                 viewButton.clicked += () => ToggleSidePanels(projectPanel, inspectorPanel);
@@ -286,6 +294,39 @@ namespace OmsiMapEditor.UI
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
 
             CreateBackgroundCamera();
+            groundRenderer = new GameObject("Map Ground").AddComponent<MapGroundRenderer>();
+            groundRenderer.Loaded += SetStatus;
+        }
+
+        /// <summary>Keeps the ground camera on the screen rectangle and view of the map view.</summary>
+        private void LateUpdate()
+        {
+            if (groundRenderer == null || mapCanvas == null || rootElement == null)
+                return;
+            var panelWidth = rootElement.worldBound.width;
+            if (!mapCanvas.HasView || float.IsNaN(panelWidth) || panelWidth <= 0f)
+            {
+                groundRenderer.SetView(Rect.zero, Vector2.zero, 0f);
+                return;
+            }
+
+            // Panel units to screen pixels; screen rectangles start at the bottom left.
+            var scale = Screen.width / panelWidth;
+            var bounds = mapCanvas.worldBound;
+            var screenRect = new Rect(bounds.x * scale, Screen.height - bounds.yMax * scale, bounds.width * scale, bounds.height * scale);
+            groundRenderer.SetView(screenRect, mapCanvas.Center, bounds.height * mapCanvas.MetersPerPixel);
+        }
+
+        private void ToggleGround()
+        {
+            if (groundRenderer == null || mapCanvas == null)
+                return;
+            groundRenderer.GroundVisible = !groundRenderer.GroundVisible;
+            mapCanvas.ShowTileFill = !groundRenderer.GroundVisible;
+            mapCanvas.Refresh();
+            if (groundToggleButton != null)
+                groundToggleButton.text = groundRenderer.GroundVisible ? "Textures: on" : "Textures: off";
+            SetStatus(groundRenderer.GroundVisible ? "Ground textures shown." : "Ground textures hidden; tiles are drawn plain.");
         }
 
         private void OpenMap()
@@ -405,6 +446,9 @@ namespace OmsiMapEditor.UI
                 mapCanvas.AllowEditing = session.CanEdit;
                 mapCanvas.SetMap(summary, keepView);
                 mapCanvas.SetSelection(selectedTile, selection);
+                mapCanvas.ShowTileFill = groundRenderer == null || !groundRenderer.GroundVisible;
+                groundRenderer?.Load(summary, session.Source, Path.GetFileName(session.GlobalConfigPath),
+                    OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath), mapCanvas.OriginX, mapCanvas.OriginY);
             }
             StartOutlineBuild(summary);
             UpdateMapHeader();
@@ -1397,7 +1441,8 @@ namespace OmsiMapEditor.UI
             var cameraObject = new GameObject("Editor Background Camera");
             var camera = cameraObject.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.055f, 0.063f, 0.075f, 1f);
+            // The colour of the viewport around the map view, which is transparent so the ground camera shows.
+            camera.backgroundColor = new Color(0.078f, 0.094f, 0.114f, 1f);
             camera.cullingMask = 0;
             camera.depth = -100f;
             camera.useOcclusionCulling = false;

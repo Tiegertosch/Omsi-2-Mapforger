@@ -1,7 +1,7 @@
 {
   "name": "Editor.UI",
   "rootNamespace": "OmsiMapEditor.UI",
-  "references": ["Editor.Core", "Editor.OMSI"],
+  "references": ["Editor.Core", "Editor.OMSI", "Editor.World"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

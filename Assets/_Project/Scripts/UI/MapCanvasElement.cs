@@ -173,6 +173,19 @@ namespace OmsiMapEditor.UI
 
         public float MetersPerPixel => metersPerPixel;
 
+        /// <summary>Map-relative metres at the centre of the view; world metres minus <see cref="OriginX"/> and <see cref="OriginY"/>.</summary>
+        public Vector2 Center => center;
+
+        /// <summary>World metres of the map's lowest tile corner, which the view draws relative to.</summary>
+        public double OriginX => originX;
+
+        public double OriginY => originY;
+
+        public bool HasView => hasView && summary != null;
+
+        /// <summary>When false, available tiles are not filled, so a ground drawn below the view shows through.</summary>
+        public bool ShowTileFill { get; set; } = true;
+
         public bool IsPlacing => placementAsset != null;
 
         /// <summary>Heading of the placement preview in degrees.</summary>
@@ -437,7 +450,7 @@ namespace OmsiMapEditor.UI
             foreach (var tile in summary.Tiles)
             {
                 var rect = TileRect(tile);
-                if (!rect.Overlaps(visible))
+                if (!rect.Overlaps(visible) || tile.IsAvailable && !ShowTileFill)
                     continue;
                 painter.fillColor = tile.IsAvailable ? TileColor : MissingTileColor;
                 painter.BeginPath();

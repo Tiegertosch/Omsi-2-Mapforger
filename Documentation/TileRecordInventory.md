@@ -180,6 +180,19 @@ Die 58 Einstiegspunkte von Grundorf und Berlin-Spandau liegen höchstens 1 m neb
 
 In Grundorf und Berlin-Spandau liegt der Wert genau eins über der höchsten ID, auch über den IDs der Chrono-Kacheln. In Stadtückheim ist er 92, und die ID 92 ist bereits vergeben. Ein Editor muss neue IDs deshalb oberhalb des größeren der beiden Werte vergeben: `[NextIDCode]` und höchste vorhandene ID plus eins.
 
+### `[groundtex]` und Bodenmasken
+
+Jeder `[groundtex]`-Abschnitt beschreibt eine Bodentextur: Pfad der Textur, Pfad der Detailtextur, dann drei Zahlen. Die erste Zahl ist die Kantenlänge der Maske als Zweierpotenz, die zweite die Wiederholungen der Textur je Kachel, die dritte die Wiederholungen der Detailtextur. Die Pfade sind relativ zur OMSI-Installation, nicht zur Karte, zum Beispiel `texture\gras.bmp` für `OMSI 2\Texture\gras.bmp`. Die Feldbedeutungen stammen aus den [openOMSI-Formatnotizen](https://github.com/openOMSI-org/openOMSI/blob/main/docs/FORMATS.md) und passen zu den Daten.
+
+| Karte | Bodentexturen | Masken | Beispiel |
+|---|---|---|---|
+| Grundorf | 2 | 7 | Gras mit `gras_det` 60-mal, Kopfstein 16-mal mit Masken 512 × 512 |
+| Berlin-Spandau | 8 | 230 | zusätzlich Schotter, Asphalt, Sand, zwei Feldarten, Betonplatten |
+
+Die erste Bodentextur bedeckt die ganze Karte und hat keine Maske. Jede weitere hat je Kachel höchstens eine Maske `texture\map\tile_x_y.map.<Index>.dds`. Fehlt die Datei, ist die Textur auf dieser Kachel nicht gemalt. Eine Maske ist ein 8-Bit-Alpha-DDS der angegebenen Größe. Ihre erste Zeile liegt an der Nordkante, ihre erste Spalte an der Westkante. Das wurde an Grundorf geprüft: Die Kopfsteinflächen der Masken liegen unter der Wendeschleife, dem Haltestellenplatz und der Dorfmitte, gespiegelt passen sie nicht. Alle Bodentexturen der drei Karten sind 24-Bit-BMP. Die Detailtextur wird einfach aufmultipliziert; die mitgelieferten Detailtexturen sind hell, `noise_low` hat im Mittel 242.
+
+Weitere Dateien je Kachel neben der Karte: `tile_x_y.map.LM.bmp` ist eine 256 × 256 große Nacht-Lightmap mit dem Licht der Laternen. `texture\map\tile_x_y.map.roadmap.bmp` ist OMSIs schematische Karte für die Kartenanzeige im Spiel. Mapforge verwendet beide nicht.
+
 ## Zahlenformat
 
 Der OMSI-Editor schreibt Kommazahlen mit höchstens 15 gültigen Ziffern und invarianter Kultur. Sehr kleine Werte schreibt er wissenschaftlich mit kurzem Exponenten, zum Beispiel `1.33514401335476E-5` oder `-3.59590604939723E-6`. Ganze Werte stehen ohne Nachkommastellen, etwa `300`. Diese Regel reproduziert 243.482 von 243.487 Kommazahlen der drei Karten zeichengenau. Die fünf Ausnahmen haben einen zweistelligen Exponenten wie `1.024455E-06` und stammen von einem anderen Werkzeug. `OmsiNumberFormat` setzt diese Regel um.

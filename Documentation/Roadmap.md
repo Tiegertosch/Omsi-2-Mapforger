@@ -32,6 +32,10 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen
 - Kartenkacheln und Koordinatenverwaltung entwickeln
 - 3D-Viewport und navigierbare Weltansicht ergänzen
+- [x] Draufsicht mit Bodentexturen: `[groundtex]` und Masken je Kachel, von einer Kamera unter der Vektorebene gezeichnet (ADR 013)
+- Straßen und Gleise als texturierte Bänder aus den `.sli`-Profilen
+- Objekte mit ihren Materialtexturen von oben zeichnen
+- Speicher und Ladezeit der Bodentexturen großer Karten begrenzen, etwa Masken erst laden, wenn ihre Kachel sichtbar wird
 - Geometrie- und Straßenwerkzeuge entwerfen
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
 - Validierungsberichte und Integritätsprüfungen ergänzen
