@@ -10,6 +10,30 @@ namespace OmsiMapEditor.OMSI
     {
         public string FileName { get; internal set; }
         public bool EditorOnly { get; internal set; }
+
+        /// <summary>Index of the [LOD] level the mesh belongs to in file order, or -1 when it comes before any [LOD].</summary>
+        public int LodLevel { get; internal set; } = -1;
+
+        /// <summary>The variable of a [visible] condition, or null when the mesh is always shown.</summary>
+        public string VisibleVariable { get; internal set; }
+
+        /// <summary>The mesh is shown while <see cref="VisibleVariable"/> has this value.</summary>
+        public double VisibleValue { get; internal set; }
+
+        /// <summary>[matl] settings for materials of this mesh, chosen by texture name and index.</summary>
+        public List<OmsiSceneryMaterial> Materials { get; } = new List<OmsiSceneryMaterial>();
+    }
+
+    /// <summary>A [matl] entry: the material of the mesh with this texture, and its alpha mode from [matl_alpha].</summary>
+    public sealed class OmsiSceneryMaterial
+    {
+        public string Texture { get; internal set; }
+
+        /// <summary>Which material with that texture is meant, counting from 0.</summary>
+        public int Index { get; internal set; }
+
+        /// <summary>0 opaque; 1 the alpha channel cuts the texture; 2 it blends.</summary>
+        public int AlphaMode { get; internal set; }
     }
 
     /// <summary>Tree parameters from [tree]: texture, height range and width-to-height ratio range.</summary>
@@ -65,6 +89,9 @@ namespace OmsiMapEditor.OMSI
             var file = OmsiRecordFile.Parse(bytes, null);
             var result = new OmsiSceneryObject();
             var nextMeshIsEditorOnly = false;
+            var lodLevels = 0;
+            OmsiSceneryMesh lastMesh = null;
+            OmsiSceneryMaterial lastMaterial = null;
             foreach (var record in file.Records)
             {
                 var values = record.AllValues();
@@ -73,10 +100,37 @@ namespace OmsiMapEditor.OMSI
                     case "onlyeditor":
                         nextMeshIsEditorOnly = true;
                         break;
+                    case "lod":
+                        lodLevels++;
+                        break;
                     case "mesh":
                         if (values.Count > 0 && values[0].Length > 0)
-                            result.Meshes.Add(new OmsiSceneryMesh { FileName = values[0], EditorOnly = nextMeshIsEditorOnly });
+                        {
+                            lastMesh = new OmsiSceneryMesh { FileName = values[0], EditorOnly = nextMeshIsEditorOnly, LodLevel = lodLevels - 1 };
+                            result.Meshes.Add(lastMesh);
+                        }
+                        lastMaterial = null;
                         nextMeshIsEditorOnly = false;
+                        break;
+                    case "visible":
+                        if (lastMesh != null && values.Count >= 2 &&
+                            double.TryParse(values[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var visibleValue))
+                        {
+                            lastMesh.VisibleVariable = values[0];
+                            lastMesh.VisibleValue = visibleValue;
+                        }
+                        break;
+                    case "matl":
+                        lastMaterial = null;
+                        if (lastMesh != null && values.Count >= 2 && int.TryParse(values[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var materialIndex))
+                        {
+                            lastMaterial = new OmsiSceneryMaterial { Texture = values[0], Index = materialIndex };
+                            lastMesh.Materials.Add(lastMaterial);
+                        }
+                        break;
+                    case "matl_alpha":
+                        if (lastMaterial != null && values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var alphaMode))
+                            lastMaterial.AlphaMode = alphaMode;
                         break;
                     case "collision_mesh":
                     case "collisionmesh":

@@ -44,7 +44,7 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Player-Inhaltsgrenze | Erfolgreich: Build vom 20. Oktober 2026 nach ADR 005 ohne Freigabeliste; `Editor.OMSI.dll` ist enthalten, `Editor.OMSI.Editor.dll` und OMSI-Quelldateiformate fehlen, der Bytevergleich mit der Installation meldete keinen Treffer |
 | Grundorf-Import | Erfolgreich: 19 Kacheln, 1.095 Objekte, 60 Splines, 37 Anbindungen und 19 Terrain-Felder per Unity Batch-Mode eingelesen |
 | Weitere Karten | Erfolgreich: Stadtückheim und Berlin-Spandau lesend eingelesen, alle gezählten Objekte und Splines dekodiert |
-| Portable Unit-Tests | Erfolgreich: 104 Tests für Kodierung, verlustfreies Dateimodell, typisierte Zugriffe, ID-Vergabe, Leser, Geometrie und Spline-Verbindungen ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
+| Portable Unit-Tests | Erfolgreich: 107 Tests für Kodierung, verlustfreies Dateimodell, typisierte Zugriffe, ID-Vergabe, Leser, Geometrie und Spline-Verbindungen ausserhalb von Unity mit Roslyn und NUnit ausgefuehrt |
 | Typisierte Zugriffe | Erfolgreich: 36.093 Datensätze der drei Karten ohne Lesefehler; 0 Abweichungen zum Leser bei 32.639 Objekten und Splines; Neusetzen der eigenen Werte ändert nur 2 Datensätze mit fremdem Zahlenformat |
 | Objektumrisse | Erfolgreich am 20. Oktober 2026: Umrisse für 107 von 108 Objektarten in Grundorf und alle 872 in Berlin-Spandau; Entwürfelung über Normalen geprüft, Achsen und Drehung über Anschlusspunkte von Kreuzungen. Im gebauten Player in Berlin-Spandau bei 1,3 m/px keine Neuzeichnung über 50 ms und keine Ausnahmen |
 | Nicht konvexe Umrisse | Erfolgreich am 21. Oktober 2026 außerhalb von Unity: Konturen für alle Objektarten von Grundorf und Berlin-Spandau berechnet und als Bildtafel gegen die Hülle geprüft; L-, U- und Mäanderbauten, Kreuzungsarme, Brücken und Innenhöfe folgen dem Modell. Im gebauten Player in Berlin-Spandau bedienbar und nur minimal langsamer als in Grundorf; eine Neuzeichnung dauerte 52 ms bei 1,28 m/px, keine Ausnahmen im Player-Log |
@@ -55,7 +55,8 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | ID-Vergabe | Erfolgreich: Grundorf und Berlin-Spandau setzen bei `[NextIDCode]` fort, Stadtückheim bei 93 statt beim bereits vergebenen 92 |
 | Verlustfreie Rundreise | Erfolgreich: alle 1.409 Textdateien der drei installierten Karten byte-identisch, darunter 766 Kacheln mit 57.180 Datensätzen, alle mit belegtem Layout; Unity-Batch-Prüfung für Berlin-Spandau 1.172 von 1.172 |
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
-| Unity Test Runner | Erfolgreich: alle 109 EditMode-Tests am 21. Oktober 2026 per Unity Batch-Mode bestanden |
+| Unity Test Runner | Erfolgreich: alle 112 EditMode-Tests am 21. Oktober 2026 per Unity Batch-Mode bestanden |
+| Objekte mit Texturen | Erfolgreich am 21. Oktober 2026 im gebauten Player: Grundorf und Berlin-Spandau mit texturierten Häusern, Kreuzungen und Baumkronen; Drehung und Lage passen zu den Umrissen. Zunächst blieben alle Objekte unsichtbar, weil der Build die Instancing-Variante des Shaders gestrichen hatte; ein Instancing-Material in `Resources` hält sie jetzt im Build. Statuszeile: 872 Objektarten, 632 Texturen, fünf erwartete Hinweise auf Schrifttexturen und ein fehlendes Modell |
 | Straßen und Gleise | Erfolgreich am 21. Oktober 2026 außerhalb von Unity: die Spline-Flächen von Grundorf in ihrer mittleren Texturfarbe gezeichnet, sie liegen auf den Mittellinien und schließen an die Kreuzungsobjekte an; Profile und Texturen aller drei Karten ohne Fehlstelle gelesen. Im gebauten Player in Berlin-Spandau geprüft: Fahrbahn, Bordstein und Gehweg texturiert, die Straße unter einer Brücke liegt richtig; die Spline-Linien der Vektorebene stören über den Texturen nicht |
 | Bodentexturen | Erfolgreich am 21. Oktober 2026 außerhalb von Unity: Grundorf aus `[groundtex]` und den sieben Masken zu einem Bild zusammengesetzt, Splines und Umrisse darübergelegt; die Kopfsteinflächen liegen unter Wendeschleife, Haltestellenplatz und Dorfmitte. Im gebauten Player in Grundorf und Berlin-Spandau deckungsgleich mit Splines und Umrissen beim Zoomen und Verschieben; in Berlin-Spandau waren die Texturen sofort nach dem Laden der Karte da. Keine Ausnahmen im Player-Log, die Vektorebene zeichnete wie zuvor höchstens 52 ms |
 | Kachelwechsel | Erfolgreich am 21. Oktober 2026 über eine Projekt-Arbeitskopie: aus den ersten zehn Kacheln je bis zu 15 Objekte in eine Nachbarkachel verlegt, in Grundorf 142 von 149, in Berlin-Spandau 131 von 150; die übrigen hielten Chrono-Auswahl, Einstiegspunkte, angehängte Objekte und Variablen-Eltern fest. Nach erneutem Lesen lag jedes Objekt in der Zielkachel an seiner Position, nach dem Zurücknehmen war die Arbeitskopie leer und die Originalkarte unverändert |
@@ -93,12 +94,19 @@ OMSI_MAP_CONFIG="D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cf
 
 **Bei offenem Editor:** Ordner `Assets`, `Packages`, `ProjectSettings` und `Library` in ein temporäres Verzeichnis kopieren, etwa 1,1 GB, und die Befehle dort mit `-projectPath` auf die Kopie ausführen. Die reine Logik in `Editor.Core` und `Editor.OMSI` lässt sich zusätzlich ohne Unity prüfen. Dazu kompiliert man sie mit dem Roslyn-Compiler der Visual Studio Build Tools und NUnit aus `Library/PackageCache/com.unity.ext.nunit@*/net472/unity-custom/`. Die dafür benutzten Hilfsskripte lagen nur im Arbeitsverzeichnis der Sitzung und sind nicht Teil des Repositorys.
 
+**Player ohne Klicken prüfen:** Der gebaute Player öffnet mit `-openMap pfad\global.cfg` oder `-openProject pfad.omproj` direkt eine Karte. `-view kachelX kachelY x y meterProPixel` setzt den Ausschnitt, `-screenshot datei.png` speichert ein Bildschirmfoto, sobald Boden, Objekte und Umrisse geladen sind, und `-quit` beendet den Player danach:
+
+```bash
+./Builds/Windows/OMSIMapEditor.exe -screen-width 1600 -screen-height 900 -screen-fullscreen 0 \
+  -openMap "D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cfg" -view 0 -1 150 150 0.25 \
+  -screenshot "C:/temp/grundorf.png" -quit -logFile "C:/temp/player.log"
+```
+
 **Player-Log:** Der gebaute Player schreibt nach `%USERPROFILE%\AppData\LocalLow\OMSI Map Editor\OMSI Map Editor\Player.log`. Die Kartenansicht meldet dort Neuzeichnungen über 50 ms.
 
 ## Naechste Schritte
 
-Die offenen Punkte stehen in der [Roadmap](Roadmap.md) unter „Später“. Zuletzt abgeschlossen sind Bodentexturen, Straßen und Gleise in der Draufsicht, davor die Mehrfachauswahl mit Kachelwechsel. Naheliegende nächste Schritte sind:
+Die offenen Punkte stehen in der [Roadmap](Roadmap.md) unter „Später“. Zuletzt abgeschlossen ist die texturierte Draufsicht mit Boden, Straßen, Gleisen und Objekten, davor die Mehrfachauswahl mit Kachelwechsel. Naheliegende nächste Schritte sind:
 
-1. Objekte mit ihren Texturen von oben.
-2. Fahrplandaten lesend importieren, Haltestellen und Linien anzeigen, Chrono-Varianten als Ebenen.
-3. Terrain und 3D-Ansicht.
+1. Fahrplandaten lesend importieren, Haltestellen und Linien anzeigen, Chrono-Varianten als Ebenen.
+2. Terrain und 3D-Ansicht.

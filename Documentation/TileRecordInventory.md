@@ -191,6 +191,10 @@ Jeder `[groundtex]`-Abschnitt beschreibt eine Bodentextur: Pfad der Textur, Pfad
 
 Die erste Bodentextur bedeckt die ganze Karte und hat keine Maske. Jede weitere hat je Kachel höchstens eine Maske `texture\map\tile_x_y.map.<Index>.dds`. Fehlt die Datei, ist die Textur auf dieser Kachel nicht gemalt. Eine Maske ist ein 8-Bit-Alpha-DDS der angegebenen Größe. Ihre erste Zeile liegt an der Nordkante, ihre erste Spalte an der Westkante. Das wurde an Grundorf geprüft: Die Kopfsteinflächen der Masken liegen unter der Wendeschleife, dem Haltestellenplatz und der Dorfmitte, gespiegelt passen sie nicht. Alle Bodentexturen der drei Karten sind 24-Bit-BMP. Die Detailtextur wird einfach aufmultipliziert; die mitgelieferten Detailtexturen sind hell, `noise_low` hat im Mittel 242.
 
+### Geländehöhen
+
+`tile_x_y.map.terrain` beginnt mit der 32-Bit-Zahl 60, dann folgen 61 × 61 Höhen als 32-Bit-Gleitkommazahlen, je eine alle 1/60 der Kachelkante. Der erste Wert liegt an der Südwestecke, x läuft am schnellsten nach Osten, die Zeilen laufen nach Norden. Geprüft an den absolut gespeicherten Spline-Höhen: In Berlin-Spandau liegen 2.466 Spline-Anfänge im Median 1 mm und zu 80 % höchstens 0,25 m über dem bilinear gelesenen Gelände. Bei gespiegelter oder vertauschter Anordnung sind es im Median 0,4 bis 0,6 m und zu 80 % bis 2,9 m.
+
 Weitere Dateien je Kachel neben der Karte: `tile_x_y.map.LM.bmp` ist eine 256 × 256 große Nacht-Lightmap mit dem Licht der Laternen. `texture\map\tile_x_y.map.roadmap.bmp` ist OMSIs schematische Karte für die Kartenanzeige im Spiel. Mapforge verwendet beide nicht.
 
 ## Zahlenformat

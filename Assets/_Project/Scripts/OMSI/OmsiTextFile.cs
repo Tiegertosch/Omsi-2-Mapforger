@@ -109,14 +109,15 @@ namespace OmsiMapEditor.OMSI
         {
             var characters = new char[bytes.Length];
             for (var index = 0; index < bytes.Length; index++)
-            {
-                var value = bytes[index];
-                characters[index] = value >= 0x80 && value <= 0x9F
-                    ? Windows1252HighControlRange[value - 0x80]
-                    : (char)value;
-            }
+                characters[index] = Windows1252Char(bytes[index]);
 
             return new string(characters);
+        }
+
+        /// <summary>One Windows-1252 byte as a character, for binary formats that store such strings.</summary>
+        internal static char Windows1252Char(byte value)
+        {
+            return value >= 0x80 && value <= 0x9F ? Windows1252HighControlRange[value - 0x80] : (char)value;
         }
 
         private static byte[] EncodeWindows1252(string text)

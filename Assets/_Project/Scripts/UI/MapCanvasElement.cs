@@ -186,6 +186,9 @@ namespace OmsiMapEditor.UI
         /// <summary>When false, available tiles are not filled, so a ground drawn below the view shows through.</summary>
         public bool ShowTileFill { get; set; } = true;
 
+        /// <summary>When false, object outlines are only stroked, so textured objects below keep their colours.</summary>
+        public bool ShowOutlineFill { get; set; } = true;
+
         public bool IsPlacing => placementAsset != null;
 
         /// <summary>Heading of the placement preview in degrees.</summary>
@@ -324,6 +327,19 @@ namespace OmsiMapEditor.UI
         public void Zoom(float factor)
         {
             ZoomAround(layout.size * 0.5f, factor);
+        }
+
+        /// <summary>Centres the view on a tile-local position at the given scale.</summary>
+        public void ShowArea(OmsiTileSummary tile, double localX, double localY, float viewMetersPerPixel)
+        {
+            if (tile == null || viewMetersPerPixel <= 0f)
+                return;
+            center = ToMap(tile, localX, localY);
+            metersPerPixel = viewMetersPerPixel;
+            hasView = true;
+            isFitted = false;
+            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
         }
 
         public void CenterOn(OmsiTileSummary tile, OmsiObjectRecord item)
@@ -510,7 +526,8 @@ namespace OmsiMapEditor.UI
                 }
                 if (any)
                 {
-                    painter.Fill();
+                    if (ShowOutlineFill)
+                        painter.Fill();
                     painter.Stroke();
                 }
             }

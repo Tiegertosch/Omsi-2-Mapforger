@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace OmsiMapEditor.OMSI
@@ -27,6 +28,65 @@ namespace OmsiMapEditor.OMSI
         public int Channels { get; }
 
         public byte[] Pixels { get; }
+
+        /// <summary>Halves the image with a 2 × 2 box filter until neither side exceeds <paramref name="maximumSize"/>.</summary>
+        public OmsiImage Reduce(int maximumSize)
+        {
+            var image = this;
+            while ((image.Width > maximumSize || image.Height > maximumSize) && image.Width > 1 && image.Height > 1)
+            {
+                int width = image.Width / 2, height = image.Height / 2, channels = image.Channels;
+                var pixels = new byte[width * height * channels];
+                for (var y = 0; y < height; y++)
+                    for (var x = 0; x < width; x++)
+                        for (var channel = 0; channel < channels; channel++)
+                        {
+                            var sum = image.Pixels[((2 * y) * image.Width + 2 * x) * channels + channel] +
+                                      image.Pixels[((2 * y) * image.Width + 2 * x + 1) * channels + channel] +
+                                      image.Pixels[((2 * y + 1) * image.Width + 2 * x) * channels + channel] +
+                                      image.Pixels[((2 * y + 1) * image.Width + 2 * x + 1) * channels + channel];
+                            pixels[(y * width + x) * channels + channel] = (byte)((sum + 2) / 4);
+                        }
+                image = new OmsiImage(width, height, channels, pixels);
+            }
+            return image;
+        }
+    }
+
+    public enum OmsiBlockFormat
+    {
+        Dxt1,
+        Dxt3,
+        Dxt5
+    }
+
+    /// <summary>
+    /// A block-compressed DDS surface kept compressed, so a graphics card can use it directly: the mip levels from the
+    /// largest down, each stored rows from top to bottom in 4 × 4 blocks.
+    /// </summary>
+    public sealed class OmsiCompressedImage
+    {
+        internal OmsiCompressedImage(OmsiBlockFormat format, int width, int height, List<byte[]> levels)
+        {
+            Format = format;
+            Width = width;
+            Height = height;
+            Levels = levels;
+        }
+
+        public OmsiBlockFormat Format { get; }
+
+        /// <summary>Size of the first level in <see cref="Levels"/>.</summary>
+        public int Width { get; }
+
+        public int Height { get; }
+
+        public IReadOnlyList<byte[]> Levels { get; }
+
+        public static int BlockBytes(OmsiBlockFormat format)
+        {
+            return format == OmsiBlockFormat.Dxt1 ? 8 : 16;
+        }
     }
 
     /// <summary>
@@ -49,6 +109,61 @@ namespace OmsiMapEditor.OMSI
             else if (LooksLikeTga(bytes))
                 image = DecodeTga(bytes);
             return image != null;
+        }
+
+        /// <summary>
+        /// Reads a DXT1, DXT3 or DXT5 DDS file without decoding it, starting at the first mip level whose sides do not
+        /// exceed <paramref name="maximumSize"/>. Returns false for other files.
+        /// </summary>
+        public static bool TryReadCompressed(byte[] bytes, int maximumSize, out OmsiCompressedImage image)
+        {
+            if (bytes == null)
+                throw new ArgumentNullException(nameof(bytes));
+            image = null;
+            if (bytes.Length < 128 || bytes[0] != 'D' || bytes[1] != 'D' || bytes[2] != 'S' || bytes[3] != ' ' || (Int32(bytes, 80) & DdpfFourCc) == 0)
+                return false;
+
+            OmsiBlockFormat format;
+            switch (Int32(bytes, 84))
+            {
+                case 0x31545844: format = OmsiBlockFormat.Dxt1; break;
+                case 0x33545844: format = OmsiBlockFormat.Dxt3; break;
+                case 0x35545844: format = OmsiBlockFormat.Dxt5; break;
+                default: return false;
+            }
+            var width = Int32(bytes, 16);
+            var height = Int32(bytes, 12);
+            CheckSize(width, height);
+            // DDSD_MIPMAPCOUNT; without it the file holds one level.
+            var mipCount = (Int32(bytes, 8) & 0x20000) != 0 ? Math.Max(1, Int32(bytes, 28)) : 1;
+
+            var levels = new List<byte[]>();
+            var offset = 128;
+            int keptWidth = 0, keptHeight = 0;
+            for (var level = 0; level < mipCount && width > 0 && height > 0; level++)
+            {
+                var size = Math.Max(1, (width + 3) / 4) * Math.Max(1, (height + 3) / 4) * OmsiCompressedImage.BlockBytes(format);
+                if (offset + size > bytes.Length)
+                    break;
+                if (width <= maximumSize && height <= maximumSize)
+                {
+                    if (levels.Count == 0)
+                    {
+                        keptWidth = width;
+                        keptHeight = height;
+                    }
+                    var data = new byte[size];
+                    Array.Copy(bytes, offset, data, 0, size);
+                    levels.Add(data);
+                }
+                offset += size;
+                width /= 2;
+                height /= 2;
+            }
+            if (levels.Count == 0)
+                return false;
+            image = new OmsiCompressedImage(format, keptWidth, keptHeight, levels);
+            return true;
         }
 
         private static int Int32(byte[] bytes, int offset)

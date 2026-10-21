@@ -100,6 +100,9 @@ namespace OmsiMapEditor.World
 
         public bool IsLoading => loading != null || pending != null;
 
+        /// <summary>The camera looking down on the map view; other renderers draw into it too.</summary>
+        public Camera ViewCamera => groundCamera;
+
         public bool GroundVisible
         {
             get => groundVisible;

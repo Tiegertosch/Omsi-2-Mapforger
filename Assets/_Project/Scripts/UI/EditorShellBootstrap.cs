@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -55,6 +56,7 @@ namespace OmsiMapEditor.UI
         private VisualElement inspectorPanel;
         private MapCanvasElement mapCanvas;
         private MapGroundRenderer groundRenderer;
+        private MapObjectRenderer objectRenderer;
         private VisualElement rootElement;
         private Button groundToggleButton;
         private OmsiTileSummary selectedTile;
@@ -91,6 +93,7 @@ namespace OmsiMapEditor.UI
         private readonly Dictionary<string, OmsiObjectOutline> outlineCache = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
         private string outlineInstallationRoot;
         private int outlineBuildGeneration;
+        private bool outlinesBuilding;
 
         private void Awake()
         {
@@ -296,6 +299,9 @@ namespace OmsiMapEditor.UI
             CreateBackgroundCamera();
             groundRenderer = new GameObject("Map Ground").AddComponent<MapGroundRenderer>();
             groundRenderer.Loaded += SetStatus;
+            objectRenderer = groundRenderer.gameObject.AddComponent<MapObjectRenderer>();
+            objectRenderer.SetCamera(groundRenderer.ViewCamera);
+            objectRenderer.Loaded += SetStatus;
         }
 
         /// <summary>Keeps the ground camera on the screen rectangle and view of the map view.</summary>
@@ -322,7 +328,10 @@ namespace OmsiMapEditor.UI
             if (groundRenderer == null || mapCanvas == null)
                 return;
             groundRenderer.GroundVisible = !groundRenderer.GroundVisible;
+            if (objectRenderer != null)
+                objectRenderer.ObjectsVisible = groundRenderer.GroundVisible;
             mapCanvas.ShowTileFill = !groundRenderer.GroundVisible;
+            mapCanvas.ShowOutlineFill = !groundRenderer.GroundVisible;
             mapCanvas.Refresh();
             if (groundToggleButton != null)
                 groundToggleButton.text = groundRenderer.GroundVisible ? "Textures: on" : "Textures: off";
@@ -346,14 +355,91 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>
+        /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
+        /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-screenshot file.png</c>, taken once ground, objects and
+        /// outlines are loaded, and <c>-quit</c>.
+        /// </summary>
+        private IEnumerator Start()
+        {
+            var args = Environment.GetCommandLineArgs();
+            string Argument(string name, int offset)
+            {
+                var index = Array.IndexOf(args, name);
+                return index >= 0 && index + offset < args.Length ? args[index + offset] : null;
+            }
+
+            var mapPath = Argument("-openMap", 1);
+            var projectPath = Argument("-openProject", 1);
+            var quit = Array.IndexOf(args, "-quit") >= 0;
+            if (mapPath == null && projectPath == null)
+                yield break;
+
+            if (projectPath != null)
+                OpenProjectFile(projectPath);
+            else
+            {
+                try
+                {
+                    LoadMap(mapPath, string.Empty, null, false);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+            // Two frames for the layout, so the view has its size.
+            yield return null;
+            yield return null;
+            if (currentSummary == null)
+            {
+                if (quit)
+                    Application.Quit(1);
+                yield break;
+            }
+
+            if (Argument("-view", 5) != null && int.TryParse(Argument("-view", 1), out var tileX) && int.TryParse(Argument("-view", 2), out var tileY) &&
+                double.TryParse(Argument("-view", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var localX) &&
+                double.TryParse(Argument("-view", 4), NumberStyles.Float, CultureInfo.InvariantCulture, out var localY) &&
+                float.TryParse(Argument("-view", 5), NumberStyles.Float, CultureInfo.InvariantCulture, out var scale))
+            {
+                var tile = currentSummary.Tiles.Find(candidate => candidate.X == tileX && candidate.Y == tileY);
+                mapCanvas?.ShowArea(tile, localX, localY, scale);
+                UpdateZoomLabel();
+            }
+
+            var screenshot = Argument("-screenshot", 1);
+            if (screenshot != null)
+            {
+                var started = Time.realtimeSinceStartup;
+                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || outlinesBuilding) && Time.realtimeSinceStartup - started < 300f)
+                    yield return null;
+                for (var frame = 0; frame < 10; frame++)
+                    yield return null;
+                // At the end of the frame the screen holds the cameras and the UI on top.
+                yield return new WaitForEndOfFrame();
+                var shot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                shot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+                shot.Apply();
+                File.WriteAllBytes(Path.GetFullPath(screenshot), shot.EncodeToPNG());
+                Destroy(shot);
+                Debug.Log("Screenshot saved: " + Path.GetFullPath(screenshot));
+            }
+            if (quit)
+                Application.Quit();
+        }
+
         private void OpenProject()
+        {
+            var projectPath = WindowsFileDialog.OpenFile("Open a Mapforge project", WindowsFileDialog.ProjectFilter);
+            if (!string.IsNullOrEmpty(projectPath))
+                OpenProjectFile(projectPath);
+        }
+
+        private void OpenProjectFile(string projectPath)
         {
             try
             {
-                var projectPath = WindowsFileDialog.OpenFile("Open a Mapforge project", WindowsFileDialog.ProjectFilter);
-                if (string.IsNullOrEmpty(projectPath))
-                    return;
-
                 var fullProjectPath = Path.GetFullPath(projectPath);
                 var project = JsonUtility.FromJson<MapforgeProject>(File.ReadAllText(fullProjectPath));
                 if (project == null)
@@ -447,8 +533,11 @@ namespace OmsiMapEditor.UI
                 mapCanvas.SetMap(summary, keepView);
                 mapCanvas.SetSelection(selectedTile, selection);
                 mapCanvas.ShowTileFill = groundRenderer == null || !groundRenderer.GroundVisible;
-                groundRenderer?.Load(summary, session.Source, Path.GetFileName(session.GlobalConfigPath),
-                    OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath), mapCanvas.OriginX, mapCanvas.OriginY);
+                mapCanvas.ShowOutlineFill = mapCanvas.ShowTileFill;
+                var installationRoot = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
+                groundRenderer?.Load(summary, session.Source, Path.GetFileName(session.GlobalConfigPath), installationRoot,
+                    mapCanvas.OriginX, mapCanvas.OriginY);
+                objectRenderer?.Load(summary, session.Source, installationRoot, mapCanvas.OriginX, mapCanvas.OriginY);
             }
             StartOutlineBuild(summary);
             UpdateMapHeader();
@@ -490,6 +579,7 @@ namespace OmsiMapEditor.UI
             }
 
             var generation = ++outlineBuildGeneration;
+            outlinesBuilding = true;
             var task = Task.Run(() =>
             {
                 var catalog = new OmsiObjectOutlineCatalog(root);
@@ -508,6 +598,7 @@ namespace OmsiMapEditor.UI
                 // A newer map replaced this one while the outlines were computed.
                 if (generation != outlineBuildGeneration)
                     return;
+                outlinesBuilding = false;
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
@@ -755,6 +846,7 @@ namespace OmsiMapEditor.UI
             }
             ApplySelection(selection.Count > 0 ? selection[selection.Count - 1].Tile : selectedTile);
             mapCanvas?.Refresh();
+            objectRenderer?.RefreshPlacements();
             foreach (var tile in browserEntries.Keys)
                 UpdateBrowserEntry(tile);
             UpdateCounts();

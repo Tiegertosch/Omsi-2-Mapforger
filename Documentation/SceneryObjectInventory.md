@@ -82,6 +82,30 @@ Am stärksten weichen lange Wohnzeilen in L-, U- und Mäanderform, große Kreuzu
 
 Der Katalog für Berlin-Spandau braucht ohne das Lesen der Karte etwa 2,8 s, wenn die Modelldateien im Dateicache liegen. Beim ersten Lesen von der Festplatte dauerte er 36 s. Die App berechnet ihn im Hintergrund. Über alle Platzierungen von Berlin-Spandau haben die Konturen 281.000 Eckpunkte, die Hüllen 235.000.
 
+## Darstellung mit Modellen und Texturen
+
+Für die texturierte Draufsicht zählen weitere Angaben der `.sco` und der `.o3d`:
+
+| Quelle | Angabe | Bedeutung |
+|---|---|---|
+| `.o3d` Abschnitt `0x26` | je Material diffuse RGBA, Glanz RGB, Eigenleuchten RGB, Glanzstärke, dann Texturname mit Längenbyte | Texturname in Windows-1252 |
+| `.o3d` Dreiecke | nach den drei Indizes eine 16-Bit-Zahl | Materialindex des Dreiecks |
+| `.sco` `[LOD]` | Schwelle | beginnt eine Detailstufe; Stufen zählen in Dateireihenfolge |
+| `.sco` `[visible]` | Variable, Wert | das vorherige `[mesh]` ist nur bei diesem Wert sichtbar |
+| `.sco` `[matl]` | Texturname, Nummer | wählt ein Material des vorherigen `[mesh]` nach Texturname und Vorkommen |
+| `.sco` `[matl_alpha]` | 0, 1 oder 2 | Alpha des vorherigen `[matl]`: aus, Ausschneiden, Überblenden |
+
+Laut openOMSI nimmt OMSI die erste Detailstufe, deren Schwelle die Bildschirmgröße des Objekts erreicht; aus der Nähe ist das die erste. Mapforge zeigt deshalb die Modelle vor dem ersten `[LOD]` und die der ersten Stufe. `[visible]`-Bedingungen werten alle Variablen als 0, nur `sommerhalbjahr` als 1. Das schaltet vor allem Ampellichter (`red`, `green`, `yellow`) aus und zeigt sommerliche Objekte wie Kühe auf der Weide.
+
+**Texturen:** Die Modelle nennen oft `.bmp`, im Ordner `texture` neben der `.sco` liegt aber eine gleichnamige `.dds`. Mapforge sucht wie OMSI zuerst diese `.dds`, dann die genannte Datei, dann beides im globalen Ordner `Texture`. Daneben gibt es `_#low`-Varianten für niedrige Texturqualität, die Mapforge nicht nutzt. In Berlin-Spandau finden sich so 660 Texturen, 431 DDS mit DXT1 oder DXT3, 163 BMP und 66 TGA, zusammen 329 MB. Es fehlen nur vier Schrifttexturen wie `textfeld.bmp`, die OMSI zur Laufzeit erzeugt.
+
+| Karte | Objektarten | Bäume | Dreiecke je Art einmal | Dreiecke aller Platzierungen |
+|---|---|---|---|---|
+| Grundorf | 108 | 18 | 17.536 | 76.144 |
+| Berlin-Spandau | 872 | 33 | 405.645 | 2.401.834 |
+
+Die Modelle aller 872 Objektarten von Berlin-Spandau sind in etwa 1 s gebaut. Text-`.x`-Modelle haben in Mapforge noch keine Texturkoordinaten und erscheinen grau.
+
 ## Spline-Profile (`.sli`)
 
 Ein Spline-Datensatz nennt eine `.sli`-Datei. Sie beschreibt den Querschnitt, der entlang des Splines extrudiert wird. Für die Draufsicht zählen diese Abschnitte:

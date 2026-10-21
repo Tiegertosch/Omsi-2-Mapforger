@@ -292,6 +292,86 @@ namespace OmsiMapEditor.Tests
             };
         }
 
+        [Test]
+        public void BuildsModelsFromTheVisibleMeshesWithTheirMaterials()
+        {
+            // Two triangles with different materials; the second material's texture exists only as .dds.
+            File.WriteAllBytes(Model("shop.o3d"), O3d(1, 0, null, new[] { V(0, 0, 0), V(1, 0, 0), V(0, 0, 1), V(1, 0, 1) },
+                new[] { 0, 1, 2, 1, 3, 2 }, new[] { 0, 1 }, new[] { "wall.bmp", "glass.bmp" }));
+            File.WriteAllBytes(Model("shop_low.o3d"), O3d(1, 0, null, new[] { V(0, 0, 0), V(1, 0, 0), V(0, 0, 1) }, new[] { 0, 1, 2 }));
+            File.WriteAllBytes(Model("lamp.o3d"), O3d(1, 0, null, new[] { V(0, 0, 0), V(1, 0, 0), V(0, 0, 1) }, new[] { 0, 1, 2 }));
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test", "texture"));
+            File.WriteAllBytes(Path.Combine(installation, "Sceneryobjects", "Test", "texture", "wall.bmp"), new byte[] { 1 });
+            File.WriteAllBytes(Path.Combine(installation, "Sceneryobjects", "Test", "texture", "glass.dds"), new byte[] { 1 });
+            WriteSco("shop.sco",
+                "[absheight]", "",
+                "[LOD]", "0.3", "",
+                "[mesh]", "shop.o3d", "", "[matl]", "glass.bmp", "0", "", "[matl_alpha]", "1", "",
+                "[mesh]", "lamp.o3d", "", "[visible]", "red", "1", "",
+                "[LOD]", "0.05", "",
+                "[mesh]", "shop_low.o3d");
+
+            var catalog = new OmsiObjectModelCatalog(installation);
+            var shop = catalog.Get(@"Sceneryobjects\Test\shop.sco");
+
+            Assert.IsTrue(shop.HasAbsoluteHeight);
+            // Only the first level; the red lamp is off by default.
+            Assert.AreEqual(4, shop.VertexCount);
+            Assert.AreEqual(2, shop.Materials.Count);
+            Assert.AreEqual(Path.Combine(@"Sceneryobjects\Test", "texture", "wall.bmp"), shop.Materials[0].TexturePath);
+            Assert.AreEqual(Path.Combine(@"Sceneryobjects\Test", "texture", "glass.dds"), shop.Materials[1].TexturePath);
+            Assert.AreEqual(0, shop.Materials[0].AlphaMode);
+            Assert.AreEqual(1, shop.Materials[1].AlphaMode);
+            Assert.AreEqual(0.5f, shop.Materials[0].Red);
+            CollectionAssert.AreEqual(new[] { 1, 3, 2 }, shop.Triangles[1]);
+            CollectionAssert.IsEmpty(catalog.Problems);
+        }
+
+        [Test]
+        public void ReadsTerrainHeightsFromTheSouthWestCorner()
+        {
+            var bytes = new byte[4 + 61 * 61 * 4];
+            BitConverter.GetBytes(60).CopyTo(bytes, 0);
+            // Height grows by 1 m per column eastwards and by 10 m per row northwards.
+            for (var row = 0; row < 61; row++)
+                for (var column = 0; column < 61; column++)
+                    BitConverter.GetBytes((float)(column + 10 * row)).CopyTo(bytes, 4 + (row * 61 + column) * 4);
+
+            var terrain = OmsiTerrain.Parse(bytes);
+
+            Assert.AreEqual(0.0, terrain.HeightAt(0, 0, 300), 1e-9);
+            Assert.AreEqual(2.5 + 10 * 1.5, terrain.HeightAt(12.5, 7.5, 300), 1e-5);
+            Assert.AreEqual(60.0 + 600.0, terrain.HeightAt(400, 400, 300), 1e-9);
+            Assert.Throws<InvalidDataException>(() => OmsiTerrain.Parse(new byte[12]));
+        }
+
+        [Test]
+        public void ReadsCompressedDdsLevelsWithinASizeLimitAndReducesImages()
+        {
+            // DXT1, 8 × 8 with two mip levels: 4 blocks, then 1.
+            var bytes = new byte[128 + 32 + 8];
+            Encoding.ASCII.GetBytes("DDS ").CopyTo(bytes, 0);
+            BitConverter.GetBytes(0x20000).CopyTo(bytes, 8);
+            BitConverter.GetBytes(8).CopyTo(bytes, 12);
+            BitConverter.GetBytes(8).CopyTo(bytes, 16);
+            BitConverter.GetBytes(2).CopyTo(bytes, 28);
+            BitConverter.GetBytes(0x4).CopyTo(bytes, 80);
+            BitConverter.GetBytes(0x31545844).CopyTo(bytes, 84);
+            bytes[128 + 32] = 7;
+
+            Assert.IsTrue(OmsiImageReader.TryReadCompressed(bytes, 1024, out var full));
+            Assert.IsTrue(OmsiImageReader.TryReadCompressed(bytes, 4, out var reduced));
+
+            Assert.AreEqual(2, full.Levels.Count);
+            Assert.AreEqual(8, full.Width);
+            Assert.AreEqual(1, reduced.Levels.Count);
+            Assert.AreEqual(4, reduced.Width);
+            Assert.AreEqual(7, reduced.Levels[0][0]);
+            var image = new OmsiImage(2, 2, 1, new byte[] { 0, 10, 20, 30 }).Reduce(1);
+            Assert.AreEqual(1, image.Width);
+            Assert.AreEqual(15, image.Pixels[0]);
+        }
+
         private struct MeshVertex
         {
             public float X, Y, Z, NX, NY, NZ, U, V;
@@ -302,8 +382,9 @@ namespace OmsiMapEditor.Tests
             return new MeshVertex { X = x, Y = y, Z = z, NY = 1 };
         }
 
-        /// <summary>Writes an .o3d file: header, vertices, triangles and an identity matrix.</summary>
-        private static byte[] O3d(byte version, byte flags, uint? key, MeshVertex[] vertices, int[] triangleIndices)
+        /// <summary>Writes an .o3d file: header, vertices, triangles, optional materials and an identity matrix.</summary>
+        private static byte[] O3d(byte version, byte flags, uint? key, MeshVertex[] vertices, int[] triangleIndices,
+            int[] triangleMaterials = null, string[] materialTextures = null)
         {
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream))
@@ -328,7 +409,19 @@ namespace OmsiMapEditor.Tests
                 {
                     if ((flags & 1) != 0) writer.Write((uint)triangleIndices[index]); else writer.Write((ushort)triangleIndices[index]);
                     if (index % 3 == 2)
-                        writer.Write((ushort)0);
+                        writer.Write((ushort)(triangleMaterials?[index / 3] ?? 0));
+                }
+                if (materialTextures != null)
+                {
+                    writer.Write((byte)0x26);
+                    writer.Write((ushort)materialTextures.Length);
+                    foreach (var texture in materialTextures)
+                    {
+                        foreach (var value in new[] { 0.5f, 0.25f, 1f, 1f, 0f, 0f, 0f, 0f, 0f, 0f, 0f })
+                            writer.Write(value);
+                        writer.Write((byte)texture.Length);
+                        writer.Write(Encoding.ASCII.GetBytes(texture));
+                    }
                 }
                 writer.Write((byte)0x79);
                 for (var index = 0; index < 16; index++)

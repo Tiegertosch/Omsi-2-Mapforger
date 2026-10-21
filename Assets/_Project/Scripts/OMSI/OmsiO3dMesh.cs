@@ -16,7 +16,19 @@ namespace OmsiMapEditor.OMSI
         public float U, V;
     }
 
-    /// <summary>Vertices and triangles of a binary OMSI .o3d mesh. Materials, the pivot matrix and bones are skipped.</summary>
+    /// <summary>A material of an .o3d mesh: its diffuse colour and the texture file name, empty for none.</summary>
+    public sealed class OmsiMeshMaterial
+    {
+        public float DiffuseRed { get; internal set; }
+        public float DiffuseGreen { get; internal set; }
+        public float DiffuseBlue { get; internal set; }
+        public float DiffuseAlpha { get; internal set; }
+
+        /// <summary>File name in the <c>texture</c> folder next to the scenery object, as stored in the mesh.</summary>
+        public string Texture { get; internal set; }
+    }
+
+    /// <summary>Vertices, triangles and materials of a binary OMSI .o3d mesh. The pivot matrix and bones are skipped.</summary>
     public sealed class OmsiO3dMesh
     {
         public int Version { get; private set; }
@@ -32,6 +44,11 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Vertex indices, three per triangle; triangles with an index beyond the vertices are dropped.</summary>
         public List<int> TriangleIndices { get; } = new List<int>();
+
+        /// <summary>Material index of each triangle, in the order of <see cref="TriangleIndices"/>.</summary>
+        public List<int> TriangleMaterials { get; } = new List<int>();
+
+        public List<OmsiMeshMaterial> Materials { get; } = new List<OmsiMeshMaterial>();
 
         public static OmsiO3dMesh Load(string path)
         {
@@ -109,20 +126,27 @@ namespace OmsiMapEditor.OMSI
                             var a = longIndices ? (int)reader.U32() : reader.U16();
                             var b = longIndices ? (int)reader.U32() : reader.U16();
                             var c = longIndices ? (int)reader.U32() : reader.U16();
-                            reader.U16();
+                            var material = reader.U16();
                             mesh.TriangleIndices.Add(a);
                             mesh.TriangleIndices.Add(b);
                             mesh.TriangleIndices.Add(c);
+                            mesh.TriangleMaterials.Add(material);
                         }
                         break;
                     }
                     case 0x26:
                     {
+                        // Diffuse RGBA, specular RGB, emissive RGB and specular power, then the texture name.
                         var count = reader.U16();
                         for (var index = 0; index < count; index++)
                         {
-                            reader.Skip(11 * 4);
-                            reader.Skip(reader.U8());
+                            var material = new OmsiMeshMaterial
+                            {
+                                DiffuseRed = reader.F32(), DiffuseGreen = reader.F32(), DiffuseBlue = reader.F32(), DiffuseAlpha = reader.F32()
+                            };
+                            reader.Skip(7 * 4);
+                            material.Texture = reader.Text(reader.U8());
+                            mesh.Materials.Add(material);
                         }
                         break;
                     }
@@ -154,7 +178,10 @@ namespace OmsiMapEditor.OMSI
             {
                 if (TriangleIndices[index] >= Vertices.Count || TriangleIndices[index + 1] >= Vertices.Count ||
                     TriangleIndices[index + 2] >= Vertices.Count)
+                {
                     TriangleIndices.RemoveRange(index, 3);
+                    TriangleMaterials.RemoveAt(index / 3);
+                }
             }
         }
 
@@ -257,6 +284,17 @@ namespace OmsiMapEditor.OMSI
                 var value = BitConverter.ToUInt32(bytes, position);
                 position += 4;
                 return value;
+            }
+
+            /// <summary>A Windows-1252 string of the given length.</summary>
+            public string Text(int length)
+            {
+                Need(length);
+                var text = new char[length];
+                for (var index = 0; index < length; index++)
+                    text[index] = OmsiTextFile.Windows1252Char(bytes[position + index]);
+                position += length;
+                return new string(text);
             }
 
             public float F32()
