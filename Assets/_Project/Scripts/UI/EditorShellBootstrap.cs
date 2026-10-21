@@ -59,6 +59,7 @@ namespace OmsiMapEditor.UI
         private MapObjectRenderer objectRenderer;
         private VisualElement rootElement;
         private Button groundToggleButton;
+        private Button view3DButton;
         private OmsiTileSummary selectedTile;
         private OmsiObjectRecord selectedObject;
 
@@ -168,6 +169,7 @@ namespace OmsiMapEditor.UI
             var zoomInButton = root.Q<Button>("zoom-in-button");
             var centerSelectionButton = root.Q<Button>("center-selection-button");
             groundToggleButton = root.Q<Button>("ground-toggle-button");
+            view3DButton = root.Q<Button>("view3d-button");
 
             var mapView = root.Q<VisualElement>("map-view");
             if (mapView != null)
@@ -235,6 +237,8 @@ namespace OmsiMapEditor.UI
                 centerSelectionButton.clicked += CenterSelection;
             if (groundToggleButton != null)
                 groundToggleButton.clicked += ToggleGround;
+            if (view3DButton != null)
+                view3DButton.clicked += ToggleThreeDimensional;
 
             if (viewButton != null)
                 viewButton.clicked += () => ToggleSidePanels(projectPanel, inspectorPanel);
@@ -334,7 +338,37 @@ namespace OmsiMapEditor.UI
             var scale = Screen.width / panelWidth;
             var bounds = mapCanvas.worldBound;
             var screenRect = new Rect(bounds.x * scale, Screen.height - bounds.yMax * scale, bounds.width * scale, bounds.height * scale);
-            groundRenderer.SetView(screenRect, mapCanvas.Center, bounds.height * mapCanvas.MetersPerPixel);
+            if (mapCanvas.ThreeDimensional)
+            {
+                var target = mapCanvas.OrbitTarget;
+                groundRenderer.SetOrbitView(screenRect, new Vector3(target.x, groundRenderer.HeightAt(target), target.y), mapCanvas.OrbitYaw,
+                    mapCanvas.OrbitPitch, mapCanvas.OrbitDistance);
+            }
+            else
+            {
+                groundRenderer.SetView(screenRect, mapCanvas.Center, bounds.height * mapCanvas.MetersPerPixel);
+            }
+        }
+
+        /// <summary>Switches between editing the map from above and looking at it in 3D.</summary>
+        private void ToggleThreeDimensional()
+        {
+            if (mapCanvas == null || groundRenderer == null || currentSummary == null)
+                return;
+            if (mapCanvas.ThreeDimensional)
+                mapCanvas.LeaveOrbitView();
+            else
+            {
+                StopPlacement();
+                mapCanvas.EnterOrbitView();
+            }
+            groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
+            if (view3DButton != null)
+                view3DButton.text = mapCanvas.ThreeDimensional ? "3D: on" : "3D: off";
+            UpdateMapHeader();
+            SetStatus(mapCanvas.ThreeDimensional
+                ? "3D view: right drag turns, left or middle drag moves, the wheel zooms. Switch 3D off to edit."
+                : "Back to the map from above.");
         }
 
         private void ToggleGround()
@@ -370,8 +404,8 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
-        /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-screenshot file.png</c>, taken once ground, objects and
-        /// outlines are loaded, and <c>-quit</c>.
+        /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
+        /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and <c>-quit</c>.
         /// </summary>
         private IEnumerator Start()
         {
@@ -419,6 +453,15 @@ namespace OmsiMapEditor.UI
                 var tile = currentSummary.Tiles.Find(candidate => candidate.X == tileX && candidate.Y == tileY);
                 mapCanvas?.ShowArea(tile, localX, localY, scale);
                 UpdateZoomLabel();
+            }
+
+            if (Argument("-orbit", 3) != null &&
+                float.TryParse(Argument("-orbit", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var yaw) &&
+                float.TryParse(Argument("-orbit", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var pitch) &&
+                float.TryParse(Argument("-orbit", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var distance))
+            {
+                ToggleThreeDimensional();
+                mapCanvas?.SetOrbit(yaw, pitch, distance);
             }
 
             var screenshot = Argument("-screenshot", 1);
@@ -907,7 +950,7 @@ namespace OmsiMapEditor.UI
                     SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.Delete && selection.Count > 0)
+                else if (evt.keyCode == KeyCode.Delete && selection.Count > 0 && (mapCanvas == null || !mapCanvas.ThreeDimensional))
                 {
                     DeleteSelectedObjects();
                     evt.StopPropagation();
@@ -1656,7 +1699,9 @@ namespace OmsiMapEditor.UI
             }
             if (mapHintLabel != null)
             {
-                mapHintLabel.text = session != null && session.CanEdit
+                mapHintLabel.text = mapCanvas != null && mapCanvas.ThreeDimensional
+                    ? "3D view   Right drag: turn   Left or middle drag: move   Wheel: zoom   3D: off to edit"
+                    : session != null && session.CanEdit
                     ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
                     : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
                 mapHintLabel.style.display = DisplayStyle.Flex;

@@ -35,6 +35,7 @@
                         <ui:Button name="zoom-in-button" text="+" class="map-control-button map-zoom-button" />
                         <ui:Button name="center-selection-button" text="Center selection" class="map-control-button" />
                         <ui:Button name="ground-toggle-button" text="Textures: on" class="map-control-button" tooltip="Show the ground textures of the map, or plain tiles." />
+                        <ui:Button name="view3d-button" text="3D: off" class="map-control-button" tooltip="Look at the map in 3D: right drag turns, left drag moves, the wheel zooms. Editing happens in the map from above." />
                         <ui:Label name="map-hint" class="map-hint" style="display: none;" />
                     </ui:VisualElement>
                     <ui:Button name="empty-state-open-button" text="Open OMSI map..." class="primary-button" />

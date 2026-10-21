@@ -86,7 +86,7 @@ namespace OmsiMapEditor.UI
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
-        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box }
+        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan }
 
         private sealed class SplinePath
         {
@@ -185,6 +185,57 @@ namespace OmsiMapEditor.UI
         public bool AllowEditing { get; set; }
 
         public float MetersPerPixel => metersPerPixel;
+
+        /// <summary>
+        /// True in the 3D view: the element draws nothing and its drags turn and move a camera around
+        /// <see cref="OrbitTarget"/> instead of editing. Editing happens in the map from above.
+        /// </summary>
+        public bool ThreeDimensional { get; private set; }
+
+        /// <summary>The point the 3D camera looks at, in map-relative metres.</summary>
+        public Vector2 OrbitTarget { get; private set; }
+
+        /// <summary>Heading of the 3D camera in degrees, clockwise from north.</summary>
+        public float OrbitYaw { get; private set; }
+
+        /// <summary>Tilt of the 3D camera below the horizon in degrees.</summary>
+        public float OrbitPitch { get; private set; } = 40f;
+
+        public float OrbitDistance { get; private set; } = 300f;
+
+        /// <summary>Switches to the 3D view, looking at the centre of the map view from a distance that shows about as much.</summary>
+        public void EnterOrbitView()
+        {
+            CancelDrag();
+            ThreeDimensional = true;
+            OrbitTarget = center;
+            OrbitDistance = Mathf.Clamp(layout.height * metersPerPixel, 20f, 15000f);
+            OrbitPitch = 40f;
+            OrbitYaw = 0f;
+            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Sets the 3D camera directly, for example from the command line.</summary>
+        public void SetOrbit(float yawDegrees, float pitchDegrees, float distance)
+        {
+            OrbitYaw = (yawDegrees % 360f + 360f) % 360f;
+            OrbitPitch = Mathf.Clamp(pitchDegrees, 5f, 89f);
+            OrbitDistance = Mathf.Clamp(distance, 5f, 15000f);
+            NotifyPointerInfo(null);
+        }
+
+        /// <summary>Returns to the map from above, centred where the 3D camera looked.</summary>
+        public void LeaveOrbitView()
+        {
+            CancelDrag();
+            ThreeDimensional = false;
+            center = OrbitTarget;
+            hasView = true;
+            isFitted = false;
+            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
+        }
 
         /// <summary>Map-relative metres at the centre of the view; world metres minus <see cref="OriginX"/> and <see cref="OriginY"/>.</summary>
         public Vector2 Center => center;
@@ -474,7 +525,7 @@ namespace OmsiMapEditor.UI
 
         private void Draw(MeshGenerationContext context)
         {
-            if (summary == null || !hasView)
+            if (summary == null || !hasView || ThreeDimensional)
                 return;
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
@@ -821,6 +872,13 @@ namespace OmsiMapEditor.UI
 
             Focus();
             var position = (Vector2)evt.localPosition;
+            if (ThreeDimensional)
+            {
+                // Right button turns, the others move the camera.
+                BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                evt.StopPropagation();
+                return;
+            }
             if (evt.button == 1 || evt.button == 2)
             {
                 BeginDrag(DragMode.Pan, evt.pointerId, position);
@@ -928,6 +986,18 @@ namespace OmsiMapEditor.UI
 
             switch (dragMode)
             {
+                case DragMode.Orbit:
+                    var turn = position - dragLastPointer;
+                    SetOrbit(OrbitYaw + turn.x * 0.3f, OrbitPitch + turn.y * 0.3f, OrbitDistance);
+                    break;
+                case DragMode.OrbitPan:
+                    // The ground follows the pointer: forward and right of the camera on the map.
+                    var shift = (position - dragLastPointer) * OrbitDistance * 0.0015f;
+                    var yaw = OrbitYaw * Mathf.Deg2Rad;
+                    var forward = new Vector2(Mathf.Sin(yaw), Mathf.Cos(yaw));
+                    var right = new Vector2(Mathf.Cos(yaw), -Mathf.Sin(yaw));
+                    OrbitTarget += forward * shift.y - right * shift.x;
+                    break;
                 case DragMode.Pan:
                     var delta = position - dragLastPointer;
                     center += new Vector2(-delta.x, delta.y) * metersPerPixel;
@@ -1054,6 +1124,12 @@ namespace OmsiMapEditor.UI
         {
             if (summary == null || !hasView)
                 return;
+            if (ThreeDimensional)
+            {
+                SetOrbit(OrbitYaw, OrbitPitch, OrbitDistance * (evt.delta.y > 0f ? 1.15f : 1f / 1.15f));
+                evt.StopPropagation();
+                return;
+            }
             ZoomAround((Vector2)evt.localMousePosition, evt.delta.y > 0f ? 1f / 1.25f : 1.25f);
             evt.StopPropagation();
         }
@@ -1175,6 +1251,12 @@ namespace OmsiMapEditor.UI
             if (PointerInfoChanged == null || summary == null)
                 return;
 
+            if (ThreeDimensional)
+            {
+                PointerInfoChanged("3D view   distance " + OrbitDistance.ToString("0") + " m   heading " + OrbitYaw.ToString("0") + "°   tilt " +
+                                   OrbitPitch.ToString("0") + "°");
+                return;
+            }
             var scale = "1 px = " + (metersPerPixel >= 1f ? metersPerPixel.ToString("0.#") : metersPerPixel.ToString("0.###")) + " m";
             if (!screen.HasValue)
             {

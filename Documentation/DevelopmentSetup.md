@@ -57,6 +57,7 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
 | Unity Test Runner | Erfolgreich: alle 113 EditMode-Tests am 21. Oktober 2026 per Unity Batch-Mode bestanden |
 | Bäume und `.x`-Modelle | Erfolgreich am 21. Oktober 2026 per Kommandozeilen-Screenshot: Baumkronen in Grundorf und Berlin-Spandau belaubt mit Licht und Schatten, ohne Stammreste; die Zeilenbauten `wohn_01` bis `wohn_05` in Berlin-Spandau mit Dachtextur statt grau. Mitbewegen beim Ziehen noch nicht im Player geprüft |
+| Gelände und 3D-Ansicht | Erfolgreich am 21. Oktober 2026 per Kommandozeilen-Screenshot: Grundorf und Berlin-Spandau in 3D mit Häusern, Bahnhof, Gleisen und Kreisverkehr auf dem Gelände, Hügel verdecken den Himmel; die Draufsicht bleibt unverändert. Bedienung mit der Maus noch nicht im Player geprüft |
 | Objekte mit Texturen | Erfolgreich am 21. Oktober 2026 im gebauten Player: Grundorf und Berlin-Spandau mit texturierten Häusern, Kreuzungen und Baumkronen; Drehung und Lage passen zu den Umrissen. Zunächst blieben alle Objekte unsichtbar, weil der Build die Instancing-Variante des Shaders gestrichen hatte; ein Instancing-Material in `Resources` hält sie jetzt im Build. Statuszeile: 872 Objektarten, 632 Texturen, fünf erwartete Hinweise auf Schrifttexturen und ein fehlendes Modell. Per Kommandozeilen-Screenshot geprüft: mit eingeschalteten Texturen liegen dünne Spline-Linien über den Gleisen, und nur Objekte ohne Modell zeigen noch Punkt und Umriss |
 | Straßen und Gleise | Erfolgreich am 21. Oktober 2026 außerhalb von Unity: die Spline-Flächen von Grundorf in ihrer mittleren Texturfarbe gezeichnet, sie liegen auf den Mittellinien und schließen an die Kreuzungsobjekte an; Profile und Texturen aller drei Karten ohne Fehlstelle gelesen. Im gebauten Player in Berlin-Spandau geprüft: Fahrbahn, Bordstein und Gehweg texturiert, die Straße unter einer Brücke liegt richtig; die Spline-Linien der Vektorebene stören über den Texturen nicht |
 | Bodentexturen | Erfolgreich am 21. Oktober 2026 außerhalb von Unity: Grundorf aus `[groundtex]` und den sieben Masken zu einem Bild zusammengesetzt, Splines und Umrisse darübergelegt; die Kopfsteinflächen liegen unter Wendeschleife, Haltestellenplatz und Dorfmitte. Im gebauten Player in Grundorf und Berlin-Spandau deckungsgleich mit Splines und Umrissen beim Zoomen und Verschieben; in Berlin-Spandau waren die Texturen sofort nach dem Laden der Karte da. Keine Ausnahmen im Player-Log, die Vektorebene zeichnete wie zuvor höchstens 52 ms |
@@ -95,7 +96,7 @@ OMSI_MAP_CONFIG="D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cf
 
 **Bei offenem Editor:** Ordner `Assets`, `Packages`, `ProjectSettings` und `Library` in ein temporäres Verzeichnis kopieren, etwa 1,1 GB, und die Befehle dort mit `-projectPath` auf die Kopie ausführen. Die reine Logik in `Editor.Core` und `Editor.OMSI` lässt sich zusätzlich ohne Unity prüfen. Dazu kompiliert man sie mit dem Roslyn-Compiler der Visual Studio Build Tools und NUnit aus `Library/PackageCache/com.unity.ext.nunit@*/net472/unity-custom/`. Die dafür benutzten Hilfsskripte lagen nur im Arbeitsverzeichnis der Sitzung und sind nicht Teil des Repositorys.
 
-**Player ohne Klicken prüfen:** Der gebaute Player öffnet mit `-openMap pfad\global.cfg` oder `-openProject pfad.omproj` direkt eine Karte. `-view kachelX kachelY x y meterProPixel` setzt den Ausschnitt, `-screenshot datei.png` speichert ein Bildschirmfoto, sobald Boden, Objekte und Umrisse geladen sind, und `-quit` beendet den Player danach:
+**Player ohne Klicken prüfen:** Der gebaute Player öffnet mit `-openMap pfad\global.cfg` oder `-openProject pfad.omproj` direkt eine Karte. `-view kachelX kachelY x y meterProPixel` setzt den Ausschnitt, `-orbit Richtung Neigung Abstand` zeigt ihn in 3D, `-screenshot datei.png` speichert ein Bildschirmfoto, sobald Boden, Objekte und Umrisse geladen sind, und `-quit` beendet den Player danach:
 
 ```bash
 ./Builds/Windows/OMSIMapEditor.exe -screen-width 1600 -screen-height 900 -screen-fullscreen 0 \
@@ -107,7 +108,7 @@ OMSI_MAP_CONFIG="D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cf
 
 ## Naechste Schritte
 
-Die offenen Punkte stehen in der [Roadmap](Roadmap.md) unter „Später“. Zuletzt abgeschlossen ist die texturierte Draufsicht mit Boden, Straßen, Gleisen und Objekten, davor die Mehrfachauswahl mit Kachelwechsel. Naheliegende nächste Schritte sind:
+Die offenen Punkte stehen in der [Roadmap](Roadmap.md) unter „Später“. Zuletzt abgeschlossen sind Gelände und 3D-Ansicht, davor die texturierte Draufsicht mit Boden, Straßen, Gleisen und Objekten. Naheliegende nächste Schritte sind:
 
 1. Fahrplandaten lesend importieren, Haltestellen und Linien anzeigen, Chrono-Varianten als Ebenen.
 2. Terrain und 3D-Ansicht.
