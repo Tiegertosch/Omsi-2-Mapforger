@@ -13,7 +13,10 @@ namespace OmsiMapEditor.UI
     /// <summary>Creates the UI Toolkit shell when the player starts and connects it to the opened map.</summary>
     public sealed class EditorShellBootstrap : MonoBehaviour
     {
-        /// <summary>One object edit; tile coordinates and ID find the object again after the map is re-read.</summary>
+        /// <summary>
+        /// One object edit: either changed values, found again by tile coordinates and ID, or a placement or
+        /// deletion that the session takes back file by file.
+        /// </summary>
         private sealed class ObjectEditStep
         {
             public int TileX;
@@ -21,9 +24,11 @@ namespace OmsiMapEditor.UI
             public int ObjectId;
             public double[] Before;
             public double[] After;
+            public OmsiObjectChange Change;
         }
 
         private const int HistoryLimit = 200;
+        private const double PlacementRotationStep = 15.0;
 
         private OmsiMapSummary currentSummary;
         private readonly Dictionary<OmsiTileSummary, Button> browserEntries = new Dictionary<OmsiTileSummary, Button>();
@@ -54,6 +59,23 @@ namespace OmsiMapEditor.UI
         private TextField exportNameField;
         private Label exportTargetLabel;
         private Button exportConfirmButton;
+        private VisualElement editMenu;
+        private VisualElement placeDialog;
+        private TextField placeSearchField;
+        private Toggle placeUsedToggle;
+        private ListView placeList;
+        private Label placeInfoLabel;
+        private Button placeConfirmButton;
+        private Label browserCountsLabel;
+
+        // Scenery objects to place: the .sco files of the OMSI installation, listed once in the background.
+        private readonly List<string> placeItems = new List<string>();
+        private readonly Dictionary<string, int> usedAssetCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private List<string> installationAssets;
+        private Task<List<string>> installationScan;
+        private string installationScanRoot;
+        private string placementAsset;
+        private bool placementHasAbsoluteHeight;
 
         // Object outlines are computed in the background and kept per OMSI installation.
         private readonly Dictionary<string, OmsiObjectOutline> outlineCache = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
@@ -97,6 +119,18 @@ namespace OmsiMapEditor.UI
             var exportCancelButton = root.Q<Button>("export-cancel-button");
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
+            editMenu = root.Q<VisualElement>("edit-menu");
+            var placeObjectMenuItem = root.Q<Button>("place-object-menu-item");
+            var deleteObjectMenuItem = root.Q<Button>("delete-object-menu-item");
+            var undoMenuItem = root.Q<Button>("undo-menu-item");
+            var redoMenuItem = root.Q<Button>("redo-menu-item");
+            placeDialog = root.Q<VisualElement>("place-dialog");
+            placeSearchField = root.Q<TextField>("place-search-field");
+            placeUsedToggle = root.Q<Toggle>("place-used-toggle");
+            placeList = root.Q<ListView>("place-list");
+            placeInfoLabel = root.Q<Label>("place-info-label");
+            placeConfirmButton = root.Q<Button>("place-confirm-button");
+            var placeCancelButton = root.Q<Button>("place-cancel-button");
             emptyStateOpenButton = root.Q<Button>("empty-state-open-button");
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -127,6 +161,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.ObjectSelected += (tile, item) => SelectObject(tile, item, false);
                 mapCanvas.TileClicked += tile => SelectTile(tile, false);
                 mapCanvas.ObjectEdited += OnObjectDragged;
+                mapCanvas.PlacementRequested += PlaceChosenObject;
                 mapCanvas.PointerInfoChanged += text =>
                 {
                     if (mapOverlayLabel != null)
@@ -140,7 +175,7 @@ namespace OmsiMapEditor.UI
             }
 
             if (fileButton != null)
-                fileButton.clicked += () => TogglePopup(fileMenu, helpMenu);
+                fileButton.clicked += () => TogglePopup(fileMenu, helpMenu, editMenu);
             if (openMapMenuItem != null)
                 openMapMenuItem.clicked += () =>
                 {
@@ -185,18 +220,61 @@ namespace OmsiMapEditor.UI
             if (viewButton != null)
                 viewButton.clicked += () => ToggleSidePanels(projectPanel, inspectorPanel);
             if (editButton != null)
-                editButton.SetEnabled(false);
+                editButton.clicked += () => TogglePopup(editMenu, fileMenu, helpMenu);
+            if (placeObjectMenuItem != null)
+                placeObjectMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    OpenPlaceDialog();
+                };
+            if (deleteObjectMenuItem != null)
+                deleteObjectMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    DeleteSelectedObject();
+                };
+            if (undoMenuItem != null)
+                undoMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    StepHistory(undoSteps, redoSteps, true);
+                };
+            if (redoMenuItem != null)
+                redoMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    StepHistory(redoSteps, undoSteps, false);
+                };
+            if (placeList != null)
+            {
+                placeList.makeItem = () =>
+                {
+                    var item = new Label();
+                    item.AddToClassList("place-list-item");
+                    return item;
+                };
+                placeList.bindItem = (element, index) => ((Label)element).text = DescribePlaceItem(placeItems[index]);
+                placeList.itemsSource = placeItems;
+                placeList.selectionChanged += _ => UpdatePlaceInfo();
+                placeList.itemsChosen += _ => ConfirmPlacement();
+            }
+            placeSearchField?.RegisterValueChangedCallback(_ => RefreshPlaceList());
+            placeUsedToggle?.RegisterValueChangedCallback(_ => RefreshPlaceList());
+            if (placeConfirmButton != null)
+                placeConfirmButton.clicked += ConfirmPlacement;
+            if (placeCancelButton != null)
+                placeCancelButton.clicked += () => HidePopup(placeDialog);
             if (toolsButton != null)
             {
                 toolsButton.SetEnabled(false);
                 toolsButton.clicked += ValidateLoadedMap;
             }
             if (helpButton != null)
-                helpButton.clicked += () => TogglePopup(helpMenu, fileMenu);
+                helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu);
             if (helpCloseButton != null)
                 helpCloseButton.clicked += () => HidePopup(helpMenu);
 
-            // Undo and redo work anywhere except inside a text field, which keeps its own text undo.
+            // Shortcuts work anywhere except inside a text field, which keeps its own text undo and Delete key.
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
 
             CreateBackgroundCamera();
@@ -300,6 +378,8 @@ namespace OmsiMapEditor.UI
             currentProjectName = projectName ?? string.Empty;
             undoSteps.Clear();
             redoSteps.Clear();
+            StopPlacement();
+            HidePopup(placeDialog);
             selectedTile = null;
             selectedObject = null;
             if (keepView && previousTile != null)
@@ -469,10 +549,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            undoSteps.Add(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
-            if (undoSteps.Count > HistoryLimit)
-                undoSteps.RemoveAt(0);
-            redoSteps.Clear();
+            PushHistory(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
             AfterObjectChanged(tile, item);
             SetStatus("Object #" + item.Id + " saved to the project workspace (" + tile.FileName + "). Ctrl+Z undoes it.");
         }
@@ -494,11 +571,38 @@ namespace OmsiMapEditor.UI
 
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (!(evt.ctrlKey || evt.commandKey))
+            if (evt.keyCode == KeyCode.Escape && (IsShown(placeDialog) || IsShown(exportDialog)))
+            {
+                HidePopup(placeDialog);
+                HidePopup(exportDialog);
+                evt.StopPropagation();
                 return;
+            }
             var focused = evt.target as VisualElement;
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null)
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(placeDialog) || IsShown(exportDialog))
                 return;
+
+            if (!(evt.ctrlKey || evt.commandKey))
+            {
+                if (evt.keyCode == KeyCode.Escape && mapCanvas != null && mapCanvas.IsPlacing)
+                {
+                    StopPlacement();
+                    SetStatus("Placement stopped.");
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.R && mapCanvas != null && mapCanvas.IsPlacing)
+                {
+                    mapCanvas.PlacementHeading += evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep;
+                    SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Delete && selectedObject != null)
+                {
+                    DeleteSelectedObject();
+                    evt.StopPropagation();
+                }
+                return;
+            }
 
             if (evt.keyCode == KeyCode.Z && !evt.shiftKey)
             {
@@ -522,6 +626,12 @@ namespace OmsiMapEditor.UI
 
             var step = from[from.Count - 1];
             from.RemoveAt(from.Count - 1);
+            if (step.Change != null)
+            {
+                StepStructuralChange(step, to, undo);
+                return;
+            }
+
             var tile = currentSummary.Tiles.Find(candidate => candidate.X == step.TileX && candidate.Y == step.TileY);
             var item = tile?.Objects.Find(candidate => candidate.Id == step.ObjectId);
             if (item == null)
@@ -545,6 +655,322 @@ namespace OmsiMapEditor.UI
             to.Add(step);
             AfterObjectChanged(tile, item);
             SetStatus((undo ? "Undid" : "Redid") + " the change of object #" + item.Id + ".");
+        }
+
+        private void StepStructuralChange(ObjectEditStep step, List<ObjectEditStep> to, bool undo)
+        {
+            var change = step.Change;
+            try
+            {
+                if (undo)
+                    session.Undo(currentSummary, change);
+                else
+                    session.Redo(currentSummary, change);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not " + (undo ? "undo" : "redo") + ": " + exception.Message);
+                return;
+            }
+
+            to.Add(step);
+            // Undoing a placement or redoing a deletion removes the object; otherwise it is back and gets selected.
+            var exists = change.IsPlacement == change.IsApplied;
+            AfterStructureChanged(change.Tile, exists ? change.Record : null);
+            var what = change.IsPlacement ? "placement" : "deletion";
+            SetStatus((undo ? "Undid the " : "Redid the ") + what + " of object #" + change.Record.Id + ".");
+        }
+
+        private void PushHistory(ObjectEditStep step)
+        {
+            undoSteps.Add(step);
+            if (undoSteps.Count > HistoryLimit)
+                undoSteps.RemoveAt(0);
+            redoSteps.Clear();
+        }
+
+        /// <summary>Refreshes the view after an object was added or removed; selects the object or else its tile.</summary>
+        private void AfterStructureChanged(OmsiTileSummary tile, OmsiObjectRecord item)
+        {
+            if (item != null)
+            {
+                SelectObject(tile, item, false);
+            }
+            else
+            {
+                SelectTile(tile, false);
+            }
+            mapCanvas?.Refresh();
+            UpdateBrowserEntry(tile);
+            UpdateCounts();
+            UpdateMapStateLabel();
+        }
+
+        /// <summary>Deletes the selected object unless other parts of the map still refer to it.</summary>
+        private void DeleteSelectedObject()
+        {
+            if (selectedObject == null || selectedTile == null)
+            {
+                SetStatus("Select an object to delete.");
+                return;
+            }
+            if (session == null || !session.CanEdit)
+            {
+                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to edit it.");
+                return;
+            }
+
+            var tile = selectedTile;
+            var item = selectedObject;
+            OmsiObjectDeletion deletion;
+            try
+            {
+                deletion = session.DeleteObject(currentSummary, tile, item);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not delete object #" + item.Id + ": " + exception.Message);
+                return;
+            }
+
+            if (!deletion.Deleted)
+            {
+                SetStatus("Object #" + item.Id + " was not deleted; it is still referenced by " + DescribeReferences(deletion.Blockers) + ".");
+                return;
+            }
+
+            PushHistory(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Change = deletion.Change });
+            AfterStructureChanged(tile, null);
+            SetStatus("Deleted object #" + item.Id + " (" + item.AssetPath + ") from " + tile.FileName + ". Ctrl+Z restores it.");
+        }
+
+        private static string DescribeReferences(IReadOnlyList<OmsiReference> references)
+        {
+            var described = new List<string>();
+            foreach (var reference in references)
+            {
+                var text = reference.ToString();
+                if (!described.Contains(text))
+                    described.Add(text);
+            }
+            var shown = described.GetRange(0, Math.Min(3, described.Count));
+            return string.Join(", ", shown) + (described.Count > shown.Count ? " and " + (described.Count - shown.Count) + " more" : string.Empty);
+        }
+
+        private void OpenPlaceDialog()
+        {
+            if (session == null || currentSummary == null)
+            {
+                SetStatus("Open an OMSI map before placing objects.");
+                return;
+            }
+            if (!session.CanEdit)
+            {
+                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to place objects.");
+                return;
+            }
+            if (placeDialog == null || placeList == null)
+                return;
+
+            usedAssetCounts.Clear();
+            foreach (var tile in currentSummary.Tiles)
+                foreach (var item in tile.Objects)
+                    usedAssetCounts[item.AssetPath] = usedAssetCounts.TryGetValue(item.AssetPath, out var count) ? count + 1 : 1;
+            StartInstallationScan();
+            RefreshPlaceList();
+            placeDialog.style.display = DisplayStyle.Flex;
+            placeSearchField?.Focus();
+        }
+
+        /// <summary>Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread.</summary>
+        private void StartInstallationScan()
+        {
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            if (installationScan != null && string.Equals(root, installationScanRoot, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            installationScanRoot = root;
+            installationAssets = null;
+            var scan = Task.Run(() =>
+            {
+                var result = new List<string>();
+                var folder = Path.Combine(root, "Sceneryobjects");
+                if (!Directory.Exists(folder))
+                    return result;
+                foreach (var path in Directory.EnumerateFiles(folder, "*.sco", SearchOption.AllDirectories))
+                    result.Add(path.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar));
+                result.Sort(StringComparer.OrdinalIgnoreCase);
+                return result;
+            });
+            installationScan = scan;
+
+            IVisualElementScheduledItem poll = null;
+            poll = placeDialog.schedule.Execute(() =>
+            {
+                if (!scan.IsCompleted)
+                    return;
+                poll.Pause();
+                if (!ReferenceEquals(scan, installationScan))
+                    return;
+                if (scan.IsFaulted)
+                {
+                    Debug.LogException(scan.Exception);
+                    installationAssets = new List<string>();
+                    SetStatus("Could not list the scenery objects of the OMSI installation: " + scan.Exception?.GetBaseException().Message);
+                }
+                else
+                {
+                    installationAssets = scan.Result;
+                }
+                if (IsShown(placeDialog))
+                    RefreshPlaceList();
+            }).Every(150);
+        }
+
+        private void RefreshPlaceList()
+        {
+            if (placeList == null)
+                return;
+
+            var usedOnly = placeUsedToggle == null || placeUsedToggle.value;
+            var candidates = new SortedSet<string>(usedAssetCounts.Keys, StringComparer.OrdinalIgnoreCase);
+            if (!usedOnly && installationAssets != null)
+                candidates.UnionWith(installationAssets);
+
+            var terms = (placeSearchField?.value ?? string.Empty).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var previous = SelectedPlaceItem();
+            placeItems.Clear();
+            foreach (var candidate in candidates)
+            {
+                var matches = true;
+                foreach (var term in terms)
+                    if (candidate.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        matches = false;
+                        break;
+                    }
+                if (matches)
+                    placeItems.Add(candidate);
+            }
+            placeList.RefreshItems();
+            var previousIndex = previous == null ? -1 : placeItems.FindIndex(item => string.Equals(item, previous, StringComparison.OrdinalIgnoreCase));
+            if (previousIndex >= 0)
+                placeList.SetSelectionWithoutNotify(new[] { previousIndex });
+            else
+                placeList.ClearSelection();
+            UpdatePlaceInfo();
+        }
+
+        private string DescribePlaceItem(string assetPath)
+        {
+            return usedAssetCounts.TryGetValue(assetPath, out var count)
+                ? assetPath + "    (" + count + "× in this map)"
+                : assetPath;
+        }
+
+        private string SelectedPlaceItem()
+        {
+            var index = placeList?.selectedIndex ?? -1;
+            return index >= 0 && index < placeItems.Count ? placeItems[index] : null;
+        }
+
+        private void UpdatePlaceInfo()
+        {
+            if (placeInfoLabel == null)
+                return;
+
+            var usedOnly = placeUsedToggle == null || placeUsedToggle.value;
+            var scanning = !usedOnly && installationAssets == null;
+            var selected = SelectedPlaceItem();
+            placeInfoLabel.text = (selected ?? placeItems.Count + " object(s)" + (scanning ? "; listing the OMSI installation..." : string.Empty)) +
+                                  (selected == null ? "\nSelect an object and choose Place, or double-click it." : string.Empty);
+            placeConfirmButton?.SetEnabled(selected != null);
+        }
+
+        /// <summary>Closes the dialog and starts placement mode with the chosen object.</summary>
+        private void ConfirmPlacement()
+        {
+            var assetPath = SelectedPlaceItem();
+            if (assetPath == null)
+                return;
+            HidePopup(placeDialog);
+
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            placementHasAbsoluteHeight = false;
+            var problem = (string)null;
+            try
+            {
+                var scoPath = OmsiRelativePath.Resolve(root, assetPath);
+                if (File.Exists(scoPath))
+                {
+                    var sceneryObject = OmsiSceneryObject.Parse(File.ReadAllBytes(scoPath));
+                    placementHasAbsoluteHeight = sceneryObject.HasAbsoluteHeight || sceneryObject.HasSplineHelper;
+                }
+                else
+                {
+                    problem = " The object file is missing in the OMSI installation; OMSI will not show it.";
+                }
+
+                // One outline is quick to compute; the preview needs it right away.
+                if (!outlineCache.ContainsKey(assetPath) && string.Equals(root, outlineInstallationRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    outlineCache[assetPath] = new OmsiObjectOutlineCatalog(root).Get(assetPath);
+                    mapCanvas?.SetOutlines(outlineCache);
+                }
+            }
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
+                                              exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                problem = " The object file could not be read: " + exception.Message;
+            }
+
+            placementAsset = assetPath;
+            mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
+            mapCanvas?.Focus();
+            SetStatus("Placing " + assetPath + ": click into the map. Shift+click keeps placing, R turns the preview, Esc stops." + (problem ?? string.Empty));
+        }
+
+        private void PlaceChosenObject(MapPlacement placement)
+        {
+            if (placementAsset == null || session == null || !session.CanEdit)
+            {
+                StopPlacement();
+                return;
+            }
+            if (placement.Tile == null || !placement.Tile.IsAvailable)
+            {
+                SetStatus(placement.Tile == null ? "Click inside a map tile to place the object." : "The tile file " + placement.Tile.FileName + " is missing.");
+                return;
+            }
+
+            OmsiObjectChange change;
+            try
+            {
+                change = session.PlaceObject(currentSummary, placement.Tile, placementAsset, placement.LocalX, placement.LocalY, 0, mapCanvas.PlacementHeading);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not place the object: " + exception.Message);
+                return;
+            }
+
+            var assetPath = placementAsset;
+            if (!placement.KeepPlacing)
+                StopPlacement();
+            PushHistory(new ObjectEditStep { TileX = placement.Tile.X, TileY = placement.Tile.Y, ObjectId = change.Record.Id, Change = change });
+            AfterStructureChanged(placement.Tile, change.Record);
+            SetStatus("Placed object #" + change.Record.Id + " (" + assetPath + ") in tile " + placement.Tile.X + ", " + placement.Tile.Y +
+                      ". Ctrl+Z undoes it." +
+                      (placementHasAbsoluteHeight ? " Its height is absolute, not above the terrain; set Height in the inspector." : string.Empty));
+        }
+
+        private void StopPlacement()
+        {
+            placementAsset = null;
+            mapCanvas?.EndPlacement();
         }
 
         private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField)
@@ -686,15 +1112,20 @@ namespace OmsiMapEditor.UI
             return string.IsNullOrWhiteSpace(result) ? "OMSI Map" : result;
         }
 
-        private static void TogglePopup(VisualElement popup, VisualElement otherPopup)
+        private static void TogglePopup(VisualElement popup, params VisualElement[] otherPopups)
         {
             if (popup == null)
                 return;
 
             var show = popup.resolvedStyle.display == DisplayStyle.None;
-            if (otherPopup != null)
-                otherPopup.style.display = DisplayStyle.None;
+            foreach (var otherPopup in otherPopups)
+                HidePopup(otherPopup);
             popup.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private static bool IsShown(VisualElement popup)
+        {
+            return popup != null && popup.resolvedStyle.display != DisplayStyle.None;
         }
 
         private static void HidePopup(VisualElement popup)
@@ -850,16 +1281,9 @@ namespace OmsiMapEditor.UI
                 mapTitleLabel.RemoveFromClassList("viewport-label");
                 mapTitleLabel.AddToClassList("map-title");
             }
+            UpdateCounts();
             if (mapCountsLabel != null)
-            {
-                mapCountsLabel.text = "Tiles: " + currentSummary.Tiles.Count + "    Objects: " + currentSummary.ObjectCount +
-                                      "    Splines: " + currentSummary.SplineCount + "    Connections: " + currentSummary.AttachmentCount +
-                                      "    Terrain: " + currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count +
-                                      (currentSummary.UsesWorldCoordinates
-                                          ? "    World coordinates: " + currentSummary.TileSizeMeters.ToString("0.0") + " m tiles"
-                                          : string.Empty);
                 mapCountsLabel.style.display = DisplayStyle.Flex;
-            }
             if (mapDescriptionLabel != null)
             {
                 mapDescriptionLabel.text = currentSummary.Description ?? string.Empty;
@@ -879,7 +1303,7 @@ namespace OmsiMapEditor.UI
             if (mapHintLabel != null)
             {
                 mapHintLabel.text = session != null && session.CanEdit
-                    ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+Z / Ctrl+Y: undo / redo"
+                    ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
                     : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
                 mapHintLabel.style.display = DisplayStyle.Flex;
             }
@@ -934,11 +1358,10 @@ namespace OmsiMapEditor.UI
             mapName.AddToClassList("browser-map-name");
             projectPanel.Add(mapName);
 
-            var mapCounts = new Label(currentSummary.Tiles.Count + " tiles  •  " +
-                                      currentSummary.ObjectCount + " objects  •  " +
-                                      currentSummary.SplineCount + " splines");
-            mapCounts.AddToClassList("browser-map-counts");
-            projectPanel.Add(mapCounts);
+            browserCountsLabel = new Label();
+            browserCountsLabel.AddToClassList("browser-map-counts");
+            projectPanel.Add(browserCountsLabel);
+            UpdateCounts();
 
             var tileList = new ScrollView(ScrollViewMode.Vertical);
             tileList.AddToClassList("browser-tile-list");
@@ -956,6 +1379,23 @@ namespace OmsiMapEditor.UI
                 UpdateBrowserEntry(tile);
             }
             projectPanel.Add(tileList);
+        }
+
+        /// <summary>Refreshes the map totals in the header and the project browser after objects were added or removed.</summary>
+        private void UpdateCounts()
+        {
+            if (currentSummary == null)
+                return;
+            if (browserCountsLabel != null)
+                browserCountsLabel.text = currentSummary.Tiles.Count + " tiles  •  " + currentSummary.ObjectCount + " objects  •  " +
+                                          currentSummary.SplineCount + " splines";
+            if (mapCountsLabel != null)
+                mapCountsLabel.text = "Tiles: " + currentSummary.Tiles.Count + "    Objects: " + currentSummary.ObjectCount +
+                                      "    Splines: " + currentSummary.SplineCount + "    Connections: " + currentSummary.AttachmentCount +
+                                      "    Terrain: " + currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count +
+                                      (currentSummary.UsesWorldCoordinates
+                                          ? "    World coordinates: " + currentSummary.TileSizeMeters.ToString("0.0") + " m tiles"
+                                          : string.Empty);
         }
 
         /// <summary>Refreshes one tile list entry, for example its edited marker, without rebuilding the list.</summary>
@@ -1091,6 +1531,10 @@ namespace OmsiMapEditor.UI
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
+                var delete = new Button(DeleteSelectedObject) { text = "Delete object" };
+                delete.AddToClassList("map-control-button");
+                delete.AddToClassList("inspector-edit-delete");
+                editor.Add(delete);
                 if (IsTileEdited(selectedTile))
                     AddRevertTileButton(editor);
             }

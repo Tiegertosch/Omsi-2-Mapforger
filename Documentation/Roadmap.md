@@ -54,7 +54,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Genauere, nicht konvexe Umrisse für L-förmige Gebäude, große Kreuzungen und Plätze
 - Mehrere Objekte gleichzeitig auswählen und verschieben
 - Objekte beim Verschieben über eine Kachelgrenze in die neue Kachel übernehmen; bisher behalten sie ihre Kachel mit Koordinaten außerhalb davon
-- Objekte in der App anlegen und löschen; die Bausteine dafür stehen in `OmsiTileEditing`
+- [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
+- Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen; bisher wird 0 geschrieben und ein Hinweis angezeigt
+- Andere Elemente anlegen und löschen: angehängte Objekte, Spline-Anhängungen und Splines
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
 - Haltestellen und Linienverläufe in der Kartenübersicht darstellen
 - Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern

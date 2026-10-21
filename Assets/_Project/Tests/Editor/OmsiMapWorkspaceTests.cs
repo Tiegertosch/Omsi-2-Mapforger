@@ -203,6 +203,123 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(session.IsTileModified("tile_0_0.map"));
         }
 
+        [Test]
+        public void PlacesObjectsWithANewIdAndUndoesThemCompletely()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+
+            var change = session.PlaceObject(summary, tile, @"Sceneryobjects\new.sco", 100.5, 50.25, 0, 90);
+
+            Assert.AreEqual(10, change.Record.Id);
+            Assert.AreEqual(2, tile.Objects.Count);
+            Assert.AreEqual(2, tile.ObjectCount);
+            Assert.AreEqual(2, summary.ObjectCount);
+            Assert.AreEqual(11, summary.NextIdCode);
+            CollectionAssert.AreEqual(new[] { "global.cfg", "tile_0_0.map" }, session.ModifiedFiles());
+            var reread = session.Read();
+            Assert.AreEqual(11, reread.NextIdCode);
+            var placed = reread.Tiles[0].Objects.Single(item => item.Id == 10);
+            Assert.AreEqual(@"Sceneryobjects\new.sco", placed.AssetPath);
+            Assert.AreEqual(100.5, placed.LocalX, 1e-12);
+            Assert.AreEqual(90.0, placed.HeadingDegrees, 1e-12);
+
+            session.Undo(summary, change);
+            Assert.AreEqual(1, tile.Objects.Count);
+            Assert.AreEqual(1, summary.ObjectCount);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+
+            session.Redo(summary, change);
+            Assert.AreSame(change.Record, tile.Objects[1]);
+            Assert.AreEqual(10, session.Read().Tiles[0].Objects[1].Id);
+
+            // An undone ID is not handed out again.
+            Assert.AreEqual(11, session.PlaceObject(summary, tile, @"Sceneryobjects\new.sco", 1, 1, 0, 0).Record.Id);
+        }
+
+        [Test]
+        public void DeletesObjectsAndKeepsEntryPointsOnTheirObject()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+
+            var deletion = session.DeleteObject(summary, tile, tile.Objects[0]);
+
+            Assert.IsTrue(deletion.Deleted);
+            Assert.AreEqual(1, tile.Objects.Count);
+            Assert.AreEqual(6, tile.Objects[0].Id);
+            Assert.AreEqual(1, summary.ObjectCount);
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+            var tileText = OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_0_0.map"));
+            StringAssert.DoesNotContain("[rule]", tileText);
+            StringAssert.DoesNotContain("a.sco", tileText);
+
+            session.Undo(summary, deletion.Change);
+            Assert.AreEqual(5, tile.Objects[0].Id);
+            Assert.AreEqual(2, summary.ObjectCount);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+
+            session.Redo(summary, deletion.Change);
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+            session.RevertTile("tile_0_0.map");
+            Assert.AreEqual("1", EntryPoints(session.Workspace).GetField(1));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+        }
+
+        [Test]
+        public void RefusesToDeleteReferencedObjects()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+
+            var deletion = session.DeleteObject(summary, tile, tile.Objects[1]);
+
+            Assert.IsFalse(deletion.Deleted);
+            Assert.AreEqual("entry point", deletion.Blockers.Single().Kind);
+            Assert.AreEqual(2, tile.Objects.Count);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+        }
+
+        [Test]
+        public void UndoRefusesToOverwriteLaterChanges()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var change = session.PlaceObject(summary, tile, @"Sceneryobjects\new.sco", 1, 2, 0, 0);
+            session.UpdateObject(tile, tile.Objects[0], 15, 20, 0, 0);
+            var edited = session.Workspace.ReadAllBytes("tile_0_0.map");
+
+            Assert.Throws<InvalidOperationException>(() => session.Undo(summary, change));
+
+            CollectionAssert.AreEqual(edited, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            Assert.AreEqual(2, tile.Objects.Count);
+            Assert.IsTrue(change.IsApplied);
+        }
+
+        /// <summary>Objects 5 (with a rule) and 6; an entry point names object 6 by index 1 and by ID.</summary>
+        private void UseMapWithEntryPoint()
+        {
+            Write(original, "global.cfg", "[name]", "Testmap", "", "[NextIDCode]", "10", "",
+                "[entrypoints]", "1", "1", "6", "0", "1", "0", "2", "0", "0", "0", "1", "0", "Depot", "",
+                "[map]", "0", "0", "tile_0_0.map", "");
+            Write(original, "tile_0_0.map", "[version]", "14", "",
+                "[object]", "0", "a.sco", "5", "10", "20", "0", "0", "0", "0", "0", "",
+                "[rule]", "0", "trafficdensity", "1.000", "0", "",
+                "[object]", "0", "b.sco", "6", "30", "40", "0", "0", "0", "0", "0", "");
+        }
+
+        private static OmsiRecord EntryPoints(IOmsiFileSource source)
+        {
+            return OmsiRecordFile.Parse(source.ReadAllBytes("global.cfg"), OmsiGlobalConfigLayouts.Instance)
+                .Records.Single(record => record.Name == "entrypoints");
+        }
+
         private static void Write(string folder, string name, params string[] lines)
         {
             File.WriteAllBytes(Path.Combine(folder, name),

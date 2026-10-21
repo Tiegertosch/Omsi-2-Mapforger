@@ -5,7 +5,7 @@
             <ui:Label text="OMSI Map Editor" class="brand" />
             <ui:VisualElement class="menu-container">
                 <ui:Button name="file-menu-button" text="File" class="toolbar-menu-button" />
-                <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" tooltip="Map editing tools are not implemented yet." />
+                <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" />
                 <ui:Button name="view-menu-button" text="View" class="toolbar-menu-button" />
                 <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" tooltip="Check the loaded map: import warnings and whether connected splines meet." />
                 <ui:Button name="help-menu-button" text="Help" class="toolbar-menu-button" />
@@ -52,11 +52,19 @@
             <ui:Label class="menu-divider" />
             <ui:Button name="open-map-menu-item" text="Open OMSI map..." class="menu-popup-item" />
         </ui:VisualElement>
+        <ui:VisualElement name="edit-menu" class="menu-popup edit-menu">
+            <ui:Button name="place-object-menu-item" text="Place object..." class="menu-popup-item" />
+            <ui:Button name="delete-object-menu-item" text="Delete selected object    Del" class="menu-popup-item" />
+            <ui:Label class="menu-divider" />
+            <ui:Button name="undo-menu-item" text="Undo    Ctrl+Z" class="menu-popup-item" />
+            <ui:Button name="redo-menu-item" text="Redo    Ctrl+Y" class="menu-popup-item" />
+        </ui:VisualElement>
         <ui:VisualElement name="help-menu" class="menu-popup help-menu">
             <ui:Label text="OMSI Map Editor" class="popup-title" />
             <ui:Label text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
             <ui:Label text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
             <ui:Label text="With a project, click an object in a tile or in the inspector list to edit its position and heading. Edits are saved to the project's workspace; the original map is not changed." class="popup-description" />
+            <ui:Label text="Edit > Place object... chooses a scenery object and places it with a click into the map. Del deletes the selected object unless other parts of the map still refer to it." class="popup-description" />
             <ui:Label text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
             <ui:Label text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
             <ui:Button name="help-menu-close-button" text="Close" class="menu-popup-item popup-close" />
@@ -71,6 +79,20 @@
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="export-cancel-button" text="Cancel" class="map-control-button" />
                     <ui:Button name="export-confirm-button" text="Export" class="map-control-button dialog-primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="place-dialog" class="dialog-overlay" style="display: none;">
+            <ui:VisualElement class="dialog place-dialog">
+                <ui:Label text="Place object" class="popup-title" />
+                <ui:Label text="Choose a scenery object, then click into the map to place it. Shift+click keeps placing, R and Shift+R turn the preview, Esc stops." class="popup-description" />
+                <ui:TextField name="place-search-field" label="Search" class="dialog-field" />
+                <ui:Toggle name="place-used-toggle" label="Used in this map only" value="true" class="dialog-field" />
+                <ui:ListView name="place-list" fixed-item-height="22" selection-type="Single" class="place-list" />
+                <ui:Label name="place-info-label" class="popup-description place-info" />
+                <ui:VisualElement class="dialog-buttons">
+                    <ui:Button name="place-cancel-button" text="Cancel" class="map-control-button" />
+                    <ui:Button name="place-confirm-button" text="Place" class="map-control-button dialog-primary" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

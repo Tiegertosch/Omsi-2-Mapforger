@@ -16,9 +16,21 @@ namespace OmsiMapEditor.UI
         public double HeadingDegrees;
     }
 
+    /// <summary>A click while placing: the tile under the pointer (null outside the map) and the tile-local position.</summary>
+    internal sealed class MapPlacement
+    {
+        public OmsiTileSummary Tile;
+        public double LocalX;
+        public double LocalY;
+
+        /// <summary>Shift was held, so placing should continue with the same object.</summary>
+        public bool KeepPlacing;
+    }
+
     /// <summary>
     /// Continuous top-down view of a whole map in world metres. Pans and zooms, draws tiles, splines and objects that
-    /// are visible, selects objects and, when editing is allowed, moves and rotates them by dragging.
+    /// are visible, selects objects and, when editing is allowed, moves and rotates them by dragging. In placement
+    /// mode a preview of the chosen object follows the pointer and a click reports where it should go.
     /// </summary>
     internal sealed class MapCanvasElement : VisualElement
     {
@@ -40,6 +52,8 @@ namespace OmsiMapEditor.UI
         private static readonly Color OutlineStrokeColor = new Color(0.62f, 0.78f, 0.9f, 0.85f);
         private static readonly Color TreeFillColor = new Color(0.32f, 0.62f, 0.36f, 0.32f);
         private static readonly Color TreeStrokeColor = new Color(0.45f, 0.78f, 0.5f, 0.7f);
+        private static readonly Color PlacementColor = new Color(0.47f, 0.9f, 0.6f, 1f);
+        private static readonly Color PlacementFillColor = new Color(0.47f, 0.9f, 0.6f, 0.25f);
 
         /// <summary>Outlines are drawn from this scale on; further out the map shows markers only.</summary>
         private const float OutlineMetersPerPixel = 1.5f;
@@ -92,6 +106,11 @@ namespace OmsiMapEditor.UI
         private double previewLocalY;
         private double previewHeading;
 
+        // Placement mode: the object to place and the map position under the pointer, if any.
+        private string placementAsset;
+        private double placementHeading;
+        private Vector2? placementPointer;
+
         public MapCanvasElement()
         {
             AddToClassList("map-canvas");
@@ -102,6 +121,7 @@ namespace OmsiMapEditor.UI
             RegisterCallback<PointerMoveEvent>(OnPointerMove);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
             RegisterCallback<PointerCaptureOutEvent>(_ => CancelDrag());
+            RegisterCallback<PointerLeaveEvent>(_ => SetPlacementPointer(null));
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
@@ -116,6 +136,9 @@ namespace OmsiMapEditor.UI
         /// <summary>An object was moved or rotated by dragging and the pointer was released.</summary>
         public event Action<MapObjectEdit> ObjectEdited;
 
+        /// <summary>The map was left-clicked in placement mode.</summary>
+        public event Action<MapPlacement> PlacementRequested;
+
         /// <summary>Describes the position under the pointer and the scale, for an overlay label.</summary>
         public event Action<string> PointerInfoChanged;
 
@@ -123,6 +146,34 @@ namespace OmsiMapEditor.UI
         public bool AllowEditing { get; set; }
 
         public float MetersPerPixel => metersPerPixel;
+
+        public bool IsPlacing => placementAsset != null;
+
+        /// <summary>Heading of the placement preview in degrees.</summary>
+        public double PlacementHeading
+        {
+            get => placementHeading;
+            set
+            {
+                placementHeading = (value % 360.0 + 360.0) % 360.0;
+                MarkDirtyRepaint();
+            }
+        }
+
+        /// <summary>Starts placement mode: left clicks report positions instead of selecting objects.</summary>
+        public void BeginPlacement(string assetPath, double headingDegrees)
+        {
+            CancelDrag();
+            placementAsset = assetPath;
+            PlacementHeading = headingDegrees;
+        }
+
+        public void EndPlacement()
+        {
+            placementAsset = null;
+            placementPointer = null;
+            MarkDirtyRepaint();
+        }
 
         public void SetMap(OmsiMapSummary map, bool keepView)
         {
@@ -322,6 +373,7 @@ namespace OmsiMapEditor.UI
             DrawSplines(painter, visible);
             DrawObjects(context, painter, visible);
             DrawSelection(painter);
+            DrawPlacement(painter);
 
             // Report slow redraws once per new maximum, so large maps can be diagnosed from the player log.
             var milliseconds = (float)watch.Elapsed.TotalMilliseconds;
@@ -556,6 +608,39 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        private void DrawPlacement(Painter2D painter)
+        {
+            if (placementAsset == null || !placementPointer.HasValue)
+                return;
+
+            var position = placementPointer.Value;
+            var screen = MapToScreen(position);
+            painter.strokeColor = PlacementColor;
+            painter.lineWidth = 2f;
+            if (footprints.TryGetValue(placementAsset, out var footprint))
+            {
+                painter.fillColor = PlacementFillColor;
+                painter.BeginPath();
+                AddFootprint(painter, footprint, position, placementHeading);
+                painter.Fill();
+                painter.Stroke();
+            }
+            var heading = (float)(placementHeading * Math.PI / 180.0);
+            painter.BeginPath();
+            painter.Arc(screen, 5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+            painter.MoveTo(screen);
+            painter.LineTo(screen + new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading)) * HandleDistance);
+            painter.Stroke();
+        }
+
+        private void SetPlacementPointer(Vector2? screen)
+        {
+            if (placementAsset == null)
+                return;
+            placementPointer = screen.HasValue ? ScreenToMap(screen.Value) : (Vector2?)null;
+            MarkDirtyRepaint();
+        }
+
         private Vector2 SelectedObjectScreen()
         {
             return IsDraggingObject()
@@ -590,6 +675,23 @@ namespace OmsiMapEditor.UI
             }
             if (evt.button != 0)
                 return;
+
+            if (placementAsset != null)
+            {
+                var map = ScreenToMap(position);
+                var target = TileAt(map);
+                var placement = new MapPlacement { Tile = target, KeepPlacing = evt.shiftKey };
+                if (target != null)
+                {
+                    var rect = TileRect(target);
+                    // Centimetres are precise enough for a click and keep the written numbers short.
+                    placement.LocalX = Math.Round(map.x - rect.xMin, 2);
+                    placement.LocalY = Math.Round(map.y - rect.yMin, 2);
+                }
+                PlacementRequested?.Invoke(placement);
+                evt.StopPropagation();
+                return;
+            }
 
             if (AllowEditing && selectedObject != null &&
                 Vector2.Distance(position, HandleScreen(SelectedObjectScreen())) <= HandleRadius + 3f)
@@ -642,6 +744,7 @@ namespace OmsiMapEditor.UI
             var position = (Vector2)evt.localPosition;
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
+                SetPlacementPointer(position);
                 NotifyPointerInfo(position);
                 return;
             }
