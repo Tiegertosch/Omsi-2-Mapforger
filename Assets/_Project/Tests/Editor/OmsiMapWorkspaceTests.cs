@@ -248,7 +248,7 @@ namespace OmsiMapEditor.Tests
 
             var deletion = session.DeleteObject(summary, tile, tile.Objects[0]);
 
-            Assert.IsTrue(deletion.Deleted);
+            Assert.IsTrue(deletion.Succeeded);
             Assert.AreEqual(1, tile.Objects.Count);
             Assert.AreEqual(6, tile.Objects[0].Id);
             Assert.AreEqual(1, summary.ObjectCount);
@@ -279,7 +279,7 @@ namespace OmsiMapEditor.Tests
 
             var deletion = session.DeleteObject(summary, tile, tile.Objects[1]);
 
-            Assert.IsFalse(deletion.Deleted);
+            Assert.IsFalse(deletion.Succeeded);
             Assert.AreEqual("entry point", deletion.Blockers.Single().Kind);
             Assert.AreEqual(2, tile.Objects.Count);
             CollectionAssert.IsEmpty(session.ModifiedFiles());
@@ -300,6 +300,76 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEqual(edited, session.Workspace.ReadAllBytes("tile_0_0.map"));
             Assert.AreEqual(2, tile.Objects.Count);
             Assert.IsTrue(change.IsApplied);
+        }
+
+        [Test]
+        public void TransfersObjectsIntoAnotherTileWithTheirRulesAndBack()
+        {
+            UseTwoTiles();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var source = summary.Tiles[0];
+            var target = summary.Tiles[1];
+            var item = source.Objects.Single(o => o.Id == 5);
+
+            var result = session.TransferObject(summary, source, item, target, 12.5, 40);
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreSame(target, result.Change.CurrentTile);
+            CollectionAssert.DoesNotContain(source.Objects, item);
+            Assert.AreSame(item, target.Objects.Last());
+            Assert.AreEqual(12.5, item.LocalX, 1e-12);
+            Assert.AreEqual(3, summary.ObjectCount);
+            // The later object's entry point moves down by one in the source tile.
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+            var reread = session.Read();
+            Assert.AreEqual(new[] { 6 }, reread.Tiles[0].Objects.Select(o => o.Id).ToArray());
+            Assert.AreEqual(new[] { 7, 5 }, reread.Tiles[1].Objects.Select(o => o.Id).ToArray());
+            var targetText = OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_1_0.map"));
+            StringAssert.Contains("trafficdensity", targetText);
+            StringAssert.DoesNotContain("trafficdensity", OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_0_0.map")));
+
+            session.Undo(summary, result.Change);
+            Assert.AreSame(source, result.Change.CurrentTile);
+            Assert.AreSame(item, source.Objects[0]);
+            Assert.AreEqual(10.0, item.LocalX, 1e-12);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+        }
+
+        [Test]
+        public void KeepsObjectsInTheirTileWhileTileBoundReferencesNameThem()
+        {
+            UseTwoTiles();
+            File.WriteAllBytes(Path.Combine(original, "tile_0_0.map"), OmsiTextFile.Encode(string.Join("\r\n",
+                "[version]", "14", "",
+                "[object]", "0", "a.sco", "5", "10", "20", "0", "0", "0", "0", "0", "",
+                "[varparent]", "99", "",
+                "[object]", "0", "b.sco", "6", "30", "40", "0", "0", "0", "0", "0", "") + "\r\n", OmsiTextEncoding.Utf16LittleEndian));
+            Directory.CreateDirectory(Path.Combine(original, "TTData"));
+            File.WriteAllText(Path.Combine(original, "TTData", "Busstops.cfg"), "[busstop]\r\nStop\r\n1\r\n7\r\n0.0\r\n0\r\n0\r\n");
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+
+            var withVariableParent = session.TransferObject(summary, summary.Tiles[0], summary.Tiles[0].Objects[0], summary.Tiles[1], 1, 1);
+            var entryPoint = session.TransferObject(summary, summary.Tiles[0], summary.Tiles[0].Objects[1], summary.Tiles[1], 1, 1);
+            var busStop = session.TransferObject(summary, summary.Tiles[1], summary.Tiles[1].Objects[0], summary.Tiles[0], 2, 2);
+
+            Assert.AreEqual("variable parent of the object", withVariableParent.Blockers.Single().Kind);
+            Assert.AreEqual("entry point", entryPoint.Blockers.Single().Kind);
+            Assert.IsTrue(busStop.Succeeded);
+            CollectionAssert.AreEqual(new[] { "tile_0_0.map", "tile_1_0.map" }, session.ModifiedFiles());
+        }
+
+        /// <summary>Tile 0 as in <see cref="UseMapWithEntryPoint"/>; tile 1 to its right holds object 7.</summary>
+        private void UseTwoTiles()
+        {
+            UseMapWithEntryPoint();
+            Write(original, "global.cfg", "[name]", "Testmap", "", "[NextIDCode]", "10", "",
+                "[entrypoints]", "1", "1", "6", "0", "1", "0", "2", "0", "0", "0", "1", "0", "Depot", "",
+                "[map]", "0", "0", "tile_0_0.map", "",
+                "[map]", "1", "0", "tile_1_0.map", "");
+            Write(original, "tile_1_0.map", "[version]", "14", "",
+                "[object]", "0", "c.sco", "7", "50", "60", "0", "0", "0", "0", "0", "");
         }
 
         /// <summary>Objects 5 (with a rule) and 6; an entry point names object 6 by index 1 and by ID.</summary>

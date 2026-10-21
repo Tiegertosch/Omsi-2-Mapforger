@@ -6,6 +6,13 @@ using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
 {
+    /// <summary>A selected object and the tile that holds it.</summary>
+    internal sealed class MapSelectionItem
+    {
+        public OmsiTileSummary Tile;
+        public OmsiObjectRecord Record;
+    }
+
     /// <summary>A finished drag of an object: its new position and heading in tile-local values.</summary>
     internal sealed class MapObjectEdit
     {
@@ -13,6 +20,7 @@ namespace OmsiMapEditor.UI
         public OmsiObjectRecord Record;
         public double LocalX;
         public double LocalY;
+        public double Height;
         public double HeadingDegrees;
     }
 
@@ -29,8 +37,9 @@ namespace OmsiMapEditor.UI
 
     /// <summary>
     /// Continuous top-down view of a whole map in world metres. Pans and zooms, draws tiles, splines and objects that
-    /// are visible, selects objects and, when editing is allowed, moves and rotates them by dragging. In placement
-    /// mode a preview of the chosen object follows the pointer and a click reports where it should go.
+    /// are visible, selects objects and, when editing is allowed, moves and rotates them by dragging. Ctrl+click and
+    /// Ctrl+drag select several objects, which then move together. In placement mode a preview of the chosen object
+    /// follows the pointer and a click reports where it should go.
     /// </summary>
     internal sealed class MapCanvasElement : VisualElement
     {
@@ -54,6 +63,7 @@ namespace OmsiMapEditor.UI
         private static readonly Color TreeStrokeColor = new Color(0.45f, 0.78f, 0.5f, 0.7f);
         private static readonly Color PlacementColor = new Color(0.47f, 0.9f, 0.6f, 1f);
         private static readonly Color PlacementFillColor = new Color(0.47f, 0.9f, 0.6f, 0.25f);
+        private static readonly Color BoxFillColor = new Color(1f, 0.36f, 0.42f, 0.12f);
 
         /// <summary>Outlines are drawn from this scale on; further out the map shows markers only.</summary>
         private const float OutlineMetersPerPixel = 1.5f;
@@ -72,7 +82,7 @@ namespace OmsiMapEditor.UI
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
-        private enum DragMode { None, Pan, MovePending, Move, Rotate }
+        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box }
 
         private sealed class SplinePath
         {
@@ -97,7 +107,14 @@ namespace OmsiMapEditor.UI
         private float slowestDrawMilliseconds;
 
         private OmsiTileSummary selectedTile;
+
+        // The selection; the primary object is the last one and the only one with a rotation handle.
         private OmsiObjectRecord selectedObject;
+        private readonly List<MapSelectionItem> selection = new List<MapSelectionItem>();
+        private readonly HashSet<OmsiObjectRecord> selectedRecords = new HashSet<OmsiObjectRecord>();
+
+        // A click on a member of a larger selection keeps the group for dragging; without a drag it selects only it.
+        private MapSelectionItem clickedMember;
 
         private DragMode dragMode;
         private int dragPointerId = -1;
@@ -133,11 +150,17 @@ namespace OmsiMapEditor.UI
         /// <summary>An object was clicked; the tile and record identify it.</summary>
         public event Action<OmsiTileSummary, OmsiObjectRecord> ObjectSelected;
 
+        /// <summary>An object was Ctrl+clicked to add it to the selection or take it out.</summary>
+        public event Action<OmsiTileSummary, OmsiObjectRecord> ObjectToggled;
+
+        /// <summary>A box was dragged with Ctrl; the objects inside it, to add to the selection.</summary>
+        public event Action<List<MapSelectionItem>> ObjectsBoxSelected;
+
         /// <summary>Empty space inside a tile was clicked.</summary>
         public event Action<OmsiTileSummary> TileClicked;
 
-        /// <summary>An object was moved or rotated by dragging and the pointer was released.</summary>
-        public event Action<MapObjectEdit> ObjectEdited;
+        /// <summary>The selection was moved, or its object rotated, by dragging and the pointer was released.</summary>
+        public event Action<List<MapObjectEdit>> ObjectsEdited;
 
         /// <summary>The map was left-clicked in placement mode.</summary>
         public event Action<MapPlacement> PlacementRequested;
@@ -189,10 +212,22 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
-        public void SetSelection(OmsiTileSummary tile, OmsiObjectRecord item)
+        /// <param name="tile">The highlighted tile.</param>
+        /// <param name="items">The selected objects; the last one is the primary object.</param>
+        public void SetSelection(OmsiTileSummary tile, IReadOnlyList<MapSelectionItem> items)
         {
             selectedTile = tile;
-            selectedObject = item;
+            selection.Clear();
+            selectedRecords.Clear();
+            if (items != null)
+            {
+                foreach (var item in items)
+                {
+                    selection.Add(item);
+                    selectedRecords.Add(item.Record);
+                }
+            }
+            selectedObject = selection.Count > 0 ? selection[selection.Count - 1].Record : null;
             MarkDirtyRepaint();
         }
 
@@ -386,6 +421,7 @@ namespace OmsiMapEditor.UI
             DrawObjects(context, painter, visible);
             DrawSelection(painter);
             DrawPlacement(painter);
+            DrawBox(painter);
 
             // Report slow redraws once per new maximum, so large maps can be diagnosed from the player log.
             var milliseconds = (float)watch.Elapsed.TotalMilliseconds;
@@ -450,13 +486,12 @@ namespace OmsiMapEditor.UI
                     {
                         if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.IsTree != trees)
                             continue;
-                        var dragging = ReferenceEquals(item, selectedObject) && IsDraggingObject();
-                        var position = dragging ? ToMap(tile, previewLocalX, previewLocalY) : ToMap(tile, item.LocalX, item.LocalY);
+                        var position = DrawnPosition(tile, item);
                         if (footprint.Radius / metersPerPixel < 1.5f ||
                             position.x + footprint.Radius < visible.xMin || position.x - footprint.Radius > visible.xMax ||
                             position.y + footprint.Radius < visible.yMin || position.y - footprint.Radius > visible.yMax)
                             continue;
-                        AddFootprint(painter, footprint, position, dragging ? previewHeading : item.HeadingDegrees);
+                        AddFootprint(painter, footprint, position, DrawnHeading(item));
                         any = true;
                     }
                 }
@@ -541,16 +576,14 @@ namespace OmsiMapEditor.UI
                 // Objects may lie outside their own tile, so test each object, not just the tile rectangle.
                 foreach (var item in tile.Objects)
                 {
-                    var map = ReferenceEquals(item, selectedObject) && IsDraggingObject()
-                        ? ToMap(tile, previewLocalX, previewLocalY)
-                        : ToMap(tile, item.LocalX, item.LocalY);
+                    var map = DrawnPosition(tile, item);
                     if (!visible.Contains(map))
                         continue;
                     var screen = MapToScreen(map);
                     markers.Add(screen);
                     if (showHeading)
                     {
-                        var heading = (float)(item.HeadingDegrees * Math.PI / 180.0);
+                        var heading = (float)(DrawnHeading(item) * Math.PI / 180.0);
                         painter.MoveTo(screen);
                         painter.LineTo(screen + new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading)) * 7f);
                     }
@@ -589,27 +622,29 @@ namespace OmsiMapEditor.UI
 
         private void DrawSelection(Painter2D painter)
         {
-            if (selectedObject == null || selectedTile == null)
+            if (selection.Count == 0)
                 return;
 
-            var screen = SelectedObjectScreen();
-            var handle = HandleScreen(screen);
             painter.strokeColor = SelectedObjectColor;
             painter.lineWidth = 2f;
-            if (footprints.TryGetValue(selectedObject.AssetPath, out var selectedFootprint))
+            painter.BeginPath();
+            foreach (var item in selection)
             {
-                var dragging = IsDraggingObject();
-                painter.BeginPath();
-                AddFootprint(painter, selectedFootprint,
-                    dragging ? ToMap(selectedTile, previewLocalX, previewLocalY) : ToMap(selectedTile, selectedObject.LocalX, selectedObject.LocalY),
-                    dragging ? previewHeading : selectedObject.HeadingDegrees);
-                painter.Stroke();
+                var position = DrawnPosition(item.Tile, item.Record);
+                if (footprints.TryGetValue(item.Record.AssetPath, out var footprint))
+                    AddFootprint(painter, footprint, position, DrawnHeading(item.Record));
+                var screen = MapToScreen(position);
+                painter.MoveTo(screen + new Vector2(7f, 0f));
+                painter.Arc(screen, 7f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
             }
-            painter.BeginPath();
-            painter.Arc(screen, 7f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
             painter.Stroke();
+            if (!HasRotationHandle())
+                return;
+
+            var objectScreen = SelectedObjectScreen();
+            var handle = HandleScreen(objectScreen);
             painter.BeginPath();
-            painter.MoveTo(screen);
+            painter.MoveTo(objectScreen);
             painter.LineTo(handle);
             painter.Stroke();
 
@@ -656,17 +691,52 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        private void DrawBox(Painter2D painter)
+        {
+            if (dragMode != DragMode.Box)
+                return;
+            var rect = Rect.MinMaxRect(Mathf.Min(dragStartPointer.x, dragLastPointer.x), Mathf.Min(dragStartPointer.y, dragLastPointer.y),
+                Mathf.Max(dragStartPointer.x, dragLastPointer.x), Mathf.Max(dragStartPointer.y, dragLastPointer.y));
+            painter.fillColor = BoxFillColor;
+            painter.strokeColor = SelectedObjectColor;
+            painter.lineWidth = 1f;
+            painter.BeginPath();
+            painter.MoveTo(new Vector2(rect.xMin, rect.yMin));
+            painter.LineTo(new Vector2(rect.xMax, rect.yMin));
+            painter.LineTo(new Vector2(rect.xMax, rect.yMax));
+            painter.LineTo(new Vector2(rect.xMin, rect.yMax));
+            painter.ClosePath();
+            painter.Fill();
+            painter.Stroke();
+        }
+
+        /// <summary>Where an object is drawn: shifted by the drag while it belongs to the moved selection.</summary>
+        private Vector2 DrawnPosition(OmsiTileSummary tile, OmsiObjectRecord item)
+        {
+            return dragMode == DragMode.Move && selectedRecords.Contains(item)
+                ? ToMap(tile, item.LocalX + previewLocalX - dragStartLocalX, item.LocalY + previewLocalY - dragStartLocalY)
+                : ToMap(tile, item.LocalX, item.LocalY);
+        }
+
+        private double DrawnHeading(OmsiObjectRecord item)
+        {
+            return dragMode == DragMode.Rotate && ReferenceEquals(item, selectedObject) ? previewHeading : item.HeadingDegrees;
+        }
+
+        /// <summary>Only a single selected object can be rotated by its handle.</summary>
+        private bool HasRotationHandle()
+        {
+            return selection.Count == 1 && selectedObject != null && selectedTile != null;
+        }
+
         private Vector2 SelectedObjectScreen()
         {
-            return IsDraggingObject()
-                ? MapToScreen(ToMap(selectedTile, previewLocalX, previewLocalY))
-                : MapToScreen(ToMap(selectedTile, selectedObject.LocalX, selectedObject.LocalY));
+            return MapToScreen(DrawnPosition(selectedTile, selectedObject));
         }
 
         private Vector2 HandleScreen(Vector2 objectScreen)
         {
-            var headingDegrees = dragMode == DragMode.Rotate || dragMode == DragMode.Move ? previewHeading : selectedObject.HeadingDegrees;
-            var heading = (float)(headingDegrees * Math.PI / 180.0);
+            var heading = (float)(DrawnHeading(selectedObject) * Math.PI / 180.0);
             return objectScreen + new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading)) * HandleDistance;
         }
 
@@ -708,22 +778,44 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (AllowEditing && selectedObject != null &&
+            if (AllowEditing && HasRotationHandle() &&
                 Vector2.Distance(position, HandleScreen(SelectedObjectScreen())) <= HandleRadius + 3f)
             {
-                StartObjectDrag(DragMode.Rotate, evt.pointerId, position);
+                StartObjectDrag(DragMode.Rotate, selectedObject, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
             }
 
+            var toggle = evt.ctrlKey || evt.commandKey;
             if (TryPickObject(position, out var tile, out var item))
             {
-                selectedTile = tile;
-                selectedObject = item;
-                ObjectSelected?.Invoke(tile, item);
-                if (AllowEditing)
-                    StartObjectDrag(DragMode.MovePending, evt.pointerId, position);
+                if (toggle)
+                {
+                    ObjectToggled?.Invoke(tile, item);
+                }
+                else if (selection.Count > 1 && selectedRecords.Contains(item))
+                {
+                    clickedMember = new MapSelectionItem { Tile = tile, Record = item };
+                    if (AllowEditing)
+                        StartObjectDrag(DragMode.MovePending, item, evt.pointerId, position);
+                    else
+                        ObjectSelected?.Invoke(tile, item);
+                }
+                else
+                {
+                    // The shell replaces the selection with this object before the drag starts.
+                    ObjectSelected?.Invoke(tile, item);
+                    if (AllowEditing)
+                        StartObjectDrag(DragMode.MovePending, item, evt.pointerId, position);
+                }
                 MarkDirtyRepaint();
+                evt.StopPropagation();
+                return;
+            }
+
+            if (toggle)
+            {
+                BeginDrag(DragMode.Box, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
             }
@@ -735,13 +827,14 @@ namespace OmsiMapEditor.UI
             evt.StopPropagation();
         }
 
-        private void StartObjectDrag(DragMode mode, int pointerId, Vector2 position)
+        /// <param name="anchor">The object under the pointer; the whole selection moves by its offset.</param>
+        private void StartObjectDrag(DragMode mode, OmsiObjectRecord anchor, int pointerId, Vector2 position)
         {
-            dragStartLocalX = selectedObject.LocalX;
-            dragStartLocalY = selectedObject.LocalY;
-            previewLocalX = selectedObject.LocalX;
-            previewLocalY = selectedObject.LocalY;
-            previewHeading = selectedObject.HeadingDegrees;
+            dragStartLocalX = anchor.LocalX;
+            dragStartLocalY = anchor.LocalY;
+            previewLocalX = anchor.LocalX;
+            previewLocalY = anchor.LocalY;
+            previewHeading = anchor.HeadingDegrees;
             BeginDrag(mode, pointerId, position);
         }
 
@@ -806,21 +899,60 @@ namespace OmsiMapEditor.UI
                 return;
 
             var finished = dragMode;
-            var edit = finished == DragMode.Move || finished == DragMode.Rotate
-                ? new MapObjectEdit
+            List<MapObjectEdit> edits = null;
+            if (finished == DragMode.Move)
+            {
+                edits = new List<MapObjectEdit>();
+                foreach (var item in selection)
                 {
-                    Tile = selectedTile,
-                    Record = selectedObject,
-                    LocalX = previewLocalX,
-                    LocalY = previewLocalY,
-                    HeadingDegrees = previewHeading
+                    edits.Add(new MapObjectEdit
+                    {
+                        Tile = item.Tile,
+                        Record = item.Record,
+                        LocalX = item.Record.LocalX + previewLocalX - dragStartLocalX,
+                        LocalY = item.Record.LocalY + previewLocalY - dragStartLocalY,
+                        Height = item.Record.Height,
+                        HeadingDegrees = item.Record.HeadingDegrees
+                    });
                 }
-                : null;
+            }
+            else if (finished == DragMode.Rotate)
+            {
+                edits = new List<MapObjectEdit>
+                {
+                    new MapObjectEdit
+                    {
+                        Tile = selectedTile, Record = selectedObject, LocalX = selectedObject.LocalX, LocalY = selectedObject.LocalY,
+                        Height = selectedObject.Height, HeadingDegrees = previewHeading
+                    }
+                };
+            }
+            var boxed = finished == DragMode.Box ? ObjectsInBox(dragStartPointer, dragLastPointer) : null;
+            var member = finished == DragMode.MovePending ? clickedMember : null;
             EndDrag();
-            if (edit != null)
-                ObjectEdited?.Invoke(edit);
+
+            if (edits != null)
+                ObjectsEdited?.Invoke(edits);
+            if (boxed != null)
+                ObjectsBoxSelected?.Invoke(boxed);
+            if (member != null)
+                ObjectSelected?.Invoke(member.Tile, member.Record);
             MarkDirtyRepaint();
             evt.StopPropagation();
+        }
+
+        /// <summary>Objects whose position lies inside the box between two screen points.</summary>
+        private List<MapSelectionItem> ObjectsInBox(Vector2 first, Vector2 second)
+        {
+            var a = ScreenToMap(first);
+            var b = ScreenToMap(second);
+            var box = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+            var result = new List<MapSelectionItem>();
+            foreach (var tile in summary.Tiles)
+                foreach (var item in tile.Objects)
+                    if (box.Contains(ToMap(tile, item.LocalX, item.LocalY)))
+                        result.Add(new MapSelectionItem { Tile = tile, Record = item });
+            return result;
         }
 
         private void CancelDrag()
@@ -837,6 +969,7 @@ namespace OmsiMapEditor.UI
             var pointerId = dragPointerId;
             dragMode = DragMode.None;
             dragPointerId = -1;
+            clickedMember = null;
             if (pointerId >= 0 && this.HasPointerCapture(pointerId))
                 this.ReleasePointer(pointerId);
         }
@@ -979,7 +1112,10 @@ namespace OmsiMapEditor.UI
                 ? "outside the map"
                 : "Tile " + tile.X + ", " + tile.Y + "   x " + (map.x - TileRect(tile).xMin).ToString("0.0") +
                   "   y " + (map.y - TileRect(tile).yMin).ToString("0.0");
-            if (IsDraggingObject())
+            if (dragMode == DragMode.Move && selection.Count > 1)
+                text = selection.Count + " objects   moved x " + (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") +
+                       "   y " + (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00");
+            else if (IsDraggingObject())
                 text = "#" + selectedObject.Id + "   x " + previewLocalX.ToString("0.00") + "   y " + previewLocalY.ToString("0.00") +
                        "   heading " + previewHeading.ToString("0.0") + "°";
             PointerInfoChanged(text + "      " + scale);

@@ -36,6 +36,15 @@ namespace OmsiMapEditor.OMSI
             "object", "attachObj", "splineAttachement", "splineAttachement_repeater"
         };
 
+        /// <summary>
+        /// References that tie an object to its tile: OMSI resolves them within the tile or by tile and index.
+        /// Timetables and bus stops name the ID alone, which a moved object keeps.
+        /// </summary>
+        private static readonly HashSet<string> TileBoundReferenceKinds = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "attached object parent", "variable parent", "chrono selection", "entry point"
+        };
+
         private const int EntryPointFieldCount = 12;
 
         /// <summary>
@@ -90,14 +99,89 @@ namespace OmsiMapEditor.OMSI
             if (references == null)
                 throw new ArgumentNullException(nameof(references));
 
+            var blockers = new List<OmsiReference>();
+            var isRepeater = element is OmsiSplineAttachmentView attachmentView && attachmentView.IsRepeater;
+            if (!isRepeater && TryGetId(element, out var id))
+                blockers.AddRange(references.To(id));
+            return Detach(tile, element, tileIndex, globalConfig, blockers, null);
+        }
+
+        /// <summary>
+        /// Moves an [object] with its rules to the end of another tile and sets its position there. The ID stays, so
+        /// timetables and bus stops keep finding it. Nothing changes while references tie the object to its tile:
+        /// attached objects, variable parents, chrono selections and entry points; they are returned instead.
+        /// </summary>
+        /// <param name="source">The tile that holds the object.</param>
+        /// <param name="item">A view created from a record of <paramref name="source"/>.</param>
+        /// <param name="sourceTileIndex">The source tile's position in global.cfg's [map] list.</param>
+        /// <param name="target">The tile that receives the object.</param>
+        /// <param name="x">Position in the target tile.</param>
+        /// <param name="y">Position in the target tile.</param>
+        public static OmsiRemovalResult MoveObjectToTile(OmsiRecordFile source, OmsiObjectView item, int sourceTileIndex,
+            OmsiRecordFile target, double x, double y, OmsiRecordFile globalConfig, OmsiReferenceIndex references)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            if (target == null)
+                throw new ArgumentNullException(nameof(target));
+            if (ReferenceEquals(source, target))
+                throw new ArgumentException("The target must be another tile.", nameof(target));
+            if (globalConfig == null)
+                throw new ArgumentNullException(nameof(globalConfig));
+            if (references == null)
+                throw new ArgumentNullException(nameof(references));
+            if (target.Version < 9)
+                throw new InvalidOperationException("Objects can only be moved into tiles of version 9 or later.");
+
+            var blockers = new List<OmsiReference>();
+            foreach (var reference in references.To(item.Id))
+                if (TileBoundReferenceKinds.Contains(reference.Kind))
+                    blockers.Add(reference);
+            var position = source.Records.IndexOf(item.Record);
+            for (var next = position + 1; position >= 0 && next < source.Records.Count && ModifierSections.Contains(source.Records[next].Name); next++)
+            {
+                var modifier = source.Records[next];
+                if (string.Equals(modifier.Name, "varparent", StringComparison.OrdinalIgnoreCase))
+                    blockers.Add(new OmsiReference(item.Id, "its tile", "variable parent of the object"));
+                else if (!modifier.HasKnownLayout || !modifier.IsComplete)
+                    blockers.Add(new OmsiReference(item.Id, "its tile", "[" + modifier.Name + "] without verified layout"));
+            }
+
+            var moved = new List<OmsiRecord>();
+            var result = Detach(source, item, sourceTileIndex, globalConfig, blockers, moved);
+            if (!result.Removed)
+                return result;
+
+            // Copies with the target's line endings; the free text after a record, such as "Object Nr. 5", stays behind.
+            var first = target.Records.Count;
+            foreach (var record in moved)
+            {
+                var fields = new List<string>();
+                foreach (var field in record.Fields)
+                    fields.Add(field.Text);
+                target.InsertRecord(target.Records.Count, target.CreateRecord(record.Name, fields));
+            }
+            var view = (OmsiObjectView)OmsiTileRecords.Create(target, target.Records[first]);
+            view.X = x;
+            view.Y = y;
+            return result;
+        }
+
+        /// <summary>
+        /// Removes an element and the records that modify it unless there are blockers or an entry point names it by
+        /// index. Index maintenance happens first, while the positions still describe the unchanged tile.
+        /// </summary>
+        private static OmsiRemovalResult Detach(OmsiRecordFile tile, OmsiTileRecordView element, int tileIndex,
+            OmsiRecordFile globalConfig, List<OmsiReference> blockers, List<OmsiRecord> removedRecords)
+        {
             var position = tile.Records.IndexOf(element.Record);
             if (position < 0)
                 throw new ArgumentException("The element does not belong to this tile.", nameof(element));
 
             var result = new OmsiRemovalResult();
-            var isRepeater = element is OmsiSplineAttachmentView attachmentView && attachmentView.IsRepeater;
-            if (!isRepeater && TryGetId(element, out var id))
-                result.Blockers.AddRange(references.To(id));
+            result.Blockers.AddRange(blockers);
 
             var entryPoints = FindEntryPoints(globalConfig);
             var placedIndex = PlacedIndexOf(tile, position);
@@ -114,7 +198,6 @@ namespace OmsiMapEditor.OMSI
             if (result.Blockers.Count > 0)
                 return result;
 
-            // Index maintenance first, while the positions still describe the unchanged tile.
             if (element is OmsiSplineView)
                 result.ShiftedAttachmentSplineIndices = ShiftAttachmentSplineIndices(tile, SplineIndexOf(tile, position));
             if (placedIndex >= 0 && entryPoints != null)
@@ -124,7 +207,10 @@ namespace OmsiMapEditor.OMSI
             while (position + count < tile.Records.Count && ModifierSections.Contains(tile.Records[position + count].Name))
                 count++;
             for (var removed = 0; removed < count; removed++)
+            {
+                removedRecords?.Add(tile.Records[position]);
                 tile.RemoveRecord(tile.Records[position]);
+            }
 
             result.RemovedRecordCount = count;
             result.Removed = true;

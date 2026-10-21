@@ -25,6 +25,9 @@ namespace OmsiMapEditor.UI
             public double[] Before;
             public double[] After;
             public OmsiObjectChange Change;
+
+            /// <summary>Several steps done together, such as moving a selection; undone in reverse order.</summary>
+            public List<ObjectEditStep> Group;
         }
 
         private const int HistoryLimit = 200;
@@ -52,6 +55,9 @@ namespace OmsiMapEditor.UI
         private MapCanvasElement mapCanvas;
         private OmsiTileSummary selectedTile;
         private OmsiObjectRecord selectedObject;
+
+        // All selected objects; selectedObject is the last of them.
+        private readonly List<MapSelectionItem> selection = new List<MapSelectionItem>();
         private string currentProjectName = string.Empty;
         private OmsiMapSession session;
         private VisualElement exportDialog;
@@ -160,7 +166,9 @@ namespace OmsiMapEditor.UI
                 mapCanvas = new MapCanvasElement();
                 mapCanvas.ObjectSelected += (tile, item) => SelectObject(tile, item, false);
                 mapCanvas.TileClicked += tile => SelectTile(tile, false);
-                mapCanvas.ObjectEdited += OnObjectDragged;
+                mapCanvas.ObjectToggled += ToggleObject;
+                mapCanvas.ObjectsBoxSelected += AddToSelection;
+                mapCanvas.ObjectsEdited += CommitEdits;
                 mapCanvas.PlacementRequested += PlaceChosenObject;
                 mapCanvas.PointerInfoChanged += text =>
                 {
@@ -231,7 +239,7 @@ namespace OmsiMapEditor.UI
                 deleteObjectMenuItem.clicked += () =>
                 {
                     HidePopup(editMenu);
-                    DeleteSelectedObject();
+                    DeleteSelectedObjects();
                 };
             if (undoMenuItem != null)
                 undoMenuItem.clicked += () =>
@@ -388,12 +396,15 @@ namespace OmsiMapEditor.UI
                 selectedObject = selectedTile.Objects.Find(item => item.Id == previousObjectId.Value);
             if (selectedTile == null)
                 selectedTile = summary.Tiles.Count > 0 ? summary.Tiles[0] : null;
+            selection.Clear();
+            if (selectedObject != null)
+                selection.Add(new MapSelectionItem { Tile = selectedTile, Record = selectedObject });
 
             if (mapCanvas != null)
             {
                 mapCanvas.AllowEditing = session.CanEdit;
                 mapCanvas.SetMap(summary, keepView);
-                mapCanvas.SetSelection(selectedTile, selectedObject);
+                mapCanvas.SetSelection(selectedTile, selection);
             }
             StartOutlineBuild(summary);
             UpdateMapHeader();
@@ -482,21 +493,45 @@ namespace OmsiMapEditor.UI
             if (tile == null || item == null)
                 return;
 
-            var previousTile = selectedTile;
-            selectedTile = tile;
-            selectedObject = item;
-            if (!ReferenceEquals(previousTile, tile))
-            {
-                SetTileHighlight(previousTile, false);
-                SetTileHighlight(tile, true);
-                ScrollBrowserTo(tile);
-            }
-            mapCanvas?.SetSelection(tile, item);
+            selection.Clear();
+            selection.Add(new MapSelectionItem { Tile = tile, Record = item });
+            ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, item);
-            RenderInspector();
             SetStatus("Selected object #" + item.Id + " (" + item.AssetPath + ")" +
                       (session != null && session.CanEdit ? "" : " - read-only; save a project to edit"));
+        }
+
+        /// <summary>Adds an object to the selection or takes it out (Ctrl+click).</summary>
+        private void ToggleObject(OmsiTileSummary tile, OmsiObjectRecord item)
+        {
+            if (tile == null || item == null)
+                return;
+            var index = selection.FindIndex(entry => ReferenceEquals(entry.Record, item));
+            if (index >= 0)
+                selection.RemoveAt(index);
+            else
+                selection.Add(new MapSelectionItem { Tile = tile, Record = item });
+            ApplySelection(selection.Count > 0 ? selection[selection.Count - 1].Tile : tile);
+            SetStatus(DescribeSelection());
+        }
+
+        /// <summary>Adds the objects of a Ctrl+drag box to the selection.</summary>
+        private void AddToSelection(List<MapSelectionItem> items)
+        {
+            var known = new HashSet<OmsiObjectRecord>();
+            foreach (var entry in selection)
+                known.Add(entry.Record);
+            foreach (var item in items)
+                if (known.Add(item.Record))
+                    selection.Add(item);
+            if (selection.Count == 0)
+            {
+                SetStatus("There are no objects in the box.");
+                return;
+            }
+            ApplySelection(selection[selection.Count - 1].Tile);
+            SetStatus(DescribeSelection());
         }
 
         private void SelectTile(OmsiTileSummary tile, bool centerView)
@@ -504,54 +539,148 @@ namespace OmsiMapEditor.UI
             if (tile == null || currentSummary == null)
                 return;
 
-            var previousTile = selectedTile;
-            selectedTile = tile;
-            selectedObject = null;
-            SetTileHighlight(previousTile, false);
-            SetTileHighlight(tile, true);
-            ScrollBrowserTo(tile);
-            mapCanvas?.SetSelection(tile, null);
+            selection.Clear();
+            ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, null);
-            RenderInspector();
             SetStatus("Selected tile " + tile.X + ", " + tile.Y);
         }
 
-        private void OnObjectDragged(MapObjectEdit edit)
+        /// <summary>Makes the last selected object the primary one, highlights the tile and refreshes the views.</summary>
+        private void ApplySelection(OmsiTileSummary tile)
         {
-            if (edit?.Tile == null || edit.Record == null)
-                return;
-            CommitObjectEdit(edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Record.Height, edit.HeadingDegrees);
+            var previousTile = selectedTile;
+            selectedTile = tile;
+            selectedObject = selection.Count > 0 ? selection[selection.Count - 1].Record : null;
+            if (!ReferenceEquals(previousTile, tile))
+            {
+                SetTileHighlight(previousTile, false);
+                SetTileHighlight(tile, true);
+                if (tile != null)
+                    ScrollBrowserTo(tile);
+            }
+            mapCanvas?.SetSelection(tile, selection);
+            RenderInspector();
         }
 
-        /// <summary>Saves an object change into the workspace, updates the view and records it for undo.</summary>
-        private void CommitObjectEdit(OmsiTileSummary tile, OmsiObjectRecord item, double x, double y, double z, double heading)
+        private string DescribeSelection()
         {
+            if (selection.Count == 0)
+                return "Selection cleared.";
+            if (selection.Count == 1)
+                return "Selected object #" + selectedObject.Id + " (" + selectedObject.AssetPath + ")";
+            return selection.Count + " objects selected. Drag one of them to move all; Del deletes them; Ctrl+click adds or removes one.";
+        }
+
+        private bool IsSelected(OmsiObjectRecord item)
+        {
+            return selection.Exists(entry => ReferenceEquals(entry.Record, item));
+        }
+
+        /// <summary>
+        /// Saves moved or rotated objects into the workspace as one undo step. An object that ends up in another tile
+        /// moves into that tile, unless references tie it to its own; then it stays there with outside coordinates.
+        /// </summary>
+        private void CommitEdits(List<MapObjectEdit> edits)
+        {
+            if (edits == null || edits.Count == 0)
+                return;
             if (session == null || !session.CanEdit)
             {
                 SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to edit it.");
                 return;
             }
 
-            var before = Values(item);
-            try
+            var parts = new List<ObjectEditStep>();
+            var kept = new List<string>();
+            var transfers = new List<string>();
+            OmsiReferenceIndex references = null;
+            string failure = null;
+            foreach (var edit in edits)
             {
-                if (!session.UpdateObject(tile, item, x, y, z, heading))
+                try
                 {
-                    SetStatus("Object #" + item.Id + " is unchanged.");
-                    return;
+                    var target = OtherTileAt(edit.Tile, edit.LocalX, edit.LocalY, out var targetX, out var targetY);
+                    if (target != null)
+                    {
+                        references = references ?? session.BuildReferenceIndex();
+                        var result = session.TransferObject(currentSummary, edit.Tile, edit.Record, target, targetX, targetY, references);
+                        if (result.Succeeded)
+                        {
+                            parts.Add(new ObjectEditStep { Change = result.Change });
+                            transfers.Add("#" + edit.Record.Id + " into tile " + target.X + ", " + target.Y);
+                            // A transfer keeps height and heading; an edit from the inspector may change them too.
+                            AddValueStep(parts, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit.Height, edit.HeadingDegrees);
+                            continue;
+                        }
+                        kept.Add("#" + edit.Record.Id + " (" + DescribeReferences(result.Blockers) + ")");
+                    }
+                    AddValueStep(parts, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height, edit.HeadingDegrees);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                    failure = "Could not save object #" + edit.Record.Id + ": " + exception.Message;
+                    break;
                 }
             }
-            catch (Exception exception)
+
+            if (parts.Count > 0)
+                PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts });
+            RefreshAfterChange(null);
+
+            if (failure != null)
             {
-                Debug.LogException(exception);
-                SetStatus("Could not save object #" + item.Id + ": " + exception.Message);
+                SetStatus(failure + (parts.Count > 0 ? " The changes before it were saved; Ctrl+Z undoes them." : string.Empty));
                 return;
             }
+            if (parts.Count == 0)
+            {
+                SetStatus(edits.Count == 1 ? "Object #" + edits[0].Record.Id + " is unchanged." : "The objects are unchanged.");
+                return;
+            }
+            var message = edits.Count == 1
+                ? "Object #" + edits[0].Record.Id + " saved to the project workspace."
+                : edits.Count + " objects saved to the project workspace.";
+            if (transfers.Count > 0)
+                message += " Moved " + JoinLimited(transfers) + ".";
+            if (kept.Count > 0)
+                message += " Kept in their tile because references tie them to it: " + JoinLimited(kept) + ".";
+            SetStatus(message + " Ctrl+Z undoes it.");
+        }
 
-            PushHistory(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
-            AfterObjectChanged(tile, item);
-            SetStatus("Object #" + item.Id + " saved to the project workspace (" + tile.FileName + "). Ctrl+Z undoes it.");
+        private void AddValueStep(List<ObjectEditStep> parts, OmsiTileSummary tile, OmsiObjectRecord item, double x, double y, double z, double heading)
+        {
+            var before = Values(item);
+            if (session.UpdateObject(tile, item, x, y, z, heading))
+                parts.Add(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
+        }
+
+        /// <summary>
+        /// The other tile that contains a tile-local position, with the position in that tile; null when the position
+        /// lies in its own tile or where the map has no tile.
+        /// </summary>
+        private OmsiTileSummary OtherTileAt(OmsiTileSummary tile, double x, double y, out double targetX, out double targetY)
+        {
+            var size = currentSummary.TileSizeMeters;
+            targetX = x;
+            targetY = y;
+            if (x >= 0 && x < size && y >= 0 && y < size)
+                return null;
+            var tileX = tile.X + (int)Math.Floor(x / size);
+            var tileY = tile.Y + (int)Math.Floor(y / size);
+            var target = currentSummary.Tiles.Find(candidate => candidate.X == tileX && candidate.Y == tileY && candidate.IsAvailable);
+            if (target == null || ReferenceEquals(target, tile))
+                return null;
+            targetX = x + (tile.X - tileX) * size;
+            targetY = y + (tile.Y - tileY) * size;
+            return target;
+        }
+
+        private static string JoinLimited(List<string> parts)
+        {
+            var shown = parts.GetRange(0, Math.Min(3, parts.Count));
+            return string.Join(", ", shown) + (parts.Count > shown.Count ? " and " + (parts.Count - shown.Count) + " more" : string.Empty);
         }
 
         private static double[] Values(OmsiObjectRecord item)
@@ -559,14 +688,43 @@ namespace OmsiMapEditor.UI
             return new[] { item.LocalX, item.LocalY, item.Height, item.HeadingDegrees };
         }
 
-        private void AfterObjectChanged(OmsiTileSummary tile, OmsiObjectRecord item)
+        /// <summary>
+        /// Brings the selection and the views up to date after objects changed, moved between tiles, appeared or
+        /// disappeared. Objects that no longer exist leave the selection.
+        /// </summary>
+        /// <param name="select">The new selection, or null to keep the current one.</param>
+        private void RefreshAfterChange(IEnumerable<MapSelectionItem> select)
         {
-            selectedTile = tile;
-            selectedObject = item;
-            mapCanvas?.SetSelection(tile, item);
-            UpdateBrowserEntry(tile);
-            RenderInspector();
+            if (select != null)
+            {
+                var items = new List<MapSelectionItem>(select);
+                selection.Clear();
+                selection.AddRange(items);
+            }
+            for (var index = selection.Count - 1; index >= 0; index--)
+            {
+                var tile = TileHolding(selection[index]);
+                if (tile == null)
+                    selection.RemoveAt(index);
+                else
+                    selection[index].Tile = tile;
+            }
+            ApplySelection(selection.Count > 0 ? selection[selection.Count - 1].Tile : selectedTile);
+            mapCanvas?.Refresh();
+            foreach (var tile in browserEntries.Keys)
+                UpdateBrowserEntry(tile);
+            UpdateCounts();
             UpdateMapStateLabel();
+        }
+
+        private OmsiTileSummary TileHolding(MapSelectionItem item)
+        {
+            if (item.Tile != null && item.Tile.Objects.Contains(item.Record))
+                return item.Tile;
+            foreach (var tile in currentSummary.Tiles)
+                if (tile.Objects.Contains(item.Record))
+                    return tile;
+            return null;
         }
 
         private void OnShortcut(KeyDownEvent evt)
@@ -590,15 +748,20 @@ namespace OmsiMapEditor.UI
                     SetStatus("Placement stopped.");
                     evt.StopPropagation();
                 }
+                else if (evt.keyCode == KeyCode.Escape && selection.Count > 0)
+                {
+                    // Not stopped: the map view also cancels a drag in progress.
+                    SelectTile(selectedTile, false);
+                }
                 else if (evt.keyCode == KeyCode.R && mapCanvas != null && mapCanvas.IsPlacing)
                 {
                     mapCanvas.PlacementHeading += evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep;
                     SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.Delete && selectedObject != null)
+                else if (evt.keyCode == KeyCode.Delete && selection.Count > 0)
                 {
-                    DeleteSelectedObject();
+                    DeleteSelectedObjects();
                     evt.StopPropagation();
                 }
                 return;
@@ -626,60 +789,91 @@ namespace OmsiMapEditor.UI
 
             var step = from[from.Count - 1];
             from.RemoveAt(from.Count - 1);
+            var touched = new List<MapSelectionItem>();
+            try
+            {
+                ApplyStep(step, undo, touched);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                RefreshAfterChange(null);
+                SetStatus("Could not " + (undo ? "undo" : "redo") + " " + DescribeStep(step) + ": " + exception.Message);
+                return;
+            }
+
+            to.Add(step);
+            RefreshAfterChange(touched);
+            SetStatus((undo ? "Undid " : "Redid ") + DescribeStep(step) + ".");
+        }
+
+        /// <summary>
+        /// Undoes or redoes a step; the parts of a group are undone in reverse order. Collects the objects that exist
+        /// afterwards, so they can be selected.
+        /// </summary>
+        private void ApplyStep(ObjectEditStep step, bool undo, List<MapSelectionItem> touched)
+        {
+            if (step.Group != null)
+            {
+                for (var index = 0; index < step.Group.Count; index++)
+                    ApplyStep(step.Group[undo ? step.Group.Count - 1 - index : index], undo, touched);
+                return;
+            }
+
             if (step.Change != null)
             {
-                StepStructuralChange(step, to, undo);
+                if (undo)
+                    session.Undo(currentSummary, step.Change);
+                else
+                    session.Redo(currentSummary, step.Change);
+                if (step.Change.ObjectExists)
+                    Touch(touched, step.Change.CurrentTile, step.Change.Record);
                 return;
             }
 
             var tile = currentSummary.Tiles.Find(candidate => candidate.X == step.TileX && candidate.Y == step.TileY);
             var item = tile?.Objects.Find(candidate => candidate.Id == step.ObjectId);
             if (item == null)
-            {
-                SetStatus("The object of this step no longer exists.");
-                return;
-            }
-
+                throw new InvalidOperationException("Object #" + step.ObjectId + " no longer exists.");
             var target = undo ? step.Before : step.After;
-            try
-            {
-                session.UpdateObject(tile, item, target[0], target[1], target[2], target[3]);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                SetStatus("Could not " + (undo ? "undo" : "redo") + ": " + exception.Message);
-                return;
-            }
-
-            to.Add(step);
-            AfterObjectChanged(tile, item);
-            SetStatus((undo ? "Undid" : "Redid") + " the change of object #" + item.Id + ".");
+            session.UpdateObject(tile, item, target[0], target[1], target[2], target[3]);
+            Touch(touched, tile, item);
         }
 
-        private void StepStructuralChange(ObjectEditStep step, List<ObjectEditStep> to, bool undo)
+        private static void Touch(List<MapSelectionItem> touched, OmsiTileSummary tile, OmsiObjectRecord item)
         {
-            var change = step.Change;
-            try
-            {
-                if (undo)
-                    session.Undo(currentSummary, change);
-                else
-                    session.Redo(currentSummary, change);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                SetStatus("Could not " + (undo ? "undo" : "redo") + ": " + exception.Message);
-                return;
-            }
+            if (!touched.Exists(entry => ReferenceEquals(entry.Record, item)))
+                touched.Add(new MapSelectionItem { Tile = tile, Record = item });
+        }
 
-            to.Add(step);
-            // Undoing a placement or redoing a deletion removes the object; otherwise it is back and gets selected.
-            var exists = change.IsPlacement == change.IsApplied;
-            AfterStructureChanged(change.Tile, exists ? change.Record : null);
-            var what = change.IsPlacement ? "placement" : "deletion";
-            SetStatus((undo ? "Undid the " : "Redid the ") + what + " of object #" + change.Record.Id + ".");
+        private static string DescribeStep(ObjectEditStep step)
+        {
+            if (step.Group != null)
+            {
+                var ids = new HashSet<int>();
+                CollectIds(step, ids);
+                return "the change of " + ids.Count + " objects";
+            }
+            if (step.Change == null)
+                return "the change of object #" + step.ObjectId;
+            switch (step.Change.Kind)
+            {
+                case OmsiObjectChangeKind.Placement:
+                    return "the placement of object #" + step.Change.Record.Id;
+                case OmsiObjectChangeKind.Deletion:
+                    return "the deletion of object #" + step.Change.Record.Id;
+                default:
+                    return "the move of object #" + step.Change.Record.Id + " into tile " + step.Change.TargetTile.X + ", " + step.Change.TargetTile.Y;
+            }
+        }
+
+        private static void CollectIds(ObjectEditStep step, HashSet<int> ids)
+        {
+            if (step.Group != null)
+                foreach (var part in step.Group)
+                    CollectIds(part, ids);
+            else
+                ids.Add(step.Change?.Record.Id ?? step.ObjectId);
         }
 
         private void PushHistory(ObjectEditStep step)
@@ -690,27 +884,13 @@ namespace OmsiMapEditor.UI
             redoSteps.Clear();
         }
 
-        /// <summary>Refreshes the view after an object was added or removed; selects the object or else its tile.</summary>
-        private void AfterStructureChanged(OmsiTileSummary tile, OmsiObjectRecord item)
+        /// <summary>
+        /// Deletes the selected objects as one undo step. Objects that other parts of the map still refer to stay and
+        /// remain selected.
+        /// </summary>
+        private void DeleteSelectedObjects()
         {
-            if (item != null)
-            {
-                SelectObject(tile, item, false);
-            }
-            else
-            {
-                SelectTile(tile, false);
-            }
-            mapCanvas?.Refresh();
-            UpdateBrowserEntry(tile);
-            UpdateCounts();
-            UpdateMapStateLabel();
-        }
-
-        /// <summary>Deletes the selected object unless other parts of the map still refer to it.</summary>
-        private void DeleteSelectedObject()
-        {
-            if (selectedObject == null || selectedTile == null)
+            if (selection.Count == 0)
             {
                 SetStatus("Select an object to delete.");
                 return;
@@ -721,29 +901,51 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            var tile = selectedTile;
-            var item = selectedObject;
-            OmsiObjectDeletion deletion;
+            var targets = new List<MapSelectionItem>(selection);
+            var parts = new List<ObjectEditStep>();
+            var kept = new List<MapSelectionItem>();
+            var reasons = new List<string>();
+            IReadOnlyList<OmsiReference> blockers = new OmsiReference[0];
+            string failure = null;
             try
             {
-                deletion = session.DeleteObject(currentSummary, tile, item);
+                // One index for all objects; deleting objects does not add references.
+                var references = session.BuildReferenceIndex();
+                foreach (var entry in targets)
+                {
+                    var result = session.DeleteObject(currentSummary, entry.Tile, entry.Record, references);
+                    if (result.Succeeded)
+                    {
+                        parts.Add(new ObjectEditStep { TileX = entry.Tile.X, TileY = entry.Tile.Y, ObjectId = entry.Record.Id, Change = result.Change });
+                    }
+                    else
+                    {
+                        kept.Add(entry);
+                        blockers = result.Blockers;
+                        reasons.Add("#" + entry.Record.Id + " by " + DescribeReferences(result.Blockers));
+                    }
+                }
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not delete object #" + item.Id + ": " + exception.Message);
-                return;
+                failure = "Could not delete: " + exception.Message;
             }
 
-            if (!deletion.Deleted)
-            {
-                SetStatus("Object #" + item.Id + " was not deleted; it is still referenced by " + DescribeReferences(deletion.Blockers) + ".");
-                return;
-            }
+            if (parts.Count > 0)
+                PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts });
+            RefreshAfterChange(kept);
 
-            PushHistory(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Change = deletion.Change });
-            AfterStructureChanged(tile, null);
-            SetStatus("Deleted object #" + item.Id + " (" + item.AssetPath + ") from " + tile.FileName + ". Ctrl+Z restores it.");
+            if (failure != null)
+                SetStatus(failure + (parts.Count > 0 ? " " + parts.Count + " object(s) were deleted before; Ctrl+Z restores them." : string.Empty));
+            else if (targets.Count == 1 && parts.Count == 1)
+                SetStatus("Deleted object #" + targets[0].Record.Id + " (" + targets[0].Record.AssetPath + ") from " + targets[0].Tile.FileName + ". Ctrl+Z restores it.");
+            else if (targets.Count == 1)
+                SetStatus("Object #" + targets[0].Record.Id + " was not deleted; it is still referenced by " + DescribeReferences(blockers) + ".");
+            else
+                SetStatus("Deleted " + parts.Count + " of " + targets.Count + " objects." +
+                          (kept.Count > 0 ? " Still referenced and kept: " + JoinLimited(reasons) + "." : string.Empty) +
+                          (parts.Count > 0 ? " Ctrl+Z restores them." : string.Empty));
         }
 
         private static string DescribeReferences(IReadOnlyList<OmsiReference> references)
@@ -961,7 +1163,7 @@ namespace OmsiMapEditor.UI
             if (!placement.KeepPlacing)
                 StopPlacement();
             PushHistory(new ObjectEditStep { TileX = placement.Tile.X, TileY = placement.Tile.Y, ObjectId = change.Record.Id, Change = change });
-            AfterStructureChanged(placement.Tile, change.Record);
+            RefreshAfterChange(new[] { new MapSelectionItem { Tile = placement.Tile, Record = change.Record } });
             SetStatus("Placed object #" + change.Record.Id + " (" + assetPath + ") in tile " + placement.Tile.X + ", " + placement.Tile.Y +
                       ". Ctrl+Z undoes it." +
                       (placementHasAbsoluteHeight ? " Its height is absolute, not above the terrain; set Height in the inspector." : string.Empty));
@@ -980,7 +1182,10 @@ namespace OmsiMapEditor.UI
             if (!TryParseField(xField, "X", out var x) || !TryParseField(yField, "Y", out var y) ||
                 !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading))
                 return;
-            CommitObjectEdit(selectedTile, item, x, y, z, heading);
+            CommitEdits(new List<MapObjectEdit>
+            {
+                new MapObjectEdit { Tile = selectedTile, Record = item, LocalX = x, LocalY = y, Height = z, HeadingDegrees = heading }
+            });
         }
 
         private bool TryParseField(TextField field, string name, out double value)
@@ -1303,7 +1508,7 @@ namespace OmsiMapEditor.UI
             if (mapHintLabel != null)
             {
                 mapHintLabel.text = session != null && session.CanEdit
-                    ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
+                    ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
                     : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
                 mapHintLabel.style.display = DisplayStyle.Flex;
             }
@@ -1444,7 +1649,9 @@ namespace OmsiMapEditor.UI
             // The object editor scrolls together with the record lists, so neither squeezes the other.
             var records = new ScrollView(ScrollViewMode.Vertical);
             records.AddToClassList("inspector-records");
-            if (selectedObject != null)
+            if (selection.Count > 1)
+                AddSelectionSummary(records);
+            else if (selectedObject != null)
                 AddObjectEditor(records, selectedObject);
             else if (IsTileEdited(selectedTile))
                 AddRevertTileButton(records);
@@ -1461,9 +1668,15 @@ namespace OmsiMapEditor.UI
                               "  H " + item.Height.ToString("F1") + " m  •  " + item.HeadingDegrees.ToString("F1") + "°";
                 var record = AddInspectorRecord(records, details, "inspector-record");
                 record.AddToClassList("inspector-record-clickable");
-                record.EnableInClassList("inspector-record-selected", ReferenceEquals(item, selectedObject));
+                record.EnableInClassList("inspector-record-selected", IsSelected(item));
                 var capturedItem = item;
-                record.RegisterCallback<ClickEvent>(_ => SelectObject(selectedTile, capturedItem, true));
+                record.RegisterCallback<ClickEvent>(evt =>
+                {
+                    if (evt.ctrlKey || evt.commandKey)
+                        ToggleObject(selectedTile, capturedItem);
+                    else
+                        SelectObject(selectedTile, capturedItem, true);
+                });
             }
 
             var splinesHeading = new Label("SPLINE PLACEMENTS");
@@ -1507,6 +1720,39 @@ namespace OmsiMapEditor.UI
             return session != null && session.CanEdit && session.IsTileModified(tile.FileName);
         }
 
+        /// <summary>The selection when it holds several objects: their count and IDs, and a button to delete them.</summary>
+        private void AddSelectionSummary(VisualElement container)
+        {
+            var editor = new VisualElement();
+            editor.AddToClassList("inspector-edit");
+            var heading = new Label("SELECTED OBJECTS");
+            heading.AddToClassList("inspector-section-heading");
+            editor.Add(heading);
+            var ids = new List<string>();
+            foreach (var entry in selection)
+                ids.Add("#" + entry.Record.Id);
+            var names = new Label(selection.Count + " objects: " + string.Join(", ", ids.GetRange(0, Math.Min(12, ids.Count))) +
+                                  (ids.Count > 12 ? ", ..." : string.Empty));
+            names.AddToClassList("inspector-edit-name");
+            editor.Add(names);
+
+            var canEdit = session != null && session.CanEdit;
+            if (canEdit)
+            {
+                var delete = new Button(DeleteSelectedObjects) { text = "Delete " + selection.Count + " objects" };
+                delete.AddToClassList("map-control-button");
+                delete.AddToClassList("inspector-edit-delete");
+                editor.Add(delete);
+            }
+            var hint = new Label(canEdit
+                ? "Drag one of them on the map to move all. Ctrl+click adds or removes an object, Esc clears the selection."
+                : "Read-only. Save a Mapforge project (File > Save map project as...) to edit this map.");
+            hint.AddToClassList("muted");
+            hint.AddToClassList("inspector-edit-hint");
+            editor.Add(hint);
+            container.Add(editor);
+        }
+
         /// <summary>Position and heading fields for the selected object; read-only without a project.</summary>
         private void AddObjectEditor(VisualElement container, OmsiObjectRecord item)
         {
@@ -1531,7 +1777,7 @@ namespace OmsiMapEditor.UI
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
-                var delete = new Button(DeleteSelectedObject) { text = "Delete object" };
+                var delete = new Button(DeleteSelectedObjects) { text = "Delete object" };
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);

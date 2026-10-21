@@ -54,7 +54,7 @@
         </ui:VisualElement>
         <ui:VisualElement name="edit-menu" class="menu-popup edit-menu">
             <ui:Button name="place-object-menu-item" text="Place object..." class="menu-popup-item" />
-            <ui:Button name="delete-object-menu-item" text="Delete selected object    Del" class="menu-popup-item" />
+            <ui:Button name="delete-object-menu-item" text="Delete selection    Del" class="menu-popup-item" />
             <ui:Label class="menu-divider" />
             <ui:Button name="undo-menu-item" text="Undo    Ctrl+Z" class="menu-popup-item" />
             <ui:Button name="redo-menu-item" text="Redo    Ctrl+Y" class="menu-popup-item" />
@@ -65,6 +65,7 @@
             <ui:Label text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
             <ui:Label text="With a project, click an object in a tile or in the inspector list to edit its position and heading. Edits are saved to the project's workspace; the original map is not changed." class="popup-description" />
             <ui:Label text="Edit > Place object... chooses a scenery object and places it with a click into the map. Del deletes the selected object unless other parts of the map still refer to it." class="popup-description" />
+            <ui:Label text="Ctrl+click adds objects to the selection or removes them; Ctrl+drag on empty space selects all objects in a box. Dragging one selected object moves all of them. An object moved over a tile border moves into that tile." class="popup-description" />
             <ui:Label text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
             <ui:Label text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
             <ui:Button name="help-menu-close-button" text="Close" class="menu-popup-item popup-close" />
