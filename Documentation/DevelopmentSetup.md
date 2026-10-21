@@ -56,7 +56,7 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Kompilierung gegen Unity-DLLs | Erfolgreich: alle Projekt-Assemblies inklusive `Editor.Tests` mit Player- und Editor-Defines gegen die Unity-6000.6.6f1-Referenzen kompiliert |
 | Unity Test Runner | Erfolgreich: alle 91 EditMode-Tests am 21. Oktober 2026 per Unity Batch-Mode bestanden |
 | Platzieren und Löschen | Erfolgreich am 21. Oktober 2026 über eine Projekt-Arbeitskopie: In Grundorf und Berlin-Spandau je ein Objekt platziert, `[NextIDCode]` fortgeschrieben, je 48 Objekte gelöscht oder abgewiesen und alles zurückgenommen. Abgewiesen wurden Objekte mit Verweisen aus Fahrplan, Haltestellen, Einstiegspunkten, Chrono und Elternbeziehungen. Danach war die Arbeitskopie leer und die Originalkarte byte-gleich. Löschen dauert in Berlin-Spandau bis 0,7 s, Platzieren 0,45 s beim ersten Mal |
-| Platzieren im Spiel | Erfolgreich am 21. Oktober 2026: in Grundorf im gebauten Player Heuballen und Kühe auf die Wendeschleife gesetzt; sie erscheinen in der exportierten Karte in OMSI an ihrer Stelle. Löschen im Spiel noch nicht eigens geprüft |
+| Platzieren und Löschen im Spiel | Erfolgreich am 21. Oktober 2026: in Grundorf im gebauten Player Heuballen und Kühe auf die Wendeschleife gesetzt und die Scheunengebäude gelöscht; in der exportierten Karte stehen die neuen Objekte in OMSI an ihrer Stelle, die Scheunen fehlen |
 | Spline-Verbindungen | Erfolgreich: Grundorf 36/36, Stadtückheim 17/17, Berlin-Spandau 1.464/1.467 innerhalb 0,5 m; die drei Lücken sind einseitige Verweise in den Kartendaten |
 | Visueller Player-Test | Erfolgreich am 20. Oktober 2026: Grundorf und Berlin-Spandau im gebauten Player geladen, Kacheln und Liste angeklickt, Kartenprüfung über **Tools** ausgeführt; keine Ausnahmen im Player-Log |
 | Editor-Playmode | Noch nicht durchgefuehrt |
@@ -94,8 +94,7 @@ OMSI_MAP_CONFIG="D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cf
 
 Die offenen Punkte stehen in der [Roadmap](Roadmap.md) unter „Später“. Zuletzt abgeschlossen sind das Platzieren und Löschen von Objekten, davor die 2D-Draufsicht mit Bearbeiten und die Objektumrisse. Naheliegende nächste Schritte sind:
 
-1. Ein gelöschtes Objekt in einer exportierten Karte in OMSI prüfen.
-2. Genauere, nicht konvexe Umrisse für L-förmige Gebäude, Kreuzungen und Plätze.
-3. Mehrfachauswahl und Übernahme von Objekten in die neue Kachel beim Verschieben über Kachelgrenzen; das Platzieren und Löschen liefert dafür die Bausteine.
-4. Fahrplandaten lesend importieren, Haltestellen und Linien anzeigen, Chrono-Varianten als Ebenen.
-5. Terrain und 3D-Ansicht.
+1. Genauere, nicht konvexe Umrisse für L-förmige Gebäude, Kreuzungen und Plätze.
+2. Mehrfachauswahl und Übernahme von Objekten in die neue Kachel beim Verschieben über Kachelgrenzen; das Platzieren und Löschen liefert dafür die Bausteine.
+3. Fahrplandaten lesend importieren, Haltestellen und Linien anzeigen, Chrono-Varianten als Ebenen.
+4. Terrain und 3D-Ansicht.
