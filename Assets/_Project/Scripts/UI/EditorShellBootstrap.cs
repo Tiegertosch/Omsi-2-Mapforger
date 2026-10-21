@@ -304,7 +304,18 @@ namespace OmsiMapEditor.UI
             objectRenderer.Loaded += SetStatus;
             objectRenderer.ModelsChanged += () => mapCanvas?.UpdateModelFlags();
             if (mapCanvas != null)
+            {
                 mapCanvas.HasModel = objectRenderer.HasModel;
+                mapCanvas.MovePreviewed += (items, offsetX, offsetY) =>
+                {
+                    var objects = new List<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>>(items.Count);
+                    foreach (var item in items)
+                        objects.Add(new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(item.Tile, item.Record));
+                    objectRenderer.PreviewMove(objects, offsetX, offsetY);
+                };
+                mapCanvas.HeadingPreviewed += objectRenderer.PreviewHeading;
+                mapCanvas.PreviewEnded += objectRenderer.EndPreview;
+            }
         }
 
         /// <summary>Keeps the ground camera on the screen rectangle and view of the map view.</summary>

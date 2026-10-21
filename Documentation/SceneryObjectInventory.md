@@ -97,14 +97,18 @@ Für die texturierte Draufsicht zählen weitere Angaben der `.sco` und der `.o3d
 
 Laut openOMSI nimmt OMSI die erste Detailstufe, deren Schwelle die Bildschirmgröße des Objekts erreicht; aus der Nähe ist das die erste. Mapforge zeigt deshalb die Modelle vor dem ersten `[LOD]` und die der ersten Stufe. `[visible]`-Bedingungen werten alle Variablen als 0, nur `sommerhalbjahr` als 1. Das schaltet vor allem Ampellichter (`red`, `green`, `yellow`) aus und zeigt sommerliche Objekte wie Kühe auf der Weide.
 
-**Texturen:** Die Modelle nennen oft `.bmp`, im Ordner `texture` neben der `.sco` liegt aber eine gleichnamige `.dds`. Mapforge sucht wie OMSI zuerst diese `.dds`, dann die genannte Datei, dann beides im globalen Ordner `Texture`. Daneben gibt es `_#low`-Varianten für niedrige Texturqualität, die Mapforge nicht nutzt. In Berlin-Spandau finden sich so 660 Texturen, 431 DDS mit DXT1 oder DXT3, 163 BMP und 66 TGA, zusammen 329 MB. Es fehlen nur vier Schrifttexturen wie `textfeld.bmp`, die OMSI zur Laufzeit erzeugt.
+**Texturen:** Die Modelle nennen oft `.bmp`, im Ordner `texture` neben der `.sco` liegt aber eine gleichnamige `.dds`. Mapforge sucht wie OMSI zuerst diese `.dds`, dann die genannte Datei, dann beides im globalen Ordner `Texture`. Daneben gibt es `_#low`-Varianten für niedrige Texturqualität, die Mapforge nicht nutzt. In Berlin-Spandau finden sich so 660 Texturen, 431 DDS mit DXT1 oder DXT3, 163 BMP und 66 TGA, zusammen 329 MB. Es fehlen nur Schrifttexturen wie `textfeld.bmp` und `StrSchild_Text1.bmp`, die OMSI zur Laufzeit erzeugt.
 
 | Karte | Objektarten | Bäume | Dreiecke je Art einmal | Dreiecke aller Platzierungen |
 |---|---|---|---|---|
 | Grundorf | 108 | 18 | 17.536 | 76.144 |
 | Berlin-Spandau | 872 | 33 | 405.645 | 2.401.834 |
 
-Die Modelle aller 872 Objektarten von Berlin-Spandau sind in etwa 1 s gebaut. Text-`.x`-Modelle haben in Mapforge noch keine Texturkoordinaten und erscheinen grau.
+Die Modelle aller 872 Objektarten von Berlin-Spandau sind in etwa 1 s gebaut.
+
+**`.x`-Modelle:** In `Mesh` folgen auf Eckpunkte und Flächen eingebettete Blöcke. `MeshMaterialList` nennt die Zahl der Materialien und je Fläche einen Materialindex, dann die Materialien selbst, eingebettet oder als Verweis `{ Name }` auf ein `Material` weiter oben in der Datei. Ein Material hat Flächenfarbe RGBA, Glanzstärke, Glanzfarbe, Eigenleuchten und optional `TextureFilename`. `MeshNormals` hat eigene Normalen mit eigener Flächenliste, `MeshTextureCoords` u und v je Eckpunkt mit v von oben. Alle 55 `.x`-Dateien der Installation lesen sich so; 52 haben Texturen, alle haben Normalen.
+
+**Bäume von oben:** Die Baumtexturen sind Seitenansichten mit Alphakanal, die Krone oben, darunter der Stamm. Mapforge nimmt als Krone die oberen 70 % der deckenden Pixel und legt deren Rechteck auf eine flache Kuppel mit dem Kronenradius. Durchsichtige Stellen werden ausgeschnitten, sodass ein belaubter Rand entsteht; die Normalen der Kuppel geben Licht und Schatten.
 
 ## Spline-Profile (`.sli`)
 

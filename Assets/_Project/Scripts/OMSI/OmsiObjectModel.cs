@@ -163,7 +163,7 @@ namespace OmsiMapEditor.OMSI
                 if (bytes.Length >= 2 && bytes[0] == 0x84 && bytes[1] == 0x19)
                     AddO3d(model, objectFolder, mesh, OmsiO3dMesh.Parse(bytes));
                 else
-                    AddX(model, OmsiXMesh.Parse(bytes));
+                    AddX(model, objectFolder, mesh, OmsiXMesh.Parse(bytes));
             }
             catch (InvalidDataException exception)
             {
@@ -181,27 +181,10 @@ namespace OmsiMapEditor.OMSI
                 model.Uvs.AddRange(new[] { vertex.U, vertex.V });
             }
 
-            // Materials of this mesh, then their triangles; [matl] picks a material by texture name and occurrence.
-            var materialSlots = new int[Math.Max(1, mesh.Materials.Count)];
-            var occurrences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            for (var index = 0; index < mesh.Materials.Count; index++)
-            {
-                var source = mesh.Materials[index];
-                var texture = source.Texture ?? string.Empty;
-                occurrences.TryGetValue(texture, out var occurrence);
-                occurrences[texture] = occurrence + 1;
-                var settings = sceneryMesh.Materials.Find(item => string.Equals(item.Texture, texture, StringComparison.OrdinalIgnoreCase) && item.Index == occurrence);
-                materialSlots[index] = AddMaterial(model, new OmsiModelMaterial
-                {
-                    TexturePath = texture.Length > 0 ? ResolveTexture(objectFolder, texture) : null,
-                    Red = source.DiffuseRed,
-                    Green = source.DiffuseGreen,
-                    Blue = source.DiffuseBlue,
-                    AlphaMode = settings?.AlphaMode ?? 0
-                });
-            }
-            if (mesh.Materials.Count == 0)
-                materialSlots[0] = AddMaterial(model, new OmsiModelMaterial { Red = 0.7f, Green = 0.7f, Blue = 0.7f });
+            // Materials of this mesh, then their triangles; a mesh without materials is grey.
+            var materialSlots = mesh.Materials.Count > 0
+                ? MaterialSlots(model, objectFolder, sceneryMesh, mesh.Materials)
+                : new[] { AddMaterial(model, new OmsiModelMaterial { Red = 0.7f, Green = 0.7f, Blue = 0.7f }) };
 
             for (var triangle = 0; triangle * 3 + 2 < mesh.TriangleIndices.Count; triangle++)
             {
@@ -212,30 +195,79 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        /// <summary>Text .x meshes are drawn untextured in grey with flat normals; they are rare in OMSI scenery.</summary>
-        private static void AddX(OmsiObjectModel model, OmsiXMesh mesh)
+        /// <summary>
+        /// Text .x meshes with their materials, normals and texture coordinates. Where the file gives no normal, the
+        /// vertex takes the normal of its first face.
+        /// </summary>
+        private void AddX(OmsiObjectModel model, string objectFolder, OmsiSceneryMesh sceneryMesh, OmsiXMesh mesh)
         {
-            var slot = AddMaterial(model, new OmsiModelMaterial { Red = 0.7f, Green = 0.7f, Blue = 0.7f });
+            var first = model.VertexCount;
+            var normals = new float[mesh.Positions.Count][];
+            for (var index = 0; index < normals.Length; index++)
+                normals[index] = mesh.Normals[index];
             for (var index = 0; index + 2 < mesh.TriangleIndices.Count; index += 3)
             {
                 var a = mesh.Positions[mesh.TriangleIndices[index]];
                 var b = mesh.Positions[mesh.TriangleIndices[index + 1]];
                 var c = mesh.Positions[mesh.TriangleIndices[index + 2]];
-                // Face normal from the left-handed winding Direct3D uses.
                 double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
                 double vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
                 double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
                 var length = Math.Sqrt(nx * nx + ny * ny + nz * nz);
                 if (length < 1e-12)
                     continue;
-                foreach (var corner in new[] { a, b, c })
-                {
-                    model.Triangles[slot].Add(model.VertexCount);
-                    model.Positions.AddRange(corner);
-                    model.Normals.AddRange(new[] { (float)(-nx / length), (float)(-ny / length), (float)(-nz / length) });
-                    model.Uvs.AddRange(new[] { 0f, 0f });
-                }
+                // Direct3D's clockwise front faces in a left-handed frame: the cross product points to the back.
+                var face = new[] { (float)(-nx / length), (float)(-ny / length), (float)(-nz / length) };
+                for (var corner = 0; corner < 3; corner++)
+                    normals[mesh.TriangleIndices[index + corner]] = normals[mesh.TriangleIndices[index + corner]] ?? face;
             }
+            for (var index = 0; index < mesh.Positions.Count; index++)
+            {
+                model.Positions.AddRange(mesh.Positions[index]);
+                model.Normals.AddRange(normals[index] ?? new[] { 0f, 1f, 0f });
+                model.Uvs.AddRange(mesh.Uvs[index]);
+            }
+
+            var slots = MaterialSlots(model, objectFolder, sceneryMesh, mesh.Materials);
+            var fallback = -1;
+            for (var triangle = 0; triangle * 3 + 2 < mesh.TriangleIndices.Count; triangle++)
+            {
+                var material = mesh.TriangleMaterials[triangle];
+                int slot;
+                if (material >= 0 && material < slots.Length)
+                    slot = slots[material];
+                else
+                    slot = fallback >= 0 ? fallback : fallback = AddMaterial(model, new OmsiModelMaterial { Red = 0.7f, Green = 0.7f, Blue = 0.7f });
+                for (var corner = 0; corner < 3; corner++)
+                    model.Triangles[slot].Add(first + mesh.TriangleIndices[triangle * 3 + corner]);
+            }
+        }
+
+        /// <summary>
+        /// The model's material for each material of a mesh. [matl] picks a mesh material by its texture name and its
+        /// occurrence among the materials with that name and sets its alpha mode.
+        /// </summary>
+        private int[] MaterialSlots(OmsiObjectModel model, string objectFolder, OmsiSceneryMesh sceneryMesh, List<OmsiMeshMaterial> materials)
+        {
+            var slots = new int[materials.Count];
+            var occurrences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < materials.Count; index++)
+            {
+                var source = materials[index];
+                var texture = source.Texture ?? string.Empty;
+                occurrences.TryGetValue(texture, out var occurrence);
+                occurrences[texture] = occurrence + 1;
+                var settings = sceneryMesh.Materials.Find(item => string.Equals(item.Texture, texture, StringComparison.OrdinalIgnoreCase) && item.Index == occurrence);
+                slots[index] = AddMaterial(model, new OmsiModelMaterial
+                {
+                    TexturePath = texture.Length > 0 ? ResolveTexture(objectFolder, texture) : null,
+                    Red = source.DiffuseRed,
+                    Green = source.DiffuseGreen,
+                    Blue = source.DiffuseBlue,
+                    AlphaMode = settings?.AlphaMode ?? 0
+                });
+            }
+            return slots;
         }
 
         /// <summary>Reuses an equal material, so objects made of several meshes keep few draw calls.</summary>

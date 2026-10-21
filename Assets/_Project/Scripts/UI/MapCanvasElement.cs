@@ -166,6 +166,15 @@ namespace OmsiMapEditor.UI
         /// <summary>The selection was moved, or its object rotated, by dragging and the pointer was released.</summary>
         public event Action<List<MapObjectEdit>> ObjectsEdited;
 
+        /// <summary>The selection is being dragged by this many metres east and north; the edit follows on release.</summary>
+        public event Action<IReadOnlyList<MapSelectionItem>, double, double> MovePreviewed;
+
+        /// <summary>The selected object is being turned to this heading; the edit follows on release.</summary>
+        public event Action<OmsiTileSummary, OmsiObjectRecord, double> HeadingPreviewed;
+
+        /// <summary>A move or turn ended, whether it was released or cancelled.</summary>
+        public event Action PreviewEnded;
+
         /// <summary>The map was left-clicked in placement mode.</summary>
         public event Action<MapPlacement> PlacementRequested;
 
@@ -949,6 +958,10 @@ namespace OmsiMapEditor.UI
             }
 
             dragLastPointer = position;
+            if (dragMode == DragMode.Move)
+                MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY);
+            else if (dragMode == DragMode.Rotate)
+                HeadingPreviewed?.Invoke(selectedTile, selectedObject, previewHeading);
             NotifyPointerInfo(position);
             MarkDirtyRepaint();
         }
@@ -1027,11 +1040,14 @@ namespace OmsiMapEditor.UI
         {
             // Reset first: releasing the capture raises PointerCaptureOutEvent, which must find no drag in progress.
             var pointerId = dragPointerId;
+            var previewed = IsDraggingObject();
             dragMode = DragMode.None;
             dragPointerId = -1;
             clickedMember = null;
             if (pointerId >= 0 && this.HasPointerCapture(pointerId))
                 this.ReleasePointer(pointerId);
+            if (previewed)
+                PreviewEnded?.Invoke();
         }
 
         private void OnWheel(WheelEvent evt)

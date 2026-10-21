@@ -40,6 +40,11 @@ namespace OmsiMapEditor.World
             /// <summary>Average colour of a tree's opaque texels; white for other objects.</summary>
             public Color TreeColour = Color.white;
 
+            /// <summary>The crown in a tree's side-view texture as offset and size in texture coordinates, or null.</summary>
+            public Vector4? CrownArea;
+
+            public string TreeTexturePath;
+
             public Mesh Mesh;
             public Material[] Materials;
             public Matrix4x4[] Instances = new Matrix4x4[0];
@@ -57,6 +62,7 @@ namespace OmsiMapEditor.World
         // An instancing material in Resources keeps the instancing variant of the shader in a build; new materials copy it.
         private Material template;
         private Mesh treeDisc;
+        private Mesh treeCrown;
         private Camera targetCamera;
         private OmsiMapSummary summary;
         private string installationRoot;
@@ -77,6 +83,10 @@ namespace OmsiMapEditor.World
         private bool reportWhenUploaded;
         private bool objectsVisible = true;
         private readonly Dictionary<long, OmsiTerrain> terrains = new Dictionary<long, OmsiTerrain>();
+
+        /// <summary>Where each placement's matrix lives, so a drag can move single instances.</summary>
+        private readonly Dictionary<OmsiObjectRecord, KeyValuePair<KindData, int>> instanceOf =
+            new Dictionary<OmsiObjectRecord, KeyValuePair<KindData, int>>();
         private readonly Dictionary<string, KindData> kinds = new Dictionary<string, KindData>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
         private readonly List<UnityEngine.Object> owned = new List<UnityEngine.Object>();
@@ -108,6 +118,7 @@ namespace OmsiMapEditor.World
             if (template == null)
                 Debug.LogError("MapObjectSurface.mat was not found in Resources.");
             treeDisc = CreateDisc();
+            treeCrown = CreateCrown();
         }
 
         /// <summary>The camera that shows the objects; the ground camera.</summary>
@@ -165,6 +176,7 @@ namespace OmsiMapEditor.World
             summary = null;
             requestedKinds.Clear();
             terrains.Clear();
+            instanceOf.Clear();
             kinds.Clear();
             textures.Clear();
             foreach (var item in owned)
@@ -270,6 +282,8 @@ namespace OmsiMapEditor.World
                 {
                     var tree = ReadTexture(installationRoot, model.TreeTexturePath, data);
                     kind.TreeColour = AverageOpaqueColour(tree?.Image);
+                    kind.CrownArea = CrownArea(tree?.Image);
+                    kind.TreeTexturePath = model.TreeTexturePath;
                 }
                 else
                 {
@@ -308,6 +322,47 @@ namespace OmsiMapEditor.World
             }
             data.Textures[relativePath] = texture;
             return texture;
+        }
+
+        /// <summary>
+        /// The crown of a side-view tree texture: the upper 70 % of the opaque texels, below them the trunk. Returned as
+        /// the rectangle around the crown in texture coordinates with v from the top, so the round crown mesh shows the
+        /// crown and never reaches past the image into the trunk; null without an alpha channel.
+        /// </summary>
+        private static Vector4? CrownArea(OmsiImage image)
+        {
+            if (image == null || image.Channels != 4)
+                return null;
+            int top = -1, bottom = -1;
+            for (var row = 0; row < image.Height; row++)
+            {
+                for (var column = 0; column < image.Width; column++)
+                {
+                    if (image.Pixels[(row * image.Width + column) * 4 + 3] < 128)
+                        continue;
+                    if (top < 0)
+                        top = row;
+                    bottom = row;
+                    break;
+                }
+            }
+            if (top < 0)
+                return null;
+
+            var crownBottom = top + (int)((bottom - top) * 0.7);
+            int left = image.Width, right = -1;
+            for (var row = top; row <= crownBottom; row++)
+                for (var column = 0; column < image.Width; column++)
+                    if (image.Pixels[(row * image.Width + column) * 4 + 3] >= 128)
+                    {
+                        left = Math.Min(left, column);
+                        right = Math.Max(right, column);
+                    }
+            if (right < left)
+                return null;
+
+            return new Vector4((float)left / image.Width, (float)top / image.Height,
+                (float)(right - left + 1) / image.Width, (float)(crownBottom - top + 1) / image.Height);
         }
 
         /// <summary>The mean colour of the texels that are not transparent, darkened a little like a crown in shade.</summary>
@@ -362,9 +417,19 @@ namespace OmsiMapEditor.World
             var model = kind.Model;
             if (model.IsTree)
             {
-                kind.Mesh = treeDisc;
-                var material = NewMaterial(Texture2D.whiteTexture, kind.TreeColour, 0f);
-                kind.Materials = new[] { material };
+                if (kind.CrownArea.HasValue)
+                {
+                    // The crown of the texture on a dome, cut out where the leaves are transparent.
+                    kind.Mesh = treeCrown;
+                    var crown = NewMaterial(TextureFor(kind.TreeTexturePath), Color.white, 0.5f);
+                    crown.SetVector("_UvRect", kind.CrownArea.Value);
+                    kind.Materials = new[] { crown };
+                }
+                else
+                {
+                    kind.Mesh = treeDisc;
+                    kind.Materials = new[] { NewMaterial(Texture2D.whiteTexture, kind.TreeColour, 0f) };
+                }
                 return;
             }
             if (model.VertexCount == 0)
@@ -552,28 +617,126 @@ namespace OmsiMapEditor.World
                     kind.Instances = new Matrix4x4[count];
                 kind.InstanceCount = 0;
             }
+            instanceOf.Clear();
             foreach (var tile in summary.Tiles)
             {
-                terrains.TryGetValue(TileKey(tile.X, tile.Y), out var terrain);
                 foreach (var item in tile.Objects)
                 {
                     if (!kinds.TryGetValue(item.AssetPath, out var kind) || kind.Mesh == null)
                         continue;
-                    var model = kind.Model;
-                    var ground = model.HasAbsoluteHeight || terrain == null ? 0.0 : terrain.HeightAt(item.LocalX, item.LocalY, tileSize);
-                    var position = new Vector3((float)(tile.X * tileSize + item.LocalX - originX), (float)(ground + item.Height),
-                        (float)(tile.Y * tileSize + item.LocalY - originY));
-                    var rotation = Quaternion.Euler(0f, (float)item.HeadingDegrees, 0f);
-                    var scale = Vector3.one;
-                    if (model.IsTree)
-                    {
-                        // The crown sits at the tree's mean height, above the roads it may overhang.
-                        position.y += (float)model.TreeHeight;
-                        scale = new Vector3((float)model.TreeRadius, 1f, (float)model.TreeRadius);
-                    }
-                    kind.Instances[kind.InstanceCount++] = Matrix4x4.TRS(position, rotation, scale);
+                    instanceOf[item] = new KeyValuePair<KindData, int>(kind, kind.InstanceCount);
+                    kind.Instances[kind.InstanceCount++] = PlacementMatrix(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees);
                 }
             }
+        }
+
+        /// <summary>
+        /// Draws dragged objects at their preview position until the drag ends; the offset is in metres and the same
+        /// for every object, which may lie in different tiles.
+        /// </summary>
+        public void PreviewMove(IEnumerable<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>> objects, double offsetX, double offsetY)
+        {
+            foreach (var pair in objects)
+                PreviewPlacement(pair.Key, pair.Value, pair.Value.LocalX + offsetX, pair.Value.LocalY + offsetY, pair.Value.HeadingDegrees);
+        }
+
+        /// <summary>Draws an object turned to a preview heading until the drag ends.</summary>
+        public void PreviewHeading(OmsiTileSummary tile, OmsiObjectRecord item, double headingDegrees)
+        {
+            if (item != null)
+                PreviewPlacement(tile, item, item.LocalX, item.LocalY, headingDegrees);
+        }
+
+        /// <summary>Returns to the stored placements; a committed edit arrives through <see cref="RefreshPlacements"/>.</summary>
+        public void EndPreview()
+        {
+            placementsDirty = true;
+        }
+
+        private void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double headingDegrees)
+        {
+            if (tile == null || item == null || !instanceOf.TryGetValue(item, out var place))
+                return;
+            place.Key.Instances[place.Value] = PlacementMatrix(place.Key.Model, tile, localX, localY, item.Height, headingDegrees);
+        }
+
+        /// <summary>
+        /// Position on the map, standing on the terrain under it unless the height is absolute, turned clockwise by the
+        /// heading as OMSI does. Tree crowns sit at the tree's mean height, above the roads they may overhang.
+        /// </summary>
+        private Matrix4x4 PlacementMatrix(OmsiObjectModel model, OmsiTileSummary tile, double localX, double localY, double height,
+            double headingDegrees)
+        {
+            var worldX = tile.X * tileSize + localX;
+            var worldY = tile.Y * tileSize + localY;
+            var ground = model.HasAbsoluteHeight ? 0.0 : GroundAt(worldX, worldY);
+            var position = new Vector3((float)(worldX - originX), (float)(ground + height), (float)(worldY - originY));
+            var scale = Vector3.one;
+            if (model.IsTree)
+            {
+                position.y += (float)model.TreeHeight;
+                scale = new Vector3((float)model.TreeRadius, (float)model.TreeRadius, (float)model.TreeRadius);
+            }
+            return Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)headingDegrees, 0f), scale);
+        }
+
+        /// <summary>Terrain height at a world position, from the tile that contains it; 0 where no terrain was read.</summary>
+        private double GroundAt(double worldX, double worldY)
+        {
+            var tileX = (int)Math.Floor(worldX / tileSize);
+            var tileY = (int)Math.Floor(worldY / tileSize);
+            return terrains.TryGetValue(TileKey(tileX, tileY), out var terrain)
+                ? terrain.HeightAt(worldX - tileX * tileSize, worldY - tileY * tileSize, tileSize)
+                : 0.0;
+        }
+
+        /// <summary>
+        /// A flat dome of radius 1 and height 0.6 for tree crowns. Its normals give the crown light and shade; the texture
+        /// coordinates project the crown of a side-view texture from above, north at the top of the image.
+        /// </summary>
+        private static Mesh CreateCrown()
+        {
+            const int rings = 6;
+            const int segments = 24;
+            const float height = 0.6f;
+            var vertices = new List<Vector3> { new Vector3(0f, height, 0f) };
+            var normals = new List<Vector3> { Vector3.up };
+            var uvs = new List<Vector2> { new Vector2(0.5f, 0.5f) };
+            var triangles = new List<int>();
+            for (var ring = 1; ring <= rings; ring++)
+            {
+                var radius = (float)ring / rings;
+                var y = height * Mathf.Sqrt(Mathf.Max(0f, 1f - radius * radius));
+                for (var segment = 0; segment < segments; segment++)
+                {
+                    var angle = 2f * Mathf.PI * segment / segments;
+                    var x = radius * Mathf.Cos(angle);
+                    var z = radius * Mathf.Sin(angle);
+                    vertices.Add(new Vector3(x, y, z));
+                    // The normal of the ellipsoid with semi-axes 1, height and 1.
+                    normals.Add(new Vector3(x, y / (height * height), z).normalized);
+                    uvs.Add(new Vector2(0.5f + 0.5f * x, 0.5f - 0.5f * z));
+                }
+            }
+            for (var segment = 0; segment < segments; segment++)
+                triangles.AddRange(new[] { 0, 1 + (segment + 1) % segments, 1 + segment });
+            for (var ring = 1; ring < rings; ring++)
+            {
+                var inner = 1 + (ring - 1) * segments;
+                var outer = 1 + ring * segments;
+                for (var segment = 0; segment < segments; segment++)
+                {
+                    var next = (segment + 1) % segments;
+                    triangles.AddRange(new[] { inner + segment, inner + next, outer + segment, inner + next, outer + next, outer + segment });
+                }
+            }
+            var mesh = new Mesh { name = "Tree crown dome" };
+            mesh.SetVertices(vertices);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         /// <summary>A flat disc of radius 1 facing up, for tree crowns.</summary>
@@ -601,6 +764,8 @@ namespace OmsiMapEditor.World
             Clear();
             if (treeDisc != null)
                 Destroy(treeDisc);
+            if (treeCrown != null)
+                Destroy(treeCrown);
         }
     }
 }

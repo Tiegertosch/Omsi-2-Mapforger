@@ -7,6 +7,7 @@ Shader "Mapforge/ObjectSurface"
         _MainTex ("Texture", 2D) = "white" {}
         _Color ("Colour", Color) = (1, 1, 1, 1)
         _Cutoff ("Alpha cutoff, 0 for opaque", Float) = 0
+        _UvRect ("Texture area: offset xy, size zw", Vector) = (0, 0, 1, 1)
     }
 
     SubShader
@@ -31,6 +32,7 @@ Shader "Mapforge/ObjectSurface"
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
                 float _Cutoff;
+                float4 _UvRect;
             CBUFFER_END
 
             struct Attributes
@@ -54,7 +56,8 @@ Shader "Mapforge/ObjectSurface"
                 UNITY_SETUP_INSTANCE_ID(input);
                 output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
-                output.uv = input.uv;
+                // Tree crowns use only the crown of their side-view texture.
+                output.uv = _UvRect.xy + input.uv * _UvRect.zw;
                 return output;
             }
 

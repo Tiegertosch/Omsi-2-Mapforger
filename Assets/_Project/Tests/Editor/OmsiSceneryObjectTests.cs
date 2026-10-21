@@ -109,6 +109,34 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ReadsXMaterialsNormalsAndTextureCoordinates()
+        {
+            // Two faces: the first uses a material defined at the top and referenced by name, the second an inline one.
+            const string text = "xof 0303txt 0032\n" +
+                                "Material Roof { 0.5;0.5;0.5;1.0;; 0.0; 0.0;0.0;0.0;; 0.0;0.0;0.0;; TextureFilename { \"roof.bmp\"; } }\n" +
+                                "Mesh Box {\n" +
+                                "  4; 0;0;0;, 1;0;0;, 1;0;1;, 0;0;1;;\n" +
+                                "  2; 3;0,1,2;, 3;0,2,3;;\n" +
+                                "  MeshMaterialList { 2; 2; 0, 1;;\n" +
+                                "    { Roof }\n" +
+                                "    Material Wall { 1.0;0.25;0.0;1.0;; 5.0; 0.0;0.0;0.0;; 0.0;0.0;0.0;; }\n" +
+                                "  }\n" +
+                                "  MeshNormals { 1; 0;1;0;; 2; 3;0,0,0;, 3;0,0,0;; }\n" +
+                                "  MeshTextureCoords { 4; 0;0;, 1;0;, 1;1;, 0;1;; }\n" +
+                                "}\n";
+
+            var mesh = OmsiXMesh.Parse(Encoding.ASCII.GetBytes(text));
+
+            Assert.AreEqual(2, mesh.Materials.Count);
+            Assert.AreEqual("roof.bmp", mesh.Materials[0].Texture);
+            Assert.AreEqual(0.25f, mesh.Materials[1].DiffuseGreen);
+            Assert.AreEqual(string.Empty, mesh.Materials[1].Texture);
+            CollectionAssert.AreEqual(new[] { 0, 1 }, mesh.TriangleMaterials);
+            CollectionAssert.AreEqual(new[] { 0f, 1f, 0f }, mesh.Normals[2]);
+            CollectionAssert.AreEqual(new[] { 1f, 1f }, mesh.Uvs[2]);
+        }
+
+        [Test]
         public void ParsesTheFootprintSectionsOfASceneryObject()
         {
             var sco = OmsiSceneryObject.Parse(Encoding.UTF8.GetBytes(string.Join("\r\n",

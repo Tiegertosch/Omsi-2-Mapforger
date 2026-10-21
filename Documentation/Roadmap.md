@@ -36,9 +36,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Straßen und Gleise als texturierte Bänder aus den `.sli`-Profilen
 - Freileitungen, Fahrdraht und Zäune in der Draufsicht als dünne Linien zeigen
 - [x] Objekte mit ihren Materialtexturen von oben zeichnen: erste Detailstufe, `[visible]` im Sommer, `.dds` vor `.bmp`, Instancing, auf dem Gelände (ADR 013)
-- Text-`.x`-Modelle mit Texturkoordinaten und Materialien lesen; bisher grau
-- Modelle beim Ziehen mitbewegen; bisher folgt nur der Umriss bis zum Loslassen
-- Bäume genauer zeigen als eine Kronenscheibe in Durchschnittsfarbe
+- [x] Text-`.x`-Modelle mit Texturkoordinaten, Normalen und Materialien lesen, auch Materialverweise
+- [x] Modelle beim Ziehen und Drehen mitbewegen, auf dem Gelände unter der neuen Position
+- [x] Bäume als Kuppel mit dem Kronenausschnitt ihrer Seitentextur zeigen statt als Scheibe in Durchschnittsfarbe
 - Speicher und Ladezeit der Bodentexturen großer Karten begrenzen, etwa Masken erst laden, wenn ihre Kachel sichtbar wird
 - Geometrie- und Straßenwerkzeuge entwerfen
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
