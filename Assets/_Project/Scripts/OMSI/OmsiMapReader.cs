@@ -11,7 +11,12 @@ namespace OmsiMapEditor.OMSI
         private sealed class Section
         {
             public string Name;
+
+            /// <summary>Field lines first, then the free text after the record.</summary>
             public readonly List<string> Lines = new List<string>();
+
+            /// <summary>Number of field lines with a verified layout; 0 when the layout is unknown.</summary>
+            public int FieldCount;
         }
 
         public static OmsiMapSummary Read(string globalConfigPath)
@@ -233,6 +238,13 @@ namespace OmsiMapEditor.OMSI
                 !TryDouble(values, 9, out var length) || !TryDouble(values, 10, out var radius))
                 return false;
 
+            var isSplineH = string.Equals(section.Name, "spline_h", StringComparison.OrdinalIgnoreCase);
+            var heightDifference = 0.0;
+            if (isSplineH && values.Count > 13 && TryDouble(values, 13, out var difference))
+                heightDifference = difference;
+            else if (!isSplineH && values.Count > 12 && TryDouble(values, 11, out var gradientStart) && TryDouble(values, 12, out var gradientEnd))
+                heightDifference = length * (gradientStart + gradientEnd) / 200.0;
+
             record = new OmsiSplineRecord
             {
                 AssetPath = values[1],
@@ -242,10 +254,12 @@ namespace OmsiMapEditor.OMSI
                 LocalX = x,
                 LocalY = y,
                 Height = height,
+                EndHeight = height + heightDifference,
                 HeadingDegrees = heading,
                 LengthMeters = length,
                 RadiusMeters = radius,
-                IsSplineH = string.Equals(section.Name, "spline_h", StringComparison.OrdinalIgnoreCase)
+                IsSplineH = isSplineH,
+                IsMirrored = section.FieldCount > 0 && values[section.FieldCount - 1] == "mirror"
             };
             return true;
         }
@@ -295,7 +309,7 @@ namespace OmsiMapEditor.OMSI
             var result = new List<Section>(file.Records.Count);
             foreach (var record in file.Records)
             {
-                var section = new Section { Name = record.Name };
+                var section = new Section { Name = record.Name, FieldCount = record.HasKnownLayout ? record.Fields.Count : 0 };
                 foreach (var line in record.Fields)
                     section.Lines.Add(line.Text);
                 foreach (var line in record.Trailer)

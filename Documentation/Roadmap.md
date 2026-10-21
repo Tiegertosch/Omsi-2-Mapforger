@@ -33,7 +33,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Kartenkacheln und Koordinatenverwaltung entwickeln
 - 3D-Viewport und navigierbare Weltansicht ergänzen
 - [x] Draufsicht mit Bodentexturen: `[groundtex]` und Masken je Kachel, von einer Kamera unter der Vektorebene gezeichnet (ADR 013)
-- Straßen und Gleise als texturierte Bänder aus den `.sli`-Profilen
+- [x] Straßen und Gleise als texturierte Bänder aus den `.sli`-Profilen
+- Freileitungen, Fahrdraht und Zäune in der Draufsicht als dünne Linien zeigen
 - Objekte mit ihren Materialtexturen von oben zeichnen
 - Speicher und Ladezeit der Bodentexturen großer Karten begrenzen, etwa Masken erst laden, wenn ihre Kachel sichtbar wird
 - Geometrie- und Straßenwerkzeuge entwerfen

@@ -64,6 +64,20 @@ namespace OmsiMapEditor.OMSI
                 spline.LocalY + radius * (Math.Sin(endHeading) - Math.Sin(heading)));
         }
 
+        /// <summary>
+        /// Position in tile-local metres and heading in radians after <paramref name="distance"/> metres along the
+        /// spline. Heading 0 points north (+Y) and grows clockwise.
+        /// </summary>
+        public static void GetLocalFrameAt(OmsiSplineRecord spline, double distance, out OmsiMapPoint position, out double headingRadians)
+        {
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            position = GetLocalPointAt(spline, distance);
+            headingRadians = spline.HeadingDegrees * Math.PI / 180.0;
+            if (Math.Abs(spline.RadiusMeters) > 0.001)
+                headingRadians += distance / spline.RadiusMeters;
+        }
+
         private static bool HasValidLength(OmsiSplineRecord spline)
         {
             return spline.LengthMeters > 0.0 && !double.IsNaN(spline.LengthMeters) && !double.IsInfinity(spline.LengthMeters);

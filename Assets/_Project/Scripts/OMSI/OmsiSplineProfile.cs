@@ -1,0 +1,240 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+
+namespace OmsiMapEditor.OMSI
+{
+    /// <summary>A texture of a spline profile.</summary>
+    public sealed class OmsiSplineTexture
+    {
+        /// <summary>Path relative to the OMSI installation: the <c>texture</c> folder next to the .sli file.</summary>
+        public string Path { get; internal set; }
+
+        /// <summary>True when [matl_alpha] follows the texture, so its alpha channel cuts or blends.</summary>
+        public bool UsesAlpha { get; internal set; }
+    }
+
+    /// <summary>One point of a cross-section, left to right; x is positive to the right of the spline.</summary>
+    public struct OmsiProfilePoint
+    {
+        public double X;
+        public double Height;
+        public double U;
+
+        /// <summary>V grows by this much per metre along the spline; V is 0 at the spline start.</summary>
+        public double VPerMeter;
+    }
+
+    /// <summary>A strip of the cross-section with one texture; extruded along the spline.</summary>
+    public sealed class OmsiProfileStrip
+    {
+        public int TextureIndex { get; internal set; }
+        public List<OmsiProfilePoint> Points { get; } = new List<OmsiProfilePoint>();
+    }
+
+    /// <summary>The graphical cross-section of a spline type (.sli): textures and the strips that use them.</summary>
+    public sealed class OmsiSplineProfile
+    {
+        public List<OmsiSplineTexture> Textures { get; } = new List<OmsiSplineTexture>();
+        public List<OmsiProfileStrip> Strips { get; } = new List<OmsiProfileStrip>();
+
+        /// <summary>True for helper splines such as invisible paths, which only the OMSI editor shows.</summary>
+        public bool EditorOnly { get; internal set; }
+
+        /// <summary>
+        /// Reads a .sli file. Texture names are resolved against the <c>texture</c> folder next to
+        /// <paramref name="assetPath"/>, the path the tile files use.
+        /// </summary>
+        public static OmsiSplineProfile Parse(byte[] bytes, string assetPath)
+        {
+            var file = OmsiRecordFile.Parse(bytes, null);
+            var folder = System.IO.Path.GetDirectoryName(assetPath ?? string.Empty) ?? string.Empty;
+            var result = new OmsiSplineProfile();
+            OmsiProfileStrip strip = null;
+            foreach (var record in file.Records)
+            {
+                // Keywords are followed by their values; comments come after them and are ignored.
+                var values = record.AllValues();
+                switch (record.Name.ToLowerInvariant())
+                {
+                    case "onlyeditor":
+                        result.EditorOnly = true;
+                        break;
+                    case "texture":
+                        if (values.Count > 0)
+                            result.Textures.Add(new OmsiSplineTexture { Path = System.IO.Path.Combine(folder, "texture", values[0].Trim()) });
+                        break;
+                    case "matl_alpha":
+                        if (result.Textures.Count > 0 && values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var alpha))
+                            result.Textures[result.Textures.Count - 1].UsesAlpha = alpha > 0;
+                        break;
+                    case "profile":
+                        strip = values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var texture)
+                            ? new OmsiProfileStrip { TextureIndex = texture }
+                            : null;
+                        if (strip != null)
+                            result.Strips.Add(strip);
+                        break;
+                    case "profilepnt":
+                        if (strip != null && TryNumbers(values, out var numbers))
+                            strip.Points.Add(new OmsiProfilePoint { X = numbers[0], Height = numbers[1], U = numbers[2], VPerMeter = numbers[3] });
+                        break;
+                }
+            }
+            result.Strips.RemoveAll(item => item.Points.Count < 2);
+            return result;
+        }
+
+        private static bool TryNumbers(List<string> values, out double[] numbers)
+        {
+            numbers = new double[4];
+            if (values.Count < 4)
+                return false;
+            for (var index = 0; index < 4; index++)
+                if (!double.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out numbers[index]))
+                    return false;
+            return true;
+        }
+    }
+
+    /// <summary>Triangles of one texture of a spline: positions (east, height, north), texture coordinates and indices.</summary>
+    public sealed class OmsiSurfaceMesh
+    {
+        public int TextureIndex { get; internal set; }
+        public List<double> Positions { get; } = new List<double>();
+        public List<double> Uvs { get; } = new List<double>();
+        public List<int> Triangles { get; } = new List<int>();
+
+        public int VertexCount => Positions.Count / 3;
+    }
+
+    /// <summary>Extrudes spline profiles along a spline's plan-view curve.</summary>
+    public static class OmsiSplineSurface
+    {
+        /// <summary>Strips narrower than this seen from above, such as kerb faces, are left out.</summary>
+        private const double MinimumWidth = 0.02;
+
+        /// <summary>Largest change of heading between two samples of a curve.</summary>
+        private const double MaximumStepRadians = 2.0 * Math.PI / 180.0;
+
+        /// <summary>
+        /// Builds the surfaces a spline shows from above, one per texture. Positions are in metres relative to the
+        /// spline's tile corner: x east, y height (spline height plus profile height), z north. A mirrored spline turns
+        /// its cross-section over.
+        /// </summary>
+        public static List<OmsiSurfaceMesh> Build(OmsiSplineRecord spline, OmsiSplineProfile profile)
+        {
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+
+            var meshes = new Dictionary<int, OmsiSurfaceMesh>();
+            var length = spline.LengthMeters;
+            if (!(length > 0.0) || double.IsInfinity(length))
+                return new List<OmsiSurfaceMesh>();
+
+            var turn = Math.Abs(spline.RadiusMeters) > 0.001 ? length / Math.Abs(spline.RadiusMeters) : 0.0;
+            var steps = Math.Max(1, Math.Min(512, (int)Math.Ceiling(turn / MaximumStepRadians)));
+            var mirror = spline.IsMirrored ? -1.0 : 1.0;
+
+            foreach (var strip in profile.Strips)
+            {
+                if (strip.TextureIndex < 0 || strip.TextureIndex >= profile.Textures.Count)
+                    continue;
+                if (!meshes.TryGetValue(strip.TextureIndex, out var mesh))
+                {
+                    mesh = new OmsiSurfaceMesh { TextureIndex = strip.TextureIndex };
+                    meshes.Add(strip.TextureIndex, mesh);
+                }
+                for (var point = 0; point + 1 < strip.Points.Count; point++)
+                {
+                    var left = strip.Points[point];
+                    var right = strip.Points[point + 1];
+                    if (Math.Abs(right.X - left.X) < MinimumWidth)
+                        continue;
+                    AddRibbon(mesh, spline, left, right, mirror, steps);
+                }
+            }
+
+            var result = new List<OmsiSurfaceMesh>();
+            foreach (var mesh in meshes.Values)
+                if (mesh.Triangles.Count > 0)
+                    result.Add(mesh);
+            return result;
+        }
+
+        /// <summary>One piece of the cross-section swept along the spline as a band of quads.</summary>
+        private static void AddRibbon(OmsiSurfaceMesh mesh, OmsiSplineRecord spline, OmsiProfilePoint left, OmsiProfilePoint right,
+            double mirror, int steps)
+        {
+            var first = mesh.VertexCount;
+            for (var step = 0; step <= steps; step++)
+            {
+                var distance = spline.LengthMeters * step / steps;
+                var height = spline.Height + (spline.EndHeight - spline.Height) * step / steps;
+                OmsiMapGeometry.GetLocalFrameAt(spline, distance, out var position, out var heading);
+                // The right-hand side of the travel direction: heading 0 runs north, so right is east.
+                var rightX = Math.Cos(heading);
+                var rightY = -Math.Sin(heading);
+                foreach (var point in new[] { left, right })
+                {
+                    var offset = point.X * mirror;
+                    mesh.Positions.Add(position.X + rightX * offset);
+                    mesh.Positions.Add(height + point.Height);
+                    mesh.Positions.Add(position.Y + rightY * offset);
+                    mesh.Uvs.Add(point.U);
+                    mesh.Uvs.Add(distance * point.VPerMeter);
+                }
+            }
+            for (var step = 0; step < steps; step++)
+            {
+                var a = first + step * 2;
+                mesh.Triangles.AddRange(new[] { a, a + 2, a + 1, a + 1, a + 2, a + 3 });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads and caches the spline profiles of one OMSI installation by asset path, as tile files name them.
+    /// </summary>
+    public sealed class OmsiSplineProfileCatalog
+    {
+        private readonly string installationRoot;
+        private readonly Dictionary<string, OmsiSplineProfile> profiles = new Dictionary<string, OmsiSplineProfile>(StringComparer.OrdinalIgnoreCase);
+
+        public OmsiSplineProfileCatalog(string installationRoot)
+        {
+            this.installationRoot = System.IO.Path.GetFullPath(installationRoot);
+        }
+
+        /// <summary>Problems met while reading, one per file.</summary>
+        public List<string> Problems { get; } = new List<string>();
+
+        /// <summary>The profile, or null when the file is missing or unreadable; the reason goes to <see cref="Problems"/>.</summary>
+        public OmsiSplineProfile Get(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return null;
+            if (profiles.TryGetValue(assetPath, out var cached))
+                return cached;
+
+            OmsiSplineProfile profile = null;
+            try
+            {
+                var path = OmsiRelativePath.Resolve(installationRoot, assetPath);
+                if (File.Exists(path))
+                    profile = OmsiSplineProfile.Parse(File.ReadAllBytes(path), assetPath);
+                else
+                    Problems.Add(assetPath + " not found");
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                Problems.Add(assetPath + ": " + exception.Message);
+            }
+            profiles.Add(assetPath, profile);
+            return profile;
+        }
+    }
+}

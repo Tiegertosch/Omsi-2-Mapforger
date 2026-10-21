@@ -82,6 +82,30 @@ Am stärksten weichen lange Wohnzeilen in L-, U- und Mäanderform, große Kreuzu
 
 Der Katalog für Berlin-Spandau braucht ohne das Lesen der Karte etwa 2,8 s, wenn die Modelldateien im Dateicache liegen. Beim ersten Lesen von der Festplatte dauerte er 36 s. Die App berechnet ihn im Hintergrund. Über alle Platzierungen von Berlin-Spandau haben die Konturen 281.000 Eckpunkte, die Hüllen 235.000.
 
+## Spline-Profile (`.sli`)
+
+Ein Spline-Datensatz nennt eine `.sli`-Datei. Sie beschreibt den Querschnitt, der entlang des Splines extrudiert wird. Für die Draufsicht zählen diese Abschnitte:
+
+| Abschnitt | Werte | Bedeutung |
+|---|---|---|
+| `[texture]` | Dateiname | Textur im Unterordner `texture` neben der `.sli`; die Reihenfolge ergibt die Nummer, ab 0 |
+| `[matl_alpha]` | Zahl | nach einer `[texture]`: deren Alphakanal gilt, etwa für Zäune als TGA |
+| `[profile]` | Texturnummer | beginnt ein Profilstück mit dieser Textur |
+| `[profilepnt]` | x, Höhe, u, v | ein Punkt des Stücks; x quer, rechts positiv; u quer zur Fahrtrichtung; v wächst je Meter um diesen Wert |
+| `[onlyeditor]` | keine | die ganze Spline-Art ist ein Hilfsspline, den nur der OMSI-Editor zeigt, etwa unsichtbare Wege |
+
+Ein Profilstück hat mindestens zwei Punkte, von links nach rechts. Die Bedeutung von v steht als Kommentar aus dem OMSI-SDK in den Dateien selbst: „0.2 (1/m) bedeutet bspw., dass nach 5 m die V-Koordinate 1 beträgt. V beginnt stets mit 0.“ Kommentare stehen frei zwischen den Abschnitten; nur ganze Zeilen in eckigen Klammern sind Abschlüsse. Ein Spline mit `mirror` am Ende seines Datensatzes dreht den Querschnitt um.
+
+`OmsiSplineSurface` legt jedes Stück zwischen zwei Punkten als Band entlang der Gerade oder des Kreisbogens; Bögen werden höchstens alle 2° unterteilt. Die Höhe ist die Spline-Höhe, linear bis zur Endhöhe, plus die Profilhöhe. Stücke unter 2 cm Breite in der Draufsicht entfallen, etwa Bordsteinkanten.
+
+| Karte | Splines | mit Fläche | nur Editor | Texturen |
+|---|---|---|---|---|
+| Grundorf | 60 | 53 | 7 | 7 BMP |
+| Stadtückheim | 28 | 28 | 0 | 4 BMP |
+| Berlin-Spandau | 2.486 | 2.019 | 89 | 41 BMP, 2 TGA |
+
+Die übrigen 378 Splines in Berlin-Spandau sind Freileitungen, Fahrdraht, Quertragwerke und Zäune. Sie bestehen nur aus senkrechten oder sehr schmalen Flächen und sind von oben nicht zu sehen. Gleise wie `rail_concrete_01.sli` zeigen Schotterbett, Schwellen und die Oberseiten der Schienenköpfe, die etwa 5 cm breit sind. Nicht ausgewertet sind `[length]`, `[scaleTexByLength]`, `[patchwork_chain]`, `[heightprofile]` und `[path]`; sie betreffen das Fahrverhalten, die Gelände-Anpassung oder seltene Texturvarianten.
+
 ## Grenzen
 
 - **Raster:** Die Kontur ist auf etwa eine Zelle genau, also 0,2 m bei Objekten bis 200 m. Überstehende Dächer zählen zur Fläche, weil die Draufsicht sie zeigt.

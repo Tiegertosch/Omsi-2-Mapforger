@@ -81,6 +81,10 @@ namespace OmsiMapEditor.OMSI
         public double LocalX { get; internal set; }
         public double LocalY { get; internal set; }
         public double Height { get; internal set; }
+
+        /// <summary>Absolute height at the end: the start height plus the height difference of the record.</summary>
+        public double EndHeight { get; internal set; }
+
         public double HeadingDegrees { get; internal set; }
         public double LengthMeters { get; internal set; }
 
@@ -92,5 +96,8 @@ namespace OmsiMapEditor.OMSI
         /// the height difference between start and end as field 13; cant, skew and alignment move back by one.
         /// </summary>
         public bool IsSplineH { get; internal set; }
+
+        /// <summary>True when the record ends with "mirror": the cross-section is turned over.</summary>
+        public bool IsMirrored { get; internal set; }
     }
 }

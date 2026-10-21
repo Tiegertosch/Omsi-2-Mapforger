@@ -9,16 +9,22 @@ using UnityEngine.Rendering;
 namespace OmsiMapEditor.World
 {
     /// <summary>
-    /// Draws the textured ground of a map from above: every tile is a quad on the XZ plane (x east, z north, metres
-    /// relative to the map origin) with one mesh per ground texture. An orthographic camera looks straight down and
-    /// renders into the screen rectangle of the map view, below the UI.
+    /// Draws the textured ground of a map and the splines on it from above. Every tile is a quad on the XZ plane (x
+    /// east, z north, metres relative to the map origin) with one mesh per ground texture; the splines of a tile are
+    /// extruded from their .sli profiles into one mesh per texture, at their real heights. An orthographic camera looks
+    /// straight down and renders into the screen rectangle of the map view, below the UI.
     /// </summary>
     public sealed class MapGroundRenderer : MonoBehaviour
     {
         /// <summary>Layer of the ground meshes; only the ground camera renders it.</summary>
         public const int GroundLayer = 8;
 
-        private const float CameraHeight = 500f;
+        /// <summary>Above any terrain; an orthographic camera keeps depth precision linear over its range.</summary>
+        private const float CameraHeight = 10000f;
+
+        /// <summary>Spline surfaces come after every ground texture; those with alpha come last.</summary>
+        private const int SplineQueue = 3100;
+        private const int AlphaSplineQueue = 3200;
 
         /// <summary>Texture uploads per frame stop after this many milliseconds, so the UI stays responsive.</summary>
         private const float UploadBudgetMilliseconds = 8f;
@@ -37,18 +43,44 @@ namespace OmsiMapEditor.World
 
             /// <summary>Masks by ground texture index; the first texture has none.</summary>
             public readonly List<KeyValuePair<int, OmsiImage>> Masks = new List<KeyValuePair<int, OmsiImage>>();
+
+            public readonly List<SplineBatch> Splines = new List<SplineBatch>();
+        }
+
+        /// <summary>The surfaces of all splines of a tile that share one texture, relative to the tile corner.</summary>
+        private sealed class SplineBatch
+        {
+            public string TextureKey;
+            public readonly List<Vector3> Vertices = new List<Vector3>();
+            public readonly List<Vector2> Uvs = new List<Vector2>();
+            public readonly List<int> Triangles = new List<int>();
+        }
+
+        private sealed class SplineTextureData
+        {
+            public bool UsesAlpha;
+
+            /// <summary>Decoded image, or null when <see cref="Encoded"/> holds a JPEG or PNG for the engine to decode.</summary>
+            public OmsiImage Image;
+
+            public byte[] Encoded;
         }
 
         private sealed class GroundData
         {
             public readonly List<LayerData> Layers = new List<LayerData>();
             public readonly List<TileData> Tiles = new List<TileData>();
+            public readonly Dictionary<string, SplineTextureData> SplineTextures = new Dictionary<string, SplineTextureData>(StringComparer.OrdinalIgnoreCase);
             public readonly List<string> Problems = new List<string>();
+            public int SplineCount;
+            public int DrawnSplineCount;
         }
 
         private Camera groundCamera;
         private Transform groundRoot;
         private Shader shader;
+        private Shader splineShader;
+        private readonly Dictionary<string, Material> splineMaterials = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
         private Mesh tileMesh;
         private double tileSize;
         private double originX;
@@ -84,6 +116,9 @@ namespace OmsiMapEditor.World
             shader = Resources.Load<Shader>("MapGroundLayer");
             if (shader == null)
                 Debug.LogError("MapGroundLayer.shader was not found in Resources.");
+            splineShader = Resources.Load<Shader>("MapSplineSurface");
+            if (splineShader == null)
+                Debug.LogError("MapSplineSurface.shader was not found in Resources.");
 
             var cameraObject = new GameObject("Map Ground Camera");
             cameraObject.transform.SetParent(transform, false);
@@ -116,7 +151,10 @@ namespace OmsiMapEditor.World
             tileSize = summary.TileSizeMeters;
             this.originX = originX;
             this.originY = originY;
-            var tiles = new List<OmsiTileSummary>(summary.Tiles);
+            // Copies, so the worker never sees a list the editor changes.
+            var tiles = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>>();
+            foreach (var tile in summary.Tiles)
+                tiles.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>(tile, tile.Splines.ToArray()));
             loadingGeneration = generation;
             loading = Task.Run(() => Read(tiles, source, globalConfigRelativePath, installationRoot));
         }
@@ -135,6 +173,7 @@ namespace OmsiMapEditor.World
                 Destroy(item);
             owned.Clear();
             layerMaterials.Clear();
+            splineMaterials.Clear();
         }
 
         /// <summary>
@@ -180,7 +219,8 @@ namespace OmsiMapEditor.World
                 ContinueBuild();
         }
 
-        private static GroundData Read(List<OmsiTileSummary> tiles, IOmsiFileSource source, string globalConfigRelativePath, string installationRoot)
+        private static GroundData Read(List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>> tiles, IOmsiFileSource source,
+            string globalConfigRelativePath, string installationRoot)
         {
             var data = new GroundData();
             var images = new Dictionary<string, OmsiImage>(StringComparer.OrdinalIgnoreCase);
@@ -194,8 +234,10 @@ namespace OmsiMapEditor.World
                 });
             }
 
-            foreach (var tile in tiles)
+            var profiles = new OmsiSplineProfileCatalog(installationRoot);
+            foreach (var pair in tiles)
             {
+                var tile = pair.Key;
                 if (!tile.IsAvailable)
                     continue;
                 var tileData = new TileData { X = tile.X, Y = tile.Y };
@@ -216,9 +258,77 @@ namespace OmsiMapEditor.World
                         data.Problems.Add(maskPath + ": " + exception.Message);
                     }
                 }
+                AddSplines(tileData, pair.Value, profiles, installationRoot, data);
                 data.Tiles.Add(tileData);
             }
+            data.Problems.AddRange(profiles.Problems);
             return data;
+        }
+
+        /// <summary>Extrudes the splines of a tile and gathers their surfaces by texture.</summary>
+        private static void AddSplines(TileData tile, OmsiSplineRecord[] splines, OmsiSplineProfileCatalog profiles, string installationRoot,
+            GroundData data)
+        {
+            var batches = new Dictionary<string, SplineBatch>(StringComparer.OrdinalIgnoreCase);
+            foreach (var spline in splines)
+            {
+                data.SplineCount++;
+                var profile = profiles.Get(spline.AssetPath);
+                if (profile == null || profile.EditorOnly)
+                    continue;
+                var drawn = false;
+                foreach (var surface in OmsiSplineSurface.Build(spline, profile))
+                {
+                    var texture = profile.Textures[surface.TextureIndex];
+                    var key = texture.Path + (texture.UsesAlpha ? "|alpha" : string.Empty);
+                    if (!data.SplineTextures.ContainsKey(key))
+                        data.SplineTextures[key] = ReadSplineTexture(installationRoot, texture, data.Problems);
+                    if (!batches.TryGetValue(key, out var batch))
+                    {
+                        batch = new SplineBatch { TextureKey = key };
+                        batches.Add(key, batch);
+                        tile.Splines.Add(batch);
+                    }
+
+                    var first = batch.Vertices.Count;
+                    for (var vertex = 0; vertex < surface.VertexCount; vertex++)
+                    {
+                        batch.Vertices.Add(new Vector3((float)surface.Positions[vertex * 3], (float)surface.Positions[vertex * 3 + 1],
+                            (float)surface.Positions[vertex * 3 + 2]));
+                        batch.Uvs.Add(new Vector2((float)surface.Uvs[vertex * 2], (float)surface.Uvs[vertex * 2 + 1]));
+                    }
+                    foreach (var index in surface.Triangles)
+                        batch.Triangles.Add(first + index);
+                    drawn = true;
+                }
+                if (drawn)
+                    data.DrawnSplineCount++;
+            }
+        }
+
+        private static SplineTextureData ReadSplineTexture(string installationRoot, OmsiSplineTexture texture, List<string> problems)
+        {
+            var result = new SplineTextureData { UsesAlpha = texture.UsesAlpha };
+            try
+            {
+                var path = OmsiRelativePath.Resolve(installationRoot, texture.Path);
+                if (!File.Exists(path))
+                {
+                    problems.Add(texture.Path + " not found");
+                    return result;
+                }
+                var bytes = File.ReadAllBytes(path);
+                if (OmsiImageReader.TryDecode(bytes, out var image))
+                    result.Image = image;
+                else
+                    result.Encoded = bytes;
+            }
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
+                                              exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                problems.Add(texture.Path + ": " + exception.Message);
+            }
+            return result;
         }
 
         private static OmsiImage ReadInstallationImage(string installationRoot, string relativePath, Dictionary<string, OmsiImage> cache,
@@ -285,7 +395,8 @@ namespace OmsiMapEditor.World
             var masks = 0;
             foreach (var tile in data.Tiles)
                 masks += tile.Masks.Count;
-            var report = "Ground textures ready: " + data.Layers.Count + " texture(s), " + masks + " tile mask(s)";
+            var report = "Ground textures ready: " + data.Layers.Count + " texture(s), " + masks + " tile mask(s), " +
+                         data.DrawnSplineCount + " of " + data.SplineCount + " splines with surfaces";
             if (data.Problems.Count > 0)
                 report += "; " + data.Problems.Count + " problem(s), first: " + data.Problems[0];
             if (data.Problems.Count > 0)
@@ -307,6 +418,78 @@ namespace OmsiMapEditor.World
                 owned.Add(material);
                 AddQuad("Tile " + tile.X + ", " + tile.Y + " layer " + pair.Key, position, material);
             }
+            foreach (var batch in tile.Splines)
+                AddSplineBatch("Tile " + tile.X + ", " + tile.Y + " splines", position, batch);
+        }
+
+        private void AddSplineBatch(string name, Vector3 position, SplineBatch batch)
+        {
+            var material = SplineMaterial(batch.TextureKey);
+            if (material == null)
+                return;
+            var mesh = new Mesh { name = name };
+            if (batch.Vertices.Count > 65000)
+                mesh.indexFormat = IndexFormat.UInt32;
+            mesh.SetVertices(batch.Vertices);
+            mesh.SetUVs(0, batch.Uvs);
+            mesh.SetTriangles(batch.Triangles, 0);
+            mesh.RecalculateBounds();
+            owned.Add(mesh);
+
+            var item = new GameObject(name) { layer = GroundLayer };
+            item.transform.SetParent(groundRoot, false);
+            item.transform.localPosition = position;
+            item.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var meshRenderer = item.AddComponent<MeshRenderer>();
+            meshRenderer.sharedMaterial = material;
+            meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+            meshRenderer.lightProbeUsage = LightProbeUsage.Off;
+            meshRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        }
+
+        /// <summary>One material per spline texture, shared by all tiles.</summary>
+        private Material SplineMaterial(string key)
+        {
+            if (splineMaterials.TryGetValue(key, out var material))
+                return material;
+            if (splineShader == null || pending == null || !pending.SplineTextures.TryGetValue(key, out var texture))
+                return null;
+
+            material = new Material(splineShader);
+            material.SetTexture("_MainTex", UploadSplineTexture(texture));
+            if (texture.UsesAlpha)
+            {
+                material.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
+                material.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
+                material.SetFloat("_DepthWrite", 0f);
+                material.SetFloat("_UseAlpha", 1f);
+                material.renderQueue = AlphaSplineQueue;
+            }
+            else
+            {
+                material.renderQueue = SplineQueue;
+            }
+            owned.Add(material);
+            splineMaterials.Add(key, material);
+            return material;
+        }
+
+        private Texture2D UploadSplineTexture(SplineTextureData texture)
+        {
+            if (texture.Image != null)
+                return Upload(texture.Image, null, TextureWrapMode.Repeat);
+            if (texture.Encoded == null)
+                return Texture2D.grayTexture;
+
+            var encoded = new Texture2D(2, 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            if (!encoded.LoadImage(texture.Encoded, true))
+            {
+                Destroy(encoded);
+                return Texture2D.grayTexture;
+            }
+            owned.Add(encoded);
+            return encoded;
         }
 
         private void AddQuad(string name, Vector3 position, Material material)
