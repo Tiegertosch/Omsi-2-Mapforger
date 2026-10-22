@@ -116,14 +116,15 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Panels schweben und sind einklappbar, Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Werkzeuge sind Modi (Q Drag = wählen und frei ziehen, W Move = Achsenpfeile inkl. Höhe, E Rotate = Griff/Ringe). Lucide-Icons als SVG-Pfade in `LucideIcons.cs`, gezeichnet von `IconElement` (neue Icons dort eintragen, Lizenz steht in THIRD_PARTY_NOTICES); Inter (OFL) ist freigegeben, sichtbarer Name bleibt „OMSI Map Editor“. Etappen stehen in der Roadmap. Herkunft von Objekten (Basisspiel/DLC/User-Content) kommt aus Steams Manifesten (`OmsiContentOrigins`, ADR 016); Steam liegt hier unter `C:\Program Files (x86)\Steam`, keine DLCs installiert.
 
-## Aktueller Stand (22. Oktober 2026)
+## Aktueller Stand (22. Oktober 2026, Abend)
 
-- Zweig `feature/drag-preview-trees` (noch nicht nach `main` gemergt, nicht gepusht).
-- Zuletzt fertig und geprüft (22. Oktober): angehängte Objekte und Spline-Anhängungen, Rückseiten-Culling, Glas/`[matl_transmap]`, Bäume in 3D als gekreuzte Flächen. 116 Tests grün, Player-Screenshots geprüft. Prüfstelle für Transparenz: 70er-Wartehäuschen in Grundorf, Kachel `0 -1` bei x 264 / y 31 (`-view 0 -1 264 31 0.02 -orbit 110 12 7`).
-- **Bearbeiten in 3D nach ADR 014:** Pitch/Bank lesen, zeichnen, Inspector, Undo; Auswahl per Strahl, Verschieben, drei Drehringe (grün Heading, rot Pitch, blau Bank). Maus in 3D: links bearbeiten, Mitte Kamera verschieben, rechts Kamera drehen. Pitch/Bank-Vorzeichen am 22. Oktober vom Nutzer im Spiel bestätigt. Kreuzungen (`[splinehelper]`) nie kippen. Danach alle 2D-Werkzeuge in 3D nachgezogen (Strg+Rahmen, Entf, Platzieren, Marker, Kachelrand, Einpassen/Zoom/Zentrieren) – neue Werkzeuge immer für beide Ansichten bauen. Nächster Schritt: mehrere Objekte gemeinsam drehen.
-- Danach korrigiert (`9c98fa3`): Verdeckung überblendeter Materialien in zwei Durchgängen, Skripttexturen wie Anzeigetafeln werden nicht mehr gezeichnet. 117 Tests grün, Screenshots geprüft.
-- Noch nicht im Player mit der Maus geprüft: Mitbewegen der Modelle beim Ziehen, Bedienung der 3D-Ansicht.
+- Zweig `feature/drag-preview-trees`, letzter Commit `a774cc0`; nicht nach `main` gemergt, nicht gepusht.
+- Heute fertig und vom Nutzer im Player geprüft: angehängte Objekte, Glas/Transparenz, Bearbeiten in 3D mit Pitch/Bank und Drehringen (ADR 014), alle 2D-Werkzeuge auch in 3D, Platziervorschau mit Modell.
+- Oberfläche nach ADR 015 komplett (Etappen 1–4): randlose Karte, schwebende Panels, Werkzeugleiste (Q Drag, W Move mit Achsenpfeilen inkl. Höhe, E Rotate, Entf, 3 Objekte), Objekte-Bibliothek (Library/In map/Favorites), Inter, Lucide-Icons. Bedienung im Player vom Nutzer geprüft bis Etappe 3; Etappe 4 nur per Screenshot.
+- DLC-Erkennung (ADR 016) mit echten Daten bestätigt: Nutzer hat DLC „HafenCity Hamburg“ (630010) installiert; Prüfstelle für DLC-Etikett und „Hide DLC objects“: Library-Ordner `HafenCityHamburg`.
+- Bewusst später: Farben der Vektorebene ans Corporate Design anpassen (Auswahl rot, Kachel gold, Splines orange) – Nutzer will das erst später.
+- Nächster geplanter Schritt: mehrere Objekte gemeinsam drehen (2D und 3D). Weitere Ideen in der Roadmap: Ordner von Hand als DLC markieren, Vorschaubilder aus `Sceneryobjects
+EditorThumbnails`, Fahrplandaten, Gelände unter Straßen ausschneiden, Splines anlegen/löschen.
 - Hinweis: Kachel-`.map`-Dateien sind teils UTF-16 – `grep` findet darin nichts, mit Python dekodieren.
-- Naheliegende nächste Schritte laut Roadmap: Fahrplandaten (TTData) lesend importieren, Haltestellen/Linien anzeigen, Chrono-Varianten als Ebenen; Objekte in 3D wählen; Gelände unter Straßen ausschneiden; Splines anlegen/löschen.
 
 Diesen Abschnitt bei größeren Fortschritten aktualisieren.
