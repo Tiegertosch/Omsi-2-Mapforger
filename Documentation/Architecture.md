@@ -13,9 +13,9 @@
 | Assembly | Zuständigkeit | Abhängigkeiten |
 |---|---|---|
 | `Editor.Core` | Gemeinsame Grundschicht und zentrale Datenverträge wie Projektdatei und Anwendungseinstellungen | Keine Projekt-Assembly |
-| `Editor.UI` | Editoransicht, Werkzeugleisten, Dateidialoge und UI Toolkit Komponenten | `Editor.Core`, `Editor.OMSI` |
+| `Editor.UI` | Shell, Kartenansicht (`MapCanvasElement`), Werkzeugleiste, Objekte-Bibliothek, Startbildschirm, Icons, Dateidialoge | `Editor.Core`, `Editor.OMSI`, `Editor.World` |
 | `Editor.Geometry` | Geometrie-, Kurven- und Profilberechnungen | `Editor.Core` |
-| `Editor.World` | Kartenkacheln, Koordinaten und Weltzustand | `Editor.Core` |
+| `Editor.World` | Unity-Darstellung der Karte: Boden, Splines und Objekte mit Texturen (`MapGroundRenderer`, `MapObjectRenderer`), Picking und Vorschau | `Editor.Core`, `Editor.OMSI` |
 | `Editor.Objects` | Platzierbare Objektdefinitionen und Instanzen | `Editor.Core` |
 | `Editor.OMSI` | Import/Export und OMSI-Kompatibilität | `Editor.Core` |
 | `Editor.Validation` | Prüfungen, Meldungen und Integritätsberichte | `Editor.Core` |
@@ -54,4 +54,4 @@ UI und Fachmodule dürfen von Core abhängen. Die UI nutzt zusätzlich `Editor.O
 
 ## Tests
 
-EditMode-Tests liegen in `Assets/_Project/Tests/Editor/` und laufen über **Window > General > Test Runner**. Sie decken Textdekodierung und -kodierung, das verlustfreie Dateimodell, positionelles Lesen von Kachel-Datensätzen, Kachelversionen, das Kachelraster beider Koordinatenarten, Terrain-Höhen, Pfadgrenzen, Spline-Geometrie, den Spline-Kachelindex, die Spline-Verbindungsprüfung und die Einstellungsdatei ab. Die Tests erzeugen ihre OMSI-Beispieldateien selbst in einem temporären Ordner und benötigen keine OMSI-Installation.
+EditMode-Tests liegen in `Assets/_Project/Tests/Editor/` und laufen über **Window > General > Test Runner**. Sie decken die Herkunft von Dateien aus Steams Manifesten, Anhängungen, Pitch und Bank, Textdekodierung und -kodierung, das verlustfreie Dateimodell, positionelles Lesen von Kachel-Datensätzen, Kachelversionen, das Kachelraster beider Koordinatenarten, Terrain-Höhen, Pfadgrenzen, Spline-Geometrie, den Spline-Kachelindex, die Spline-Verbindungsprüfung und die Einstellungsdatei ab. Die Tests erzeugen ihre OMSI-Beispieldateien selbst in einem temporären Ordner und benötigen keine OMSI-Installation.

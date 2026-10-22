@@ -118,14 +118,12 @@ Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Pa
 
 ## Aktueller Stand (22. Oktober 2026, Abend)
 
-- Zweig `feature/drag-preview-trees`, letzter Commit `a774cc0`; nicht nach `main` gemergt, nicht gepusht.
-- Heute fertig und vom Nutzer im Player geprüft: angehängte Objekte, Glas/Transparenz, Bearbeiten in 3D mit Pitch/Bank und Drehringen (ADR 014), alle 2D-Werkzeuge auch in 3D, Platziervorschau mit Modell.
-- Oberfläche nach ADR 015 komplett (Etappen 1–4): randlose Karte, schwebende Panels, Werkzeugleiste (Q Drag, W Move mit Achsenpfeilen inkl. Höhe, E Rotate, Entf, 3 Objekte), Objekte-Bibliothek (Library/In map/Favorites), Inter, Lucide-Icons. Bedienung im Player vom Nutzer geprüft bis Etappe 3; Etappe 4 nur per Screenshot.
+- Alles auf `main` gemergt und nach `origin` gepusht; `feature/drag-preview-trees` ist erledigt. Neue Arbeit in einem neuen Zweig beginnen.
+- Heute fertig und vom Nutzer im Player geprüft: angehängte Objekte, Glas/Transparenz, Bearbeiten in 3D mit Pitch/Bank und Drehringen (ADR 014), alle 2D-Werkzeuge auch in 3D, Platziervorschau mit Modell, Oberfläche nach ADR 015 bis Etappe 3.
+- Heute fertig, nur per Screenshot geprüft: Etappe 4 (Inter, Icons, Umschalter), Startbildschirm mit zuletzt geöffneten (`RecentFiles`, nur von Hand Geöffnetes) und „New map“ als „Planned“, Ansichtsknöpfe neben eingeklapptem Inspector.
 - DLC-Erkennung (ADR 016) mit echten Daten bestätigt: Nutzer hat DLC „HafenCity Hamburg“ (630010) installiert; Prüfstelle für DLC-Etikett und „Hide DLC objects“: Library-Ordner `HafenCityHamburg`.
-- Bewusst später: Farben der Vektorebene ans Corporate Design anpassen (Auswahl rot, Kachel gold, Splines orange) – Nutzer will das erst später.
-- Startbildschirm mit Projekt/Karte öffnen und zuletzt geöffneten (`RecentFiles`, nur von Hand Geöffnetes); „New map“ als „Planned“ – das Anlegen neuer Karten ist ein eigener nächster Schritt mit Test im Spiel.
-- Nächster geplanter Schritt: mehrere Objekte gemeinsam drehen (2D und 3D) oder neue Karte anlegen – Nutzer fragen. Weitere Ideen in der Roadmap: Ordner von Hand als DLC markieren, Vorschaubilder aus `Sceneryobjects
-EditorThumbnails`, Fahrplandaten, Gelände unter Straßen ausschneiden, Splines anlegen/löschen.
+- Bewusst später: Farben der Vektorebene ans Corporate Design anpassen (Auswahl rot, Kachel gold, Splines orange).
+- Nächster Schritt: Nutzer wählen lassen zwischen „mehrere Objekte gemeinsam drehen“ (2D und 3D) und „neue Karte anlegen“ (Vorlage aus Basiskarte, leere Kachel, Test im Spiel). Weitere Ideen in der Roadmap.
 - Hinweis: Kachel-`.map`-Dateien sind teils UTF-16 – `grep` findet darin nichts, mit Python dekodieren.
 
 Diesen Abschnitt bei größeren Fortschritten aktualisieren.

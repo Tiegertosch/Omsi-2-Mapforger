@@ -1,6 +1,6 @@
 ﻿# OMSI Map Editor
 
-A Windows desktop editor foundation for creating and maintaining OMSI 2 maps. It currently contains the Unity project scaffold, a UI Toolkit shell, and a read-only Grundorf importer for map overview data. Map editing and full OMSI format support are not implemented yet.
+A Windows desktop editor for maintaining OMSI 2 maps, in development. It reads maps straight from your OMSI installation and shows them from above and in 3D with their ground, roads and objects. In a project you can move, turn, tilt, place and delete scenery objects, also in 3D, with undo, and export the result as a separate map that OMSI loads. Splines, terrain, timetables and new maps cannot be edited yet; see the [roadmap](Documentation/Roadmap.md).
 
 ## Requirements
 
@@ -25,12 +25,12 @@ Unity writes generated project settings and `Packages/packages-lock.json` during
 ## Project structure
 
 - `Assets/_Project/Scripts/` holds first-party C# modules. Each module has an assembly definition.
-- `Assets/_Project/UI/` contains the UI Toolkit shell and its stylesheet.
+- `Assets/_Project/UI/` contains the UI Toolkit shell, its stylesheet with the design tokens, and the Inter font.
 - `Assets/_Project/Scenes/` contains the startup scene.
 - `Assets/_Project/Settings/` stores project-owned rendering settings; `Settings/Resources/editor-settings.json` holds application defaults read by the editor setup and the player.
-- `Assets/_Project/Tests/Editor/` contains EditMode tests for the OMSI reader, geometry, and settings.
+- `Assets/_Project/Tests/Editor/` contains EditMode tests for the OMSI file model, reader, editing, geometry, content origins and settings.
 - `Packages/manifest.json` pins direct Unity packages.
-- `Documentation/` records architecture, setup, decisions, and roadmap.
+- `Documentation/` records architecture, setup, decisions, roadmap, the corporate design and the OMSI format findings.
 
 ## Development
 
