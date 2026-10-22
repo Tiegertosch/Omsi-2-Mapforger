@@ -42,15 +42,18 @@ namespace OmsiMapEditor.UI
         private Label statusLabel;
         private Label mapStateLabel;
         private Label mapTitleLabel;
-        private Label mapCountsLabel;
-        private Label mapDescriptionLabel;
-        private Label mapWarningsLabel;
+        private Label pointerInfoLabel;
+        private Label selectionInfoLabel;
+        private VisualElement emptyState;
+        private VisualElement workspaceElement;
+        private VisualElement projectFrame;
+        private VisualElement inspectorFrame;
+        private Button projectCollapseButton;
+        private Button inspectorCollapseButton;
         private Label mapHintLabel;
         private Label zoomLabel;
-        private Label mapOverlayLabel;
         private Button emptyStateOpenButton;
         private Button toolsButton;
-        private VisualElement mapLegend;
         private VisualElement mapControls;
         private VisualElement projectPanel;
         private VisualElement inspectorPanel;
@@ -137,7 +140,10 @@ namespace OmsiMapEditor.UI
             var exportCancelButton = root.Q<Button>("export-cancel-button");
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
+            var viewMenu = root.Q<VisualElement>("view-menu");
             editMenu = root.Q<VisualElement>("edit-menu");
+            var projectPanelMenuItem = root.Q<Button>("project-panel-menu-item");
+            var inspectorMenuItem = root.Q<Button>("inspector-menu-item");
             var placeObjectMenuItem = root.Q<Button>("place-object-menu-item");
             var deleteObjectMenuItem = root.Q<Button>("delete-object-menu-item");
             var undoMenuItem = root.Q<Button>("undo-menu-item");
@@ -153,12 +159,16 @@ namespace OmsiMapEditor.UI
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
             mapTitleLabel = root.Q<Label>("map-title");
-            mapCountsLabel = root.Q<Label>("map-counts");
-            mapDescriptionLabel = root.Q<Label>("map-description");
-            mapWarningsLabel = root.Q<Label>("map-warnings");
             mapHintLabel = root.Q<Label>("map-hint");
-            mapLegend = root.Q<VisualElement>("map-legend");
             mapControls = root.Q<VisualElement>("map-controls");
+            pointerInfoLabel = root.Q<Label>("pointer-info");
+            selectionInfoLabel = root.Q<Label>("selection-info");
+            emptyState = root.Q<VisualElement>("empty-state");
+            workspaceElement = root.Q<VisualElement>("workspace");
+            projectFrame = root.Q<VisualElement>("project-frame");
+            inspectorFrame = root.Q<VisualElement>("inspector-frame");
+            projectCollapseButton = root.Q<Button>("project-collapse-button");
+            inspectorCollapseButton = root.Q<Button>("inspector-collapse-button");
             zoomLabel = root.Q<Label>("zoom-label");
             projectPanel = root.Q<VisualElement>("project-panel");
             inspectorPanel = root.Q<VisualElement>("inspector-panel");
@@ -186,18 +196,32 @@ namespace OmsiMapEditor.UI
                 mapCanvas.PlacementRequested += PlaceChosenObject;
                 mapCanvas.PointerInfoChanged += text =>
                 {
-                    if (mapOverlayLabel != null)
-                        mapOverlayLabel.text = text;
+                    if (pointerInfoLabel != null)
+                        pointerInfoLabel.text = text;
                     UpdateZoomLabel();
                 };
                 mapView.Add(mapCanvas);
-                mapOverlayLabel = new Label { pickingMode = PickingMode.Ignore };
-                mapOverlayLabel.AddToClassList("map-overlay");
-                mapView.Add(mapOverlayLabel);
             }
 
+            if (projectCollapseButton != null)
+                projectCollapseButton.clicked += () => SetPanelCollapsed(projectFrame, !IsPanelCollapsed(projectFrame));
+            if (inspectorCollapseButton != null)
+                inspectorCollapseButton.clicked += () => SetPanelCollapsed(inspectorFrame, !IsPanelCollapsed(inspectorFrame));
+            if (projectPanelMenuItem != null)
+                projectPanelMenuItem.clicked += () =>
+                {
+                    HidePopup(viewMenu);
+                    SetPanelCollapsed(projectFrame, !IsPanelCollapsed(projectFrame));
+                };
+            if (inspectorMenuItem != null)
+                inspectorMenuItem.clicked += () =>
+                {
+                    HidePopup(viewMenu);
+                    SetPanelCollapsed(inspectorFrame, !IsPanelCollapsed(inspectorFrame));
+                };
+
             if (fileButton != null)
-                fileButton.clicked += () => TogglePopup(fileMenu, helpMenu, editMenu);
+                fileButton.clicked += () => TogglePopup(fileMenu, helpMenu, editMenu, viewMenu);
             if (openMapMenuItem != null)
                 openMapMenuItem.clicked += () =>
                 {
@@ -244,9 +268,9 @@ namespace OmsiMapEditor.UI
                 view3DButton.clicked += ToggleThreeDimensional;
 
             if (viewButton != null)
-                viewButton.clicked += () => ToggleSidePanels(projectPanel, inspectorPanel);
+                viewButton.clicked += () => TogglePopup(viewMenu, fileMenu, helpMenu, editMenu);
             if (editButton != null)
-                editButton.clicked += () => TogglePopup(editMenu, fileMenu, helpMenu);
+                editButton.clicked += () => TogglePopup(editMenu, fileMenu, helpMenu, viewMenu);
             if (placeObjectMenuItem != null)
                 placeObjectMenuItem.clicked += () =>
                 {
@@ -296,7 +320,7 @@ namespace OmsiMapEditor.UI
                 toolsButton.clicked += ValidateLoadedMap;
             }
             if (helpButton != null)
-                helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu);
+                helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu, viewMenu);
             if (helpCloseButton != null)
                 helpCloseButton.clicked += () => HidePopup(helpMenu);
 
@@ -335,6 +359,7 @@ namespace OmsiMapEditor.UI
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
             var panelWidth = rootElement.worldBound.width;
+            mapCanvas.FitInsets = FreeMapInsets();
             if (!mapCanvas.HasView || float.IsNaN(panelWidth) || panelWidth <= 0f)
             {
                 groundRenderer.SetView(Rect.zero, Vector2.zero, 0f);
@@ -802,6 +827,10 @@ namespace OmsiMapEditor.UI
                     ScrollBrowserTo(tile);
             }
             mapCanvas?.SetSelection(tile, selection);
+            if (selectionInfoLabel != null)
+                selectionInfoLabel.text = selection.Count == 0 ? string.Empty
+                    : selection.Count == 1 ? "1 object selected"
+                    : selection.Count + " objects selected";
             RenderInspector();
         }
 
@@ -1600,14 +1629,47 @@ namespace OmsiMapEditor.UI
                 popup.style.display = DisplayStyle.None;
         }
 
-        private void ToggleSidePanels(VisualElement projectPanel, VisualElement inspectorPanel)
+        private static bool IsPanelCollapsed(VisualElement frame)
         {
-            var show = projectPanel != null && projectPanel.resolvedStyle.display == DisplayStyle.None;
-            if (projectPanel != null)
-                projectPanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-            if (inspectorPanel != null)
-                inspectorPanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-            SetStatus(show ? "Side panels shown" : "Side panels hidden");
+            return frame != null && frame.ClassListContains("floating-panel-collapsed");
+        }
+
+        /// <summary>
+        /// Collapses a floating panel to its title bar or opens it again. The arrow points the way the panel will go;
+        /// the view controls move along with the inspector.
+        /// </summary>
+        private void SetPanelCollapsed(VisualElement frame, bool collapsed)
+        {
+            if (frame == null)
+                return;
+            frame.EnableInClassList("floating-panel-collapsed", collapsed);
+            var isInspector = ReferenceEquals(frame, inspectorFrame);
+            var button = isInspector ? inspectorCollapseButton : projectCollapseButton;
+            if (button != null)
+            {
+                // The project browser folds to the left, the inspector to the right.
+                button.text = collapsed == isInspector ? "‹" : "›";
+                button.tooltip = (collapsed ? "Open the " : "Collapse the ") + (isInspector ? "inspector" : "project browser");
+            }
+            if (isInspector)
+                workspaceElement?.EnableInClassList("inspector-collapsed", collapsed);
+        }
+
+        /// <summary>
+        /// The map area that panels and controls leave free, in pixels from each edge, so fitting the map shows it
+        /// there and not under a panel.
+        /// </summary>
+        private Vector4 FreeMapInsets()
+        {
+            if (mapCanvas == null)
+                return Vector4.zero;
+            var canvas = mapCanvas.worldBound;
+            var left = projectFrame != null && !IsPanelCollapsed(projectFrame) ? projectFrame.worldBound.xMax - canvas.xMin : 0f;
+            var right = inspectorFrame != null && !IsPanelCollapsed(inspectorFrame) ? canvas.xMax - inspectorFrame.worldBound.xMin : 0f;
+            var top = mapControls != null && mapControls.resolvedStyle.display != DisplayStyle.None ? mapControls.worldBound.yMax - canvas.yMin : 0f;
+            // Before the first layout the bounds are not known yet.
+            float Clean(float value) => float.IsNaN(value) ? 0f : Mathf.Max(0f, value);
+            return new Vector4(Clean(left), Clean(top), Clean(right), 0f);
         }
 
         private void ValidateLoadedMap()
@@ -1630,7 +1692,7 @@ namespace OmsiMapEditor.UI
         {
             var importPart = summary.Warnings.Count == 0
                 ? "no import warnings"
-                : summary.Warnings.Count + " import warning(s), see the map header";
+                : summary.Warnings.Count + " import warning(s), see the project browser";
             var splinePart = continuity.ConnectedCount + " of " + continuity.LinkCount + " spline links meet";
             if (continuity.Gaps.Count > 0)
             {
@@ -1743,30 +1805,8 @@ namespace OmsiMapEditor.UI
                 ? currentSummary.Name
                 : currentSummary.FriendlyName;
             if (mapTitleLabel != null)
-            {
                 mapTitleLabel.text = displayName;
-                mapTitleLabel.RemoveFromClassList("viewport-label");
-                mapTitleLabel.AddToClassList("map-title");
-            }
             UpdateCounts();
-            if (mapCountsLabel != null)
-                mapCountsLabel.style.display = DisplayStyle.Flex;
-            if (mapDescriptionLabel != null)
-            {
-                mapDescriptionLabel.text = currentSummary.Description ?? string.Empty;
-                mapDescriptionLabel.style.display = string.IsNullOrWhiteSpace(currentSummary.Description)
-                    ? DisplayStyle.None
-                    : DisplayStyle.Flex;
-            }
-            if (mapWarningsLabel != null)
-            {
-                var warnings = currentSummary.Warnings;
-                mapWarningsLabel.text = warnings.Count == 0
-                    ? string.Empty
-                    : warnings.Count + " import warning(s): " + warnings[0] + (warnings.Count > 1 ? "  (hover for all)" : string.Empty);
-                mapWarningsLabel.tooltip = string.Join("\n", warnings.GetRange(0, Math.Min(warnings.Count, 40)));
-                mapWarningsLabel.style.display = warnings.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
-            }
             if (mapHintLabel != null)
             {
                 mapHintLabel.text = mapCanvas != null && mapCanvas.ThreeDimensional
@@ -1778,12 +1818,10 @@ namespace OmsiMapEditor.UI
                     : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
                 mapHintLabel.style.display = DisplayStyle.Flex;
             }
-            if (mapLegend != null)
-                mapLegend.style.display = DisplayStyle.Flex;
             if (mapControls != null)
                 mapControls.style.display = DisplayStyle.Flex;
-            if (emptyStateOpenButton != null)
-                emptyStateOpenButton.style.display = DisplayStyle.None;
+            if (emptyState != null)
+                emptyState.style.display = DisplayStyle.None;
             UpdateZoomLabel();
         }
 
@@ -1808,9 +1846,6 @@ namespace OmsiMapEditor.UI
 
             projectPanel.Clear();
             browserEntries.Clear();
-            var heading = new Label("PROJECT BROWSER");
-            heading.AddToClassList("panel-heading");
-            projectPanel.Add(heading);
 
             if (currentSummary == null)
             {
@@ -1838,6 +1873,25 @@ namespace OmsiMapEditor.UI
             projectPanel.Add(browserCountsLabel);
             UpdateCounts();
 
+            var warnings = currentSummary.Warnings;
+            if (warnings.Count > 0)
+            {
+                var warningLabel = new Label(warnings.Count + " import warning(s): " + warnings[0] + (warnings.Count > 1 ? "  (hover for all)" : string.Empty))
+                {
+                    tooltip = string.Join("\n", warnings.GetRange(0, Math.Min(warnings.Count, 40)))
+                };
+                warningLabel.AddToClassList("browser-map-warnings");
+                projectPanel.Add(warningLabel);
+            }
+            if (!string.IsNullOrWhiteSpace(currentSummary.Description))
+            {
+                // The description can be long; it stays folded until asked for.
+                var description = new Foldout { text = "About this map", value = false };
+                description.AddToClassList("browser-map-description");
+                description.Add(new Label(currentSummary.Description.Trim()));
+                projectPanel.Add(description);
+            }
+
             var tileList = new ScrollView(ScrollViewMode.Vertical);
             tileList.AddToClassList("browser-tile-list");
             foreach (var tile in currentSummary.Tiles)
@@ -1863,14 +1917,11 @@ namespace OmsiMapEditor.UI
                 return;
             if (browserCountsLabel != null)
                 browserCountsLabel.text = currentSummary.Tiles.Count + " tiles  •  " + currentSummary.ObjectCount + " objects  •  " +
-                                          currentSummary.SplineCount + " splines";
-            if (mapCountsLabel != null)
-                mapCountsLabel.text = "Tiles: " + currentSummary.Tiles.Count + "    Objects: " + currentSummary.ObjectCount +
-                                      "    Splines: " + currentSummary.SplineCount + "    Connections: " + currentSummary.AttachmentCount +
-                                      "    Terrain: " + currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count +
-                                      (currentSummary.UsesWorldCoordinates
-                                          ? "    World coordinates: " + currentSummary.TileSizeMeters.ToString("0.0") + " m tiles"
-                                          : string.Empty);
+                                          currentSummary.SplineCount + " splines\n" + currentSummary.AttachmentCount + " connections  •  terrain " +
+                                          currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count +
+                                          (currentSummary.UsesWorldCoordinates
+                                              ? "\nWorld coordinates, " + currentSummary.TileSizeMeters.ToString("0.0") + " m tiles"
+                                              : string.Empty);
         }
 
         /// <summary>Refreshes one tile list entry, for example its edited marker, without rebuilding the list.</summary>
@@ -1890,9 +1941,6 @@ namespace OmsiMapEditor.UI
                 return;
 
             inspectorPanel.Clear();
-            var heading = new Label("INSPECTOR");
-            heading.AddToClassList("panel-heading");
-            inspectorPanel.Add(heading);
 
             if (selectedTile == null)
             {

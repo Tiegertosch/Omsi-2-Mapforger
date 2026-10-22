@@ -27,6 +27,14 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Leser gegen Stadtückheim und Berlin-Spandau gegenprüfen
 - [x] Automatische EditMode-Tests für Leser, Geometrie und Einstellungen ergänzen
 
+## Oberfläche nach dem Corporate Design (ADR 015)
+
+- [x] Etappe 1: Design-Tokens, randlose Karte, schwebende einklappbare Panels, Ansichtsknöpfe, Statusleiste
+- Etappe 2: untere Werkzeugleiste mit den fertigen Werkzeugen und Tastenkappen
+- Etappe 3: Objekte-Panel mit Bibliothek, Suche und Kategorien statt des Platzierdialogs
+- Etappe 4: Lucide-Icons und Schrift Inter, Feinschliff
+- Farben der Vektorebene an das Corporate Design anpassen: Auswahl ist rot, Splines orange
+
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen

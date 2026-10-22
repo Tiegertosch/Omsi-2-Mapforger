@@ -295,6 +295,25 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>
+        /// Pixels at the left, top, right and bottom edge that floating panels cover; fitting the map leaves them out.
+        /// </summary>
+        public Vector4 FitInsets
+        {
+            get => fitInsets;
+            set
+            {
+                if (value == fitInsets)
+                    return;
+                fitInsets = value;
+                // A fitted map follows panels that open, close or get their size after the map was fitted.
+                if (isFitted && hasView && !ThreeDimensional)
+                    FitToMap();
+            }
+        }
+
+        private Vector4 fitInsets;
+
         /// <summary>Map-relative metres at the centre of the view; world metres minus <see cref="OriginX"/> and <see cref="OriginY"/>.</summary>
         public Vector2 Center => center;
 
@@ -481,10 +500,12 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            // Fit into the part of the view that panels leave free and centre the map there.
             const float margin = 24f;
-            center = mapBounds.center;
-            metersPerPixel = Mathf.Max(mapBounds.width / Mathf.Max(1f, size.x - margin * 2f),
-                mapBounds.height / Mathf.Max(1f, size.y - margin * 2f));
+            var free = new Vector2(Mathf.Max(50f, size.x - FitInsets.x - FitInsets.z), Mathf.Max(50f, size.y - FitInsets.y - FitInsets.w));
+            metersPerPixel = Mathf.Max(mapBounds.width / Mathf.Max(1f, free.x - margin * 2f),
+                mapBounds.height / Mathf.Max(1f, free.y - margin * 2f));
+            center = mapBounds.center + new Vector2((FitInsets.z - FitInsets.x) * 0.5f, (FitInsets.y - FitInsets.w) * 0.5f) * metersPerPixel;
             hasView = true;
             isFitted = true;
             NotifyPointerInfo(null);

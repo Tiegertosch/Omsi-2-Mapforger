@@ -112,6 +112,10 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 - `Documentation/Roadmap.md` – erledigt `[x]` und offen
 - `Documentation/TileRecordInventory.md`, `GrundorfFormatInventory.md`, `SceneryObjectInventory.md`, `TimetableChronoInventory.md` – OMSI-Formatbefunde
 
+## Oberfläche
+
+Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Panels schweben und sind einklappbar, Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Lucide-Icons (ISC, als PNG) und Inter (OFL) sind freigegeben, sichtbarer Name bleibt „OMSI Map Editor“. Etappen stehen in der Roadmap.
+
 ## Aktueller Stand (22. Oktober 2026)
 
 - Zweig `feature/drag-preview-trees` (noch nicht nach `main` gemergt, nicht gepusht).
