@@ -20,8 +20,9 @@ namespace OmsiMapEditor.World
 
         private const float UploadBudgetMilliseconds = 8f;
 
-        /// <summary>Objects come after the spline surfaces, which they stand on.</summary>
+        /// <summary>Objects come after the spline surfaces, which they stand on; see-through ones after all others.</summary>
         private const int ObjectQueue = 3150;
+        private const int TransparentObjectQueue = 3250;
 
         private const int InstancesPerCall = 1023;
 
@@ -49,6 +50,11 @@ namespace OmsiMapEditor.World
             public Material[] Materials;
             public Matrix4x4[] Instances = new Matrix4x4[0];
             public int InstanceCount;
+
+            /// <summary>For trees in the 3D view: crossed upright planes standing on the ground, like OMSI draws them.</summary>
+            public Material CrossMaterial;
+
+            public Matrix4x4[] CrossInstances = new Matrix4x4[0];
         }
 
         private sealed class LoadData
@@ -63,6 +69,7 @@ namespace OmsiMapEditor.World
         private Material template;
         private Mesh treeDisc;
         private Mesh treeCrown;
+        private Mesh treeCross;
         private Camera targetCamera;
         private OmsiMapSummary summary;
         private string installationRoot;
@@ -83,6 +90,9 @@ namespace OmsiMapEditor.World
         private bool reportWhenUploaded;
         private bool objectsVisible = true;
         private readonly Dictionary<long, OmsiTerrain> terrains = new Dictionary<long, OmsiTerrain>();
+
+        // Objects along splines; splines are not edited, so the rows are laid out once per map.
+        private List<KeyValuePair<string, OmsiPlacedAttachment>> splineRows;
 
         /// <summary>Where each placement's matrix lives, so a drag can move single instances.</summary>
         private readonly Dictionary<OmsiObjectRecord, KeyValuePair<KindData, int>> instanceOf =
@@ -106,6 +116,9 @@ namespace OmsiMapEditor.World
         /// <summary>True while models are read or uploaded or placements wait to be updated.</summary>
         public bool IsLoading => loading != null || pending != null || placementsDirty;
 
+        /// <summary>In the 3D view trees stand as crossed planes; from above they show their crown.</summary>
+        public bool ThreeDimensional { get; set; }
+
         public bool ObjectsVisible
         {
             get => objectsVisible;
@@ -119,6 +132,7 @@ namespace OmsiMapEditor.World
                 Debug.LogError("MapObjectSurface.mat was not found in Resources.");
             treeDisc = CreateDisc();
             treeCrown = CreateCrown();
+            treeCross = CreateCross();
         }
 
         /// <summary>The camera that shows the objects; the ground camera.</summary>
@@ -177,6 +191,7 @@ namespace OmsiMapEditor.World
             requestedKinds.Clear();
             terrains.Clear();
             instanceOf.Clear();
+            splineRows = null;
             kinds.Clear();
             textures.Clear();
             foreach (var item in owned)
@@ -227,9 +242,13 @@ namespace OmsiMapEditor.World
             {
                 if (kind.Mesh == null || kind.InstanceCount == 0)
                     continue;
-                for (var submesh = 0; submesh < kind.Materials.Length; submesh++)
+                var crossed = ThreeDimensional && kind.CrossMaterial != null;
+                var mesh = crossed ? treeCross : kind.Mesh;
+                var materials = crossed ? new[] { kind.CrossMaterial } : kind.Materials;
+                var instances = crossed ? kind.CrossInstances : kind.Instances;
+                for (var submesh = 0; submesh < materials.Length; submesh++)
                 {
-                    var material = kind.Materials[submesh];
+                    var material = materials[submesh];
                     if (material == null)
                         continue;
                     var parameters = new RenderParams(material)
@@ -242,7 +261,7 @@ namespace OmsiMapEditor.World
                         worldBounds = new Bounds(Vector3.zero, new Vector3(1e6f, 1e5f, 1e6f))
                     };
                     for (var start = 0; start < kind.InstanceCount; start += InstancesPerCall)
-                        Graphics.RenderMeshInstanced(parameters, kind.Mesh, submesh, kind.Instances,
+                        Graphics.RenderMeshInstanced(parameters, mesh, submesh, instances,
                             Math.Min(InstancesPerCall, kind.InstanceCount - start), start);
                 }
             }
@@ -288,7 +307,10 @@ namespace OmsiMapEditor.World
                 else
                 {
                     foreach (var material in model.Materials)
+                    {
                         ReadTexture(installationRoot, material.TexturePath, data);
+                        ReadTexture(installationRoot, material.TransparencyTexturePath, data);
+                    }
                 }
                 data.Kinds.Add(kind);
             }
@@ -421,14 +443,19 @@ namespace OmsiMapEditor.World
                 {
                     // The crown of the texture on a dome, cut out where the leaves are transparent.
                     kind.Mesh = treeCrown;
-                    var crown = NewMaterial(TextureFor(kind.TreeTexturePath), Color.white, 0.5f);
+                    var crown = NewMaterial(TextureFor(kind.TreeTexturePath), Color.white, 0.5f, false);
                     crown.SetVector("_UvRect", kind.CrownArea.Value);
+                    crown.SetFloat("_Cull", (float)CullMode.Off);
                     kind.Materials = new[] { crown };
+                    // The planes are seen from both sides.
+                    kind.CrossMaterial = NewMaterial(TextureFor(kind.TreeTexturePath), Color.white, 0.5f, false);
+                    kind.CrossMaterial.SetFloat("_Cull", (float)CullMode.Off);
                 }
                 else
                 {
                     kind.Mesh = treeDisc;
-                    kind.Materials = new[] { NewMaterial(Texture2D.whiteTexture, kind.TreeColour, 0f) };
+                    kind.Materials = new[] { NewMaterial(Texture2D.whiteTexture, kind.TreeColour, 0f, false) };
+                    kind.Materials[0].SetFloat("_Cull", (float)CullMode.Off);
                 }
                 return;
             }
@@ -458,20 +485,33 @@ namespace OmsiMapEditor.World
                 if (model.Triangles[index].Count == 0)
                     continue;
                 var source = model.Materials[index];
-                kind.Materials[index] = NewMaterial(TextureFor(source.TexturePath), new Color(source.Red, source.Green, source.Blue, 1f),
-                    source.AlphaMode > 0 ? 0.5f : 0f);
+                kind.Materials[index] = NewMaterial(TextureFor(source.TexturePath), new Color(source.Red, source.Green, source.Blue, source.Alpha),
+                    source.AlphaMode == 1 ? 0.5f : 0f, source.IsTransparent);
+                if (source.TransparencyTexturePath != null)
+                {
+                    kind.Materials[index].SetTexture("_AlphaTex", TextureFor(source.TransparencyTexturePath));
+                    kind.Materials[index].SetFloat("_UseAlphaTex", 1f);
+                }
             }
             mesh.RecalculateBounds();
             owned.Add(mesh);
             kind.Mesh = mesh;
         }
 
-        private Material NewMaterial(Texture texture, Color colour, float cutoff)
+        /// <param name="blended">See-through: blended over what lies behind, after all opaque objects, without depth.</param>
+        private Material NewMaterial(Texture texture, Color colour, float cutoff, bool blended)
         {
-            var material = new Material(template) { enableInstancing = true, renderQueue = ObjectQueue };
+            var material = new Material(template) { enableInstancing = true, renderQueue = blended ? TransparentObjectQueue : ObjectQueue };
             material.SetTexture("_MainTex", texture);
             material.SetColor("_Color", colour);
             material.SetFloat("_Cutoff", cutoff);
+            if (blended)
+            {
+                material.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
+                material.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
+                material.SetFloat("_DepthWrite", 0f);
+                material.SetFloat("_Blended", 1f);
+            }
             owned.Add(material);
             return material;
         }
@@ -586,16 +626,34 @@ namespace OmsiMapEditor.World
         /// </summary>
         private void UpdatePlacements()
         {
+            if (splineRows == null)
+            {
+                splineRows = new List<KeyValuePair<string, OmsiPlacedAttachment>>();
+                var layout = new OmsiSplineAttachmentLayout(summary);
+                foreach (var tile in summary.Tiles)
+                    foreach (var row in tile.SplineAttachments)
+                        foreach (var placed in layout.Place(tile, row))
+                            splineRows.Add(new KeyValuePair<string, OmsiPlacedAttachment>(row.AssetPath, placed));
+            }
+
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var missing = new List<string>();
+            void Count(string assetPath)
+            {
+                counts.TryGetValue(assetPath, out var count);
+                counts[assetPath] = count + 1;
+                if (count == 0 && !kinds.ContainsKey(assetPath) && !requestedKinds.Contains(assetPath))
+                    missing.Add(assetPath);
+            }
             foreach (var tile in summary.Tiles)
+            {
                 foreach (var item in tile.Objects)
-                {
-                    counts.TryGetValue(item.AssetPath, out var count);
-                    counts[item.AssetPath] = count + 1;
-                    if (count == 0 && !kinds.ContainsKey(item.AssetPath) && !requestedKinds.Contains(item.AssetPath))
-                        missing.Add(item.AssetPath);
-                }
+                    Count(item.AssetPath);
+                foreach (var attached in tile.AttachedObjects)
+                    Count(attached.AssetPath);
+            }
+            foreach (var row in splineRows)
+                Count(row.Key);
             if (missing.Count > 0 && loading == null)
             {
                 requestedKinds.UnionWith(missing);
@@ -615,19 +673,78 @@ namespace OmsiMapEditor.World
                 counts.TryGetValue(kind.AssetPath, out var count);
                 if (kind.Instances.Length < count)
                     kind.Instances = new Matrix4x4[count];
+                if (kind.CrossMaterial != null && kind.CrossInstances.Length < count)
+                    kind.CrossInstances = new Matrix4x4[count];
                 kind.InstanceCount = 0;
             }
             instanceOf.Clear();
+            var frames = new Dictionary<int, KeyValuePair<Matrix4x4, OmsiObjectModel>>();
             foreach (var tile in summary.Tiles)
             {
+                frames.Clear();
                 foreach (var item in tile.Objects)
                 {
                     if (!kinds.TryGetValue(item.AssetPath, out var kind) || kind.Mesh == null)
                         continue;
+                    var frame = PlacementFrame(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees);
+                    frames[item.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
                     instanceOf[item] = new KeyValuePair<KindData, int>(kind, kind.InstanceCount);
-                    kind.Instances[kind.InstanceCount++] = PlacementMatrix(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees);
+                    SetFromFrame(kind, kind.InstanceCount++, frame);
+                }
+
+                // Attached objects hang at a point of their parent, which comes earlier in the tile; in file order an
+                // attached parent is placed before its children.
+                foreach (var attached in tile.AttachedObjects)
+                {
+                    if (!frames.TryGetValue(attached.ParentId, out var parent) || attached.AttachPointIndex < 0 ||
+                        attached.AttachPointIndex >= parent.Value.AttachPoints.Count ||
+                        !kinds.TryGetValue(attached.AssetPath, out var kind) || kind.Mesh == null)
+                        continue;
+                    var frame = parent.Key * AttachMatrix(parent.Value.AttachPoints[attached.AttachPointIndex]) *
+                                Matrix4x4.Rotate(Quaternion.Euler(0f, (float)attached.HeadingDegrees, 0f));
+                    frames[attached.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
+                    SetFromFrame(kind, kind.InstanceCount++, frame);
                 }
             }
+
+            foreach (var row in splineRows)
+            {
+                if (!kinds.TryGetValue(row.Key, out var kind) || kind.Mesh == null)
+                    continue;
+                var placed = row.Value;
+                var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
+                SetFromFrame(kind, kind.InstanceCount++, Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one));
+            }
+        }
+
+        /// <summary>
+        /// The frame of an attachment point. OMSI writes its steps for a Direct3D row vector, applied in file order, in
+        /// the object frame x right, y forward, z up; Unity has y up and z forward.
+        /// </summary>
+        private static Matrix4x4 AttachMatrix(OmsiAttachPoint point)
+        {
+            var matrix = Matrix4x4.identity;
+            foreach (var step in point.Steps)
+            {
+                Matrix4x4 operation;
+                switch (step.Kind)
+                {
+                    case "attach_trans":
+                        operation = Matrix4x4.Translate(new Vector3((float)step.X, (float)step.Z, (float)step.Y));
+                        break;
+                    case "attach_rot_x":
+                        operation = Matrix4x4.Rotate(Quaternion.Euler((float)step.X, 0f, 0f));
+                        break;
+                    case "attach_rot_y":
+                        operation = Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, (float)step.X));
+                        break;
+                    default:
+                        operation = Matrix4x4.Rotate(Quaternion.Euler(0f, (float)step.X, 0f));
+                        break;
+                }
+                matrix = operation * matrix;
+            }
+            return matrix;
         }
 
         /// <summary>
@@ -657,27 +774,44 @@ namespace OmsiMapEditor.World
         {
             if (tile == null || item == null || !instanceOf.TryGetValue(item, out var place))
                 return;
-            place.Key.Instances[place.Value] = PlacementMatrix(place.Key.Model, tile, localX, localY, item.Height, headingDegrees);
+            SetPlacement(place.Key, place.Value, tile, localX, localY, item.Height, headingDegrees);
+        }
+
+        private void SetPlacement(KindData kind, int index, OmsiTileSummary tile, double localX, double localY, double height, double headingDegrees)
+        {
+            SetFromFrame(kind, index, PlacementFrame(kind.Model, tile, localX, localY, height, headingDegrees));
+        }
+
+        /// <summary>
+        /// The instance matrices of an object standing in this frame. A tree's crown sits at its mean height, above the
+        /// roads it may overhang; its crossed planes stand in the frame, as tall as the tree and as wide as its crown.
+        /// </summary>
+        private static void SetFromFrame(KindData kind, int index, Matrix4x4 frame)
+        {
+            var model = kind.Model;
+            if (!model.IsTree)
+            {
+                kind.Instances[index] = frame;
+                return;
+            }
+            var radius = (float)model.TreeRadius;
+            kind.Instances[index] = frame * Matrix4x4.TRS(new Vector3(0f, (float)model.TreeHeight, 0f), Quaternion.identity, new Vector3(radius, radius, radius));
+            if (kind.CrossMaterial != null)
+                kind.CrossInstances[index] = frame * Matrix4x4.Scale(new Vector3(radius, (float)model.TreeHeight, radius));
         }
 
         /// <summary>
         /// Position on the map, standing on the terrain under it unless the height is absolute, turned clockwise by the
-        /// heading as OMSI does. Tree crowns sit at the tree's mean height, above the roads they may overhang.
+        /// heading as OMSI does.
         /// </summary>
-        private Matrix4x4 PlacementMatrix(OmsiObjectModel model, OmsiTileSummary tile, double localX, double localY, double height,
+        private Matrix4x4 PlacementFrame(OmsiObjectModel model, OmsiTileSummary tile, double localX, double localY, double height,
             double headingDegrees)
         {
             var worldX = tile.X * tileSize + localX;
             var worldY = tile.Y * tileSize + localY;
             var ground = model.HasAbsoluteHeight ? 0.0 : GroundAt(worldX, worldY);
             var position = new Vector3((float)(worldX - originX), (float)(ground + height), (float)(worldY - originY));
-            var scale = Vector3.one;
-            if (model.IsTree)
-            {
-                position.y += (float)model.TreeHeight;
-                scale = new Vector3((float)model.TreeRadius, (float)model.TreeRadius, (float)model.TreeRadius);
-            }
-            return Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)headingDegrees, 0f), scale);
+            return Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)headingDegrees, 0f), Vector3.one);
         }
 
         /// <summary>Terrain height at a world position, from the tile that contains it; 0 where no terrain was read.</summary>
@@ -739,6 +873,31 @@ namespace OmsiMapEditor.World
             return mesh;
         }
 
+        /// <summary>
+        /// Two upright planes crossing at right angles, 2 wide and 1 high from the ground, for trees in the 3D view. The
+        /// whole side-view texture covers each plane, its top row at the top; normals point up so both planes are lit
+        /// alike.
+        /// </summary>
+        private static Mesh CreateCross()
+        {
+            var vertices = new[]
+            {
+                new Vector3(-1f, 0f, 0f), new Vector3(1f, 0f, 0f), new Vector3(1f, 1f, 0f), new Vector3(-1f, 1f, 0f),
+                new Vector3(0f, 0f, -1f), new Vector3(0f, 0f, 1f), new Vector3(0f, 1f, 1f), new Vector3(0f, 1f, -1f)
+            };
+            var uvs = new[]
+            {
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f), new Vector2(0f, 0f),
+                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f), new Vector2(0f, 0f)
+            };
+            var normals = new Vector3[vertices.Length];
+            for (var index = 0; index < normals.Length; index++)
+                normals[index] = Vector3.up;
+            var mesh = new Mesh { name = "Tree planes", vertices = vertices, normals = normals, uv = uvs, triangles = new[] { 0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6 } };
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
         /// <summary>A flat disc of radius 1 facing up, for tree crowns.</summary>
         private static Mesh CreateDisc()
         {
@@ -766,6 +925,8 @@ namespace OmsiMapEditor.World
                 Destroy(treeDisc);
             if (treeCrown != null)
                 Destroy(treeCrown);
+            if (treeCross != null)
+                Destroy(treeCross);
         }
     }
 }

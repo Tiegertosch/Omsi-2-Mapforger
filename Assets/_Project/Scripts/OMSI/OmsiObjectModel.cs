@@ -14,8 +14,17 @@ namespace OmsiMapEditor.OMSI
         public float Green { get; internal set; } = 1f;
         public float Blue { get; internal set; } = 1f;
 
+        /// <summary>Opacity of the diffuse colour; below 1 the material is see-through, like plain glass.</summary>
+        public float Alpha { get; internal set; } = 1f;
+
         /// <summary>0 opaque; 1 the texture's alpha cuts; 2 it blends (see <see cref="OmsiSceneryMaterial"/>).</summary>
         public int AlphaMode { get; internal set; }
+
+        /// <summary>The texture whose alpha gives the opacity ([matl_transmap]), relative to the installation, or null.</summary>
+        public string TransparencyTexturePath { get; internal set; }
+
+        /// <summary>True when the material is drawn blended over what lies behind it.</summary>
+        public bool IsTransparent => AlphaMode == 2 || Alpha < 0.99f;
     }
 
     /// <summary>
@@ -41,6 +50,9 @@ namespace OmsiMapEditor.OMSI
         /// [splinehelper].
         /// </summary>
         public bool HasAbsoluteHeight { get; internal set; }
+
+        /// <summary>Points where attached objects hang, from [new_attachment].</summary>
+        public IReadOnlyList<OmsiAttachPoint> AttachPoints { get; internal set; } = new OmsiAttachPoint[0];
 
         /// <summary>Crown radius of a tree in metres.</summary>
         public double TreeRadius { get; internal set; }
@@ -110,7 +122,11 @@ namespace OmsiMapEditor.OMSI
                 return null;
             }
 
-            var model = new OmsiObjectModel { HasAbsoluteHeight = sceneryObject.HasAbsoluteHeight || sceneryObject.HasSplineHelper };
+            var model = new OmsiObjectModel
+            {
+                HasAbsoluteHeight = sceneryObject.HasAbsoluteHeight || sceneryObject.HasSplineHelper,
+                AttachPoints = sceneryObject.AttachPoints
+            };
             if (sceneryObject.Tree != null)
             {
                 var tree = sceneryObject.Tree;
@@ -264,7 +280,9 @@ namespace OmsiMapEditor.OMSI
                     Red = source.DiffuseRed,
                     Green = source.DiffuseGreen,
                     Blue = source.DiffuseBlue,
-                    AlphaMode = settings?.AlphaMode ?? 0
+                    Alpha = source.DiffuseAlpha,
+                    AlphaMode = settings?.AlphaMode ?? 0,
+                    TransparencyTexturePath = settings?.TransparencyTexture != null ? ResolveTexture(objectFolder, settings.TransparencyTexture) : null
                 });
             }
             return slots;
@@ -278,7 +296,8 @@ namespace OmsiMapEditor.OMSI
                 var existing = model.Materials[index];
                 if (string.Equals(existing.TexturePath, material.TexturePath, StringComparison.OrdinalIgnoreCase) &&
                     existing.AlphaMode == material.AlphaMode && existing.Red == material.Red &&
-                    existing.Green == material.Green && existing.Blue == material.Blue)
+                    string.Equals(existing.TransparencyTexturePath, material.TransparencyTexturePath, StringComparison.OrdinalIgnoreCase) &&
+                    existing.Green == material.Green && existing.Blue == material.Blue && existing.Alpha == material.Alpha)
                     return index;
             }
             model.Materials.Add(material);

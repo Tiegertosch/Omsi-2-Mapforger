@@ -363,6 +363,8 @@ namespace OmsiMapEditor.UI
                 mapCanvas.EnterOrbitView();
             }
             groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
+            if (objectRenderer != null)
+                objectRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (view3DButton != null)
                 view3DButton.text = mapCanvas.ThreeDimensional ? "3D: on" : "3D: off";
             UpdateMapHeader();

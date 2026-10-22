@@ -74,3 +74,6 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen
 - Haltestellen und Linienverläufe in der Kartenübersicht darstellen
 - Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern
+- [x] Angehängte Objekte (`[attachObj]`, auch mehrstufig) und Spline-Anhängungen zeichnen; der Startabstand zählt ab dem Kettenanfang
+- [x] Rückseiten wie OMSI weglassen, Glas überblenden, `[matl_transmap]` als Deckkraft auswerten, Bäume in 3D als gekreuzte Flächen
+- [x] Transparenzkarten am 70er-Wartehäuschen im Player prüfen (22. Oktober 2026: Seitenscheiben halbdurchsichtig)

@@ -51,6 +51,12 @@ namespace OmsiMapEditor.OMSI
         public bool IsAvailable { get; internal set; }
         public List<OmsiObjectRecord> Objects { get; } = new List<OmsiObjectRecord>();
         public List<OmsiSplineRecord> Splines { get; } = new List<OmsiSplineRecord>();
+
+        /// <summary>[attachObj] records: objects hanging at an attachment point of an earlier object of this tile.</summary>
+        public List<OmsiAttachedObjectRecord> AttachedObjects { get; } = new List<OmsiAttachedObjectRecord>();
+
+        /// <summary>[splineAttachement] records and their repeaters, in file order.</summary>
+        public List<OmsiSplineAttachmentRecord> SplineAttachments { get; } = new List<OmsiSplineAttachmentRecord>();
         public float TerrainMinHeight { get; internal set; }
         public float TerrainMaxHeight { get; internal set; }
         public bool HasTerrain { get; internal set; }
@@ -65,6 +71,52 @@ namespace OmsiMapEditor.OMSI
         public double LocalY { get; internal set; }
         public double Height { get; internal set; }
         public double HeadingDegrees { get; internal set; }
+    }
+
+    /// <summary>An object attached to an attachment point ([new_attachment]) of its parent object.</summary>
+    public sealed class OmsiAttachedObjectRecord
+    {
+        public string AssetPath { get; internal set; }
+        public int Id { get; internal set; }
+
+        /// <summary>The parent's ID; the parent is written earlier in the same tile.</summary>
+        public int ParentId { get; internal set; }
+
+        /// <summary>Index of the parent's [new_attachment] point.</summary>
+        public int AttachPointIndex { get; internal set; }
+
+        public double HeadingDegrees { get; internal set; }
+    }
+
+    /// <summary>A row of objects along a spline chain: lamps, posts, signs or a single bus stop.</summary>
+    public sealed class OmsiSplineAttachmentRecord
+    {
+        public string AssetPath { get; internal set; }
+        public int Id { get; internal set; }
+
+        /// <summary>The spline in this tile's spline order, [spline] and [spline_h] counted together.</summary>
+        public int SplineIndex { get; internal set; }
+
+        /// <summary>Distance to the right of the spline.</summary>
+        public double LateralOffset { get; internal set; }
+
+        /// <summary>Height above the spline.</summary>
+        public double Height { get; internal set; }
+
+        /// <summary>Distance of the first object from the start of the spline.</summary>
+        public double StartDistance { get; internal set; }
+
+        /// <summary>Heading relative to the spline's direction.</summary>
+        public double HeadingDegrees { get; internal set; }
+
+        /// <summary>Distance between objects; 0 places one object.</summary>
+        public double Interval { get; internal set; }
+
+        /// <summary>Objects follow while their distance from the first does not exceed this.</summary>
+        public double Range { get; internal set; }
+
+        /// <summary>True for [splineAttachement_repeater], which continues a row on another tile.</summary>
+        public bool IsRepeater { get; internal set; }
     }
 
     /// <summary>Plan-view curve parameters for one map spline.</summary>

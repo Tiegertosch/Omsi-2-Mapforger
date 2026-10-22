@@ -34,6 +34,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>0 opaque; 1 the alpha channel cuts the texture; 2 it blends.</summary>
         public int AlphaMode { get; internal set; }
+
+        /// <summary>
+        /// [matl_transmap]: a texture whose alpha gives the opacity instead of the main texture's alpha, which then
+        /// holds the reflection strength for [matl_envmap]. Null when the main texture's alpha applies.
+        /// </summary>
+        public string TransparencyTexture { get; internal set; }
     }
 
     /// <summary>Tree parameters from [tree]: texture, height range and width-to-height ratio range.</summary>
@@ -67,6 +73,25 @@ namespace OmsiMapEditor.OMSI
         public double HeadingDegrees { get; internal set; }
     }
 
+    /// <summary>One step of an attachment point's transform, applied in file order.</summary>
+    public sealed class OmsiAttachStep
+    {
+        /// <summary>"attach_trans", "attach_rot_x", "attach_rot_y" or "attach_rot_z".</summary>
+        public string Kind { get; internal set; }
+
+        /// <summary>For a translation: x right, y forward, z up, in metres. For a rotation: the angle in degrees in X.</summary>
+        public double X { get; internal set; }
+
+        public double Y { get; internal set; }
+        public double Z { get; internal set; }
+    }
+
+    /// <summary>A [new_attachment] point where [attachObj] objects hang, in the object frame.</summary>
+    public sealed class OmsiAttachPoint
+    {
+        public List<OmsiAttachStep> Steps { get; } = new List<OmsiAttachStep>();
+    }
+
     /// <summary>The parts of a scenery object (.sco) that matter for its footprint.</summary>
     public sealed class OmsiSceneryObject
     {
@@ -84,6 +109,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>[splinehelper]: spline file, then x, height, y and heading, the order spline records use.</summary>
         public List<OmsiSplineHelper> SplineHelpers { get; } = new List<OmsiSplineHelper>();
 
+        /// <summary>[new_attachment] points in file order; [attachObj] names them by index.</summary>
+        public List<OmsiAttachPoint> AttachPoints { get; } = new List<OmsiAttachPoint>();
+
         public static OmsiSceneryObject Parse(byte[] bytes)
         {
             var file = OmsiRecordFile.Parse(bytes, null);
@@ -95,6 +123,11 @@ namespace OmsiMapEditor.OMSI
             foreach (var record in file.Records)
             {
                 var values = record.AllValues();
+                if (string.Equals(record.Name, "new_attachment", StringComparison.OrdinalIgnoreCase))
+                    result.AttachPoints.Add(new OmsiAttachPoint());
+                // Its sub-commands are plain lines after the block.
+                if (result.AttachPoints.Count > 0)
+                    ReadAttachSteps(values, result.AttachPoints[result.AttachPoints.Count - 1]);
                 switch (record.Name.ToLowerInvariant())
                 {
                     case "onlyeditor":
@@ -131,6 +164,10 @@ namespace OmsiMapEditor.OMSI
                     case "matl_alpha":
                         if (lastMaterial != null && values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var alphaMode))
                             lastMaterial.AlphaMode = alphaMode;
+                        break;
+                    case "matl_transmap":
+                        if (lastMaterial != null && values.Count > 0 && values[0].Length > 0)
+                            lastMaterial.TransparencyTexture = values[0];
                         break;
                     case "collision_mesh":
                     case "collisionmesh":
@@ -169,6 +206,19 @@ namespace OmsiMapEditor.OMSI
                 }
             }
             return result;
+        }
+
+        private static void ReadAttachSteps(List<string> values, OmsiAttachPoint point)
+        {
+            for (var index = 0; index < values.Count; index++)
+            {
+                var kind = values[index].ToLowerInvariant();
+                var count = kind == "attach_trans" ? 3 : kind == "attach_rot_x" || kind == "attach_rot_y" || kind == "attach_rot_z" ? 1 : 0;
+                if (count == 0 || index + count >= values.Count || !TryNumbers(values.GetRange(index + 1, count), count, out var numbers))
+                    continue;
+                point.Steps.Add(new OmsiAttachStep { Kind = kind, X = numbers[0], Y = count == 3 ? numbers[1] : 0, Z = count == 3 ? numbers[2] : 0 });
+                index += count;
+            }
         }
 
         private static bool TryNumbers(List<string> values, int count, out double[] numbers)

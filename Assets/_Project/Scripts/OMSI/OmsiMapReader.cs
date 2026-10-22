@@ -151,10 +151,19 @@ namespace OmsiMapEditor.OMSI
                     else
                         summary.Warnings.Add("Could not decode a [" + section.Name + "] placement in " + tile.FileName + ".");
                 }
-                else if (string.Equals(section.Name, "attachObj", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(section.Name, "splineAttachement", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(section.Name, "splineAttachement_repeater", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(section.Name, "attachObj", StringComparison.OrdinalIgnoreCase))
+                {
                     tile.AttachmentCount++;
+                    if (version >= 12 && TryReadAttachedObject(section, out var attached))
+                        tile.AttachedObjects.Add(attached);
+                }
+                else if (string.Equals(section.Name, "splineAttachement", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(section.Name, "splineAttachement_repeater", StringComparison.OrdinalIgnoreCase))
+                {
+                    tile.AttachmentCount++;
+                    if (TryReadSplineAttachment(section, out var attachment))
+                        tile.SplineAttachments.Add(attachment);
+                }
             }
 
             if (skippedOldSplines > 0)
@@ -173,6 +182,40 @@ namespace OmsiMapEditor.OMSI
             {
                 summary.Warnings.Add("Terrain data missing or not recognized for " + tile.FileName + ".");
             }
+        }
+
+        private static bool TryReadAttachedObject(Section section, out OmsiAttachedObjectRecord record)
+        {
+            record = null;
+            var values = Values(section);
+            if (values.Count < 9 || !int.TryParse(values[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ||
+                !int.TryParse(values[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parent) ||
+                !int.TryParse(values[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out var point) ||
+                !TryDouble(values, 6, out var heading))
+                return false;
+            record = new OmsiAttachedObjectRecord { AssetPath = values[1], Id = id, ParentId = parent, AttachPointIndex = point, HeadingDegrees = heading };
+            return true;
+        }
+
+        /// <summary>A repeater has two more leading fields: the master's tile index and the number of its first object.</summary>
+        private static bool TryReadSplineAttachment(Section section, out OmsiSplineAttachmentRecord record)
+        {
+            record = null;
+            var values = Values(section);
+            var repeater = string.Equals(section.Name, "splineAttachement_repeater", StringComparison.OrdinalIgnoreCase);
+            var shift = repeater ? 2 : 0;
+            if (values.Count < 12 + shift || !int.TryParse(values[2 + shift], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ||
+                !int.TryParse(values[3 + shift], NumberStyles.Integer, CultureInfo.InvariantCulture, out var spline) ||
+                !TryDouble(values, 4 + shift, out var offset) || !TryDouble(values, 5 + shift, out var height) ||
+                !TryDouble(values, 6 + shift, out var start) || !TryDouble(values, 7 + shift, out var heading) ||
+                !TryDouble(values, 10 + shift, out var interval) || !TryDouble(values, 11 + shift, out var range))
+                return false;
+            record = new OmsiSplineAttachmentRecord
+            {
+                AssetPath = values[1 + shift], Id = id, SplineIndex = spline, LateralOffset = offset, Height = height,
+                StartDistance = start, HeadingDegrees = heading, Interval = interval, Range = range, IsRepeater = repeater
+            };
+            return true;
         }
 
         private static bool TryReadObject(Section section, out OmsiObjectRecord record)
