@@ -72,8 +72,34 @@
 .map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 .empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
-.empty-state-title { font-size: 20px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); margin-bottom: var(--mf-space-2); }
-.empty-state-text { max-width: 420px; -unity-text-align: middle-center; white-space: normal; color: var(--mf-color-text-secondary); }
+/* Welcome screen in the middle of the empty map */
+.welcome { width: 720px; align-items: stretch; }
+.welcome-title { font-size: 26px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); -unity-text-align: middle-center; }
+.welcome-tagline { margin-top: var(--mf-space-1); margin-bottom: 28px; -unity-text-align: middle-center; color: var(--mf-color-text-secondary); }
+.welcome-cards { flex-direction: row; justify-content: space-between; margin-bottom: 28px; }
+.welcome-card { width: 228px; height: 168px; margin: 0; padding: var(--mf-space-4); flex-direction: column; align-items: flex-start; justify-content: flex-start; color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
+.welcome-card:hover { border-color: var(--mf-color-accent); background-color: var(--mf-color-panel-raised); }
+.welcome-card:disabled { color: var(--mf-color-text-muted); }
+.welcome-card-icon { width: 40px; height: 40px; margin-bottom: var(--mf-space-3); padding: 9px; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
+.welcome-card:disabled .welcome-card-icon { color: var(--mf-color-text-muted); background-color: var(--mf-color-panel-raised); }
+.welcome-card-icon > .icon { flex-grow: 1; }
+.welcome-card-title { margin: 0 0 var(--mf-space-1); padding: 0; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.welcome-card-text { margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; -unity-text-align: upper-left; }
+.welcome-card:disabled .welcome-card-text { color: var(--mf-color-text-muted); }
+.welcome-card-badge { position: absolute; top: var(--mf-space-4); right: var(--mf-space-4); padding: 1px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-sm); }
+.welcome-section { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
+.welcome-recent { padding: var(--mf-space-1); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
+.welcome-empty { padding: var(--mf-space-3); color: var(--mf-color-text-muted); }
+.welcome-recent-row { height: 46px; margin: 0; padding: 0 var(--mf-space-3); flex-direction: row; align-items: center; color: var(--mf-color-text-primary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-md); }
+.welcome-recent-row:hover { background-color: var(--mf-color-panel-hover); }
+.welcome-recent-row:disabled { color: var(--mf-color-text-muted); }
+.welcome-recent-icon { width: 18px; height: 18px; margin-right: var(--mf-space-3); color: var(--mf-color-accent); flex-shrink: 0; }
+.welcome-recent-row:disabled .welcome-recent-icon { color: var(--mf-color-text-muted); }
+.welcome-recent-texts { flex-grow: 1; flex-shrink: 1; overflow: hidden; }
+.welcome-recent-texts > Label { margin: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -unity-text-align: middle-left; }
+.welcome-recent-name { -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.welcome-recent-path { font-size: 10px; color: var(--mf-color-text-muted); }
+.welcome-recent-kind { margin: 0 0 0 var(--mf-space-3); padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); flex-shrink: 0; }
 .primary-button { margin-top: 20px; height: 36px; padding-left: var(--mf-space-4); padding-right: var(--mf-space-4); background-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); border-width: 0; border-radius: var(--mf-radius-md); }
 .primary-button:hover { background-color: var(--mf-color-accent-hover); }
 
@@ -95,7 +121,6 @@
 
 /* View controls, top right of the map next to the inspector */
 .view-controls { position: absolute; top: var(--mf-space-2); right: 316px; flex-direction: row; align-items: center; padding: var(--mf-space-1); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
-.inspector-collapsed .view-controls { right: 140px; }
 .view-control-button { height: 28px; margin: 0 2px; padding-left: var(--mf-space-2); padding-right: var(--mf-space-2); color: var(--mf-color-text-primary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .view-control-button:hover { background-color: var(--mf-color-panel-hover); }
 .view-control-button:disabled { color: var(--mf-color-text-muted); }

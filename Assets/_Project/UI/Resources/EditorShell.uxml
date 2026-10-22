@@ -14,11 +14,7 @@
         </ui:VisualElement>
         <ui:VisualElement name="workspace" class="workspace">
             <ui:VisualElement name="map-view" class="map-view" />
-            <ui:VisualElement name="empty-state" class="empty-state">
-                <ui:Label text="No map loaded" class="empty-state-title" />
-                <ui:Label text="Open the global.cfg of an OMSI map to view it, or a Mapforge project to edit it." class="empty-state-text" />
-                <ui:Button name="empty-state-open-button" text="Open OMSI map..." class="primary-button" />
-            </ui:VisualElement>
+            <ui:VisualElement name="empty-state" class="empty-state" />
             <ui:VisualElement name="project-frame" class="floating-panel project-frame">
                 <ui:VisualElement class="floating-panel-header">
                     <ui:Label text="Project" class="floating-panel-title" />

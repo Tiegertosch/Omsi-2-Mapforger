@@ -55,7 +55,6 @@ namespace OmsiMapEditor.UI
         private EditorTool activeTool = EditorTool.Drag;
         private Label mapHintLabel;
         private Label zoomLabel;
-        private Button emptyStateOpenButton;
         private Button toolsButton;
         private VisualElement mapControls;
         private VisualElement projectPanel;
@@ -158,7 +157,6 @@ namespace OmsiMapEditor.UI
                 objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
                 objectsPanelHost.Add(objectsPanel);
             }
-            emptyStateOpenButton = root.Q<Button>("empty-state-open-button");
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
             mapTitleLabel = root.Q<Label>("map-title");
@@ -167,6 +165,14 @@ namespace OmsiMapEditor.UI
             pointerInfoLabel = root.Q<Label>("pointer-info");
             selectionInfoLabel = root.Q<Label>("selection-info");
             emptyState = root.Q<VisualElement>("empty-state");
+            if (emptyState != null)
+            {
+                var welcome = new WelcomeScreen();
+                welcome.OpenProjectRequested += OpenProject;
+                welcome.OpenMapRequested += OpenMap;
+                welcome.RecentChosen += OpenRecent;
+                emptyState.Add(welcome);
+            }
             workspaceElement = root.Q<VisualElement>("workspace");
             projectFrame = root.Q<VisualElement>("project-frame");
             inspectorFrame = root.Q<VisualElement>("inspector-frame");
@@ -276,8 +282,6 @@ namespace OmsiMapEditor.UI
                 exportConfirmButton.clicked += ExportMap;
             if (exportCancelButton != null)
                 exportCancelButton.clicked += () => HidePopup(exportDialog);
-            if (emptyStateOpenButton != null)
-                emptyStateOpenButton.clicked += OpenMap;
             if (fitMapButton != null)
                 fitMapButton.clicked += FitMap;
             if (zoomOutButton != null)
@@ -364,6 +368,7 @@ namespace OmsiMapEditor.UI
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
             var panelWidth = rootElement.worldBound.width;
+            PlaceViewControls();
             mapCanvas.FitInsets = FreeMapInsets();
             if (!mapCanvas.HasView || float.IsNaN(panelWidth) || panelWidth <= 0f)
             {
@@ -453,6 +458,7 @@ namespace OmsiMapEditor.UI
                     return;
 
                 LoadMap(path, string.Empty, null, false);
+                RememberCurrent();
             }
             catch (Exception exception)
             {
@@ -465,6 +471,7 @@ namespace OmsiMapEditor.UI
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
         /// <c>-select objectId</c>, <c>-tool drag|move|rotate</c>, <c>-objects</c> to open the object library,
+        /// <c>-fold project|inspector|both</c> to collapse panels,
         /// <c>-place Sceneryobjects\...\object.sco</c> with the
         /// preview at the centre of the view,
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
@@ -483,10 +490,22 @@ namespace OmsiMapEditor.UI
             var projectPath = Argument("-openProject", 1);
             var quit = Array.IndexOf(args, "-quit") >= 0;
             if (mapPath == null && projectPath == null)
+            {
+                // Without a map a screenshot shows the welcome screen.
+                var welcomeShot = Argument("-screenshot", 1);
+                if (welcomeShot == null)
+                    yield break;
+                for (var frame = 0; frame < 10; frame++)
+                    yield return null;
+                yield return new WaitForEndOfFrame();
+                SaveScreenshot(welcomeShot);
+                if (quit)
+                    Application.Quit();
                 yield break;
+            }
 
             if (projectPath != null)
-                OpenProjectFile(projectPath);
+                OpenProjectFile(projectPath, false);
             else
             {
                 try
@@ -546,6 +565,12 @@ namespace OmsiMapEditor.UI
             if (Array.IndexOf(args, "-objects") >= 0)
                 ShowObjectsPanel(true);
 
+            var fold = Argument("-fold", 1);
+            if (fold == "project" || fold == "both")
+                SetPanelCollapsed(projectFrame, true);
+            if (fold == "inspector" || fold == "both")
+                SetPanelCollapsed(inspectorFrame, true);
+
             var placeAsset = Argument("-place", 1);
             if (placeAsset != null)
             {
@@ -564,15 +589,21 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 // At the end of the frame the screen holds the cameras and the UI on top.
                 yield return new WaitForEndOfFrame();
-                var shot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-                shot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-                shot.Apply();
-                File.WriteAllBytes(Path.GetFullPath(screenshot), shot.EncodeToPNG());
-                Destroy(shot);
-                Debug.Log("Screenshot saved: " + Path.GetFullPath(screenshot));
+                SaveScreenshot(screenshot);
             }
             if (quit)
                 Application.Quit();
+        }
+
+        /// <summary>Saves the screen as it is at the end of the frame, cameras and UI together, as a PNG file.</summary>
+        private void SaveScreenshot(string path)
+        {
+            var shot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+            shot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+            shot.Apply();
+            File.WriteAllBytes(Path.GetFullPath(path), shot.EncodeToPNG());
+            Destroy(shot);
+            Debug.Log("Screenshot saved: " + Path.GetFullPath(path));
         }
 
         private void OpenProject()
@@ -582,7 +613,8 @@ namespace OmsiMapEditor.UI
                 OpenProjectFile(projectPath);
         }
 
-        private void OpenProjectFile(string projectPath)
+        /// <param name="remember">Adds the project to the recent files; command-line checks leave them alone.</param>
+        private void OpenProjectFile(string projectPath, bool remember = true)
         {
             try
             {
@@ -599,12 +631,46 @@ namespace OmsiMapEditor.UI
                     ? Path.GetFileNameWithoutExtension(fullProjectPath)
                     : project.projectName;
                 LoadMap(project.globalConfigPath, projectName, fullProjectPath, false);
+                if (remember)
+                    RememberCurrent();
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
                 SetStatus("Could not open project: " + exception.Message);
             }
+        }
+
+        /// <summary>Opens a project or map from the welcome screen's recent files.</summary>
+        private void OpenRecent(RecentFile entry)
+        {
+            if (entry.IsProject)
+            {
+                OpenProjectFile(entry.Path);
+                return;
+            }
+            try
+            {
+                LoadMap(entry.Path, string.Empty, null, false);
+                RememberCurrent();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not open map: " + exception.Message);
+            }
+        }
+
+        /// <summary>Puts the open project, or the open map without a project, at the top of the recent files.</summary>
+        private void RememberCurrent()
+        {
+            if (session == null || currentSummary == null)
+                return;
+            var mapName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
+            if (!string.IsNullOrEmpty(session.ProjectFilePath))
+                RecentFiles.Add(true, session.ProjectFilePath, currentProjectName + "  ·  " + mapName);
+            else
+                RecentFiles.Add(false, currentSummary.GlobalConfigPath, mapName);
         }
 
         private void SaveProjectAs()
@@ -634,6 +700,7 @@ namespace OmsiMapEditor.UI
                 File.WriteAllText(fullProjectPath, JsonUtility.ToJson(project, true), new System.Text.UTF8Encoding(false));
                 // From now on the map is read through the project's workspace, which also receives the edits.
                 LoadMap(currentSummary.GlobalConfigPath, project.projectName, fullProjectPath, true);
+                RememberCurrent();
                 SetStatus("Project saved: " + fullProjectPath + ". Edits are saved to " + session.Workspace.WorkspacePath);
             }
             catch (Exception exception)
@@ -1710,8 +1777,19 @@ namespace OmsiMapEditor.UI
                 button.Q<IconElement>()?.SetIcon(collapsed == isInspector ? "chevron-left" : "chevron-right");
                 button.tooltip = (collapsed ? "Open the " : "Collapse the ") + (isInspector ? "inspector" : "project browser");
             }
-            if (isInspector)
-                workspaceElement?.EnableInClassList("inspector-collapsed", collapsed);
+        }
+
+        /// <summary>
+        /// Keeps the view controls just left of the inspector, open or folded, whatever width its title bar takes.
+        /// </summary>
+        private void PlaceViewControls()
+        {
+            if (mapControls == null || inspectorFrame == null || workspaceElement == null)
+                return;
+            var right = workspaceElement.worldBound.xMax - inspectorFrame.worldBound.xMin + 8f;
+            if (float.IsNaN(right) || right < 0f || Mathf.Abs(mapControls.resolvedStyle.right - right) < 0.5f)
+                return;
+            mapControls.style.right = right;
         }
 
         /// <summary>

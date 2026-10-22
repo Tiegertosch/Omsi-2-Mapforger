@@ -98,7 +98,7 @@ Unity: `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. Befehle siehe `Docu
   -screenshot "<scratchpad>/grundorf.png" -quit -logFile "<scratchpad>/player.log"
 ```
 
-Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte), `-tool drag|move|rotate` (Pfeile nur mit `move`, Ringe/Drehgriff nur mit `rotate`), `-objects` (Objekte-Bibliothek offen). Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
+Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte), `-tool drag|move|rotate` (Pfeile nur mit `move`, Ringe/Drehgriff nur mit `rotate`), `-objects` (Objekte-Bibliothek offen), `-fold project|inspector|both`. Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
 
 ## Testkarten
 
@@ -123,7 +123,8 @@ Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Pa
 - Oberfläche nach ADR 015 komplett (Etappen 1–4): randlose Karte, schwebende Panels, Werkzeugleiste (Q Drag, W Move mit Achsenpfeilen inkl. Höhe, E Rotate, Entf, 3 Objekte), Objekte-Bibliothek (Library/In map/Favorites), Inter, Lucide-Icons. Bedienung im Player vom Nutzer geprüft bis Etappe 3; Etappe 4 nur per Screenshot.
 - DLC-Erkennung (ADR 016) mit echten Daten bestätigt: Nutzer hat DLC „HafenCity Hamburg“ (630010) installiert; Prüfstelle für DLC-Etikett und „Hide DLC objects“: Library-Ordner `HafenCityHamburg`.
 - Bewusst später: Farben der Vektorebene ans Corporate Design anpassen (Auswahl rot, Kachel gold, Splines orange) – Nutzer will das erst später.
-- Nächster geplanter Schritt: mehrere Objekte gemeinsam drehen (2D und 3D). Weitere Ideen in der Roadmap: Ordner von Hand als DLC markieren, Vorschaubilder aus `Sceneryobjects
+- Startbildschirm mit Projekt/Karte öffnen und zuletzt geöffneten (`RecentFiles`, nur von Hand Geöffnetes); „New map“ als „Planned“ – das Anlegen neuer Karten ist ein eigener nächster Schritt mit Test im Spiel.
+- Nächster geplanter Schritt: mehrere Objekte gemeinsam drehen (2D und 3D) oder neue Karte anlegen – Nutzer fragen. Weitere Ideen in der Roadmap: Ordner von Hand als DLC markieren, Vorschaubilder aus `Sceneryobjects
 EditorThumbnails`, Fahrplandaten, Gelände unter Straßen ausschneiden, Splines anlegen/löschen.
 - Hinweis: Kachel-`.map`-Dateien sind teils UTF-16 – `grep` findet darin nichts, mit Python dekodieren.
 
