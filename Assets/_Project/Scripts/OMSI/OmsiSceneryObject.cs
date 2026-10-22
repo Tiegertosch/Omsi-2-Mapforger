@@ -40,6 +40,12 @@ namespace OmsiMapEditor.OMSI
         /// holds the reflection strength for [matl_envmap]. Null when the main texture's alpha applies.
         /// </summary>
         public string TransparencyTexture { get; internal set; }
+
+        /// <summary>
+        /// [useTextTexture] or [useScriptTexture]: OMSI replaces the texture at run time with one a script fills, such
+        /// as a display text; the named file is only a placeholder.
+        /// </summary>
+        public bool HasGeneratedTexture { get; internal set; }
     }
 
     /// <summary>Tree parameters from [tree]: texture, height range and width-to-height ratio range.</summary>
@@ -168,6 +174,11 @@ namespace OmsiMapEditor.OMSI
                     case "matl_transmap":
                         if (lastMaterial != null && values.Count > 0 && values[0].Length > 0)
                             lastMaterial.TransparencyTexture = values[0];
+                        break;
+                    case "usetexttexture":
+                    case "usescripttexture":
+                        if (lastMaterial != null)
+                            lastMaterial.HasGeneratedTexture = true;
                         break;
                     case "collision_mesh":
                     case "collisionmesh":

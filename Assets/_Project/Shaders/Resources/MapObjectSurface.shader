@@ -1,6 +1,7 @@
 // A scenery object, drawn with GPU instancing: texture times material colour, shaded by a fixed sun so that roofs and
-// walls read as shapes. Materials with [matl_alpha] 1 cut away where the texture is transparent; see-through materials
-// such as glass blend over what lies behind them without writing depth.
+// walls read as shapes. Materials with [matl_alpha] 1 cut away where the texture is transparent. A see-through material
+// is drawn twice: its opaque texels with depth among the other objects, then the rest, such as glass, blended over what
+// lies behind without writing depth.
 Shader "Mapforge/ObjectSurface"
 {
     Properties
@@ -10,6 +11,7 @@ Shader "Mapforge/ObjectSurface"
         _UseAlphaTex ("Use opacity texture", Float) = 0
         _Color ("Colour", Color) = (1, 1, 1, 1)
         _Cutoff ("Alpha cutoff, 0 for opaque", Float) = 0
+        _CutAbove ("Cut texels above this alpha, 0 for none", Float) = 0
         _UvRect ("Texture area: offset xy, size zw", Vector) = (0, 0, 1, 1)
         [Enum(UnityEngine.Rendering.BlendMode)] _SourceBlend ("Source blend", Float) = 1
         [Enum(UnityEngine.Rendering.BlendMode)] _DestinationBlend ("Destination blend", Float) = 0
@@ -45,6 +47,7 @@ Shader "Mapforge/ObjectSurface"
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
                 float _Cutoff;
+                float _CutAbove;
                 float4 _UvRect;
                 float _SourceBlend;
                 float _DestinationBlend;
@@ -86,15 +89,19 @@ Shader "Mapforge/ObjectSurface"
                 // With a transparency map the main texture's alpha is reflection strength, not opacity.
                 if (_UseAlphaTex > 0.5)
                     texel.a = SAMPLE_TEXTURE2D(_AlphaTex, sampler_AlphaTex, input.uv).a;
+                half opacity = texel.a * _Color.a;
                 if (_Cutoff > 0.0)
-                    clip(texel.a - _Cutoff);
+                    clip(opacity - _Cutoff);
+                // The blended pass leaves out what the opaque pass has drawn.
+                if (_CutAbove > 0.0)
+                    clip(_CutAbove - opacity);
                 // A sun from the south-east, high up; both sides of a normal are lit alike, which suits the
                 // two-sided tree planes and meshes with inconsistent normals.
                 float3 sun = normalize(float3(0.35, 0.85, -0.4));
                 // Meshes without normals would give NaN with normalize().
                 float3 normal = input.normalWS / max(length(input.normalWS), 1e-5);
                 half light = 0.55 + 0.45 * abs(dot(normal, sun));
-                half alpha = _Blended > 0.5 ? texel.a * _Color.a : 1.0;
+                half alpha = _Blended > 0.5 ? opacity : 1.0;
                 return half4(texel.rgb * _Color.rgb * light, alpha);
             }
             ENDHLSL

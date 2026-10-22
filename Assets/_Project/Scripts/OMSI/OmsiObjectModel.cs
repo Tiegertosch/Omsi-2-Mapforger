@@ -23,6 +23,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The texture whose alpha gives the opacity ([matl_transmap]), relative to the installation, or null.</summary>
         public string TransparencyTexturePath { get; internal set; }
 
+        /// <summary>
+        /// The texture is made at run time by a script, such as a display text; <see cref="TexturePath"/> is then null,
+        /// as the file is only a placeholder.
+        /// </summary>
+        public bool HasGeneratedTexture { get; internal set; }
+
         /// <summary>True when the material is drawn blended over what lies behind it.</summary>
         public bool IsTransparent => AlphaMode == 2 || Alpha < 0.99f;
     }
@@ -274,9 +280,11 @@ namespace OmsiMapEditor.OMSI
                 occurrences.TryGetValue(texture, out var occurrence);
                 occurrences[texture] = occurrence + 1;
                 var settings = sceneryMesh.Materials.Find(item => string.Equals(item.Texture, texture, StringComparison.OrdinalIgnoreCase) && item.Index == occurrence);
+                var generated = settings?.HasGeneratedTexture ?? false;
                 slots[index] = AddMaterial(model, new OmsiModelMaterial
                 {
-                    TexturePath = texture.Length > 0 ? ResolveTexture(objectFolder, texture) : null,
+                    TexturePath = texture.Length > 0 && !generated ? ResolveTexture(objectFolder, texture) : null,
+                    HasGeneratedTexture = generated,
                     Red = source.DiffuseRed,
                     Green = source.DiffuseGreen,
                     Blue = source.DiffuseBlue,
@@ -296,6 +304,7 @@ namespace OmsiMapEditor.OMSI
                 var existing = model.Materials[index];
                 if (string.Equals(existing.TexturePath, material.TexturePath, StringComparison.OrdinalIgnoreCase) &&
                     existing.AlphaMode == material.AlphaMode && existing.Red == material.Red &&
+                    existing.HasGeneratedTexture == material.HasGeneratedTexture &&
                     string.Equals(existing.TransparencyTexturePath, material.TransparencyTexturePath, StringComparison.OrdinalIgnoreCase) &&
                     existing.Green == material.Green && existing.Blue == material.Blue && existing.Alpha == material.Alpha)
                     return index;

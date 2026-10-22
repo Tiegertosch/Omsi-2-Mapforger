@@ -356,6 +356,29 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void MaterialsWithScriptTexturesKeepNoPlaceholderFile()
+        {
+            // The display font exists only in the object's script, not as a file.
+            File.WriteAllBytes(Model("display.o3d"), O3d(1, 0, null, new[] { V(0, 0, 0), V(1, 0, 0), V(0, 0, 1), V(1, 0, 1) },
+                new[] { 0, 1, 2, 1, 3, 2 }, new[] { 0, 1 }, new[] { "case.bmp", "text.tga" }));
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test", "texture"));
+            File.WriteAllBytes(Path.Combine(installation, "Sceneryobjects", "Test", "texture", "case.bmp"), new byte[] { 1 });
+            WriteSco("display.sco",
+                "[mesh]", "display.o3d", "",
+                "[matl]", "text.tga", "0", "", "[useTextTexture]", "0", "", "[matl_alpha]", "2");
+
+            var catalog = new OmsiObjectModelCatalog(installation);
+            var display = catalog.Get(@"Sceneryobjects\Test\display.sco");
+
+            Assert.AreEqual(2, display.Materials.Count);
+            Assert.IsFalse(display.Materials[0].HasGeneratedTexture);
+            Assert.IsTrue(display.Materials[1].HasGeneratedTexture);
+            Assert.IsNull(display.Materials[1].TexturePath);
+            Assert.AreEqual(2, display.Materials[1].AlphaMode);
+            CollectionAssert.IsEmpty(catalog.Problems);
+        }
+
+        [Test]
         public void ReadsTerrainHeightsFromTheSouthWestCorner()
         {
             var bytes = new byte[4 + 61 * 61 * 4];

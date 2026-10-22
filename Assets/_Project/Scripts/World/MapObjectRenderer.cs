@@ -24,6 +24,12 @@ namespace OmsiMapEditor.World
         private const int ObjectQueue = 3150;
         private const int TransparentObjectQueue = 3250;
 
+        /// <summary>Texels at least this opaque are drawn with depth; the blended pass of a material draws the rest.</summary>
+        private const float OpaqueAlpha = 0.99f;
+
+        /// <summary>A display whose text a script writes stays empty in the editor; opaque ones show a dark face.</summary>
+        private static readonly Color EmptyDisplayColour = new Color(0.08f, 0.08f, 0.08f, 1f);
+
         private const int InstancesPerCall = 1023;
 
         private sealed class TextureData
@@ -48,6 +54,10 @@ namespace OmsiMapEditor.World
 
             public Mesh Mesh;
             public Material[] Materials;
+
+            /// <summary>Per submesh, the blended pass of a see-through material, or null.</summary>
+            public Material[] BlendedMaterials;
+
             public Matrix4x4[] Instances = new Matrix4x4[0];
             public int InstanceCount;
 
@@ -244,26 +254,33 @@ namespace OmsiMapEditor.World
                     continue;
                 var crossed = ThreeDimensional && kind.CrossMaterial != null;
                 var mesh = crossed ? treeCross : kind.Mesh;
-                var materials = crossed ? new[] { kind.CrossMaterial } : kind.Materials;
                 var instances = crossed ? kind.CrossInstances : kind.Instances;
-                for (var submesh = 0; submesh < materials.Length; submesh++)
+                Draw(kind, mesh, crossed ? new[] { kind.CrossMaterial } : kind.Materials, instances);
+                if (!crossed && kind.BlendedMaterials != null)
+                    Draw(kind, mesh, kind.BlendedMaterials, instances);
+            }
+        }
+
+        /// <summary>Draws every instance of a kind with one material per submesh; null materials are left out.</summary>
+        private void Draw(KindData kind, Mesh mesh, Material[] materials, Matrix4x4[] instances)
+        {
+            for (var submesh = 0; submesh < materials.Length; submesh++)
+            {
+                var material = materials[submesh];
+                if (material == null)
+                    continue;
+                var parameters = new RenderParams(material)
                 {
-                    var material = materials[submesh];
-                    if (material == null)
-                        continue;
-                    var parameters = new RenderParams(material)
-                    {
-                        camera = targetCamera,
-                        layer = MapGroundRenderer.GroundLayer,
-                        shadowCastingMode = ShadowCastingMode.Off,
-                        receiveShadows = false,
-                        // The instances spread over the whole map; a box around all of it keeps them from being culled.
-                        worldBounds = new Bounds(Vector3.zero, new Vector3(1e6f, 1e5f, 1e6f))
-                    };
-                    for (var start = 0; start < kind.InstanceCount; start += InstancesPerCall)
-                        Graphics.RenderMeshInstanced(parameters, mesh, submesh, instances,
-                            Math.Min(InstancesPerCall, kind.InstanceCount - start), start);
-                }
+                    camera = targetCamera,
+                    layer = MapGroundRenderer.GroundLayer,
+                    shadowCastingMode = ShadowCastingMode.Off,
+                    receiveShadows = false,
+                    // The instances spread over the whole map; a box around all of it keeps them from being culled.
+                    worldBounds = new Bounds(Vector3.zero, new Vector3(1e6f, 1e5f, 1e6f))
+                };
+                for (var start = 0; start < kind.InstanceCount; start += InstancesPerCall)
+                    Graphics.RenderMeshInstanced(parameters, mesh, submesh, instances,
+                        Math.Min(InstancesPerCall, kind.InstanceCount - start), start);
             }
         }
 
@@ -485,17 +502,46 @@ namespace OmsiMapEditor.World
                 if (model.Triangles[index].Count == 0)
                     continue;
                 var source = model.Materials[index];
-                kind.Materials[index] = NewMaterial(TextureFor(source.TexturePath), new Color(source.Red, source.Green, source.Blue, source.Alpha),
-                    source.AlphaMode == 1 ? 0.5f : 0f, source.IsTransparent);
-                if (source.TransparencyTexturePath != null)
+                if (source.HasGeneratedTexture)
                 {
-                    kind.Materials[index].SetTexture("_AlphaTex", TextureFor(source.TransparencyTexturePath));
-                    kind.Materials[index].SetFloat("_UseAlphaTex", 1f);
+                    // Without its script the text is empty: see-through where the material blends or cuts.
+                    if (source.AlphaMode == 0)
+                        kind.Materials[index] = NewMaterial(Texture2D.whiteTexture, EmptyDisplayColour, 0f, false);
+                    continue;
                 }
+
+                var colour = new Color(source.Red, source.Green, source.Blue, source.Alpha);
+                if (!source.IsTransparent)
+                {
+                    kind.Materials[index] = NewMaterial(TextureFor(source.TexturePath), colour, source.AlphaMode == 1 ? 0.5f : 0f, false);
+                    SetTransparencyTexture(kind.Materials[index], source);
+                    continue;
+                }
+
+                // Mostly opaque materials such as a bus shelter with glass panes must hide what lies behind them, so
+                // their opaque texels write depth; only the rest blends. Plain glass has no opaque texels.
+                if (source.Alpha >= OpaqueAlpha)
+                {
+                    kind.Materials[index] = NewMaterial(TextureFor(source.TexturePath), colour, OpaqueAlpha, false);
+                    SetTransparencyTexture(kind.Materials[index], source);
+                }
+                kind.BlendedMaterials = kind.BlendedMaterials ?? new Material[model.Materials.Count];
+                kind.BlendedMaterials[index] = NewMaterial(TextureFor(source.TexturePath), colour, 0f, true);
+                kind.BlendedMaterials[index].SetFloat("_CutAbove", OpaqueAlpha);
+                SetTransparencyTexture(kind.BlendedMaterials[index], source);
             }
             mesh.RecalculateBounds();
             owned.Add(mesh);
             kind.Mesh = mesh;
+        }
+
+        /// <summary>With [matl_transmap] the opacity comes from that texture's alpha.</summary>
+        private void SetTransparencyTexture(Material material, OmsiModelMaterial source)
+        {
+            if (source.TransparencyTexturePath == null)
+                return;
+            material.SetTexture("_AlphaTex", TextureFor(source.TransparencyTexturePath));
+            material.SetFloat("_UseAlphaTex", 1f);
         }
 
         /// <param name="blended">See-through: blended over what lies behind, after all opaque objects, without depth.</param>
