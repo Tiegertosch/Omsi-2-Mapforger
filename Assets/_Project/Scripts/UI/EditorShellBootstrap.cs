@@ -50,6 +50,9 @@ namespace OmsiMapEditor.UI
         private VisualElement inspectorFrame;
         private Button projectCollapseButton;
         private Button inspectorCollapseButton;
+        private VisualElement toolbarHost;
+        private MapToolbar toolbar;
+        private EditorTool activeTool = EditorTool.Drag;
         private Label mapHintLabel;
         private Label zoomLabel;
         private Button emptyStateOpenButton;
@@ -203,6 +206,16 @@ namespace OmsiMapEditor.UI
                 mapView.Add(mapCanvas);
             }
 
+            toolbarHost = root.Q<VisualElement>("tool-bar-host");
+            if (toolbarHost != null)
+            {
+                toolbar = new MapToolbar();
+                toolbar.ToolChosen += SetTool;
+                toolbar.DeleteRequested += DeleteSelectedObjects;
+                toolbar.ObjectsRequested += OpenPlaceDialog;
+                toolbarHost.Add(toolbar);
+            }
+
             if (projectCollapseButton != null)
                 projectCollapseButton.clicked += () => SetPanelCollapsed(projectFrame, !IsPanelCollapsed(projectFrame));
             if (inspectorCollapseButton != null)
@@ -337,12 +350,12 @@ namespace OmsiMapEditor.UI
             if (mapCanvas != null)
             {
                 mapCanvas.HasModel = objectRenderer.HasModel;
-                mapCanvas.MovePreviewed += (items, offsetX, offsetY) =>
+                mapCanvas.MovePreviewed += (items, offsetX, offsetY, offsetHeight) =>
                 {
                     var objects = new List<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>>(items.Count);
                     foreach (var item in items)
                         objects.Add(new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(item.Tile, item.Record));
-                    objectRenderer.PreviewMove(objects, offsetX, offsetY);
+                    objectRenderer.PreviewMove(objects, offsetX, offsetY, offsetHeight);
                 };
                 mapCanvas.HeadingPreviewed += objectRenderer.PreviewHeading;
                 mapCanvas.OrientationPreviewed += objectRenderer.PreviewOrientation;
@@ -417,7 +430,7 @@ namespace OmsiMapEditor.UI
             SetStatus(mapCanvas.ThreeDimensional
                 ? "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it" +
                   (session != null && session.CanEdit
-                      ? ", drag it to move it, drag a ring to turn it: green heading, red pitch, blue bank."
+                      ? " and drag it; the move tool (W) moves it along arrows, also up, the rotate tool (E) turns it on rings: green heading, red pitch, blue bank."
                       : ".")
                 : "Back to the map from above.");
         }
@@ -461,7 +474,8 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
-        /// <c>-select objectId</c>, <c>-place Sceneryobjects\...\object.sco</c> with the preview at the centre of the view,
+        /// <c>-select objectId</c>, <c>-tool select|move|rotate</c>, <c>-place Sceneryobjects\...\object.sco</c> with the
+        /// preview at the centre of the view,
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
         /// </summary>
@@ -533,6 +547,10 @@ namespace OmsiMapEditor.UI
                     break;
                 }
             }
+
+            var toolName = Argument("-tool", 1);
+            if (toolName != null && Enum.TryParse<EditorTool>(toolName, true, out var chosenTool))
+                SetTool(chosenTool);
 
             var placeAsset = Argument("-place", 1);
             if (placeAsset != null)
@@ -663,6 +681,10 @@ namespace OmsiMapEditor.UI
             if (mapCanvas != null)
             {
                 mapCanvas.AllowEditing = session.CanEdit;
+                // A map without a project can only be looked at; selecting is the only tool then.
+                if (!session.CanEdit)
+                    activeTool = EditorTool.Drag;
+                mapCanvas.Tool = activeTool;
                 mapCanvas.SetMap(summary, keepView);
                 mapCanvas.SetSelection(selectedTile, selection);
                 mapCanvas.TexturedView = groundRenderer != null && groundRenderer.GroundVisible;
@@ -831,6 +853,7 @@ namespace OmsiMapEditor.UI
                 selectionInfoLabel.text = selection.Count == 0 ? string.Empty
                     : selection.Count == 1 ? "1 object selected"
                     : selection.Count + " objects selected";
+            UpdateToolbar();
             RenderInspector();
         }
 
@@ -1035,6 +1058,16 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.Delete && selection.Count > 0)
                 {
                     DeleteSelectedObjects();
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Q || evt.keyCode == KeyCode.W || evt.keyCode == KeyCode.E)
+                {
+                    SetTool(evt.keyCode == KeyCode.W ? EditorTool.Move : evt.keyCode == KeyCode.E ? EditorTool.Rotate : EditorTool.Drag);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Alpha3 || evt.keyCode == KeyCode.Keypad3)
+                {
+                    OpenPlaceDialog();
                     evt.StopPropagation();
                 }
                 return;
@@ -1408,6 +1441,7 @@ namespace OmsiMapEditor.UI
 
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
+            UpdateToolbar();
             mapCanvas?.Focus();
             SetStatus("Placing " + assetPath + ": click into the map. Shift+click keeps placing, R turns the preview, Esc stops." + (problem ?? string.Empty));
         }
@@ -1451,6 +1485,7 @@ namespace OmsiMapEditor.UI
         {
             placementAsset = null;
             mapCanvas?.EndPlacement();
+            UpdateToolbar();
         }
 
         private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField,
@@ -1629,6 +1664,32 @@ namespace OmsiMapEditor.UI
                 popup.style.display = DisplayStyle.None;
         }
 
+        /// <summary>Makes a tool active; choosing one ends placing. Without a project only selecting is possible.</summary>
+        private void SetTool(EditorTool tool)
+        {
+            if (currentSummary == null)
+                return;
+            if (tool != EditorTool.Drag && (session == null || !session.CanEdit))
+            {
+                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to move or rotate objects.");
+                return;
+            }
+            if (placementAsset != null)
+                StopPlacement();
+            activeTool = tool;
+            if (mapCanvas != null)
+                mapCanvas.Tool = tool;
+            UpdateToolbar();
+            SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
+                : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."
+                : "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.");
+        }
+
+        private void UpdateToolbar()
+        {
+            toolbar?.ShowState(activeTool, placementAsset != null, session != null && session.CanEdit, selection.Count > 0);
+        }
+
         private static bool IsPanelCollapsed(VisualElement frame)
         {
             return frame != null && frame.ClassListContains("floating-panel-collapsed");
@@ -1667,9 +1728,10 @@ namespace OmsiMapEditor.UI
             var left = projectFrame != null && !IsPanelCollapsed(projectFrame) ? projectFrame.worldBound.xMax - canvas.xMin : 0f;
             var right = inspectorFrame != null && !IsPanelCollapsed(inspectorFrame) ? canvas.xMax - inspectorFrame.worldBound.xMin : 0f;
             var top = mapControls != null && mapControls.resolvedStyle.display != DisplayStyle.None ? mapControls.worldBound.yMax - canvas.yMin : 0f;
+            var bottom = toolbar != null && toolbarHost.resolvedStyle.display != DisplayStyle.None ? canvas.yMax - toolbar.worldBound.yMin : 0f;
             // Before the first layout the bounds are not known yet.
             float Clean(float value) => float.IsNaN(value) ? 0f : Mathf.Max(0f, value);
-            return new Vector4(Clean(left), Clean(top), Clean(right), 0f);
+            return new Vector4(Clean(left), Clean(top), Clean(right), Clean(bottom));
         }
 
         private void ValidateLoadedMap()
@@ -1809,17 +1871,20 @@ namespace OmsiMapEditor.UI
             UpdateCounts();
             if (mapHintLabel != null)
             {
-                mapHintLabel.text = mapCanvas != null && mapCanvas.ThreeDimensional
-                    ? session != null && session.CanEdit
-                        ? "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Drag an object: move   Drag a ring: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
-                        : "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Click an object to inspect it   Save a project to edit"
-                    : session != null && session.CanEdit
-                    ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
-                    : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
+                var view = mapCanvas != null && mapCanvas.ThreeDimensional
+                    ? "3D view: right drag turns the view, middle drag moves it, the wheel zooms."
+                    : "From above: the wheel zooms, right or middle drag pans.";
+                mapHintLabel.text = view + (session != null && session.CanEdit
+                    ? "\nTools: Q drag objects freely, W move along axis arrows (Shift: whole metres), E rotate (round handle from above, rings in 3D; Shift: 15° steps), " +
+                      "Del delete, 3 place objects.\nCtrl+click or Ctrl+drag selects several. Ctrl+Z / Ctrl+Y undo and redo."
+                    : "\nClick an object to inspect it. Save a project (File > Save map project as...) to edit the map.");
                 mapHintLabel.style.display = DisplayStyle.Flex;
             }
             if (mapControls != null)
                 mapControls.style.display = DisplayStyle.Flex;
+            if (toolbarHost != null)
+                toolbarHost.style.display = DisplayStyle.Flex;
+            UpdateToolbar();
             if (emptyState != null)
                 emptyState.style.display = DisplayStyle.None;
             UpdateZoomLabel();

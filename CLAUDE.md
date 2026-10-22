@@ -98,7 +98,7 @@ Unity: `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. Befehle siehe `Docu
   -screenshot "<scratchpad>/grundorf.png" -quit -logFile "<scratchpad>/player.log"
 ```
 
-Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte). Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
+Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte), `-tool drag|move|rotate` (Pfeile nur mit `move`, Ringe/Drehgriff nur mit `rotate`). Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
 
 ## Testkarten
 
@@ -114,7 +114,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 ## Oberfläche
 
-Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Panels schweben und sind einklappbar, Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Lucide-Icons (ISC, als PNG) und Inter (OFL) sind freigegeben, sichtbarer Name bleibt „OMSI Map Editor“. Etappen stehen in der Roadmap.
+Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Panels schweben und sind einklappbar, Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Werkzeuge sind Modi (Q Drag = wählen und frei ziehen, W Move = Achsenpfeile inkl. Höhe, E Rotate = Griff/Ringe). Lucide-Icons als SVG-Pfade in `LucideIcons.cs`, gezeichnet von `IconElement` (neue Icons dort eintragen, Lizenz steht in THIRD_PARTY_NOTICES); Inter (OFL) ist freigegeben, sichtbarer Name bleibt „OMSI Map Editor“. Etappen stehen in der Roadmap.
 
 ## Aktueller Stand (22. Oktober 2026)
 

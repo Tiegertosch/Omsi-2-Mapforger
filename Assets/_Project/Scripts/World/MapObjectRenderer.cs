@@ -841,28 +841,29 @@ namespace OmsiMapEditor.World
         }
 
         /// <summary>
-        /// Draws dragged objects at their preview position until the drag ends; the offset is in metres and the same
-        /// for every object, which may lie in different tiles.
+        /// Draws dragged objects at their preview position until the drag ends; the offsets are in metres east, north
+        /// and up and the same for every object, which may lie in different tiles.
         /// </summary>
-        public void PreviewMove(IEnumerable<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>> objects, double offsetX, double offsetY)
+        public void PreviewMove(IEnumerable<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>> objects, double offsetX, double offsetY,
+            double offsetHeight)
         {
             foreach (var pair in objects)
-                PreviewPlacement(pair.Key, pair.Value, pair.Value.LocalX + offsetX, pair.Value.LocalY + offsetY, pair.Value.HeadingDegrees,
-                    pair.Value.PitchDegrees, pair.Value.BankDegrees);
+                PreviewPlacement(pair.Key, pair.Value, pair.Value.LocalX + offsetX, pair.Value.LocalY + offsetY, pair.Value.Height + offsetHeight,
+                    pair.Value.HeadingDegrees, pair.Value.PitchDegrees, pair.Value.BankDegrees);
         }
 
         /// <summary>Draws an object turned to a preview heading until the drag ends.</summary>
         public void PreviewHeading(OmsiTileSummary tile, OmsiObjectRecord item, double headingDegrees)
         {
             if (item != null)
-                PreviewPlacement(tile, item, item.LocalX, item.LocalY, headingDegrees, item.PitchDegrees, item.BankDegrees);
+                PreviewPlacement(tile, item, item.LocalX, item.LocalY, item.Height, headingDegrees, item.PitchDegrees, item.BankDegrees);
         }
 
         /// <summary>Draws an object turned to a preview orientation until the drag ends.</summary>
         public void PreviewOrientation(OmsiTileSummary tile, OmsiObjectRecord item, double headingDegrees, double pitchDegrees, double bankDegrees)
         {
             if (item != null)
-                PreviewPlacement(tile, item, item.LocalX, item.LocalY, headingDegrees, pitchDegrees, bankDegrees);
+                PreviewPlacement(tile, item, item.LocalX, item.LocalY, item.Height, headingDegrees, pitchDegrees, bankDegrees);
         }
 
         /// <summary>True when the object joins splines, like a crossing; the editor does not tilt such objects.</summary>
@@ -886,12 +887,12 @@ namespace OmsiMapEditor.World
             placementsDirty = true;
         }
 
-        private void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double headingDegrees,
-            double pitchDegrees, double bankDegrees)
+        private void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double height,
+            double headingDegrees, double pitchDegrees, double bankDegrees)
         {
             if (tile == null || item == null || !instanceOf.TryGetValue(item, out var place))
                 return;
-            place.Frame = PlacementFrame(place.Kind.Model, tile, localX, localY, item.Height, headingDegrees, pitchDegrees, bankDegrees);
+            place.Frame = PlacementFrame(place.Kind.Model, tile, localX, localY, height, headingDegrees, pitchDegrees, bankDegrees);
             SetFromFrame(place.Kind, place.Index, place.Frame);
         }
 

@@ -40,7 +40,8 @@ namespace OmsiMapEditor.UI
 
     /// <summary>
     /// Continuous top-down view of a whole map in world metres. Pans and zooms, draws tiles, splines and objects that
-    /// are visible, selects objects and, when editing is allowed, moves and rotates them by dragging. Ctrl+click and
+    /// are visible, selects objects and, when editing is allowed, moves or rotates them by dragging, as the active
+    /// <see cref="EditorTool"/> says. Ctrl+click and
     /// Ctrl+drag select several objects, which then move together. In placement mode a preview of the chosen object
     /// follows the pointer and a click reports where it should go.
     /// </summary>
@@ -85,6 +86,13 @@ namespace OmsiMapEditor.UI
         /// changes exactly one stored angle.
         /// </summary>
         private enum RingAxis { None, Pitch, Heading, Bank }
+
+        /// <summary>The direction an axis arrow of the move tool moves the selection: east, north or up.</summary>
+        private enum MoveAxis { None, East, North, Up }
+
+        /// <summary>Arrows are this long on screen; their heads this large.</summary>
+        private const float ArrowPixels = 80f;
+        private const float ArrowHeadPixels = 11f;
 
         /// <summary>Outlines are drawn from this scale on; further out the map shows markers only.</summary>
         private const float OutlineMetersPerPixel = 1.5f;
@@ -164,6 +172,14 @@ namespace OmsiMapEditor.UI
         private double turnAngle;
         private readonly Label angleLabel;
 
+        // Move tool: the arrow under the pointer and the one being dragged. A drag along an arrow keeps the offset
+        // along its axis, in metres from where the drag started; the height offset applies to the whole selection.
+        private MoveAxis hoveredArrow;
+        private MoveAxis activeArrow;
+        private Vector3 arrowOrigin;
+        private float arrowStartParameter;
+        private double previewHeightOffset;
+
         // Placement mode: the object to place and the map position under the pointer, if any.
         private string placementAsset;
         private double placementHeading;
@@ -206,7 +222,7 @@ namespace OmsiMapEditor.UI
         public event Action<List<MapObjectEdit>> ObjectsEdited;
 
         /// <summary>The selection is being dragged by this many metres east and north; the edit follows on release.</summary>
-        public event Action<IReadOnlyList<MapSelectionItem>, double, double> MovePreviewed;
+        public event Action<IReadOnlyList<MapSelectionItem>, double, double, double> MovePreviewed;
 
         /// <summary>The selected object is being turned to this heading; the edit follows on release.</summary>
         public event Action<OmsiTileSummary, OmsiObjectRecord, double> HeadingPreviewed;
@@ -231,6 +247,34 @@ namespace OmsiMapEditor.UI
 
         /// <summary>When false, objects can be selected but not dragged.</summary>
         public bool AllowEditing { get; set; }
+
+        /// <summary>
+        /// The active tool: dragging an object moves the selection freely with <see cref="EditorTool.Drag"/> and
+        /// <see cref="EditorTool.Move"/>, which also shows axis arrows; the rotation handle and rings appear only with
+        /// <see cref="EditorTool.Rotate"/>. Selecting works with every tool.
+        /// </summary>
+        public EditorTool Tool
+        {
+            get => tool;
+            set
+            {
+                if (tool == value)
+                    return;
+                CancelDrag();
+                tool = value;
+                hoveredRing = RingAxis.None;
+                hoveredArrow = MoveAxis.None;
+                MarkDirtyRepaint();
+            }
+        }
+
+        private EditorTool tool;
+
+        private bool CanMove => AllowEditing && (tool == EditorTool.Drag || tool == EditorTool.Move);
+
+        private bool HasArrows => AllowEditing && tool == EditorTool.Move && selection.Count > 0 && selectedObject != null;
+
+        private bool CanRotate => AllowEditing && tool == EditorTool.Rotate;
 
         public float MetersPerPixel => metersPerPixel;
 
@@ -656,6 +700,7 @@ namespace OmsiMapEditor.UI
             DrawSplines(painter, visible);
             DrawObjects(context, painter, visible);
             DrawSelection(painter);
+            DrawArrows(painter);
             DrawPlacement(painter);
             DrawBox(painter);
 
@@ -888,7 +933,7 @@ namespace OmsiMapEditor.UI
             painter.LineTo(handle);
             painter.Stroke();
 
-            if (AllowEditing)
+            if (CanRotate)
             {
                 painter.fillColor = dragMode == DragMode.Rotate ? SelectedObjectColor : new Color(0.12f, 0.14f, 0.17f, 1f);
                 painter.BeginPath();
@@ -1033,7 +1078,14 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (AllowEditing && HasRotationHandle() &&
+            if (!(evt.ctrlKey || evt.commandKey) && ArrowAt(position, out var arrow))
+            {
+                StartArrowDrag(arrow, evt.pointerId, position);
+                evt.StopPropagation();
+                return;
+            }
+
+            if (CanRotate && HasRotationHandle() &&
                 Vector2.Distance(position, HandleScreen(SelectedObjectScreen())) <= HandleRadius + 3f)
             {
                 StartObjectDrag(DragMode.Rotate, selectedObject, evt.pointerId, position);
@@ -1091,7 +1143,7 @@ namespace OmsiMapEditor.UI
             else if (selection.Count > 1 && selectedRecords.Contains(item))
             {
                 clickedMember = new MapSelectionItem { Tile = tile, Record = item };
-                if (AllowEditing)
+                if (CanMove)
                     StartObjectDrag(DragMode.MovePending, item, pointerId, position);
                 else
                     ObjectSelected?.Invoke(tile, item);
@@ -1100,7 +1152,7 @@ namespace OmsiMapEditor.UI
             {
                 // The shell replaces the selection with this object before the drag starts.
                 ObjectSelected?.Invoke(tile, item);
-                if (AllowEditing)
+                if (CanMove)
                     StartObjectDrag(DragMode.MovePending, item, pointerId, position);
             }
             MarkDirtyRepaint();
@@ -1126,6 +1178,11 @@ namespace OmsiMapEditor.UI
             if (!toggle && RingAt(camera, position, out var ring, out var ringPoint))
             {
                 StartTurn(ring, ringPoint, pointerId, position);
+                return;
+            }
+            if (!toggle && ArrowAt(position, out var arrow))
+            {
+                StartArrowDrag(arrow, pointerId, position);
                 return;
             }
 
@@ -1203,7 +1260,7 @@ namespace OmsiMapEditor.UI
                     var map = ToMap(tile, item.LocalX, item.LocalY);
                     if ((map - eye).sqrMagnitude > MarkerReach * MarkerReach || hasModel(item.AssetPath))
                         continue;
-                    var world = new Vector3(map.x, (GroundHeight != null ? GroundHeight(map) : 0f) + (float)item.Height, map.y);
+                    var world = WorldPosition(tile, item);
                     if (camera.TryProject(world, out var screen))
                         yield return new Marker { Tile = tile, Record = item, World = world, Screen = screen };
                 }
@@ -1217,8 +1274,12 @@ namespace OmsiMapEditor.UI
         {
             if (ObjectRenderer != null && ObjectRenderer.TryGetPlacement(item, out var frame, out _))
                 return frame.GetColumn(3);
-            var map = ToMap(tile, item.LocalX, item.LocalY);
-            return new Vector3(map.x, (GroundHeight != null ? GroundHeight(map) : 0f) + (float)item.Height, map.y);
+            // A marker follows a move preview like a model does.
+            var moving = dragMode == DragMode.Move && selectedRecords.Contains(item);
+            var map = ToMap(tile, item.LocalX + (moving ? previewLocalX - dragStartLocalX : 0.0),
+                item.LocalY + (moving ? previewLocalY - dragStartLocalY : 0.0));
+            var height = item.Height + (moving ? previewHeightOffset : 0.0);
+            return new Vector3(map.x, (GroundHeight != null ? GroundHeight(map) : 0f) + (float)height, map.y);
         }
 
         /// <summary>Objects whose position appears inside the box between two element positions in 3D.</summary>
@@ -1271,6 +1332,158 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
+        private static Vector3 ArrowDirection(MoveAxis axis)
+        {
+            return axis == MoveAxis.East ? Vector3.right : axis == MoveAxis.North ? Vector3.forward : Vector3.up;
+        }
+
+        private static Color ArrowColor(MoveAxis axis)
+        {
+            // The colours of the rings: red east like the pitch axis, blue north like bank, green up like heading.
+            return axis == MoveAxis.East ? PitchRingColor : axis == MoveAxis.North ? BankRingColor : HeadingRingColor;
+        }
+
+        private static string ArrowName(MoveAxis axis)
+        {
+            return axis == MoveAxis.East ? "X" : axis == MoveAxis.North ? "Y" : "Height";
+        }
+
+        /// <summary>
+        /// The move tool's arrows on screen, from the primary selected object as it is drawn now: east and north from
+        /// above, and up in 3D. Each runs from <paramref name="origin"/> to its tip.
+        /// </summary>
+        private List<KeyValuePair<MoveAxis, Vector2>> Arrows(out Vector2 origin)
+        {
+            var arrows = new List<KeyValuePair<MoveAxis, Vector2>>(3);
+            origin = default;
+            if (!HasArrows || summary == null || !hasView)
+                return arrows;
+            if (!ThreeDimensional)
+            {
+                origin = MapToScreen(DrawnPosition(PrimaryTile(), selectedObject));
+                arrows.Add(new KeyValuePair<MoveAxis, Vector2>(MoveAxis.East, origin + new Vector2(ArrowPixels, 0f)));
+                arrows.Add(new KeyValuePair<MoveAxis, Vector2>(MoveAxis.North, origin + new Vector2(0f, -ArrowPixels)));
+                return arrows;
+            }
+
+            var camera = OrbitCamera();
+            var world = WorldPosition(PrimaryTile(), selectedObject);
+            var depth = camera.Depth(world);
+            if (depth <= 1f || !camera.TryProject(world, out origin))
+                return arrows;
+            var length = ArrowPixels / camera.PixelsPerMeter(depth);
+            foreach (var axis in new[] { MoveAxis.East, MoveAxis.North, MoveAxis.Up })
+                if (camera.TryProject(world + ArrowDirection(axis) * length, out var tip))
+                    arrows.Add(new KeyValuePair<MoveAxis, Vector2>(axis, tip));
+            return arrows;
+        }
+
+        /// <summary>The arrow whose shaft or head lies within reach of an element position.</summary>
+        private bool ArrowAt(Vector2 position, out MoveAxis axis)
+        {
+            axis = MoveAxis.None;
+            var nearest = RingPickDistance;
+            foreach (var arrow in Arrows(out var origin))
+            {
+                // The first part of the shaft stays free, so a click on the object itself does not grab an arrow.
+                var start = Vector2.Lerp(origin, arrow.Value, 0.2f);
+                var segment = arrow.Value - start;
+                var along = segment.sqrMagnitude > 1e-6f ? Mathf.Clamp01(Vector2.Dot(position - start, segment) / segment.sqrMagnitude) : 0f;
+                var distance = Vector2.Distance(start + segment * along, position);
+                if (distance >= nearest)
+                    continue;
+                nearest = distance;
+                axis = arrow.Key;
+            }
+            return axis != MoveAxis.None;
+        }
+
+        private void StartArrowDrag(MoveAxis axis, int pointerId, Vector2 position)
+        {
+            StartObjectDrag(DragMode.Move, selectedObject, pointerId, position);
+            activeArrow = axis;
+            if (ThreeDimensional)
+            {
+                arrowOrigin = WorldPosition(PrimaryTile(), selectedObject);
+                TryAxisParameter(OrbitCamera().RayThrough(position), out arrowStartParameter);
+            }
+            ShowDragLabel(position, ArrowName(axis) + " +0.00 m");
+        }
+
+        /// <summary>Where along the dragged arrow's axis a pointer ray passes closest, in metres from the arrow's origin.</summary>
+        private bool TryAxisParameter(Ray ray, out float parameter)
+        {
+            parameter = 0f;
+            var direction = ArrowDirection(activeArrow);
+            var b = Vector3.Dot(direction, ray.direction);
+            var denominator = 1f - b * b;
+            // Looking along the axis, the pointer cannot say how far to go.
+            if (denominator < 1e-3f)
+                return false;
+            var offset = arrowOrigin - ray.origin;
+            parameter = (b * Vector3.Dot(ray.direction, offset) - Vector3.Dot(direction, offset)) / denominator;
+            return true;
+        }
+
+        /// <summary>
+        /// Follows the pointer along the dragged arrow: from above by the pointer's travel along the arrow, in 3D by the
+        /// point of the axis nearest to the pointer's ray. Shift moves in whole metres.
+        /// </summary>
+        private void UpdateArrowMove(Vector2 position, bool snap)
+        {
+            double offset;
+            if (ThreeDimensional)
+            {
+                if (!TryAxisParameter(OrbitCamera().RayThrough(position), out var parameter))
+                    return;
+                offset = parameter - arrowStartParameter;
+            }
+            else
+            {
+                var direction = activeArrow == MoveAxis.East ? Vector2.right : Vector2.down;
+                offset = Vector2.Dot(position - dragStartPointer, direction) * metersPerPixel;
+            }
+            if (snap)
+                offset = Math.Round(offset);
+            previewLocalX = dragStartLocalX + (activeArrow == MoveAxis.East ? offset : 0.0);
+            previewLocalY = dragStartLocalY + (activeArrow == MoveAxis.North ? offset : 0.0);
+            previewHeightOffset = activeArrow == MoveAxis.Up ? offset : 0.0;
+            ShowDragLabel(position, ArrowName(activeArrow) + " " + offset.ToString("+0.00;-0.00") + " m");
+        }
+
+        /// <summary>The move tool's arrows, the dragged one bright and the others faint while it is dragged.</summary>
+        private void DrawArrows(Painter2D painter)
+        {
+            var arrows = Arrows(out var origin);
+            var dragging = activeArrow != MoveAxis.None;
+            foreach (var arrow in arrows)
+            {
+                var emphasised = dragging ? arrow.Key == activeArrow : arrow.Key == hoveredArrow;
+                var colour = ArrowColor(arrow.Key);
+                if (dragging && !emphasised)
+                    colour.a = 0.35f;
+                var tip = arrow.Value;
+                var direction = (tip - origin).normalized;
+                if (direction == Vector2.zero)
+                    continue;
+                var side = new Vector2(-direction.y, direction.x) * (ArrowHeadPixels * 0.5f);
+                var neck = tip - direction * ArrowHeadPixels;
+                painter.strokeColor = colour;
+                painter.fillColor = colour;
+                painter.lineWidth = emphasised ? 4f : 2.5f;
+                painter.BeginPath();
+                painter.MoveTo(origin);
+                painter.LineTo(neck);
+                painter.Stroke();
+                painter.BeginPath();
+                painter.MoveTo(tip);
+                painter.LineTo(neck + side);
+                painter.LineTo(neck - side);
+                painter.ClosePath();
+                painter.Fill();
+            }
+        }
+
         /// <summary>
         /// Centre and radius of the rotation rings: at the pivot of the only selected object, around its model and at
         /// least <see cref="MinimumRingPixels"/> across on screen. False when there are no rings to show.
@@ -1279,7 +1492,7 @@ namespace OmsiMapEditor.UI
         {
             centre = default;
             radius = 0f;
-            if (!AllowEditing || selection.Count != 1 || selectedObject == null || ObjectRenderer == null ||
+            if (!CanRotate || selection.Count != 1 || selectedObject == null || ObjectRenderer == null ||
                 dragMode == DragMode.Move || !ObjectRenderer.TryGetPlacement(selectedObject, out var frame, out var bounds))
                 return false;
             centre = frame.GetColumn(3);
@@ -1429,20 +1642,29 @@ namespace OmsiMapEditor.UI
         {
             var name = activeRing == RingAxis.Pitch ? "Pitch" : activeRing == RingAxis.Bank ? "Bank" : "Heading";
             var value = activeRing == RingAxis.Pitch ? previewPitch : activeRing == RingAxis.Bank ? previewBank : previewHeading;
-            angleLabel.text = name + " " + value.ToString("0.0") + "°";
+            ShowDragLabel(position, name + " " + value.ToString("0.0") + "°");
+        }
+
+        /// <summary>Shows what a drag changes, such as an angle or an offset, next to the pointer.</summary>
+        private void ShowDragLabel(Vector2 position, string text)
+        {
+            angleLabel.text = text;
             angleLabel.style.left = position.x + 16f;
             angleLabel.style.top = position.y - 28f;
             angleLabel.style.display = DisplayStyle.Flex;
         }
 
-        private void UpdateHoveredRing(Vector2 position)
+        /// <summary>Highlights the ring or arrow under the pointer, so it is clear what a drag would take.</summary>
+        private void UpdateHoveredHandles(Vector2 position)
         {
             var ring = RingAxis.None;
             if (ThreeDimensional && hasView && summary != null)
                 RingAt(OrbitCamera(), position, out ring, out _);
-            if (ring == hoveredRing)
+            ArrowAt(position, out var arrow);
+            if (ring == hoveredRing && arrow == hoveredArrow)
                 return;
             hoveredRing = ring;
+            hoveredArrow = arrow;
             MarkDirtyRepaint();
         }
 
@@ -1464,6 +1686,7 @@ namespace OmsiMapEditor.UI
             for (var index = 0; index < selection.Count && index < 200; index++)
                 if (ObjectRenderer.TryGetPlacement(selection[index].Record, out var frame, out var bounds))
                     DrawBoundingBox(painter, camera, frame, bounds);
+            DrawArrows(painter);
 
             if (!TryGetRings(camera, out var centre, out var radius))
                 return;
@@ -1612,6 +1835,7 @@ namespace OmsiMapEditor.UI
             previewHeading = anchor.HeadingDegrees;
             previewPitch = anchor.PitchDegrees;
             previewBank = anchor.BankDegrees;
+            previewHeightOffset = 0.0;
             BeginDrag(mode, pointerId, position);
         }
 
@@ -1630,7 +1854,7 @@ namespace OmsiMapEditor.UI
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
                 SetPlacementPointer(position);
-                UpdateHoveredRing(position);
+                UpdateHoveredHandles(position);
                 NotifyPointerInfo(position);
                 return;
             }
@@ -1660,7 +1884,11 @@ namespace OmsiMapEditor.UI
                     break;
             }
 
-            if (dragMode == DragMode.Move && ThreeDimensional)
+            if (dragMode == DragMode.Move && activeArrow != MoveAxis.None)
+            {
+                UpdateArrowMove(position, evt.shiftKey);
+            }
+            else if (dragMode == DragMode.Move && ThreeDimensional)
             {
                 // The grabbed point slides over its horizontal plane; the objects keep their height over the ground.
                 if (TryIntersectHorizontal(OrbitCamera().RayThrough(position), moveGrabPoint.y, out var point))
@@ -1693,7 +1921,7 @@ namespace OmsiMapEditor.UI
 
             dragLastPointer = position;
             if (dragMode == DragMode.Move)
-                MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY);
+                MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY, previewHeightOffset);
             else if (dragMode == DragMode.Rotate)
                 HeadingPreviewed?.Invoke(selectedTile, selectedObject, previewHeading);
             else if (dragMode == DragMode.Turn)
@@ -1720,7 +1948,7 @@ namespace OmsiMapEditor.UI
                         Record = item.Record,
                         LocalX = item.Record.LocalX + previewLocalX - dragStartLocalX,
                         LocalY = item.Record.LocalY + previewLocalY - dragStartLocalY,
-                        Height = item.Record.Height,
+                        Height = item.Record.Height + previewHeightOffset,
                         HeadingDegrees = item.Record.HeadingDegrees,
                         PitchDegrees = item.Record.PitchDegrees,
                         BankDegrees = item.Record.BankDegrees
@@ -1797,6 +2025,8 @@ namespace OmsiMapEditor.UI
             dragPointerId = -1;
             clickedMember = null;
             activeRing = RingAxis.None;
+            activeArrow = MoveAxis.None;
+            previewHeightOffset = 0.0;
             angleLabel.style.display = DisplayStyle.None;
             if (pointerId >= 0 && this.HasPointerCapture(pointerId))
                 this.ReleasePointer(pointerId);
@@ -1956,7 +2186,8 @@ namespace OmsiMapEditor.UI
                 else if (dragMode == DragMode.Move)
                     view = (selection.Count > 1 ? selection.Count + " objects" : "#" + selectedObject.Id) + "   moved x " +
                            (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") + "   y " +
-                           (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00") + "      " + view;
+                           (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00") + "   height " +
+                           previewHeightOffset.ToString("+0.00;-0.00") + "      " + view;
                 else if (screen.HasValue && hasView)
                 {
                     var ground = GroundPoint(OrbitCamera().RayThrough(screen.Value));

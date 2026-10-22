@@ -30,9 +30,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 ## Oberfläche nach dem Corporate Design (ADR 015)
 
 - [x] Etappe 1: Design-Tokens, randlose Karte, schwebende einklappbare Panels, Ansichtsknöpfe, Statusleiste
-- Etappe 2: untere Werkzeugleiste mit den fertigen Werkzeugen und Tastenkappen
+- [x] Etappe 2: untere Werkzeugleiste mit den fertigen Werkzeugen und Tastenkappen (Drag Q zum freien Ziehen, Move W mit Achsenpfeilen auch für die Höhe, Rotate E, Delete Entf, Objects 3), Lucide-Icons als Vektorpfade
 - Etappe 3: Objekte-Panel mit Bibliothek, Suche und Kategorien statt des Platzierdialogs
-- Etappe 4: Lucide-Icons und Schrift Inter, Feinschliff
+- Etappe 4: Schrift Inter, Icons für Ansichtsknöpfe und Panels, Feinschliff
 - Farben der Vektorebene an das Corporate Design anpassen: Auswahl ist rot, Splines orange
 
 ## Später

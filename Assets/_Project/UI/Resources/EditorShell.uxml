@@ -37,6 +37,7 @@
                     <ui:Label text="Select an item to inspect its properties." class="muted" />
                 </ui:VisualElement>
             </ui:VisualElement>
+            <ui:VisualElement name="tool-bar-host" class="tool-bar-host" picking-mode="Ignore" style="display: none;" />
             <ui:VisualElement name="map-controls" class="view-controls" style="display: none;">
                 <ui:Button name="fit-map-button" text="Fit map" class="view-control-button" tooltip="Show the whole map" />
                 <ui:Button name="zoom-out-button" text="−" class="view-control-button view-zoom-button" tooltip="Zoom out (mouse wheel)" />
