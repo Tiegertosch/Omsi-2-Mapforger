@@ -1,4 +1,5 @@
-/* Design tokens from Documentation/CorporateDesign.md; components use these instead of raw values. */
+/* Design tokens from Documentation/CorporateDesign.md; components use these instead of raw values. The fonts are
+   Inter Regular and SemiBold in Fonts/, referenced directly because variables do not carry asset references. */
 :root {
     --mf-color-bg: #171C23;
     --mf-color-panel: #202630;
@@ -33,9 +34,9 @@
 }
 
 /* Application frame */
-.app-root { width: 100%; height: 100%; min-height: 100%; flex-grow: 1; align-items: stretch; background-color: rgba(0, 0, 0, 0); color: var(--mf-color-text-primary); font-size: var(--mf-font-body); }
+.app-root { width: 100%; height: 100%; min-height: 100%; flex-grow: 1; align-items: stretch; background-color: rgba(0, 0, 0, 0); color: var(--mf-color-text-primary); font-size: var(--mf-font-body); -unity-font: url("Fonts/Inter-Regular.ttf"); }
 .menu-bar { height: 36px; min-height: 36px; flex-shrink: 0; flex-direction: row; align-items: center; padding-left: var(--mf-space-4); padding-right: var(--mf-space-4); background-color: var(--mf-color-panel); border-bottom-width: 1px; border-bottom-color: var(--mf-color-border-subtle); }
-.brand { -unity-font-style: bold; font-size: var(--mf-font-heading); }
+.brand { -unity-font: url("Fonts/Inter-SemiBold.ttf"); font-size: var(--mf-font-heading); }
 .menu-container { margin-left: 24px; flex-direction: row; align-items: center; position: relative; }
 .toolbar-menu-button { min-width: 50px; height: 28px; margin: 0 2px; padding-left: 10px; padding-right: 10px; color: var(--mf-color-text-primary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .toolbar-menu-button:hover { background-color: var(--mf-color-panel-hover); }
@@ -43,7 +44,7 @@
 .menu-bar-map { flex-grow: 1; -unity-text-align: middle-right; color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Menus and popups */
-.menu-popup { position: absolute; top: 38px; min-width: 230px; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); z-index: 100; display: none; }
+.menu-popup { position: absolute; top: 38px; min-width: 230px; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); display: none; }
 .file-menu { left: 168px; }
 .edit-menu { left: 222px; }
 .view-menu { left: 276px; }
@@ -54,7 +55,7 @@
 .menu-popup-item-checked { color: var(--mf-color-accent); }
 .menu-divider { height: 1px; margin: 5px 4px; background-color: var(--mf-color-border); }
 .menu-section-label { margin: 4px 10px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
-.popup-title { margin: 4px 8px 8px; font-size: var(--mf-font-heading); -unity-font-style: bold; }
+.popup-title { margin: 4px 8px 8px; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .popup-description { margin: 4px 8px; color: var(--mf-color-text-secondary); white-space: normal; }
 .help-controls { margin-bottom: var(--mf-space-2); padding: var(--mf-space-2); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-sm); }
 .popup-close { align-self: flex-end; min-width: 68px; -unity-text-align: middle-center; }
@@ -71,19 +72,21 @@
 .map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 .empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
-.empty-state-title { font-size: 20px; -unity-font-style: bold; margin-bottom: var(--mf-space-2); }
+.empty-state-title { font-size: 20px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); margin-bottom: var(--mf-space-2); }
 .empty-state-text { max-width: 420px; -unity-text-align: middle-center; white-space: normal; color: var(--mf-color-text-secondary); }
-.primary-button { margin-top: 20px; height: 36px; padding-left: var(--mf-space-4); padding-right: var(--mf-space-4); background-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font-style: bold; border-width: 0; border-radius: var(--mf-radius-md); }
+.primary-button { margin-top: 20px; height: 36px; padding-left: var(--mf-space-4); padding-right: var(--mf-space-4); background-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); border-width: 0; border-radius: var(--mf-radius-md); }
 .primary-button:hover { background-color: var(--mf-color-accent-hover); }
 
 /* Floating panels */
 .floating-panel { position: absolute; top: var(--mf-space-2); bottom: var(--mf-space-2); padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .project-frame { left: var(--mf-space-2); width: 270px; }
 .inspector-frame { right: var(--mf-space-2); width: 300px; }
-.floating-panel-header { flex-direction: row; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
-.floating-panel-title { font-size: var(--mf-font-heading); -unity-font-style: bold; }
+.floating-panel-header { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
+.floating-panel-title { flex-grow: 1; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.floating-panel-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-accent); }
 .floating-panel-content { flex-grow: 1; min-height: 0; }
-.panel-collapse-button { width: 24px; height: 24px; margin: 0; padding: 0; -unity-text-align: middle-center; font-size: 16px; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
+.panel-collapse-button { width: 24px; height: 24px; margin: 0; padding: 3px; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
+.panel-collapse-button > .icon { flex-grow: 1; }
 .panel-collapse-button:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
 .floating-panel-collapsed { bottom: auto; width: auto; padding-top: var(--mf-space-1); padding-bottom: var(--mf-space-1); }
 .floating-panel-collapsed > .floating-panel-header { margin-bottom: 0; }
@@ -96,7 +99,14 @@
 .view-control-button { height: 28px; margin: 0 2px; padding-left: var(--mf-space-2); padding-right: var(--mf-space-2); color: var(--mf-color-text-primary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .view-control-button:hover { background-color: var(--mf-color-panel-hover); }
 .view-control-button:disabled { color: var(--mf-color-text-muted); }
-.view-zoom-button { min-width: 28px; padding-left: 4px; padding-right: 4px; -unity-text-align: middle-center; font-size: 15px; }
+.view-control-button { flex-direction: row; align-items: center; }
+.view-control-button > .icon { width: 16px; height: 16px; margin-right: 6px; }
+.view-control-button > Label { margin: 0; padding: 0; }
+.view-control-icon-only { width: 30px; padding-left: 0; padding-right: 0; justify-content: center; }
+.view-control-icon-only > .icon { margin-right: 0; }
+.view-control-active, .view-control-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
+.view-control-active:disabled { color: var(--mf-color-bg); background-color: var(--mf-color-accent); opacity: 0.5; }
+.view-control-separator { width: 1px; height: 18px; margin: 0 var(--mf-space-1); background-color: var(--mf-color-border); }
 .zoom-label { min-width: 52px; -unity-text-align: middle-center; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 
 /* Tool bar at the bottom of the map */
@@ -120,7 +130,7 @@
 .tool-panel-badge { width: 40px; height: 40px; margin-right: var(--mf-space-3); align-items: center; justify-content: center; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
 .tool-panel-badge > .icon { width: 24px; height: 24px; }
 .tool-panel-titles { flex-grow: 1; }
-.tool-panel-title { font-size: var(--mf-font-heading); -unity-font-style: bold; }
+.tool-panel-title { font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .tool-panel-subtitle { font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .panel-icon-button { width: 28px; height: 28px; margin: 0; padding: 4px; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .panel-icon-button:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
@@ -128,7 +138,7 @@
 .panel-tabs { flex-direction: row; margin-bottom: var(--mf-space-2); padding: 3px; background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); }
 .panel-tab { flex-grow: 1; height: 30px; margin: 0; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .panel-tab:hover { color: var(--mf-color-text-primary); }
-.panel-tab-active, .panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); -unity-font-style: bold; }
+.panel-tab-active, .panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .panel-search { margin-bottom: var(--mf-space-2); }
 .panel-search-field { margin: 0; }
 .panel-search-field .unity-base-text-field__input { height: 32px; padding-left: var(--mf-space-2); padding-right: 30px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
@@ -153,12 +163,12 @@
 .panel-toggle { margin: 0 0 var(--mf-space-2); }
 .panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
-.panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: 10px; -unity-font-style: bold; color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }
+.panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }
 
 /* Project browser */
-.panel-heading { margin-bottom: var(--mf-space-3); font-size: var(--mf-font-secondary); -unity-font-style: bold; color: var(--mf-color-text-secondary); }
+.panel-heading { margin-bottom: var(--mf-space-3); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .browser-project-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-secondary); color: var(--mf-color-info); white-space: normal; }
-.browser-map-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font-style: bold; white-space: normal; }
+.browser-map-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); white-space: normal; }
 .browser-map-counts { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .browser-map-warnings { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-warning); white-space: normal; }
 .browser-map-description { margin-bottom: var(--mf-space-2); }
@@ -171,12 +181,12 @@
 .browser-tile-entry-edited { border-left-width: 3px; border-left-color: var(--mf-color-warning); }
 
 /* Inspector */
-.inspector-title { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-heading); -unity-font-style: bold; }
+.inspector-title { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .inspector-property { margin-bottom: 6px; }
 .inspector-property-name { margin-bottom: 1px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .inspector-property-value { color: var(--mf-color-text-primary); white-space: normal; }
 .inspector-records { flex-grow: 1; min-height: 0; margin-top: var(--mf-space-2); border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); }
-.inspector-section-heading { margin-top: var(--mf-space-3); margin-bottom: 5px; font-size: var(--mf-font-secondary); -unity-font-style: bold; color: var(--mf-color-text-secondary); }
+.inspector-section-heading { margin-top: var(--mf-space-3); margin-bottom: 5px; font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .inspector-record { margin-bottom: 4px; padding: 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-sm); white-space: normal; }
 .inspector-record-empty { margin-bottom: 5px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); }
 .inspector-record-clickable:hover { background-color: var(--mf-color-panel-hover); }
@@ -219,7 +229,7 @@
 .export-target { margin-top: 8px; color: var(--mf-color-info); }
 .export-problem { color: var(--mf-color-error); }
 .dialog-buttons { flex-direction: row; justify-content: flex-end; margin-top: var(--mf-space-3); }
-.dialog-primary { background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font-style: bold; }
+.dialog-primary { background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .dialog-primary:hover { background-color: var(--mf-color-accent-hover); }
 
 /* Status bar */

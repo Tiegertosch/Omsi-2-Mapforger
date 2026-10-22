@@ -216,6 +216,17 @@ namespace OmsiMapEditor.UI
                 toolbarHost.Add(toolbar);
             }
 
+            DecorateButton(fitMapButton, "maximize", null);
+            DecorateButton(zoomOutButton, "minus", null);
+            DecorateButton(zoomInButton, "plus", null);
+            DecorateButton(centerSelectionButton, "crosshair", null);
+            DecorateButton(groundToggleButton, "layers", "Textures");
+            DecorateButton(view3DButton, "rotate-3d", "3D");
+            DecorateButton(projectCollapseButton, "chevron-left", null);
+            DecorateButton(inspectorCollapseButton, "chevron-right", null);
+            AddPanelIcon(projectFrame, "map");
+            AddPanelIcon(inspectorFrame, "sliders-horizontal");
+
             if (projectCollapseButton != null)
                 projectCollapseButton.clicked += () => SetPanelCollapsed(projectFrame, !IsPanelCollapsed(projectFrame));
             if (inspectorCollapseButton != null)
@@ -404,8 +415,7 @@ namespace OmsiMapEditor.UI
             groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (objectRenderer != null)
                 objectRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
-            if (view3DButton != null)
-                view3DButton.text = mapCanvas.ThreeDimensional ? "3D: on" : "3D: off";
+            view3DButton?.EnableInClassList("view-control-active", mapCanvas.ThreeDimensional);
             UpdateMapHeader();
             UpdateZoomLabel();
             SetStatus(mapCanvas.ThreeDimensional
@@ -431,8 +441,7 @@ namespace OmsiMapEditor.UI
                 objectRenderer.ObjectsVisible = visible;
             mapCanvas.TexturedView = visible;
             mapCanvas.Refresh();
-            if (groundToggleButton != null)
-                groundToggleButton.text = visible ? "Textures: on" : "Textures: off";
+            groundToggleButton?.EnableInClassList("view-control-active", visible);
         }
 
         private void OpenMap()
@@ -1654,6 +1663,31 @@ namespace OmsiMapEditor.UI
             toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, session != null && session.CanEdit, selection.Count > 0);
         }
 
+        /// <summary>
+        /// Gives a button a Lucide icon and, if given, a label next to it; a button draws its own text over its children,
+        /// so the text moves into a label.
+        /// </summary>
+        private static void DecorateButton(Button button, string icon, string label)
+        {
+            if (button == null)
+                return;
+            button.text = string.Empty;
+            button.Add(new IconElement(icon));
+            if (label != null)
+                button.Add(new Label(label) { pickingMode = PickingMode.Ignore });
+        }
+
+        /// <summary>Puts an accent icon before the title of a floating panel.</summary>
+        private static void AddPanelIcon(VisualElement frame, string icon)
+        {
+            var header = frame?.Q(className: "floating-panel-header");
+            if (header == null)
+                return;
+            var element = new IconElement(icon);
+            element.AddToClassList("floating-panel-icon");
+            header.Insert(0, element);
+        }
+
         private static bool IsPanelCollapsed(VisualElement frame)
         {
             return frame != null && frame.ClassListContains("floating-panel-collapsed");
@@ -1673,7 +1707,7 @@ namespace OmsiMapEditor.UI
             if (button != null)
             {
                 // The project browser folds to the left, the inspector to the right.
-                button.text = collapsed == isInspector ? "‹" : "›";
+                button.Q<IconElement>()?.SetIcon(collapsed == isInspector ? "chevron-left" : "chevron-right");
                 button.tooltip = (collapsed ? "Open the " : "Collapse the ") + (isInspector ? "inspector" : "project browser");
             }
             if (isInspector)

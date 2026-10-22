@@ -22,7 +22,7 @@
             <ui:VisualElement name="project-frame" class="floating-panel project-frame">
                 <ui:VisualElement class="floating-panel-header">
                     <ui:Label text="Project" class="floating-panel-title" />
-                    <ui:Button name="project-collapse-button" text="‹" class="panel-collapse-button" tooltip="Collapse the project browser" />
+                    <ui:Button name="project-collapse-button" class="panel-collapse-button" tooltip="Collapse the project browser" />
                 </ui:VisualElement>
                 <ui:VisualElement name="project-panel" class="floating-panel-content">
                     <ui:Label text="No map loaded" class="muted" />
@@ -31,7 +31,7 @@
             <ui:VisualElement name="inspector-frame" class="floating-panel inspector-frame">
                 <ui:VisualElement class="floating-panel-header">
                     <ui:Label text="Inspector" class="floating-panel-title" />
-                    <ui:Button name="inspector-collapse-button" text="›" class="panel-collapse-button" tooltip="Collapse the inspector" />
+                    <ui:Button name="inspector-collapse-button" class="panel-collapse-button" tooltip="Collapse the inspector" />
                 </ui:VisualElement>
                 <ui:VisualElement name="inspector-panel" class="floating-panel-content">
                     <ui:Label text="Select an item to inspect its properties." class="muted" />
@@ -40,13 +40,14 @@
             <ui:VisualElement name="tool-panel-host" class="tool-panel-host" picking-mode="Ignore" style="display: none;" />
             <ui:VisualElement name="tool-bar-host" class="tool-bar-host" picking-mode="Ignore" style="display: none;" />
             <ui:VisualElement name="map-controls" class="view-controls" style="display: none;">
-                <ui:Button name="fit-map-button" text="Fit map" class="view-control-button" tooltip="Show the whole map" />
-                <ui:Button name="zoom-out-button" text="−" class="view-control-button view-zoom-button" tooltip="Zoom out (mouse wheel)" />
+                <ui:Button name="fit-map-button" class="view-control-button view-control-icon-only" tooltip="Fit map: show the whole map" />
+                <ui:Button name="zoom-out-button" class="view-control-button view-control-icon-only" tooltip="Zoom out (mouse wheel)" />
                 <ui:Label name="zoom-label" text="Fit" class="zoom-label" />
-                <ui:Button name="zoom-in-button" text="+" class="view-control-button view-zoom-button" tooltip="Zoom in (mouse wheel)" />
-                <ui:Button name="center-selection-button" text="Center selection" class="view-control-button" tooltip="Move the view to the selected object or tile" />
-                <ui:Button name="ground-toggle-button" text="Textures: on" class="view-control-button" tooltip="Show the ground and objects textured, or plain tiles with outlines. The 3D view always shows textures." />
-                <ui:Button name="view3d-button" text="3D: off" class="view-control-button" tooltip="Look at and edit the map in 3D: right drag turns, middle drag moves, the wheel zooms." />
+                <ui:Button name="zoom-in-button" class="view-control-button view-control-icon-only" tooltip="Zoom in (mouse wheel)" />
+                <ui:Button name="center-selection-button" class="view-control-button view-control-icon-only" tooltip="Center selection: move the view to the selected object or tile" />
+                <ui:VisualElement class="view-control-separator" />
+                <ui:Button name="ground-toggle-button" text="Textures" class="view-control-button view-control-active" tooltip="Show the ground and objects textured, or plain tiles with outlines. The 3D view always shows textures." />
+                <ui:Button name="view3d-button" text="3D" class="view-control-button" tooltip="Look at and edit the map in 3D: right drag turns, middle drag moves, the wheel zooms." />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="file-menu" class="menu-popup file-menu">

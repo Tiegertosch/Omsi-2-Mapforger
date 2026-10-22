@@ -37,7 +37,7 @@ namespace OmsiMapEditor.OMSI
         {
             "Agriculture", "Animals", "Buildings_DDR_RUE", "Buildings_JHY", "Buildings_MC", "Buildings_RUE", "Generic", "Kreuz_MC",
             "Kreuz_RUE", "Railroad_MC", "Railroad_RUE", "Ruede", "Static_Vehicles_RUE", "Streetobjects_MC", "Streetobjects_RUE",
-            "Trees_MC", "Verkehrszeichen_MC", "Verkehrszeichen_RUE"
+            "Streetobjects_RW1HH", "Trees_MC", "Verkehrszeichen_MC", "Verkehrszeichen_RUE"
         };
 
         private readonly HashSet<string> baseFiles = new HashSet<string>(StringComparer.Ordinal);

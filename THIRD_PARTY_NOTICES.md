@@ -35,6 +35,14 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
+## Inter
+
+The user interface font in `Assets/_Project/UI/Resources/Fonts/` is Inter 4.1 (Regular and SemiBold):
+
+- Source: <https://github.com/rsms/inter>, release v4.1
+- Copyright (c) 2016 The Inter Project Authors
+- License: SIL Open Font License 1.1; the full text ships next to the fonts as `Inter-LICENSE.txt`
+
 ## OMSI
 
 OMSI and its content are not part of this project. Mapforge reads OMSI files from the user's own installation and does not ship them.
