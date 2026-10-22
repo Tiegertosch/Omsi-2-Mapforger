@@ -149,6 +149,11 @@
 .favorite-button { width: 26px; height: 26px; color: var(--mf-color-border); }
 .favorite-on, .favorite-on:hover { color: var(--mf-color-accent); }
 .panel-info { margin-top: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.panel-info-warning { color: var(--mf-color-warning); }
+.panel-toggle { margin: 0 0 var(--mf-space-2); }
+.panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
+.panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
+.panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: 10px; -unity-font-style: bold; color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }
 
 /* Project browser */
 .panel-heading { margin-bottom: var(--mf-space-3); font-size: var(--mf-font-secondary); -unity-font-style: bold; color: var(--mf-color-text-secondary); }

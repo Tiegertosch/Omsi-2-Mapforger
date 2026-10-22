@@ -90,7 +90,10 @@ namespace OmsiMapEditor.UI
         // Scenery objects to place: the .sco files of the OMSI installation, listed once in the background.
         private readonly Dictionary<string, int> usedAssetCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private List<string> installationAssets;
-        private Task<List<string>> installationScan;
+        private Task<KeyValuePair<List<string>, OmsiContentOrigins>> installationScan;
+
+        // Where the installation's files come from: base game, DLC or user content; null until the scan is done.
+        private OmsiContentOrigins contentOrigins;
         private string installationScanRoot;
         private string placementAsset;
         private bool placementHasAbsoluteHeight;
@@ -1309,10 +1312,13 @@ namespace OmsiMapEditor.UI
             foreach (var tile in currentSummary.Tiles)
                 foreach (var item in tile.Objects)
                     usedAssetCounts[item.AssetPath] = usedAssetCounts.TryGetValue(item.AssetPath, out var count) ? count + 1 : 1;
-            objectsPanel.SetCatalog(installationAssets, usedAssetCounts);
+            objectsPanel.SetCatalog(installationAssets, usedAssetCounts, contentOrigins);
         }
 
-        /// <summary>Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread.</summary>
+        /// <summary>
+        /// Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread, and reads from
+        /// Steam's file lists which of them belong to the base game, a DLC or neither.
+        /// </summary>
         private void StartInstallationScan()
         {
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
@@ -1321,16 +1327,19 @@ namespace OmsiMapEditor.UI
 
             installationScanRoot = root;
             installationAssets = null;
+            contentOrigins = null;
             var scan = Task.Run(() =>
             {
                 var result = new List<string>();
                 var folder = Path.Combine(root, "Sceneryobjects");
-                if (!Directory.Exists(folder))
-                    return result;
-                foreach (var path in Directory.EnumerateFiles(folder, "*.sco", SearchOption.AllDirectories))
-                    result.Add(path.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar));
-                result.Sort(StringComparer.OrdinalIgnoreCase);
-                return result;
+                if (Directory.Exists(folder))
+                {
+                    foreach (var path in Directory.EnumerateFiles(folder, "*.sco", SearchOption.AllDirectories))
+                        result.Add(path.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar));
+                    result.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+                var origins = OmsiContentOrigins.ForInstallation(root, OmsiContentOrigins.LikelySteamRoots());
+                return new KeyValuePair<List<string>, OmsiContentOrigins>(result, origins);
             });
             installationScan = scan;
 
@@ -1346,13 +1355,16 @@ namespace OmsiMapEditor.UI
                 {
                     Debug.LogException(scan.Exception);
                     installationAssets = new List<string>();
+                    contentOrigins = OmsiContentOrigins.FoldersOnly("The installation could not be listed.");
                     SetStatus("Could not list the scenery objects of the OMSI installation: " + scan.Exception?.GetBaseException().Message);
                 }
                 else
                 {
-                    installationAssets = scan.Result;
+                    installationAssets = scan.Result.Key;
+                    contentOrigins = scan.Result.Value;
+                    Debug.Log("Object origins: " + contentOrigins.Description);
                 }
-                objectsPanel.SetCatalog(installationAssets, usedAssetCounts);
+                objectsPanel.SetCatalog(installationAssets, usedAssetCounts, contentOrigins);
             }).Every(150);
         }
 
@@ -1699,7 +1711,48 @@ namespace OmsiMapEditor.UI
             if (worstGap != null)
                 SelectTile(worstGap.Tile, true);
 
-            SetStatus(DescribeMapCheck(currentSummary, continuity));
+            SetStatus(DescribeMapCheck(currentSummary, continuity) + " " + DescribeDlcUse());
+        }
+
+        /// <summary>
+        /// Which objects of the map, also attached ones and rows along splines, belong to a DLC; players without it
+        /// do not see them.
+        /// </summary>
+        private string DescribeDlcUse()
+        {
+            if (contentOrigins == null)
+                return "The origin of the objects is still being read; run the check again in a moment.";
+            if (!contentOrigins.FromSteam)
+                return "DLC objects cannot be told apart without Steam's file lists.";
+            var kinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var placements = 0;
+            void Count(string assetPath)
+            {
+                if (contentOrigins.Of(assetPath) != OmsiContentOrigin.Dlc)
+                    return;
+                kinds.Add(assetPath);
+                placements++;
+            }
+            foreach (var tile in currentSummary.Tiles)
+            {
+                foreach (var item in tile.Objects)
+                    Count(item.AssetPath);
+                foreach (var attached in tile.AttachedObjects)
+                    Count(attached.AssetPath);
+                foreach (var row in tile.SplineAttachments)
+                    Count(row.AssetPath);
+            }
+            return kinds.Count == 0
+                ? "No DLC objects: the map needs only the base game and freeware."
+                : kinds.Count + " DLC object(s) in " + placements + " placement(s), such as " + Path.GetFileName(First(kinds)) +
+                  "; players without that DLC miss them.";
+        }
+
+        private static string First(IEnumerable<string> items)
+        {
+            foreach (var item in items)
+                return item;
+            return string.Empty;
         }
 
         private static string DescribeMapCheck(OmsiMapSummary summary, OmsiSplineContinuityReport continuity)
@@ -1837,6 +1890,9 @@ namespace OmsiMapEditor.UI
             if (toolbarHost != null)
                 toolbarHost.style.display = DisplayStyle.Flex;
             UpdateToolbar();
+            // The object library and the map check need the installation's objects and their origin.
+            if (objectsPanel != null)
+                StartInstallationScan();
             if (emptyState != null)
                 emptyState.style.display = DisplayStyle.None;
             UpdateZoomLabel();

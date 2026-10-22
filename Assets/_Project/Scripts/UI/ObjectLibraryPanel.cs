@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -9,13 +10,15 @@ namespace OmsiMapEditor.UI
     /// <summary>
     /// The panel of the Objects tool: scenery objects of the OMSI installation by folder, the ones this map uses and the
     /// user's favourites, with a search across all of them. A click on an object reports it so placing can start; the
-    /// panel stays open for the next one. Favourites are a user preference, kept across maps and sessions.
+    /// panel stays open for the next one. Favourites are a user preference, kept across maps and sessions. Objects of
+    /// a DLC carry a tag and can be hidden, so maps for everyone use only the base game and freeware.
     /// </summary>
     internal sealed class ObjectLibraryPanel : VisualElement
     {
         private enum Tab { Library, InMap, Favorites }
 
         private const string FavoritesKey = "Mapforge.ObjectFavorites";
+        private const string HideDlcKey = "Mapforge.HideDlcObjects";
         private const string RootFolder = "Sceneryobjects";
 
         private sealed class Entry
@@ -24,6 +27,7 @@ namespace OmsiMapEditor.UI
             public string Path;
             public string Name;
             public string Detail;
+            public bool IsDlc;
         }
 
         private readonly List<Entry> entries = new List<Entry>();
@@ -34,8 +38,10 @@ namespace OmsiMapEditor.UI
         private readonly Label folderLabel;
         private readonly ListView list;
         private readonly Label info;
+        private readonly Toggle hideDlc;
 
         private IReadOnlyList<string> library;
+        private OmsiContentOrigins origins;
         private IReadOnlyDictionary<string, int> used = new Dictionary<string, int>();
         private Tab tab = Tab.Library;
         private string folder = RootFolder;
@@ -86,6 +92,16 @@ namespace OmsiMapEditor.UI
             searchRow.Add(searchIcon);
             Add(searchRow);
 
+            hideDlc = new Toggle("Hide DLC objects") { value = PlayerPrefs.GetInt(HideDlcKey, 0) != 0 };
+            hideDlc.AddToClassList("panel-toggle");
+            hideDlc.RegisterValueChangedCallback(evt =>
+            {
+                PlayerPrefs.SetInt(HideDlcKey, evt.newValue ? 1 : 0);
+                PlayerPrefs.Save();
+                Refresh();
+            });
+            Add(hideDlc);
+
             folderBar = new VisualElement();
             folderBar.AddToClassList("panel-folder-bar");
             var back = new Button(GoUp) { tooltip = "Up one folder" };
@@ -123,13 +139,31 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// The objects to offer: every .sco below Sceneryobjects, or null while the installation is still being listed,
-        /// and how often this map uses each object. Objects of the map join the library even if their file is missing.
+        /// how often this map uses each object, and where the files come from, or null while that is not known yet.
+        /// Objects of the map join the library even if their file is missing.
         /// </summary>
-        public void SetCatalog(IReadOnlyList<string> installationObjects, IReadOnlyDictionary<string, int> usedCounts)
+        public void SetCatalog(IReadOnlyList<string> installationObjects, IReadOnlyDictionary<string, int> usedCounts,
+            OmsiContentOrigins contentOrigins)
         {
             library = installationObjects;
             used = usedCounts ?? new Dictionary<string, int>();
+            origins = contentOrigins;
+            hideDlc.tooltip = "Hide objects that belong to a DLC, so the map needs only the base game and freeware. " +
+                              (origins == null ? "The origin of the files is still being read."
+                                  : origins.FromSteam ? origins.Description
+                                  : origins.Description + " Without Steam's lists DLC objects cannot be told apart and stay visible.");
             Refresh();
+        }
+
+        private bool IsDlc(string path)
+        {
+            return origins != null && origins.Of(path) == OmsiContentOrigin.Dlc;
+        }
+
+        /// <summary>DLC objects leave the library and the favourites while the toggle is on; the map's own list keeps them.</summary>
+        private bool Hidden(string path)
+        {
+            return hideDlc.value && tab != Tab.InMap && IsDlc(path);
         }
 
         /// <summary>Placing ended; no object is highlighted any more.</summary>
@@ -173,6 +207,7 @@ namespace OmsiMapEditor.UI
             entries.Clear();
             var terms = (search.value ?? string.Empty).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             var browsing = tab == Tab.Library && terms.Length == 0;
+            hideDlc.style.display = tab == Tab.InMap ? DisplayStyle.None : DisplayStyle.Flex;
             folderBar.style.display = browsing && !string.Equals(folder, RootFolder, StringComparison.OrdinalIgnoreCase)
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
@@ -194,7 +229,7 @@ namespace OmsiMapEditor.UI
                 else
                     candidates.UnionWith(favorites);
                 foreach (var candidate in candidates)
-                    if (Matches(candidate, terms))
+                    if (Matches(candidate, terms) && !Hidden(candidate))
                         entries.Add(ObjectEntry(candidate, true));
             }
 
@@ -215,7 +250,7 @@ namespace OmsiMapEditor.UI
             var objects = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
             void Visit(string path)
             {
-                if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || Hidden(path))
                     return;
                 var rest = path.Substring(prefix.Length);
                 var separator = rest.IndexOf(Path.DirectorySeparatorChar);
@@ -270,7 +305,22 @@ namespace OmsiMapEditor.UI
             var detail = showFolder ? location : string.Empty;
             if (count > 0)
                 detail += (detail.Length > 0 ? "  •  " : string.Empty) + count + "× in this map";
-            return new Entry { Path = path, Name = Path.GetFileNameWithoutExtension(path), Detail = detail };
+            return new Entry { Path = path, Name = Path.GetFileNameWithoutExtension(path), Detail = detail, IsDlc = IsDlc(path) };
+        }
+
+        /// <summary>How many objects of the map, and how many placements of them, belong to a DLC.</summary>
+        private bool DlcUse(out int kinds, out int placements)
+        {
+            kinds = 0;
+            placements = 0;
+            foreach (var pair in used)
+            {
+                if (!IsDlc(pair.Key))
+                    continue;
+                kinds++;
+                placements += pair.Value;
+            }
+            return kinds > 0;
         }
 
         private static string Count(int count, string noun)
@@ -290,6 +340,9 @@ namespace OmsiMapEditor.UI
         {
             var folderCount = entries.FindAll(entry => entry.IsFolder).Count;
             var objectCount = entries.Count - folderCount;
+            var usesDlc = DlcUse(out var kinds, out var placements);
+            var dlcWarning = chosen == null && tab == Tab.InMap && usesDlc;
+            info.EnableInClassList("panel-info-warning", dlcWarning);
             if (chosen != null)
                 info.text = "Click into the map to place " + Path.GetFileNameWithoutExtension(chosen) +
                             ". Shift+click keeps placing, R turns it, Esc stops.";
@@ -297,6 +350,9 @@ namespace OmsiMapEditor.UI
                 info.text = "Listing the scenery objects of the OMSI installation...";
             else if (tab == Tab.Favorites && favorites.Count == 0)
                 info.text = "Mark objects with the star to find them here.";
+            else if (dlcWarning)
+                info.text = "This map uses " + Count(kinds, "DLC object") + " in " + Count(placements, "placement") +
+                            "; players without that DLC miss them. Maps for everyone should do without.";
             else
                 info.text = (folderCount > 0 ? Count(folderCount, "folder") + ", " : string.Empty) + Count(objectCount, "object") +
                             ". Click an object, then click into the map to place it.";
@@ -335,6 +391,9 @@ namespace OmsiMapEditor.UI
             detail.AddToClassList("panel-row-detail");
             texts.Add(detail);
             row.Add(texts);
+            var tag = new Label("DLC") { name = "row-tag", tooltip = "Part of a DLC: players without it do not see this object." };
+            tag.AddToClassList("panel-row-tag");
+            row.Add(tag);
             var star = new Button { name = "row-star", tooltip = "Add to or remove from favorites" };
             star.AddToClassList("panel-icon-button");
             star.AddToClassList("favorite-button");
@@ -358,6 +417,7 @@ namespace OmsiMapEditor.UI
             var detail = row.Q<Label>("row-detail");
             detail.text = entry.Detail;
             detail.style.display = string.IsNullOrEmpty(entry.Detail) ? DisplayStyle.None : DisplayStyle.Flex;
+            row.Q<Label>("row-tag").style.display = entry.IsDlc ? DisplayStyle.Flex : DisplayStyle.None;
             var star = row.Q<Button>("row-star");
             star.userData = entry.IsFolder ? null : entry.Path;
             star.style.visibility = entry.IsFolder ? Visibility.Hidden : Visibility.Visible;
