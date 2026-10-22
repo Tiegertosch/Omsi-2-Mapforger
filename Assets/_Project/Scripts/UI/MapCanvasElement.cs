@@ -220,6 +220,12 @@ namespace OmsiMapEditor.UI
         /// <summary>The map was left-clicked in placement mode.</summary>
         public event Action<MapPlacement> PlacementRequested;
 
+        /// <summary>
+        /// The placement preview changed: the object, its map position under the pointer and its heading; a null
+        /// position when the pointer is off the map or placement ended.
+        /// </summary>
+        public event Action<string, Vector2?, double> PlacementPreviewed;
+
         /// <summary>Describes the position under the pointer and the scale, for an overlay label.</summary>
         public event Action<string> PointerInfoChanged;
 
@@ -230,8 +236,10 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// True in the 3D view: the right button turns the camera around <see cref="OrbitTarget"/> and the middle one
-        /// moves it. The left button selects objects by their models, drags them over the ground and turns the
-        /// selected object on its rotation rings; the element draws only the selection and the rings.
+        /// moves it. The left button does what it does from above: it selects objects by their models or markers,
+        /// Ctrl+click and Ctrl+drag select several, dragging moves them over the ground, rings turn a single object, and
+        /// in placement mode a click places on the ground. Zoom, fitting and centring move the camera. The element draws
+        /// the selected tile, markers, selection, rings, placement preview and selection box over the scene.
         /// </summary>
         public bool ThreeDimensional { get; private set; }
 
@@ -334,8 +342,14 @@ namespace OmsiMapEditor.UI
             set
             {
                 placementHeading = (value % 360.0 + 360.0) % 360.0;
+                NotifyPlacementPreview();
                 MarkDirtyRepaint();
             }
+        }
+
+        private void NotifyPlacementPreview()
+        {
+            PlacementPreviewed?.Invoke(placementAsset, placementAsset != null ? placementPointer : null, placementHeading);
         }
 
         /// <summary>Starts placement mode: left clicks report positions instead of selecting objects.</summary>
@@ -346,10 +360,17 @@ namespace OmsiMapEditor.UI
             PlacementHeading = headingDegrees;
         }
 
+        /// <summary>Puts the placement preview at the centre of the view, as if the pointer were there; for command-line checks.</summary>
+        public void PointPlacementAtCenter()
+        {
+            SetPlacementPointer(layout.size * 0.5f);
+        }
+
         public void EndPlacement()
         {
             placementAsset = null;
             placementPointer = null;
+            NotifyPlacementPreview();
             MarkDirtyRepaint();
         }
 
@@ -441,8 +462,18 @@ namespace OmsiMapEditor.UI
             return new Vector2(position.x + local.x * cos + local.y * sin, position.y - local.x * sin + local.y * cos);
         }
 
+        /// <summary>Shows the whole map: from above fitted to the view, in 3D from a distance that takes it in.</summary>
         public void FitToMap()
         {
+            if (ThreeDimensional)
+            {
+                if (summary == null || mapBounds.width <= 0f)
+                    return;
+                OrbitTarget = mapBounds.center;
+                SetOrbit(OrbitYaw, Mathf.Max(OrbitPitch, 40f), Mathf.Max(mapBounds.width, mapBounds.height) * 1.2f);
+                return;
+            }
+
             var size = layout.size;
             if (summary == null || mapBounds.width <= 0f || float.IsNaN(size.x) || size.x < 10f || size.y < 10f)
             {
@@ -460,9 +491,15 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
-        /// <summary>Zooms around the element centre; a factor above 1 zooms in.</summary>
+        /// <summary>Zooms around the element centre, in 3D towards the point the camera looks at; a factor above 1 zooms in.</summary>
         public void Zoom(float factor)
         {
+            if (ThreeDimensional)
+            {
+                if (factor > 0f)
+                    SetOrbit(OrbitYaw, OrbitPitch, OrbitDistance / factor);
+                return;
+            }
             ZoomAround(layout.size * 0.5f, factor);
         }
 
@@ -479,10 +516,17 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>Centres the view on an object, or on a tile without one; in 3D the camera turns to it and comes close to an object.</summary>
         public void CenterOn(OmsiTileSummary tile, OmsiObjectRecord item)
         {
             if (tile == null)
                 return;
+            if (ThreeDimensional)
+            {
+                OrbitTarget = item != null ? ToMap(tile, item.LocalX, item.LocalY) : ToMap(tile, tileSize * 0.5, tileSize * 0.5);
+                SetOrbit(OrbitYaw, OrbitPitch, item != null ? Mathf.Min(OrbitDistance, 60f) : Mathf.Max(OrbitDistance, (float)tileSize * 1.2f));
+                return;
+            }
             center = item != null
                 ? ToMap(tile, item.LocalX, item.LocalY)
                 : ToMap(tile, tileSize * 0.5, tileSize * 0.5);
@@ -862,7 +906,16 @@ namespace OmsiMapEditor.UI
         {
             if (placementAsset == null)
                 return;
-            placementPointer = screen.HasValue ? ScreenToMap(screen.Value) : (Vector2?)null;
+            if (ThreeDimensional)
+            {
+                var ground = screen.HasValue && hasView && summary != null ? GroundPoint(OrbitCamera().RayThrough(screen.Value)) : null;
+                placementPointer = ground.HasValue ? new Vector2(ground.Value.x, ground.Value.z) : (Vector2?)null;
+            }
+            else
+            {
+                placementPointer = screen.HasValue ? ScreenToMap(screen.Value) : (Vector2?)null;
+            }
+            NotifyPlacementPreview();
             MarkDirtyRepaint();
         }
 
@@ -939,7 +992,7 @@ namespace OmsiMapEditor.UI
                 if (evt.button == 1 || evt.button == 2)
                     BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
                 else if (evt.button == 0)
-                    PointerDown3D(position, evt.pointerId, evt.ctrlKey || evt.commandKey);
+                    PointerDown3D(position, evt.pointerId, evt.ctrlKey || evt.commandKey, evt.shiftKey);
                 evt.StopPropagation();
                 return;
             }
@@ -954,17 +1007,7 @@ namespace OmsiMapEditor.UI
 
             if (placementAsset != null)
             {
-                var map = ScreenToMap(position);
-                var target = TileAt(map);
-                var placement = new MapPlacement { Tile = target, KeepPlacing = evt.shiftKey };
-                if (target != null)
-                {
-                    var rect = TileRect(target);
-                    // Centimetres are precise enough for a click and keep the written numbers short.
-                    placement.LocalX = Math.Round(map.x - rect.xMin, 2);
-                    placement.LocalY = Math.Round(map.y - rect.yMin, 2);
-                }
-                PlacementRequested?.Invoke(placement);
+                RequestPlacement(ScreenToMap(position), evt.shiftKey);
                 evt.StopPropagation();
                 return;
             }
@@ -999,6 +1042,21 @@ namespace OmsiMapEditor.UI
             evt.StopPropagation();
         }
 
+        /// <summary>Reports a placement click at a map position; outside the map the tile is null.</summary>
+        private void RequestPlacement(Vector2 map, bool keepPlacing)
+        {
+            var target = TileAt(map);
+            var placement = new MapPlacement { Tile = target, KeepPlacing = keepPlacing };
+            if (target != null)
+            {
+                var rect = TileRect(target);
+                // Centimetres are precise enough for a click and keep the written numbers short.
+                placement.LocalX = Math.Round(map.x - rect.xMin, 2);
+                placement.LocalY = Math.Round(map.y - rect.yMin, 2);
+            }
+            PlacementRequested?.Invoke(placement);
+        }
+
         /// <summary>
         /// A click on an object: Ctrl adds or removes it, a member of a larger selection keeps the group for dragging,
         /// any other object becomes the selection. With editing allowed, dragging moves the selection.
@@ -1028,30 +1086,132 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// A left click in the 3D view: on a rotation ring it starts turning the selected object, on an object it
-        /// selects it and may start moving it, on the ground it selects the tile there.
+        /// A left click in the 3D view, like one from above: in placement mode it places on the ground; on a rotation
+        /// ring it starts turning the selected object; on an object, by its model or its marker, it selects it and may
+        /// start moving it; Ctrl on empty space starts a selection box; otherwise it selects the tile there.
         /// </summary>
-        private void PointerDown3D(Vector2 position, int pointerId, bool toggle)
+        private void PointerDown3D(Vector2 position, int pointerId, bool toggle, bool keepPlacing)
         {
             var camera = OrbitCamera();
+            var ray = camera.RayThrough(position);
+            var ground = GroundPoint(ray);
+            if (placementAsset != null)
+            {
+                if (ground.HasValue)
+                    RequestPlacement(new Vector2(ground.Value.x, ground.Value.z), keepPlacing);
+                return;
+            }
+
             if (!toggle && RingAt(camera, position, out var ring, out var ringPoint))
             {
                 StartTurn(ring, ringPoint, pointerId, position);
                 return;
             }
 
-            var ray = camera.RayThrough(position);
-            if (ObjectRenderer != null && ObjectRenderer.TryPick(ray, out var tile, out var item, out var distance))
+            if (TryPick3D(camera, position, out var tile, out var item, out var grabPoint))
             {
-                moveGrabPoint = ray.GetPoint(distance);
+                moveGrabPoint = grabPoint;
                 SelectPicked(tile, item, toggle, pointerId, position);
                 return;
             }
 
-            var ground = GroundPoint(ray);
+            if (toggle)
+            {
+                BeginDrag(DragMode.Box, pointerId, position);
+                return;
+            }
             var clickedTile = ground.HasValue ? TileAt(new Vector2(ground.Value.x, ground.Value.z)) : null;
-            if (clickedTile != null && !toggle)
+            if (clickedTile != null)
                 TileClicked?.Invoke(clickedTile);
+        }
+
+        /// <summary>Objects without a model show a marker in 3D up to this distance from the camera.</summary>
+        private const float MarkerReach = 400f;
+
+        /// <summary>
+        /// The object under an element position in 3D: the nearest model along the ray, or a marker of an object
+        /// without model within <see cref="PickRadius"/> pixels when it lies in front of that model.
+        /// </summary>
+        private bool TryPick3D(MapOrbitCamera camera, Vector2 position, out OmsiTileSummary tile, out OmsiObjectRecord item,
+            out Vector3 grabPoint)
+        {
+            tile = null;
+            item = null;
+            grabPoint = default;
+            var ray = camera.RayThrough(position);
+            var modelDistance = float.MaxValue;
+            if (ObjectRenderer != null && ObjectRenderer.TryPick(ray, out tile, out item, out modelDistance))
+                grabPoint = ray.GetPoint(modelDistance);
+
+            var nearest = PickRadius;
+            foreach (var marker in Markers(camera))
+            {
+                var distance = Vector2.Distance(marker.Screen, position);
+                var depth = Vector3.Distance(camera.Position, marker.World);
+                if (distance > nearest || depth > modelDistance)
+                    continue;
+                nearest = distance;
+                tile = marker.Tile;
+                item = marker.Record;
+                grabPoint = marker.World;
+            }
+            return item != null;
+        }
+
+        private struct Marker
+        {
+            public OmsiTileSummary Tile;
+            public OmsiObjectRecord Record;
+            public Vector3 World;
+            public Vector2 Screen;
+        }
+
+        /// <summary>
+        /// Objects without a model that the 3D view shows as markers: on the ground under their position plus their
+        /// height, within <see cref="MarkerReach"/> of the camera and in front of it.
+        /// </summary>
+        private IEnumerable<Marker> Markers(MapOrbitCamera camera)
+        {
+            if (summary == null || hasModel == null)
+                yield break;
+            var eye = new Vector2(camera.Position.x, camera.Position.z);
+            foreach (var tile in summary.Tiles)
+            {
+                foreach (var item in tile.Objects)
+                {
+                    var map = ToMap(tile, item.LocalX, item.LocalY);
+                    if ((map - eye).sqrMagnitude > MarkerReach * MarkerReach || hasModel(item.AssetPath))
+                        continue;
+                    var world = new Vector3(map.x, (GroundHeight != null ? GroundHeight(map) : 0f) + (float)item.Height, map.y);
+                    if (camera.TryProject(world, out var screen))
+                        yield return new Marker { Tile = tile, Record = item, World = world, Screen = screen };
+                }
+            }
+        }
+
+        /// <summary>
+        /// Where an object stands in 3D: its drawn frame when it has a model, else its marker position on the ground.
+        /// </summary>
+        private Vector3 WorldPosition(OmsiTileSummary tile, OmsiObjectRecord item)
+        {
+            if (ObjectRenderer != null && ObjectRenderer.TryGetPlacement(item, out var frame, out _))
+                return frame.GetColumn(3);
+            var map = ToMap(tile, item.LocalX, item.LocalY);
+            return new Vector3(map.x, (GroundHeight != null ? GroundHeight(map) : 0f) + (float)item.Height, map.y);
+        }
+
+        /// <summary>Objects whose position appears inside the box between two element positions in 3D.</summary>
+        private List<MapSelectionItem> ObjectsInBox3D(Vector2 first, Vector2 second)
+        {
+            var box = Rect.MinMaxRect(Mathf.Min(first.x, second.x), Mathf.Min(first.y, second.y), Mathf.Max(first.x, second.x),
+                Mathf.Max(first.y, second.y));
+            var camera = OrbitCamera();
+            var result = new List<MapSelectionItem>();
+            foreach (var tile in summary.Tiles)
+                foreach (var item in tile.Objects)
+                    if (camera.TryProject(WorldPosition(tile, item), out var screen) && box.Contains(screen))
+                        result.Add(new MapSelectionItem { Tile = tile, Record = item });
+            return result;
         }
 
         /// <summary>The 3D camera as the ground renderer places it, looking at the ground under <see cref="OrbitTarget"/>.</summary>
@@ -1265,12 +1425,19 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
-        /// <summary>The 3D view's overlay: boxes around the selected objects and the rotation rings.</summary>
+        /// <summary>
+        /// The 3D view's overlay: the selected tile's border on the ground, markers of objects without a model, boxes
+        /// around the selected objects, the rotation rings, the placement preview and a selection box.
+        /// </summary>
         private void Draw3D(Painter2D painter)
         {
             if (ObjectRenderer == null || layout.width < 1f || layout.height < 1f)
                 return;
             var camera = OrbitCamera();
+            DrawTileBorder3D(painter, camera);
+            DrawMarkers3D(painter, camera);
+            DrawPlacement3D(painter, camera);
+            DrawBox(painter);
             painter.lineWidth = 1.5f;
             painter.strokeColor = SelectedObjectColor;
             for (var index = 0; index < selection.Count && index < 200; index++)
@@ -1289,24 +1456,104 @@ namespace OmsiMapEditor.UI
                     colour.a = 0.35f;
                 painter.strokeColor = colour;
                 painter.lineWidth = emphasised ? 4f : 2.5f;
-                var points = RingPoints(centre, RingNormal(axis, heading, pitch), radius);
-                painter.BeginPath();
-                var open = false;
-                foreach (var point in points)
-                {
-                    if (!camera.TryProject(point, out var screen))
-                    {
-                        open = false;
-                        continue;
-                    }
-                    if (open)
-                        painter.LineTo(screen);
-                    else
-                        painter.MoveTo(screen);
-                    open = true;
-                }
-                painter.Stroke();
+                StrokeWorldLine(painter, camera, RingPoints(centre, RingNormal(axis, heading, pitch), radius));
             }
+        }
+
+        /// <summary>A world point on the ground at a map position, lifted a little so it is not hidden in the terrain.</summary>
+        private Vector3 OnGround(Vector2 map, float lift)
+        {
+            return new Vector3(map.x, (GroundHeight != null ? GroundHeight(map) : 0f) + lift, map.y);
+        }
+
+        /// <summary>Draws a line through world points, leaving gaps where points lie behind the camera.</summary>
+        private static void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points)
+        {
+            painter.BeginPath();
+            var open = false;
+            foreach (var point in points)
+            {
+                if (!camera.TryProject(point, out var screen))
+                {
+                    open = false;
+                    continue;
+                }
+                if (open)
+                    painter.LineTo(screen);
+                else
+                    painter.MoveTo(screen);
+                open = true;
+            }
+            painter.Stroke();
+        }
+
+        /// <summary>The selected tile's border, following the ground every few metres.</summary>
+        private void DrawTileBorder3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            if (selectedTile == null)
+                return;
+            var rect = TileRect(selectedTile);
+            const int steps = 40;
+            var corners = new[] { new Vector2(rect.xMin, rect.yMin), new Vector2(rect.xMax, rect.yMin), new Vector2(rect.xMax, rect.yMax), new Vector2(rect.xMin, rect.yMax) };
+            var points = new List<Vector3>(steps * 4 + 1);
+            for (var side = 0; side < 4; side++)
+                for (var step = 0; step < steps; step++)
+                    points.Add(OnGround(Vector2.Lerp(corners[side], corners[(side + 1) % 4], (float)step / steps), 0.3f));
+            points.Add(points[0]);
+            painter.strokeColor = SelectedTileColor;
+            painter.lineWidth = 2f;
+            StrokeWorldLine(painter, camera, points);
+        }
+
+        /// <summary>Objects without a model: a dot and a short line in their heading, red when selected.</summary>
+        private void DrawMarkers3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            painter.lineWidth = 1.5f;
+            foreach (var marker in Markers(camera))
+            {
+                var selected = selectedRecords.Contains(marker.Record);
+                painter.strokeColor = selected ? SelectedObjectColor : (Color)ObjectColor;
+                painter.fillColor = painter.strokeColor;
+                painter.BeginPath();
+                painter.Arc(marker.Screen, selected ? 5f : 3.5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                painter.Fill();
+                var heading = (float)(marker.Record.HeadingDegrees * Math.PI / 180.0);
+                var ahead = marker.World + new Vector3(Mathf.Sin(heading), 0f, Mathf.Cos(heading)) * 1.5f;
+                if (camera.TryProject(ahead, out var tip))
+                {
+                    painter.BeginPath();
+                    painter.MoveTo(marker.Screen);
+                    painter.LineTo(tip);
+                    painter.Stroke();
+                }
+            }
+        }
+
+        /// <summary>The placement preview on the ground under the pointer: the outline in its heading and a heading line.</summary>
+        private void DrawPlacement3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            if (placementAsset == null || !placementPointer.HasValue)
+                return;
+            var position = placementPointer.Value;
+            var heading = (float)(placementHeading * Math.PI / 180.0);
+            var sin = Mathf.Sin(heading);
+            var cos = Mathf.Cos(heading);
+            painter.strokeColor = PlacementColor;
+            painter.lineWidth = 2f;
+            if (footprints.TryGetValue(placementAsset, out var footprint))
+            {
+                foreach (var contour in footprint.Contours)
+                {
+                    var points = new List<Vector3>(contour.Length + 1);
+                    foreach (var local in contour)
+                        points.Add(OnGround(ObjectToMap(local, position, sin, cos), 0.2f));
+                    if (points.Count > 0)
+                        points.Add(points[0]);
+                    StrokeWorldLine(painter, camera, points);
+                }
+            }
+            var length = Mathf.Max(2f, footprint?.Radius ?? 0f);
+            StrokeWorldLine(painter, camera, new[] { OnGround(position, 0.2f), OnGround(position + new Vector2(sin, cos) * length, 0.2f) });
         }
 
         private static readonly int[] BoxEdges = { 0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7 };
@@ -1482,7 +1729,9 @@ namespace OmsiMapEditor.UI
                     }
                 };
             }
-            var boxed = finished == DragMode.Box ? ObjectsInBox(dragStartPointer, dragLastPointer) : null;
+            var boxed = finished != DragMode.Box ? null
+                : ThreeDimensional ? ObjectsInBox3D(dragStartPointer, dragLastPointer)
+                : ObjectsInBox(dragStartPointer, dragLastPointer);
             var member = finished == DragMode.MovePending ? clickedMember : null;
             EndDrag();
 
@@ -1575,7 +1824,8 @@ namespace OmsiMapEditor.UI
 
         private void OnGeometryChanged(GeometryChangedEvent evt)
         {
-            if ((!hasView || isFitted) && summary != null)
+            // The 3D camera keeps its place when the view changes size.
+            if ((!hasView || isFitted) && summary != null && !ThreeDimensional)
                 FitToMap();
             MarkDirtyRepaint();
         }
@@ -1660,6 +1910,16 @@ namespace OmsiMapEditor.UI
             return null;
         }
 
+        /// <summary>The tile and tile-local position of a map position, or that it lies outside the map.</summary>
+        private string DescribeMapPosition(Vector2? map)
+        {
+            var tile = map.HasValue ? TileAt(map.Value) : null;
+            return tile == null
+                ? "outside the map"
+                : "Tile " + tile.X + ", " + tile.Y + "   x " + (map.Value.x - TileRect(tile).xMin).ToString("0.0") +
+                  "   y " + (map.Value.y - TileRect(tile).yMin).ToString("0.0");
+        }
+
         private void NotifyPointerInfo(Vector2? screen)
         {
             if (PointerInfoChanged == null || summary == null)
@@ -1676,6 +1936,11 @@ namespace OmsiMapEditor.UI
                     view = (selection.Count > 1 ? selection.Count + " objects" : "#" + selectedObject.Id) + "   moved x " +
                            (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") + "   y " +
                            (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00") + "      " + view;
+                else if (screen.HasValue && hasView)
+                {
+                    var ground = GroundPoint(OrbitCamera().RayThrough(screen.Value));
+                    view = DescribeMapPosition(ground.HasValue ? new Vector2(ground.Value.x, ground.Value.z) : (Vector2?)null) + "      " + view;
+                }
                 PointerInfoChanged(view);
                 return;
             }
@@ -1686,12 +1951,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            var map = ScreenToMap(screen.Value);
-            var tile = TileAt(map);
-            var text = tile == null
-                ? "outside the map"
-                : "Tile " + tile.X + ", " + tile.Y + "   x " + (map.x - TileRect(tile).xMin).ToString("0.0") +
-                  "   y " + (map.y - TileRect(tile).yMin).ToString("0.0");
+            var text = DescribeMapPosition(ScreenToMap(screen.Value));
             if (dragMode == DragMode.Move && selection.Count > 1)
                 text = selection.Count + " objects   moved x " + (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") +
                        "   y " + (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00");

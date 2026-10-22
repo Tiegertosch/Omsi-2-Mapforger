@@ -60,6 +60,9 @@ namespace OmsiMapEditor.UI
         private VisualElement rootElement;
         private Button groundToggleButton;
         private Button view3DButton;
+
+        // Textures were switched off in the view from above; the 3D view shows them and returns to that choice.
+        private bool texturesHiddenAbove;
         private OmsiTileSummary selectedTile;
         private OmsiObjectRecord selectedObject;
 
@@ -319,6 +322,7 @@ namespace OmsiMapEditor.UI
                 };
                 mapCanvas.HeadingPreviewed += objectRenderer.PreviewHeading;
                 mapCanvas.OrientationPreviewed += objectRenderer.PreviewOrientation;
+                mapCanvas.PlacementPreviewed += objectRenderer.SetPlacementPreview;
                 mapCanvas.PreviewEnded += objectRenderer.EndPreview;
                 mapCanvas.ObjectRenderer = objectRenderer;
                 mapCanvas.GroundHeight = groundRenderer.HeightAt;
@@ -349,6 +353,8 @@ namespace OmsiMapEditor.UI
                 // Selection boxes and rings follow models that load, previews and undo, which arrive after the view drew.
                 if (selection.Count > 0)
                     mapCanvas.Refresh();
+                // The wheel and the camera drags change the distance inside the map view.
+                UpdateZoomLabel();
             }
             else
             {
@@ -361,19 +367,28 @@ namespace OmsiMapEditor.UI
         {
             if (mapCanvas == null || groundRenderer == null || currentSummary == null)
                 return;
+            // The 3D view consists of the textured scene, so it shows textures and keeps the choice from above for later.
             if (mapCanvas.ThreeDimensional)
+            {
                 mapCanvas.LeaveOrbitView();
+                if (texturesHiddenAbove)
+                    SetTextures(false);
+            }
             else
             {
-                StopPlacement();
+                texturesHiddenAbove = !groundRenderer.GroundVisible;
+                if (texturesHiddenAbove)
+                    SetTextures(true);
                 mapCanvas.EnterOrbitView();
             }
+            groundToggleButton?.SetEnabled(!mapCanvas.ThreeDimensional);
             groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (objectRenderer != null)
                 objectRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (view3DButton != null)
                 view3DButton.text = mapCanvas.ThreeDimensional ? "3D: on" : "3D: off";
             UpdateMapHeader();
+            UpdateZoomLabel();
             SetStatus(mapCanvas.ThreeDimensional
                 ? "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it" +
                   (session != null && session.CanEdit
@@ -384,16 +399,21 @@ namespace OmsiMapEditor.UI
 
         private void ToggleGround()
         {
-            if (groundRenderer == null || mapCanvas == null)
+            if (groundRenderer == null || mapCanvas == null || mapCanvas.ThreeDimensional)
                 return;
-            groundRenderer.GroundVisible = !groundRenderer.GroundVisible;
+            SetTextures(!groundRenderer.GroundVisible);
+            SetStatus(groundRenderer.GroundVisible ? "Ground textures shown." : "Ground textures hidden; tiles are drawn plain.");
+        }
+
+        private void SetTextures(bool visible)
+        {
+            groundRenderer.GroundVisible = visible;
             if (objectRenderer != null)
-                objectRenderer.ObjectsVisible = groundRenderer.GroundVisible;
-            mapCanvas.TexturedView = groundRenderer.GroundVisible;
+                objectRenderer.ObjectsVisible = visible;
+            mapCanvas.TexturedView = visible;
             mapCanvas.Refresh();
             if (groundToggleButton != null)
-                groundToggleButton.text = groundRenderer.GroundVisible ? "Textures: on" : "Textures: off";
-            SetStatus(groundRenderer.GroundVisible ? "Ground textures shown." : "Ground textures hidden; tiles are drawn plain.");
+                groundToggleButton.text = visible ? "Textures: on" : "Textures: off";
         }
 
         private void OpenMap()
@@ -416,7 +436,8 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
-        /// <c>-select objectId</c>, <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
+        /// <c>-select objectId</c>, <c>-place Sceneryobjects\...\object.sco</c> with the preview at the centre of the view,
+        /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
         /// </summary>
         private IEnumerator Start()
@@ -486,6 +507,13 @@ namespace OmsiMapEditor.UI
                     SelectObject(tile, item, false);
                     break;
                 }
+            }
+
+            var placeAsset = Argument("-place", 1);
+            if (placeAsset != null)
+            {
+                StartPlacement(placeAsset);
+                mapCanvas?.PointPlacementAtCenter();
             }
 
             var screenshot = Argument("-screenshot", 1);
@@ -975,7 +1003,7 @@ namespace OmsiMapEditor.UI
                     SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.Delete && selection.Count > 0 && (mapCanvas == null || !mapCanvas.ThreeDimensional))
+                else if (evt.keyCode == KeyCode.Delete && selection.Count > 0)
                 {
                     DeleteSelectedObjects();
                     evt.StopPropagation();
@@ -1314,7 +1342,12 @@ namespace OmsiMapEditor.UI
             if (assetPath == null)
                 return;
             HidePopup(placeDialog);
+            StartPlacement(assetPath);
+        }
 
+        /// <summary>Starts placement mode with an object file relative to the OMSI installation.</summary>
+        private void StartPlacement(string assetPath)
+        {
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             placementHasAbsoluteHeight = false;
             var problem = (string)null;
@@ -1344,9 +1377,6 @@ namespace OmsiMapEditor.UI
                 problem = " The object file could not be read: " + exception.Message;
             }
 
-            // Objects are placed in the map from above.
-            if (mapCanvas != null && mapCanvas.ThreeDimensional)
-                ToggleThreeDimensional();
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
             mapCanvas?.Focus();
@@ -1741,7 +1771,7 @@ namespace OmsiMapEditor.UI
             {
                 mapHintLabel.text = mapCanvas != null && mapCanvas.ThreeDimensional
                     ? session != null && session.CanEdit
-                        ? "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Click: select   Drag an object: move   Drag a ring: rotate (Shift: 15° steps)   Del: delete"
+                        ? "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Drag an object: move   Drag a ring: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
                         : "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Click an object to inspect it   Save a project to edit"
                     : session != null && session.CanEdit
                     ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
@@ -1762,9 +1792,13 @@ namespace OmsiMapEditor.UI
             if (zoomLabel == null || mapCanvas == null)
                 return;
             var metersPerPixel = mapCanvas.MetersPerPixel;
-            zoomLabel.text = metersPerPixel >= 1f
-                ? metersPerPixel.ToString("0.#") + " m/px"
-                : (1f / metersPerPixel).ToString("0.#") + " px/m";
+            var text = mapCanvas.ThreeDimensional
+                ? mapCanvas.OrbitDistance.ToString("0") + " m"
+                : metersPerPixel >= 1f
+                    ? metersPerPixel.ToString("0.#") + " m/px"
+                    : (1f / metersPerPixel).ToString("0.#") + " px/m";
+            if (zoomLabel.text != text)
+                zoomLabel.text = text;
         }
 
         private void RenderProjectBrowser()

@@ -98,7 +98,7 @@ Unity: `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. Befehle siehe `Docu
   -screenshot "<scratchpad>/grundorf.png" -quit -logFile "<scratchpad>/player.log"
 ```
 
-Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`. Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
+Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte). Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
 
 ## Testkarten
 
@@ -116,7 +116,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 - Zweig `feature/drag-preview-trees` (noch nicht nach `main` gemergt, nicht gepusht).
 - Zuletzt fertig und geprüft (22. Oktober): angehängte Objekte und Spline-Anhängungen, Rückseiten-Culling, Glas/`[matl_transmap]`, Bäume in 3D als gekreuzte Flächen. 116 Tests grün, Player-Screenshots geprüft. Prüfstelle für Transparenz: 70er-Wartehäuschen in Grundorf, Kachel `0 -1` bei x 264 / y 31 (`-view 0 -1 264 31 0.02 -orbit 110 12 7`).
-- **Bearbeiten in 3D nach ADR 014:** Pitch/Bank lesen, zeichnen, Inspector, Undo; Auswahl per Strahl, Verschieben, drei Drehringe (grün Heading, rot Pitch, blau Bank). Maus in 3D: links bearbeiten, Mitte Kamera verschieben, rechts Kamera drehen. Pitch/Bank-Vorzeichen am 22. Oktober vom Nutzer im Spiel bestätigt. Kreuzungen (`[splinehelper]`) nie kippen. Noch offen: mehrere Objekte gemeinsam drehen.
+- **Bearbeiten in 3D nach ADR 014:** Pitch/Bank lesen, zeichnen, Inspector, Undo; Auswahl per Strahl, Verschieben, drei Drehringe (grün Heading, rot Pitch, blau Bank). Maus in 3D: links bearbeiten, Mitte Kamera verschieben, rechts Kamera drehen. Pitch/Bank-Vorzeichen am 22. Oktober vom Nutzer im Spiel bestätigt. Kreuzungen (`[splinehelper]`) nie kippen. Danach alle 2D-Werkzeuge in 3D nachgezogen (Strg+Rahmen, Entf, Platzieren, Marker, Kachelrand, Einpassen/Zoom/Zentrieren) – neue Werkzeuge immer für beide Ansichten bauen. Nächster Schritt: mehrere Objekte gemeinsam drehen.
 - Danach korrigiert (`9c98fa3`): Verdeckung überblendeter Materialien in zwei Durchgängen, Skripttexturen wie Anzeigetafeln werden nicht mehr gezeichnet. 117 Tests grün, Screenshots geprüft.
 - Noch nicht im Player mit der Maus geprüft: Mitbewegen der Modelle beim Ziehen, Bedienung der 3D-Ansicht.
 - Hinweis: Kachel-`.map`-Dateien sind teils UTF-16 – `grep` findet darin nichts, mit Python dekodieren.

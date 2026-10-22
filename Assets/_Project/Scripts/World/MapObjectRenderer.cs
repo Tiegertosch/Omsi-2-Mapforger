@@ -110,6 +110,12 @@ namespace OmsiMapEditor.World
         private bool objectsVisible = true;
         private readonly Dictionary<long, OmsiTerrain> terrains = new Dictionary<long, OmsiTerrain>();
 
+        // The object about to be placed, drawn under the pointer as one extra instance.
+        private string previewAsset;
+        private Vector2? previewPosition;
+        private double previewHeading;
+        private readonly Matrix4x4[] previewInstance = new Matrix4x4[1];
+
         // Objects along splines; splines are not edited, so the rows are laid out once per map.
         private List<KeyValuePair<string, OmsiPlacedAttachment>> splineRows;
 
@@ -131,8 +137,9 @@ namespace OmsiMapEditor.World
         /// <summary>Raised when the set of kinds with a model changed, such as after reading a newly placed kind.</summary>
         public event Action ModelsChanged;
 
-        /// <summary>True while models are read or uploaded or placements wait to be updated.</summary>
-        public bool IsLoading => loading != null || pending != null || placementsDirty;
+        /// <summary>True while models are read or uploaded, placements wait to be updated or a placement preview waits to be read.</summary>
+        public bool IsLoading => loading != null || pending != null || placementsDirty ||
+                                 (previewAsset != null && summary != null && !requestedKinds.Contains(previewAsset));
 
         /// <summary>In the 3D view trees stand as crossed planes; from above they show their crown.</summary>
         public bool ThreeDimensional { get; set; }
@@ -245,6 +252,20 @@ namespace OmsiMapEditor.World
             if (pending != null)
                 ContinueUpload();
 
+            // A placement preview of a kind the map does not use yet; read like a newly placed kind.
+            if (previewAsset != null && loading == null && pending == null && summary != null && requestedKinds.Add(previewAsset))
+            {
+                var missing = new List<string> { previewAsset };
+                var root = installationRoot;
+                loadingGeneration = generation;
+                loading = Task.Run(() =>
+                {
+                    var data = new LoadData();
+                    ReadKinds(missing, root, data);
+                    return data;
+                });
+            }
+
             if (placementsDirty && pending == null && loading == null && summary != null)
             {
                 placementsDirty = false;
@@ -260,17 +281,35 @@ namespace OmsiMapEditor.World
             {
                 if (kind.Mesh == null || kind.InstanceCount == 0)
                     continue;
-                var crossed = ThreeDimensional && kind.CrossMaterial != null;
-                var mesh = crossed ? treeCross : kind.Mesh;
-                var instances = crossed ? kind.CrossInstances : kind.Instances;
-                Draw(kind, mesh, crossed ? new[] { kind.CrossMaterial } : kind.Materials, instances);
-                if (!crossed && kind.BlendedMaterials != null)
-                    Draw(kind, mesh, kind.BlendedMaterials, instances);
+                DrawKind(kind, kind.Instances, kind.CrossInstances, kind.InstanceCount);
+            }
+
+            if (previewAsset != null && previewPosition.HasValue && kinds.TryGetValue(previewAsset, out var preview) && preview.Mesh != null)
+            {
+                // Stands where PlaceObject puts it: on the terrain unless absolute, at height 0, upright.
+                var position = previewPosition.Value;
+                var ground = preview.Model.HasAbsoluteHeight ? 0.0 : GroundAt(position.x + originX, position.y + originY);
+                var frame = Matrix4x4.TRS(new Vector3(position.x, (float)ground, position.y),
+                    Orientation(previewHeading, 0.0, 0.0), Vector3.one);
+                var crossed = ThreeDimensional && preview.CrossMaterial != null;
+                previewInstance[0] = crossed ? CrossMatrix(preview.Model, frame) : InstanceMatrix(preview.Model, frame);
+                DrawKind(preview, previewInstance, previewInstance, 1);
             }
         }
 
-        /// <summary>Draws every instance of a kind with one material per submesh; null materials are left out.</summary>
-        private void Draw(KindData kind, Mesh mesh, Material[] materials, Matrix4x4[] instances)
+        /// <summary>Draws instances of a kind: its model, or in 3D a tree's crossed planes, then blended materials.</summary>
+        private void DrawKind(KindData kind, Matrix4x4[] instances, Matrix4x4[] crossInstances, int count)
+        {
+            var crossed = ThreeDimensional && kind.CrossMaterial != null;
+            var mesh = crossed ? treeCross : kind.Mesh;
+            var drawn = crossed ? crossInstances : instances;
+            Draw(mesh, crossed ? new[] { kind.CrossMaterial } : kind.Materials, drawn, count);
+            if (!crossed && kind.BlendedMaterials != null)
+                Draw(mesh, kind.BlendedMaterials, drawn, count);
+        }
+
+        /// <summary>Draws the first instances with one material per submesh; null materials are left out.</summary>
+        private void Draw(Mesh mesh, Material[] materials, Matrix4x4[] instances, int count)
         {
             for (var submesh = 0; submesh < materials.Length; submesh++)
             {
@@ -286,9 +325,8 @@ namespace OmsiMapEditor.World
                     // The instances spread over the whole map; a box around all of it keeps them from being culled.
                     worldBounds = new Bounds(Vector3.zero, new Vector3(1e6f, 1e5f, 1e6f))
                 };
-                for (var start = 0; start < kind.InstanceCount; start += InstancesPerCall)
-                    Graphics.RenderMeshInstanced(parameters, mesh, submesh, instances,
-                        Math.Min(InstancesPerCall, kind.InstanceCount - start), start);
+                for (var start = 0; start < count; start += InstancesPerCall)
+                    Graphics.RenderMeshInstanced(parameters, mesh, submesh, instances, Math.Min(InstancesPerCall, count - start), start);
             }
         }
 
@@ -976,16 +1014,36 @@ namespace OmsiMapEditor.World
         /// </summary>
         private static void SetFromFrame(KindData kind, int index, Matrix4x4 frame)
         {
-            var model = kind.Model;
-            if (!model.IsTree)
-            {
-                kind.Instances[index] = frame;
-                return;
-            }
-            var radius = (float)model.TreeRadius;
-            kind.Instances[index] = frame * Matrix4x4.TRS(new Vector3(0f, (float)model.TreeHeight, 0f), Quaternion.identity, new Vector3(radius, radius, radius));
+            kind.Instances[index] = InstanceMatrix(kind.Model, frame);
             if (kind.CrossMaterial != null)
-                kind.CrossInstances[index] = frame * Matrix4x4.Scale(new Vector3(radius, (float)model.TreeHeight, radius));
+                kind.CrossInstances[index] = CrossMatrix(kind.Model, frame);
+        }
+
+        private static Matrix4x4 InstanceMatrix(OmsiObjectModel model, Matrix4x4 frame)
+        {
+            if (!model.IsTree)
+                return frame;
+            var radius = (float)model.TreeRadius;
+            return frame * Matrix4x4.TRS(new Vector3(0f, (float)model.TreeHeight, 0f), Quaternion.identity, new Vector3(radius, radius, radius));
+        }
+
+        private static Matrix4x4 CrossMatrix(OmsiObjectModel model, Matrix4x4 frame)
+        {
+            var radius = (float)model.TreeRadius;
+            return frame * Matrix4x4.Scale(new Vector3(radius, (float)model.TreeHeight, radius));
+        }
+
+        /// <summary>
+        /// Shows the object about to be placed under the pointer, standing where a click would put it; null asset or
+        /// position hides it. A kind not read yet is read in the background and appears when it is ready.
+        /// </summary>
+        /// <param name="mapPosition">Map-relative metres, as the map view reports them.</param>
+        public void SetPlacementPreview(string assetPath, Vector2? mapPosition, double headingDegrees)
+        {
+            // The kind is read as soon as placement starts, before the pointer reaches the map.
+            previewAsset = assetPath;
+            previewPosition = mapPosition;
+            previewHeading = headingDegrees;
         }
 
         /// <summary>
