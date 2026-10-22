@@ -31,8 +31,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 
 - [x] Etappe 1: Design-Tokens, randlose Karte, schwebende einklappbare Panels, Ansichtsknöpfe, Statusleiste
 - [x] Etappe 2: untere Werkzeugleiste mit den fertigen Werkzeugen und Tastenkappen (Drag Q zum freien Ziehen, Move W mit Achsenpfeilen auch für die Höhe, Rotate E, Delete Entf, Objects 3), Lucide-Icons als Vektorpfade
-- Etappe 3: Objekte-Panel mit Bibliothek, Suche und Kategorien statt des Platzierdialogs
-- Etappe 4: Schrift Inter, Icons für Ansichtsknöpfe und Panels, Feinschliff
+- [x] Etappe 3: Objekte-Panel mit Bibliothek nach Ordnern, Reitern „In map“ und „Favorites“ und Suche statt des Platzierdialogs
+- Etappe 4: Schrift Inter, Icons für Ansichtsknöpfe und Panels, Feinschliff\n- Objekte-Bibliothek: Vorschaubilder der Objekte, Kategorien aus den `[groups]` der `.sco`-Dateien
 - Farben der Vektorebene an das Corporate Design anpassen: Auswahl ist rot, Splines orange
 
 ## Später

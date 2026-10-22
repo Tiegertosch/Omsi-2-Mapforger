@@ -82,16 +82,12 @@ namespace OmsiMapEditor.UI
         private Label exportTargetLabel;
         private Button exportConfirmButton;
         private VisualElement editMenu;
-        private VisualElement placeDialog;
-        private TextField placeSearchField;
-        private Toggle placeUsedToggle;
-        private ListView placeList;
-        private Label placeInfoLabel;
-        private Button placeConfirmButton;
+        private VisualElement objectsPanelHost;
+        private ObjectLibraryPanel objectsPanel;
+        private bool objectsPanelOpen;
         private Label browserCountsLabel;
 
         // Scenery objects to place: the .sco files of the OMSI installation, listed once in the background.
-        private readonly List<string> placeItems = new List<string>();
         private readonly Dictionary<string, int> usedAssetCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private List<string> installationAssets;
         private Task<List<string>> installationScan;
@@ -151,13 +147,14 @@ namespace OmsiMapEditor.UI
             var deleteObjectMenuItem = root.Q<Button>("delete-object-menu-item");
             var undoMenuItem = root.Q<Button>("undo-menu-item");
             var redoMenuItem = root.Q<Button>("redo-menu-item");
-            placeDialog = root.Q<VisualElement>("place-dialog");
-            placeSearchField = root.Q<TextField>("place-search-field");
-            placeUsedToggle = root.Q<Toggle>("place-used-toggle");
-            placeList = root.Q<ListView>("place-list");
-            placeInfoLabel = root.Q<Label>("place-info-label");
-            placeConfirmButton = root.Q<Button>("place-confirm-button");
-            var placeCancelButton = root.Q<Button>("place-cancel-button");
+            objectsPanelHost = root.Q<VisualElement>("tool-panel-host");
+            if (objectsPanelHost != null)
+            {
+                objectsPanel = new ObjectLibraryPanel();
+                objectsPanel.ObjectChosen += StartPlacement;
+                objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
+                objectsPanelHost.Add(objectsPanel);
+            }
             emptyStateOpenButton = root.Q<Button>("empty-state-open-button");
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -212,7 +209,7 @@ namespace OmsiMapEditor.UI
                 toolbar = new MapToolbar();
                 toolbar.ToolChosen += SetTool;
                 toolbar.DeleteRequested += DeleteSelectedObjects;
-                toolbar.ObjectsRequested += OpenPlaceDialog;
+                toolbar.ObjectsRequested += () => ShowObjectsPanel(!objectsPanelOpen);
                 toolbarHost.Add(toolbar);
             }
 
@@ -288,7 +285,7 @@ namespace OmsiMapEditor.UI
                 placeObjectMenuItem.clicked += () =>
                 {
                     HidePopup(editMenu);
-                    OpenPlaceDialog();
+                    ShowObjectsPanel(true);
                 };
             if (deleteObjectMenuItem != null)
                 deleteObjectMenuItem.clicked += () =>
@@ -308,25 +305,6 @@ namespace OmsiMapEditor.UI
                     HidePopup(editMenu);
                     StepHistory(redoSteps, undoSteps, false);
                 };
-            if (placeList != null)
-            {
-                placeList.makeItem = () =>
-                {
-                    var item = new Label();
-                    item.AddToClassList("place-list-item");
-                    return item;
-                };
-                placeList.bindItem = (element, index) => ((Label)element).text = DescribePlaceItem(placeItems[index]);
-                placeList.itemsSource = placeItems;
-                placeList.selectionChanged += _ => UpdatePlaceInfo();
-                placeList.itemsChosen += _ => ConfirmPlacement();
-            }
-            placeSearchField?.RegisterValueChangedCallback(_ => RefreshPlaceList());
-            placeUsedToggle?.RegisterValueChangedCallback(_ => RefreshPlaceList());
-            if (placeConfirmButton != null)
-                placeConfirmButton.clicked += ConfirmPlacement;
-            if (placeCancelButton != null)
-                placeCancelButton.clicked += () => HidePopup(placeDialog);
             if (toolsButton != null)
             {
                 toolsButton.SetEnabled(false);
@@ -474,7 +452,8 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
-        /// <c>-select objectId</c>, <c>-tool select|move|rotate</c>, <c>-place Sceneryobjects\...\object.sco</c> with the
+        /// <c>-select objectId</c>, <c>-tool drag|move|rotate</c>, <c>-objects</c> to open the object library,
+        /// <c>-place Sceneryobjects\...\object.sco</c> with the
         /// preview at the centre of the view,
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
@@ -552,6 +531,9 @@ namespace OmsiMapEditor.UI
             if (toolName != null && Enum.TryParse<EditorTool>(toolName, true, out var chosenTool))
                 SetTool(chosenTool);
 
+            if (Array.IndexOf(args, "-objects") >= 0)
+                ShowObjectsPanel(true);
+
             var placeAsset = Argument("-place", 1);
             if (placeAsset != null)
             {
@@ -563,7 +545,8 @@ namespace OmsiMapEditor.UI
             if (screenshot != null)
             {
                 var started = Time.realtimeSinceStartup;
-                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || outlinesBuilding) && Time.realtimeSinceStartup - started < 300f)
+                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || outlinesBuilding ||
+                        (installationScan != null && !installationScan.IsCompleted)) && Time.realtimeSinceStartup - started < 300f)
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
@@ -665,7 +648,7 @@ namespace OmsiMapEditor.UI
             undoSteps.Clear();
             redoSteps.Clear();
             StopPlacement();
-            HidePopup(placeDialog);
+            ShowObjectsPanel(false);
             selectedTile = null;
             selectedObject = null;
             if (keepView && previousTile != null)
@@ -1025,15 +1008,24 @@ namespace OmsiMapEditor.UI
 
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (evt.keyCode == KeyCode.Escape && (IsShown(placeDialog) || IsShown(exportDialog)))
+            if (evt.keyCode == KeyCode.Escape && IsShown(exportDialog))
             {
-                HidePopup(placeDialog);
                 HidePopup(exportDialog);
                 evt.StopPropagation();
                 return;
             }
             var focused = evt.target as VisualElement;
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(placeDialog) || IsShown(exportDialog))
+            // Esc in the object search still stops placing first, then closes the panel.
+            if (evt.keyCode == KeyCode.Escape && objectsPanel != null && focused != null && objectsPanel.Contains(focused))
+            {
+                if (placementAsset != null)
+                    StopPlacement();
+                else
+                    ShowObjectsPanel(false);
+                evt.StopPropagation();
+                return;
+            }
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog))
                 return;
 
             if (!(evt.ctrlKey || evt.commandKey))
@@ -1042,6 +1034,11 @@ namespace OmsiMapEditor.UI
                 {
                     StopPlacement();
                     SetStatus("Placement stopped.");
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && objectsPanelOpen)
+                {
+                    ShowObjectsPanel(false);
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Escape && selection.Count > 0)
@@ -1067,7 +1064,7 @@ namespace OmsiMapEditor.UI
                 }
                 else if (evt.keyCode == KeyCode.Alpha3 || evt.keyCode == KeyCode.Keypad3)
                 {
-                    OpenPlaceDialog();
+                    ShowObjectsPanel(!objectsPanelOpen);
                     evt.StopPropagation();
                 }
                 return;
@@ -1267,8 +1264,23 @@ namespace OmsiMapEditor.UI
             return string.Join(", ", shown) + (described.Count > shown.Count ? " and " + (described.Count - shown.Count) + " more" : string.Empty);
         }
 
-        private void OpenPlaceDialog()
+        /// <summary>
+        /// Opens or closes the Objects tool's panel. Opening needs an editable map; it counts the objects the map uses
+        /// and lists the installation's objects in the background. Closing ends placing.
+        /// </summary>
+        private void ShowObjectsPanel(bool show)
         {
+            if (objectsPanelHost == null)
+                return;
+            if (!show)
+            {
+                if (placementAsset != null)
+                    StopPlacement();
+                objectsPanelOpen = false;
+                objectsPanelHost.style.display = DisplayStyle.None;
+                UpdateToolbar();
+                return;
+            }
             if (session == null || currentSummary == null)
             {
                 SetStatus("Open an OMSI map before placing objects.");
@@ -1279,17 +1291,25 @@ namespace OmsiMapEditor.UI
                 SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to place objects.");
                 return;
             }
-            if (placeDialog == null || placeList == null)
-                return;
 
+            UpdateObjectsCatalog();
+            StartInstallationScan();
+            objectsPanelOpen = true;
+            objectsPanelHost.style.display = DisplayStyle.Flex;
+            objectsPanel.FocusSearch();
+            UpdateToolbar();
+        }
+
+        /// <summary>Counts the objects the map uses and hands them with the installation's objects to the panel.</summary>
+        private void UpdateObjectsCatalog()
+        {
+            if (objectsPanel == null || currentSummary == null)
+                return;
             usedAssetCounts.Clear();
             foreach (var tile in currentSummary.Tiles)
                 foreach (var item in tile.Objects)
                     usedAssetCounts[item.AssetPath] = usedAssetCounts.TryGetValue(item.AssetPath, out var count) ? count + 1 : 1;
-            StartInstallationScan();
-            RefreshPlaceList();
-            placeDialog.style.display = DisplayStyle.Flex;
-            placeSearchField?.Focus();
+            objectsPanel.SetCatalog(installationAssets, usedAssetCounts);
         }
 
         /// <summary>Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread.</summary>
@@ -1315,7 +1335,7 @@ namespace OmsiMapEditor.UI
             installationScan = scan;
 
             IVisualElementScheduledItem poll = null;
-            poll = placeDialog.schedule.Execute(() =>
+            poll = objectsPanel.schedule.Execute(() =>
             {
                 if (!scan.IsCompleted)
                     return;
@@ -1332,79 +1352,8 @@ namespace OmsiMapEditor.UI
                 {
                     installationAssets = scan.Result;
                 }
-                if (IsShown(placeDialog))
-                    RefreshPlaceList();
+                objectsPanel.SetCatalog(installationAssets, usedAssetCounts);
             }).Every(150);
-        }
-
-        private void RefreshPlaceList()
-        {
-            if (placeList == null)
-                return;
-
-            var usedOnly = placeUsedToggle == null || placeUsedToggle.value;
-            var candidates = new SortedSet<string>(usedAssetCounts.Keys, StringComparer.OrdinalIgnoreCase);
-            if (!usedOnly && installationAssets != null)
-                candidates.UnionWith(installationAssets);
-
-            var terms = (placeSearchField?.value ?? string.Empty).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var previous = SelectedPlaceItem();
-            placeItems.Clear();
-            foreach (var candidate in candidates)
-            {
-                var matches = true;
-                foreach (var term in terms)
-                    if (candidate.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
-                    {
-                        matches = false;
-                        break;
-                    }
-                if (matches)
-                    placeItems.Add(candidate);
-            }
-            placeList.RefreshItems();
-            var previousIndex = previous == null ? -1 : placeItems.FindIndex(item => string.Equals(item, previous, StringComparison.OrdinalIgnoreCase));
-            if (previousIndex >= 0)
-                placeList.SetSelectionWithoutNotify(new[] { previousIndex });
-            else
-                placeList.ClearSelection();
-            UpdatePlaceInfo();
-        }
-
-        private string DescribePlaceItem(string assetPath)
-        {
-            return usedAssetCounts.TryGetValue(assetPath, out var count)
-                ? assetPath + "    (" + count + "× in this map)"
-                : assetPath;
-        }
-
-        private string SelectedPlaceItem()
-        {
-            var index = placeList?.selectedIndex ?? -1;
-            return index >= 0 && index < placeItems.Count ? placeItems[index] : null;
-        }
-
-        private void UpdatePlaceInfo()
-        {
-            if (placeInfoLabel == null)
-                return;
-
-            var usedOnly = placeUsedToggle == null || placeUsedToggle.value;
-            var scanning = !usedOnly && installationAssets == null;
-            var selected = SelectedPlaceItem();
-            placeInfoLabel.text = (selected ?? placeItems.Count + " object(s)" + (scanning ? "; listing the OMSI installation..." : string.Empty)) +
-                                  (selected == null ? "\nSelect an object and choose Place, or double-click it." : string.Empty);
-            placeConfirmButton?.SetEnabled(selected != null);
-        }
-
-        /// <summary>Closes the dialog and starts placement mode with the chosen object.</summary>
-        private void ConfirmPlacement()
-        {
-            var assetPath = SelectedPlaceItem();
-            if (assetPath == null)
-                return;
-            HidePopup(placeDialog);
-            StartPlacement(assetPath);
         }
 
         /// <summary>Starts placement mode with an object file relative to the OMSI installation.</summary>
@@ -1476,6 +1425,8 @@ namespace OmsiMapEditor.UI
                 StopPlacement();
             PushHistory(new ObjectEditStep { TileX = placement.Tile.X, TileY = placement.Tile.Y, ObjectId = change.Record.Id, Change = change });
             RefreshAfterChange(new[] { new MapSelectionItem { Tile = placement.Tile, Record = change.Record } });
+            if (objectsPanelOpen)
+                UpdateObjectsCatalog();
             SetStatus("Placed object #" + change.Record.Id + " (" + assetPath + ") in tile " + placement.Tile.X + ", " + placement.Tile.Y +
                       ". Ctrl+Z undoes it." +
                       (placementHasAbsoluteHeight ? " Its height is absolute, not above the terrain; set Height in the inspector." : string.Empty));
@@ -1485,6 +1436,7 @@ namespace OmsiMapEditor.UI
         {
             placementAsset = null;
             mapCanvas?.EndPlacement();
+            objectsPanel?.ClearChosen();
             UpdateToolbar();
         }
 
@@ -1674,8 +1626,8 @@ namespace OmsiMapEditor.UI
                 SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to move or rotate objects.");
                 return;
             }
-            if (placementAsset != null)
-                StopPlacement();
+            // Another tool ends placing and closes the object library.
+            ShowObjectsPanel(false);
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
@@ -1687,7 +1639,7 @@ namespace OmsiMapEditor.UI
 
         private void UpdateToolbar()
         {
-            toolbar?.ShowState(activeTool, placementAsset != null, session != null && session.CanEdit, selection.Count > 0);
+            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, session != null && session.CanEdit, selection.Count > 0);
         }
 
         private static bool IsPanelCollapsed(VisualElement frame)

@@ -37,6 +37,7 @@
                     <ui:Label text="Select an item to inspect its properties." class="muted" />
                 </ui:VisualElement>
             </ui:VisualElement>
+            <ui:VisualElement name="tool-panel-host" class="tool-panel-host" picking-mode="Ignore" style="display: none;" />
             <ui:VisualElement name="tool-bar-host" class="tool-bar-host" picking-mode="Ignore" style="display: none;" />
             <ui:VisualElement name="map-controls" class="view-controls" style="display: none;">
                 <ui:Button name="fit-map-button" text="Fit map" class="view-control-button" tooltip="Show the whole map" />
@@ -80,7 +81,7 @@
             <ui:Label text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
             <ui:Label text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
             <ui:Label text="With a project, click an object in the map or in the inspector list to edit its position and orientation. Edits are saved to the project's workspace; the original map is not changed." class="popup-description" />
-            <ui:Label text="Edit > Place object... chooses a scenery object and places it with a click into the map. Del deletes the selected object unless other parts of the map still refer to it." class="popup-description" />
+            <ui:Label text="Objects (3) opens the object library: browse the Sceneryobjects folders, the objects of this map or your favorites, click one and click into the map to place it. Del deletes the selected object unless other parts of the map still refer to it." class="popup-description" />
             <ui:Label text="Ctrl+click adds objects to the selection or removes them; Ctrl+drag on empty space selects all objects in a box. Dragging one selected object moves all of them. An object moved over a tile border moves into that tile." class="popup-description" />
             <ui:Label text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
             <ui:Label text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
@@ -96,20 +97,6 @@
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="export-cancel-button" text="Cancel" class="map-control-button" />
                     <ui:Button name="export-confirm-button" text="Export" class="map-control-button dialog-primary" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-        </ui:VisualElement>
-        <ui:VisualElement name="place-dialog" class="dialog-overlay" style="display: none;">
-            <ui:VisualElement class="dialog place-dialog">
-                <ui:Label text="Place object" class="popup-title" />
-                <ui:Label text="Choose a scenery object, then click into the map to place it. Shift+click keeps placing, R and Shift+R turn the preview, Esc stops." class="popup-description" />
-                <ui:TextField name="place-search-field" label="Search" class="dialog-field" />
-                <ui:Toggle name="place-used-toggle" label="Used in this map only" value="true" class="dialog-field" />
-                <ui:ListView name="place-list" fixed-item-height="22" selection-type="Single" class="place-list" />
-                <ui:Label name="place-info-label" class="popup-description place-info" />
-                <ui:VisualElement class="dialog-buttons">
-                    <ui:Button name="place-cancel-button" text="Cancel" class="map-control-button" />
-                    <ui:Button name="place-confirm-button" text="Place" class="map-control-button dialog-primary" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
