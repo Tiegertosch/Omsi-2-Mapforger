@@ -19,6 +19,9 @@ namespace OmsiMapEditor.World
         /// <summary>Layer of the ground meshes; only the ground camera renders it.</summary>
         public const int GroundLayer = 8;
 
+        /// <summary>Vertical field of view of the 3D view in degrees; the map view projects with the same value.</summary>
+        public const float OrbitFieldOfView = 45f;
+
         /// <summary>Above any terrain; an orthographic camera keeps depth precision linear over its range.</summary>
         private const float CameraHeight = 10000f;
 
@@ -238,7 +241,7 @@ namespace OmsiMapEditor.World
             if (!valid)
                 return;
             groundCamera.orthographic = false;
-            groundCamera.fieldOfView = 45f;
+            groundCamera.fieldOfView = OrbitFieldOfView;
             groundCamera.nearClipPlane = 0.5f;
             groundCamera.farClipPlane = 20000f;
             groundCamera.backgroundColor = SkyColour;

@@ -67,6 +67,15 @@ namespace OmsiMapEditor.World
             public Matrix4x4[] CrossInstances = new Matrix4x4[0];
         }
 
+        /// <summary>Where an editable object is drawn: its instance and its frame, also while a drag previews it.</summary>
+        private sealed class Placement
+        {
+            public KindData Kind;
+            public int Index;
+            public OmsiTileSummary Tile;
+            public Matrix4x4 Frame;
+        }
+
         private sealed class LoadData
         {
             public readonly Dictionary<long, OmsiTerrain> Terrains = new Dictionary<long, OmsiTerrain>();
@@ -105,8 +114,7 @@ namespace OmsiMapEditor.World
         private List<KeyValuePair<string, OmsiPlacedAttachment>> splineRows;
 
         /// <summary>Where each placement's matrix lives, so a drag can move single instances.</summary>
-        private readonly Dictionary<OmsiObjectRecord, KeyValuePair<KindData, int>> instanceOf =
-            new Dictionary<OmsiObjectRecord, KeyValuePair<KindData, int>>();
+        private readonly Dictionary<OmsiObjectRecord, Placement> instanceOf = new Dictionary<OmsiObjectRecord, Placement>();
         private readonly Dictionary<string, KindData> kinds = new Dictionary<string, KindData>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
         private readonly List<UnityEngine.Object> owned = new List<UnityEngine.Object>();
@@ -732,9 +740,10 @@ namespace OmsiMapEditor.World
                 {
                     if (!kinds.TryGetValue(item.AssetPath, out var kind) || kind.Mesh == null)
                         continue;
-                    var frame = PlacementFrame(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees);
+                    var frame = PlacementFrame(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees,
+                        item.PitchDegrees, item.BankDegrees);
                     frames[item.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
-                    instanceOf[item] = new KeyValuePair<KindData, int>(kind, kind.InstanceCount);
+                    instanceOf[item] = new Placement { Kind = kind, Index = kind.InstanceCount, Tile = tile, Frame = frame };
                     SetFromFrame(kind, kind.InstanceCount++, frame);
                 }
 
@@ -747,7 +756,7 @@ namespace OmsiMapEditor.World
                         !kinds.TryGetValue(attached.AssetPath, out var kind) || kind.Mesh == null)
                         continue;
                     var frame = parent.Key * AttachMatrix(parent.Value.AttachPoints[attached.AttachPointIndex]) *
-                                Matrix4x4.Rotate(Quaternion.Euler(0f, (float)attached.HeadingDegrees, 0f));
+                                Matrix4x4.Rotate(Orientation(attached.HeadingDegrees, attached.PitchDegrees, attached.BankDegrees));
                     frames[attached.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
                     SetFromFrame(kind, kind.InstanceCount++, frame);
                 }
@@ -800,14 +809,37 @@ namespace OmsiMapEditor.World
         public void PreviewMove(IEnumerable<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>> objects, double offsetX, double offsetY)
         {
             foreach (var pair in objects)
-                PreviewPlacement(pair.Key, pair.Value, pair.Value.LocalX + offsetX, pair.Value.LocalY + offsetY, pair.Value.HeadingDegrees);
+                PreviewPlacement(pair.Key, pair.Value, pair.Value.LocalX + offsetX, pair.Value.LocalY + offsetY, pair.Value.HeadingDegrees,
+                    pair.Value.PitchDegrees, pair.Value.BankDegrees);
         }
 
         /// <summary>Draws an object turned to a preview heading until the drag ends.</summary>
         public void PreviewHeading(OmsiTileSummary tile, OmsiObjectRecord item, double headingDegrees)
         {
             if (item != null)
-                PreviewPlacement(tile, item, item.LocalX, item.LocalY, headingDegrees);
+                PreviewPlacement(tile, item, item.LocalX, item.LocalY, headingDegrees, item.PitchDegrees, item.BankDegrees);
+        }
+
+        /// <summary>Draws an object turned to a preview orientation until the drag ends.</summary>
+        public void PreviewOrientation(OmsiTileSummary tile, OmsiObjectRecord item, double headingDegrees, double pitchDegrees, double bankDegrees)
+        {
+            if (item != null)
+                PreviewPlacement(tile, item, item.LocalX, item.LocalY, headingDegrees, pitchDegrees, bankDegrees);
+        }
+
+        /// <summary>True when the object joins splines, like a crossing; the editor does not tilt such objects.</summary>
+        public bool HasSplineHelper(string assetPath)
+        {
+            return assetPath != null && kinds.TryGetValue(assetPath, out var kind) && kind.Model.HasSplineHelper;
+        }
+
+        /// <summary>
+        /// The ground height under a world position relative to the map origin, as objects stand on it; used to move
+        /// objects in the 3D view.
+        /// </summary>
+        public double GroundHeight(double mapX, double mapY)
+        {
+            return GroundAt(mapX + originX, mapY + originY);
         }
 
         /// <summary>Returns to the stored placements; a committed edit arrives through <see cref="RefreshPlacements"/>.</summary>
@@ -816,16 +848,126 @@ namespace OmsiMapEditor.World
             placementsDirty = true;
         }
 
-        private void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double headingDegrees)
+        private void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double headingDegrees,
+            double pitchDegrees, double bankDegrees)
         {
             if (tile == null || item == null || !instanceOf.TryGetValue(item, out var place))
                 return;
-            SetPlacement(place.Key, place.Value, tile, localX, localY, item.Height, headingDegrees);
+            place.Frame = PlacementFrame(place.Kind.Model, tile, localX, localY, item.Height, headingDegrees, pitchDegrees, bankDegrees);
+            SetFromFrame(place.Kind, place.Index, place.Frame);
         }
 
-        private void SetPlacement(KindData kind, int index, OmsiTileSummary tile, double localX, double localY, double height, double headingDegrees)
+        /// <summary>
+        /// The frame an object is drawn in, including a drag preview, and the box around its model in that frame.
+        /// False for objects without a model.
+        /// </summary>
+        public bool TryGetPlacement(OmsiObjectRecord item, out Matrix4x4 frame, out Bounds bounds)
         {
-            SetFromFrame(kind, index, PlacementFrame(kind.Model, tile, localX, localY, height, headingDegrees));
+            frame = Matrix4x4.identity;
+            bounds = default;
+            if (item == null || !instanceOf.TryGetValue(item, out var place))
+                return false;
+            frame = place.Frame;
+            bounds = LocalBounds(place.Kind);
+            return true;
+        }
+
+        /// <summary>
+        /// The editable object nearest along a ray in map-relative metres with y up: placed objects, not attached ones
+        /// or rows along splines. Models are hit by their triangles, trees by the box around crown and trunk.
+        /// </summary>
+        public bool TryPick(Ray ray, out OmsiTileSummary tile, out OmsiObjectRecord item, out float distance)
+        {
+            tile = null;
+            item = null;
+            distance = float.MaxValue;
+            foreach (var pair in instanceOf)
+            {
+                var place = pair.Value;
+                var bounds = LocalBounds(place.Kind);
+                // A sphere around the box rules out most objects cheaply.
+                var centre = place.Frame.MultiplyPoint3x4(bounds.center);
+                var toCentre = centre - ray.origin;
+                var along = Vector3.Dot(toCentre, ray.direction);
+                var radius = bounds.extents.magnitude;
+                if (along < -radius || (toCentre - ray.direction * along).sqrMagnitude > radius * radius)
+                    continue;
+
+                var inverse = place.Frame.inverse;
+                var localRay = new Ray(inverse.MultiplyPoint3x4(ray.origin), inverse.MultiplyVector(ray.direction));
+                if (!bounds.IntersectRay(localRay, out var boxDistance) || boxDistance >= distance)
+                    continue;
+                var hit = boxDistance;
+                if (!place.Kind.Model.IsTree && !TryHitTriangles(place.Kind.Model, localRay, out hit))
+                    continue;
+                if (hit >= distance)
+                    continue;
+                distance = hit;
+                tile = place.Tile;
+                item = pair.Key;
+            }
+            return item != null;
+        }
+
+        /// <summary>
+        /// The box around a kind in its placement frame; a tree's covers trunk and crown, which the drawn instances
+        /// scale from unit meshes.
+        /// </summary>
+        private static Bounds LocalBounds(KindData kind)
+        {
+            var model = kind.Model;
+            if (!model.IsTree)
+                return kind.Mesh.bounds;
+            var radius = (float)model.TreeRadius;
+            var height = (float)model.TreeHeight + radius * 0.6f;
+            return new Bounds(new Vector3(0f, height * 0.5f, 0f), new Vector3(radius * 2f, height, radius * 2f));
+        }
+
+        /// <summary>The nearest triangle of a model along a ray in its frame; both sides count.</summary>
+        private static bool TryHitTriangles(OmsiObjectModel model, Ray ray, out float distance)
+        {
+            distance = float.MaxValue;
+            var positions = model.Positions;
+            foreach (var triangles in model.Triangles)
+            {
+                for (var index = 0; index + 2 < triangles.Count; index += 3)
+                {
+                    var a = Vertex(positions, triangles[index]);
+                    var b = Vertex(positions, triangles[index + 1]);
+                    var c = Vertex(positions, triangles[index + 2]);
+                    if (TryHitTriangle(ray, a, b, c, out var hit) && hit < distance)
+                        distance = hit;
+                }
+            }
+            return distance < float.MaxValue;
+        }
+
+        private static Vector3 Vertex(List<float> positions, int index)
+        {
+            return new Vector3(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]);
+        }
+
+        /// <summary>Möller–Trumbore ray and triangle test.</summary>
+        private static bool TryHitTriangle(Ray ray, Vector3 a, Vector3 b, Vector3 c, out float distance)
+        {
+            distance = 0f;
+            var edge1 = b - a;
+            var edge2 = c - a;
+            var p = Vector3.Cross(ray.direction, edge2);
+            var determinant = Vector3.Dot(edge1, p);
+            if (Mathf.Abs(determinant) < 1e-9f)
+                return false;
+            var inverse = 1f / determinant;
+            var t = ray.origin - a;
+            var u = Vector3.Dot(t, p) * inverse;
+            if (u < 0f || u > 1f)
+                return false;
+            var q = Vector3.Cross(t, edge1);
+            var v = Vector3.Dot(ray.direction, q) * inverse;
+            if (v < 0f || u + v > 1f)
+                return false;
+            distance = Vector3.Dot(edge2, q) * inverse;
+            return distance > 0f;
         }
 
         /// <summary>
@@ -851,13 +993,23 @@ namespace OmsiMapEditor.World
         /// heading as OMSI does.
         /// </summary>
         private Matrix4x4 PlacementFrame(OmsiObjectModel model, OmsiTileSummary tile, double localX, double localY, double height,
-            double headingDegrees)
+            double headingDegrees, double pitchDegrees, double bankDegrees)
         {
             var worldX = tile.X * tileSize + localX;
             var worldY = tile.Y * tileSize + localY;
             var ground = model.HasAbsoluteHeight ? 0.0 : GroundAt(worldX, worldY);
             var position = new Vector3((float)(worldX - originX), (float)(ground + height), (float)(worldY - originY));
-            return Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)headingDegrees, 0f), Vector3.one);
+            return Matrix4x4.TRS(position, Orientation(headingDegrees, pitchDegrees, bankDegrees), Vector3.one);
+        }
+
+        /// <summary>
+        /// OMSI's object rotation: bank about the forward axis, then pitch about the right axis, then heading about the
+        /// up axis, as Direct3D's yaw-pitch-roll. Unity's Euler angles turn in the same order and the same senses, as both
+        /// use a left-handed frame with y up; positive pitch lowers the front, which matches pitched objects on slopes.
+        /// </summary>
+        public static Quaternion Orientation(double headingDegrees, double pitchDegrees, double bankDegrees)
+        {
+            return Quaternion.Euler((float)pitchDegrees, (float)headingDegrees, (float)bankDegrees);
         }
 
         /// <summary>Terrain height at a world position, from the tile that contains it; 0 where no terrain was read.</summary>

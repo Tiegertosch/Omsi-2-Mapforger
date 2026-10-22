@@ -204,6 +204,32 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void SessionSetsPitchAndBankAndKeepsThemWhenOnlyHeadingChanges()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects[0];
+            Assert.AreEqual(0.0, item.PitchDegrees, 0.0);
+            Assert.AreEqual(0.0, item.BankDegrees, 0.0);
+
+            Assert.IsTrue(session.UpdateObject(tile, item, 10, 20, 0, 0, -1.5, 6));
+            Assert.AreEqual(-1.5, item.PitchDegrees, 1e-12);
+            Assert.AreEqual(6.0, item.BankDegrees, 1e-12);
+
+            // Heading-only edits, such as dragging the handle in the view from above, keep the tilt.
+            Assert.IsTrue(session.UpdateObject(tile, item, 10, 20, 0, 90));
+            Assert.IsTrue(session.UpdateObject("tile_0_0.map", 5, 10, 20, 0, 45));
+            var read = session.Read().Tiles[0].Objects[0];
+            Assert.AreEqual(45.0, read.HeadingDegrees, 1e-12);
+            Assert.AreEqual(-1.5, read.PitchDegrees, 1e-12);
+            Assert.AreEqual(6.0, read.BankDegrees, 1e-12);
+
+            Assert.IsTrue(session.UpdateObject(tile, item, 10, 20, 0, 0, 0, 0));
+            Assert.IsFalse(session.IsTileModified("tile_0_0.map"));
+        }
+
+        [Test]
         public void PlacesObjectsWithANewIdAndUndoesThemCompletely()
         {
             var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));

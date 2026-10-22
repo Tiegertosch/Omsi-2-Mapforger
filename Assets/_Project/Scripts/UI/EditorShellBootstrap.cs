@@ -318,7 +318,10 @@ namespace OmsiMapEditor.UI
                     objectRenderer.PreviewMove(objects, offsetX, offsetY);
                 };
                 mapCanvas.HeadingPreviewed += objectRenderer.PreviewHeading;
+                mapCanvas.OrientationPreviewed += objectRenderer.PreviewOrientation;
                 mapCanvas.PreviewEnded += objectRenderer.EndPreview;
+                mapCanvas.ObjectRenderer = objectRenderer;
+                mapCanvas.GroundHeight = groundRenderer.HeightAt;
             }
         }
 
@@ -343,6 +346,9 @@ namespace OmsiMapEditor.UI
                 var target = mapCanvas.OrbitTarget;
                 groundRenderer.SetOrbitView(screenRect, new Vector3(target.x, groundRenderer.HeightAt(target), target.y), mapCanvas.OrbitYaw,
                     mapCanvas.OrbitPitch, mapCanvas.OrbitDistance);
+                // Selection boxes and rings follow models that load, previews and undo, which arrive after the view drew.
+                if (selection.Count > 0)
+                    mapCanvas.Refresh();
             }
             else
             {
@@ -369,7 +375,10 @@ namespace OmsiMapEditor.UI
                 view3DButton.text = mapCanvas.ThreeDimensional ? "3D: on" : "3D: off";
             UpdateMapHeader();
             SetStatus(mapCanvas.ThreeDimensional
-                ? "3D view: right drag turns, left or middle drag moves, the wheel zooms. Switch 3D off to edit."
+                ? "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it" +
+                  (session != null && session.CanEdit
+                      ? ", drag it to move it, drag a ring to turn it: green heading, red pitch, blue bank."
+                      : ".")
                 : "Back to the map from above.");
         }
 
@@ -407,7 +416,8 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
-        /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and <c>-quit</c>.
+        /// <c>-select objectId</c>, <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
+        /// <c>-quit</c>.
         /// </summary>
         private IEnumerator Start()
         {
@@ -464,6 +474,18 @@ namespace OmsiMapEditor.UI
             {
                 ToggleThreeDimensional();
                 mapCanvas?.SetOrbit(yaw, pitch, distance);
+            }
+
+            if (int.TryParse(Argument("-select", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var selectId))
+            {
+                foreach (var tile in currentSummary.Tiles)
+                {
+                    var item = tile.Objects.Find(candidate => candidate.Id == selectId);
+                    if (item == null)
+                        continue;
+                    SelectObject(tile, item, false);
+                    break;
+                }
             }
 
             var screenshot = Argument("-screenshot", 1);
@@ -801,13 +823,13 @@ namespace OmsiMapEditor.UI
                         {
                             parts.Add(new ObjectEditStep { Change = result.Change });
                             transfers.Add("#" + edit.Record.Id + " into tile " + target.X + ", " + target.Y);
-                            // A transfer keeps height and heading; an edit from the inspector may change them too.
-                            AddValueStep(parts, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit.Height, edit.HeadingDegrees);
+                            // A transfer keeps height and orientation; an edit from the inspector may change them too.
+                            AddValueStep(parts, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit);
                             continue;
                         }
                         kept.Add("#" + edit.Record.Id + " (" + DescribeReferences(result.Blockers) + ")");
                     }
-                    AddValueStep(parts, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height, edit.HeadingDegrees);
+                    AddValueStep(parts, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit);
                 }
                 catch (Exception exception)
                 {
@@ -841,10 +863,11 @@ namespace OmsiMapEditor.UI
             SetStatus(message + " Ctrl+Z undoes it.");
         }
 
-        private void AddValueStep(List<ObjectEditStep> parts, OmsiTileSummary tile, OmsiObjectRecord item, double x, double y, double z, double heading)
+        /// <summary>Saves the edit's height and orientation at a tile-local position and records it for undo.</summary>
+        private void AddValueStep(List<ObjectEditStep> parts, OmsiTileSummary tile, OmsiObjectRecord item, double x, double y, MapObjectEdit edit)
         {
             var before = Values(item);
-            if (session.UpdateObject(tile, item, x, y, z, heading))
+            if (session.UpdateObject(tile, item, x, y, edit.Height, edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees))
                 parts.Add(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
         }
 
@@ -877,7 +900,7 @@ namespace OmsiMapEditor.UI
 
         private static double[] Values(OmsiObjectRecord item)
         {
-            return new[] { item.LocalX, item.LocalY, item.Height, item.HeadingDegrees };
+            return new[] { item.LocalX, item.LocalY, item.Height, item.HeadingDegrees, item.PitchDegrees, item.BankDegrees };
         }
 
         /// <summary>
@@ -1029,7 +1052,7 @@ namespace OmsiMapEditor.UI
             if (item == null)
                 throw new InvalidOperationException("Object #" + step.ObjectId + " no longer exists.");
             var target = undo ? step.Before : step.After;
-            session.UpdateObject(tile, item, target[0], target[1], target[2], target[3]);
+            session.UpdateObject(tile, item, target[0], target[1], target[2], target[3], target[4], target[5]);
             Touch(touched, tile, item);
         }
 
@@ -1321,6 +1344,9 @@ namespace OmsiMapEditor.UI
                 problem = " The object file could not be read: " + exception.Message;
             }
 
+            // Objects are placed in the map from above.
+            if (mapCanvas != null && mapCanvas.ThreeDimensional)
+                ToggleThreeDimensional();
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
             mapCanvas?.Focus();
@@ -1368,17 +1394,29 @@ namespace OmsiMapEditor.UI
             mapCanvas?.EndPlacement();
         }
 
-        private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField)
+        private void ApplyObjectEdit(OmsiObjectRecord item, TextField xField, TextField yField, TextField zField, TextField headingField,
+            TextField pitchField, TextField bankField)
         {
             if (selectedTile == null)
                 return;
             if (!TryParseField(xField, "X", out var x) || !TryParseField(yField, "Y", out var y) ||
-                !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading))
+                !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading) ||
+                !TryParseField(pitchField, "Pitch", out var pitch) || !TryParseField(bankField, "Bank", out var bank))
                 return;
             CommitEdits(new List<MapObjectEdit>
             {
-                new MapObjectEdit { Tile = selectedTile, Record = item, LocalX = x, LocalY = y, Height = z, HeadingDegrees = heading }
+                new MapObjectEdit
+                {
+                    Tile = selectedTile, Record = item, LocalX = x, LocalY = y, Height = z, HeadingDegrees = heading,
+                    PitchDegrees = pitch, BankDegrees = bank
+                }
             });
+        }
+
+        /// <summary>Objects that join splines, such as crossings, keep their tilt; tilting them would tear the roads apart.</summary>
+        private bool CanTilt(OmsiObjectRecord item)
+        {
+            return objectRenderer == null || !objectRenderer.HasSplineHelper(item.AssetPath);
         }
 
         private bool TryParseField(TextField field, string name, out double value)
@@ -1702,7 +1740,9 @@ namespace OmsiMapEditor.UI
             if (mapHintLabel != null)
             {
                 mapHintLabel.text = mapCanvas != null && mapCanvas.ThreeDimensional
-                    ? "3D view   Right drag: turn   Left or middle drag: move   Wheel: zoom   3D: off to edit"
+                    ? session != null && session.CanEdit
+                        ? "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Click: select   Drag an object: move   Drag a ring: rotate (Shift: 15° steps)   Del: delete"
+                        : "3D view   Right drag: turn view   Middle drag: move view   Wheel: zoom   Click an object to inspect it   Save a project to edit"
                     : session != null && session.CanEdit
                     ? "Wheel: zoom   Right or middle drag: pan   Drag an object: move   Drag the round handle: rotate (Shift: 15° steps)   Ctrl+click or Ctrl+drag: select several   Edit > Place object...   Del: delete   Ctrl+Z / Ctrl+Y: undo / redo"
                     : "Wheel: zoom   Drag: pan   Click an object to inspect it   Save a project to move objects";
@@ -1861,7 +1901,10 @@ namespace OmsiMapEditor.UI
             {
                 var details = "#" + item.Id + "  " + item.AssetPath + "\n" +
                               "X " + item.LocalX.ToString("F1") + "  Y " + item.LocalY.ToString("F1") +
-                              "  H " + item.Height.ToString("F1") + " m  •  " + item.HeadingDegrees.ToString("F1") + "°";
+                              "  H " + item.Height.ToString("F1") + " m  •  " + item.HeadingDegrees.ToString("F1") + "°" +
+                              (item.PitchDegrees != 0 || item.BankDegrees != 0
+                                  ? "  P " + item.PitchDegrees.ToString("F1") + "°  B " + item.BankDegrees.ToString("F1") + "°"
+                                  : string.Empty);
                 var record = AddInspectorRecord(records, details, "inspector-record");
                 record.AddToClassList("inspector-record-clickable");
                 record.EnableInClassList("inspector-record-selected", IsSelected(item));
@@ -1949,7 +1992,7 @@ namespace OmsiMapEditor.UI
             container.Add(editor);
         }
 
-        /// <summary>Position and heading fields for the selected object; read-only without a project.</summary>
+        /// <summary>Position and orientation fields for the selected object; read-only without a project.</summary>
         private void AddObjectEditor(VisualElement container, OmsiObjectRecord item)
         {
             var editor = new VisualElement();
@@ -1965,11 +2008,22 @@ namespace OmsiMapEditor.UI
             var yField = AddEditField(editor, "Y (m)", item.LocalY);
             var zField = AddEditField(editor, "Height (m)", item.Height);
             var headingField = AddEditField(editor, "Heading (°)", item.HeadingDegrees);
+            var pitchField = AddEditField(editor, "Pitch (°)", item.PitchDegrees);
+            var bankField = AddEditField(editor, "Bank (°)", item.BankDegrees);
 
             var canEdit = session != null && session.CanEdit;
             if (canEdit)
             {
-                var apply = new Button(() => ApplyObjectEdit(item, xField, yField, zField, headingField)) { text = "Apply" };
+                if (!CanTilt(item))
+                {
+                    pitchField.SetEnabled(false);
+                    bankField.SetEnabled(false);
+                    var locked = new Label("Joins splines like a crossing: pitch and bank stay as they are, so the roads stay connected.");
+                    locked.AddToClassList("muted");
+                    locked.AddToClassList("inspector-edit-hint");
+                    editor.Add(locked);
+                }
+                var apply = new Button(() => ApplyObjectEdit(item, xField, yField, zField, headingField, pitchField, bankField)) { text = "Apply" };
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
@@ -1982,7 +2036,7 @@ namespace OmsiMapEditor.UI
             }
             else
             {
-                foreach (var field in new[] { xField, yField, zField, headingField })
+                foreach (var field in new[] { xField, yField, zField, headingField, pitchField, bankField })
                     field.SetEnabled(false);
                 var hint = new Label("Read-only. Save a Mapforge project (File > Save map project as...) to edit this map.");
                 hint.AddToClassList("muted");

@@ -32,8 +32,10 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen
 - Kartenkacheln und Koordinatenverwaltung entwickeln
 - [x] 3D-Viewport und navigierbare Weltansicht ergänzen: Gelände aus den Höhen je Kachel, perspektivische Kamera mit Drehen, Verschieben und Zoomen (ADR 013)
-- In der 3D-Ansicht Objekte wählen und bearbeiten; bisher wird nur in der Draufsicht bearbeitet
-- Bäume in der 3D-Ansicht als gekreuzte Flächen wie in OMSI zeigen; die Kronenkuppel der Draufsicht wirkt von der Seite wie ein Schirm
+- [x] In der 3D-Ansicht Objekte wählen, über das Gelände verschieben und an drei Ringen drehen: grün Heading, rot Pitch, blau Bank (ADR 014)
+- [x] Pitch und Bank von Objekten lesen, zeichnen, im Inspector bearbeiten und rückgängig machen; Objekte mit `[splinehelper]` bleiben ungekippt (ADR 014)
+- [x] Vorzeichen von Pitch und Bank im Spiel prüfen (22. Oktober 2026: Wartehäuschen mit Pitch 15 und Laterne mit Bank 15 in Grundorf wie im Editor)
+- [x] Bäume in der 3D-Ansicht als gekreuzte Flächen wie in OMSI zeigen; die Kronenkuppel der Draufsicht wirkt von der Seite wie ein Schirm
 - Gelände unter Straßen ausschneiden, wie OMSI es mit `[terrainholeprofile]` tut
 - [x] Draufsicht mit Bodentexturen: `[groundtex]` und Masken je Kachel, von einer Kamera unter der Vektorebene gezeichnet (ADR 013)
 - [x] Straßen und Gleise als texturierte Bänder aus den `.sli`-Profilen

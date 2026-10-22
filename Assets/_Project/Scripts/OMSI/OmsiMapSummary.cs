@@ -71,6 +71,15 @@ namespace OmsiMapEditor.OMSI
         public double LocalY { get; internal set; }
         public double Height { get; internal set; }
         public double HeadingDegrees { get; internal set; }
+
+        /// <summary>
+        /// Tilt about the object's right axis; positive lowers its front. OMSI turns an object by bank, then pitch, then
+        /// heading, like Direct3D's yaw-pitch-roll.
+        /// </summary>
+        public double PitchDegrees { get; internal set; }
+
+        /// <summary>Tilt about the object's forward axis; positive raises its right side.</summary>
+        public double BankDegrees { get; internal set; }
     }
 
     /// <summary>An object attached to an attachment point ([new_attachment]) of its parent object.</summary>
@@ -86,6 +95,11 @@ namespace OmsiMapEditor.OMSI
         public int AttachPointIndex { get; internal set; }
 
         public double HeadingDegrees { get; internal set; }
+
+        /// <summary>Pitch and bank as for <see cref="OmsiObjectRecord"/>, relative to the attachment point.</summary>
+        public double PitchDegrees { get; internal set; }
+
+        public double BankDegrees { get; internal set; }
     }
 
     /// <summary>A row of objects along a spline chain: lamps, posts, signs or a single bus stop.</summary>

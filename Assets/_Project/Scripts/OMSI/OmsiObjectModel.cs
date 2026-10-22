@@ -57,6 +57,12 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public bool HasAbsoluteHeight { get; internal set; }
 
+        /// <summary>
+        /// The object joins splines through [splinehelper], like a crossing. Tilting it would tear the joined roads
+        /// apart, so the editor keeps its pitch and bank.
+        /// </summary>
+        public bool HasSplineHelper { get; internal set; }
+
         /// <summary>Points where attached objects hang, from [new_attachment].</summary>
         public IReadOnlyList<OmsiAttachPoint> AttachPoints { get; internal set; } = new OmsiAttachPoint[0];
 
@@ -131,6 +137,7 @@ namespace OmsiMapEditor.OMSI
             var model = new OmsiObjectModel
             {
                 HasAbsoluteHeight = sceneryObject.HasAbsoluteHeight || sceneryObject.HasSplineHelper,
+                HasSplineHelper = sceneryObject.HasSplineHelper,
                 AttachPoints = sceneryObject.AttachPoints
             };
             if (sceneryObject.Tree != null)

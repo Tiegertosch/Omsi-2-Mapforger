@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OmsiMapEditor.OMSI;
+using OmsiMapEditor.World;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -13,7 +14,7 @@ namespace OmsiMapEditor.UI
         public OmsiObjectRecord Record;
     }
 
-    /// <summary>A finished drag of an object: its new position and heading in tile-local values.</summary>
+    /// <summary>A finished drag of an object: its new position and orientation in tile-local values.</summary>
     internal sealed class MapObjectEdit
     {
         public OmsiTileSummary Tile;
@@ -22,6 +23,8 @@ namespace OmsiMapEditor.UI
         public double LocalY;
         public double Height;
         public double HeadingDegrees;
+        public double PitchDegrees;
+        public double BankDegrees;
     }
 
     /// <summary>A click while placing: the tile under the pointer (null outside the map) and the tile-local position.</summary>
@@ -66,6 +69,23 @@ namespace OmsiMapEditor.UI
         private static readonly Color PlacementFillColor = new Color(0.47f, 0.9f, 0.6f, 0.25f);
         private static readonly Color BoxFillColor = new Color(1f, 0.36f, 0.42f, 0.12f);
 
+        // Rotation rings in the 3D view, coloured like the X, Y and Z axes they turn about.
+        private static readonly Color PitchRingColor = new Color(0.94f, 0.33f, 0.33f, 1f);
+        private static readonly Color HeadingRingColor = new Color(0.42f, 0.85f, 0.42f, 1f);
+        private static readonly Color BankRingColor = new Color(0.36f, 0.58f, 1f, 1f);
+        private const float RingPickDistance = 7f;
+        private const int RingSegments = 96;
+
+        /// <summary>Rings stay at least this large on screen, so small objects can still be turned.</summary>
+        private const float MinimumRingPixels = 60f;
+
+        /// <summary>
+        /// The angle a rotation ring changes. The rings form a gimbal in OMSI's order: heading turns about the vertical,
+        /// pitch about the right axis after heading, bank about the forward axis after heading and pitch, so each ring
+        /// changes exactly one stored angle.
+        /// </summary>
+        private enum RingAxis { None, Pitch, Heading, Bank }
+
         /// <summary>Outlines are drawn from this scale on; further out the map shows markers only.</summary>
         private const float OutlineMetersPerPixel = 1.5f;
 
@@ -86,7 +106,7 @@ namespace OmsiMapEditor.UI
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
-        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan }
+        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan, Turn }
 
         private sealed class SplinePath
         {
@@ -129,6 +149,20 @@ namespace OmsiMapEditor.UI
         private double previewLocalX;
         private double previewLocalY;
         private double previewHeading;
+        private double previewPitch;
+        private double previewBank;
+
+        // 3D view: a move slides over the horizontal plane through the grabbed point; a turn follows the pointer
+        // around the ring's centre, adding up the angle step by step so it may go round more than once.
+        private Vector3 moveGrabPoint;
+        private RingAxis hoveredRing;
+        private RingAxis activeRing;
+        private Vector3 turnCentre;
+        private Vector3 turnAxis;
+        private Vector3 turnLastVector;
+        private double turnStartAngle;
+        private double turnAngle;
+        private readonly Label angleLabel;
 
         // Placement mode: the object to place and the map position under the pointer, if any.
         private string placementAsset;
@@ -149,6 +183,11 @@ namespace OmsiMapEditor.UI
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
+
+            angleLabel = new Label { pickingMode = PickingMode.Ignore };
+            angleLabel.AddToClassList("map-angle-label");
+            angleLabel.style.display = DisplayStyle.None;
+            Add(angleLabel);
         }
 
         /// <summary>An object was clicked; the tile and record identify it.</summary>
@@ -172,6 +211,9 @@ namespace OmsiMapEditor.UI
         /// <summary>The selected object is being turned to this heading; the edit follows on release.</summary>
         public event Action<OmsiTileSummary, OmsiObjectRecord, double> HeadingPreviewed;
 
+        /// <summary>The selected object is being turned on a ring in the 3D view; heading, pitch and bank follow.</summary>
+        public event Action<OmsiTileSummary, OmsiObjectRecord, double, double, double> OrientationPreviewed;
+
         /// <summary>A move or turn ended, whether it was released or cancelled.</summary>
         public event Action PreviewEnded;
 
@@ -187,10 +229,17 @@ namespace OmsiMapEditor.UI
         public float MetersPerPixel => metersPerPixel;
 
         /// <summary>
-        /// True in the 3D view: the element draws nothing and its drags turn and move a camera around
-        /// <see cref="OrbitTarget"/> instead of editing. Editing happens in the map from above.
+        /// True in the 3D view: the right button turns the camera around <see cref="OrbitTarget"/> and the middle one
+        /// moves it. The left button selects objects by their models, drags them over the ground and turns the
+        /// selected object on its rotation rings; the element draws only the selection and the rings.
         /// </summary>
         public bool ThreeDimensional { get; private set; }
+
+        /// <summary>The object models of the 3D view, for picking objects and placing the rings; null leaves 3D editing off.</summary>
+        public MapObjectRenderer ObjectRenderer { get; set; }
+
+        /// <summary>Ground height at a map position, for the point the 3D camera looks at.</summary>
+        public Func<Vector2, float> GroundHeight { get; set; }
 
         /// <summary>The point the 3D camera looks at, in map-relative metres.</summary>
         public Vector2 OrbitTarget { get; private set; }
@@ -223,6 +272,7 @@ namespace OmsiMapEditor.UI
             OrbitPitch = Mathf.Clamp(pitchDegrees, 5f, 89f);
             OrbitDistance = Mathf.Clamp(distance, 5f, 15000f);
             NotifyPointerInfo(null);
+            MarkDirtyRepaint();
         }
 
         /// <summary>Returns to the map from above, centred where the 3D camera looked.</summary>
@@ -525,8 +575,13 @@ namespace OmsiMapEditor.UI
 
         private void Draw(MeshGenerationContext context)
         {
-            if (summary == null || !hasView || ThreeDimensional)
+            if (summary == null || !hasView)
                 return;
+            if (ThreeDimensional)
+            {
+                Draw3D(context.painter2D);
+                return;
+            }
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var visible = VisibleMapRect(16f);
@@ -862,7 +917,13 @@ namespace OmsiMapEditor.UI
 
         private bool IsDraggingObject()
         {
-            return dragMode == DragMode.Move || dragMode == DragMode.Rotate;
+            return dragMode == DragMode.Move || dragMode == DragMode.Rotate || dragMode == DragMode.Turn;
+        }
+
+        /// <summary>The tile of the primary selected object.</summary>
+        private OmsiTileSummary PrimaryTile()
+        {
+            return selection.Count > 0 ? selection[selection.Count - 1].Tile : selectedTile;
         }
 
         private void OnPointerDown(PointerDownEvent evt)
@@ -874,8 +935,11 @@ namespace OmsiMapEditor.UI
             var position = (Vector2)evt.localPosition;
             if (ThreeDimensional)
             {
-                // Right button turns, the others move the camera.
-                BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                // Right button turns the camera, the middle one moves it; the left one edits.
+                if (evt.button == 1 || evt.button == 2)
+                    BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                else if (evt.button == 0)
+                    PointerDown3D(position, evt.pointerId, evt.ctrlKey || evt.commandKey);
                 evt.StopPropagation();
                 return;
             }
@@ -916,26 +980,7 @@ namespace OmsiMapEditor.UI
             var toggle = evt.ctrlKey || evt.commandKey;
             if (TryPickObject(position, out var tile, out var item))
             {
-                if (toggle)
-                {
-                    ObjectToggled?.Invoke(tile, item);
-                }
-                else if (selection.Count > 1 && selectedRecords.Contains(item))
-                {
-                    clickedMember = new MapSelectionItem { Tile = tile, Record = item };
-                    if (AllowEditing)
-                        StartObjectDrag(DragMode.MovePending, item, evt.pointerId, position);
-                    else
-                        ObjectSelected?.Invoke(tile, item);
-                }
-                else
-                {
-                    // The shell replaces the selection with this object before the drag starts.
-                    ObjectSelected?.Invoke(tile, item);
-                    if (AllowEditing)
-                        StartObjectDrag(DragMode.MovePending, item, evt.pointerId, position);
-                }
-                MarkDirtyRepaint();
+                SelectPicked(tile, item, toggle, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
             }
@@ -954,6 +999,341 @@ namespace OmsiMapEditor.UI
             evt.StopPropagation();
         }
 
+        /// <summary>
+        /// A click on an object: Ctrl adds or removes it, a member of a larger selection keeps the group for dragging,
+        /// any other object becomes the selection. With editing allowed, dragging moves the selection.
+        /// </summary>
+        private void SelectPicked(OmsiTileSummary tile, OmsiObjectRecord item, bool toggle, int pointerId, Vector2 position)
+        {
+            if (toggle)
+            {
+                ObjectToggled?.Invoke(tile, item);
+            }
+            else if (selection.Count > 1 && selectedRecords.Contains(item))
+            {
+                clickedMember = new MapSelectionItem { Tile = tile, Record = item };
+                if (AllowEditing)
+                    StartObjectDrag(DragMode.MovePending, item, pointerId, position);
+                else
+                    ObjectSelected?.Invoke(tile, item);
+            }
+            else
+            {
+                // The shell replaces the selection with this object before the drag starts.
+                ObjectSelected?.Invoke(tile, item);
+                if (AllowEditing)
+                    StartObjectDrag(DragMode.MovePending, item, pointerId, position);
+            }
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// A left click in the 3D view: on a rotation ring it starts turning the selected object, on an object it
+        /// selects it and may start moving it, on the ground it selects the tile there.
+        /// </summary>
+        private void PointerDown3D(Vector2 position, int pointerId, bool toggle)
+        {
+            var camera = OrbitCamera();
+            if (!toggle && RingAt(camera, position, out var ring, out var ringPoint))
+            {
+                StartTurn(ring, ringPoint, pointerId, position);
+                return;
+            }
+
+            var ray = camera.RayThrough(position);
+            if (ObjectRenderer != null && ObjectRenderer.TryPick(ray, out var tile, out var item, out var distance))
+            {
+                moveGrabPoint = ray.GetPoint(distance);
+                SelectPicked(tile, item, toggle, pointerId, position);
+                return;
+            }
+
+            var ground = GroundPoint(ray);
+            var clickedTile = ground.HasValue ? TileAt(new Vector2(ground.Value.x, ground.Value.z)) : null;
+            if (clickedTile != null && !toggle)
+                TileClicked?.Invoke(clickedTile);
+        }
+
+        /// <summary>The 3D camera as the ground renderer places it, looking at the ground under <see cref="OrbitTarget"/>.</summary>
+        private MapOrbitCamera OrbitCamera()
+        {
+            var height = GroundHeight != null ? GroundHeight(OrbitTarget) : 0f;
+            return new MapOrbitCamera(new Vector3(OrbitTarget.x, height, OrbitTarget.y), OrbitYaw, OrbitPitch, OrbitDistance, layout.size);
+        }
+
+        /// <summary>Where a ray meets the ground, found by stepping between ground heights; null when it points upwards.</summary>
+        private Vector3? GroundPoint(Ray ray)
+        {
+            var height = GroundHeight != null ? GroundHeight(OrbitTarget) : 0f;
+            Vector3 point = default;
+            for (var step = 0; step < 4; step++)
+            {
+                if (!TryIntersectHorizontal(ray, height, out point))
+                    return null;
+                if (GroundHeight == null)
+                    break;
+                height = GroundHeight(new Vector2(point.x, point.z));
+            }
+            return point;
+        }
+
+        /// <summary>Where a ray meets the horizontal plane at a height, in front of the camera and within reach.</summary>
+        private static bool TryIntersectHorizontal(Ray ray, float height, out Vector3 point)
+        {
+            point = default;
+            if (Mathf.Abs(ray.direction.y) < 1e-4f)
+                return false;
+            var distance = (height - ray.origin.y) / ray.direction.y;
+            if (distance <= 0f || distance > 20000f)
+                return false;
+            point = ray.GetPoint(distance);
+            return true;
+        }
+
+        /// <summary>
+        /// Centre and radius of the rotation rings: at the pivot of the only selected object, around its model and at
+        /// least <see cref="MinimumRingPixels"/> across on screen. False when there are no rings to show.
+        /// </summary>
+        private bool TryGetRings(MapOrbitCamera camera, out Vector3 centre, out float radius)
+        {
+            centre = default;
+            radius = 0f;
+            if (!AllowEditing || selection.Count != 1 || selectedObject == null || ObjectRenderer == null ||
+                dragMode == DragMode.Move || !ObjectRenderer.TryGetPlacement(selectedObject, out var frame, out var bounds))
+                return false;
+            centre = frame.GetColumn(3);
+            var depth = camera.Depth(centre);
+            if (depth <= 1f)
+                return false;
+            var reach = Mathf.Max(Mathf.Abs(bounds.min.x), Mathf.Abs(bounds.max.x), Mathf.Abs(bounds.min.z), Mathf.Abs(bounds.max.z));
+            radius = Mathf.Max(reach * 1.15f, MinimumRingPixels / camera.PixelsPerMeter(depth));
+            return true;
+        }
+
+        /// <summary>All three rings; objects that join splines, like crossings, keep pitch and bank and get only heading.</summary>
+        private IEnumerable<RingAxis> VisibleRings()
+        {
+            yield return RingAxis.Heading;
+            if (!ObjectRenderer.HasSplineHelper(selectedObject.AssetPath))
+            {
+                yield return RingAxis.Pitch;
+                yield return RingAxis.Bank;
+            }
+        }
+
+        /// <summary>The selected object's orientation, as previewed while a ring is dragged.</summary>
+        private void CurrentOrientation(out double heading, out double pitch, out double bank)
+        {
+            var turning = dragMode == DragMode.Turn;
+            heading = turning ? previewHeading : selectedObject.HeadingDegrees;
+            pitch = turning ? previewPitch : selectedObject.PitchDegrees;
+            bank = turning ? previewBank : selectedObject.BankDegrees;
+        }
+
+        /// <summary>
+        /// The axis a ring turns about, in the order OMSI applies the angles: heading about the vertical, pitch about
+        /// the right axis after heading, bank about the forward axis after heading and pitch.
+        /// </summary>
+        private static Vector3 RingNormal(RingAxis ring, double heading, double pitch)
+        {
+            switch (ring)
+            {
+                case RingAxis.Pitch:
+                    return Quaternion.Euler(0f, (float)heading, 0f) * Vector3.right;
+                case RingAxis.Bank:
+                    return Quaternion.Euler((float)pitch, (float)heading, 0f) * Vector3.forward;
+                default:
+                    return Vector3.up;
+            }
+        }
+
+        private static Vector3[] RingPoints(Vector3 centre, Vector3 normal, float radius)
+        {
+            var u = Vector3.Cross(normal, Mathf.Abs(normal.y) < 0.9f ? Vector3.up : Vector3.forward).normalized;
+            var v = Vector3.Cross(normal, u);
+            var points = new Vector3[RingSegments + 1];
+            for (var index = 0; index <= RingSegments; index++)
+            {
+                var angle = 2f * Mathf.PI * index / RingSegments;
+                points[index] = centre + (u * Mathf.Cos(angle) + v * Mathf.Sin(angle)) * radius;
+            }
+            return points;
+        }
+
+        /// <summary>The ring nearest to an element position within reach, and the point on it under the pointer.</summary>
+        private bool RingAt(MapOrbitCamera camera, Vector2 position, out RingAxis ring, out Vector3 point)
+        {
+            ring = RingAxis.None;
+            point = default;
+            if (!TryGetRings(camera, out var centre, out var radius))
+                return false;
+            CurrentOrientation(out var heading, out var pitch, out _);
+            var nearest = RingPickDistance;
+            foreach (var axis in VisibleRings())
+            {
+                var points = RingPoints(centre, RingNormal(axis, heading, pitch), radius);
+                for (var index = 0; index < RingSegments; index++)
+                {
+                    if (!camera.TryProject(points[index], out var a) || !camera.TryProject(points[index + 1], out var b))
+                        continue;
+                    var segment = b - a;
+                    var along = segment.sqrMagnitude > 1e-6f ? Mathf.Clamp01(Vector2.Dot(position - a, segment) / segment.sqrMagnitude) : 0f;
+                    var distance = Vector2.Distance(a + segment * along, position);
+                    if (distance >= nearest)
+                        continue;
+                    nearest = distance;
+                    ring = axis;
+                    point = Vector3.Lerp(points[index], points[index + 1], along);
+                }
+            }
+            return ring != RingAxis.None;
+        }
+
+        private void StartTurn(RingAxis ring, Vector3 ringPoint, int pointerId, Vector2 position)
+        {
+            ObjectRenderer.TryGetPlacement(selectedObject, out var frame, out _);
+            previewHeading = selectedObject.HeadingDegrees;
+            previewPitch = selectedObject.PitchDegrees;
+            previewBank = selectedObject.BankDegrees;
+            activeRing = ring;
+            turnCentre = frame.GetColumn(3);
+            turnAxis = RingNormal(ring, previewHeading, previewPitch);
+            turnLastVector = Vector3.ProjectOnPlane(ringPoint - turnCentre, turnAxis);
+            turnStartAngle = ring == RingAxis.Pitch ? previewPitch : ring == RingAxis.Bank ? previewBank : previewHeading;
+            turnAngle = turnStartAngle;
+            BeginDrag(DragMode.Turn, pointerId, position);
+            ShowAngle(position);
+        }
+
+        /// <summary>
+        /// Follows the pointer around the ring: where its ray meets the ring's plane, the angle from the last such point
+        /// adds to the turn. Shift rounds the angle to 15° steps.
+        /// </summary>
+        private void UpdateTurn(Vector2 position, bool snap)
+        {
+            var ray = OrbitCamera().RayThrough(position);
+            // Seen edge-on, the plane gives no useful point; the turn waits until the view or pointer allows it.
+            if (Mathf.Abs(Vector3.Dot(ray.direction, turnAxis)) < 0.02f || !new Plane(turnAxis, turnCentre).Raycast(ray, out var enter) ||
+                enter > 20000f)
+                return;
+            var current = ray.GetPoint(enter) - turnCentre;
+            if (current.sqrMagnitude < 1e-6f)
+                return;
+            turnAngle += Vector3.SignedAngle(turnLastVector, current, turnAxis);
+            turnLastVector = current;
+            var angle = snap ? Math.Round(turnAngle / 15.0) * 15.0 : turnAngle;
+            switch (activeRing)
+            {
+                case RingAxis.Pitch:
+                    previewPitch = HalfTurn(angle);
+                    break;
+                case RingAxis.Bank:
+                    previewBank = HalfTurn(angle);
+                    break;
+                default:
+                    previewHeading = (angle % 360.0 + 360.0) % 360.0;
+                    break;
+            }
+            ShowAngle(position);
+        }
+
+        /// <summary>An angle between -180° and 180°.</summary>
+        private static double HalfTurn(double degrees)
+        {
+            return degrees - 360.0 * Math.Floor((degrees + 180.0) / 360.0);
+        }
+
+        /// <summary>Shows the angle of the ring being dragged next to the pointer.</summary>
+        private void ShowAngle(Vector2 position)
+        {
+            var name = activeRing == RingAxis.Pitch ? "Pitch" : activeRing == RingAxis.Bank ? "Bank" : "Heading";
+            var value = activeRing == RingAxis.Pitch ? previewPitch : activeRing == RingAxis.Bank ? previewBank : previewHeading;
+            angleLabel.text = name + " " + value.ToString("0.0") + "°";
+            angleLabel.style.left = position.x + 16f;
+            angleLabel.style.top = position.y - 28f;
+            angleLabel.style.display = DisplayStyle.Flex;
+        }
+
+        private void UpdateHoveredRing(Vector2 position)
+        {
+            var ring = RingAxis.None;
+            if (ThreeDimensional && hasView && summary != null)
+                RingAt(OrbitCamera(), position, out ring, out _);
+            if (ring == hoveredRing)
+                return;
+            hoveredRing = ring;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>The 3D view's overlay: boxes around the selected objects and the rotation rings.</summary>
+        private void Draw3D(Painter2D painter)
+        {
+            if (ObjectRenderer == null || layout.width < 1f || layout.height < 1f)
+                return;
+            var camera = OrbitCamera();
+            painter.lineWidth = 1.5f;
+            painter.strokeColor = SelectedObjectColor;
+            for (var index = 0; index < selection.Count && index < 200; index++)
+                if (ObjectRenderer.TryGetPlacement(selection[index].Record, out var frame, out var bounds))
+                    DrawBoundingBox(painter, camera, frame, bounds);
+
+            if (!TryGetRings(camera, out var centre, out var radius))
+                return;
+            CurrentOrientation(out var heading, out var pitch, out _);
+            var turning = dragMode == DragMode.Turn;
+            foreach (var axis in VisibleRings())
+            {
+                var colour = axis == RingAxis.Pitch ? PitchRingColor : axis == RingAxis.Bank ? BankRingColor : HeadingRingColor;
+                var emphasised = turning ? axis == activeRing : axis == hoveredRing;
+                if (turning && !emphasised)
+                    colour.a = 0.35f;
+                painter.strokeColor = colour;
+                painter.lineWidth = emphasised ? 4f : 2.5f;
+                var points = RingPoints(centre, RingNormal(axis, heading, pitch), radius);
+                painter.BeginPath();
+                var open = false;
+                foreach (var point in points)
+                {
+                    if (!camera.TryProject(point, out var screen))
+                    {
+                        open = false;
+                        continue;
+                    }
+                    if (open)
+                        painter.LineTo(screen);
+                    else
+                        painter.MoveTo(screen);
+                    open = true;
+                }
+                painter.Stroke();
+            }
+        }
+
+        private static readonly int[] BoxEdges = { 0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7 };
+
+        private static void DrawBoundingBox(Painter2D painter, MapOrbitCamera camera, Matrix4x4 frame, Bounds bounds)
+        {
+            var corners = new Vector2[8];
+            var visible = new bool[8];
+            for (var index = 0; index < 8; index++)
+            {
+                var local = new Vector3((index & 1) == 0 ? bounds.min.x : bounds.max.x, (index & 2) == 0 ? bounds.min.y : bounds.max.y,
+                    (index & 4) == 0 ? bounds.min.z : bounds.max.z);
+                visible[index] = camera.TryProject(frame.MultiplyPoint3x4(local), out corners[index]);
+            }
+            painter.BeginPath();
+            for (var edge = 0; edge < BoxEdges.Length; edge += 2)
+            {
+                var a = BoxEdges[edge];
+                var b = BoxEdges[edge + 1];
+                if (!visible[a] || !visible[b])
+                    continue;
+                painter.MoveTo(corners[a]);
+                painter.LineTo(corners[b]);
+            }
+            painter.Stroke();
+        }
+
         /// <param name="anchor">The object under the pointer; the whole selection moves by its offset.</param>
         private void StartObjectDrag(DragMode mode, OmsiObjectRecord anchor, int pointerId, Vector2 position)
         {
@@ -962,6 +1342,8 @@ namespace OmsiMapEditor.UI
             previewLocalX = anchor.LocalX;
             previewLocalY = anchor.LocalY;
             previewHeading = anchor.HeadingDegrees;
+            previewPitch = anchor.PitchDegrees;
+            previewBank = anchor.BankDegrees;
             BeginDrag(mode, pointerId, position);
         }
 
@@ -980,6 +1362,7 @@ namespace OmsiMapEditor.UI
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
                 SetPlacementPointer(position);
+                UpdateHoveredRing(position);
                 NotifyPointerInfo(position);
                 return;
             }
@@ -1009,11 +1392,24 @@ namespace OmsiMapEditor.UI
                     break;
             }
 
-            if (dragMode == DragMode.Move)
+            if (dragMode == DragMode.Move && ThreeDimensional)
+            {
+                // The grabbed point slides over its horizontal plane; the objects keep their height over the ground.
+                if (TryIntersectHorizontal(OrbitCamera().RayThrough(position), moveGrabPoint.y, out var point))
+                {
+                    previewLocalX = dragStartLocalX + (point.x - moveGrabPoint.x);
+                    previewLocalY = dragStartLocalY + (point.z - moveGrabPoint.z);
+                }
+            }
+            else if (dragMode == DragMode.Move)
             {
                 var moved = position - dragStartPointer;
                 previewLocalX = dragStartLocalX + moved.x * metersPerPixel;
                 previewLocalY = dragStartLocalY - moved.y * metersPerPixel;
+            }
+            else if (dragMode == DragMode.Turn)
+            {
+                UpdateTurn(position, evt.shiftKey);
             }
             else if (dragMode == DragMode.Rotate)
             {
@@ -1032,6 +1428,8 @@ namespace OmsiMapEditor.UI
                 MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY);
             else if (dragMode == DragMode.Rotate)
                 HeadingPreviewed?.Invoke(selectedTile, selectedObject, previewHeading);
+            else if (dragMode == DragMode.Turn)
+                OrientationPreviewed?.Invoke(PrimaryTile(), selectedObject, previewHeading, previewPitch, previewBank);
             NotifyPointerInfo(position);
             MarkDirtyRepaint();
         }
@@ -1055,7 +1453,9 @@ namespace OmsiMapEditor.UI
                         LocalX = item.Record.LocalX + previewLocalX - dragStartLocalX,
                         LocalY = item.Record.LocalY + previewLocalY - dragStartLocalY,
                         Height = item.Record.Height,
-                        HeadingDegrees = item.Record.HeadingDegrees
+                        HeadingDegrees = item.Record.HeadingDegrees,
+                        PitchDegrees = item.Record.PitchDegrees,
+                        BankDegrees = item.Record.BankDegrees
                     });
                 }
             }
@@ -1066,7 +1466,19 @@ namespace OmsiMapEditor.UI
                     new MapObjectEdit
                     {
                         Tile = selectedTile, Record = selectedObject, LocalX = selectedObject.LocalX, LocalY = selectedObject.LocalY,
-                        Height = selectedObject.Height, HeadingDegrees = previewHeading
+                        Height = selectedObject.Height, HeadingDegrees = previewHeading,
+                        PitchDegrees = selectedObject.PitchDegrees, BankDegrees = selectedObject.BankDegrees
+                    }
+                };
+            }
+            else if (finished == DragMode.Turn)
+            {
+                edits = new List<MapObjectEdit>
+                {
+                    new MapObjectEdit
+                    {
+                        Tile = PrimaryTile(), Record = selectedObject, LocalX = selectedObject.LocalX, LocalY = selectedObject.LocalY,
+                        Height = selectedObject.Height, HeadingDegrees = previewHeading, PitchDegrees = previewPitch, BankDegrees = previewBank
                     }
                 };
             }
@@ -1114,6 +1526,8 @@ namespace OmsiMapEditor.UI
             dragMode = DragMode.None;
             dragPointerId = -1;
             clickedMember = null;
+            activeRing = RingAxis.None;
+            angleLabel.style.display = DisplayStyle.None;
             if (pointerId >= 0 && this.HasPointerCapture(pointerId))
                 this.ReleasePointer(pointerId);
             if (previewed)
@@ -1253,8 +1667,16 @@ namespace OmsiMapEditor.UI
 
             if (ThreeDimensional)
             {
-                PointerInfoChanged("3D view   distance " + OrbitDistance.ToString("0") + " m   heading " + OrbitYaw.ToString("0") + "°   tilt " +
-                                   OrbitPitch.ToString("0") + "°");
+                var view = "3D view   distance " + OrbitDistance.ToString("0") + " m   heading " + OrbitYaw.ToString("0") + "°   tilt " +
+                           OrbitPitch.ToString("0") + "°";
+                if (dragMode == DragMode.Turn)
+                    view = "#" + selectedObject.Id + "   heading " + previewHeading.ToString("0.0") + "°   pitch " + previewPitch.ToString("0.0") +
+                           "°   bank " + previewBank.ToString("0.0") + "°      " + view;
+                else if (dragMode == DragMode.Move)
+                    view = (selection.Count > 1 ? selection.Count + " objects" : "#" + selectedObject.Id) + "   moved x " +
+                           (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") + "   y " +
+                           (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00") + "      " + view;
+                PointerInfoChanged(view);
                 return;
             }
             var scale = "1 px = " + (metersPerPixel >= 1f ? metersPerPixel.ToString("0.#") : metersPerPixel.ToString("0.###")) + " m";

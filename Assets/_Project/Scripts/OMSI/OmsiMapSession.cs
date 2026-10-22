@@ -154,6 +154,20 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public bool UpdateObject(string tileFileName, int objectId, double x, double y, double z, double headingDegrees)
         {
+            return UpdateObject(tileFileName, objectId, x, y, z, headingDegrees, null, null);
+        }
+
+        /// <summary>Like the method above and also sets pitch and bank.</summary>
+        public bool UpdateObject(string tileFileName, int objectId, double x, double y, double z, double headingDegrees,
+            double pitchDegrees, double bankDegrees)
+        {
+            return UpdateObject(tileFileName, objectId, x, y, z, headingDegrees, (double?)pitchDegrees, bankDegrees);
+        }
+
+        /// <param name="pitchDegrees">Null keeps the stored pitch; the same for bank.</param>
+        private bool UpdateObject(string tileFileName, int objectId, double x, double y, double z, double headingDegrees,
+            double? pitchDegrees, double? bankDegrees)
+        {
             var workspace = RequireWorkspace();
             var relative = OmsiRelativePath.Normalize(tileFileName);
             var tile = OmsiRecordFile.Parse(workspace.ReadAllBytes(relative), OmsiTileRecordLayouts.Instance);
@@ -174,6 +188,8 @@ namespace OmsiMapEditor.OMSI
             if (target.Y != y) { target.Y = y; changed = true; }
             if (target.Z != z) { target.Z = z; changed = true; }
             if (target.HeadingDegrees != headingDegrees) { target.HeadingDegrees = headingDegrees; changed = true; }
+            if (pitchDegrees.HasValue && target.PitchDegrees != pitchDegrees.Value) { target.PitchDegrees = pitchDegrees.Value; changed = true; }
+            if (bankDegrees.HasValue && target.BankDegrees != bankDegrees.Value) { target.BankDegrees = bankDegrees.Value; changed = true; }
             if (changed)
                 workspace.Save(relative, tile);
             return changed;
@@ -186,17 +202,28 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public bool UpdateObject(OmsiTileSummary tile, OmsiObjectRecord record, double x, double y, double z, double headingDegrees)
         {
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+            return UpdateObject(tile, record, x, y, z, headingDegrees, record.PitchDegrees, record.BankDegrees);
+        }
+
+        /// <summary>Like the method above and also sets pitch and bank.</summary>
+        public bool UpdateObject(OmsiTileSummary tile, OmsiObjectRecord record, double x, double y, double z, double headingDegrees,
+            double pitchDegrees, double bankDegrees)
+        {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
             if (record == null)
                 throw new ArgumentNullException(nameof(record));
 
-            if (!UpdateObject(tile.FileName, record.Id, x, y, z, headingDegrees))
+            if (!UpdateObject(tile.FileName, record.Id, x, y, z, headingDegrees, pitchDegrees, bankDegrees))
                 return false;
             record.LocalX = AsWritten(x);
             record.LocalY = AsWritten(y);
             record.Height = AsWritten(z);
             record.HeadingDegrees = AsWritten(headingDegrees);
+            record.PitchDegrees = AsWritten(pitchDegrees);
+            record.BankDegrees = AsWritten(bankDegrees);
             return true;
         }
 
@@ -238,7 +265,9 @@ namespace OmsiMapEditor.OMSI
                 LocalX = view.X,
                 LocalY = view.Y,
                 Height = view.Z,
-                HeadingDegrees = view.HeadingDegrees
+                HeadingDegrees = view.HeadingDegrees,
+                PitchDegrees = view.PitchDegrees,
+                BankDegrees = view.BankDegrees
             };
             var change = new OmsiObjectChange(OmsiObjectChangeKind.Placement, tile, record, tile.Objects.Count);
             AddFile(change, tilePath, tileBefore, tileFile.ToBytes());

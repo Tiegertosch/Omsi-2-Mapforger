@@ -193,7 +193,13 @@ namespace OmsiMapEditor.OMSI
                 !int.TryParse(values[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out var point) ||
                 !TryDouble(values, 6, out var heading))
                 return false;
-            record = new OmsiAttachedObjectRecord { AssetPath = values[1], Id = id, ParentId = parent, AttachPointIndex = point, HeadingDegrees = heading };
+            TryDouble(values, 7, out var pitch);
+            TryDouble(values, 8, out var bank);
+            record = new OmsiAttachedObjectRecord
+            {
+                AssetPath = values[1], Id = id, ParentId = parent, AttachPointIndex = point, HeadingDegrees = heading,
+                PitchDegrees = pitch, BankDegrees = bank
+            };
             return true;
         }
 
@@ -226,6 +232,8 @@ namespace OmsiMapEditor.OMSI
                 !TryDouble(values, 5, out var height) || !TryDouble(values, 6, out var heading) ||
                 !int.TryParse(values[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
                 return false;
+            TryDouble(values, 7, out var pitch);
+            TryDouble(values, 8, out var bank);
 
             record = new OmsiObjectRecord
             {
@@ -234,7 +242,9 @@ namespace OmsiMapEditor.OMSI
                 LocalX = x,
                 LocalY = y,
                 Height = height,
-                HeadingDegrees = heading
+                HeadingDegrees = heading,
+                PitchDegrees = pitch,
+                BankDegrees = bank
             };
             return true;
         }
