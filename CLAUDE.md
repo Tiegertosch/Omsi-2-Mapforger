@@ -115,7 +115,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 - Zweig `feature/drag-preview-trees` (noch nicht nach `main` gemergt, nicht gepusht).
 - Zuletzt fertig und geprüft (22. Oktober): angehängte Objekte und Spline-Anhängungen, Rückseiten-Culling, Glas/`[matl_transmap]`, Bäume in 3D als gekreuzte Flächen. 116 Tests grün, Player-Screenshots geprüft. Prüfstelle für Transparenz: 70er-Wartehäuschen in Grundorf, Kachel `0 -1` bei x 264 / y 31 (`-view 0 -1 264 31 0.02 -orbit 110 12 7`).
-- Danach korrigiert (noch nicht committet): Verdeckung überblendeter Materialien in zwei Durchgängen, Skripttexturen wie Anzeigetafeln werden nicht mehr gezeichnet. 117 Tests grün, Screenshots geprüft.
+- Danach korrigiert (`9c98fa3`): Verdeckung überblendeter Materialien in zwei Durchgängen, Skripttexturen wie Anzeigetafeln werden nicht mehr gezeichnet. 117 Tests grün, Screenshots geprüft.
 - Noch nicht im Player mit der Maus geprüft: Mitbewegen der Modelle beim Ziehen, Bedienung der 3D-Ansicht.
 - Hinweis: Kachel-`.map`-Dateien sind teils UTF-16 – `grep` findet darin nichts, mit Python dekodieren.
 - Naheliegende nächste Schritte laut Roadmap: Fahrplandaten (TTData) lesend importieren, Haltestellen/Linien anzeigen, Chrono-Varianten als Ebenen; Objekte in 3D wählen; Gelände unter Straßen ausschneiden; Splines anlegen/löschen.
