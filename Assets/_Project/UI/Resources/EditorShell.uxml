@@ -44,6 +44,7 @@
                 <ui:VisualElement class="view-control-separator" />
                 <ui:Button name="ground-toggle-button" text="Textures" class="view-control-button view-control-active" tooltip="Show the ground and objects textured, or plain tiles with outlines. The 3D view always shows textures." />
                 <ui:Button name="view3d-button" text="3D" class="view-control-button" tooltip="Look at and edit the map in 3D: right drag turns, middle drag moves, the wheel zooms." />
+                <ui:Button name="routes-toggle-button" text="Routes" class="view-control-button" tooltip="Show the bus stops and the routes of the timetable lines in the view from above. Lines are listed in the project browser." />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="file-menu" class="menu-popup file-menu">
@@ -72,6 +73,7 @@
                 <ui:Label text="Trees" class="map-legend-tree" />
                 <ui:Label text="Wires (dashed)" class="map-legend-wire" />
                 <ui:Label text="Fences" class="map-legend-fence" />
+                <ui:Label text="Bus routes and stops" class="map-legend-route" />
                 <ui:Label text="Selected" class="map-legend-selected" />
             </ui:VisualElement>
         </ui:VisualElement>

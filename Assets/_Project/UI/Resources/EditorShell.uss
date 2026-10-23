@@ -67,11 +67,12 @@
 .map-legend-selected { color: var(--mf-color-error); }
 .map-legend-wire { color: var(--mf-color-text-secondary); }
 .map-legend-fence { color: var(--mf-color-text-muted); }
+.map-legend-route { color: var(--mf-color-text-primary); }
 
 /* Workspace: the map fills it, panels and controls float above it */
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
 .map-view { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
-.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); --map-wire: var(--mf-color-text-secondary); --map-fence: var(--mf-color-text-muted); }
+.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); --map-wire: var(--mf-color-text-secondary); --map-fence: var(--mf-color-text-muted); --map-route: var(--mf-color-text-primary); --map-route-quiet: var(--mf-color-text-secondary); }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 .empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
 /* Welcome screen in the middle of the empty map */
@@ -218,6 +219,8 @@
 .browser-map-warnings { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-warning); white-space: normal; }
 .browser-map-description { margin-bottom: var(--mf-space-2); }
 .browser-map-description Label { font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.browser-lines { margin-bottom: var(--mf-space-2); flex-shrink: 0; }
+.browser-line-list { max-height: 180px; }
 .browser-tile-list { flex-grow: 1; min-height: 0; }
 .browser-tile-entry { min-height: 28px; margin: 0 0 3px; padding-left: var(--mf-space-2); padding-right: var(--mf-space-1); -unity-text-align: middle-left; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: var(--mf-radius-sm); }
 .browser-tile-entry:hover { background-color: var(--mf-color-panel-hover); }

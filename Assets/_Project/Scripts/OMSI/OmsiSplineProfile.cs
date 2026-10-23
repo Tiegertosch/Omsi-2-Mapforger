@@ -46,6 +46,22 @@ namespace OmsiMapEditor.OMSI
         public List<OmsiProfilePoint> Points { get; } = new List<OmsiProfilePoint>();
     }
 
+    /// <summary>A lane of a spline type: [path] in the .sli, which vehicles and pedestrians follow.</summary>
+    public sealed class OmsiSplineLane
+    {
+        /// <summary>0 for roads, 1 for pedestrians, further values for rails and others.</summary>
+        public int Kind { get; internal set; }
+
+        /// <summary>Distance from the spline, positive to the right.</summary>
+        public double X { get; internal set; }
+
+        public double Height { get; internal set; }
+        public double Width { get; internal set; }
+
+        /// <summary>0 along the spline, 1 against it, 2 both ways.</summary>
+        public int Direction { get; internal set; }
+    }
+
     /// <summary>The graphical cross-section of a spline type (.sli): textures and the strips that use them.</summary>
     public sealed class OmsiSplineProfile
     {
@@ -69,6 +85,9 @@ namespace OmsiMapEditor.OMSI
         /// the lateral positions of their [terrainholeprofilepnt] points, left to right.
         /// </summary>
         public List<List<double>> TerrainHoles { get; } = new List<List<double>>();
+
+        /// <summary>The lanes in the order of the file; timetables name them by this index.</summary>
+        public List<OmsiSplineLane> Lanes { get; } = new List<OmsiSplineLane>();
 
         /// <summary>
         /// Reads a .sli file. Texture names are resolved against the <c>texture</c> folder next to
@@ -112,6 +131,20 @@ namespace OmsiMapEditor.OMSI
                         if (result.TerrainHoles.Count > 0 && values.Count > 0 &&
                             double.TryParse(values[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var holeX))
                             result.TerrainHoles[result.TerrainHoles.Count - 1].Add(holeX);
+                        break;
+                    case "path":
+                        // Kind, x, height, width and direction; a lane that cannot be read still keeps the index of the next.
+                        var lane = new OmsiSplineLane();
+                        if (values.Count >= 5 && TryNumbers(values, out var laneValues))
+                        {
+                            lane.Kind = (int)laneValues[0];
+                            lane.X = laneValues[1];
+                            lane.Height = laneValues[2];
+                            lane.Width = laneValues[3];
+                        }
+                        if (values.Count >= 5 && int.TryParse(values[4].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var direction))
+                            lane.Direction = direction;
+                        result.Lanes.Add(lane);
                         break;
                     case "profilepnt":
                         if (strip != null && TryNumbers(values, out var numbers))

@@ -151,6 +151,45 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void RoutesFollowTheLanesOfSplinesAndObjects()
+        {
+            // Line D drives its own track over lane 0 of the crossing, which runs 10 m forward from the object.
+            WriteText(Path.Combine("TTData", "R3.ttr"), "Header", "", "[track_entry]", "12", "0", "0", "0", "10.0", "0", "");
+            WriteText(Path.Combine("TTData", "D.ttp"), "Header", "", "[trip]", "R3", "North", "D", "", "[station_typ2]", "12", "", "[profile]", "x", "1", "");
+            WriteText(Path.Combine("TTData", "D.ttl"), "Header", "", "[newtour]", "1", "Busses", "0", "", "[addtrip]", "D", "0", "300.000", "");
+            var crossing = OmsiSceneryObject.Parse(Encoding.UTF8.GetBytes("[path]\r\n0\r\n0\r\n0\r\n0\r\n0\r\n10\r\n0\r\n0\r\n0\r\n3\r\n"));
+            // Lane 0 of the road lies 2 m to the right of the spline.
+            var road = OmsiSplineProfile.Parse(Encoding.UTF8.GetBytes("[path]\r\n0\r\n2\r\n0\r\n3\r\n0\r\n"), @"Splines\road.sli");
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+            var timetable = OmsiTimetable.Read(new OmsiFolderSource(mapFolder));
+            var heading = summary.Tiles[0].Objects.Single(item => item.Id == 12);
+            Assert.AreEqual(0.0, heading.HeadingDegrees);
+
+            var routes = OmsiTimetableRoutes.Build(timetable, summary,
+                asset => asset.EndsWith("crossing.sco", StringComparison.OrdinalIgnoreCase) ? crossing : null,
+                asset => asset.EndsWith("road.sli", StringComparison.OrdinalIgnoreCase) ? road : null);
+
+            // The stop "Ghost" names an object the map does not have.
+            CollectionAssert.AreEqual(new[] { "West", "East" }, routes.Stops.Select(stop => stop.Name));
+            Assert.AreEqual(95.0, routes.Stops[1].Position.X, 1e-9);
+            var lineA = routes.Lines.Single(line => line.Name == "A");
+            Assert.AreEqual(3, lineA.ScheduledTripCount);
+            CollectionAssert.AreEquivalent(new[] { 10, 11 }, lineA.StopIds);
+            // Trip A has no track and drives the link from 10 to 11 over spline 20, which runs east from 0, 0.
+            var lane = lineA.Paths.Single();
+            Assert.AreEqual(0.0, lane[0].X, 1e-9);
+            Assert.AreEqual(-2.0, lane[0].Y, 1e-9);
+            Assert.AreEqual(100.0, lane[lane.Length - 1].X, 1e-9);
+            Assert.AreEqual(-2.0, lane[lane.Length - 1].Y, 1e-9);
+            var crossingLane = routes.Lines.Single(line => line.Name == "D").Paths.Single();
+            Assert.AreEqual(150.0, crossingLane[0].X, 1e-9);
+            Assert.AreEqual(150.0, crossingLane[0].Y, 1e-9);
+            Assert.AreEqual(150.0, crossingLane[crossingLane.Length - 1].X, 1e-9);
+            Assert.AreEqual(160.0, crossingLane[crossingLane.Length - 1].Y, 1e-9);
+            Assert.AreEqual(0, routes.MissingEntryCount);
+        }
+
+        [Test]
         public void MapCheckGroupsMissingVariableParentsAndNamesDuplicateIds()
         {
             WriteTile("tile_1_0.map", "[version]", "14", "",

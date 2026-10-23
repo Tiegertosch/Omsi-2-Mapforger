@@ -67,6 +67,8 @@ namespace OmsiMapEditor.UI
         private static readonly CustomStyleProperty<Color> HandleProperty = new CustomStyleProperty<Color>("--map-handle");
         private static readonly CustomStyleProperty<Color> WireProperty = new CustomStyleProperty<Color>("--map-wire");
         private static readonly CustomStyleProperty<Color> FenceProperty = new CustomStyleProperty<Color>("--map-fence");
+        private static readonly CustomStyleProperty<Color> RouteProperty = new CustomStyleProperty<Color>("--map-route");
+        private static readonly CustomStyleProperty<Color> QuietRouteProperty = new CustomStyleProperty<Color>("--map-route-quiet");
 
         private Color tileColor = Hex(0x202630);
         private Color missingTileColor = Mix(Hex(0x202630), Hex(0xE06464), 0.3f);
@@ -87,6 +89,9 @@ namespace OmsiMapEditor.UI
         private Color handleFillColor = Hex(0x29313D);
         private Color wireColor = Hex(0xAEB8C5, 0.9f);
         private Color fenceColor = Hex(0x7E8A99, 0.95f);
+        private Color routeColor = Hex(0xF2F4F7);
+        private Color quietRouteColor = Hex(0xAEB8C5, 0.55f);
+        private Color stopOutlineColor = Hex(0x171C23);
 
         // Rotation rings in the 3D view, coloured like the X, Y and Z axes they turn about.
         private static readonly Color PitchRingColor = new Color(0.94f, 0.33f, 0.33f, 1f);
@@ -170,6 +175,38 @@ namespace OmsiMapEditor.UI
         private IReadOnlyDictionary<string, OmsiSplineLineKind> splineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
 
         private readonly List<SplinePath> splines = new List<SplinePath>();
+
+        /// <summary>A lane that timetable lines drive, once however many lines share it.</summary>
+        private sealed class RouteLane
+        {
+            public Vector2[] Points;
+            public Rect Bounds;
+            public HashSet<int> Lines;
+        }
+
+        private sealed class RouteStop
+        {
+            public Vector2 Position;
+            public string Name;
+            public int ObjectId;
+        }
+
+        private readonly List<RouteLane> routeLanes = new List<RouteLane>();
+        private readonly List<RouteStop> routeStops = new List<RouteStop>();
+        private readonly List<HashSet<int>> routeLineStops = new List<HashSet<int>>();
+        private readonly List<string> routeLineNames = new List<string>();
+        private int highlightedLine = -1;
+        private bool showRoutes;
+
+        /// <summary>Stop names are written from this scale on, or further out for the stops of the highlighted line.</summary>
+        private const float StopLabelMetersPerPixel = 1.2f;
+        private const float HighlightedStopLabelMetersPerPixel = 6f;
+
+        /// <summary>Average width of a character of a stop name at 12 px, for keeping names apart.</summary>
+        private const float LabelCharacterPixels = 6.6f;
+
+        /// <summary>Stops with the same name closer than this on screen get one name.</summary>
+        private const float SameNamePixels = 80f;
         private OmsiMapSummary summary;
         private double tileSize = 300.0;
         private double originX;
@@ -298,6 +335,12 @@ namespace OmsiMapEditor.UI
                 wireColor = WithAlpha(wire, 0.9f);
             if (style.TryGetValue(FenceProperty, out var fence))
                 fenceColor = WithAlpha(fence, 0.95f);
+            if (style.TryGetValue(RouteProperty, out var route))
+                routeColor = route;
+            if (style.TryGetValue(QuietRouteProperty, out var quietRoute))
+                quietRouteColor = WithAlpha(quietRoute, 0.55f);
+            if (style.TryGetValue(TileProperty, out var outline))
+                stopOutlineColor = outline;
             MarkDirtyRepaint();
         }
 
@@ -556,6 +599,8 @@ namespace OmsiMapEditor.UI
             tileSize = map?.TileSizeMeters ?? 300.0;
             CancelDrag();
             BuildCaches();
+            // Routes are relative to the origin of the map they were built for.
+            SetRoutes(null);
             objectsByTileOutdated = true;
             if (!keepView || !hasView)
                 FitToMap();
@@ -579,6 +624,75 @@ namespace OmsiMapEditor.UI
             }
             selectedObject = selection.Count > 0 ? selection[selection.Count - 1].Record : null;
             MarkDirtyRepaint();
+        }
+
+        /// <summary>Shows the stops and the lanes the timetable lines drive, in the view from above.</summary>
+        public bool ShowRoutes
+        {
+            get => showRoutes;
+            set
+            {
+                showRoutes = value;
+                MarkDirtyRepaint();
+            }
+        }
+
+        /// <summary>Takes the routes of the loaded map; null removes them.</summary>
+        public void SetRoutes(OmsiTimetableRoutes routes)
+        {
+            routeLanes.Clear();
+            routeStops.Clear();
+            routeLineStops.Clear();
+            routeLineNames.Clear();
+            highlightedLine = -1;
+            if (routes != null && summary != null)
+            {
+                var lanes = new Dictionary<OmsiMapPoint[], RouteLane>();
+                for (var line = 0; line < routes.Lines.Count; line++)
+                {
+                    routeLineNames.Add(routes.Lines[line].Name);
+                    routeLineStops.Add(routes.Lines[line].StopIds);
+                    foreach (var path in routes.Lines[line].Paths)
+                    {
+                        // Lines that share a lane share its points, so the lane is converted and drawn once.
+                        if (!lanes.TryGetValue(path, out var lane))
+                        {
+                            var points = new Vector2[path.Length];
+                            for (var index = 0; index < path.Length; index++)
+                                points[index] = new Vector2((float)(path[index].X - originX), (float)(path[index].Y - originY));
+                            lane = new RouteLane { Points = points, Bounds = Bounds(points), Lines = new HashSet<int>() };
+                            lanes.Add(path, lane);
+                            routeLanes.Add(lane);
+                        }
+                        lane.Lines.Add(line);
+                    }
+                }
+                foreach (var stop in routes.Stops)
+                    routeStops.Add(new RouteStop
+                    {
+                        Position = new Vector2((float)(stop.Position.X - originX), (float)(stop.Position.Y - originY)), Name = stop.Name, ObjectId = stop.ObjectId
+                    });
+            }
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Draws one line above the others and names its stops further out; null or an unknown name shows all alike.</summary>
+        public void HighlightLine(string name)
+        {
+            highlightedLine = name == null ? -1 : routeLineNames.IndexOf(name);
+            MarkDirtyRepaint();
+        }
+
+        private static Rect Bounds(Vector2[] points)
+        {
+            var minimum = points[0];
+            var maximum = points[0];
+            foreach (var point in points)
+            {
+                minimum = Vector2.Min(minimum, point);
+                maximum = Vector2.Max(maximum, point);
+            }
+            return Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y);
         }
 
         /// <summary>Draws again after objects changed: moved, turned, placed or deleted.</summary>
@@ -868,6 +982,7 @@ namespace OmsiMapEditor.UI
             DrawSplines(painter, visible);
             var splinesDone = watch.Elapsed.TotalMilliseconds;
             DrawObjects(context, painter, visible);
+            DrawRoutes(context, painter, visible);
             var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
             DrawArrows(painter);
@@ -1033,6 +1148,90 @@ namespace OmsiMapEditor.UI
                 }
             }
             painter.Stroke();
+        }
+
+        /// <summary>
+        /// The lanes of the timetable lines over splines and objects, the highlighted line on top and wider, then the
+        /// stops as dots and, close enough, their names.
+        /// </summary>
+        private void DrawRoutes(MeshGenerationContext context, Painter2D painter, Rect visible)
+        {
+            if (!showRoutes || routeStops.Count == 0 && routeLanes.Count == 0)
+                return;
+
+            var width = Mathf.Clamp(4f / metersPerPixel, 1.5f, 4f);
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
+            StrokeRouteLanes(painter, visible, false, highlightedLine >= 0 ? quietRouteColor : routeColor, width);
+            if (highlightedLine >= 0)
+            {
+                StrokeRouteLanes(painter, visible, true, stopOutlineColor, width + 3f);
+                StrokeRouteLanes(painter, visible, true, routeColor, width + 1f);
+            }
+
+            var highlightedStops = highlightedLine >= 0 ? routeLineStops[highlightedLine] : null;
+            var radius = metersPerPixel < 2f ? 4f : 3f;
+            var labels = new List<RouteStop>();
+            painter.lineWidth = 1.5f;
+            painter.strokeColor = stopOutlineColor;
+            foreach (var stop in routeStops)
+            {
+                if (!visible.Contains(stop.Position))
+                    continue;
+                var onLine = highlightedStops != null && highlightedStops.Contains(stop.ObjectId);
+                painter.fillColor = highlightedStops == null || onLine ? routeColor : quietRouteColor;
+                painter.BeginPath();
+                painter.Arc(MapToScreen(stop.Position), onLine ? radius + 1f : radius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                painter.Fill();
+                painter.Stroke();
+                if (metersPerPixel <= StopLabelMetersPerPixel || onLine && metersPerPixel <= HighlightedStopLabelMetersPerPixel)
+                    labels.Add(stop);
+            }
+
+            // Names last, so lanes and dots do not cover them; a dark copy behind each keeps it readable on any ground.
+            // A name that would overlap one already written is left out, and so is the second stop of a pair with the
+            // same name, one for each direction.
+            var written = new List<Rect>();
+            var writtenNames = new List<KeyValuePair<string, Vector2>>();
+            foreach (var stop in labels)
+            {
+                var screen = MapToScreen(stop.Position);
+                var at = screen + new Vector2(radius + 4f, -8f);
+                var area = new Rect(at.x, at.y, stop.Name.Length * LabelCharacterPixels, 15f);
+                if (written.Exists(other => other.Overlaps(area)) ||
+                    writtenNames.Exists(other => other.Key == stop.Name && (other.Value - screen).sqrMagnitude < SameNamePixels * SameNamePixels))
+                    continue;
+                written.Add(area);
+                writtenNames.Add(new KeyValuePair<string, Vector2>(stop.Name, screen));
+                context.DrawText(stop.Name, at + new Vector2(1f, 1f), 12f, stopOutlineColor, null);
+                context.DrawText(stop.Name, at, 12f, routeColor, null);
+            }
+        }
+
+        private void StrokeRouteLanes(Painter2D painter, Rect visible, bool highlighted, Color color, float width)
+        {
+            painter.strokeColor = color;
+            painter.lineWidth = width;
+            painter.BeginPath();
+            var any = false;
+            foreach (var lane in routeLanes)
+            {
+                if (!lane.Bounds.Overlaps(visible) || highlighted && !lane.Lines.Contains(highlightedLine))
+                    continue;
+                any = true;
+                var last = MapToScreen(lane.Points[0]);
+                painter.MoveTo(last);
+                for (var index = 1; index < lane.Points.Length; index++)
+                {
+                    var point = MapToScreen(lane.Points[index]);
+                    if ((point - last).sqrMagnitude < 4f && index < lane.Points.Length - 1)
+                        continue;
+                    painter.LineTo(point);
+                    last = point;
+                }
+            }
+            if (any)
+                painter.Stroke();
         }
 
         /// <summary>Overhead lines as dashes of 6 pixels with gaps of 4, fences as a solid line, both 1 pixel wide.</summary>

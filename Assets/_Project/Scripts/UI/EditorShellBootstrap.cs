@@ -65,6 +65,14 @@ namespace OmsiMapEditor.UI
         private VisualElement rootElement;
         private Button groundToggleButton;
         private Button view3DButton;
+        private Button routesToggleButton;
+
+        // Stops and line routes of the timetable, built in the background after loading and after edits.
+        private OmsiTimetableRoutes routes;
+        private Task<OmsiTimetableRoutes> routesTask;
+        private int routesGeneration;
+        private string highlightedLine;
+        private readonly Dictionary<string, Button> lineEntries = new Dictionary<string, Button>(StringComparer.Ordinal);
 
         // Textures were switched off in the view from above; the 3D view shows them and returns to that choice.
         private bool texturesHiddenAbove;
@@ -229,6 +237,7 @@ namespace OmsiMapEditor.UI
             var centerSelectionButton = root.Q<Button>("center-selection-button");
             groundToggleButton = root.Q<Button>("ground-toggle-button");
             view3DButton = root.Q<Button>("view3d-button");
+            routesToggleButton = root.Q<Button>("routes-toggle-button");
 
             var mapView = root.Q<VisualElement>("map-view");
             if (mapView != null)
@@ -265,6 +274,7 @@ namespace OmsiMapEditor.UI
             DecorateButton(centerSelectionButton, "crosshair", null);
             DecorateButton(groundToggleButton, "layers", "Textures");
             DecorateButton(view3DButton, "rotate-3d", "3D");
+            DecorateButton(routesToggleButton, "route", "Routes");
             DecorateButton(projectCollapseButton, "chevron-left", null);
             DecorateButton(inspectorCollapseButton, "chevron-right", null);
             AddPanelIcon(projectFrame, "map");
@@ -351,6 +361,11 @@ namespace OmsiMapEditor.UI
                 groundToggleButton.clicked += ToggleGround;
             if (view3DButton != null)
                 view3DButton.clicked += ToggleThreeDimensional;
+            if (routesToggleButton != null)
+            {
+                routesToggleButton.SetEnabled(false);
+                routesToggleButton.clicked += () => ShowRoutes(mapCanvas != null && !mapCanvas.ShowRoutes);
+            }
 
             if (viewButton != null)
                 viewButton.clicked += () => TogglePopup(viewMenu, fileMenu, helpMenu, editMenu);
@@ -478,6 +493,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.EnterOrbitView();
             }
             groundToggleButton?.SetEnabled(!mapCanvas.ThreeDimensional);
+            routesToggleButton?.SetEnabled(routes != null && !mapCanvas.ThreeDimensional);
             groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (objectRenderer != null)
                 objectRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
@@ -634,6 +650,17 @@ namespace OmsiMapEditor.UI
 
             if (Array.IndexOf(args, "-check") >= 0)
                 ValidateLoadedMap();
+
+            if (Array.IndexOf(args, "-routes") >= 0)
+            {
+                var routesStarted = Time.realtimeSinceStartup;
+                while (routesTask != null && Time.realtimeSinceStartup - routesStarted < 120f)
+                    yield return null;
+                ShowRoutes(true);
+                var lineName = Argument("-routes", 1);
+                if (lineName != null && !lineName.StartsWith("-", StringComparison.Ordinal))
+                    HighlightLine(lineName);
+            }
 
             if (Array.IndexOf(args, "-objects") >= 0)
             {
@@ -832,6 +859,10 @@ namespace OmsiMapEditor.UI
                 objectRenderer?.Load(summary, session.Source, installationRoot, mapCanvas.OriginX, mapCanvas.OriginY);
             }
             StartOutlineBuild(summary);
+            routes = null;
+            highlightedLine = null;
+            routesToggleButton?.SetEnabled(false);
+            StartRoutesBuild(summary);
             UpdateMapHeader();
             RenderProjectBrowser();
             RenderInspector();
@@ -907,6 +938,77 @@ namespace OmsiMapEditor.UI
                         withOutline++;
                 SetStatus("Object outlines ready for " + withOutline + " of " + kinds.Count + " object kinds. Zoom in to see them.");
             }).Every(150);
+        }
+
+        /// <summary>
+        /// Reads the timetable and finds where its lines run, on a worker thread: stops at their objects, lanes over the
+        /// splines and objects they drive. The previous routes stay on screen until the new ones are ready.
+        /// </summary>
+        private void StartRoutesBuild(OmsiMapSummary summary)
+        {
+            if (mapCanvas == null || session == null)
+                return;
+            var source = session.Source;
+            var installationRoot = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
+            var generation = ++routesGeneration;
+            var task = Task.Run(() =>
+            {
+                var timetable = OmsiTimetable.Read(source);
+                return timetable.BusStops.Count == 0 && timetable.Lines.Count == 0 ? null : OmsiTimetableRoutes.Build(timetable, summary, installationRoot);
+            });
+            routesTask = task;
+
+            IVisualElementScheduledItem poll = null;
+            poll = mapCanvas.schedule.Execute(() =>
+            {
+                if (!task.IsCompleted)
+                    return;
+                poll.Pause();
+                // A newer map or edit started another build meanwhile.
+                if (generation != routesGeneration)
+                    return;
+                routesTask = null;
+                if (task.IsFaulted)
+                {
+                    Debug.LogException(task.Exception);
+                    SetStatus("Bus routes could not be read: " + task.Exception?.GetBaseException().Message);
+                    return;
+                }
+                var firstRoutes = routes == null;
+                routes = task.Result;
+                mapCanvas.SetRoutes(routes);
+                mapCanvas.HighlightLine(highlightedLine);
+                routesToggleButton?.SetEnabled(routes != null && !mapCanvas.ThreeDimensional);
+                if (routes == null)
+                    ShowRoutes(false);
+                if (firstRoutes)
+                    RenderProjectBrowser();
+            }).Every(150);
+        }
+
+        /// <summary>Shows or hides the stops and line routes in the view from above.</summary>
+        private void ShowRoutes(bool visible)
+        {
+            if (mapCanvas == null)
+                return;
+            visible &= routes != null;
+            mapCanvas.ShowRoutes = visible;
+            routesToggleButton?.EnableInClassList("view-control-active", visible);
+            if (visible && routes != null)
+                SetStatus(routes.Stops.Count + " stops and " + routes.Lines.Count + " lines shown" +
+                          (routes.MissingEntryCount > 0 ? "; " + routes.MissingEntryCount + " driven paths are not on the map" : string.Empty) +
+                          ". Click a line in the project browser to highlight it.");
+        }
+
+        /// <summary>Highlights a line on the map and in the line list; the highlighted line again shows all alike.</summary>
+        private void HighlightLine(string name)
+        {
+            highlightedLine = name == highlightedLine ? null : name;
+            mapCanvas?.HighlightLine(highlightedLine);
+            foreach (var pair in lineEntries)
+                pair.Value.EnableInClassList("browser-tile-entry-selected", pair.Key == highlightedLine);
+            if (highlightedLine != null)
+                ShowRoutes(true);
         }
 
         /// <summary>Reads the map again through the same session, keeping the view.</summary>
@@ -1146,6 +1248,9 @@ namespace OmsiMapEditor.UI
             mapCanvas?.Refresh();
             objectRenderer?.RefreshPlacements();
             groundRenderer?.RefreshTerrainHoles(currentSummary);
+            // Moved stops and crossings move their routes.
+            if (routes != null)
+                StartRoutesBuild(currentSummary);
             foreach (var tile in browserEntries.Keys)
                 UpdateBrowserEntry(tile);
             UpdateCounts();
@@ -2360,6 +2465,32 @@ namespace OmsiMapEditor.UI
                 description.AddToClassList("browser-map-description");
                 description.Add(new Label(currentSummary.Description.Trim()));
                 projectPanel.Add(description);
+            }
+
+            lineEntries.Clear();
+            if (routes != null && routes.Lines.Count > 0)
+            {
+                var lines = new Foldout { text = "Lines (" + routes.Lines.Count + ")", value = false };
+                lines.AddToClassList("browser-lines");
+                var lineList = new ScrollView(ScrollViewMode.Vertical);
+                lineList.AddToClassList("browser-line-list");
+                var sorted = new List<OmsiRouteLine>(routes.Lines);
+                sorted.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
+                foreach (var line in sorted)
+                {
+                    var name = line.Name;
+                    var entry = new Button(() => HighlightLine(name))
+                    {
+                        text = "Line " + name + "     " + line.StopIds.Count + " stops  /  " + line.ScheduledTripCount + " trips",
+                        tooltip = "Highlight line " + name + " on the map; click again to show all lines alike."
+                    };
+                    entry.AddToClassList("browser-tile-entry");
+                    entry.EnableInClassList("browser-tile-entry-selected", name == highlightedLine);
+                    lineList.Add(entry);
+                    lineEntries[name] = entry;
+                }
+                lines.Add(lineList);
+                projectPanel.Add(lines);
             }
 
             var tileList = new ScrollView(ScrollViewMode.Vertical);
