@@ -67,7 +67,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] `[worldcoordinates]`-Karten wie Berlin-Spandau mit gemessener Kachelkante darstellen (siehe ADR 007)
 - [x] Exakte Kachelgeometrie von `[worldcoordinates]`-Karten aus der Kachelnummer ableiten: Die Kacheln sind Web-Mercator-Kacheln der Zoomstufe 16, gezählt von Greenwich und vom Äquator (ADR 019); die Verbindungsprüfung misst darin exakt (Berlin-Spandau 1.464 von 1.467 Verbindungen unter 5 cm), die Kante der ebenen Darstellung kommt aus der mittleren Kachelzeile, der Inspector nennt Breite und Länge der Kachel
 - [x] Objekte darstellen, die OMSI mit Koordinaten außerhalb ihrer eigenen Kachel speichert (18 in Berlin-Spandau); die durchgehende Draufsicht zeigt sie an ihrer Weltposition
-- Spline-Datensätze vor Kachelversion 11 dekodieren
+- Spline-Datensätze vor Kachelversion 11 dekodieren – zurückgestellt: Keine installierte Karte hat solche Kacheln mit Splines (HafenCity Hamburg hat 79 Kacheln der Version 10, alle ohne Splines), und das Format ist nicht dokumentiert; ohne Beispieldatei wäre die Feldfolge geraten (Stand 23. Oktober 2026)
 - [x] Vollständige Kachel-Datensätze und `global.cfg` untersuchen (siehe [TileRecordInventory.md](TileRecordInventory.md))
 - [x] Kachel-Datensätze verlustfrei lesen und unverändert zurückschreiben können (ADR 008; Rundreise über alle 1.409 Textdateien byte-identisch)
 - [x] Bearbeitungsablauf mit Speicherziel festlegen: Arbeitskopie im Projekt, Export als eigene OMSI-Karte (ADR 009)

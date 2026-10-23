@@ -61,7 +61,7 @@ Abhängigkeitsrichtung: UI → OMSI → Core; OMSI kennt UI nicht. Größte Date
 
 1. **Originalkarte nie verändern.** Gespeichert wird nur in `Name.workspace` neben `Name.omproj` (atomar über Temp-Datei). Export nur in einen eigenen Ordner `Kartenname (Mapforge)` mit Markierungsdatei `mapforge-export.txt` (ADR 009).
 2. **Verlustfrei:** Was der Editor nicht versteht, bleibt als Freitext unverändert erhalten. Kodierung, BOM, Zeilenenden pro Zeile bleiben erhalten (ADR 008).
-3. **Keine OMSI-Spielinhalte im Player.** Der Build vergleicht alle Player-Abhängigkeiten bytegenau mit der Installation; OMSI-Daten werden zur Laufzeit nur extern gelesen (ADR 005).
+3. **Keine OMSI-Spielinhalte im Player.** Der Build vergleicht alle Player-Abhängigkeiten bytegenau mit der Installation und mit der Freigabeliste `Assets/_Project/Settings/PlayerAssetReview.txt`; neue oder geänderte Player-Dateien warnen im normalen Build und stoppen `BuildRelease`. Nach Prüfung mit „Record Reviewed Player Assets“ neu schreiben. OMSI-Daten werden zur Laufzeit nur extern gelesen (ADR 005).
 4. Neue Objekte am **Kachelende** anfügen, damit sich keine Indizes verschieben. Löschen nimmt folgende `[rule]`/`[varparent]`/Terrain-Datensätze mit und verweigert bei bestehenden Verweisen (ADR 011).
 5. Kachelwechsel nur ohne kachelgebundene Verweise (Einstiegspunkt, Chrono, angehängtes Objekt, `[varparent]`) – sonst bleibt das Objekt mit Koordinaten außerhalb in seiner Kachel (ADR 012).
 6. Undo für Platzieren/Löschen über Dateistände vorher/nachher; Verschieben/Drehen wertbasiert.
@@ -98,7 +98,7 @@ Unity: `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. Befehle siehe `Docu
   -screenshot "<scratchpad>/grundorf.png" -quit -logFile "<scratchpad>/player.log"
 ```
 
-Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte), `-tool drag|move|rotate` (Pfeile nur mit `move`, Ringe/Drehgriff nur mit `rotate`), `-objects` (Objekte-Bibliothek offen), `-fold project|inspector|both`. Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
+Weitere Argumente: `-openProject <.omproj>`, `-orbit Richtung Neigung Abstand` (3D), `-select <objektID>`, `-place <Sceneryobjects\...\x.sco>` (Platziervorschau in der Bildmitte), `-tool drag|move|rotate` (Pfeile nur mit `move`, Ringe/Drehgriff nur mit `rotate`), `-objects` (Objekte-Bibliothek offen, dazu `-objectsTab`/`-objectsAt`/`-objectsSearch`), `-fold project|inspector|both`, `-plain` (ohne Texturen), `-check` (Kartenprüfung), `-routes [Linie]` (Linienwege, optional hervorgehoben), `-chrono JJJJ-MM-TT` (Chrono-Ansicht), `-newMap [Vorlage]`. Für Bearbeitungsansichten (Ringe, Griffe) ein Testprojekt im Scratchpad anlegen: `{"formatVersion":1,"projectName":"Test","globalConfigPath":"D:/.../maps/Grundorf/global.cfg"}` – die Arbeitskopie landet daneben, die Originalkarte bleibt unberührt. In Pfaden Schrägstriche verwenden. Bild dann mit Read ansehen. Gute Ausschnitte: Grundorf `0 -1 150 150 0.25`, Berlin-Spandau `2402 11279 200 200 0.4`.
 
 ## Testkarten
 
@@ -116,14 +116,13 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Panels schweben und sind einklappbar, Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Werkzeuge sind Modi (Q Drag = wählen und frei ziehen, W Move = Achsenpfeile inkl. Höhe, E Rotate = Griff/Ringe). Lucide-Icons als SVG-Pfade in `LucideIcons.cs`, gezeichnet von `IconElement` (neue Icons dort eintragen, Lizenz steht in THIRD_PARTY_NOTICES); Inter (OFL) ist freigegeben, sichtbarer Name bleibt „OMSI Map Editor“. Etappen stehen in der Roadmap. Herkunft von Objekten (Basisspiel/DLC/User-Content) kommt aus Steams Manifesten (`OmsiContentOrigins`, ADR 016); Steam liegt hier unter `C:\Program Files (x86)\Steam`, keine DLCs installiert.
 
-## Aktueller Stand (22. Oktober 2026, Abend)
+## Aktueller Stand (23. Oktober 2026, Abend)
 
-- Alles auf `main` gemergt und nach `origin` gepusht; `feature/drag-preview-trees` ist erledigt. Neue Arbeit in einem neuen Zweig beginnen.
-- Heute fertig und vom Nutzer im Player geprüft: angehängte Objekte, Glas/Transparenz, Bearbeiten in 3D mit Pitch/Bank und Drehringen (ADR 014), alle 2D-Werkzeuge auch in 3D, Platziervorschau mit Modell, Oberfläche nach ADR 015 bis Etappe 3.
-- Heute fertig, nur per Screenshot geprüft: Etappe 4 (Inter, Icons, Umschalter), Startbildschirm mit zuletzt geöffneten (`RecentFiles`, nur von Hand Geöffnetes) und „New map“ als „Planned“, Ansichtsknöpfe neben eingeklapptem Inspector.
-- DLC-Erkennung (ADR 016) mit echten Daten bestätigt: Nutzer hat DLC „HafenCity Hamburg“ (630010) installiert; Prüfstelle für DLC-Etikett und „Hide DLC objects“: Library-Ordner `HafenCityHamburg`.
-- Bewusst später: Farben der Vektorebene ans Corporate Design anpassen (Auswahl rot, Kachel gold, Splines orange).
-- Nächster Schritt: Nutzer wählen lassen zwischen „mehrere Objekte gemeinsam drehen“ (2D und 3D) und „neue Karte anlegen“ (Vorlage aus Basiskarte, leere Kachel, Test im Spiel). Weitere Ideen in der Roadmap.
+- Zweig `feature/open-items` (Sammelzweig, ein Commit je Punkt), **nicht gemergt, nicht gepusht** – wartet auf Test und Freigabe durch den Nutzer.
+- Erledigt auf dem Zweig: Vektorebene in Token-Farben, Gruppen und nEditor-Vorschaubilder in der Objekte-Bibliothek, DLC-Markierung von Hand, „New map“ aus Vorlage (ADR 017), Geländelöcher und Leitungen/Zäune (ADR 018), schnelleres Zeichnen und Masken nur nahe der Ansicht, `[worldcoordinates]` als Web Mercator (ADR 019), Kartenprüfung mit zehn Themen und Fahrplan-Import, Haltestellen und Linienwege („Routes“), Chrono-Ansicht für ein Datum (ADR 020, schreibgeschützt), Freigabeliste für Player-Dateien (ADR 005 ergänzt).
+- Nur per Screenshot/Batch geprüft, vom Nutzer im Player zu testen: DLC-Markierung, Masken beim Verschieben der Ansicht, neue Karte im Spiel (startet sie ohne Einstiegspunkt?), Löcher nach Verschieben einer Kreuzung, Linie per Klick hervorheben, Routen nach Bearbeitung, Rückkehr mit „Base map“ und Bearbeitungssperren in der Chrono-Ansicht, Bestätigungsdialog von „Record Reviewed Player Assets“.
+- Zurückgestellt: Splines vor Kachelversion 11 (keine Beispieldaten).
+- Hinweis: Hooks des Plugins legen bei `cd` in Unterordner `.omc`-Ordner an (auch unter `Assets/`); immer mit absoluten Pfaden arbeiten.
 - Hinweis: Kachel-`.map`-Dateien sind teils UTF-16 – `grep` findet darin nichts, mit Python dekodieren.
 
 Diesen Abschnitt bei größeren Fortschritten aktualisieren.
