@@ -7,7 +7,7 @@
                 <ui:Button name="file-menu-button" text="File" class="toolbar-menu-button" />
                 <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" />
                 <ui:Button name="view-menu-button" text="View" class="toolbar-menu-button" />
-                <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" tooltip="Check the loaded map: import warnings and whether connected splines meet." />
+                <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" tooltip="Check the loaded map: import, spline connections, IDs, entry points, attachments, files, timetable, chrono variants and DLC objects." />
                 <ui:Button name="help-menu-button" text="Help" class="toolbar-menu-button" />
             </ui:VisualElement>
             <ui:Label name="map-title" class="menu-bar-map" />
@@ -97,6 +97,17 @@
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="export-cancel-button" text="Cancel" class="map-control-button" />
                     <ui:Button name="export-confirm-button" text="Export" class="map-control-button dialog-primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="check-dialog" class="dialog-overlay" style="display: none;">
+            <ui:VisualElement class="dialog check-dialog">
+                <ui:Label text="Map check" class="popup-title" />
+                <ui:Label name="check-summary" class="popup-description" />
+                <ui:ScrollView name="check-sections" class="check-sections" />
+                <ui:VisualElement class="dialog-buttons">
+                    <ui:Button name="check-copy-button" text="Copy report" class="map-control-button" />
+                    <ui:Button name="check-close-button" text="Close" class="map-control-button dialog-primary" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

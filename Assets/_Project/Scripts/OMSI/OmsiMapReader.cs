@@ -121,7 +121,25 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Oldest tile version whose [spline] records carry separate previous and next IDs.</summary>
         private const int FirstVersionWithSplineNeighbourIds = 11;
 
+        /// <summary>
+        /// The elements a file adds in the tile record format, such as a chrono change list: objects, splines, attached
+        /// objects and rows along splines, in a new tile summary with the position and file name of
+        /// <paramref name="tile"/>. Selections and other commands of the file are left to the caller.
+        /// </summary>
+        internal static OmsiTileSummary ReadAddedElements(IOmsiFileSource source, string path, OmsiTileSummary tile)
+        {
+            var added = new OmsiTileSummary { X = tile.X, Y = tile.Y, FileName = tile.FileName, IsAvailable = true };
+            ReadTileRecords(source, path, added, new OmsiMapSummary());
+            return added;
+        }
+
         private static void ReadTile(IOmsiFileSource source, string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
+        {
+            ReadTileRecords(source, tilePath, tile, summary);
+            ReadTerrain(source, tilePath, tile, summary);
+        }
+
+        private static void ReadTileRecords(IOmsiFileSource source, string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
         {
             var sections = ReadSections(source, tilePath, OmsiTileRecordLayouts.Instance);
             var version = ReadTileVersion(sections);
@@ -167,7 +185,10 @@ namespace OmsiMapEditor.OMSI
             if (skippedOldSplines > 0)
                 summary.Warnings.Add(tile.FileName + " uses tile version " + version + "; its " + skippedOldSplines +
                                      " spline(s) use an older field layout and were counted but not decoded.");
+        }
 
+        private static void ReadTerrain(IOmsiFileSource source, string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)
+        {
             var terrainPath = tilePath + ".terrain";
             if (source.FileExists(terrainPath) && TryReadTerrainRange(source.ReadAllBytes(terrainPath), out var minHeight, out var maxHeight))
             {

@@ -78,6 +78,11 @@ namespace OmsiMapEditor.UI
         private VisualElement exportDialog;
         private TextField exportFolderField;
         private TextField exportNameField;
+        private VisualElement checkDialog;
+        private Label checkSummaryLabel;
+        private ScrollView checkSections;
+        private Task<OmsiMapCheckReport> checkTask;
+        private OmsiMapCheckReport lastCheck;
         private VisualElement newMapDialog;
         private Label newMapTemplateLabel;
         private TextField newMapFolderField;
@@ -146,6 +151,21 @@ namespace OmsiMapEditor.UI
             exportTargetLabel = root.Q<Label>("export-target-label");
             exportConfirmButton = root.Q<Button>("export-confirm-button");
             var exportCancelButton = root.Q<Button>("export-cancel-button");
+            checkDialog = root.Q<VisualElement>("check-dialog");
+            checkSummaryLabel = root.Q<Label>("check-summary");
+            checkSections = root.Q<ScrollView>("check-sections");
+            var checkCopyButton = root.Q<Button>("check-copy-button");
+            var checkCloseButton = root.Q<Button>("check-close-button");
+            if (checkCopyButton != null)
+                checkCopyButton.clicked += () =>
+                {
+                    if (lastCheck == null || currentSummary == null)
+                        return;
+                    GUIUtility.systemCopyBuffer = lastCheck.ToText(currentSummary.Name);
+                    SetStatus("Map check report copied.");
+                };
+            if (checkCloseButton != null)
+                checkCloseButton.clicked += () => HidePopup(checkDialog);
             var newMapMenuItem = root.Q<Button>("new-map-menu-item");
             newMapDialog = root.Q<VisualElement>("new-map-dialog");
             newMapTemplateLabel = root.Q<Label>("new-map-template-label");
@@ -512,6 +532,7 @@ namespace OmsiMapEditor.UI
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
         /// <c>-select objectId</c>, <c>-tool drag|move|rotate</c>, <c>-plain</c> for plain tiles without textures,
+        /// <c>-check</c> to run the map check and show its report,
         /// <c>-objects</c> to open the object library, with <c>-objectsTab library|groups|inmap|favorites</c>,
         /// <c>-objectsAt folder-or-group</c> and <c>-objectsSearch text</c>,
         /// <c>-fold project|inspector|both</c> to collapse panels,
@@ -611,6 +632,9 @@ namespace OmsiMapEditor.UI
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
                 SetTextures(false);
 
+            if (Array.IndexOf(args, "-check") >= 0)
+                ValidateLoadedMap();
+
             if (Array.IndexOf(args, "-objects") >= 0)
             {
                 ShowObjectsPanel(true);
@@ -634,7 +658,7 @@ namespace OmsiMapEditor.UI
             if (screenshot != null)
             {
                 var started = Time.realtimeSinceStartup;
-                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || outlinesBuilding ||
+                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || outlinesBuilding || checkTask != null ||
                         (installationScan != null && !installationScan.IsCompleted)) && Time.realtimeSinceStartup - started < 300f)
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
@@ -1140,10 +1164,11 @@ namespace OmsiMapEditor.UI
 
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog)))
+            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog)))
             {
                 HidePopup(exportDialog);
                 HidePopup(newMapDialog);
+                HidePopup(checkDialog);
                 evt.StopPropagation();
                 return;
             }
@@ -1158,7 +1183,7 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog))
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog))
                 return;
 
             if (!(evt.ctrlKey || evt.commandKey))
@@ -1980,20 +2005,131 @@ namespace OmsiMapEditor.UI
             return new Vector4(Clean(left), Clean(top), Clean(right), Clean(bottom));
         }
 
+        /// <summary>
+        /// Runs the map check in the background and shows its report: each topic with its outcome and findings, the
+        /// tile worth looking at first, and the objects that belong to a DLC.
+        /// </summary>
         private void ValidateLoadedMap()
         {
-            if (currentSummary == null)
+            if (currentSummary == null || session == null)
             {
                 SetStatus("Open a map before running validation.");
                 return;
             }
+            if (checkTask != null)
+                return;
 
-            var continuity = OmsiSplineContinuity.Check(currentSummary);
-            var worstGap = continuity.Gaps.Count > 0 ? continuity.Gaps[0] : null;
-            if (worstGap != null)
-                SelectTile(worstGap.Tile, true);
+            var summary = currentSummary;
+            var source = session.Source;
+            var installationRoot = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
+            var configName = Path.GetFileName(session.GlobalConfigPath);
+            checkSections?.Clear();
+            if (checkSummaryLabel != null)
+                checkSummaryLabel.text = "Checking " + (string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName) + "...";
+            if (checkDialog != null)
+                checkDialog.style.display = DisplayStyle.Flex;
+            SetStatus("Checking the map...");
+            var task = Task.Run(() => OmsiMapCheck.Run(summary, source, installationRoot, configName));
+            checkTask = task;
+            IVisualElementScheduledItem poll = null;
+            poll = rootElement.schedule.Execute(() =>
+            {
+                if (!task.IsCompleted)
+                    return;
+                poll.Pause();
+                checkTask = null;
+                if (task.IsFaulted || !ReferenceEquals(summary, currentSummary))
+                {
+                    if (task.IsFaulted)
+                    {
+                        Debug.LogException(task.Exception);
+                        SetStatus("The map check failed: " + task.Exception?.GetBaseException().Message);
+                    }
+                    HidePopup(checkDialog);
+                    return;
+                }
+                var report = task.Result;
+                report.Sections.Add(DlcSection());
+                lastCheck = report;
+                ShowCheckReport(report);
+            }).Every(100);
+        }
 
-            SetStatus(DescribeMapCheck(currentSummary, continuity) + " " + DescribeDlcUse());
+        private void ShowCheckReport(OmsiMapCheckReport report)
+        {
+            if (checkSections == null || checkSummaryLabel == null)
+                return;
+            var problems = report.ProblemCount;
+            checkSummaryLabel.text = problems == 0
+                ? "No problems found in " + report.Sections.Count + " topics."
+                : problems + " of " + report.Sections.Count + " topics have findings that look like mistakes in the map data.";
+            SetStatus("Map check: " + (problems == 0 ? "passed." : problems + " topic(s) with problems; see the report."));
+            checkSections.Clear();
+            foreach (var section in report.Sections)
+            {
+                var box = new VisualElement();
+                box.AddToClassList("check-section");
+                var header = new VisualElement();
+                header.AddToClassList("check-section-header");
+                var status = new Label(section.Status == OmsiCheckStatus.Passed ? "OK" : section.Status == OmsiCheckStatus.Note ? "Note" : "Problem");
+                status.AddToClassList("check-status");
+                status.AddToClassList(section.Status == OmsiCheckStatus.Passed ? "check-status-passed"
+                    : section.Status == OmsiCheckStatus.Note ? "check-status-note" : "check-status-problem");
+                header.Add(status);
+                var title = new Label(section.Title);
+                title.AddToClassList("check-section-title");
+                header.Add(title);
+                if (section.Tile != null)
+                {
+                    var tile = currentSummary.Tiles.Find(candidate => candidate.X == section.Tile.X && candidate.Y == section.Tile.Y);
+                    var show = new Button(() =>
+                    {
+                        HidePopup(checkDialog);
+                        if (tile != null)
+                            SelectTile(tile, true);
+                    }) { text = "Show tile " + section.Tile.X + ", " + section.Tile.Y };
+                    show.AddToClassList("map-control-button");
+                    show.AddToClassList("check-section-button");
+                    header.Add(show);
+                }
+                box.Add(header);
+                var summaryLabel = new Label(section.Summary);
+                summaryLabel.AddToClassList("check-section-summary");
+                box.Add(summaryLabel);
+                AddFindings(box, section.Findings, 6);
+                checkSections.Add(box);
+            }
+        }
+
+        /// <summary>Lists the first findings and a button that shows the rest.</summary>
+        private static void AddFindings(VisualElement box, List<string> findings, int shown)
+        {
+            var list = new VisualElement();
+            box.Add(list);
+            void Fill(int count)
+            {
+                list.Clear();
+                for (var index = 0; index < Math.Min(count, findings.Count); index++)
+                {
+                    var finding = new Label("• " + findings[index]);
+                    finding.AddToClassList("check-finding");
+                    list.Add(finding);
+                }
+                if (findings.Count <= count)
+                    return;
+                var more = new Button(() => Fill(int.MaxValue)) { text = "Show all " + findings.Count };
+                more.AddToClassList("map-control-button");
+                more.AddToClassList("check-more-button");
+                list.Add(more);
+            }
+            Fill(shown);
+        }
+
+        private OmsiCheckSection DlcSection()
+        {
+            var section = new OmsiCheckSection("DLC objects") { Summary = DescribeDlcUse() };
+            section.Status = section.Summary.StartsWith("No DLC", StringComparison.Ordinal) ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
+            return section;
         }
 
         /// <summary>
@@ -2035,27 +2171,6 @@ namespace OmsiMapEditor.UI
             foreach (var item in items)
                 return item;
             return string.Empty;
-        }
-
-        private static string DescribeMapCheck(OmsiMapSummary summary, OmsiSplineContinuityReport continuity)
-        {
-            var importPart = summary.Warnings.Count == 0
-                ? "no import warnings"
-                : summary.Warnings.Count + " import warning(s), see the project browser";
-            var splinePart = continuity.ConnectedCount + " of " + continuity.LinkCount + " spline links meet";
-            if (continuity.Gaps.Count > 0)
-            {
-                var worstGap = continuity.Gaps[0];
-                splinePart += "; " + continuity.Gaps.Count + " gap(s) above " + continuity.ToleranceMeters.ToString("0.0#") +
-                              " m, largest " + worstGap.DistanceMeters.ToString("0.00") + " m between splines " +
-                              worstGap.SplineId + " and " + worstGap.NeighbourId +
-                              (worstGap.IsMutual ? string.Empty : ", referenced from one side only") + " (selected tile)";
-            }
-            if (continuity.MissingNeighbourCount > 0)
-                splinePart += "; " + continuity.MissingNeighbourCount + " link(s) point to splines that were not loaded";
-
-            var passed = summary.Warnings.Count == 0 && continuity.Gaps.Count == 0 && continuity.MissingNeighbourCount == 0;
-            return (passed ? "Map check passed: " : "Map check: ") + importPart + "; " + splinePart + ".";
         }
 
         private void SetStatus(string message)

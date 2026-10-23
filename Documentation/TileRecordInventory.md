@@ -131,7 +131,7 @@ Steigungsknicke sind in OMSI also erlaubt; die Höhe bleibt trotzdem stetig. Die
 
 - **`[rule]`:** Die Felder sind Pfadindex im Element, Regelname, Wert und eine weitere Zahl. Vorkommende Namen sind `trafficdensity`, `speedlimit`, `priority`, `trucks`, `no_cars` und `bus`. Regeln folgen Objekten und Splines.
 - **`[kill_rule]`:** Gleiches Layout. In Berlin-Spandau kommt nur `priority` vor. Vermutlich wird damit eine Regel entfernt, die das Objekt selbst mitbringt.
-- **`[varparent]`:** Ein Feld mit der ID des Elements, das die Variablen liefert, zum Beispiel die Kreuzung einer Ampel. In Berlin-Spandau liegt das Ziel 910-mal in derselben Kachel und 96-mal in einer Nachbarkachel. 41 Ziele existieren nicht.
+- **`[varparent]`:** Ein Feld mit der ID des Elements, das die Variablen liefert, zum Beispiel die Kreuzung einer Ampel. In Berlin-Spandau liegt das Ziel 910-mal in derselben Kachel und 96-mal in einer Nachbarkachel. Die 41 Ziele, die hier zunächst als fehlend galten, sind Objekte entlang von Splines (`[splineAttachement]`); alle 1.047 Ziele existieren (Kartenprüfung vom 23. Oktober 2026).
 - **`[spline_terrain_align]`:** Ohne Feld. Es folgt Splines und auch Kreuzungsobjekten, in 33 Fällen direkt einem Objekt. Laut openOMSI schneidet das Element dann seine Kontur aus dem Gelände.
 - **`[spline_terrain_align_2]`:** Ein Feld mit den Werten 1 bis 4. Es steuert laut openOMSI, wie die Enden der Kontur behandelt werden.
 - **`[water]`:** Verweist auf die Binärdatei `tile_X_Y.map.water` mit einer 32-Bit-Anzahl und je vier Höhenwerten. Alle 34 Dateien haben die Anzahl 1 und sind 20 Byte groß.

@@ -31,7 +31,7 @@ namespace OmsiMapEditor.OMSI
             "rule", "kill_rule", "varparent", "spline_terrain_align", "spline_terrain_align_2"
         };
 
-        private static readonly HashSet<string> PlacedObjectSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        internal static readonly HashSet<string> PlacedObjectSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "object", "attachObj", "splineAttachement", "splineAttachement_repeater"
         };

@@ -180,6 +180,19 @@
 .panel-row { flex-grow: 1; flex-direction: row; align-items: center; padding-left: var(--mf-space-1); padding-right: var(--mf-space-1); }
 .panel-row-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-text-secondary); flex-shrink: 0; }
 .dialog-row { flex-direction: row; align-items: center; margin: 4px 0; }
+.check-dialog { width: 760px; max-height: 86%; }
+.check-sections { flex-shrink: 1; min-height: 120px; max-height: 560px; margin: 4px 0 8px; }
+.check-section { margin: 0 0 var(--mf-space-2); padding: var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-md); }
+.check-section-header { flex-direction: row; align-items: center; }
+.check-section-title { flex-grow: 1; margin: 0; -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.check-status { margin: 0 var(--mf-space-2) 0 0; padding: 1px 6px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); border-radius: var(--mf-radius-sm); }
+.check-status-passed { background-color: var(--mf-color-success); }
+.check-status-note { background-color: var(--mf-color-warning); }
+.check-status-problem { background-color: var(--mf-color-error); }
+.check-section-summary { margin: 2px 0 0; white-space: normal; color: var(--mf-color-text-secondary); }
+.check-finding { margin: 1px 0 0 var(--mf-space-3); font-size: var(--mf-font-secondary); white-space: normal; color: var(--mf-color-text-secondary); }
+.check-section-button { height: 24px; margin: 0 0 0 var(--mf-space-2); }
+.check-more-button { align-self: flex-start; height: 22px; margin: 2px 0 0 var(--mf-space-3); font-size: var(--mf-font-secondary); }
 .dialog-row-text { flex-grow: 1; flex-shrink: 1; margin: 0 8px; }
 .panel-row-thumbnail { width: 36px; height: 36px; margin-right: var(--mf-space-2); flex-shrink: 0; background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); -unity-background-scale-mode: scale-to-fit; }
 .panel-row-texts { flex-grow: 1; flex-shrink: 1; overflow: hidden; justify-content: center; }
