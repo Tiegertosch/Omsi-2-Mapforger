@@ -63,7 +63,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Geometrie- und Straßenwerkzeuge entwerfen
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
 - [x] Validierungsberichte und Integritätsprüfungen ergänzen: Bericht unter **Tools** mit zehn Themen (Import, Spline-Verbindungen, IDs und `[NextIDCode]`, Einstiegspunkte samt Index und Winkel, Anhängungen und verwaiste Wiederholungen, `[varparent]`-Ziele, fehlende Objekt- und Spline-Dateien, Fahrplan, Chrono-Auswahlen, DLC-Objekte), im Hintergrund berechnet, mit Sprung zur Kachel und „Copy report“
-- Freigabeschritt für Player-Assets vor einer öffentlichen Auslieferung wieder einführen (siehe ADR 005)
+- [x] Freigabeschritt für Player-Assets vor einer öffentlichen Auslieferung wieder einführen (siehe ADR 005): Freigabeliste `PlayerAssetReview.txt` mit SHA-256 je Player-Datei, normaler Build warnt, Release-Build bricht ab, Menübefehl „Record Reviewed Player Assets...“
 - [x] `[worldcoordinates]`-Karten wie Berlin-Spandau mit gemessener Kachelkante darstellen (siehe ADR 007)
 - [x] Exakte Kachelgeometrie von `[worldcoordinates]`-Karten aus der Kachelnummer ableiten: Die Kacheln sind Web-Mercator-Kacheln der Zoomstufe 16, gezählt von Greenwich und vom Äquator (ADR 019); die Verbindungsprüfung misst darin exakt (Berlin-Spandau 1.464 von 1.467 Verbindungen unter 5 cm), die Kante der ebenen Darstellung kommt aus der mittleren Kachelzeile, der Inspector nennt Breite und Länge der Kachel
 - [x] Objekte darstellen, die OMSI mit Koordinaten außerhalb ihrer eigenen Kachel speichert (18 in Berlin-Spandau); die durchgehende Draufsicht zeigt sie an ihrer Weltposition

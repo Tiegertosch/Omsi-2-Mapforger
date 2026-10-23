@@ -34,11 +34,13 @@
 
 ## ADR 005: Freigabeliste für Player-Assets vorerst entfernt
 
-**Status:** Angenommen, 19. Oktober 2026. Ersetzt den Allowlist-Teil der bisherigen Build-Prüfung.
+**Status:** Angenommen, 19. Oktober 2026. Ersetzt den Allowlist-Teil der bisherigen Build-Prüfung. Am 23. Oktober 2026 durch eine Freigabeliste als Datei ergänzt, siehe unten.
 
 **Entscheidung:** Der Windows-Build prüft Player-Assets nicht mehr gegen eine fest im Code hinterlegte Liste mit SHA-256-Prüfsummen. Erhalten bleiben die Prüfung, dass die OMSI-Editorwerkzeuge Editor-only sind, und der bytegenaue Vergleich aller tatsächlichen Player-Abhängigkeiten mit der zuletzt eingelesenen OMSI-Installation.
 
 **Grund:** Jede Änderung an UXML, USS, Szene oder Render-Einstellungen blockierte den Build, bis die Prüfsumme im Code nachgetragen war. Das bremst die frühe UI-Arbeit stark. Der Bytevergleich mit der Installation fängt weiterhin direkt kopierte OMSI-Dateien ab. Nicht erkannt werden konvertierte oder veränderte OMSI-Inhalte; vor einer öffentlichen Auslieferung soll deshalb wieder eine Freigabeliste oder ein vergleichbarer Review-Schritt eingeführt werden (siehe Roadmap).
+
+**Ergänzung vom 23. Oktober 2026:** Die Freigabe steht jetzt in einer Datei statt im Code: `Assets/_Project/Settings/PlayerAssetReview.txt` nennt jede Projektdatei, die in den Player gelangt, mit ihrer SHA-256 (Format von `sha256sum`; Code, Assemblydefinitionen und Paketdateien ausgenommen). Ein normaler Build meldet neue und geänderte Dateien nur als Warnung, damit die UI-Arbeit nicht stockt; `WindowsPlayerBuild.BuildRelease` (Menü **Build > Windows Player (Release)**) bricht dann ab. Nach einer Prüfung, dass keine der Dateien OMSI-Inhalt ist, auch nicht konvertiert, schreibt **Build > Record Reviewed Player Assets...** die Liste neu; der Befehl zeigt vorher, was neu oder geändert ist. Die Liste liegt außerhalb von `Resources` und gelangt nicht selbst in den Player. Die erste Liste mit 16 Dateien (Szene, Render- und App-Einstellungen, eigene Shader, UXML, USS, Theme, Inter mit Lizenz) wurde am 23. Oktober 2026 Datei für Datei geprüft.
 
 ## ADR 006: Unity Test Framework als direkte Abhängigkeit
 
