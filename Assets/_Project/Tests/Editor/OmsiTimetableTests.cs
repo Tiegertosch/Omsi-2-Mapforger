@@ -151,6 +151,37 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ChronoKeepsRowsAlongSplinesOnTheirSplineWhenAnEarlierSplineIsDeleted()
+        {
+            WriteTile("tile_1_0.map", "[version]", "14", "",
+                "[spline]", "0", @"Splines\road.sli", "30", "0", "0", "0", "0", "0", "90", "50", "0", "0", "0", "0", "0", "0", "0", "",
+                "[spline]", "0", @"Splines\road.sli", "31", "0", "0", "0", "20", "0", "90", "50", "0", "0", "0", "0", "0", "0", "0", "",
+                "[spline]", "0", @"Splines\road.sli", "32", "0", "0", "0", "40", "0", "90", "50", "0", "0", "0", "0", "0", "0", "0", "",
+                "[splineAttachement]", "0", "lamp.sco", "41", "1", "2", "0", "0", "0", "0", "0", "10", "50", "0", "0", "",
+                "[splineAttachement]", "0", "lamp.sco", "42", "2", "2", "0", "0", "0", "0", "0", "10", "50", "0", "0", "");
+            var works = Path.Combine("Chrono", "0100_Works");
+            Directory.CreateDirectory(Path.Combine(mapFolder, works));
+            WriteText(Path.Combine(works, "Chrono.cfg"), "[startdate]", "19920401", "");
+            // The new row names spline number 2, spline 32, although spline 31 before it is deleted.
+            WriteTile(Path.Combine(works, "tile_1_0.map"), "[version]", "14", "",
+                "[selspline]", "31", "", "[delete]", "",
+                "[splineAttachement]", "0", "bench.sco", "43", "2", "3", "0", "0", "0", "0", "0", "10", "50", "0", "0", "");
+            var source = new OmsiFolderSource(mapFolder);
+            var summary = OmsiMapReader.Read(source);
+
+            var overlay = OmsiChrono.Overlay(summary, source, OmsiChrono.ReadVariants(source), out var report);
+
+            var tile = overlay.Tiles[1];
+            CollectionAssert.AreEqual(new[] { 30, 32 }, tile.Splines.Select(item => item.Id));
+            // The row on spline 31 goes with it; the other rows now name spline 32 by its new number 1.
+            CollectionAssert.AreEqual(new[] { 42, 43 }, tile.SplineAttachments.Select(item => item.Id));
+            CollectionAssert.AreEqual(new[] { 1, 1 }, tile.SplineAttachments.Select(item => item.SplineIndex));
+            Assert.AreEqual(2, report.DeletedElements);
+            // The base map keeps its numbers.
+            CollectionAssert.AreEqual(new[] { 1, 2 }, summary.Tiles[1].SplineAttachments.Select(item => item.SplineIndex));
+        }
+
+        [Test]
         public void RoutesFollowTheLanesOfSplinesAndObjects()
         {
             // Line D drives its own track over lane 0 of the crossing, which runs 10 m forward from the object.

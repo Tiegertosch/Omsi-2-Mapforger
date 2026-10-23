@@ -170,6 +170,12 @@ namespace OmsiMapEditor.OMSI
             foreach (var tile in map.Tiles)
                 tilesByFile[Path.GetFileName(tile.FileName)] = tile;
 
+            // Rows along splines name their spline by its number in the tile. Change lists number on: a deleted spline keeps
+            // its number and new splines follow the last one, so the numbers are kept here and resolved at the end.
+            var splineSlots = new Dictionary<OmsiTileSummary, List<OmsiSplineRecord>>();
+            foreach (var tile in map.Tiles)
+                splineSlots.Add(tile, new List<OmsiSplineRecord>(tile.Splines));
+
             foreach (var variant in variants)
             {
                 report.Variants.Add(variant);
@@ -177,16 +183,20 @@ namespace OmsiMapEditor.OMSI
                 {
                     if (!tilesByFile.TryGetValue(Path.GetFileName(file), out var tile))
                         continue;
-                    ApplyChanges(source, file, tile, report);
+                    ApplyChanges(source, file, tile, splineSlots[tile], report);
                     var added = OmsiMapReader.ReadAddedElements(source, file, tile);
                     tile.Objects.AddRange(added.Objects);
                     tile.Splines.AddRange(added.Splines);
+                    splineSlots[tile].AddRange(added.Splines);
                     tile.AttachedObjects.AddRange(added.AttachedObjects);
                     tile.SplineAttachments.AddRange(added.SplineAttachments);
                     report.AddedObjects += added.Objects.Count + added.AttachedObjects.Count;
                     report.AddedSplines += added.Splines.Count;
                 }
             }
+
+            foreach (var tile in map.Tiles)
+                ResolveSplineNumbers(tile, splineSlots[tile], report);
 
             foreach (var tile in map.Tiles)
             {
@@ -207,7 +217,8 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>Selections, deletions and type changes of one change list; new elements are added afterwards.</summary>
-        private static void ApplyChanges(IOmsiFileSource source, string file, OmsiTileSummary tile, OmsiChronoOverlayReport report)
+        private static void ApplyChanges(IOmsiFileSource source, string file, OmsiTileSummary tile, List<OmsiSplineRecord> splineSlots,
+            OmsiChronoOverlayReport report)
         {
             object selected = null;
             foreach (var record in OmsiRecordFile.Parse(source.ReadAllBytes(file), OmsiTileRecordLayouts.Instance).Records)
@@ -246,6 +257,7 @@ namespace OmsiMapEditor.OMSI
                             var changed = Copy(spline);
                             changed.AssetPath = values[0];
                             tile.Splines[tile.Splines.IndexOf(spline)] = changed;
+                            splineSlots[splineSlots.IndexOf(spline)] = changed;
                             selected = changed;
                             report.ChangedTypes++;
                         }
@@ -261,6 +273,42 @@ namespace OmsiMapEditor.OMSI
                         break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Points rows along splines at their spline's position in the overlay's spline list. Rows on a deleted spline go
+        /// with it; rows whose number is beyond the tile's splines are left as they are, as in the base map.
+        /// </summary>
+        private static void ResolveSplineNumbers(OmsiTileSummary tile, List<OmsiSplineRecord> splineSlots, OmsiChronoOverlayReport report)
+        {
+            if (splineSlots.Count == tile.Splines.Count)
+                return;
+            var positions = new Dictionary<OmsiSplineRecord, int>();
+            for (var index = 0; index < tile.Splines.Count; index++)
+                positions[tile.Splines[index]] = index;
+            for (var index = tile.SplineAttachments.Count - 1; index >= 0; index--)
+            {
+                var row = tile.SplineAttachments[index];
+                if (row.SplineIndex < 0 || row.SplineIndex >= splineSlots.Count)
+                    continue;
+                if (!positions.TryGetValue(splineSlots[row.SplineIndex], out var position))
+                {
+                    tile.SplineAttachments.RemoveAt(index);
+                    report.DeletedElements++;
+                }
+                else if (position != row.SplineIndex)
+                    tile.SplineAttachments[index] = Copy(row, position);
+            }
+        }
+
+        private static OmsiSplineAttachmentRecord Copy(OmsiSplineAttachmentRecord record, int splineIndex)
+        {
+            return new OmsiSplineAttachmentRecord
+            {
+                AssetPath = record.AssetPath, Id = record.Id, SplineIndex = splineIndex, LateralOffset = record.LateralOffset, Height = record.Height,
+                StartDistance = record.StartDistance, HeadingDegrees = record.HeadingDegrees, Interval = record.Interval, Range = record.Range,
+                IsRepeater = record.IsRepeater
+            };
         }
 
         private static object FindObject(OmsiTileSummary tile, int id)

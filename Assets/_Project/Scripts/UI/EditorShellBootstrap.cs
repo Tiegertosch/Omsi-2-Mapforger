@@ -83,8 +83,16 @@ namespace OmsiMapEditor.UI
         private int chronoGeneration;
         private TextField chronoDateField;
 
-        /// <summary>Edits are possible: a project is open and the base map is shown, not a chrono date.</summary>
-        private bool CanEdit => session != null && session.CanEdit && chronoDate == null;
+        /// <summary>
+        /// Edits are possible: a project is open, the base map is shown, not a chrono date, and no map check or chrono
+        /// overlay is reading the map's lists on a worker thread.
+        /// </summary>
+        private bool CanEdit => session != null && session.CanEdit && chronoDate == null && !ReadingMapInBackground;
+
+        private bool ReadingMapInBackground => chronoTask != null || checkTask != null;
+
+        // A routes build after edits waits for a pause, so a burst of edits or undos starts only one.
+        private IVisualElementScheduledItem routesRebuild;
 
         // Textures were switched off in the view from above; the 3D view shows them and returns to that choice.
         private bool texturesHiddenAbove;
@@ -924,6 +932,8 @@ namespace OmsiMapEditor.UI
 
         private string ReadOnlyMessage(string action)
         {
+            if (session != null && session.CanEdit && chronoDate == null && ReadingMapInBackground)
+                return "The map is being read for the map check or a chrono date; " + action + " again in a moment.";
             return chronoDate != null
                 ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
                   " with its chrono variants and is read-only. Choose Base map in the project browser to " + action + "."
@@ -960,6 +970,7 @@ namespace OmsiMapEditor.UI
             OmsiChronoOverlayReport report = null;
             var task = Task.Run(() => OmsiChrono.Overlay(baseMap, source, active, out report));
             chronoTask = task;
+            UpdateToolbar();
             SetStatus("Laying " + active.Count + " chrono variant(s) of " + dateText + " over the map...");
 
             IVisualElementScheduledItem poll = null;
@@ -971,6 +982,7 @@ namespace OmsiMapEditor.UI
                 if (generation != chronoGeneration)
                     return;
                 chronoTask = null;
+                UpdateToolbar();
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
@@ -978,6 +990,8 @@ namespace OmsiMapEditor.UI
                     return;
                 }
                 chronoDate = date.Value.Date;
+                StopPlacement();
+                ShowObjectsPanel(false);
                 PresentChrono(task.Result, active);
                 SetStatus(dateText + ": " + active.Count + " chrono variant(s) active, " + report.AddedObjects + " objects and " + report.AddedSplines +
                           " splines added, " + report.DeletedElements + " element(s) removed, " + report.ChangedTypes + " object(s) swapped" +
@@ -1128,9 +1142,24 @@ namespace OmsiMapEditor.UI
             if (left.Lines.Count != right.Lines.Count)
                 return false;
             for (var index = 0; index < left.Lines.Count; index++)
-                if (left.Lines[index].Name != right.Lines[index].Name)
+                if (left.Lines[index].Name != right.Lines[index].Name || left.Lines[index].StopIds.Count != right.Lines[index].StopIds.Count ||
+                    left.Lines[index].ScheduledTripCount != right.Lines[index].ScheduledTripCount)
                     return false;
             return true;
+        }
+
+        /// <summary>Builds the routes again 300 ms after the last edit; edits in between push the build back.</summary>
+        private void ScheduleRoutesRebuild()
+        {
+            if (mapCanvas == null)
+                return;
+            routesRebuild?.Pause();
+            routesRebuild = mapCanvas.schedule.Execute(() =>
+            {
+                routesRebuild = null;
+                if (currentSummary != null && chronoDate == null)
+                    StartRoutesBuild(currentSummary);
+            }).StartingIn(300);
         }
 
         /// <summary>Shows or hides the stops and line routes in the view from above.</summary>
@@ -1396,8 +1425,8 @@ namespace OmsiMapEditor.UI
             objectRenderer?.RefreshPlacements();
             groundRenderer?.RefreshTerrainHoles(currentSummary);
             // Moved stops and crossings move their routes.
-            if (routes != null)
-                StartRoutesBuild(currentSummary);
+            if (routes != null || routesTask != null)
+                ScheduleRoutesRebuild();
             foreach (var tile in browserEntries.Keys)
                 UpdateBrowserEntry(tile);
             UpdateCounts();
@@ -1496,7 +1525,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEdit || from.Count == 0)
             {
-                SetStatus(undo ? "Nothing to undo." : "Nothing to redo.");
+                SetStatus(from.Count > 0 && session != null && session.CanEdit ? ReadOnlyMessage(undo ? "undo" : "redo") : undo ? "Nothing to undo." : "Nothing to redo.");
                 return;
             }
 
@@ -1768,6 +1797,11 @@ namespace OmsiMapEditor.UI
         /// <summary>Starts placement mode with an object file relative to the OMSI installation.</summary>
         private void StartPlacement(string assetPath)
         {
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("place objects"));
+                return;
+            }
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             placementHasAbsoluteHeight = false;
             var problem = (string)null;
@@ -1886,8 +1920,13 @@ namespace OmsiMapEditor.UI
 
         private void RevertSelectedTile()
         {
-            if (!CanEdit || selectedTile == null)
+            if (selectedTile == null)
                 return;
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("revert tile edits"));
+                return;
+            }
             try
             {
                 session.RevertTile(selectedTile.FileName);
@@ -1921,6 +1960,8 @@ namespace OmsiMapEditor.UI
             exportNameField.SetValueWithoutNotify(displayName + " (Mapforge)");
             UpdateExportTarget();
             exportDialog.style.display = DisplayStyle.Flex;
+            if (chronoDate != null)
+                SetStatus("The export holds the base map with your edits; chrono variants stay in their own folders as in the original.");
         }
 
         /// <summary>
@@ -2271,20 +2312,27 @@ namespace OmsiMapEditor.UI
                 return;
             }
             if (checkTask != null)
+            {
+                if (checkDialog != null)
+                    checkDialog.style.display = DisplayStyle.Flex;
                 return;
+            }
 
-            var summary = currentSummary;
+            // The check covers the map as it is stored; a chrono view shows variants laid over it.
+            var summary = baseSummary ?? currentSummary;
             var source = session.Source;
             var installationRoot = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
             var configName = Path.GetFileName(session.GlobalConfigPath);
             checkSections?.Clear();
             if (checkSummaryLabel != null)
-                checkSummaryLabel.text = "Checking " + (string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName) + "...";
+                checkSummaryLabel.text = "Checking " + (string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName) +
+                                         (chronoDate != null ? " without chrono variants" : string.Empty) + "...";
             if (checkDialog != null)
                 checkDialog.style.display = DisplayStyle.Flex;
             SetStatus("Checking the map...");
             var task = Task.Run(() => OmsiMapCheck.Run(summary, source, installationRoot, configName));
             checkTask = task;
+            UpdateToolbar();
             IVisualElementScheduledItem poll = null;
             poll = rootElement.schedule.Execute(() =>
             {
@@ -2292,7 +2340,8 @@ namespace OmsiMapEditor.UI
                     return;
                 poll.Pause();
                 checkTask = null;
-                if (task.IsFaulted || !ReferenceEquals(summary, currentSummary))
+                UpdateToolbar();
+                if (task.IsFaulted || !ReferenceEquals(summary, baseSummary ?? currentSummary))
                 {
                     if (task.IsFaulted)
                     {
