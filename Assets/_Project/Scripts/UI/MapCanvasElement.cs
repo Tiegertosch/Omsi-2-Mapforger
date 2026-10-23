@@ -167,6 +167,10 @@ namespace OmsiMapEditor.UI
             public OmsiTileSummary Tile;
             public OmsiSplineRecord Record;
             public string AssetPath;
+
+            /// <summary>Heights at both ends, for markers in the 3D view.</summary>
+            public float StartHeight;
+            public float EndHeight;
             public Vector2[] Points;
             public Rect Bounds;
 
@@ -207,6 +211,9 @@ namespace OmsiMapEditor.UI
         // what to draw. Previews are only drawn, never part of the map until the shell builds them.
         private bool roadMode;
         private readonly List<Vector2[]> roadPreview = new List<Vector2[]>();
+
+        // Heights of the preview points, for the 3D view; null where none were given.
+        private readonly List<float[]> roadPreviewHeights = new List<float[]>();
         private bool roadPreviewValid;
         private readonly List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>> roadIssues = new List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>>();
         private Vector2? roadSnap;
@@ -651,18 +658,33 @@ namespace OmsiMapEditor.UI
         /// The planned road to draw: its pieces as world polylines, whether it can be built, the issues to mark, the spline
         /// end it would snap to and where it starts.
         /// </summary>
-        public void SetRoadPreview(IEnumerable<OmsiMapPoint[]> pieces, bool valid, IEnumerable<OmsiRoadIssue> issues, OmsiMapPoint? snap, OmsiMapPoint? start)
+        /// <param name="heights">The height of every preview point, for the 3D view; null draws the preview on the ground.</param>
+        public void SetRoadPreview(IEnumerable<OmsiMapPoint[]> pieces, bool valid, IEnumerable<OmsiRoadIssue> issues, OmsiMapPoint? snap, OmsiMapPoint? start,
+            IReadOnlyList<double[]> heights = null)
         {
             roadPreview.Clear();
+            roadPreviewHeights.Clear();
             roadIssues.Clear();
             if (pieces != null)
+            {
+                var pieceIndex = 0;
                 foreach (var piece in pieces)
                 {
                     var points = new Vector2[piece.Length];
                     for (var index = 0; index < piece.Length; index++)
                         points[index] = WorldToMap(piece[index]);
                     roadPreview.Add(points);
+                    float[] pointHeights = null;
+                    if (heights != null && pieceIndex < heights.Count && heights[pieceIndex] != null && heights[pieceIndex].Length == piece.Length)
+                    {
+                        pointHeights = new float[piece.Length];
+                        for (var index = 0; index < piece.Length; index++)
+                            pointHeights[index] = (float)heights[pieceIndex][index];
+                    }
+                    roadPreviewHeights.Add(pointHeights);
+                    pieceIndex++;
                 }
+            }
             if (issues != null)
                 foreach (var issue in issues)
                     roadIssues.Add(new KeyValuePair<Vector2, OmsiRoadIssueSeverity>(WorldToMap(new OmsiMapPoint(issue.WorldX, issue.WorldY)), issue.Severity));
@@ -675,6 +697,7 @@ namespace OmsiMapEditor.UI
         public void ClearRoadPreview()
         {
             roadPreview.Clear();
+            roadPreviewHeights.Clear();
             roadIssues.Clear();
             roadSnap = null;
             roadStart = null;
@@ -1038,7 +1061,11 @@ namespace OmsiMapEditor.UI
                 bounds.yMax = Mathf.Max(bounds.yMax, points[index].y);
             }
             splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
-            splines.Add(new SplinePath { Tile = tile, Record = spline, AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind });
+            splines.Add(new SplinePath
+            {
+                Tile = tile, Record = spline, AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind,
+                StartHeight = (float)spline.Height, EndHeight = (float)spline.EndHeight
+            });
         }
 
         private Vector2 ToMap(OmsiTileSummary tile, double localX, double localY)
@@ -1443,6 +1470,73 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>The road tool in 3D: free spline ends, the planned road at its heights, its issues and the snap ring.</summary>
+        private void DrawRoad3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            if (!roadMode && roadPreview.Count == 0)
+                return;
+            const float lift = 0.3f;
+            if (roadMode)
+            {
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 1.5f;
+                painter.BeginPath();
+                var target = OrbitTarget;
+                var reach = OrbitDistance * 3f;
+                foreach (var spline in splines)
+                {
+                    if (spline.LineKind != OmsiSplineLineKind.None || Vector2.Distance(spline.Points[0], target) > reach)
+                        continue;
+                    if (spline.Record.PreviousId == 0 && camera.TryProject(new Vector3(spline.Points[0].x, spline.StartHeight + lift, spline.Points[0].y), out var start))
+                        AddCircle(painter, start, 4f);
+                    var last = spline.Points[spline.Points.Length - 1];
+                    if (spline.Record.NextId == 0 && camera.TryProject(new Vector3(last.x, spline.EndHeight + lift, last.y), out var end))
+                        AddCircle(painter, end, 4f);
+                }
+                painter.Stroke();
+            }
+
+            for (var pass = 0; pass < 2; pass++)
+            {
+                painter.strokeColor = pass == 0 ? handleFillColor : roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.lineWidth = pass == 0 ? 6f : 3f;
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                for (var index = 0; index < roadPreview.Count; index++)
+                {
+                    var points = roadPreview[index];
+                    var heights = roadPreviewHeights[index];
+                    var world = new List<Vector3>(points.Length);
+                    for (var point = 0; point < points.Length; point++)
+                        world.Add(new Vector3(points[point].x, (heights != null ? heights[point] : GroundAt(points[point])) + lift, points[point].y));
+                    StrokeWorldLine(painter, camera, world);
+                }
+            }
+            foreach (var issue in roadIssues)
+            {
+                if (!camera.TryProject(new Vector3(issue.Key.x, GroundAt(issue.Key) + lift, issue.Key.y), out var screen))
+                    continue;
+                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? selectedObjectColor
+                    : issue.Value == OmsiRoadIssueSeverity.Warning ? selectedTileColor : wireColor;
+                painter.BeginPath();
+                AddCircle(painter, screen, 5f);
+                painter.Fill();
+            }
+            if (roadSnap.HasValue && camera.TryProject(new Vector3(roadSnap.Value.x, GroundAt(roadSnap.Value) + lift, roadSnap.Value.y), out var snap))
+            {
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 2.5f;
+                painter.BeginPath();
+                AddCircle(painter, snap, 9f);
+                painter.Stroke();
+            }
+        }
+
+        private float GroundAt(Vector2 map)
+        {
+            return GroundHeight != null ? GroundHeight(map) : 0f;
+        }
+
         private void StrokePolyline(Painter2D painter, Vector2[] points)
         {
             if (points.Length < 2)
@@ -1814,6 +1908,12 @@ namespace OmsiMapEditor.UI
                 // Right button turns the camera, the middle one moves it; the left one edits.
                 if (evt.button == 1 || evt.button == 2)
                     BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                else if (evt.button == 0 && roadMode)
+                {
+                    var ground = GroundPoint(OrbitCamera().RayThrough(position));
+                    if (ground.HasValue)
+                        RoadClicked?.Invoke(ground.Value.x + originX, ground.Value.z + originY);
+                }
                 else if (evt.button == 0)
                     PointerDown3D(position, evt.pointerId, evt.ctrlKey || evt.commandKey, evt.shiftKey);
                 evt.StopPropagation();
@@ -2463,6 +2563,7 @@ namespace OmsiMapEditor.UI
             DrawTileBorder3D(painter, camera);
             DrawMarkers3D(painter, camera);
             DrawPlacement3D(painter, camera);
+            DrawRoad3D(painter, camera);
             DrawBox(painter);
             painter.lineWidth = 1.5f;
             painter.strokeColor = selectedObjectColor;
@@ -2640,6 +2741,12 @@ namespace OmsiMapEditor.UI
                 {
                     var world = ScreenToMap(position);
                     RoadPointerMoved?.Invoke(world.x + originX, world.y + originY);
+                }
+                else if (roadMode && hasView && summary != null)
+                {
+                    var ground = GroundPoint(OrbitCamera().RayThrough(position));
+                    if (ground.HasValue)
+                        RoadPointerMoved?.Invoke(ground.Value.x + originX, ground.Value.z + originY);
                 }
                 SetPlacementPointer(position);
                 UpdateHoveredHandles(position);

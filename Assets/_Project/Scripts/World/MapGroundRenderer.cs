@@ -152,6 +152,11 @@ namespace OmsiMapEditor.World
 
         // The spline meshes of each tile, so changed splines can be built again without reading the whole map.
         private readonly Dictionary<long, List<GameObject>> tileSplineObjects = new Dictionary<long, List<GameObject>>();
+
+        // Tiles changed while the ground was still loading; their splines and terrain are built again once it is done,
+        // since the load read them before the change.
+        private readonly List<OmsiTileSummary> queuedSplineTiles = new List<OmsiTileSummary>();
+        private readonly List<OmsiTileSummary> queuedTerrainTiles = new List<OmsiTileSummary>();
         private string loadedInstallationRoot;
         private OmsiSplineProfileCatalog refreshProfiles;
         private readonly Dictionary<string, SplineTextureData> refreshTextures = new Dictionary<string, SplineTextureData>(StringComparer.OrdinalIgnoreCase);
@@ -398,8 +403,34 @@ namespace OmsiMapEditor.World
             splineMaterials.Clear();
             terrains.Clear();
             tileSplineObjects.Clear();
+            queuedSplineTiles.Clear();
+            queuedTerrainTiles.Clear();
             refreshProfiles = null;
             refreshTextures.Clear();
+        }
+
+        private static void Queue(List<OmsiTileSummary> queue, IEnumerable<OmsiTileSummary> tiles)
+        {
+            foreach (var tile in tiles)
+                if (tile != null && !queue.Contains(tile))
+                    queue.Add(tile);
+        }
+
+        /// <summary>Builds what changed while the ground was loading.</summary>
+        private void RunQueuedRefreshes()
+        {
+            if (queuedTerrainTiles.Count > 0)
+            {
+                var terrain = new List<OmsiTileSummary>(queuedTerrainTiles);
+                queuedTerrainTiles.Clear();
+                RefreshTerrain(terrain);
+            }
+            if (queuedSplineTiles.Count > 0)
+            {
+                var splines = new List<OmsiTileSummary>(queuedSplineTiles);
+                queuedSplineTiles.Clear();
+                RefreshSplines(splines);
+            }
         }
 
         /// <summary>
@@ -408,8 +439,13 @@ namespace OmsiMapEditor.World
         /// </summary>
         public void RefreshTerrain(IEnumerable<OmsiTileSummary> tiles)
         {
-            if (tiles == null || groundRoot == null || maskSource == null || loading != null || pending != null)
+            if (tiles == null)
                 return;
+            if (groundRoot == null || maskSource == null || loading != null || pending != null)
+            {
+                Queue(queuedTerrainTiles, tiles);
+                return;
+            }
             foreach (var tile in tiles)
             {
                 var key = TileKey(tile.X, tile.Y);
@@ -449,11 +485,16 @@ namespace OmsiMapEditor.World
         /// Builds the spline surfaces of some tiles again from their current splines, after roads were built, deleted,
         /// undone or redone. Other tiles stay as they are. While the map is still loading, the load reads the new state.
         /// </summary>
-        /// <returns>False when the ground is not built yet; the next load includes the change.</returns>
+        /// <returns>False when the ground is still loading; the tiles are then built again once it is done.</returns>
         public bool RefreshSplines(IEnumerable<OmsiTileSummary> tiles)
         {
-            if (tiles == null || groundRoot == null || loading != null || pending != null || string.IsNullOrEmpty(loadedInstallationRoot))
+            if (tiles == null)
+                return true;
+            if (groundRoot == null || loading != null || pending != null || string.IsNullOrEmpty(loadedInstallationRoot))
+            {
+                Queue(queuedSplineTiles, tiles);
                 return false;
+            }
             refreshProfiles = refreshProfiles ?? new OmsiSplineProfileCatalog(loadedInstallationRoot);
             var data = new GroundData();
             foreach (var pair in refreshTextures)
@@ -1040,6 +1081,7 @@ namespace OmsiMapEditor.World
             if (data.Problems.Count > 0)
                 Debug.LogWarning(report + "\n" + string.Join("\n", data.Problems));
             Loaded?.Invoke(report + ".");
+            RunQueuedRefreshes();
         }
 
         private void BuildTile(TileData tile)

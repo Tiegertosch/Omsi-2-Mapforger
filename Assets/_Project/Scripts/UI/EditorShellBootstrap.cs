@@ -545,8 +545,6 @@ namespace OmsiMapEditor.UI
         {
             if (mapCanvas == null || groundRenderer == null || currentSummary == null)
                 return;
-            if (activeTool == EditorTool.Road)
-                SetTool(EditorTool.Drag);
             // The 3D view consists of the textured scene, so it shows textures and keeps the choice from above for later.
             if (mapCanvas.ThreeDimensional)
             {
@@ -744,6 +742,10 @@ namespace OmsiMapEditor.UI
                         break;
                     points.Add(OmsiMapGeometry.TileLocalToWorld(roadTileX, roadTileY, roadLocalX, roadLocalY, currentSummary.TileSizeMeters));
                 }
+                // Wait for the ground, so the roads are built into a loaded map as when clicking.
+                var groundStarted = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundStarted < 300f)
+                    yield return null;
                 SetTool(EditorTool.Road);
                 if (roadPanel != null && Enum.TryParse<OmsiRoadHeightMode>(Argument("-roadMode", 1) == "follow" ? "FollowTerrain" : Argument("-roadMode", 1) ?? string.Empty, true,
                         out var roadMode))
@@ -1408,7 +1410,7 @@ namespace OmsiMapEditor.UI
         {
             mapCanvas?.RefreshSplines();
             if (groundRenderer != null && !groundRenderer.RefreshSplines(change.Tiles))
-                Debug.Log("Spline surfaces follow when the ground has finished loading.");
+                Debug.Log("Spline surfaces of the changed tiles are built once the ground has finished loading.");
             if (change.TerrainTiles.Count > 0)
             {
                 groundRenderer?.RefreshTerrain(change.TerrainTiles);
@@ -1494,7 +1496,10 @@ namespace OmsiMapEditor.UI
 
         private OmsiSplineEnd SnapEnd(OmsiMapPoint point)
         {
-            var reach = Math.Max(0.5, RoadSnapPixels * (mapCanvas?.MetersPerPixel ?? 1f));
+            // In 3D the snap distance grows with the distance of the camera, as the pixels per metre do.
+            var reach = mapCanvas != null && mapCanvas.ThreeDimensional
+                ? Math.Max(1.0, mapCanvas.OrbitDistance * 0.02)
+                : Math.Max(0.5, RoadSnapPixels * (mapCanvas?.MetersPerPixel ?? 1f));
             var end = OmsiSplineEnd.FindFree(currentSummary, point.X, point.Y, reach);
             // The road never joins the end it starts from.
             if (end != null && roadStartJoin != null && ReferenceEquals(end.Spline, roadStartJoin.Spline) && end.AtEnd == roadStartJoin.AtEnd)
@@ -1550,18 +1555,23 @@ namespace OmsiMapEditor.UI
             }
             var plan = PlanRoad(roadPointer.Value, out var endJoin);
             var pieces = new List<OmsiMapPoint[]>();
+            var heights = new List<double[]>();
             foreach (var piece in plan.Pieces)
             {
                 var steps = Math.Max(2, (int)Math.Ceiling(piece.LengthMeters / 2.0));
                 var points = new OmsiMapPoint[steps + 1];
+                var pointHeights = new double[steps + 1];
                 for (var step = 0; step <= steps; step++)
                 {
-                    piece.PointAt(piece.LengthMeters * step / steps, out var x, out var y, out _);
+                    piece.PointAt(piece.LengthMeters * step / steps, out var x, out var y, out var height);
                     points[step] = new OmsiMapPoint(x, y);
+                    pointHeights[step] = height;
                 }
                 pieces.Add(points);
+                heights.Add(pointHeights);
             }
-            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues, endJoin?.Position(currentSummary.TileSizeMeters), roadStart);
+            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues, endJoin?.Position(currentSummary.TileSizeMeters), roadStart,
+                heights);
             roadPanel.ShowPlan(DescribePlan(plan, endJoin), plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
         }
 
@@ -2762,11 +2772,6 @@ namespace OmsiMapEditor.UI
             if (tool != EditorTool.Drag && (!CanEdit))
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : "move or rotate objects"));
-                return;
-            }
-            if (tool == EditorTool.Road && mapCanvas != null && mapCanvas.ThreeDimensional)
-            {
-                SetStatus("Roads are built in the view from above; switch off 3D first.");
                 return;
             }
             // Another tool ends placing and closes the object library.
