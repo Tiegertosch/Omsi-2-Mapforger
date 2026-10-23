@@ -40,6 +40,9 @@ namespace OmsiMapEditor.UI
 
             /// <summary>A folder the user marked as DLC, or an object below one.</summary>
             public bool IsMarked;
+
+            /// <summary>A folder whose objects all come with the base game; every player has them, so it cannot be marked as DLC.</summary>
+            public bool IsBaseGame;
         }
 
         private readonly List<Entry> entries = new List<Entry>();
@@ -203,6 +206,11 @@ namespace OmsiMapEditor.UI
             return origins != null && origins.Of(path) == OmsiContentOrigin.Dlc;
         }
 
+        private bool IsBaseGame(string path)
+        {
+            return origins != null && origins.Of(path) == OmsiContentOrigin.BaseGame;
+        }
+
         /// <summary>DLC objects leave the library and the favourites while the toggle is on; the map's own list keeps them.</summary>
         private bool Hidden(string path)
         {
@@ -325,6 +333,8 @@ namespace OmsiMapEditor.UI
             var prefix = folder + Path.DirectorySeparatorChar;
             var subfolders = new SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var objects = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Subfolders with at least one object that does not come with the base game; only these can be marked as DLC.
+            var withOwnContent = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             void Visit(string path)
             {
                 if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || Hidden(path))
@@ -339,6 +349,8 @@ namespace OmsiMapEditor.UI
                 var name = rest.Substring(0, separator);
                 subfolders.TryGetValue(name, out var count);
                 subfolders[name] = count + 1;
+                if (!IsBaseGame(path))
+                    withOwnContent.Add(name);
             }
             if (library != null)
                 foreach (var path in library)
@@ -351,10 +363,13 @@ namespace OmsiMapEditor.UI
             foreach (var pair in subfolders)
             {
                 var path = prefix + pair.Key;
-                var marked = IsMarkedFolder(path);
+                var baseGame = !withOwnContent.Contains(pair.Key);
+                // A mark on a base game folder changes nothing, since the base game wins; it is not shown either.
+                var marked = !baseGame && IsMarkedFolder(path);
                 entries.Add(new Entry
                 {
-                    IsFolder = true, Path = path, Name = pair.Key, Detail = Count(pair.Value, "object"), IsDlc = marked, IsMarked = marked
+                    IsFolder = true, Path = path, Name = pair.Key, Detail = Count(pair.Value, "object"), IsDlc = marked, IsMarked = marked,
+                    IsBaseGame = baseGame
                 });
             }
             foreach (var path in objects)
@@ -586,7 +601,7 @@ namespace OmsiMapEditor.UI
             star.EnableInClassList("favorite-on", !entry.IsFolder && favorites.Contains(entry.Path));
             // Folders can be marked as DLC, for add-ons bought outside Steam that look like user content otherwise.
             var mark = row.Q<Button>("row-mark");
-            var markable = entry.IsFolder && !entry.IsGroup;
+            var markable = entry.IsFolder && !entry.IsGroup && !entry.IsBaseGame;
             mark.userData = markable ? entry.Path : null;
             mark.style.display = markable ? DisplayStyle.Flex : DisplayStyle.None;
             mark.EnableInClassList("dlc-mark-on", markable && entry.IsMarked);
@@ -594,7 +609,8 @@ namespace OmsiMapEditor.UI
                 ? "Marked as DLC by hand; click to count this folder as user content again"
                 : "Mark this folder as DLC, for add-ons bought outside Steam";
             row.tooltip = entry.IsGroup ? "Open the group " + entry.Name
-                : entry.IsFolder ? "Open the folder " + entry.Name
+                : entry.IsFolder ? "Open the folder " + entry.Name +
+                                   (entry.IsBaseGame ? "\nPart of the base game: every player has it, so it cannot be marked as DLC." : string.Empty)
                 : objectGroups.TryGetValue(entry.Path, out var names) ? entry.Path + "\nGroups: " + string.Join(", ", names)
                 : entry.Path;
         }
