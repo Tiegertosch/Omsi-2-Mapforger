@@ -34,11 +34,11 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Etappe 3: Objekte-Panel mit Bibliothek nach Ordnern, Reitern „In map“ und „Favorites“ und Suche statt des Platzierdialogs
 - [x] Etappe 4: Schrift Inter, Icons für Ansichtsknöpfe und Panels, Umschalter für Texturen und 3D
 - [x] Startbildschirm: Projekt öffnen, Karte öffnen, zuletzt geöffnete Projekte und Karten
-- Neue Karte anlegen: Kartenordner mit Hilfsdateien aus einer Basiskarte als Vorlage, eine leere Kachel mit flachem Gelände, dazu ein Projekt; im Spiel prüfen, ob OMSI sie lädt (auf dem Startbildschirm bisher „Planned“)\n- [x] Objekte-Bibliothek: DLC-Objekte nach Steams Dateilisten ausblenden oder kennzeichnen, User-Content bleibt sichtbar; Kartenprüfung nennt DLC-Objekte (ADR 016)
+- Neue Karte anlegen: Kartenordner mit Hilfsdateien aus einer Basiskarte als Vorlage, eine leere Kachel mit flachem Gelände, dazu ein Projekt; im Spiel prüfen, ob OMSI sie lädt (auf dem Startbildschirm bisher „Planned“)
+- [x] Objekte-Bibliothek: DLC-Objekte nach Steams Dateilisten ausblenden oder kennzeichnen, User-Content bleibt sichtbar; Kartenprüfung nennt DLC-Objekte (ADR 016)
 - Ordner von Hand als DLC markieren, für außerhalb von Steam gekaufte Add-ons
-- Objekte-Bibliothek: Vorschaubilder der Objekte (der OMSI-Editor legt welche in `Sceneryobjects
-EditorThumbnails` ab), Kategorien aus den `[groups]` der `.sco`-Dateien
-- Farben der Vektorebene an das Corporate Design anpassen: Auswahl ist rot, Splines orange
+- Objekte-Bibliothek: Vorschaubilder der Objekte (der OMSI-Editor legt welche in `Sceneryobjects\nEditorThumbnails` ab, der Ordner heißt wirklich so), Kategorien aus den `[groups]` der `.sco`-Dateien
+- [x] Farben der Vektorebene an das Corporate Design anpassen: Auswahl rot, gewählte Kachel gold, Splines orange, Objekte blau, Bäume und Platzieren grün; die Farben kommen aus den Design-Tokens
 
 ## Später
 

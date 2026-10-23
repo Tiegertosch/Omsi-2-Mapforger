@@ -470,7 +470,9 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// Command-line automation, so a check needs no clicks: <c>-openMap global.cfg</c> or <c>-openProject file.omproj</c>,
         /// <c>-view tileX tileY x y metresPerPixel</c>, <c>-orbit yaw pitch distance</c> for the 3D view of that place,
-        /// <c>-select objectId</c>, <c>-tool drag|move|rotate</c>, <c>-objects</c> to open the object library,
+        /// <c>-select objectId</c>, <c>-tool drag|move|rotate</c>, <c>-plain</c> for plain tiles without textures,
+        /// <c>-objects</c> to open the object library, with <c>-objectsTab library|groups|inmap|favorites</c>,
+        /// <c>-objectsAt folder-or-group</c> and <c>-objectsSearch text</c>,
         /// <c>-fold project|inspector|both</c> to collapse panels,
         /// <c>-place Sceneryobjects\...\object.sco</c> with the
         /// preview at the centre of the view,
@@ -561,6 +563,9 @@ namespace OmsiMapEditor.UI
             var toolName = Argument("-tool", 1);
             if (toolName != null && Enum.TryParse<EditorTool>(toolName, true, out var chosenTool))
                 SetTool(chosenTool);
+
+            if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
+                SetTextures(false);
 
             if (Array.IndexOf(args, "-objects") >= 0)
                 ShowObjectsPanel(true);

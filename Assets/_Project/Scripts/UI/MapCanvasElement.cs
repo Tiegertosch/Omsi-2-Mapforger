@@ -53,22 +53,36 @@ namespace OmsiMapEditor.UI
         private const float DragThreshold = 4f;
         private const int QuadsPerMesh = 10000;
 
-        private static readonly Color TileColor = new Color(0.115f, 0.14f, 0.165f, 1f);
-        private static readonly Color MissingTileColor = new Color(0.28f, 0.13f, 0.14f, 1f);
-        private static readonly Color TileBorderColor = new Color(0.25f, 0.31f, 0.37f, 1f);
-        private static readonly Color SelectedTileColor = new Color(0.88f, 0.69f, 0.33f, 1f);
-        private static readonly Color SplineColor = new Color(0.95f, 0.71f, 0.30f, 0.95f);
-        private static readonly Color QuietSplineColor = new Color(0.95f, 0.71f, 0.30f, 0.5f);
-        private static readonly Color32 ObjectColor = new Color(0.56f, 0.82f, 0.94f, 0.95f);
-        private static readonly Color HeadingColor = new Color(0.56f, 0.82f, 0.94f, 0.55f);
-        private static readonly Color SelectedObjectColor = new Color(1f, 0.36f, 0.42f, 1f);
-        private static readonly Color OutlineFillColor = new Color(0.42f, 0.55f, 0.66f, 0.38f);
-        private static readonly Color OutlineStrokeColor = new Color(0.62f, 0.78f, 0.9f, 0.85f);
-        private static readonly Color TreeFillColor = new Color(0.32f, 0.62f, 0.36f, 0.32f);
-        private static readonly Color TreeStrokeColor = new Color(0.45f, 0.78f, 0.5f, 0.7f);
-        private static readonly Color PlacementColor = new Color(0.47f, 0.9f, 0.6f, 1f);
-        private static readonly Color PlacementFillColor = new Color(0.47f, 0.9f, 0.6f, 0.25f);
-        private static readonly Color BoxFillColor = new Color(1f, 0.36f, 0.42f, 0.12f);
+        // Colours of the vector layer come from the design tokens: EditorShell.uss maps them to the custom properties
+        // --map-* on .map-canvas. The values here are the token colours, used until the stylesheet is resolved.
+        private static readonly CustomStyleProperty<Color> TileProperty = new CustomStyleProperty<Color>("--map-tile");
+        private static readonly CustomStyleProperty<Color> TileBorderProperty = new CustomStyleProperty<Color>("--map-tile-border");
+        private static readonly CustomStyleProperty<Color> MissingTileProperty = new CustomStyleProperty<Color>("--map-tile-missing");
+        private static readonly CustomStyleProperty<Color> SelectedTileProperty = new CustomStyleProperty<Color>("--map-tile-selected");
+        private static readonly CustomStyleProperty<Color> SplineProperty = new CustomStyleProperty<Color>("--map-spline");
+        private static readonly CustomStyleProperty<Color> ObjectProperty = new CustomStyleProperty<Color>("--map-object");
+        private static readonly CustomStyleProperty<Color> TreeProperty = new CustomStyleProperty<Color>("--map-tree");
+        private static readonly CustomStyleProperty<Color> SelectionProperty = new CustomStyleProperty<Color>("--map-selection");
+        private static readonly CustomStyleProperty<Color> PlacementProperty = new CustomStyleProperty<Color>("--map-placement");
+        private static readonly CustomStyleProperty<Color> HandleProperty = new CustomStyleProperty<Color>("--map-handle");
+
+        private Color tileColor = Hex(0x202630);
+        private Color missingTileColor = Mix(Hex(0x202630), Hex(0xE06464), 0.3f);
+        private Color tileBorderColor = Hex(0x414B59);
+        private Color selectedTileColor = Hex(0xE6B450);
+        private Color splineColor = Hex(0xF08A32, 0.95f);
+        private Color quietSplineColor = Hex(0xF08A32, 0.5f);
+        private Color32 objectColor = Hex(0x65A9D9, 0.95f);
+        private Color headingColor = Hex(0x65A9D9, 0.55f);
+        private Color selectedObjectColor = Hex(0xE06464);
+        private Color outlineFillColor = Hex(0x65A9D9, 0.3f);
+        private Color outlineStrokeColor = Hex(0x65A9D9, 0.85f);
+        private Color treeFillColor = Hex(0x55B887, 0.3f);
+        private Color treeStrokeColor = Hex(0x55B887, 0.7f);
+        private Color placementColor = Hex(0x55B887);
+        private Color placementFillColor = Hex(0x55B887, 0.25f);
+        private Color boxFillColor = Hex(0xE06464, 0.12f);
+        private Color handleFillColor = Hex(0x29313D);
 
         // Rotation rings in the 3D view, coloured like the X, Y and Z axes they turn about.
         private static readonly Color PitchRingColor = new Color(0.94f, 0.33f, 0.33f, 1f);
@@ -199,11 +213,73 @@ namespace OmsiMapEditor.UI
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
+            RegisterCallback<CustomStyleResolvedEvent>(OnCustomStyleResolved);
 
             angleLabel = new Label { pickingMode = PickingMode.Ignore };
             angleLabel.AddToClassList("map-angle-label");
             angleLabel.style.display = DisplayStyle.None;
             Add(angleLabel);
+        }
+
+        private void OnCustomStyleResolved(CustomStyleResolvedEvent evt)
+        {
+            var style = evt.customStyle;
+            if (style.TryGetValue(TileProperty, out var tile))
+                tileColor = tile;
+            if (style.TryGetValue(TileBorderProperty, out var border))
+                tileBorderColor = border;
+            if (style.TryGetValue(MissingTileProperty, out var missing))
+                missingTileColor = Mix(tileColor, missing, 0.3f);
+            if (style.TryGetValue(SelectedTileProperty, out var selectedTile))
+                selectedTileColor = selectedTile;
+            if (style.TryGetValue(SplineProperty, out var spline))
+            {
+                splineColor = WithAlpha(spline, 0.95f);
+                quietSplineColor = WithAlpha(spline, 0.5f);
+            }
+            if (style.TryGetValue(ObjectProperty, out var objectColorValue))
+            {
+                objectColor = WithAlpha(objectColorValue, 0.95f);
+                headingColor = WithAlpha(objectColorValue, 0.55f);
+                outlineFillColor = WithAlpha(objectColorValue, 0.3f);
+                outlineStrokeColor = WithAlpha(objectColorValue, 0.85f);
+            }
+            if (style.TryGetValue(TreeProperty, out var tree))
+            {
+                treeFillColor = WithAlpha(tree, 0.3f);
+                treeStrokeColor = WithAlpha(tree, 0.7f);
+            }
+            if (style.TryGetValue(SelectionProperty, out var selected))
+            {
+                selectedObjectColor = selected;
+                boxFillColor = WithAlpha(selected, 0.12f);
+            }
+            if (style.TryGetValue(PlacementProperty, out var placement))
+            {
+                placementColor = placement;
+                placementFillColor = WithAlpha(placement, 0.25f);
+            }
+            if (style.TryGetValue(HandleProperty, out var handle))
+                handleFillColor = handle;
+            MarkDirtyRepaint();
+        }
+
+        private static Color Hex(int rgb, float alpha = 1f)
+        {
+            return new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, alpha);
+        }
+
+        private static Color WithAlpha(Color color, float alpha)
+        {
+            color.a = alpha;
+            return color;
+        }
+
+        private static Color Mix(Color from, Color to, float amount)
+        {
+            var mixed = Color.Lerp(from, to, amount);
+            mixed.a = 1f;
+            return mixed;
         }
 
         /// <summary>An object was clicked; the tile and record identify it.</summary>
@@ -720,13 +796,13 @@ namespace OmsiMapEditor.UI
                 var rect = TileRect(tile);
                 if (!rect.Overlaps(visible) || tile.IsAvailable && TexturedView)
                     continue;
-                painter.fillColor = tile.IsAvailable ? TileColor : MissingTileColor;
+                painter.fillColor = tile.IsAvailable ? tileColor : missingTileColor;
                 painter.BeginPath();
                 AddRect(painter, rect);
                 painter.Fill();
             }
 
-            painter.strokeColor = TileBorderColor;
+            painter.strokeColor = tileBorderColor;
             painter.lineWidth = 1f;
             painter.BeginPath();
             foreach (var tile in summary.Tiles)
@@ -739,7 +815,7 @@ namespace OmsiMapEditor.UI
 
             if (selectedTile != null)
             {
-                painter.strokeColor = SelectedTileColor;
+                painter.strokeColor = selectedTileColor;
                 painter.lineWidth = 2f;
                 painter.BeginPath();
                 AddRect(painter, TileRect(selectedTile));
@@ -756,8 +832,8 @@ namespace OmsiMapEditor.UI
             for (var pass = 0; pass < 2; pass++)
             {
                 var trees = pass == 0;
-                painter.fillColor = trees ? TreeFillColor : OutlineFillColor;
-                painter.strokeColor = trees ? TreeStrokeColor : OutlineStrokeColor;
+                painter.fillColor = trees ? treeFillColor : outlineFillColor;
+                painter.strokeColor = trees ? treeStrokeColor : outlineStrokeColor;
                 painter.lineWidth = 1f;
                 painter.BeginPath();
                 var any = false;
@@ -816,7 +892,7 @@ namespace OmsiMapEditor.UI
 
         private void DrawSplines(Painter2D painter, Rect visible)
         {
-            painter.strokeColor = TexturedView ? QuietSplineColor : SplineColor;
+            painter.strokeColor = TexturedView ? quietSplineColor : splineColor;
             painter.lineWidth = TexturedView ? 1.5f : Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f);
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
@@ -847,7 +923,7 @@ namespace OmsiMapEditor.UI
             var markers = new List<Vector2>();
             if (showHeading)
             {
-                painter.strokeColor = HeadingColor;
+                painter.strokeColor = headingColor;
                 painter.lineWidth = 1f;
                 painter.BeginPath();
             }
@@ -877,7 +953,7 @@ namespace OmsiMapEditor.UI
 
             if (showHeading)
                 painter.Stroke();
-            WriteQuads(context, markers, half, ObjectColor);
+            WriteQuads(context, markers, half, objectColor);
         }
 
         /// <summary>Square markers written straight into meshes; much cheaper than vector circles for thousands of objects.</summary>
@@ -910,7 +986,7 @@ namespace OmsiMapEditor.UI
             if (selection.Count == 0)
                 return;
 
-            painter.strokeColor = SelectedObjectColor;
+            painter.strokeColor = selectedObjectColor;
             painter.lineWidth = 2f;
             painter.BeginPath();
             foreach (var item in selection)
@@ -935,7 +1011,7 @@ namespace OmsiMapEditor.UI
 
             if (CanRotate)
             {
-                painter.fillColor = dragMode == DragMode.Rotate ? SelectedObjectColor : new Color(0.12f, 0.14f, 0.17f, 1f);
+                painter.fillColor = dragMode == DragMode.Rotate ? selectedObjectColor : handleFillColor;
                 painter.BeginPath();
                 painter.Arc(handle, HandleRadius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
                 painter.Fill();
@@ -950,11 +1026,11 @@ namespace OmsiMapEditor.UI
 
             var position = placementPointer.Value;
             var screen = MapToScreen(position);
-            painter.strokeColor = PlacementColor;
+            painter.strokeColor = placementColor;
             painter.lineWidth = 2f;
             if (footprints.TryGetValue(placementAsset, out var footprint))
             {
-                painter.fillColor = PlacementFillColor;
+                painter.fillColor = placementFillColor;
                 painter.BeginPath();
                 AddFootprint(painter, footprint, position, placementHeading);
                 painter.Fill();
@@ -991,8 +1067,8 @@ namespace OmsiMapEditor.UI
                 return;
             var rect = Rect.MinMaxRect(Mathf.Min(dragStartPointer.x, dragLastPointer.x), Mathf.Min(dragStartPointer.y, dragLastPointer.y),
                 Mathf.Max(dragStartPointer.x, dragLastPointer.x), Mathf.Max(dragStartPointer.y, dragLastPointer.y));
-            painter.fillColor = BoxFillColor;
-            painter.strokeColor = SelectedObjectColor;
+            painter.fillColor = boxFillColor;
+            painter.strokeColor = selectedObjectColor;
             painter.lineWidth = 1f;
             painter.BeginPath();
             painter.MoveTo(new Vector2(rect.xMin, rect.yMin));
@@ -1682,7 +1758,7 @@ namespace OmsiMapEditor.UI
             DrawPlacement3D(painter, camera);
             DrawBox(painter);
             painter.lineWidth = 1.5f;
-            painter.strokeColor = SelectedObjectColor;
+            painter.strokeColor = selectedObjectColor;
             for (var index = 0; index < selection.Count && index < 200; index++)
                 if (ObjectRenderer.TryGetPlacement(selection[index].Record, out var frame, out var bounds))
                     DrawBoundingBox(painter, camera, frame, bounds);
@@ -1744,7 +1820,7 @@ namespace OmsiMapEditor.UI
                 for (var step = 0; step < steps; step++)
                     points.Add(OnGround(Vector2.Lerp(corners[side], corners[(side + 1) % 4], (float)step / steps), 0.3f));
             points.Add(points[0]);
-            painter.strokeColor = SelectedTileColor;
+            painter.strokeColor = selectedTileColor;
             painter.lineWidth = 2f;
             StrokeWorldLine(painter, camera, points);
         }
@@ -1756,7 +1832,7 @@ namespace OmsiMapEditor.UI
             foreach (var marker in Markers(camera))
             {
                 var selected = selectedRecords.Contains(marker.Record);
-                painter.strokeColor = selected ? SelectedObjectColor : (Color)ObjectColor;
+                painter.strokeColor = selected ? selectedObjectColor : (Color)objectColor;
                 painter.fillColor = painter.strokeColor;
                 painter.BeginPath();
                 painter.Arc(marker.Screen, selected ? 5f : 3.5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
@@ -1782,7 +1858,7 @@ namespace OmsiMapEditor.UI
             var heading = (float)(placementHeading * Math.PI / 180.0);
             var sin = Mathf.Sin(heading);
             var cos = Mathf.Cos(heading);
-            painter.strokeColor = PlacementColor;
+            painter.strokeColor = placementColor;
             painter.lineWidth = 2f;
             if (footprints.TryGetValue(placementAsset, out var footprint))
             {

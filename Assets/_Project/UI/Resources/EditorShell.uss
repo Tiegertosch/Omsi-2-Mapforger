@@ -69,7 +69,7 @@
 /* Workspace: the map fills it, panels and controls float above it */
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
 .map-view { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
-.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 .empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
 /* Welcome screen in the middle of the empty map */
