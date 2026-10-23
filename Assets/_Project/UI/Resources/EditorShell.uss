@@ -221,6 +221,15 @@
 .browser-map-description Label { font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .browser-lines { margin-bottom: var(--mf-space-2); flex-shrink: 0; }
 .browser-line-list { max-height: 180px; }
+.browser-chrono { margin-bottom: var(--mf-space-2); flex-shrink: 0; }
+.browser-chrono-state { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.browser-chrono-row { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-1); }
+.browser-chrono-date { flex-grow: 1; flex-shrink: 1; min-width: 80px; height: 28px; margin: 0 6px 0 0; }
+.browser-chrono-date .unity-base-text-field__input { height: 28px; margin: 0; padding: 0 6px; font-size: var(--mf-font-secondary); -unity-text-align: middle-left; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.browser-chrono-date .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
+.browser-chrono-row > .map-control-button { flex-shrink: 0; padding-left: 8px; padding-right: 8px; }
+.browser-chrono-row > .map-control-button:last-child { margin-right: 0; }
+.browser-chrono-variant { white-space: normal; padding-top: 4px; padding-bottom: 4px; }
 .browser-tile-list { flex-grow: 1; min-height: 0; }
 .browser-tile-entry { min-height: 28px; margin: 0 0 3px; padding-left: var(--mf-space-2); padding-right: var(--mf-space-1); -unity-text-align: middle-left; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: var(--mf-radius-sm); }
 .browser-tile-entry:hover { background-color: var(--mf-color-panel-hover); }

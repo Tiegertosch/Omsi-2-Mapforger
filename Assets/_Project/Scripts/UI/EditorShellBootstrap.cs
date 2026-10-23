@@ -74,6 +74,18 @@ namespace OmsiMapEditor.UI
         private string highlightedLine;
         private readonly Dictionary<string, Button> lineEntries = new Dictionary<string, Button>(StringComparer.Ordinal);
 
+        // Chrono view: the map as OMSI loads it on a date, with the variants active then laid over the base map. It is
+        // read-only; the base map stays in baseSummary and returns unchanged.
+        private OmsiMapSummary baseSummary;
+        private List<OmsiChronoVariant> chronoVariants = new List<OmsiChronoVariant>();
+        private DateTime? chronoDate;
+        private Task<OmsiMapSummary> chronoTask;
+        private int chronoGeneration;
+        private TextField chronoDateField;
+
+        /// <summary>Edits are possible: a project is open and the base map is shown, not a chrono date.</summary>
+        private bool CanEdit => session != null && session.CanEdit && chronoDate == null;
+
         // Textures were switched off in the view from above; the 3D view shows them and returns to that choice.
         private bool texturesHiddenAbove;
         private OmsiTileSummary selectedTile;
@@ -502,7 +514,7 @@ namespace OmsiMapEditor.UI
             UpdateZoomLabel();
             SetStatus(mapCanvas.ThreeDimensional
                 ? "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it" +
-                  (session != null && session.CanEdit
+                  (CanEdit
                       ? " and drag it; the move tool (W) moves it along arrows, also up, the rotate tool (E) turns it on rings: green heading, red pitch, blue bank."
                       : ".")
                 : "Back to the map from above.");
@@ -650,6 +662,15 @@ namespace OmsiMapEditor.UI
 
             if (Array.IndexOf(args, "-check") >= 0)
                 ValidateLoadedMap();
+
+            if (DateTime.TryParseExact(Argument("-chrono", 1) ?? string.Empty, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None,
+                    out var chronoArgument))
+            {
+                ShowChronoDate(chronoArgument);
+                var chronoStarted = Time.realtimeSinceStartup;
+                while (chronoTask != null && Time.realtimeSinceStartup - chronoStarted < 120f)
+                    yield return null;
+            }
 
             if (Array.IndexOf(args, "-routes") >= 0)
             {
@@ -821,16 +842,42 @@ namespace OmsiMapEditor.UI
                 ? OmsiMapSession.OpenReadOnly(globalConfigPath)
                 : OmsiMapSession.OpenProject(globalConfigPath, projectFilePath);
             var summary = newSession.Read();
-            var previousTile = selectedTile;
-            var previousObjectId = selectedObject?.Id;
 
             session = newSession;
-            currentSummary = summary;
+            baseSummary = summary;
+            chronoDate = null;
+            chronoGeneration++;
+            chronoTask = null;
+            chronoVariants = ReadChronoVariants(newSession.Source);
             currentProjectName = projectName ?? string.Empty;
             undoSteps.Clear();
             redoSteps.Clear();
             StopPlacement();
             ShowObjectsPanel(false);
+            routes = null;
+            highlightedLine = null;
+            routesToggleButton?.SetEnabled(false);
+            PresentSummary(summary, keepView);
+            StartRoutesBuild(summary);
+            UpdateMapHeader();
+            RenderProjectBrowser();
+            RenderInspector();
+            UpdateMapStateLabel();
+            SetStatus(currentSummary.Name + ": " + currentSummary.Tiles.Count + " tiles loaded" +
+                      (session.CanEdit ? " through the project workspace" : " read-only from the OMSI installation"));
+            if (toolsButton != null)
+                toolsButton.SetEnabled(true);
+        }
+
+        /// <summary>
+        /// Shows a summary of the session's map in the views: the base map or a chrono overlay. The selected tile and
+        /// object are found again by position and ID when <paramref name="keepView"/> is set.
+        /// </summary>
+        private void PresentSummary(OmsiMapSummary summary, bool keepView)
+        {
+            var previousTile = selectedTile;
+            var previousObjectId = selectedObject?.Id;
+            currentSummary = summary;
             selectedTile = null;
             selectedObject = null;
             if (keepView && previousTile != null)
@@ -845,9 +892,9 @@ namespace OmsiMapEditor.UI
 
             if (mapCanvas != null)
             {
-                mapCanvas.AllowEditing = session.CanEdit;
-                // A map without a project can only be looked at; selecting is the only tool then.
-                if (!session.CanEdit)
+                mapCanvas.AllowEditing = CanEdit;
+                // A map without a project or a chrono view can only be looked at; selecting is the only tool then.
+                if (!CanEdit)
                     activeTool = EditorTool.Drag;
                 mapCanvas.Tool = activeTool;
                 mapCanvas.SetMap(summary, keepView);
@@ -859,18 +906,106 @@ namespace OmsiMapEditor.UI
                 objectRenderer?.Load(summary, session.Source, installationRoot, mapCanvas.OriginX, mapCanvas.OriginY);
             }
             StartOutlineBuild(summary);
-            routes = null;
-            highlightedLine = null;
-            routesToggleButton?.SetEnabled(false);
-            StartRoutesBuild(summary);
+            UpdateToolbar();
+        }
+
+        private static List<OmsiChronoVariant> ReadChronoVariants(IOmsiFileSource source)
+        {
+            try
+            {
+                return OmsiChrono.ReadVariants(source);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is FormatException)
+            {
+                Debug.LogWarning("Chrono variants could not be read: " + exception.Message);
+                return new List<OmsiChronoVariant>();
+            }
+        }
+
+        private string ReadOnlyMessage(string action)
+        {
+            return chronoDate != null
+                ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
+                  " with its chrono variants and is read-only. Choose Base map in the project browser to " + action + "."
+                : "The map is read-only. Save a Mapforge project (File > Save map project as...) to " + action + ".";
+        }
+
+        /// <summary>
+        /// Shows the map as OMSI loads it on <paramref name="date"/>: the chrono variants active then are laid over a copy
+        /// of the base map on a worker thread, and the timetable of the date drives the routes. Null returns to the base
+        /// map. The chrono view is read-only; the base map and its edits are not touched.
+        /// </summary>
+        private void ShowChronoDate(DateTime? date)
+        {
+            if (session == null || baseSummary == null)
+                return;
+            var generation = ++chronoGeneration;
+            StopPlacement();
+            ShowObjectsPanel(false);
+            if (date == null)
+            {
+                chronoTask = null;
+                if (chronoDate == null)
+                    return;
+                chronoDate = null;
+                PresentChrono(baseSummary, null);
+                SetStatus(session.CanEdit ? "Base map shown; it can be edited again." : "Base map shown.");
+                return;
+            }
+
+            var active = OmsiChrono.ActiveOn(chronoVariants, date.Value);
+            var source = session.Source;
+            var baseMap = baseSummary;
+            var dateText = date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            OmsiChronoOverlayReport report = null;
+            var task = Task.Run(() => OmsiChrono.Overlay(baseMap, source, active, out report));
+            chronoTask = task;
+            SetStatus("Laying " + active.Count + " chrono variant(s) of " + dateText + " over the map...");
+
+            IVisualElementScheduledItem poll = null;
+            poll = mapCanvas.schedule.Execute(() =>
+            {
+                if (!task.IsCompleted)
+                    return;
+                poll.Pause();
+                if (generation != chronoGeneration)
+                    return;
+                chronoTask = null;
+                if (task.IsFaulted)
+                {
+                    Debug.LogException(task.Exception);
+                    SetStatus("The chrono variants of " + dateText + " could not be applied: " + task.Exception?.GetBaseException().Message);
+                    return;
+                }
+                chronoDate = date.Value.Date;
+                PresentChrono(task.Result, active);
+                SetStatus(dateText + ": " + active.Count + " chrono variant(s) active, " + report.AddedObjects + " objects and " + report.AddedSplines +
+                          " splines added, " + report.DeletedElements + " element(s) removed, " + report.ChangedTypes + " object(s) swapped" +
+                          (report.UnresolvedSelections > 0 ? ", " + report.UnresolvedSelections + " selection(s) without element" : string.Empty) +
+                          ". The chrono view is read-only.");
+            }).Every(100);
+        }
+
+        private void PresentChrono(OmsiMapSummary summary, List<OmsiChronoVariant> variants)
+        {
+            PresentSummary(summary, true);
+            StartRoutesBuild(summary, variants);
             UpdateMapHeader();
             RenderProjectBrowser();
             RenderInspector();
             UpdateMapStateLabel();
-            SetStatus(currentSummary.Name + ": " + currentSummary.Tiles.Count + " tiles loaded" +
-                      (session.CanEdit ? " through the project workspace" : " read-only from the OMSI installation"));
-            if (toolsButton != null)
-                toolsButton.SetEnabled(true);
+        }
+
+        /// <summary>The date field of the chrono section, or the status bar's complaint when it holds no date.</summary>
+        private void ShowChronoDateFromField()
+        {
+            var text = chronoDateField?.value?.Trim() ?? string.Empty;
+            if (!DateTime.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            {
+                SetStatus("Enter the date as year-month-day, for example 1992-04-05.");
+                return;
+            }
+            ShowChronoDate(date);
         }
 
         /// <summary>
@@ -944,7 +1079,8 @@ namespace OmsiMapEditor.UI
         /// Reads the timetable and finds where its lines run, on a worker thread: stops at their objects, lanes over the
         /// splines and objects they drive. The previous routes stay on screen until the new ones are ready.
         /// </summary>
-        private void StartRoutesBuild(OmsiMapSummary summary)
+        /// <param name="variants">The chrono variants whose timetables apply, or null for the base timetable.</param>
+        private void StartRoutesBuild(OmsiMapSummary summary, List<OmsiChronoVariant> variants = null)
         {
             if (mapCanvas == null || session == null)
                 return;
@@ -953,7 +1089,7 @@ namespace OmsiMapEditor.UI
             var generation = ++routesGeneration;
             var task = Task.Run(() =>
             {
-                var timetable = OmsiTimetable.Read(source);
+                var timetable = variants == null ? OmsiTimetable.Read(source) : OmsiTimetable.ReadForVariants(source, variants);
                 return timetable.BusStops.Count == 0 && timetable.Lines.Count == 0 ? null : OmsiTimetableRoutes.Build(timetable, summary, installationRoot);
             });
             routesTask = task;
@@ -974,16 +1110,27 @@ namespace OmsiMapEditor.UI
                     SetStatus("Bus routes could not be read: " + task.Exception?.GetBaseException().Message);
                     return;
                 }
-                var firstRoutes = routes == null;
+                // The line list changes with the first routes and with chrono dates that switch lines off.
+                var linesChanged = routes == null || task.Result == null || !SameLines(routes, task.Result);
                 routes = task.Result;
                 mapCanvas.SetRoutes(routes);
                 mapCanvas.HighlightLine(highlightedLine);
                 routesToggleButton?.SetEnabled(routes != null && !mapCanvas.ThreeDimensional);
                 if (routes == null)
                     ShowRoutes(false);
-                if (firstRoutes)
+                if (linesChanged)
                     RenderProjectBrowser();
             }).Every(150);
+        }
+
+        private static bool SameLines(OmsiTimetableRoutes left, OmsiTimetableRoutes right)
+        {
+            if (left.Lines.Count != right.Lines.Count)
+                return false;
+            for (var index = 0; index < left.Lines.Count; index++)
+                if (left.Lines[index].Name != right.Lines[index].Name)
+                    return false;
+            return true;
         }
 
         /// <summary>Shows or hides the stops and line routes in the view from above.</summary>
@@ -1028,7 +1175,7 @@ namespace OmsiMapEditor.UI
             if (centerView)
                 mapCanvas?.CenterOn(tile, item);
             SetStatus("Selected object #" + item.Id + " (" + item.AssetPath + ")" +
-                      (session != null && session.CanEdit ? "" : " - read-only; save a project to edit"));
+                      (CanEdit ? "" : chronoDate != null ? " - chrono view, read-only" : " - read-only; save a project to edit"));
         }
 
         /// <summary>Adds an object to the selection or takes it out (Ctrl+click).</summary>
@@ -1119,9 +1266,9 @@ namespace OmsiMapEditor.UI
         {
             if (edits == null || edits.Count == 0)
                 return;
-            if (session == null || !session.CanEdit)
+            if (!CanEdit)
             {
-                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to edit it.");
+                SetStatus(ReadOnlyMessage("edit it"));
                 return;
             }
 
@@ -1347,7 +1494,7 @@ namespace OmsiMapEditor.UI
 
         private void StepHistory(List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)
         {
-            if (session == null || !session.CanEdit || from.Count == 0)
+            if (!CanEdit || from.Count == 0)
             {
                 SetStatus(undo ? "Nothing to undo." : "Nothing to redo.");
                 return;
@@ -1461,9 +1608,9 @@ namespace OmsiMapEditor.UI
                 SetStatus("Select an object to delete.");
                 return;
             }
-            if (session == null || !session.CanEdit)
+            if (!CanEdit)
             {
-                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to edit it.");
+                SetStatus(ReadOnlyMessage("edit it"));
                 return;
             }
 
@@ -1549,9 +1696,9 @@ namespace OmsiMapEditor.UI
                 SetStatus("Open an OMSI map before placing objects.");
                 return;
             }
-            if (!session.CanEdit)
+            if (!CanEdit)
             {
-                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to place objects.");
+                SetStatus(ReadOnlyMessage("place objects"));
                 return;
             }
 
@@ -1659,7 +1806,7 @@ namespace OmsiMapEditor.UI
 
         private void PlaceChosenObject(MapPlacement placement)
         {
-            if (placementAsset == null || session == null || !session.CanEdit)
+            if (placementAsset == null || !CanEdit)
             {
                 StopPlacement();
                 return;
@@ -1739,7 +1886,7 @@ namespace OmsiMapEditor.UI
 
         private void RevertSelectedTile()
         {
-            if (session == null || !session.CanEdit || selectedTile == null)
+            if (!CanEdit || selectedTile == null)
                 return;
             try
             {
@@ -1964,9 +2111,11 @@ namespace OmsiMapEditor.UI
             var mapName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName)
                 ? currentSummary.Name
                 : currentSummary.FriendlyName;
-            var mode = session != null && session.CanEdit
-                ? session.ModifiedFiles().Count + " edited file(s)"
-                : "read-only";
+            var mode = chronoDate != null
+                ? "chrono " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", read-only"
+                : CanEdit
+                    ? session.ModifiedFiles().Count + " edited file(s)"
+                    : "read-only";
             mapStateLabel.text = (string.IsNullOrWhiteSpace(currentProjectName) ? "Map: " + mapName : "Project: " + currentProjectName) +
                                  "  |  " + currentSummary.Tiles.Count + " tiles  |  " + mode;
         }
@@ -2009,9 +2158,9 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null)
                 return;
-            if (tool != EditorTool.Drag && (session == null || !session.CanEdit))
+            if (tool != EditorTool.Drag && (!CanEdit))
             {
-                SetStatus("The map is read-only. Save a Mapforge project (File > Save map project as...) to move or rotate objects.");
+                SetStatus(ReadOnlyMessage("move or rotate objects"));
                 return;
             }
             // Another tool ends placing and closes the object library.
@@ -2027,7 +2176,7 @@ namespace OmsiMapEditor.UI
 
         private void UpdateToolbar()
         {
-            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, session != null && session.CanEdit, selection.Count > 0);
+            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, CanEdit, selection.Count > 0);
         }
 
         /// <summary>
@@ -2381,10 +2530,12 @@ namespace OmsiMapEditor.UI
                 var view = mapCanvas != null && mapCanvas.ThreeDimensional
                     ? "3D view: right drag turns the view, middle drag moves it, the wheel zooms."
                     : "From above: the wheel zooms, right or middle drag pans.";
-                mapHintLabel.text = view + (session != null && session.CanEdit
+                mapHintLabel.text = view + (CanEdit
                     ? "\nTools: Q drag objects freely, W move along axis arrows (Shift: whole metres), E rotate (round handle from above, rings in 3D; Shift: 15° steps), " +
                       "Del delete, 3 place objects.\nCtrl+click or Ctrl+drag selects several. Ctrl+Z / Ctrl+Y undo and redo."
-                    : "\nClick an object to inspect it. Save a project (File > Save map project as...) to edit the map.");
+                    : chronoDate != null
+                        ? "\nClick an object to inspect it. The chrono view is read-only; choose Base map in the project browser to edit."
+                        : "\nClick an object to inspect it. Save a project (File > Save map project as...) to edit the map.");
                 mapHintLabel.style.display = DisplayStyle.Flex;
             }
             if (mapControls != null)
@@ -2467,6 +2618,9 @@ namespace OmsiMapEditor.UI
                 projectPanel.Add(description);
             }
 
+            if (chronoVariants.Count > 0)
+                projectPanel.Add(ChronoSection());
+
             lineEntries.Clear();
             if (routes != null && routes.Lines.Count > 0)
             {
@@ -2509,6 +2663,65 @@ namespace OmsiMapEditor.UI
                 UpdateBrowserEntry(tile);
             }
             projectPanel.Add(tileList);
+        }
+
+        /// <summary>
+        /// The chrono variants with their dates, a date to show the map on and the way back to the base map. Clicking a
+        /// variant shows its first day.
+        /// </summary>
+        private VisualElement ChronoSection()
+        {
+            var section = new Foldout { text = "Chrono (" + chronoVariants.Count + " variants)", value = chronoDate != null };
+            section.AddToClassList("browser-chrono");
+            var state = new Label(chronoDate == null
+                ? "Showing the base map. Enter a date to see the map as OMSI loads it then."
+                : "Showing " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " with " +
+                  OmsiChrono.ActiveOn(chronoVariants, chronoDate.Value).Count + " active variant(s), read-only.");
+            state.AddToClassList("browser-chrono-state");
+            section.Add(state);
+
+            var row = new VisualElement();
+            row.AddToClassList("browser-chrono-row");
+            chronoDateField = new TextField { value = (chronoDate ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+            chronoDateField.AddToClassList("browser-chrono-date");
+            chronoDateField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    ShowChronoDateFromField();
+            });
+            row.Add(chronoDateField);
+            var show = new Button(ShowChronoDateFromField) { text = "Show", tooltip = "Show the map with the chrono variants active on this date" };
+            show.AddToClassList("map-control-button");
+            row.Add(show);
+            var back = new Button(() => ShowChronoDate(null)) { text = "Base map", tooltip = "Return to the map without chrono variants; it can be edited again" };
+            back.AddToClassList("map-control-button");
+            back.SetEnabled(chronoDate != null);
+            row.Add(back);
+            section.Add(row);
+
+            var list = new ScrollView(ScrollViewMode.Vertical);
+            list.AddToClassList("browser-line-list");
+            foreach (var variant in chronoVariants)
+            {
+                var captured = variant;
+                var entry = new Button(() =>
+                {
+                    if (chronoDateField != null)
+                        chronoDateField.value = (captured.Start ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    ShowChronoDateFromField();
+                })
+                {
+                    text = variant.ToString(), tooltip = variant.Folder + (variant.DeactivatedLines.Count > 0
+                        ? "\nSwitches off the lines " + string.Join(", ", variant.DeactivatedLines)
+                        : string.Empty)
+                };
+                entry.AddToClassList("browser-tile-entry");
+                entry.AddToClassList("browser-chrono-variant");
+                entry.EnableInClassList("browser-tile-entry-selected", chronoDate != null && variant.IsActiveOn(chronoDate.Value));
+                list.Add(entry);
+            }
+            section.Add(list);
+            return section;
         }
 
         /// <summary>Refreshes the map totals in the header and the project browser after objects were added or removed.</summary>
@@ -2661,7 +2874,7 @@ namespace OmsiMapEditor.UI
             names.AddToClassList("inspector-edit-name");
             editor.Add(names);
 
-            var canEdit = session != null && session.CanEdit;
+            var canEdit = CanEdit;
             if (canEdit)
             {
                 var delete = new Button(DeleteSelectedObjects) { text = "Delete " + selection.Count + " objects" };
@@ -2697,7 +2910,7 @@ namespace OmsiMapEditor.UI
             var pitchField = AddEditField(editor, "Pitch (°)", item.PitchDegrees);
             var bankField = AddEditField(editor, "Bank (°)", item.BankDegrees);
 
-            var canEdit = session != null && session.CanEdit;
+            var canEdit = CanEdit;
             if (canEdit)
             {
                 if (!CanTilt(item))
