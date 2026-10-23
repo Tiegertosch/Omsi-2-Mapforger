@@ -72,6 +72,38 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void CountsFoldersMarkedByHandAsDlcButNotBaseGameFiles()
+        {
+            File.WriteAllText(Path.Combine(steamApps, "appmanifest_252530.acf"),
+                "\"AppState\" { \"InstalledDepots\" { \"252531\" { \"manifest\" \"111\" } } }");
+            File.WriteAllBytes(Path.Combine(steamApps, "depotcache", "252531_111.manifest"),
+                Manifest(false, "Sceneryobjects\\Generic\\bench.sco"));
+            var origins = OmsiContentOrigins.ForInstallation(installation, null);
+            Assert.AreEqual(OmsiContentOrigin.UserContent, origins.Of(@"Sceneryobjects\Bought Addon\kiosk.sco"));
+
+            origins.SetMarkedFolders(new[] { @"Sceneryobjects\Bought Addon", "sceneryobjects/generic/" });
+
+            Assert.IsTrue(origins.HasMarkedFolders);
+            Assert.AreEqual(OmsiContentOrigin.Dlc, origins.Of(@"Sceneryobjects\Bought Addon\kiosk.sco"));
+            Assert.AreEqual(OmsiContentOrigin.Dlc, origins.Of(@"Sceneryobjects\Bought Addon\deep\lamp.sco"));
+            Assert.IsTrue(origins.IsMarkedByHand(@"sceneryobjects\bought addon\kiosk.sco"));
+            // A folder whose name only begins like a marked one is not marked.
+            Assert.AreEqual(OmsiContentOrigin.UserContent, origins.Of(@"Sceneryobjects\Bought Addon 2\kiosk.sco"));
+            // What the base game ships stays base game, even inside a marked folder.
+            Assert.AreEqual(OmsiContentOrigin.BaseGame, origins.Of(@"Sceneryobjects\Generic\bench.sco"));
+
+            // Without Steam's lists the marks still tell DLC apart.
+            var foldersOnly = OmsiContentOrigins.FoldersOnly("test");
+            foldersOnly.SetMarkedFolders(new[] { @"Sceneryobjects\Bought Addon" });
+            Assert.AreEqual(OmsiContentOrigin.Dlc, foldersOnly.Of(@"Sceneryobjects\Bought Addon\kiosk.sco"));
+            Assert.AreEqual(OmsiContentOrigin.Unknown, foldersOnly.Of(@"Sceneryobjects\Other\kiosk.sco"));
+
+            origins.SetMarkedFolders(null);
+            Assert.IsFalse(origins.HasMarkedFolders);
+            Assert.AreEqual(OmsiContentOrigin.UserContent, origins.Of(@"Sceneryobjects\Bought Addon\kiosk.sco"));
+        }
+
+        [Test]
         public void ReadsDepotsAndMarksDlcInAppManifests()
         {
             var depots = SteamAppManifest.InstalledDepots(

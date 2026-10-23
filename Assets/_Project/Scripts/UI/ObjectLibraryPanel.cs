@@ -8,31 +8,44 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The panel of the Objects tool: scenery objects of the OMSI installation by folder, the ones this map uses and the
-    /// user's favourites, with a search across all of them. A click on an object reports it so placing can start; the
-    /// panel stays open for the next one. Favourites are a user preference, kept across maps and sessions. Objects of
-    /// a DLC carry a tag and can be hidden, so maps for everyone use only the base game and freeware.
+    /// The panel of the Objects tool: scenery objects of the OMSI installation by folder and by the groups their files
+    /// list, the ones this map uses and the user's favourites, with a search across all of them. Rows show the preview
+    /// that the map editor nEditor cached for an object, where there is one. A click on an object reports it so placing can
+    /// start; the panel stays open for the next one. Favourites are a user preference, kept across maps and sessions.
+    /// Objects of a DLC carry a tag and can be hidden, so maps for everyone use only the base game and freeware; folders
+    /// of add-ons bought outside Steam can be marked as DLC by hand.
     /// </summary>
     internal sealed class ObjectLibraryPanel : VisualElement
     {
-        private enum Tab { Library, InMap, Favorites }
+        private enum Tab { Library, Groups, InMap, Favorites }
+
+        /// <summary>Previews are 256 × 256 pixels; this many stay loaded, the least recently shown go first.</summary>
+        private const int ThumbnailCacheSize = 160;
 
         private const string FavoritesKey = "Mapforge.ObjectFavorites";
         private const string HideDlcKey = "Mapforge.HideDlcObjects";
+        private const string DlcFoldersKey = "Mapforge.DlcFolders";
         private const string RootFolder = "Sceneryobjects";
 
         private sealed class Entry
         {
             public bool IsFolder;
+
+            /// <summary>A group of the Groups tab; like a folder it opens a list.</summary>
+            public bool IsGroup;
             public string Path;
             public string Name;
             public string Detail;
             public bool IsDlc;
+
+            /// <summary>A folder the user marked as DLC, or an object below one.</summary>
+            public bool IsMarked;
         }
 
         private readonly List<Entry> entries = new List<Entry>();
         private readonly Dictionary<Tab, Button> tabs = new Dictionary<Tab, Button>();
         private readonly HashSet<string> favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly SortedSet<string> dlcFolders = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly TextField search;
         private readonly VisualElement folderBar;
         private readonly Label folderLabel;
@@ -41,7 +54,13 @@ namespace OmsiMapEditor.UI
         private readonly Toggle hideDlc;
 
         private IReadOnlyList<string> library;
+        private IReadOnlyDictionary<string, List<string>> objectGroups = new Dictionary<string, List<string>>();
+        private readonly SortedDictionary<string, List<string>> groupMembers = new SortedDictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         private OmsiContentOrigins origins;
+        private NEditorThumbnails thumbnails;
+        private readonly Dictionary<string, Texture2D> thumbnailCache = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        private readonly LinkedList<string> thumbnailOrder = new LinkedList<string>();
+        private string group;
         private IReadOnlyDictionary<string, int> used = new Dictionary<string, int>();
         private Tab tab = Tab.Library;
         private string folder = RootFolder;
@@ -51,6 +70,7 @@ namespace OmsiMapEditor.UI
         {
             AddToClassList("tool-panel");
             LoadFavorites();
+            LoadDlcFolders();
 
             var header = new VisualElement();
             header.AddToClassList("tool-panel-header");
@@ -76,6 +96,7 @@ namespace OmsiMapEditor.UI
             var tabRow = new VisualElement();
             tabRow.AddToClassList("panel-tabs");
             AddTab(tabRow, Tab.Library, "Library", "All scenery objects of the OMSI installation, by folder");
+            AddTab(tabRow, Tab.Groups, "Groups", "Scenery objects by the groups their files list, such as Buildings or Trees");
             AddTab(tabRow, Tab.InMap, "In map", "Objects this map already uses");
             AddTab(tabRow, Tab.Favorites, "Favorites", "Objects you marked with the star");
             Add(tabRow);
@@ -115,7 +136,7 @@ namespace OmsiMapEditor.UI
 
             list = new ListView
             {
-                fixedItemHeight = 38,
+                fixedItemHeight = 44,
                 selectionType = SelectionType.Single,
                 itemsSource = entries,
                 makeItem = MakeRow,
@@ -138,20 +159,42 @@ namespace OmsiMapEditor.UI
         public event Action CloseRequested;
 
         /// <summary>
-        /// The objects to offer: every .sco below Sceneryobjects, or null while the installation is still being listed,
-        /// how often this map uses each object, and where the files come from, or null while that is not known yet.
-        /// Objects of the map join the library even if their file is missing.
+        /// The objects to offer: the installation's catalog with every .sco below Sceneryobjects, their groups, origins
+        /// and previews, or null while the installation is still being listed, and how often this map uses each object.
+        /// Objects of the map join the library even if their file is missing. Applies the user's DLC marks to the origins.
         /// </summary>
-        public void SetCatalog(IReadOnlyList<string> installationObjects, IReadOnlyDictionary<string, int> usedCounts,
-            OmsiContentOrigins contentOrigins)
+        public void SetCatalog(OmsiInstallationCatalog catalog, IReadOnlyDictionary<string, int> usedCounts)
         {
-            library = installationObjects;
+            library = catalog?.Objects;
             used = usedCounts ?? new Dictionary<string, int>();
-            origins = contentOrigins;
+            origins = catalog?.Origins;
+            origins?.SetMarkedFolders(dlcFolders);
+            if (!ReferenceEquals(thumbnails, catalog?.Thumbnails))
+                ClearThumbnails();
+            thumbnails = catalog?.Thumbnails;
+            objectGroups = catalog?.Groups ?? new Dictionary<string, List<string>>();
+            groupMembers.Clear();
+            foreach (var pair in objectGroups)
+                foreach (var name in pair.Value)
+                {
+                    if (!groupMembers.TryGetValue(name, out var members))
+                        groupMembers[name] = members = new List<string>();
+                    members.Add(pair.Key);
+                }
+            // Inside a group objects follow their names, whatever folder they come from.
+            foreach (var members in groupMembers.Values)
+                members.Sort((first, second) =>
+                {
+                    var order = string.Compare(Path.GetFileName(first), Path.GetFileName(second), StringComparison.OrdinalIgnoreCase);
+                    return order != 0 ? order : string.Compare(first, second, StringComparison.OrdinalIgnoreCase);
+                });
+            if (catalog != null && group != null && !groupMembers.ContainsKey(group))
+                group = null;
             hideDlc.tooltip = "Hide objects that belong to a DLC, so the map needs only the base game and freeware. " +
                               (origins == null ? "The origin of the files is still being read."
                                   : origins.FromSteam ? origins.Description
-                                  : origins.Description + " Without Steam's lists DLC objects cannot be told apart and stay visible.");
+                                  : origins.Description + " Without Steam's lists only folders marked as DLC can be told apart.") +
+                              " Folders of add-ons bought outside Steam can be marked as DLC with the tag button.";
             Refresh();
         }
 
@@ -178,6 +221,26 @@ namespace OmsiMapEditor.UI
             search.Focus();
         }
 
+        /// <summary>
+        /// Opens a tab by name (library, groups, inmap or favorites) with a folder of the library or a group, and search
+        /// terms, so a check from the command line can show a state without clicks. Unknown names are ignored.
+        /// </summary>
+        public void ShowState(string tabName, string location, string searchText)
+        {
+            if (tabName != null && Enum.TryParse<Tab>(tabName, true, out var kind))
+                tab = kind;
+            if (!string.IsNullOrEmpty(location))
+            {
+                if (tab == Tab.Groups)
+                    group = location;
+                else
+                    folder = location.Replace('/', Path.DirectorySeparatorChar);
+            }
+            if (searchText != null)
+                search.SetValueWithoutNotify(searchText);
+            ShowTab(tab);
+        }
+
         private void AddTab(VisualElement row, Tab kind, string text, string description)
         {
             var button = new Button(() => ShowTab(kind)) { text = text, tooltip = description };
@@ -196,6 +259,12 @@ namespace OmsiMapEditor.UI
 
         private void GoUp()
         {
+            if (tab == Tab.Groups)
+            {
+                group = null;
+                Refresh();
+                return;
+            }
             var parent = Path.GetDirectoryName(folder);
             folder = string.IsNullOrEmpty(parent) ? RootFolder : parent;
             Refresh();
@@ -207,14 +276,20 @@ namespace OmsiMapEditor.UI
             entries.Clear();
             var terms = (search.value ?? string.Empty).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             var browsing = tab == Tab.Library && terms.Length == 0;
+            var browsingGroups = tab == Tab.Groups && terms.Length == 0;
             hideDlc.style.display = tab == Tab.InMap ? DisplayStyle.None : DisplayStyle.Flex;
-            folderBar.style.display = browsing && !string.Equals(folder, RootFolder, StringComparison.OrdinalIgnoreCase)
+            folderBar.style.display = browsing && !string.Equals(folder, RootFolder, StringComparison.OrdinalIgnoreCase) ||
+                                      browsingGroups && group != null
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
-            folderLabel.text = folder.Replace(Path.DirectorySeparatorChar.ToString(), "  ›  ");
+            folderLabel.text = tab == Tab.Groups
+                ? "Groups  ›  " + group
+                : folder.Replace(Path.DirectorySeparatorChar.ToString(), "  ›  ");
 
             if (browsing)
                 ListFolder();
+            else if (browsingGroups)
+                ListGroup();
             else
             {
                 var candidates = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -224,12 +299,14 @@ namespace OmsiMapEditor.UI
                         candidates.UnionWith(library);
                     candidates.UnionWith(used.Keys);
                 }
+                else if (tab == Tab.Groups)
+                    candidates.UnionWith(objectGroups.Keys);
                 else if (tab == Tab.InMap)
                     candidates.UnionWith(used.Keys);
                 else
                     candidates.UnionWith(favorites);
                 foreach (var candidate in candidates)
-                    if (Matches(candidate, terms) && !Hidden(candidate))
+                    if ((Matches(candidate, terms) || tab == Tab.Groups && GroupsMatch(candidate, terms)) && !Hidden(candidate))
                         entries.Add(ObjectEntry(candidate, true));
             }
 
@@ -272,9 +349,55 @@ namespace OmsiMapEditor.UI
                     Visit(path);
 
             foreach (var pair in subfolders)
-                entries.Add(new Entry { IsFolder = true, Path = prefix + pair.Key, Name = pair.Key, Detail = Count(pair.Value, "object") });
+            {
+                var path = prefix + pair.Key;
+                var marked = IsMarkedFolder(path);
+                entries.Add(new Entry
+                {
+                    IsFolder = true, Path = path, Name = pair.Key, Detail = Count(pair.Value, "object"), IsDlc = marked, IsMarked = marked
+                });
+            }
             foreach (var path in objects)
                 entries.Add(ObjectEntry(path, false));
+        }
+
+        /// <summary>The groups with their object counts, or the objects of the open group.</summary>
+        private void ListGroup()
+        {
+            if (group == null)
+            {
+                // Large groups such as Buildings or Trees come first; many authors add groups with a single object.
+                var counted = new List<KeyValuePair<string, int>>();
+                foreach (var pair in groupMembers)
+                {
+                    var count = 0;
+                    foreach (var path in pair.Value)
+                        if (!Hidden(path))
+                            count++;
+                    if (count > 0)
+                        counted.Add(new KeyValuePair<string, int>(pair.Key, count));
+                }
+                counted.Sort((first, second) => first.Value != second.Value
+                    ? second.Value.CompareTo(first.Value)
+                    : string.Compare(first.Key, second.Key, StringComparison.OrdinalIgnoreCase));
+                foreach (var pair in counted)
+                    entries.Add(new Entry { IsFolder = true, IsGroup = true, Path = pair.Key, Name = pair.Key, Detail = Count(pair.Value, "object") });
+                return;
+            }
+            if (!groupMembers.TryGetValue(group, out var members))
+                return;
+            foreach (var path in members)
+                if (!Hidden(path))
+                    entries.Add(ObjectEntry(path, true));
+        }
+
+        /// <summary>True when every search term appears in the object's path or one of its groups.</summary>
+        private bool GroupsMatch(string path, string[] terms)
+        {
+            if (!objectGroups.TryGetValue(path, out var names))
+                return false;
+            var text = path + "\n" + string.Join("\n", names);
+            return Matches(text, terms);
         }
 
         private static bool ContainsPath(IReadOnlyList<string> paths, string path)
@@ -305,7 +428,11 @@ namespace OmsiMapEditor.UI
             var detail = showFolder ? location : string.Empty;
             if (count > 0)
                 detail += (detail.Length > 0 ? "  •  " : string.Empty) + count + "× in this map";
-            return new Entry { Path = path, Name = Path.GetFileNameWithoutExtension(path), Detail = detail, IsDlc = IsDlc(path) };
+            return new Entry
+            {
+                Path = path, Name = Path.GetFileNameWithoutExtension(path), Detail = detail, IsDlc = IsDlc(path),
+                IsMarked = origins != null && origins.IsMarkedByHand(path)
+            };
         }
 
         /// <summary>How many objects of the map, and how many placements of them, belong to a DLC.</summary>
@@ -338,8 +465,9 @@ namespace OmsiMapEditor.UI
 
         private void UpdateInfo()
         {
-            var folderCount = entries.FindAll(entry => entry.IsFolder).Count;
-            var objectCount = entries.Count - folderCount;
+            var folderCount = entries.FindAll(entry => entry.IsFolder && !entry.IsGroup).Count;
+            var groupCount = entries.FindAll(entry => entry.IsGroup).Count;
+            var objectCount = entries.Count - folderCount - groupCount;
             var usesDlc = DlcUse(out var kinds, out var placements);
             var dlcWarning = chosen == null && tab == Tab.InMap && usesDlc;
             info.EnableInClassList("panel-info-warning", dlcWarning);
@@ -350,6 +478,10 @@ namespace OmsiMapEditor.UI
                 info.text = "Listing the scenery objects of the OMSI installation...";
             else if (tab == Tab.Favorites && favorites.Count == 0)
                 info.text = "Mark objects with the star to find them here.";
+            else if (tab == Tab.Groups && groupCount > 0)
+                info.text = Count(groupCount, "group") + " from the [groups] of the object files. An object is in each group it names.";
+            else if (tab == Tab.Groups && library != null && groupMembers.Count == 0)
+                info.text = "No object file of the installation lists [groups].";
             else if (dlcWarning)
                 info.text = "This map uses " + Count(kinds, "DLC object") + " in " + Count(placements, "placement") +
                             "; players without that DLC miss them. Maps for everyone should do without.";
@@ -364,6 +496,12 @@ namespace OmsiMapEditor.UI
             if (index < 0 || index >= entries.Count)
                 return;
             var entry = entries[index];
+            if (entry.IsGroup)
+            {
+                group = entry.Name;
+                Refresh();
+                return;
+            }
             if (entry.IsFolder)
             {
                 folder = entry.Path;
@@ -382,6 +520,9 @@ namespace OmsiMapEditor.UI
             var icon = new IconElement("box") { name = "row-icon" };
             icon.AddToClassList("panel-row-icon");
             row.Add(icon);
+            var thumbnail = new VisualElement { name = "row-thumbnail", pickingMode = PickingMode.Ignore };
+            thumbnail.AddToClassList("panel-row-thumbnail");
+            row.Add(thumbnail);
             var texts = new VisualElement();
             texts.AddToClassList("panel-row-texts");
             var name = new Label { name = "row-name" };
@@ -406,23 +547,113 @@ namespace OmsiMapEditor.UI
                     ToggleFavorite(path);
             };
             row.Add(star);
+            var mark = new Button { name = "row-mark" };
+            mark.AddToClassList("panel-icon-button");
+            mark.AddToClassList("dlc-mark-button");
+            mark.Add(new IconElement("tag"));
+            mark.RegisterCallback<PointerDownEvent>(evt => evt.StopPropagation());
+            mark.clicked += () =>
+            {
+                if (mark.userData is string path)
+                    ToggleDlcFolder(path);
+            };
+            row.Add(mark);
             return row;
         }
 
         private void BindRow(VisualElement row, int index)
         {
             var entry = entries[index];
-            row.Q<IconElement>("row-icon").SetIcon(entry.IsFolder ? "folder" : "box");
+            var preview = entry.IsFolder ? null : Thumbnail(entry.Path);
+            var icon = row.Q<IconElement>("row-icon");
+            icon.SetIcon(entry.IsGroup ? "layers" : entry.IsFolder ? "folder" : "box");
+            icon.style.display = preview == null ? DisplayStyle.Flex : DisplayStyle.None;
+            var thumbnail = row.Q("row-thumbnail");
+            thumbnail.style.backgroundImage = preview == null ? new StyleBackground(StyleKeyword.None) : new StyleBackground(preview);
+            thumbnail.style.display = preview == null ? DisplayStyle.None : DisplayStyle.Flex;
             row.Q<Label>("row-name").text = entry.Name;
             var detail = row.Q<Label>("row-detail");
             detail.text = entry.Detail;
             detail.style.display = string.IsNullOrEmpty(entry.Detail) ? DisplayStyle.None : DisplayStyle.Flex;
-            row.Q<Label>("row-tag").style.display = entry.IsDlc ? DisplayStyle.Flex : DisplayStyle.None;
+            var tag = row.Q<Label>("row-tag");
+            tag.style.display = entry.IsDlc ? DisplayStyle.Flex : DisplayStyle.None;
+            tag.tooltip = entry.IsMarked
+                ? "Marked as DLC by hand: players without that add-on do not see these objects."
+                : "Part of a DLC: players without it do not see this object.";
             var star = row.Q<Button>("row-star");
             star.userData = entry.IsFolder ? null : entry.Path;
-            star.style.visibility = entry.IsFolder ? Visibility.Hidden : Visibility.Visible;
+            star.style.display = entry.IsFolder ? DisplayStyle.None : DisplayStyle.Flex;
             star.EnableInClassList("favorite-on", !entry.IsFolder && favorites.Contains(entry.Path));
-            row.tooltip = entry.IsFolder ? "Open the folder " + entry.Name : entry.Path;
+            // Folders can be marked as DLC, for add-ons bought outside Steam that look like user content otherwise.
+            var mark = row.Q<Button>("row-mark");
+            var markable = entry.IsFolder && !entry.IsGroup;
+            mark.userData = markable ? entry.Path : null;
+            mark.style.display = markable ? DisplayStyle.Flex : DisplayStyle.None;
+            mark.EnableInClassList("dlc-mark-on", markable && entry.IsMarked);
+            mark.tooltip = markable && entry.IsMarked
+                ? "Marked as DLC by hand; click to count this folder as user content again"
+                : "Mark this folder as DLC, for add-ons bought outside Steam";
+            row.tooltip = entry.IsGroup ? "Open the group " + entry.Name
+                : entry.IsFolder ? "Open the folder " + entry.Name
+                : objectGroups.TryGetValue(entry.Path, out var names) ? entry.Path + "\nGroups: " + string.Join(", ", names)
+                : entry.Path;
+        }
+
+        /// <summary>
+        /// The preview nEditor cached for an object, loaded on first use; null when there is none or it cannot be read.
+        /// </summary>
+        private Texture2D Thumbnail(string objectPath)
+        {
+            if (thumbnails == null || thumbnails.Count == 0)
+                return null;
+            if (thumbnailCache.TryGetValue(objectPath, out var cached))
+            {
+                thumbnailOrder.Remove(objectPath);
+                thumbnailOrder.AddFirst(objectPath);
+                return cached;
+            }
+            var file = thumbnails.PathFor(objectPath);
+            Texture2D texture = null;
+            if (file != null)
+            {
+                try
+                {
+                    texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = Path.GetFileName(file), wrapMode = TextureWrapMode.Clamp };
+                    if (!texture.LoadImage(File.ReadAllBytes(file), true))
+                    {
+                        UnityEngine.Object.Destroy(texture);
+                        texture = null;
+                    }
+                }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("Could not read the preview " + file + ": " + exception.Message);
+                    if (texture != null)
+                        UnityEngine.Object.Destroy(texture);
+                    texture = null;
+                }
+            }
+            // Objects without a preview are remembered as well, so the folder is not asked again.
+            thumbnailCache[objectPath] = texture;
+            thumbnailOrder.AddFirst(objectPath);
+            while (thumbnailOrder.Count > ThumbnailCacheSize)
+            {
+                var oldest = thumbnailOrder.Last.Value;
+                thumbnailOrder.RemoveLast();
+                if (thumbnailCache.TryGetValue(oldest, out var evicted) && evicted != null)
+                    UnityEngine.Object.Destroy(evicted);
+                thumbnailCache.Remove(oldest);
+            }
+            return texture;
+        }
+
+        private void ClearThumbnails()
+        {
+            foreach (var texture in thumbnailCache.Values)
+                if (texture != null)
+                    UnityEngine.Object.Destroy(texture);
+            thumbnailCache.Clear();
+            thumbnailOrder.Clear();
         }
 
         private void ToggleFavorite(string path)
@@ -431,6 +662,34 @@ namespace OmsiMapEditor.UI
                 favorites.Add(path);
             SaveFavorites();
             Refresh();
+        }
+
+        private bool IsMarkedFolder(string path)
+        {
+            if (dlcFolders.Contains(path))
+                return true;
+            foreach (var folderPath in dlcFolders)
+                if (path.StartsWith(folderPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
+        private void ToggleDlcFolder(string path)
+        {
+            if (!dlcFolders.Remove(path))
+                dlcFolders.Add(path);
+            PlayerPrefs.SetString(DlcFoldersKey, string.Join("\n", dlcFolders));
+            PlayerPrefs.Save();
+            origins?.SetMarkedFolders(dlcFolders);
+            Refresh();
+        }
+
+        private void LoadDlcFolders()
+        {
+            dlcFolders.Clear();
+            var stored = PlayerPrefs.GetString(DlcFoldersKey, string.Empty);
+            foreach (var path in stored.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                dlcFolders.Add(path);
         }
 
         private void LoadFavorites()

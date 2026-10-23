@@ -88,8 +88,8 @@ namespace OmsiMapEditor.UI
 
         // Scenery objects to place: the .sco files of the OMSI installation, listed once in the background.
         private readonly Dictionary<string, int> usedAssetCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        private List<string> installationAssets;
-        private Task<KeyValuePair<List<string>, OmsiContentOrigins>> installationScan;
+        private OmsiInstallationCatalog installationCatalog;
+        private Task<OmsiInstallationCatalog> installationScan;
 
         // Where the installation's files come from: base game, DLC or user content; null until the scan is done.
         private OmsiContentOrigins contentOrigins;
@@ -568,7 +568,10 @@ namespace OmsiMapEditor.UI
                 SetTextures(false);
 
             if (Array.IndexOf(args, "-objects") >= 0)
+            {
                 ShowObjectsPanel(true);
+                objectsPanel?.ShowState(Argument("-objectsTab", 1), Argument("-objectsAt", 1), Argument("-objectsSearch", 1));
+            }
 
             var fold = Argument("-fold", 1);
             if (fold == "project" || fold == "both")
@@ -1393,12 +1396,13 @@ namespace OmsiMapEditor.UI
             foreach (var tile in currentSummary.Tiles)
                 foreach (var item in tile.Objects)
                     usedAssetCounts[item.AssetPath] = usedAssetCounts.TryGetValue(item.AssetPath, out var count) ? count + 1 : 1;
-            objectsPanel.SetCatalog(installationAssets, usedAssetCounts, contentOrigins);
+            objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
         }
 
         /// <summary>
-        /// Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread, and reads from
-        /// Steam's file lists which of them belong to the base game, a DLC or neither.
+        /// Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread, with their groups
+        /// and the previews nEditor cached, and reads from Steam's file lists which of them belong to the base game, a DLC or
+        /// neither.
         /// </summary>
         private void StartInstallationScan()
         {
@@ -1407,21 +1411,9 @@ namespace OmsiMapEditor.UI
                 return;
 
             installationScanRoot = root;
-            installationAssets = null;
+            installationCatalog = null;
             contentOrigins = null;
-            var scan = Task.Run(() =>
-            {
-                var result = new List<string>();
-                var folder = Path.Combine(root, "Sceneryobjects");
-                if (Directory.Exists(folder))
-                {
-                    foreach (var path in Directory.EnumerateFiles(folder, "*.sco", SearchOption.AllDirectories))
-                        result.Add(path.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar));
-                    result.Sort(StringComparer.OrdinalIgnoreCase);
-                }
-                var origins = OmsiContentOrigins.ForInstallation(root, OmsiContentOrigins.LikelySteamRoots());
-                return new KeyValuePair<List<string>, OmsiContentOrigins>(result, origins);
-            });
+            var scan = Task.Run(() => OmsiInstallationCatalog.Scan(root, OmsiContentOrigins.LikelySteamRoots()));
             installationScan = scan;
 
             IVisualElementScheduledItem poll = null;
@@ -1435,17 +1427,18 @@ namespace OmsiMapEditor.UI
                 if (scan.IsFaulted)
                 {
                     Debug.LogException(scan.Exception);
-                    installationAssets = new List<string>();
-                    contentOrigins = OmsiContentOrigins.FoldersOnly("The installation could not be listed.");
+                    installationCatalog = OmsiInstallationCatalog.Empty("The installation could not be listed.");
+                    contentOrigins = installationCatalog.Origins;
                     SetStatus("Could not list the scenery objects of the OMSI installation: " + scan.Exception?.GetBaseException().Message);
                 }
                 else
                 {
-                    installationAssets = scan.Result.Key;
-                    contentOrigins = scan.Result.Value;
-                    Debug.Log("Object origins: " + contentOrigins.Description);
+                    installationCatalog = scan.Result;
+                    contentOrigins = installationCatalog.Origins;
+                    Debug.Log("Object origins: " + contentOrigins.Description + " Groups in " + installationCatalog.Groups.Count + " of " +
+                              installationCatalog.Objects.Count + " objects, " + installationCatalog.Thumbnails.Count + " nEditor previews.");
                 }
-                objectsPanel.SetCatalog(installationAssets, usedAssetCounts, contentOrigins);
+                objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
             }).Every(150);
         }
 
@@ -1839,8 +1832,8 @@ namespace OmsiMapEditor.UI
         {
             if (contentOrigins == null)
                 return "The origin of the objects is still being read; run the check again in a moment.";
-            if (!contentOrigins.FromSteam)
-                return "DLC objects cannot be told apart without Steam's file lists.";
+            if (!contentOrigins.FromSteam && !contentOrigins.HasMarkedFolders)
+                return "DLC objects cannot be told apart without Steam's file lists or folders marked as DLC.";
             var kinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var placements = 0;
             void Count(string assetPath)

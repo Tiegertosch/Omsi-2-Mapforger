@@ -43,6 +43,7 @@ namespace OmsiMapEditor.OMSI
         private readonly HashSet<string> baseFiles = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> dlcFiles = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> baseFolders = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> markedFolders = new List<string>();
 
         private OmsiContentOrigins()
         {
@@ -169,22 +170,58 @@ namespace OmsiMapEditor.OMSI
             return roots;
         }
 
+        /// <summary>
+        /// Folders the user marked as DLC, relative to the installation such as <c>Sceneryobjects\SomeAddon</c>: add-ons
+        /// bought outside Steam look like user content otherwise. Files below a marked folder count as DLC unless the base
+        /// game ships them. Replaces the earlier marks.
+        /// </summary>
+        public void SetMarkedFolders(IEnumerable<string> folders)
+        {
+            markedFolders.Clear();
+            if (folders == null)
+                return;
+            foreach (var folder in folders)
+                if (!string.IsNullOrWhiteSpace(folder))
+                    markedFolders.Add(Normalize(folder).TrimEnd('\\') + "\\");
+        }
+
+        public bool HasMarkedFolders => markedFolders.Count > 0;
+
+        /// <summary>True when the file lies below a folder the user marked as DLC.</summary>
+        public bool IsMarkedByHand(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath) || markedFolders.Count == 0)
+                return false;
+            var key = Normalize(relativePath);
+            foreach (var folder in markedFolders)
+                if (key.StartsWith(folder, StringComparison.Ordinal))
+                    return true;
+            return false;
+        }
+
         /// <summary>The origin of a file given relative to the installation, such as <c>Sceneryobjects\Generic\bench.sco</c>.</summary>
         public OmsiContentOrigin Of(string relativePath)
         {
             if (string.IsNullOrEmpty(relativePath))
                 return OmsiContentOrigin.Unknown;
             var key = Normalize(relativePath);
+            OmsiContentOrigin origin;
             if (FromSteam)
             {
                 // A file that the base game ships is there for everyone, even if a DLC ships it too.
                 if (baseFiles.Contains(key))
                     return OmsiContentOrigin.BaseGame;
-                return dlcFiles.Contains(key) ? OmsiContentOrigin.Dlc : OmsiContentOrigin.UserContent;
+                origin = dlcFiles.Contains(key) ? OmsiContentOrigin.Dlc : OmsiContentOrigin.UserContent;
             }
-            var separator = key.IndexOf('\\');
-            var second = separator < 0 ? -1 : key.IndexOf('\\', separator + 1);
-            return second > 0 && baseFolders.Contains(key.Substring(0, second)) ? OmsiContentOrigin.BaseGame : OmsiContentOrigin.Unknown;
+            else
+            {
+                var separator = key.IndexOf('\\');
+                var second = separator < 0 ? -1 : key.IndexOf('\\', separator + 1);
+                if (second > 0 && baseFolders.Contains(key.Substring(0, second)))
+                    return OmsiContentOrigin.BaseGame;
+                origin = OmsiContentOrigin.Unknown;
+            }
+            return IsMarkedByHand(relativePath) ? OmsiContentOrigin.Dlc : origin;
         }
 
         private static string Normalize(string path)

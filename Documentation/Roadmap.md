@@ -36,8 +36,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Startbildschirm: Projekt öffnen, Karte öffnen, zuletzt geöffnete Projekte und Karten
 - Neue Karte anlegen: Kartenordner mit Hilfsdateien aus einer Basiskarte als Vorlage, eine leere Kachel mit flachem Gelände, dazu ein Projekt; im Spiel prüfen, ob OMSI sie lädt (auf dem Startbildschirm bisher „Planned“)
 - [x] Objekte-Bibliothek: DLC-Objekte nach Steams Dateilisten ausblenden oder kennzeichnen, User-Content bleibt sichtbar; Kartenprüfung nennt DLC-Objekte (ADR 016)
-- Ordner von Hand als DLC markieren, für außerhalb von Steam gekaufte Add-ons
-- Objekte-Bibliothek: Vorschaubilder der Objekte (der OMSI-Editor legt welche in `Sceneryobjects\nEditorThumbnails` ab, der Ordner heißt wirklich so), Kategorien aus den `[groups]` der `.sco`-Dateien
+- [x] Ordner von Hand als DLC markieren, für außerhalb von Steam gekaufte Add-ons: Etikett-Knopf an jedem Ordner der Bibliothek, je Benutzer gespeichert; Bibliothek, „Hide DLC objects“, „In map“ und Kartenprüfung zählen markierte Ordner als DLC, Dateien des Basisspiels bleiben Basisspiel
+- [x] Objekte-Bibliothek: Vorschaubilder der Objekte aus `Sceneryobjects\nEditorThumbnails` (angelegt vom Drittanbieter-Editor nEditor, nicht von OMSI), Reiter „Groups“ mit den `[groups]` der `.sco`-Dateien, große Gruppen zuerst
 - [x] Farben der Vektorebene an das Corporate Design anpassen: Auswahl rot, gewählte Kachel gold, Splines orange, Objekte blau, Bäume und Platzieren grün; die Farben kommen aus den Design-Tokens
 
 ## Später
