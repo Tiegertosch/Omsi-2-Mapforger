@@ -1093,6 +1093,10 @@ namespace OmsiMapEditor.UI
             var half = metersPerPixel < 0.2f ? 3f : metersPerPixel < 1f ? 2f : 1.5f;
             var showHeading = metersPerPixel < 0.6f;
             var markers = new List<Vector2>();
+            // Far out many markers share a pixel; one each per 2 × 2 pixel cell looks the same and draws much less.
+            var cellsAcross = (int)(layout.width / 2f) + 1;
+            var cellsDown = (int)(layout.height / 2f) + 1;
+            var occupied = metersPerPixel > 2f && cellsAcross > 0 && cellsDown > 0 ? new bool[cellsAcross * cellsDown] : null;
             if (showHeading)
             {
                 painter.strokeColor = headingColor;
@@ -1114,6 +1118,17 @@ namespace OmsiMapEditor.UI
                     if (!visible.Contains(map))
                         continue;
                     var screen = MapToScreen(map);
+                    if (occupied != null)
+                    {
+                        var cellX = (int)(screen.x / 2f);
+                        var cellY = (int)(screen.y / 2f);
+                        if (cellX >= 0 && cellY >= 0 && cellX < cellsAcross && cellY < cellsDown)
+                        {
+                            if (occupied[cellY * cellsAcross + cellX])
+                                continue;
+                            occupied[cellY * cellsAcross + cellX] = true;
+                        }
+                    }
                     markers.Add(screen);
                     if (showHeading)
                     {
