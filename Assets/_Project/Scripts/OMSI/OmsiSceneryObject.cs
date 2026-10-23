@@ -104,6 +104,9 @@ namespace OmsiMapEditor.OMSI
         public List<OmsiSceneryMesh> Meshes { get; } = new List<OmsiSceneryMesh>();
         public List<string> CollisionMeshes { get; } = new List<string>();
 
+        /// <summary>[terrainhole]: meshes whose shape OMSI cuts out of the terrain under the object, such as crossings.</summary>
+        public List<string> TerrainHoleMeshes { get; } = new List<string>();
+
         /// <summary>[boundingbox]: size x, y, z, then centre x, y, z in the object frame (z up), or null.</summary>
         public double[] BoundingBox { get; internal set; }
 
@@ -184,6 +187,10 @@ namespace OmsiMapEditor.OMSI
                     case "collisionmesh":
                         if (values.Count > 0 && values[0].Length > 0)
                             result.CollisionMeshes.Add(values[0]);
+                        break;
+                    case "terrainhole":
+                        if (values.Count > 0 && values[0].Length > 0)
+                            result.TerrainHoleMeshes.Add(values[0]);
                         break;
                     case "boundingbox":
                         if (TryNumbers(values, 6, out var box))

@@ -70,6 +70,8 @@
                 <ui:Label text="Splines" class="map-legend-spline" />
                 <ui:Label text="Objects" class="map-legend-object" />
                 <ui:Label text="Trees" class="map-legend-tree" />
+                <ui:Label text="Wires (dashed)" class="map-legend-wire" />
+                <ui:Label text="Fences" class="map-legend-fence" />
                 <ui:Label text="Selected" class="map-legend-selected" />
             </ui:VisualElement>
         </ui:VisualElement>

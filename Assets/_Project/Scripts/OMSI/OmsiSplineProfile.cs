@@ -15,6 +15,19 @@ namespace OmsiMapEditor.OMSI
         public bool UsesAlpha { get; internal set; }
     }
 
+    /// <summary>How a spline without a surface seen from above is shown there.</summary>
+    public enum OmsiSplineLineKind
+    {
+        /// <summary>The spline has a surface from above, or is a helper that only the OMSI editor shows.</summary>
+        None,
+
+        /// <summary>Wires above the ground, such as overhead lines, catenary and cross spans: narrow and at least 2.5 m up.</summary>
+        Overhead,
+
+        /// <summary>Narrow upright profiles from the ground, such as fences and walls.</summary>
+        Fence
+    }
+
     /// <summary>One point of a cross-section, left to right; x is positive to the right of the spline.</summary>
     public struct OmsiProfilePoint
     {
@@ -41,6 +54,21 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True for helper splines such as invisible paths, which only the OMSI editor shows.</summary>
         public bool EditorOnly { get; internal set; }
+
+        /// <summary>
+        /// For narrow splines that show little or nothing from above, whether they hang overhead like wires or stand on
+        /// the ground like fences and walls; <see cref="OmsiSplineLineKind.None"/> for all others.
+        /// </summary>
+        public OmsiSplineLineKind LineKind { get; private set; }
+
+        /// <summary>Strips at least this high everywhere count as overhead wires.</summary>
+        public const double OverheadHeight = 2.5;
+
+        /// <summary>
+        /// [terrainholeprofile]: cross-sections that OMSI cuts out of the terrain along the spline, such as rail cuttings;
+        /// the lateral positions of their [terrainholeprofilepnt] points, left to right.
+        /// </summary>
+        public List<List<double>> TerrainHoles { get; } = new List<List<double>>();
 
         /// <summary>
         /// Reads a .sli file. Texture names are resolved against the <c>texture</c> folder next to
@@ -76,6 +104,15 @@ namespace OmsiMapEditor.OMSI
                         if (strip != null)
                             result.Strips.Add(strip);
                         break;
+                    case "terrainholeprofile":
+                        result.TerrainHoles.Add(new List<double>());
+                        break;
+                    case "terrainholeprofilepnt":
+                        // Points are x, z, y; only the lateral x matters for the shape seen from above.
+                        if (result.TerrainHoles.Count > 0 && values.Count > 0 &&
+                            double.TryParse(values[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var holeX))
+                            result.TerrainHoles[result.TerrainHoles.Count - 1].Add(holeX);
+                        break;
                     case "profilepnt":
                         if (strip != null && TryNumbers(values, out var numbers))
                             strip.Points.Add(new OmsiProfilePoint { X = numbers[0], Height = numbers[1], U = numbers[2], VPerMeter = numbers[3] });
@@ -83,8 +120,41 @@ namespace OmsiMapEditor.OMSI
                 }
             }
             result.Strips.RemoveAll(item => item.Points.Count < 2);
+            result.TerrainHoles.RemoveAll(item => item.Count < 2);
+            result.LineKind = Classify(result);
             return result;
         }
+
+        /// <summary>
+        /// Wires and fences are narrow: all points within <see cref="LineWidth"/> across. Wires hang at least
+        /// <see cref="OverheadHeight"/> up; fences and walls rise at least <see cref="FenceHeight"/>, even with a narrow
+        /// cap on top. Narrow low strips such as kerbs and road markings stay surfaces.
+        /// </summary>
+        private static OmsiSplineLineKind Classify(OmsiSplineProfile profile)
+        {
+            if (profile.EditorOnly || profile.Strips.Count == 0)
+                return OmsiSplineLineKind.None;
+            double left = double.MaxValue, right = double.MinValue, lowest = double.MaxValue, highest = double.MinValue;
+            foreach (var strip in profile.Strips)
+                foreach (var point in strip.Points)
+                {
+                    left = Math.Min(left, point.X);
+                    right = Math.Max(right, point.X);
+                    lowest = Math.Min(lowest, point.Height);
+                    highest = Math.Max(highest, point.Height);
+                }
+            if (right - left > LineWidth)
+                return OmsiSplineLineKind.None;
+            if (lowest >= OverheadHeight)
+                return OmsiSplineLineKind.Overhead;
+            return highest - lowest >= FenceHeight ? OmsiSplineLineKind.Fence : OmsiSplineLineKind.None;
+        }
+
+        /// <summary>Profiles at most this wide across count as wires or fences.</summary>
+        public const double LineWidth = 0.6;
+
+        /// <summary>Narrow profiles at least this high count as fences or walls.</summary>
+        public const double FenceHeight = 1.0;
 
         private static bool TryNumbers(List<string> values, out double[] numbers)
         {
@@ -113,7 +183,7 @@ namespace OmsiMapEditor.OMSI
     public static class OmsiSplineSurface
     {
         /// <summary>Strips narrower than this seen from above, such as kerb faces, are left out.</summary>
-        private const double MinimumWidth = 0.02;
+        public const double MinimumWidth = 0.02;
 
         /// <summary>Largest change of heading between two samples of a curve.</summary>
         private const double MaximumStepRadians = 2.0 * Math.PI / 180.0;
@@ -121,9 +191,10 @@ namespace OmsiMapEditor.OMSI
         /// <summary>
         /// Builds the surfaces a spline shows from above, one per texture. Positions are in metres relative to the
         /// spline's tile corner: x east, y height (spline height plus profile height), z north. A mirrored spline turns
-        /// its cross-section over.
+        /// its cross-section over. With <paramref name="includeUpright"/> strips that stand upright, such as kerb faces,
+        /// walls and fences, are built as well, for views from the side.
         /// </summary>
-        public static List<OmsiSurfaceMesh> Build(OmsiSplineRecord spline, OmsiSplineProfile profile)
+        public static List<OmsiSurfaceMesh> Build(OmsiSplineRecord spline, OmsiSplineProfile profile, bool includeUpright = false)
         {
             if (spline == null)
                 throw new ArgumentNullException(nameof(spline));
@@ -152,7 +223,7 @@ namespace OmsiMapEditor.OMSI
                 {
                     var left = strip.Points[point];
                     var right = strip.Points[point + 1];
-                    if (Math.Abs(right.X - left.X) < MinimumWidth)
+                    if (Math.Abs(right.X - left.X) < MinimumWidth && (!includeUpright || Math.Abs(right.Height - left.Height) < MinimumWidth))
                         continue;
                     AddRibbon(mesh, spline, left, right, mirror, steps);
                 }
@@ -163,6 +234,26 @@ namespace OmsiMapEditor.OMSI
                 if (mesh.Triangles.Count > 0)
                     result.Add(mesh);
             return result;
+        }
+
+        /// <summary>
+        /// The terrain holes of a spline seen from above: each piece between two neighbouring hole points swept along the
+        /// spline, as triangles relative to the spline's tile corner (x east, y height, z north).
+        /// </summary>
+        public static OmsiSurfaceMesh BuildTerrainHoles(OmsiSplineRecord spline, OmsiSplineProfile profile)
+        {
+            var mesh = new OmsiSurfaceMesh();
+            var length = spline.LengthMeters;
+            if (profile.TerrainHoles.Count == 0 || !(length > 0.0) || double.IsInfinity(length))
+                return mesh;
+            var turn = Math.Abs(spline.RadiusMeters) > 0.001 ? length / Math.Abs(spline.RadiusMeters) : 0.0;
+            var steps = Math.Max(1, Math.Min(512, (int)Math.Ceiling(turn / MaximumStepRadians)));
+            var mirror = spline.IsMirrored ? -1.0 : 1.0;
+            foreach (var hole in profile.TerrainHoles)
+                for (var point = 0; point + 1 < hole.Count; point++)
+                    if (Math.Abs(hole[point + 1] - hole[point]) >= MinimumWidth)
+                        AddRibbon(mesh, spline, new OmsiProfilePoint { X = hole[point] }, new OmsiProfilePoint { X = hole[point + 1] }, mirror, steps);
+            return mesh;
         }
 
         /// <summary>One piece of the cross-section swept along the spline as a band of quads.</summary>

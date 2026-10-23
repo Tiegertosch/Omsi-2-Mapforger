@@ -61,15 +61,17 @@
 .popup-close { align-self: flex-end; min-width: 68px; -unity-text-align: middle-center; }
 .map-legend { flex-direction: row; flex-wrap: wrap; margin: 4px 10px 6px; }
 .map-legend > Label { margin-right: var(--mf-space-3); font-size: var(--mf-font-secondary); }
-.map-legend-spline { color: rgb(242, 181, 77); }
-.map-legend-object { color: rgb(143, 209, 240); }
-.map-legend-tree { color: rgb(115, 199, 128); }
-.map-legend-selected { color: rgb(255, 92, 107); }
+.map-legend-spline { color: var(--mf-color-accent); }
+.map-legend-object { color: var(--mf-color-info); }
+.map-legend-tree { color: var(--mf-color-success); }
+.map-legend-selected { color: var(--mf-color-error); }
+.map-legend-wire { color: var(--mf-color-text-secondary); }
+.map-legend-fence { color: var(--mf-color-text-muted); }
 
 /* Workspace: the map fills it, panels and controls float above it */
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
 .map-view { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
-.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); }
+.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); --map-wire: var(--mf-color-text-secondary); --map-fence: var(--mf-color-text-muted); }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 .empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
 /* Welcome screen in the middle of the empty map */

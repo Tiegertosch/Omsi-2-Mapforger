@@ -62,6 +62,29 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(110.0, sidewalk.Positions[6], 1e-9);
             Assert.AreEqual(31.25, sidewalk.Positions[7], 1e-9);
             Assert.AreEqual(2.0, sidewalk.Uvs[5], 1e-9);
+
+            // For the 3D view the kerb face comes along: a second band, from 0.25 m down to 0.1 m at x -2.
+            var withUpright = OmsiSplineSurface.Build(spline, profile, true).Single(mesh => mesh.TextureIndex == 0);
+            Assert.AreEqual(8, withUpright.VertexCount);
+            Assert.AreEqual(30.1, withUpright.Positions[4 * 3 + 4], 1e-9);
+        }
+
+        [Test]
+        public void TellsOverheadWiresAndFencesFromSplinesWithASurface()
+        {
+            const string wire = "[texture]\r\nkabel.tga\r\n[profile]\r\n0\r\n[profilepnt]\r\n0\r\n5.3\r\n0\r\n1\r\n[profilepnt]\r\n0\r\n7\r\n1\r\n1\r\n";
+            const string fence = "[texture]\r\nzaun.tga\r\n[profile]\r\n0\r\n[profilepnt]\r\n0\r\n0\r\n0\r\n1\r\n[profilepnt]\r\n0\r\n2.2\r\n1\r\n1\r\n";
+            Assert.AreEqual(OmsiSplineLineKind.Overhead, OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(wire), "kabel.sli").LineKind);
+            Assert.AreEqual(OmsiSplineLineKind.Fence, OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(fence), "zaun.sli").LineKind);
+            Assert.AreEqual(OmsiSplineLineKind.None, OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Street), "street.sli").LineKind);
+            // A brick wall 0.3 m thick with its cap on top counts as a fence; a kerb of the same width does not.
+            const string wall = "[texture]\r\nwall.bmp\r\n[profile]\r\n0\r\n[profilepnt]\r\n-0.15\r\n0\r\n0\r\n1\r\n[profilepnt]\r\n-0.15\r\n2\r\n1\r\n1\r\n" +
+                                "[profile]\r\n0\r\n[profilepnt]\r\n-0.15\r\n2\r\n0\r\n1\r\n[profilepnt]\r\n0.15\r\n2\r\n1\r\n1\r\n";
+            const string kerb = "[texture]\r\nkerb.bmp\r\n[profile]\r\n0\r\n[profilepnt]\r\n-0.15\r\n0\r\n0\r\n1\r\n[profilepnt]\r\n-0.15\r\n0.15\r\n1\r\n1\r\n" +
+                                "[profile]\r\n0\r\n[profilepnt]\r\n-0.15\r\n0.15\r\n0\r\n1\r\n[profilepnt]\r\n0.15\r\n0.15\r\n1\r\n1\r\n";
+            Assert.AreEqual(OmsiSplineLineKind.Fence, OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(wall), "wall.sli").LineKind);
+            Assert.AreEqual(OmsiSplineLineKind.None, OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(kerb), "kerb.sli").LineKind);
+            Assert.AreEqual(OmsiSplineLineKind.None, OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes("[onlyeditor]\r\n" + fence), "path.sli").LineKind);
         }
 
         [Test]

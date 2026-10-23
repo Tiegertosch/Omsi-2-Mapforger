@@ -11,8 +11,10 @@ namespace OmsiMapEditor.World
     /// <summary>
     /// Draws the textured ground of a map and the splines on it from above. Every tile is a quad on the XZ plane (x
     /// east, z north, metres relative to the map origin) with one mesh per ground texture; the splines of a tile are
-    /// extruded from their .sli profiles into one mesh per texture, at their real heights. An orthographic camera looks
-    /// straight down and renders into the screen rectangle of the map view, below the UI.
+    /// extruded from their .sli profiles into one mesh per texture, at their real heights. Where OMSI cuts the terrain
+    /// away, under crossings with a terrain hole and along spline profiles with one, a hole mask per tile leaves the
+    /// ground out. An orthographic camera looks straight down and renders into the screen rectangle of the map view,
+    /// below the UI.
     /// </summary>
     public sealed class MapGroundRenderer : MonoBehaviour
     {
@@ -54,6 +56,9 @@ namespace OmsiMapEditor.World
 
             /// <summary>The tile's heights, or null when it has no terrain file; the tile is then flat at height 0.</summary>
             public OmsiTerrain Terrain;
+
+            /// <summary>Where the terrain is cut away, or null when the tile has no hole.</summary>
+            public OmsiTerrainHoleMask Holes;
         }
 
         /// <summary>The surfaces of all splines of a tile that share one texture, relative to the tile corner.</summary>
@@ -83,6 +88,12 @@ namespace OmsiMapEditor.World
             public readonly List<string> Problems = new List<string>();
             public int SplineCount;
             public int DrawnSplineCount;
+            public int HoleTileCount;
+            public HoleSources Holes;
+
+            /// <summary>Spline types without a surface from above that show as lines, by asset path.</summary>
+            public readonly Dictionary<string, OmsiSplineLineKind> LineKinds = new Dictionary<string, OmsiSplineLineKind>(StringComparer.OrdinalIgnoreCase);
+            public int LineSplineCount;
         }
 
         private Camera groundCamera;
@@ -101,6 +112,25 @@ namespace OmsiMapEditor.World
         private GroundData pending;
         private int pendingTile;
         private readonly Dictionary<int, Material> layerMaterials = new Dictionary<int, Material>();
+
+        // Copies of the base material for tiles with terrain holes.
+        private readonly List<Material> holeBaseMaterials = new List<Material>();
+
+        /// <summary>The renderers of each tile's ground layers, by tile key, so holes can be cut again after edits.</summary>
+        private readonly Dictionary<long, List<MeshRenderer>> tileMaterials = new Dictionary<long, List<MeshRenderer>>();
+        private readonly Dictionary<long, Texture2D> holeTextures = new Dictionary<long, Texture2D>();
+
+        /// <summary>What the holes of the open map were built from; null until the ground is read.</summary>
+        private HoleSources holes;
+
+        private sealed class HoleSources
+        {
+            public OmsiTerrainHoleCatalog Catalog;
+            public OmsiSplineProfileCatalog Profiles;
+            public List<KeyValuePair<long, OmsiSplineRecord>> Splines;
+            public HashSet<long> Tiles;
+            public string Signature;
+        }
         private readonly List<UnityEngine.Object> owned = new List<UnityEngine.Object>();
         private bool groundVisible = true;
         private bool threeDimensional;
@@ -110,6 +140,13 @@ namespace OmsiMapEditor.World
 
         /// <summary>Raised on the main thread when the ground of a map is complete, with a short report.</summary>
         public event Action<string> Loaded;
+
+        /// <summary>
+        /// Spline types of the open map that have no surface seen from above, such as overhead lines and fences, by asset
+        /// path; empty until the ground is read.
+        /// </summary>
+        public IReadOnlyDictionary<string, OmsiSplineLineKind> SplineLineKinds { get; private set; } =
+            new Dictionary<string, OmsiSplineLineKind>();
 
         public bool IsLoading => loading != null || pending != null;
 
@@ -171,8 +208,92 @@ namespace OmsiMapEditor.World
             var tiles = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>>();
             foreach (var tile in summary.Tiles)
                 tiles.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>(tile, tile.Splines.ToArray()));
+            var placements = Placements(summary);
             loadingGeneration = generation;
-            loading = Task.Run(() => Read(tiles, source, globalConfigRelativePath, installationRoot));
+            var size = tileSize;
+            loading = Task.Run(() => Read(tiles, placements, source, globalConfigRelativePath, installationRoot, size));
+        }
+
+        private static List<OmsiHolePlacement> Placements(OmsiMapSummary summary)
+        {
+            var placements = new List<OmsiHolePlacement>();
+            foreach (var tile in summary.Tiles)
+                foreach (var item in tile.Objects)
+                    placements.Add(new OmsiHolePlacement
+                    {
+                        TileX = tile.X, TileY = tile.Y, AssetPath = item.AssetPath, LocalX = item.LocalX, LocalY = item.LocalY,
+                        HeadingDegrees = item.HeadingDegrees, PitchDegrees = item.PitchDegrees, BankDegrees = item.BankDegrees
+                    });
+            return placements;
+        }
+
+        /// <summary>
+        /// Cuts the terrain holes again after objects were moved, turned, placed or deleted, if any object with a terrain
+        /// hole changed; other edits cost a pass over the objects only.
+        /// </summary>
+        public void RefreshTerrainHoles(OmsiMapSummary summary)
+        {
+            if (holes == null || summary == null || loading != null || pending != null)
+                return;
+            var placements = Placements(summary);
+            var signature = HoleSignature(holes.Catalog, placements);
+            if (signature == holes.Signature)
+                return;
+            holes.Signature = signature;
+            var masks = holes.Catalog.Build(placements, holes.Splines, holes.Profiles, holes.Tiles, tileSize);
+            foreach (var pair in tileMaterials)
+            {
+                masks.TryGetValue(pair.Key, out var mask);
+                if (mask != null && mask.HolePixelCount == 0)
+                    mask = null;
+                ApplyHoles(pair.Key, pair.Value, mask);
+            }
+        }
+
+        /// <summary>Where the objects with terrain holes stand, as text; equal text means equal holes.</summary>
+        private static string HoleSignature(OmsiTerrainHoleCatalog catalog, List<OmsiHolePlacement> placements)
+        {
+            var text = new System.Text.StringBuilder();
+            foreach (var placement in placements)
+            {
+                if (catalog.ObjectHole(placement.AssetPath) == null)
+                    continue;
+                text.Append(placement.TileX).Append(',').Append(placement.TileY).Append(',').Append(placement.AssetPath).Append(',')
+                    .Append(placement.LocalX.ToString("R")).Append(',').Append(placement.LocalY.ToString("R")).Append(',')
+                    .Append(placement.HeadingDegrees.ToString("R")).Append(',').Append(placement.PitchDegrees.ToString("R")).Append(',')
+                    .Append(placement.BankDegrees.ToString("R")).Append(';');
+            }
+            return text.ToString();
+        }
+
+        /// <summary>Gives the materials of a tile a hole mask, a new one, or none.</summary>
+        private void ApplyHoles(long key, List<MeshRenderer> renderers, OmsiTerrainHoleMask mask)
+        {
+            if (holeTextures.TryGetValue(key, out var old))
+            {
+                holeTextures.Remove(key);
+                owned.Remove(old);
+                Destroy(old);
+            }
+            var texture = mask != null ? UploadHoles(mask) : null;
+            if (texture != null)
+                holeTextures[key] = texture;
+            foreach (var meshRenderer in renderers)
+            {
+                var material = meshRenderer.sharedMaterial;
+                // The base material is shared by all tiles; a tile that gets holes needs its own copy.
+                if (texture != null && layerMaterials.TryGetValue(0, out var baseMaterial) && material == baseMaterial)
+                {
+                    material = new Material(baseMaterial);
+                    owned.Add(material);
+                    holeBaseMaterials.Add(material);
+                    meshRenderer.sharedMaterial = material;
+                }
+                if (texture != null)
+                    SetHoles(material, texture);
+                else
+                    material.SetFloat("_UseHoles", 0f);
+            }
         }
 
         /// <summary>Removes the ground of the previous map.</summary>
@@ -189,6 +310,11 @@ namespace OmsiMapEditor.World
                 Destroy(item);
             owned.Clear();
             layerMaterials.Clear();
+            holeBaseMaterials.Clear();
+            tileMaterials.Clear();
+            holeTextures.Clear();
+            holes = null;
+            SplineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
             splineMaterials.Clear();
             terrains.Clear();
         }
@@ -205,6 +331,8 @@ namespace OmsiMapEditor.World
                 threeDimensional = value;
                 if (layerMaterials.TryGetValue(0, out var baseMaterial))
                     baseMaterial.SetFloat("_DepthWrite", value ? 1f : 0f);
+                foreach (var material in holeBaseMaterials)
+                    material.SetFloat("_DepthWrite", value ? 1f : 0f);
             }
         }
 
@@ -290,6 +418,8 @@ namespace OmsiMapEditor.World
                 }
                 pending = task.Result;
                 pendingTile = 0;
+                holes = pending.Holes;
+                SplineLineKinds = pending.LineKinds;
                 BeginBuild(pending);
             }
 
@@ -297,8 +427,8 @@ namespace OmsiMapEditor.World
                 ContinueBuild();
         }
 
-        private static GroundData Read(List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>> tiles, IOmsiFileSource source,
-            string globalConfigRelativePath, string installationRoot)
+        private static GroundData Read(List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>> tiles, List<OmsiHolePlacement> placements,
+            IOmsiFileSource source, string globalConfigRelativePath, string installationRoot, double tileSize)
         {
             var data = new GroundData();
             var images = new Dictionary<string, OmsiImage>(StringComparer.OrdinalIgnoreCase);
@@ -349,6 +479,7 @@ namespace OmsiMapEditor.World
                 AddSplines(tileData, pair.Value, profiles, installationRoot, data);
                 data.Tiles.Add(tileData);
             }
+            AddTerrainHoles(data, tiles, placements, profiles, installationRoot, tileSize);
             data.Problems.AddRange(profiles.Problems);
             return data;
         }
@@ -364,8 +495,15 @@ namespace OmsiMapEditor.World
                 var profile = profiles.Get(spline.AssetPath);
                 if (profile == null || profile.EditorOnly)
                     continue;
+                // Wires and fences show nothing from above; the map view draws them as lines, the 3D view as strips.
+                if (profile.LineKind != OmsiSplineLineKind.None)
+                {
+                    data.LineKinds[spline.AssetPath] = profile.LineKind;
+                    data.LineSplineCount++;
+                }
                 var drawn = false;
-                foreach (var surface in OmsiSplineSurface.Build(spline, profile))
+                // Upright strips, such as walls of cuttings, kerb faces and fences, matter in the 3D view.
+                foreach (var surface in OmsiSplineSurface.Build(spline, profile, true))
                 {
                     var texture = profile.Textures[surface.TextureIndex];
                     var key = texture.Path + (texture.UsesAlpha ? "|alpha" : string.Empty);
@@ -392,6 +530,32 @@ namespace OmsiMapEditor.World
                 if (drawn)
                     data.DrawnSplineCount++;
             }
+        }
+
+        /// <summary>Draws the terrain holes of objects and splines into masks of the tiles they reach.</summary>
+        private static void AddTerrainHoles(GroundData data, List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>> tiles,
+            List<OmsiHolePlacement> placements, OmsiSplineProfileCatalog profiles, string installationRoot, double tileSize)
+        {
+            var available = new HashSet<long>();
+            foreach (var tile in data.Tiles)
+                available.Add(OmsiTerrainHoleCatalog.TileKey(tile.X, tile.Y));
+            var splines = new List<KeyValuePair<long, OmsiSplineRecord>>();
+            foreach (var pair in tiles)
+                foreach (var spline in pair.Value)
+                    splines.Add(new KeyValuePair<long, OmsiSplineRecord>(OmsiTerrainHoleCatalog.TileKey(pair.Key.X, pair.Key.Y), spline));
+            var holes = new OmsiTerrainHoleCatalog(installationRoot);
+            var masks = holes.Build(placements, splines, profiles, available, tileSize);
+            foreach (var tile in data.Tiles)
+                if (masks.TryGetValue(OmsiTerrainHoleCatalog.TileKey(tile.X, tile.Y), out var mask) && mask.HolePixelCount > 0)
+                {
+                    tile.Holes = mask;
+                    data.HoleTileCount++;
+                }
+            data.Problems.AddRange(holes.Problems);
+            data.Holes = new HoleSources
+            {
+                Catalog = holes, Profiles = profiles, Splines = splines, Tiles = available, Signature = HoleSignature(holes, placements)
+            };
         }
 
         private static SplineTextureData ReadSplineTexture(string installationRoot, OmsiSplineTexture texture, List<string> problems)
@@ -485,7 +649,9 @@ namespace OmsiMapEditor.World
             foreach (var tile in data.Tiles)
                 masks += tile.Masks.Count;
             var report = "Ground textures ready: " + data.Layers.Count + " texture(s), " + masks + " tile mask(s), " +
-                         data.DrawnSplineCount + " of " + data.SplineCount + " splines with surfaces";
+                         data.DrawnSplineCount + " of " + data.SplineCount + " splines with surfaces" +
+                         (data.LineSplineCount > 0 ? ", " + data.LineSplineCount + " overhead lines and fences" : string.Empty) +
+                         (data.HoleTileCount > 0 ? ", terrain holes in " + data.HoleTileCount + " tile(s)" : string.Empty);
             if (data.Problems.Count > 0)
                 report += "; " + data.Problems.Count + " problem(s), first: " + data.Problems[0];
             if (data.Problems.Count > 0)
@@ -503,8 +669,11 @@ namespace OmsiMapEditor.World
                 mesh = CreateTerrainMesh(tile.Terrain, (float)tileSize);
                 owned.Add(mesh);
             }
+            var key = OmsiTerrainHoleCatalog.TileKey(tile.X, tile.Y);
+            var renderers = new List<MeshRenderer>();
+            tileMaterials[key] = renderers;
             if (layerMaterials.TryGetValue(0, out var baseMaterial))
-                AddQuad("Tile " + tile.X + ", " + tile.Y, position, baseMaterial, mesh);
+                renderers.Add(AddQuad("Tile " + tile.X + ", " + tile.Y, position, baseMaterial, mesh));
             foreach (var pair in tile.Masks)
             {
                 if (!layerMaterials.TryGetValue(pair.Key, out var layerMaterial))
@@ -512,10 +681,33 @@ namespace OmsiMapEditor.World
                 var material = new Material(layerMaterial);
                 material.SetTexture("_Mask", Upload(pair.Value, null, TextureWrapMode.Clamp));
                 owned.Add(material);
-                AddQuad("Tile " + tile.X + ", " + tile.Y + " layer " + pair.Key, position, material, mesh);
+                renderers.Add(AddQuad("Tile " + tile.X + ", " + tile.Y + " layer " + pair.Key, position, material, mesh));
             }
+            if (tile.Holes != null)
+                ApplyHoles(key, renderers, tile.Holes);
             foreach (var batch in tile.Splines)
                 AddSplineBatch("Tile " + tile.X + ", " + tile.Y + " splines", position, batch);
+        }
+
+        private static void SetHoles(Material material, Texture2D holes)
+        {
+            material.SetTexture("_HoleMask", holes);
+            material.SetFloat("_UseHoles", 1f);
+        }
+
+        /// <summary>The hole mask as a texture; its rows already run from the south edge, as Unity expects.</summary>
+        private Texture2D UploadHoles(OmsiTerrainHoleMask mask)
+        {
+            var texture = new Texture2D(OmsiTerrainHoleMask.Resolution, OmsiTerrainHoleMask.Resolution, TextureFormat.R8, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                name = "Terrain holes " + mask.TileX + ", " + mask.TileY
+            };
+            texture.SetPixelData(mask.Pixels, 0);
+            texture.Apply(false, true);
+            owned.Add(texture);
+            return texture;
         }
 
         private void AddSplineBatch(string name, Vector3 position, SplineBatch batch)
@@ -588,7 +780,7 @@ namespace OmsiMapEditor.World
             return encoded;
         }
 
-        private void AddQuad(string name, Vector3 position, Material material, Mesh mesh)
+        private MeshRenderer AddQuad(string name, Vector3 position, Material material, Mesh mesh)
         {
             var quad = new GameObject(name) { layer = GroundLayer };
             quad.transform.SetParent(groundRoot, false);
@@ -600,6 +792,7 @@ namespace OmsiMapEditor.World
             meshRenderer.receiveShadows = false;
             meshRenderer.lightProbeUsage = LightProbeUsage.Off;
             meshRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            return meshRenderer;
         }
 
         /// <summary>

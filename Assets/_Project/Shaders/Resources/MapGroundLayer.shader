@@ -1,6 +1,7 @@
 // One ground texture of an OMSI tile: the texture times its detail texture, each repeated across the tile, blended
 // over the layers below through the tile's mask, and shaded by the slope of the terrain. The first layer covers the
-// tile without a mask; in the 3D view it writes depth so that hills hide what lies behind them.
+// tile without a mask; in the 3D view it writes depth so that hills hide what lies behind them. Where OMSI cuts the
+// terrain away, under crossings and along cuttings, the tile's hole mask leaves the ground out.
 Shader "Mapforge/GroundLayer"
 {
     Properties
@@ -11,6 +12,8 @@ Shader "Mapforge/GroundLayer"
         _Repeats ("Repeats per tile", Float) = 1
         _DetailRepeats ("Detail repeats per tile", Float) = 1
         _UseMask ("Use mask", Float) = 0
+        _HoleMask ("Terrain holes", 2D) = "black" {}
+        _UseHoles ("Use terrain holes", Float) = 0
         _DepthWrite ("Write depth", Float) = 0
     }
 
@@ -36,11 +39,14 @@ Shader "Mapforge/GroundLayer"
             SAMPLER(sampler_DetailTex);
             TEXTURE2D(_Mask);
             SAMPLER(sampler_Mask);
+            TEXTURE2D(_HoleMask);
+            SAMPLER(sampler_HoleMask);
 
             CBUFFER_START(UnityPerMaterial)
                 float _Repeats;
                 float _DetailRepeats;
                 float _UseMask;
+                float _UseHoles;
                 float _DepthWrite;
             CBUFFER_END
 
@@ -69,6 +75,8 @@ Shader "Mapforge/GroundLayer"
 
             half4 Fragment(Varyings input) : SV_Target
             {
+                if (_UseHoles > 0.5)
+                    clip(0.5 - SAMPLE_TEXTURE2D(_HoleMask, sampler_HoleMask, input.uv).r);
                 half3 colour = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv * _Repeats).rgb;
                 // OMSI multiplies the detail texture in plainly; its stock detail textures are bright.
                 colour *= SAMPLE_TEXTURE2D(_DetailTex, sampler_DetailTex, input.uv * _DetailRepeats).rgb;

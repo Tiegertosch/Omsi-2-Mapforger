@@ -65,6 +65,8 @@ namespace OmsiMapEditor.UI
         private static readonly CustomStyleProperty<Color> SelectionProperty = new CustomStyleProperty<Color>("--map-selection");
         private static readonly CustomStyleProperty<Color> PlacementProperty = new CustomStyleProperty<Color>("--map-placement");
         private static readonly CustomStyleProperty<Color> HandleProperty = new CustomStyleProperty<Color>("--map-handle");
+        private static readonly CustomStyleProperty<Color> WireProperty = new CustomStyleProperty<Color>("--map-wire");
+        private static readonly CustomStyleProperty<Color> FenceProperty = new CustomStyleProperty<Color>("--map-fence");
 
         private Color tileColor = Hex(0x202630);
         private Color missingTileColor = Mix(Hex(0x202630), Hex(0xE06464), 0.3f);
@@ -83,6 +85,8 @@ namespace OmsiMapEditor.UI
         private Color placementFillColor = Hex(0x55B887, 0.25f);
         private Color boxFillColor = Hex(0xE06464, 0.12f);
         private Color handleFillColor = Hex(0x29313D);
+        private Color wireColor = Hex(0xAEB8C5, 0.9f);
+        private Color fenceColor = Hex(0x7E8A99, 0.95f);
 
         // Rotation rings in the 3D view, coloured like the X, Y and Z axes they turn about.
         private static readonly Color PitchRingColor = new Color(0.94f, 0.33f, 0.33f, 1f);
@@ -132,9 +136,15 @@ namespace OmsiMapEditor.UI
 
         private sealed class SplinePath
         {
+            public string AssetPath;
             public Vector2[] Points;
             public Rect Bounds;
+
+            /// <summary>Overhead lines and fences are drawn as thin lines instead of road lines.</summary>
+            public OmsiSplineLineKind LineKind;
         }
+
+        private IReadOnlyDictionary<string, OmsiSplineLineKind> splineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
 
         private readonly List<SplinePath> splines = new List<SplinePath>();
         private OmsiMapSummary summary;
@@ -261,6 +271,10 @@ namespace OmsiMapEditor.UI
             }
             if (style.TryGetValue(HandleProperty, out var handle))
                 handleFillColor = handle;
+            if (style.TryGetValue(WireProperty, out var wire))
+                wireColor = WithAlpha(wire, 0.9f);
+            if (style.TryGetValue(FenceProperty, out var fence))
+                fenceColor = WithAlpha(fence, 0.95f);
             MarkDirtyRepaint();
         }
 
@@ -720,7 +734,8 @@ namespace OmsiMapEditor.UI
                         bounds.xMax = Mathf.Max(bounds.xMax, points[index].x);
                         bounds.yMax = Mathf.Max(bounds.yMax, points[index].y);
                     }
-                    splines.Add(new SplinePath { Points = points, Bounds = bounds });
+                    splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
+                    splines.Add(new SplinePath { AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind });
                 }
             }
         }
@@ -890,8 +905,25 @@ namespace OmsiMapEditor.UI
             painter.ClosePath();
         }
 
+        /// <summary>
+        /// Tells which spline types have no surface from above and are drawn as thin lines: overhead lines dashed, fences
+        /// solid. The ground renderer knows them once it has read the spline profiles.
+        /// </summary>
+        public void SetSplineLineKinds(IReadOnlyDictionary<string, OmsiSplineLineKind> kinds)
+        {
+            splineLineKinds = kinds ?? new Dictionary<string, OmsiSplineLineKind>();
+            foreach (var spline in splines)
+            {
+                splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
+                spline.LineKind = lineKind;
+            }
+            MarkDirtyRepaint();
+        }
+
         private void DrawSplines(Painter2D painter, Rect visible)
         {
+            DrawLineSplines(painter, visible, OmsiSplineLineKind.Fence);
+            DrawLineSplines(painter, visible, OmsiSplineLineKind.Overhead);
             painter.strokeColor = TexturedView ? quietSplineColor : splineColor;
             painter.lineWidth = TexturedView ? 1.5f : Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f);
             painter.lineCap = LineCap.Round;
@@ -899,7 +931,7 @@ namespace OmsiMapEditor.UI
             painter.BeginPath();
             foreach (var spline in splines)
             {
-                if (!spline.Bounds.Overlaps(visible))
+                if (!spline.Bounds.Overlaps(visible) || spline.LineKind != OmsiSplineLineKind.None)
                     continue;
                 var last = MapToScreen(spline.Points[0]);
                 painter.MoveTo(last);
@@ -914,6 +946,59 @@ namespace OmsiMapEditor.UI
                 }
             }
             painter.Stroke();
+        }
+
+        /// <summary>Overhead lines as dashes of 6 pixels with gaps of 4, fences as a solid line, both 1 pixel wide.</summary>
+        private void DrawLineSplines(Painter2D painter, Rect visible, OmsiSplineLineKind kind)
+        {
+            const float dash = 6f;
+            const float gap = 4f;
+            var dashed = kind == OmsiSplineLineKind.Overhead;
+            painter.strokeColor = dashed ? wireColor : fenceColor;
+            painter.lineWidth = 1f;
+            painter.lineCap = LineCap.Butt;
+            painter.lineJoin = LineJoin.Miter;
+            painter.BeginPath();
+            var any = false;
+            foreach (var spline in splines)
+            {
+                if (spline.LineKind != kind || !spline.Bounds.Overlaps(visible))
+                    continue;
+                any = true;
+                var last = MapToScreen(spline.Points[0]);
+                painter.MoveTo(last);
+                // Distance into the current dash or gap, so the pattern runs on over the points of the line.
+                var phase = 0f;
+                for (var index = 1; index < spline.Points.Length; index++)
+                {
+                    var point = MapToScreen(spline.Points[index]);
+                    if (!dashed)
+                    {
+                        painter.LineTo(point);
+                        last = point;
+                        continue;
+                    }
+                    var length = Vector2.Distance(last, point);
+                    var travelled = 0f;
+                    while (travelled < length)
+                    {
+                        var inDash = phase < dash;
+                        var step = Mathf.Min(length - travelled, inDash ? dash - phase : dash + gap - phase);
+                        travelled += step;
+                        phase += step;
+                        var at = Vector2.Lerp(last, point, travelled / length);
+                        if (inDash)
+                            painter.LineTo(at);
+                        else
+                            painter.MoveTo(at);
+                        if (phase >= dash + gap)
+                            phase = 0f;
+                    }
+                    last = point;
+                }
+            }
+            if (any)
+                painter.Stroke();
         }
 
         private void DrawObjects(MeshGenerationContext context, Painter2D painter, Rect visible)

@@ -51,10 +51,10 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Alle Werkzeuge der Draufsicht auch in 3D: Strg+Rahmen, Entf, Platzieren auf dem Gelände, Marker für Objekte ohne Modell, Kachelrand, Einpassen, Zoomtasten, Zentrieren, Position unter dem Mauszeiger
 - [x] Vorzeichen von Pitch und Bank im Spiel prüfen (22. Oktober 2026: Wartehäuschen mit Pitch 15 und Laterne mit Bank 15 in Grundorf wie im Editor)
 - [x] Bäume in der 3D-Ansicht als gekreuzte Flächen wie in OMSI zeigen; die Kronenkuppel der Draufsicht wirkt von der Seite wie ein Schirm
-- Gelände unter Straßen ausschneiden, wie OMSI es mit `[terrainholeprofile]` tut
+- [x] Gelände unter Straßen ausschneiden, wie OMSI es tut: unter Objekten mit `[terrainhole]`-Modell (Kreuzungen) und entlang von Splines mit `[terrainholeprofile]` (Gleistrog), als Lochmaske je Kachel, 0,75 m kleiner als das Lochmodell (ADR 018); senkrechte Profilstreifen wie Trogwände, Bordsteinkanten und Zäune erscheinen in 3D
 - [x] Draufsicht mit Bodentexturen: `[groundtex]` und Masken je Kachel, von einer Kamera unter der Vektorebene gezeichnet (ADR 013)
 - [x] Straßen und Gleise als texturierte Bänder aus den `.sli`-Profilen
-- Freileitungen, Fahrdraht und Zäune in der Draufsicht als dünne Linien zeigen
+- [x] Freileitungen, Fahrdraht und Zäune in der Draufsicht als dünne Linien zeigen: schmale Profile (höchstens 0,6 m) ab 2,5 m Höhe gestrichelt als Leitung, ab 1 m Höhe vom Boden als Zaun oder Mauer (ADR 018)
 - [x] Objekte mit ihren Materialtexturen von oben zeichnen: erste Detailstufe, `[visible]` im Sommer, `.dds` vor `.bmp`, Instancing, auf dem Gelände (ADR 013)
 - [x] Text-`.x`-Modelle mit Texturkoordinaten, Normalen und Materialien lesen, auch Materialverweise
 - [x] Modelle beim Ziehen und Drehen mitbewegen, auf dem Gelände unter der neuen Position

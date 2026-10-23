@@ -375,7 +375,11 @@ namespace OmsiMapEditor.UI
 
             CreateBackgroundCamera();
             groundRenderer = new GameObject("Map Ground").AddComponent<MapGroundRenderer>();
-            groundRenderer.Loaded += SetStatus;
+            groundRenderer.Loaded += report =>
+            {
+                SetStatus(report);
+                mapCanvas?.SetSplineLineKinds(groundRenderer.SplineLineKinds);
+            };
             objectRenderer = groundRenderer.gameObject.AddComponent<MapObjectRenderer>();
             objectRenderer.SetCamera(groundRenderer.ViewCamera);
             objectRenderer.Loaded += SetStatus;
@@ -1117,6 +1121,7 @@ namespace OmsiMapEditor.UI
             ApplySelection(selection.Count > 0 ? selection[selection.Count - 1].Tile : selectedTile);
             mapCanvas?.Refresh();
             objectRenderer?.RefreshPlacements();
+            groundRenderer?.RefreshTerrainHoles(currentSummary);
             foreach (var tile in browserEntries.Keys)
                 UpdateBrowserEntry(tile);
             UpdateCounts();
