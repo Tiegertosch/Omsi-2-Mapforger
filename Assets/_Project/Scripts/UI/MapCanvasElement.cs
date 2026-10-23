@@ -128,7 +128,30 @@ namespace OmsiMapEditor.UI
 
             /// <summary>True when the textured view draws a model of this kind, so marker and outline can stay away.</summary>
             public bool HasModel;
+
+            /// <summary>The convex hull, drawn instead of the contours when the object is only a few pixels large.</summary>
+            public Vector2[] Hull;
         }
+
+        /// <summary>Objects only this many pixels across are outlined by their hull; their contours would not show.</summary>
+        private const float HullPixels = 12f;
+
+        /// <summary>
+        /// The objects of a tile with their outlines looked up once, and the map area they cover with their outlines, so
+        /// a redraw skips tiles out of view instead of testing every object. Built again after edits and new outlines.
+        /// </summary>
+        private sealed class TileObjects
+        {
+            public OmsiTileSummary Tile;
+            public Rect Bounds;
+            public OmsiObjectRecord[] Records;
+
+            /// <summary>The outline of each record, or null when it has none.</summary>
+            public Footprint[] Footprints;
+        }
+
+        private readonly List<TileObjects> objectsByTile = new List<TileObjects>();
+        private bool objectsByTileOutdated = true;
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
@@ -533,6 +556,7 @@ namespace OmsiMapEditor.UI
             tileSize = map?.TileSizeMeters ?? 300.0;
             CancelDrag();
             BuildCaches();
+            objectsByTileOutdated = true;
             if (!keepView || !hasView)
                 FitToMap();
             MarkDirtyRepaint();
@@ -557,9 +581,56 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>Draws again after objects changed: moved, turned, placed or deleted.</summary>
         public void Refresh()
         {
+            objectsByTileOutdated = true;
             MarkDirtyRepaint();
+        }
+
+        /// <summary>The objects by tile, built again when objects or outlines changed since the last redraw.</summary>
+        private List<TileObjects> ObjectsByTile()
+        {
+            if (!objectsByTileOutdated)
+                return objectsByTile;
+            objectsByTileOutdated = false;
+            objectsByTile.Clear();
+            if (summary == null)
+                return objectsByTile;
+            foreach (var tile in summary.Tiles)
+            {
+                if (tile.Objects.Count == 0)
+                    continue;
+                var group = new TileObjects
+                {
+                    Tile = tile, Records = tile.Objects.ToArray(), Footprints = new Footprint[tile.Objects.Count]
+                };
+                // Objects may lie outside their own tile, so the bounds follow the objects, not the tile rectangle.
+                float minimumX = float.MaxValue, minimumY = float.MaxValue, maximumX = float.MinValue, maximumY = float.MinValue;
+                for (var index = 0; index < group.Records.Length; index++)
+                {
+                    footprints.TryGetValue(group.Records[index].AssetPath, out var footprint);
+                    group.Footprints[index] = footprint;
+                    var position = ToMap(tile, group.Records[index].LocalX, group.Records[index].LocalY);
+                    var radius = footprint?.Radius ?? 0f;
+                    minimumX = Mathf.Min(minimumX, position.x - radius);
+                    minimumY = Mathf.Min(minimumY, position.y - radius);
+                    maximumX = Mathf.Max(maximumX, position.x + radius);
+                    maximumY = Mathf.Max(maximumY, position.y + radius);
+                }
+                group.Bounds = Rect.MinMaxRect(minimumX, minimumY, maximumX, maximumY);
+                objectsByTile.Add(group);
+            }
+            return objectsByTile;
+        }
+
+        /// <summary>
+        /// True when a tile's objects may be in view. While objects are dragged they leave their tile's bounds, so then
+        /// every tile counts.
+        /// </summary>
+        private bool MayBeVisible(TileObjects group, Rect visible)
+        {
+            return dragMode == DragMode.Move || activeArrow != MoveAxis.None || group.Bounds.Overlaps(visible);
         }
 
         /// <summary>Object outlines by asset path, as the outline catalog computed them; null clears them.</summary>
@@ -575,6 +646,9 @@ namespace OmsiMapEditor.UI
                         continue;
                     var contours = pair.Value.Contours.Count > 0 ? pair.Value.Contours : new[] { hull };
                     var footprint = new Footprint { Contours = new Vector2[contours.Count][], IsTree = pair.Value.Source == OmsiOutlineSource.Tree };
+                    footprint.Hull = new Vector2[hull.Length];
+                    for (var index = 0; index < hull.Length; index++)
+                        footprint.Hull[index] = new Vector2((float)hull[index].X, (float)hull[index].Y);
                     var signedArea = 0f;
                     for (var contour = 0; contour < contours.Count; contour++)
                     {
@@ -593,6 +667,7 @@ namespace OmsiMapEditor.UI
                     footprints[pair.Key] = footprint;
                 }
             }
+            objectsByTileOutdated = true;
             MarkDirtyRepaint();
         }
 
@@ -787,9 +862,13 @@ namespace OmsiMapEditor.UI
             var visible = VisibleMapRect(16f);
             var painter = context.painter2D;
             DrawTiles(painter, visible);
+            var tilesDone = watch.Elapsed.TotalMilliseconds;
             DrawOutlines(painter, visible);
+            var outlinesDone = watch.Elapsed.TotalMilliseconds;
             DrawSplines(painter, visible);
+            var splinesDone = watch.Elapsed.TotalMilliseconds;
             DrawObjects(context, painter, visible);
+            var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
             DrawArrows(painter);
             DrawPlacement(painter);
@@ -800,7 +879,10 @@ namespace OmsiMapEditor.UI
             if (milliseconds > 50f && milliseconds > slowestDrawMilliseconds * 1.5f)
             {
                 slowestDrawMilliseconds = milliseconds;
-                Debug.LogWarning("Map view redraw took " + milliseconds.ToString("0") + " ms at " + metersPerPixel.ToString("0.###") + " m/px.");
+                Debug.LogWarning("Map view redraw took " + milliseconds.ToString("0") + " ms at " + metersPerPixel.ToString("0.###") + " m/px: tiles " +
+                                 tilesDone.ToString("0") + ", outlines " + (outlinesDone - tilesDone).ToString("0") + ", splines " +
+                                 (splinesDone - outlinesDone).ToString("0") + ", objects " + (objectsDone - splinesDone).ToString("0") + ", rest " +
+                                 (milliseconds - objectsDone).ToString("0") + " ms.");
             }
         }
 
@@ -852,19 +934,23 @@ namespace OmsiMapEditor.UI
                 painter.lineWidth = 1f;
                 painter.BeginPath();
                 var any = false;
-                foreach (var tile in summary.Tiles)
+                foreach (var group in ObjectsByTile())
                 {
-                    foreach (var item in tile.Objects)
+                    if (!MayBeVisible(group, visible))
+                        continue;
+                    for (var index = 0; index < group.Records.Length; index++)
                     {
-                        if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.IsTree != trees ||
-                            TexturedView && footprint.HasModel)
+                        var footprint = group.Footprints[index];
+                        if (footprint == null || footprint.IsTree != trees || TexturedView && footprint.HasModel)
                             continue;
-                        var position = DrawnPosition(tile, item);
-                        if (footprint.Radius / metersPerPixel < 1.5f ||
+                        var item = group.Records[index];
+                        var position = DrawnPosition(group.Tile, item);
+                        var pixels = footprint.Radius / metersPerPixel;
+                        if (pixels < 1.5f ||
                             position.x + footprint.Radius < visible.xMin || position.x - footprint.Radius > visible.xMax ||
                             position.y + footprint.Radius < visible.yMin || position.y - footprint.Radius > visible.yMax)
                             continue;
-                        AddFootprint(painter, footprint, position, DrawnHeading(item));
+                        AddFootprint(painter, footprint, position, DrawnHeading(item), pixels < HullPixels);
                         any = true;
                     }
                 }
@@ -877,12 +963,13 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void AddFootprint(Painter2D painter, Footprint footprint, Vector2 position, double headingDegrees)
+        /// <param name="hullOnly">Draws the convex hull instead of the contours, for objects only a few pixels large.</param>
+        private void AddFootprint(Painter2D painter, Footprint footprint, Vector2 position, double headingDegrees, bool hullOnly = false)
         {
             var heading = (float)(headingDegrees * Math.PI / 180.0);
             var sin = Mathf.Sin(heading);
             var cos = Mathf.Cos(heading);
-            foreach (var points in footprint.Contours)
+            foreach (var points in hullOnly && footprint.Hull != null ? new[] { footprint.Hull } : footprint.Contours)
             {
                 painter.MoveTo(MapToScreen(ObjectToMap(points[0], position, sin, cos)));
                 for (var index = 1; index < points.Length; index++)
@@ -1013,16 +1100,17 @@ namespace OmsiMapEditor.UI
                 painter.BeginPath();
             }
 
-            foreach (var tile in summary.Tiles)
+            foreach (var group in ObjectsByTile())
             {
-                if (tile.Objects.Count == 0)
+                if (!MayBeVisible(group, visible))
                     continue;
-                // Objects may lie outside their own tile, so test each object, not just the tile rectangle.
-                foreach (var item in tile.Objects)
+                for (var index = 0; index < group.Records.Length; index++)
                 {
-                    if (TexturedView && footprints.TryGetValue(item.AssetPath, out var footprint) && footprint.HasModel)
+                    var footprint = group.Footprints[index];
+                    if (TexturedView && footprint != null && footprint.HasModel)
                         continue;
-                    var map = DrawnPosition(tile, item);
+                    var item = group.Records[index];
+                    var map = DrawnPosition(group.Tile, item);
                     if (!visible.Contains(map))
                         continue;
                     var screen = MapToScreen(map);

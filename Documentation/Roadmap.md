@@ -80,7 +80,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Durchgehende 2D-Draufsicht mit Zoom und Verschieben; Objekte per Ziehen verschieben, am Griff drehen und Änderungen rückgängig machen
 - [x] `.sco`- und `.o3d`-Dateien analysieren und Objekte mit ihren Umrissen darstellen (siehe [SceneryObjectInventory.md](SceneryObjectInventory.md))
 - [x] Genauere, nicht konvexe Umrisse für L-förmige Gebäude, große Kreuzungen und Plätze: Dreiecke werden von oben gerastert und zu Konturen mit Löchern verbunden
-- Zeichenzeit großer Karten senken, etwa mit der Hülle statt der Kontur für Objekte, die nur wenige Pixel groß sind; Berlin-Spandau braucht vereinzelt etwas über 50 ms
+- [x] Zeichenzeit großer Karten senken: Objekte je Kachel mit aufgelöstem Umriss und Grenzen zwischengespeichert, Kacheln außerhalb des Ausschnitts übersprungen, Objekte unter 12 Pixeln mit ihrer Hülle statt der Kontur; Berlin-Spandau bleibt in allen geprüften Ausschnitten unter 50 ms (vorher bis 94 ms)
 - [x] Mehrere Objekte gleichzeitig auswählen und verschieben: Strg+Klick, Strg+Rahmen, gemeinsames Ziehen und Löschen als ein Rückgängig-Schritt
 - [x] Objekte beim Verschieben über eine Kachelgrenze in die neue Kachel übernehmen, samt Regeln und mit derselben ID (ADR 012)
 - Objekte mit kachelgebundenen Verweisen mitsamt diesen Verweisen umziehen: Einstiegspunkte, Chrono-Auswahl, angehängte Objekte und Variablen-Eltern
