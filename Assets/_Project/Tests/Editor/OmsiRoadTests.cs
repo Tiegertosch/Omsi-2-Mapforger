@@ -511,6 +511,87 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(tileFileHasAlignment(session));
         }
 
+        [Test]
+        public void MovingAJointBendsBothSplinesTangentiallyAndUndoRestoresThem()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 150, 1.0);
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 170, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 3
+            }, null), @"Splines\road.sli", end, null);
+            var tileBefore = session.Workspace.ReadAllBytes("tile_0_0.map");
+
+            // The joint between spline 10 and the new spline moves 10 m east.
+            var joint = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == 10), true);
+            var move = OmsiSplineEditing.PlanJointMove(summary, joint, 110, 150);
+            Assert.IsFalse(move.HasErrors, string.Join("; ", move.Issues));
+            CollectionAssert.AreEquivalent(new[] { 10, road.SplineIds[0] }, move.Splines.Select(geometry => geometry.Spline.Id));
+            var change = session.UpdateSplines(summary, move.Splines);
+
+            var spline10 = summary.Tiles[0].Splines.Single(spline => spline.Id == 10);
+            var next = summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            // Spline 10's start is free, so it runs straight from its start to the new point, at its heights.
+            Assert.AreEqual(0.0, spline10.RadiusMeters);
+            var moved = OmsiMapGeometry.GetSplineEndpoint(summary.Tiles[0], spline10, 300, true);
+            Assert.AreEqual(110.0, moved.X, 1e-6);
+            Assert.AreEqual(150.0, moved.Y, 1e-6);
+            Assert.AreEqual(2.0, spline10.EndHeight, 1e-9);
+            // The new spline starts there tangentially and still ends at 100, 170, at 3 m.
+            var start = OmsiMapGeometry.GetSplineEndpoint(summary.Tiles[0], next, 300, false);
+            var finish = OmsiMapGeometry.GetSplineEndpoint(summary.Tiles[0], next, 300, true);
+            Assert.AreEqual(110.0, start.X, 1e-6);
+            Assert.AreEqual(100.0, finish.X, 1e-6);
+            Assert.AreEqual(170.0, finish.Y, 1e-6);
+            Assert.AreEqual(OmsiRoadPlanner.ChordHeading(100, 100, 110, 150), next.HeadingDegrees, 1e-6);
+            Assert.AreNotEqual(0.0, next.RadiusMeters);
+            Assert.AreEqual(3.0, next.EndHeight, 1e-9);
+            var continuity = OmsiSplineContinuity.Check(session.Read());
+            Assert.AreEqual(continuity.LinkCount, continuity.ConnectedCount);
+
+            session.Undo(summary, change);
+            CollectionAssert.AreEqual(tileBefore, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            Assert.AreEqual(100.0, OmsiMapGeometry.GetSplineEndpoint(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == 10), 300, true).X, 1e-9);
+        }
+
+        [Test]
+        public void MovingAJointReportsAKinkWhereTheNeighbourMeetsTheNextSplineAndMovesStartsBackwards()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 150, 1.0);
+            // Two pieces after spline 10: the first one's far end is joined to the second.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 190, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2, MaximumPieceLength = 20
+            }, null), @"Splines\road.sli", end, null);
+            Assert.AreEqual(2, road.SplineIds.Count);
+            var joint = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == 10), true);
+            var move = OmsiSplineEditing.PlanJointMove(summary, joint, 108, 150);
+            Assert.That(move.Issues.Select(issue => issue.Message), Has.Some.Contains("now meets the next spline with a kink"));
+
+            // Pulling the joint aside to 130, 140, past the next spline's end at 100, 190: staying tangential would turn the
+            // next spline by more than half a circle, so it keeps its far end and heading and the kink moves to the joint.
+            var back = OmsiSplineEditing.PlanJointMove(summary, joint, 130, 140);
+            Assert.That(back.Issues.Select(issue => issue.Message), Has.Some.Contains("now meet with a kink"));
+            foreach (var pulled in back.Splines)
+                Assert.Less(pulled.LengthMeters, 80.0, "no loop for spline " + pulled.Spline.Id);
+
+            // Moving the start of spline 11, whose end is free too, keeps its end and runs straight to the new start.
+            var start11 = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == 11), false);
+            var startMove = OmsiSplineEditing.PlanJointMove(summary, start11, 195, 95);
+            var geometry = startMove.Splines.Single();
+            Assert.AreEqual(195.0, geometry.LocalX, 1e-6);
+            Assert.AreEqual(95.0, geometry.LocalY, 1e-6);
+            var preview = geometry.Preview();
+            var tail = OmsiMapGeometry.GetSplineEndpoint(summary.Tiles[0], preview, 300, true);
+            Assert.AreEqual(200.0, tail.X, 1e-6);
+            Assert.AreEqual(130.0, tail.Y, 1e-6);
+        }
+
         private static bool tileFileHasAlignment(OmsiMapSession session)
         {
             var tileFile = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);

@@ -82,7 +82,10 @@ namespace OmsiMapEditor.OMSI
         Deletion,
 
         /// <summary>The terrain was fitted to splines, or no longer is.</summary>
-        TerrainAlignment
+        TerrainAlignment,
+
+        /// <summary>Splines got a new position, shape or heights.</summary>
+        Geometry
     }
 
     /// <summary>
@@ -304,6 +307,54 @@ namespace OmsiMapEditor.OMSI
             if (shaped)
                 ReshapeTerrain(summary, change);
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
+        }
+
+        /// <summary>
+        /// Writes new geometry into placed splines: position, heading, length, radius, start height and gradients, keeping
+        /// every other field, their IDs and the rows along them. The splines stay in their tiles. The terrain fitted to
+        /// roads built here follows.
+        /// </summary>
+        public OmsiSplineChange UpdateSplines(OmsiMapSummary summary, IEnumerable<OmsiSplineGeometry> geometries)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (geometries == null)
+                throw new ArgumentNullException(nameof(geometries));
+            var files = new EditedFiles(RequireWorkspace());
+            var change = new OmsiSplineChange(OmsiSplineChangeKind.Geometry);
+            foreach (var geometry in geometries)
+            {
+                if (!(geometry.LengthMeters >= OmsiRoadPlanner.MinimumLength) || double.IsNaN(geometry.LocalX) || double.IsNaN(geometry.LocalY) ||
+                    double.IsNaN(geometry.Height) || double.IsNaN(geometry.HeadingDegrees) || double.IsNaN(geometry.RadiusMeters) ||
+                    double.IsInfinity(geometry.LengthMeters))
+                    throw new ArgumentException("Spline " + geometry.Spline.Id + " would get invalid geometry.", nameof(geometries));
+                OmsiSplineView view = null;
+                foreach (var candidate in OmsiTileRecords.Of<OmsiSplineView>(files.Tile(geometry.Tile.FileName)))
+                    if (candidate.Id == geometry.Spline.Id)
+                        view = candidate;
+                if (view == null)
+                    throw new InvalidOperationException("Spline " + geometry.Spline.Id + " was not found in " + geometry.Tile.FileName + ".");
+                view.X = geometry.LocalX;
+                view.Y = geometry.LocalY;
+                view.Height = geometry.Height;
+                view.HeadingDegrees = geometry.HeadingDegrees;
+                view.LengthMeters = geometry.LengthMeters;
+                view.RadiusMeters = geometry.RadiusMeters;
+                view.GradientStartPercent = geometry.GradientStartPercent;
+                view.GradientEndPercent = geometry.GradientEndPercent;
+                if (view.IsSplineH)
+                    view.HeightDifference = geometry.LengthMeters * (geometry.GradientStartPercent + geometry.GradientEndPercent) / 200.0;
+                change.SplineIds.Add(geometry.Spline.Id);
+                if (!change.Tiles.Contains(geometry.Tile))
+                    change.Tiles.Add(geometry.Tile);
+            }
+            if (change.SplineIds.Count == 0)
+                return null;
+            files.Collect(change.Files);
+            WriteFiles(change.Files, false);
+            RefreshSplines(summary, change);
+            ReshapeTerrain(summary, change);
+            return change;
         }
 
         /// <summary>

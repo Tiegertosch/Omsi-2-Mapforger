@@ -160,7 +160,7 @@ namespace OmsiMapEditor.UI
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
-        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan, Turn }
+        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan, Turn, SplineEnd }
 
         private sealed class SplinePath
         {
@@ -397,6 +397,20 @@ namespace OmsiMapEditor.UI
 
         /// <summary>While building roads: a left click at a world position.</summary>
         public event Action<double, double> RoadClicked;
+
+        /// <summary>A handle at the end (true) or start (false) of the selected spline is being dragged.</summary>
+        public event Action<bool> SplineEndDragStarted;
+
+        /// <summary>The dragged spline end is at a world position.</summary>
+        public event Action<double, double> SplineEndDragged;
+
+        /// <summary>The dragged spline end was let go at a world position.</summary>
+        public event Action<double, double> SplineEndDropped;
+
+        /// <summary>Dragging a spline end was cancelled; nothing changes.</summary>
+        public event Action SplineEndDragCancelled;
+
+        private bool draggedSplineAtEnd;
 
         /// <summary>The selection was moved, or its object rotated, by dragging and the pointer was released.</summary>
         public event Action<List<MapObjectEdit>> ObjectsEdited;
@@ -1319,7 +1333,43 @@ namespace OmsiMapEditor.UI
             painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
-            StrokePolyline(painter, path.Points);
+            if (dragMode != DragMode.SplineEnd)
+                StrokePolyline(painter, path.Points);
+            if (!SplineHandlesShown)
+                return;
+            // Square handles at both ends: drag one to move that end.
+            foreach (var end in new[] { path.Points[0], path.Points[path.Points.Length - 1] })
+            {
+                var screen = MapToScreen(end);
+                painter.fillColor = handleFillColor;
+                painter.strokeColor = selectedObjectColor;
+                painter.lineWidth = 2f;
+                painter.BeginPath();
+                painter.MoveTo(screen + new Vector2(-HandleRadius, -HandleRadius));
+                painter.LineTo(screen + new Vector2(HandleRadius, -HandleRadius));
+                painter.LineTo(screen + new Vector2(HandleRadius, HandleRadius));
+                painter.LineTo(screen + new Vector2(-HandleRadius, HandleRadius));
+                painter.ClosePath();
+                painter.Fill();
+                painter.Stroke();
+            }
+        }
+
+        private bool SplineHandlesShown => selectedSpline != null && AllowEditing && !roadMode && placementAsset == null && !ThreeDimensional;
+
+        /// <summary>The handle of the selected spline under a screen position: its end (true), its start (false) or none.</summary>
+        private bool? SplineHandleAt(Vector2 screen)
+        {
+            if (!SplineHandlesShown)
+                return null;
+            var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
+            if (path == null)
+                return null;
+            if (Vector2.Distance(screen, MapToScreen(path.Points[path.Points.Length - 1])) <= HandleRadius + 3f)
+                return true;
+            if (Vector2.Distance(screen, MapToScreen(path.Points[0])) <= HandleRadius + 3f)
+                return false;
+            return null;
         }
 
         /// <summary>
@@ -1328,9 +1378,9 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void DrawRoad(Painter2D painter, Rect visible)
         {
-            if (!roadMode)
+            if (!roadMode && roadPreview.Count == 0)
                 return;
-            if (metersPerPixel <= FreeEndMetersPerPixel)
+            if (roadMode && metersPerPixel <= FreeEndMetersPerPixel)
             {
                 painter.strokeColor = splineColor;
                 painter.lineWidth = 1.5f;
@@ -1789,6 +1839,16 @@ namespace OmsiMapEditor.UI
             {
                 var world = ScreenToMap(position);
                 RoadClicked?.Invoke(world.x + originX, world.y + originY);
+                evt.StopPropagation();
+                return;
+            }
+
+            var splineHandle = SplineHandleAt(position);
+            if (splineHandle.HasValue)
+            {
+                draggedSplineAtEnd = splineHandle.Value;
+                BeginDrag(DragMode.SplineEnd, evt.pointerId, position);
+                SplineEndDragStarted?.Invoke(draggedSplineAtEnd);
                 evt.StopPropagation();
                 return;
             }
@@ -2601,6 +2661,10 @@ namespace OmsiMapEditor.UI
                     var right = new Vector2(Mathf.Cos(yaw), -Mathf.Sin(yaw));
                     OrbitTarget += forward * shift.y - right * shift.x;
                     break;
+                case DragMode.SplineEnd:
+                    var dragged = ScreenToMap(position);
+                    SplineEndDragged?.Invoke(dragged.x + originX, dragged.y + originY);
+                    break;
                 case DragMode.Pan:
                     var delta = position - dragLastPointer;
                     center += new Vector2(-delta.x, delta.y) * metersPerPixel;
@@ -2664,6 +2728,15 @@ namespace OmsiMapEditor.UI
                 return;
 
             var finished = dragMode;
+            if (finished == DragMode.SplineEnd)
+            {
+                var dropped = ScreenToMap((Vector2)evt.localPosition);
+                EndDrag();
+                SplineEndDropped?.Invoke(dropped.x + originX, dropped.y + originY);
+                MarkDirtyRepaint();
+                evt.StopPropagation();
+                return;
+            }
             List<MapObjectEdit> edits = null;
             if (finished == DragMode.Move)
             {
@@ -2740,7 +2813,10 @@ namespace OmsiMapEditor.UI
         {
             if (dragMode == DragMode.None)
                 return;
+            var splineEnd = dragMode == DragMode.SplineEnd;
             EndDrag();
+            if (splineEnd)
+                SplineEndDragCancelled?.Invoke();
             MarkDirtyRepaint();
         }
 

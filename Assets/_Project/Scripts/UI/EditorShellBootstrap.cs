@@ -91,6 +91,9 @@ namespace OmsiMapEditor.UI
         /// <summary>A road snaps to a free spline end within this many pixels.</summary>
         private const float RoadSnapPixels = 12f;
 
+        // The end of the selected spline being dragged with its handle.
+        private OmsiSplineEnd draggedSplineEnd;
+
         // A spline clicked in the map; it is shown in the inspector and can be deleted.
         private OmsiTileSummary selectedSplineTile;
         private OmsiSplineRecord selectedSpline;
@@ -302,6 +305,17 @@ namespace OmsiMapEditor.UI
                     UpdateRoadPreview();
                 };
                 mapCanvas.RoadClicked += BuildRoadTo;
+                mapCanvas.SplineEndDragStarted += atEnd => draggedSplineEnd = selectedSpline != null && selectedSplineTile != null
+                    ? new OmsiSplineEnd(selectedSplineTile, selectedSpline, atEnd)
+                    : null;
+                mapCanvas.SplineEndDragged += (x, y) => PreviewSplineEnd(x, y, false);
+                mapCanvas.SplineEndDropped += (x, y) => PreviewSplineEnd(x, y, true);
+                mapCanvas.SplineEndDragCancelled += () =>
+                {
+                    draggedSplineEnd = null;
+                    mapCanvas.ClearRoadPreview();
+                    SetStatus("Moving the spline end cancelled.");
+                };
                 mapCanvas.PointerInfoChanged += text =>
                 {
                     if (pointerInfoLabel != null)
@@ -612,7 +626,8 @@ namespace OmsiMapEditor.UI
         /// <c>-newMap [template global.cfg]</c> without a map to show the new-map dialog,
         /// <c>-road tileX tileY x1 y1 x2 y2 ...</c> to click road points with the road tool (the last point is only
         /// pointed at unless <c>-roadBuild</c> follows, <c>-roadMode follow|smooth|manual</c> chooses the heights),
-        /// <c>-selectSpline id</c>,
+        /// <c>-selectSpline id</c>, <c>-moveSplineEnd id start|end tileX tileY x y</c> to drag a spline end there (built with
+        /// <c>-moveCommit</c>),
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
         /// </summary>
@@ -754,6 +769,21 @@ namespace OmsiMapEditor.UI
                 var splineTile = currentSummary.Tiles.Find(tile => tile.Splines.Exists(spline => spline.Id == splineId));
                 if (splineTile != null)
                     SelectSpline(splineTile, splineTile.Splines.Find(spline => spline.Id == splineId));
+            }
+
+            if (int.TryParse(Argument("-moveSplineEnd", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var moveId) &&
+                int.TryParse(Argument("-moveSplineEnd", 3), out var moveTileX) && int.TryParse(Argument("-moveSplineEnd", 4), out var moveTileY) &&
+                double.TryParse(Argument("-moveSplineEnd", 5), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveX) &&
+                double.TryParse(Argument("-moveSplineEnd", 6), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveY))
+            {
+                var moveTile = currentSummary.Tiles.Find(tile => tile.Splines.Exists(spline => spline.Id == moveId));
+                if (moveTile != null)
+                {
+                    SelectSpline(moveTile, moveTile.Splines.Find(spline => spline.Id == moveId));
+                    draggedSplineEnd = new OmsiSplineEnd(moveTile, selectedSpline, Argument("-moveSplineEnd", 2) != "start");
+                    var target = OmsiMapGeometry.TileLocalToWorld(moveTileX, moveTileY, moveX, moveY, currentSummary.TileSizeMeters);
+                    PreviewSplineEnd(target.X, target.Y, Array.IndexOf(args, "-moveCommit") >= 0);
+                }
             }
 
             if (Array.IndexOf(args, "-routes") >= 0)
@@ -1289,6 +1319,62 @@ namespace OmsiMapEditor.UI
             RefreshSplineViews(result.Change);
             RenderInspector();
             SetStatus("Deleted spline #" + id + "; Ctrl+Z brings it back.");
+        }
+
+        /// <summary>
+        /// While a spline end is dragged: plans the joint at the pointer and shows the changed splines; on release builds it
+        /// as one undo step, unless the plan has errors.
+        /// </summary>
+        private void PreviewSplineEnd(double x, double y, bool commit)
+        {
+            if (draggedSplineEnd == null || currentSummary == null || mapCanvas == null)
+                return;
+            var move = OmsiSplineEditing.PlanJointMove(currentSummary, draggedSplineEnd, x, y);
+            var pieces = new List<OmsiMapPoint[]>();
+            foreach (var geometry in move.Splines)
+                pieces.Add(OmsiMapGeometry.BuildSplinePolyline(geometry.Tile, geometry.Preview(), currentSummary.TileSizeMeters));
+            if (!commit)
+            {
+                mapCanvas.SetRoadPreview(pieces, !move.HasErrors, move.Issues, null, null);
+                var text = "Moving the " + (draggedSplineEnd.AtEnd ? "end" : "start") + " of spline #" + draggedSplineEnd.Spline.Id +
+                           (move.Splines.Count > 1 ? " and the spline joined there" : string.Empty);
+                foreach (var issue in move.Issues)
+                    text += "; " + issue.Message;
+                SetStatus(text);
+                return;
+            }
+
+            var id = draggedSplineEnd.Spline.Id;
+            draggedSplineEnd = null;
+            mapCanvas.ClearRoadPreview();
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("move splines"));
+                return;
+            }
+            if (move.HasErrors)
+            {
+                SetStatus("Spline #" + id + " stays: " + move.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                return;
+            }
+            OmsiSplineChange change;
+            try
+            {
+                change = session.UpdateSplines(currentSummary, move.Splines);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is ArgumentException || exception is IOException)
+            {
+                Debug.LogException(exception);
+                SetStatus("Spline #" + id + " could not be moved: " + exception.Message);
+                return;
+            }
+            if (change == null)
+                return;
+            PushHistory(new ObjectEditStep { SplineChange = change });
+            RefreshSplineViews(change);
+            var warnings = move.Issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
+            SetStatus("Moved spline #" + id + (change.SplineIds.Count > 1 ? " and #" + change.SplineIds[1] : string.Empty) +
+                      (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + " Ctrl+Z takes it back.");
         }
 
         /// <summary>Fits the terrain to the road of the selected spline, or stops fitting it, as one undo step.</summary>
@@ -2058,6 +2144,8 @@ namespace OmsiMapEditor.UI
             }
             if (step.SplineChange != null && step.SplineChange.Kind == OmsiSplineChangeKind.TerrainAlignment)
                 return "the terrain fit of " + step.SplineChange.SplineIds.Count + " spline(s)";
+            if (step.SplineChange != null && step.SplineChange.Kind == OmsiSplineChangeKind.Geometry)
+                return "the move of " + (step.SplineChange.SplineIds.Count == 1 ? "spline #" + step.SplineChange.SplineIds[0] : step.SplineChange.SplineIds.Count + " splines");
             if (step.SplineChange != null)
                 return (step.SplineChange.Kind == OmsiSplineChangeKind.Creation ? "the road of " : "the deletion of ") +
                        (step.SplineChange.SplineIds.Count == 1 ? "spline #" + step.SplineChange.SplineIds[0] : step.SplineChange.SplineIds.Count + " splines");
