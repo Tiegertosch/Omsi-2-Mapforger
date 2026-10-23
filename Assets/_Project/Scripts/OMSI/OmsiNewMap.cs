@@ -20,8 +20,8 @@ namespace OmsiMapEditor.OMSI
     /// Creates a new OMSI map next to an existing one that serves as the template: its helper files (AI lists, drivers,
     /// humans, parked cars, registrations, holidays and the water textures) and the settings of its global.cfg, such as
     /// money system, ticket pack, years, ground textures, seasons and traffic density. The new map has one tile at 0, 0
-    /// with flat terrain at height 0, no entry points, no timetable and a fresh ID counter, like a map that OMSI's own
-    /// editor starts. Tiles, timetables, chrono changes, signal routes and the last situation of the template are not
+    /// with flat terrain at height 0, one entry point named "Start" in its middle, no timetable and a fresh ID counter.
+    /// OMSI hangs and crashes on loading a map without any entry point, so the new map has one from the start. Tiles, timetables, chrono changes, signal routes and the last situation of the template are not
     /// taken over, since they describe the template's places. The map is built in a temporary sibling folder and only
     /// renamed at the end, and an existing folder is never touched.
     /// </summary>
@@ -29,6 +29,14 @@ namespace OmsiMapEditor.OMSI
     {
         public const int TileVersion = 14;
         public const string FirstTileFile = "tile_0_0.map";
+
+        /// <summary>The object every entry point of the installed maps stands on; part of the base game.</summary>
+        public const string EntryPointObject = @"Sceneryobjects\Generic\entrypoint_bus.sco";
+
+        public const string EntryPointName = "Start";
+
+        /// <summary>The entry point object is the first and only element; IDs continue after it.</summary>
+        private const int EntryPointId = 1;
 
         private const string TemporarySuffix = ".mapforge-new-tmp";
 
@@ -109,7 +117,7 @@ namespace OmsiMapEditor.OMSI
 
                 var config = OmsiRecordFile.Load(templateGlobalConfigPath, OmsiGlobalConfigLayouts.Instance);
                 File.WriteAllBytes(Path.Combine(temporary, "global.cfg"), CreateGlobalConfig(config, folderName, friendlyName.Trim(), createdAt));
-                File.WriteAllBytes(Path.Combine(temporary, FirstTileFile), CreateEmptyTile(createdAt));
+                File.WriteAllBytes(Path.Combine(temporary, FirstTileFile), CreateFirstTile(createdAt));
                 File.WriteAllBytes(Path.Combine(temporary, FirstTileFile + ".terrain"), CreateFlatTerrain(0f));
                 File.WriteAllBytes(Path.Combine(temporary, "signalroutes.cfg"), OmsiTextFile.Encode(
                     "-----------------------\r\nSignal Routes File\r\n-----------------------\r\n\r\nCreated with OMSI Map Editor\r\nDate: " +
@@ -127,8 +135,9 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// The template's global.cfg with the new names, a fresh ID counter, the map camera over the new tile, no entry
-        /// points, background image or world coordinates, and the single tile 0, 0. Unknown sections stay as they are.
+        /// The template's global.cfg with the new names, a fresh ID counter, the map camera over the new tile, the entry
+        /// point "Start" on the entry point object of the first tile, no background image or world coordinates, and the
+        /// single tile 0, 0. Unknown sections stay as they are.
         /// </summary>
         public static byte[] CreateGlobalConfig(OmsiRecordFile template, string name, string friendlyName, DateTime createdAt)
         {
@@ -143,7 +152,7 @@ namespace OmsiMapEditor.OMSI
             SetSingleField(config, "name", name, 0);
             SetSingleField(config, "friendlyname", friendlyName, 1);
             SetDescription(config, "A new map, created with OMSI Map Editor.");
-            SetSingleField(config, "NextIDCode", "1", IndexAfter(config, "version"));
+            SetSingleField(config, "NextIDCode", (EntryPointId + 1).ToString(CultureInfo.InvariantCulture), IndexAfter(config, "version"));
 
             var camera = config.Records.Find(record => string.Equals(record.Name, "mapcam", StringComparison.OrdinalIgnoreCase));
             if (camera != null && camera.Fields.Count >= 5)
@@ -156,12 +165,21 @@ namespace OmsiMapEditor.OMSI
                 camera.SetField(4, "150");
             }
 
+            // Object number 0 of tile index 0, the position of the object, heading 0 as the quaternion 0, 0, 0, 1.
+            config.InsertRecord(config.Records.Count, config.CreateRecord("entrypoints", new[]
+            {
+                "1", "0", EntryPointId.ToString(CultureInfo.InvariantCulture), "0", "150.000", "0.000", "150.000", "0.000000", "0.000000", "0.000000",
+                "1.000000", "0", EntryPointName
+            }));
             config.InsertRecord(config.Records.Count, config.CreateRecord("map", new[] { "0", "0", FirstTileFile }));
             return config.ToBytes();
         }
 
-        /// <summary>An empty tile as OMSI writes one: UTF-16 with byte order mark, version, empty terrain sections.</summary>
-        public static byte[] CreateEmptyTile(DateTime createdAt)
+        /// <summary>
+        /// The first tile as OMSI writes one, UTF-16 with byte order mark, version and empty terrain sections, with the
+        /// entry point object in its middle.
+        /// </summary>
+        public static byte[] CreateFirstTile(DateTime createdAt)
         {
             var text = new StringBuilder();
             text.Append("File created with OMSI Map Editor on ").Append(createdAt.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture)).Append("\r\n\r\n");
@@ -169,6 +187,9 @@ namespace OmsiMapEditor.OMSI
             text.Append("[terrain]\r\n\r\n\r\n");
             text.Append("[variable_terrainlightmap]\r\n\r\n");
             text.Append("[variable_terrain]\r\n\r\n");
+            // Detail level, file, ID, x, y, height, heading, pitch, bank and no labels.
+            text.Append("[object]\r\n0\r\n").Append(EntryPointObject).Append("\r\n").Append(EntryPointId.ToString(CultureInfo.InvariantCulture))
+                .Append("\r\n150\r\n150\r\n0\r\n0\r\n0\r\n0\r\n0\r\n\r\n");
             return OmsiTextFile.Encode(text.ToString(), OmsiTextEncoding.Utf16LittleEndian);
         }
 

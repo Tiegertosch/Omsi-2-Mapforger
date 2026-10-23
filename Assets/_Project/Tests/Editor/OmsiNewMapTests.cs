@@ -75,14 +75,19 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual("Neustadt", summary.Name);
             Assert.AreEqual("Neustadt (Test)", summary.FriendlyName);
             Assert.AreEqual("A new map, created with OMSI Map Editor.", summary.Description);
-            Assert.AreEqual(1, summary.NextIdCode);
+            Assert.AreEqual(2, summary.NextIdCode);
             Assert.IsFalse(summary.UsesWorldCoordinates);
             Assert.AreEqual(300.0, summary.TileSizeMeters);
             var tile = summary.Tiles.Single();
             Assert.AreEqual(0, tile.X);
             Assert.AreEqual(0, tile.Y);
             Assert.IsTrue(tile.IsAvailable);
-            Assert.AreEqual(0, tile.ObjectCount);
+            // The entry point object, without which OMSI crashes while loading the map.
+            var entryObject = tile.Objects.Single();
+            Assert.AreEqual(@"Sceneryobjects\Generic\entrypoint_bus.sco", entryObject.AssetPath);
+            Assert.AreEqual(1, entryObject.Id);
+            Assert.AreEqual(150.0, entryObject.LocalX);
+            Assert.AreEqual(150.0, entryObject.LocalY);
             Assert.IsTrue(tile.HasTerrain);
             Assert.AreEqual(0f, tile.TerrainMinHeight);
             Assert.AreEqual(0f, tile.TerrainMaxHeight);
@@ -91,7 +96,11 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(OmsiTextEncoding.Utf16LittleEndian, config.Encoding);
             Assert.AreEqual("File created with OMSI Map Editor on 23.10.2026 18:30:00", config.Preamble[0].Text);
             var names = config.Records.Select(record => record.Name).ToList();
-            CollectionAssert.DoesNotContain(names, "entrypoints");
+            // The template's entry point is replaced by one on the new tile's object.
+            var entryPoints = config.Records.Single(record => record.Name == "entrypoints");
+            CollectionAssert.AreEqual(new[] { "1", "0", "1", "0", "150.000", "0.000", "150.000", "0.000000", "0.000000", "0.000000", "1.000000", "0", "Start" },
+                entryPoints.AllValues().Take(13).ToArray());
+            Assert.AreEqual(names.IndexOf("map") - 1, names.IndexOf("entrypoints"));
             CollectionAssert.DoesNotContain(names, "backgroundimage");
             CollectionAssert.DoesNotContain(names, "worldcoordinates");
             Assert.AreEqual(1, names.Count(name => name == "map"));
@@ -101,6 +110,10 @@ namespace OmsiMapEditor.Tests
             var camera = config.Records.Single(record => record.Name == "mapcam");
             CollectionAssert.AreEqual(new[] { "0", "0", "150", "50", "150", "166.8", "-13.4", "42.5" }, camera.AllValues().Take(8).ToArray());
             Assert.IsTrue(config.IsExactRoundTrip);
+            var check = OmsiMapCheck.Run(summary, new OmsiFolderSource(target), null);
+            var entryCheck = check.Sections.Single(section => section.Title == "Entry points");
+            Assert.AreEqual(OmsiCheckStatus.Passed, entryCheck.Status, string.Join("\n", entryCheck.Findings));
+            Assert.AreEqual("1 of 1 entry points lie on their object.", entryCheck.Summary);
 
             var tileText = OmsiTextFile.Decode(File.ReadAllBytes(Path.Combine(target, "tile_0_0.map")), out var tileEncoding);
             Assert.AreEqual(OmsiTextEncoding.Utf16LittleEndian, tileEncoding);
@@ -131,7 +144,7 @@ namespace OmsiMapEditor.Tests
             var bytes = OmsiNewMap.CreateGlobalConfig(template, "Neu", "Neu (Karte)", new DateTime(2026, 1, 2));
             var config = OmsiRecordFile.Parse(bytes, OmsiGlobalConfigLayouts.Instance);
             var names = config.Records.Select(record => record.Name).ToList();
-            CollectionAssert.AreEqual(new[] { "name", "friendlyname", "description", "end", "version", "NextIDCode", "groundtex", "map" }, names);
+            CollectionAssert.AreEqual(new[] { "name", "friendlyname", "description", "end", "version", "NextIDCode", "groundtex", "entrypoints", "map" }, names);
             Assert.AreEqual("Neu (Karte)", config.Records[1].GetField(0));
         }
 
