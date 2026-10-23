@@ -22,6 +22,23 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Height at grid point (column, row); column 0 is the west edge and row 0 the south edge.</summary>
         public float this[int column, int row] => heights[row * Resolution + column];
 
+        /// <summary>A copy of the 61 × 61 heights, row by row from the south edge.</summary>
+        public float[] CopyHeights()
+        {
+            return (float[])heights.Clone();
+        }
+
+        /// <summary>A terrain file with these heights, as <see cref="Parse"/> reads it.</summary>
+        public static byte[] Encode(float[] heights)
+        {
+            if (heights == null || heights.Length != Resolution * Resolution)
+                throw new ArgumentException("A terrain has 61 × 61 heights.", nameof(heights));
+            var bytes = new byte[4 + heights.Length * 4];
+            Buffer.BlockCopy(BitConverter.GetBytes(Header), 0, bytes, 0, 4);
+            Buffer.BlockCopy(heights, 0, bytes, 4, heights.Length * 4);
+            return bytes;
+        }
+
         public static OmsiTerrain Parse(byte[] bytes)
         {
             if (bytes == null)

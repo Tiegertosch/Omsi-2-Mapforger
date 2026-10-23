@@ -86,6 +86,14 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public List<List<double>> TerrainHoles { get; } = new List<List<double>>();
 
+        /// <summary>The leftmost and rightmost point of the cross-section, metres from the spline; 0 when it has no strips.</summary>
+        public double LeftEdge { get; private set; }
+
+        public double RightEdge { get; private set; }
+
+        /// <summary>The height of the cross-section at its outer edges, such as the top of a kerb, averaged over both sides.</summary>
+        public double EdgeHeight { get; private set; }
+
         /// <summary>The lanes in the order of the file; timetables name them by this index.</summary>
         public List<OmsiSplineLane> Lanes { get; } = new List<OmsiSplineLane>();
 
@@ -155,7 +163,26 @@ namespace OmsiMapEditor.OMSI
             result.Strips.RemoveAll(item => item.Points.Count < 2);
             result.TerrainHoles.RemoveAll(item => item.Count < 2);
             result.LineKind = Classify(result);
+            MeasureEdges(result);
             return result;
+        }
+
+        private static void MeasureEdges(OmsiSplineProfile profile)
+        {
+            OmsiProfilePoint? left = null, right = null;
+            foreach (var strip in profile.Strips)
+                foreach (var point in strip.Points)
+                {
+                    if (!left.HasValue || point.X < left.Value.X)
+                        left = point;
+                    if (!right.HasValue || point.X > right.Value.X)
+                        right = point;
+                }
+            if (!left.HasValue)
+                return;
+            profile.LeftEdge = left.Value.X;
+            profile.RightEdge = right.Value.X;
+            profile.EdgeHeight = (left.Value.Height + right.Value.Height) / 2.0;
         }
 
         /// <summary>

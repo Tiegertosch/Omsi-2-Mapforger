@@ -57,6 +57,13 @@ namespace OmsiMapEditor.OMSI
             return new List<string>(result);
         }
 
+        /// <summary>A file as the original map has it, whatever the workspace holds; null when the original has no such file.</summary>
+        public byte[] ReadOriginalBytes(string relativePath)
+        {
+            var original = OmsiRelativePath.Resolve(RootPath, relativePath);
+            return File.Exists(original) ? File.ReadAllBytes(original) : null;
+        }
+
         public bool IsModified(string relativePath)
         {
             return File.Exists(WorkspaceFile(relativePath));

@@ -206,6 +206,27 @@ namespace OmsiMapEditor.World
             placementsDirty = true;
         }
 
+        /// <summary>Reads the terrain of some tiles again after roads fitted it; objects on it stand on the new ground.</summary>
+        public void RefreshTerrain(IEnumerable<OmsiTileSummary> tiles, IOmsiFileSource source)
+        {
+            if (tiles == null || source == null)
+                return;
+            foreach (var tile in tiles)
+            {
+                var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                try
+                {
+                    if (source.FileExists(path))
+                        terrains[TileKey(tile.X, tile.Y)] = OmsiTerrain.Parse(source.ReadAllBytes(path));
+                }
+                catch (InvalidDataException exception)
+                {
+                    Debug.LogWarning(path + ": " + exception.Message);
+                }
+            }
+            placementsDirty = true;
+        }
+
         public void Clear()
         {
             generation++;

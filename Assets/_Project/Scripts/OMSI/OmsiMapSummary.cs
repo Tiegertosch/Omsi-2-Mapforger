@@ -162,5 +162,11 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True when the record ends with "mirror": the cross-section is turned over.</summary>
         public bool IsMirrored { get; internal set; }
+
+        /// <summary>
+        /// True when [spline_terrain_align] or [spline_terrain_align_2] follows the spline: the terrain was fitted to it, as
+        /// OMSI's editor marks such roads. What OMSI does with the mark while driving is not known.
+        /// </summary>
+        public bool AlignsTerrain { get; internal set; }
     }
 }

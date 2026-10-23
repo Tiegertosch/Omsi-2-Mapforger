@@ -518,6 +518,14 @@ namespace OmsiMapEditor.OMSI
             workspace.Revert(tilePath);
             if (workspace.IsModified(GlobalConfigFileName))
                 RestoreEntryPoints(workspace, tilePath);
+            // Roads of this tile may have fitted the terrain here and around; it follows the roads that remain.
+            if (workspace.ModifiedFiles().Exists(path => path.EndsWith(".terrain", StringComparison.OrdinalIgnoreCase)))
+            {
+                var summary = Read();
+                var tile = summary.Tiles.Find(candidate => SamePath(candidate.FileName, tilePath));
+                if (tile != null)
+                    RefitTerrainAround(summary, tile);
+            }
         }
 
         private void RestoreEntryPoints(OmsiMapWorkspace workspace, string tilePath)

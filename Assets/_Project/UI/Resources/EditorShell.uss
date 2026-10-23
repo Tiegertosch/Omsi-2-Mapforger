@@ -207,7 +207,8 @@
 .panel-info { margin-top: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .panel-info-warning { color: var(--mf-color-warning); }
 .panel-toggle { margin: 0 0 var(--mf-space-2); }
-.road-panel { position: absolute; left: 296px; bottom: 0; width: 360px; height: 360px; }
+.road-panel { position: absolute; left: 296px; bottom: 0; width: 360px; height: 390px; }
+.road-fit-terrain { margin-top: var(--mf-space-1); }
 .road-profile { margin-bottom: var(--mf-space-2); -unity-font: url("Fonts/Inter-SemiBold.ttf"); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .road-fields { flex-direction: row; justify-content: space-between; margin-top: var(--mf-space-1); }
 .road-field { flex-direction: column; width: 31%; margin: 0; }

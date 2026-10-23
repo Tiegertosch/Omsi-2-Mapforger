@@ -296,10 +296,22 @@ namespace OmsiMapEditor.World
             if (holes == null || summary == null || loading != null || pending != null)
                 return;
             var placements = Placements(summary);
-            var signature = HoleSignature(holes.Catalog, placements);
+            // Splines built since loading, such as rail cuttings, cut the ground as well.
+            var splines = new List<KeyValuePair<long, OmsiSplineRecord>>();
+            var ids = new System.Text.StringBuilder();
+            foreach (var tile in summary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    splines.Add(new KeyValuePair<long, OmsiSplineRecord>(OmsiTerrainHoleCatalog.TileKey(tile.X, tile.Y), spline));
+                    var profile = holes.Profiles.Get(spline.AssetPath);
+                    if (profile != null && profile.TerrainHoles.Count > 0)
+                        ids.Append(spline.Id).Append(',');
+                }
+            var signature = HoleSignature(holes.Catalog, placements) + "|" + ids;
             if (signature == holes.Signature)
                 return;
             holes.Signature = signature;
+            holes.Splines = splines;
             var masks = holes.Catalog.Build(placements, holes.Splines, holes.Profiles, holes.Tiles, tileSize);
             foreach (var pair in tileMaterials)
             {
@@ -388,6 +400,49 @@ namespace OmsiMapEditor.World
             tileSplineObjects.Clear();
             refreshProfiles = null;
             refreshTextures.Clear();
+        }
+
+        /// <summary>
+        /// Reads the terrain of some tiles again, after roads fitted it, and gives their ground and mask layers the new
+        /// surface. Holes follow with <see cref="RefreshTerrainHoles"/>.
+        /// </summary>
+        public void RefreshTerrain(IEnumerable<OmsiTileSummary> tiles)
+        {
+            if (tiles == null || groundRoot == null || maskSource == null || loading != null || pending != null)
+                return;
+            foreach (var tile in tiles)
+            {
+                var key = TileKey(tile.X, tile.Y);
+                var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                if (!tileStates.TryGetValue(key, out var state) || !maskSource.FileExists(path))
+                    continue;
+                OmsiTerrain terrain;
+                try
+                {
+                    terrain = OmsiTerrain.Parse(maskSource.ReadAllBytes(path));
+                }
+                catch (InvalidDataException exception)
+                {
+                    Debug.LogWarning(path + ": " + exception.Message);
+                    continue;
+                }
+                terrains[key] = terrain;
+                var mesh = CreateTerrainMesh(terrain, (float)tileSize);
+                owned.Add(mesh);
+                if (tileMaterials.TryGetValue(key, out var renderers))
+                    foreach (var meshRenderer in renderers)
+                        if (meshRenderer != null)
+                            meshRenderer.GetComponent<MeshFilter>().sharedMesh = mesh;
+                foreach (var layer in state.MaskLayers)
+                    if (layer != null)
+                        layer.GetComponent<MeshFilter>().sharedMesh = mesh;
+                if (state.Mesh != null && state.Mesh != tileMesh)
+                {
+                    owned.Remove(state.Mesh);
+                    Destroy(state.Mesh);
+                }
+                state.Mesh = mesh;
+            }
         }
 
         /// <summary>

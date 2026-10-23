@@ -24,6 +24,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField pieceLengthField;
         private readonly TextField gradientField;
         private readonly Label profileLabel;
+        private readonly Toggle fitTerrainToggle;
         private readonly Label planLabel;
         private IReadOnlyDictionary<string, int> used = new Dictionary<string, int>();
 
@@ -101,6 +102,16 @@ namespace OmsiMapEditor.UI
             modes.Add(manualButton);
             Add(modes);
 
+            fitTerrainToggle = new Toggle("Fit terrain to the road")
+            {
+                value = true,
+                tooltip = "Lowers the ground under the road, keeps a shoulder at kerb height and cuts or banks up slopes of 1:1.5 beside it. " +
+                          "The original terrain stays in the original map; deleting the road brings it back."
+            };
+            fitTerrainToggle.AddToClassList("panel-toggle");
+            fitTerrainToggle.AddToClassList("road-fit-terrain");
+            Add(fitTerrainToggle);
+
             var fields = new VisualElement();
             fields.AddToClassList("road-fields");
             endHeightField = AddField(fields, "End height (m)", "0", "Height at the end of each new piece of road in manual mode");
@@ -124,6 +135,9 @@ namespace OmsiMapEditor.UI
         public string Profile { get; private set; }
 
         public OmsiRoadHeightMode HeightMode { get; private set; }
+
+        /// <summary>True when the terrain should be fitted to new roads.</summary>
+        public bool FitTerrain => fitTerrainToggle.value;
 
         /// <summary>The end height for manual mode, or null while the field holds no number.</summary>
         public double? EndHeight => Number(endHeightField, double.MinValue);

@@ -1287,12 +1287,47 @@ namespace OmsiMapEditor.UI
             SetStatus("Deleted spline #" + id + "; Ctrl+Z brings it back.");
         }
 
+        /// <summary>Fits the terrain to the road of the selected spline, or stops fitting it, as one undo step.</summary>
+        private void SetRoadTerrainFit(bool align)
+        {
+            if (selectedSpline == null || !CanEdit)
+                return;
+            OmsiSplineChange change;
+            try
+            {
+                change = session.SetTerrainAlignment(currentSummary, session.BuiltRoadOf(currentSummary, selectedSpline), align);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("The terrain could not be " + (align ? "fitted" : "restored") + ": " + exception.Message);
+                return;
+            }
+            if (change == null)
+            {
+                SetStatus("Nothing to change on this road.");
+                return;
+            }
+            PushHistory(new ObjectEditStep { SplineChange = change });
+            RefreshSplineViews(change);
+            SetStatus((align ? "Terrain fitted to " : "Terrain no longer fitted to ") + change.SplineIds.Count + " spline(s) of this road; Ctrl+Z takes it back.");
+        }
+
         /// <summary>Draws the changed splines again from above and in 3D and updates the counts.</summary>
         private void RefreshSplineViews(OmsiSplineChange change)
         {
             mapCanvas?.RefreshSplines();
             if (groundRenderer != null && !groundRenderer.RefreshSplines(change.Tiles))
                 Debug.Log("Spline surfaces follow when the ground has finished loading.");
+            if (change.TerrainTiles.Count > 0)
+            {
+                groundRenderer?.RefreshTerrain(change.TerrainTiles);
+                objectRenderer?.RefreshTerrain(change.TerrainTiles, session.Source);
+                // The road tool follows the fitted terrain from now on.
+                if (roadTerrain != null)
+                    roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
+            }
+            groundRenderer?.RefreshTerrainHoles(currentSummary);
             if (selectedSpline != null)
             {
                 // Undo and redo read the tiles again; the selected record is found again by its ID, or the selection ends.
@@ -1496,7 +1531,7 @@ namespace OmsiMapEditor.UI
             OmsiSplineChange change;
             try
             {
-                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, roadStartJoin, endJoin);
+                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, roadStartJoin, endJoin, roadPanel.FitTerrain);
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
@@ -2016,6 +2051,8 @@ namespace OmsiMapEditor.UI
                 CollectIds(step, ids);
                 return "the change of " + ids.Count + " objects";
             }
+            if (step.SplineChange != null && step.SplineChange.Kind == OmsiSplineChangeKind.TerrainAlignment)
+                return "the terrain fit of " + step.SplineChange.SplineIds.Count + " spline(s)";
             if (step.SplineChange != null)
                 return (step.SplineChange.Kind == OmsiSplineChangeKind.Creation ? "the road of " : "the deletion of ") +
                        (step.SplineChange.SplineIds.Count == 1 ? "spline #" + step.SplineChange.SplineIds[0] : step.SplineChange.SplineIds.Count + " splines");
@@ -3467,10 +3504,24 @@ namespace OmsiMapEditor.UI
                        "Height " + spline.Height.ToString("F2") + " to " + spline.EndHeight.ToString("F2") + " m  •  mean gradient " +
                        gradient.ToString("F1") + " %\n" +
                        "Joined at start: " + (spline.PreviousId == 0 ? "open" : "#" + spline.PreviousId) + "  •  at end: " +
-                       (spline.NextId == 0 ? "open" : "#" + spline.NextId);
+                       (spline.NextId == 0 ? "open" : "#" + spline.NextId) +
+                       (spline.AlignsTerrain ? "\nTerrain fitted to it" + (session != null && session.IsBuiltHere(spline) ? " by this editor" : " (original map)") : string.Empty);
             var details = new Label(text);
             details.AddToClassList("inspector-edit-name");
             editor.Add(details);
+            if (CanEdit && session.IsBuiltHere(spline))
+            {
+                var aligned = spline.AlignsTerrain;
+                var fit = new Button(() => SetRoadTerrainFit(!aligned))
+                {
+                    text = aligned ? "Stop fitting terrain" : "Fit terrain to this road",
+                    tooltip = aligned
+                        ? "The terrain along this road returns to the original, as far as no other road changes it."
+                        : "Lowers the ground under every spline of this road built here and shapes shoulders and slopes beside it."
+                };
+                fit.AddToClassList("map-control-button");
+                editor.Add(fit);
+            }
             if (CanEdit)
             {
                 var delete = new Button(DeleteSelectedSpline) { text = "Delete spline" };

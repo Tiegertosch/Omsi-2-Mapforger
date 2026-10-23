@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -75,7 +76,10 @@ namespace OmsiMapEditor.OMSI
     public enum OmsiSplineChangeKind
     {
         Creation,
-        Deletion
+        Deletion,
+
+        /// <summary>The terrain was fitted to splines, or no longer is.</summary>
+        TerrainAlignment
     }
 
     /// <summary>
@@ -100,6 +104,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The tiles whose splines changed, to draw again.</summary>
         public List<OmsiTileSummary> Tiles { get; } = new List<OmsiTileSummary>();
 
+        /// <summary>The tiles whose terrain was fitted again by the last apply, undo or redo, to draw again.</summary>
+        public List<OmsiTileSummary> TerrainTiles { get; } = new List<OmsiTileSummary>();
+
         internal List<OmsiObjectChange.FileState> Files { get; } = new List<OmsiObjectChange.FileState>();
     }
 
@@ -122,6 +129,13 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The kind of reference a spline's neighbours hold to it; deleting the spline opens those ends instead.</summary>
         private const string SplineNeighbourReference = "spline neighbour";
 
+        // Splines with IDs from here on were built in this editor; only their terrain alignment is computed here.
+        private int? firstNewId;
+        private OmsiSplineProfileCatalog shapeProfiles;
+
+        /// <summary>How the terrain is fitted to roads built with terrain alignment.</summary>
+        public OmsiTerrainShapeSettings TerrainShape { get; } = new OmsiTerrainShapeSettings();
+
         /// <summary>
         /// Builds a planned road as new splines of the profile <paramref name="assetPath"/>: each piece at the end of the
         /// tile its start lies in, with new map-wide IDs, the pieces linked to each other and to the joined splines by
@@ -129,7 +143,12 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         /// <param name="startJoin">A free spline end the road starts from, or null.</param>
         /// <param name="endJoin">A free spline end the road runs into, or null.</param>
-        public OmsiSplineChange CreateRoad(OmsiMapSummary summary, OmsiRoadPlan plan, string assetPath, OmsiSplineEnd startJoin, OmsiSplineEnd endJoin)
+        /// <param name="alignTerrain">
+        /// Marks the splines with [spline_terrain_align_2] 1, as OMSI's editor marks roads it fitted the terrain to, and fits
+        /// the terrain around them; the original terrain stays in the original map.
+        /// </param>
+        public OmsiSplineChange CreateRoad(OmsiMapSummary summary, OmsiRoadPlan plan, string assetPath, OmsiSplineEnd startJoin, OmsiSplineEnd endJoin,
+            bool alignTerrain = false)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -186,6 +205,8 @@ namespace OmsiMapEditor.OMSI
                     fields.AddRange(new[] { "0", "0" });
                 fields.Add("0");
                 tileFile.InsertRecord(tileFile.Records.Count, tileFile.CreateRecord("spline", fields));
+                if (alignTerrain)
+                    tileFile.InsertRecord(tileFile.Records.Count, tileFile.CreateRecord("spline_terrain_align_2", new[] { "1" }));
             }
 
             if (startJoin != null)
@@ -200,6 +221,7 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
+            ReshapeTerrain(summary, change);
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, pieceIds[pieceIds.Count - 1]);
             summary.NextIdCode = ids.NextFreeId;
             return change;
@@ -271,10 +293,119 @@ namespace OmsiMapEditor.OMSI
             if (!result.Removed)
                 return new OmsiSplineChangeResult(null, result.Blockers);
 
+            // The terrain around the deleted spline returns to what the other roads leave of the original.
+            var shaped = ShapesTerrain(spline);
             files.Collect(change.Files);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
+            if (shaped)
+                ReshapeTerrain(summary, change);
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
+        }
+
+        /// <summary>
+        /// Fits the terrain to splines built in this editor, or stops fitting it: adds or removes [spline_terrain_align_2]
+        /// after each of them and computes the terrain around them anew. Splines of the original map are left as they are.
+        /// </summary>
+        /// <returns>The change, or null when no spline needed a change.</returns>
+        public OmsiSplineChange SetTerrainAlignment(OmsiMapSummary summary, IEnumerable<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> splines, bool align)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (splines == null)
+                throw new ArgumentNullException(nameof(splines));
+            var workspace = RequireWorkspace();
+            var files = new EditedFiles(workspace);
+            var change = new OmsiSplineChange(OmsiSplineChangeKind.TerrainAlignment);
+            foreach (var pair in splines)
+            {
+                if (pair.Value.Id < FirstNewId() || pair.Value.AlignsTerrain == align)
+                    continue;
+                var tileFile = files.Tile(pair.Key.FileName);
+                var position = tileFile.Records.FindIndex(record =>
+                    (record.Name.Equals("spline", StringComparison.OrdinalIgnoreCase) || record.Name.Equals("spline_h", StringComparison.OrdinalIgnoreCase)) &&
+                    record.TryGetInt(2, out var id) && id == pair.Value.Id);
+                if (position < 0)
+                    throw new InvalidOperationException("Spline " + pair.Value.Id + " was not found in " + pair.Key.FileName + ".");
+                if (align)
+                    tileFile.InsertRecord(position + 1, tileFile.CreateRecord("spline_terrain_align_2", new[] { "1" }));
+                else
+                {
+                    // The alignment records among the records that belong to the spline, such as its rules.
+                    var index = position + 1;
+                    while (index < tileFile.Records.Count && (IsAlignment(tileFile.Records[index].Name) || IsModifier(tileFile.Records[index].Name)))
+                    {
+                        if (IsAlignment(tileFile.Records[index].Name))
+                            tileFile.RemoveRecord(tileFile.Records[index]);
+                        else
+                            index++;
+                    }
+                }
+                change.SplineIds.Add(pair.Value.Id);
+                if (!change.Tiles.Contains(pair.Key))
+                    change.Tiles.Add(pair.Key);
+            }
+            if (change.SplineIds.Count == 0)
+                return null;
+            files.Collect(change.Files);
+            WriteFiles(change.Files, false);
+            RefreshSplines(summary, change);
+            ReshapeTerrain(summary, change);
+            return change;
+        }
+
+        private static bool IsAlignment(string name)
+        {
+            return name.Equals("spline_terrain_align", StringComparison.OrdinalIgnoreCase) || name.Equals("spline_terrain_align_2", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>Records that belong to the element before them, such as rules.</summary>
+        private static bool IsModifier(string name)
+        {
+            return name.Equals("rule", StringComparison.OrdinalIgnoreCase) || name.Equals("kill_rule", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("varparent", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// The road a spline belongs to: it and the splines joined to it by neighbour IDs, in both directions, as far as
+        /// they were built in this editor.
+        /// </summary>
+        public List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> BuiltRoadOf(OmsiMapSummary summary, OmsiSplineRecord spline)
+        {
+            var byId = new Dictionary<int, KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            foreach (var tile in summary.Tiles)
+                foreach (var candidate in tile.Splines)
+                    byId[candidate.Id] = new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(tile, candidate);
+            var result = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            var seen = new HashSet<int>();
+            var pending = new Stack<int>();
+            pending.Push(spline.Id);
+            while (pending.Count > 0)
+            {
+                var id = pending.Pop();
+                if (!seen.Add(id) || id < FirstNewId() || !byId.TryGetValue(id, out var pair))
+                    continue;
+                result.Add(pair);
+                if (pair.Value.PreviousId != 0)
+                    pending.Push(pair.Value.PreviousId);
+                if (pair.Value.NextId != 0)
+                    pending.Push(pair.Value.NextId);
+            }
+            return result;
+        }
+
+        /// <summary>Computes the terrain of a tile and its neighbours anew from the roads the map has now.</summary>
+        private void RefitTerrainAround(OmsiMapSummary summary, OmsiTileSummary tile)
+        {
+            var change = new OmsiSplineChange(OmsiSplineChangeKind.TerrainAlignment);
+            change.Tiles.Add(tile);
+            ReshapeTerrain(summary, change);
+        }
+
+        /// <summary>True for splines built in this editor, whose terrain alignment can be switched.</summary>
+        public bool IsBuiltHere(OmsiSplineRecord spline)
+        {
+            return spline != null && Workspace != null && spline.Id >= FirstNewId();
         }
 
         /// <summary>Takes back created or deleted splines; fails without writing when a file was changed since.</summary>
@@ -287,6 +418,7 @@ namespace OmsiMapEditor.OMSI
             WriteFiles(change.Files, true);
             change.IsApplied = false;
             RefreshSplines(summary, change);
+            ReshapeTerrain(summary, change);
         }
 
         /// <summary>Applies undone spline changes again.</summary>
@@ -299,6 +431,77 @@ namespace OmsiMapEditor.OMSI
             WriteFiles(change.Files, false);
             change.IsApplied = true;
             RefreshSplines(summary, change);
+            ReshapeTerrain(summary, change);
+        }
+
+        /// <summary>True for splines built in this editor with terrain alignment; their terrain is computed here.</summary>
+        public bool ShapesTerrain(OmsiSplineRecord spline)
+        {
+            return spline != null && spline.AlignsTerrain && spline.Id >= FirstNewId();
+        }
+
+        /// <summary>The first ID the original map does not use: splines from here on were built in this editor.</summary>
+        private int FirstNewId()
+        {
+            if (!firstNewId.HasValue)
+            {
+                var original = new OmsiFolderSource(RequireWorkspace().RootPath);
+                firstNewId = OmsiIdAllocator.ForMap(original, GlobalConfigFileName).NextFreeId;
+            }
+            return firstNewId.Value;
+        }
+
+        /// <summary>
+        /// Fits the terrain of the changed tiles and their neighbours anew: the original terrain of each tile, fitted to
+        /// every road built here with terrain alignment that reaches it. The result replaces the workspace copy, which
+        /// disappears again when it equals the original. Records the tiles whose terrain changed in the change.
+        /// </summary>
+        private void ReshapeTerrain(OmsiMapSummary summary, OmsiSplineChange change)
+        {
+            change.TerrainTiles.Clear();
+            if (summary == null)
+                return;
+            var workspace = RequireWorkspace();
+            var size = summary.TileSizeMeters;
+            var reach = TerrainShape.MaximumReachMeters + TerrainShape.ShoulderMeters + 30.0;
+            var roads = new List<OmsiShapedRoad>();
+            foreach (var tile in summary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (!ShapesTerrain(spline))
+                        continue;
+                    shapeProfiles = shapeProfiles ?? new OmsiSplineProfileCatalog(
+                        OmsiObjectOutlineCatalog.InstallationRootOfMap(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigPath))));
+                    var profile = shapeProfiles.Get(spline.AssetPath);
+                    if (profile != null && profile.RightEdge - profile.LeftEdge > 0.0)
+                        roads.Add(new OmsiShapedRoad(tile, spline, profile, size));
+                }
+            roads.Sort((left, right) => left.Spline.Id.CompareTo(right.Spline.Id));
+
+            var targets = new List<OmsiTileSummary>();
+            foreach (var changed in change.Tiles)
+                foreach (var tile in summary.Tiles)
+                    if (Math.Abs(tile.X - changed.X) <= 1 && Math.Abs(tile.Y - changed.Y) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
+                        targets.Add(tile);
+
+            foreach (var tile in targets)
+            {
+                var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                var original = workspace.ReadOriginalBytes(path);
+                if (original == null)
+                    continue;
+                var heights = OmsiTerrain.Parse(original).CopyHeights();
+                var west = tile.X * size;
+                var south = tile.Y * size;
+                var nearby = roads.FindAll(road => road.MaxX + road.HalfWidth + reach >= west && road.MinX - road.HalfWidth - reach <= west + size &&
+                                                   road.MaxY + road.HalfWidth + reach >= south && road.MinY - road.HalfWidth - reach <= south + size);
+                OmsiTerrainShaping.Shape(heights, tile.X, tile.Y, size, nearby, TerrainShape);
+                var bytes = OmsiTerrain.Encode(heights);
+                if (SameBytes(bytes, workspace.ReadAllBytes(path)))
+                    continue;
+                workspace.Save(path, bytes);
+                change.TerrainTiles.Add(tile);
+            }
         }
 
         private static void Link(EditedFiles files, OmsiSplineEnd join, int newId, List<OmsiTileSummary> tiles)

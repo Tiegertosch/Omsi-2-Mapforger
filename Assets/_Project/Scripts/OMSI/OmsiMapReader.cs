@@ -145,9 +145,19 @@ namespace OmsiMapEditor.OMSI
             var version = ReadTileVersion(sections);
             var decodeSplines = version < 0 || version >= FirstVersionWithSplineNeighbourIds;
             var skippedOldSplines = 0;
+            // Terrain alignment applies to the spline right before it; another placed element ends that.
+            OmsiSplineRecord lastSpline = null;
             foreach (var section in sections)
             {
                 TrackHighestId(section, summary);
+                if ((string.Equals(section.Name, "spline_terrain_align", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(section.Name, "spline_terrain_align_2", StringComparison.OrdinalIgnoreCase)) && lastSpline != null)
+                {
+                    lastSpline.AlignsTerrain = true;
+                    continue;
+                }
+                if (PlacedSections.Contains(section.Name))
+                    lastSpline = null;
                 if (string.Equals(section.Name, "object", StringComparison.OrdinalIgnoreCase))
                 {
                     tile.ObjectCount++;
@@ -163,7 +173,10 @@ namespace OmsiMapEditor.OMSI
                     if (!decodeSplines)
                         skippedOldSplines++;
                     else if (TryReadSpline(section, out var splineRecord))
+                    {
                         tile.Splines.Add(splineRecord);
+                        lastSpline = splineRecord;
+                    }
                     else
                         summary.Warnings.Add("Could not decode a [" + section.Name + "] placement in " + tile.FileName + ".");
                 }
@@ -267,6 +280,11 @@ namespace OmsiMapEditor.OMSI
             };
             return true;
         }
+
+        private static readonly HashSet<string> PlacedSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "object", "attachObj", "splineAttachement", "splineAttachement_repeater", "spline", "spline_h"
+        };
 
         private static readonly HashSet<string> SectionsDefiningIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {

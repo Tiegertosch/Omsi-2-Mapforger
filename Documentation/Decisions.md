@@ -170,7 +170,7 @@
 - **Gelände folgen:** Jede Stückgrenze liegt auf dem Gelände.
 - **Manuell:** Die Höhe läuft gleichmäßig vom Start zur eingegebenen Endhöhe.
 
-In beiden Modi hat jedes Stück eine gleichbleibende Steigung (Feld 11 und 12). Das Gelände wird nie verändert. Punkte außerhalb des Geländes sind Fehler, keine Höhe 0. Steigungen über einer Warnschwelle (10 %), Knicke an angeschlossenen Enden und Straßen unter oder hoch über dem Gelände werden als strukturierte Befunde mit Position gemeldet.
+In beiden Modi hat jedes Stück eine gleichbleibende Steigung (Feld 11 und 12). Das Planen verändert das Gelände nie; angepasst wird es erst beim Bauen nach ADR 022. Punkte außerhalb des Geländes sind Fehler, keine Höhe 0. Steigungen über einer Warnschwelle (10 %), Knicke an angeschlossenen Enden und Straßen unter oder hoch über dem Gelände werden als strukturierte Befunde mit Position gemeldet.
 
 Neue Splines kommen ans Ende der Kachel, in der ihr Start liegt, mit neuen kartenweiten IDs. Beim Andocken an ein freies Spline-Ende werden die IDs gegenseitig gesetzt. Ein gelöschter Spline öffnet die Enden seiner Nachbarn, auch in anderen Kacheln. Anhängungen auf ihm sowie Fahrplan- und Chrono-Verweise verhindern das Löschen. Rückgängig und Wiederholen laufen über die Dateistände. Gebaut wird in Etappe 1 nur in der Draufsicht.
 
@@ -180,3 +180,24 @@ Neue Splines kommen ans Ende der Kachel, in der ihr Start liegt, mit neuen karte
 - Profil, Spuren und Darstellung kommen aus den vorhandenen `.sli`-Dateien und Renderern.
 - Geteilte Stücke mit eigener Steigung sind der einfachste Weg, mit OMSIs Splines (eine Steigung am Anfang und eine am Ende) dem Gelände zu folgen; Steigungsknicke an den Grenzen erlaubt OMSI (Formatbefund: 1.324 von 1.438 Verbindungen in Berlin-Spandau ohne Knick).
 - Ein glatter Höhenverlauf, Böschungen und Kreuzungsanschlüsse bauen auf denselben Datensätzen auf (Etappen 2 und 3).
+
+## ADR 022: Gelände an gebaute Straßen anpassen, nicht zerstörend
+
+**Status:** Angenommen, 23. Oktober 2026, auf Wunsch des Nutzers vor Etappe 2 gezogen. Ergänzt ADR 021.
+
+**Entscheidung:** Neue Straßen passen das Gelände standardmäßig an („Fit terrain to the road“ im Straßen-Panel). Das Gelände bekommt drei Zonen:
+- Unter der Fahrbahn, über die ganze Breite des `.sli`-Querschnitts, liegt es 0,3 m unter dem Spline.
+- Daneben folgt ein Randstreifen von 2 m auf der Höhe des Profilrands, etwa der Bordsteinoberkante.
+- Dahinter hält eine Böschung von 1:1,5 das Gelände in einem Kegel um diese Randhöhe: Höheres Gelände wird eingeschnitten, tieferes aufgeschüttet, bis höchstens 40 m.
+
+Ein Rasterpunkt unter irgendeiner Straße nimmt deren Höhe; Böschungen anderer Stücke heben ihn nie an. Weil das Gelände unter der Fahrbahn tiefer liegt als sie, braucht die Straße kein Ausschneiden.
+
+Das ursprüngliche Gelände bleibt in der Originalkarte. Nach jedem Bauen, Löschen, Rückgängig, Wiederholen und Kachel-Zurücksetzen wird das Gelände der betroffenen Kacheln und ihrer Nachbarn neu berechnet, und zwar aus dem Original plus allen im Editor gebauten Straßen mit Anpassung. Gleicht es dem Original, verschwindet die Kopie in der Arbeitskopie wieder.
+
+Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2]` mit dem Wert 1. Im Editor gebaute Straßen erkennt der Editor an IDs ab dem ersten freien ID der Originalkarte; nur ihr Gelände berechnet er. Straßen der Originalkarte behalten ihr Gelände. Die Anpassung lässt sich im Inspector für eine ganze im Editor gebaute Straße nachträglich ein- und ausschalten.
+
+**Grund:**
+- Ein Gelände mit 5 m Rasterabstand kann eine 25-m-Stückelung und Querhänge nicht nachzeichnen; ohne Anpassung stößt es durch die Fahrbahn (Rückmeldung des Nutzers mit Bild vom 23. Oktober 2026).
+- Das Briefing verlangt die Trennung von Original-Gelände, Straßendaten, abgeleiteter Anpassung und angezeigter Oberfläche: Straßen können verschoben und gelöscht werden, ohne Gelände zu verlieren.
+- Das Kennzeichen und die Form folgen dem Befund in Berlin-Spandau: An den 203 so gekennzeichneten Splines liegt das gespeicherte Gelände bis etwa 10 m neben der Mitte 0,15 bis 0,25 m über dem Spline, auf Höhe der Gehwege dieser Profile (Fahrbahn +0,10 m, Gehweg +0,25 m), und läuft über 20 bis 30 m aus. OMSIs Editor formt das Gelände also an solche Splines an und kennzeichnet sie.
+- Was OMSI im Spiel mit dem Kennzeichen tut, ist nicht bekannt und noch im Spiel zu prüfen. Ein erster Versuch, das Gelände in der Kartenansicht unter gekennzeichneten Splines über die ganze Profilbreite auszuschneiden, legte in Berlin-Spandau neben der Fahrbahn Himmel frei, wo das Profil von dieser Seite nichts zeichnet. Er wurde verworfen: Ausgeschnitten wird nur, was `[terrainhole]` und `[terrainholeprofile]` belegen (ADR 018).

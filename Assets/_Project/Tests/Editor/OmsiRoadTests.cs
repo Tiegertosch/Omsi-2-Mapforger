@@ -44,6 +44,11 @@ namespace OmsiMapEditor.Tests
             // The terrain rises 5 % to the east: 0.05 m per metre of world x.
             WriteTerrain("tile_0_0.map.terrain", 0);
             WriteTerrain("tile_1_0.map.terrain", 1);
+            // The road profile in the installation two folders up: 8 m wide with kerbs 0.15 m high at its edges.
+            var splines = Path.Combine(Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName, "Splines");
+            Directory.CreateDirectory(splines);
+            File.WriteAllText(Path.Combine(splines, "road.sli"),
+                "[texture]\r\nroad.bmp\r\n\r\n[profile]\r\n0\r\n\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n");
         }
 
         [TearDown]
@@ -327,6 +332,137 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(taken.IsFree);
             Assert.Throws<InvalidOperationException>(() => session.CreateRoad(summary, plan, @"Splines\road.sli", taken, null));
             Assert.IsNull(OmsiSplineEnd.FindFree(summary, 100, 150, 1.0));
+        }
+
+        [Test]
+        public void TerrainLiesUnderTheRoadKeepsAShoulderAndSlopesBackToTheGround()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(
+                "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n"), @"Splines\road.sli");
+            Assert.AreEqual(-4.0, profile.LeftEdge);
+            Assert.AreEqual(4.0, profile.RightEdge);
+            Assert.AreEqual(0.15, profile.EdgeHeight, 1e-12);
+            var tile = new OmsiTileSummary();
+            // A road 2 m high running north from 150, 100 to 150, 200 over flat ground at 0: an embankment.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 150, StartY = 100, StartHeight = 2, EndX = 150, EndY = 200, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual,
+                MaximumPieceLength = 200
+            }, null);
+            var spline = plan.Pieces[0].AsRecord();
+            var road = new OmsiShapedRoad(tile, spline, profile, 300);
+            var flat = new float[OmsiTerrain.Resolution * OmsiTerrain.Resolution];
+            var changed = OmsiTerrainShaping.Shape(flat, 0, 0, 300, new[] { road }, new OmsiTerrainShapeSettings());
+            Assert.Greater(changed, 0);
+            // Grid points every 5 m: column 30 is x 150 under the road, column 31 is 1 m outside its edge on the shoulder.
+            Assert.AreEqual(1.7, Height(flat, 30, 30), 1e-5);
+            Assert.AreEqual(2.15, Height(flat, 31, 30), 1e-5);
+            // 6 m outside: the slope of 1:1.5 from the shoulder would end below the ground, so the ground stays.
+            Assert.AreEqual(0.0, Height(flat, 32, 30), 1e-5);
+            // 5 m beyond the north end on its line the slopes round off around the end: 3 m past the shoulder they fall
+            // 2 m, from 2.15 to 0.15.
+            Assert.AreEqual(0.15, Height(flat, 30, 41), 1e-5);
+            Assert.AreEqual(0.0, Height(flat, 30, 43), 1e-5);
+            // Far away nothing changes.
+            Assert.AreEqual(0.0, Height(flat, 0, 0), 0.0);
+
+            // The same road through a hill at 6 m: a cutting.
+            var hill = Enumerable.Repeat(6f, OmsiTerrain.Resolution * OmsiTerrain.Resolution).ToArray();
+            OmsiTerrainShaping.Shape(hill, 0, 0, 300, new[] { road }, new OmsiTerrainShapeSettings());
+            Assert.AreEqual(1.7, Height(hill, 30, 30), 1e-5);
+            Assert.AreEqual(2.15, Height(hill, 31, 30), 1e-5);
+            Assert.AreEqual(2.15 + 4.0 / 1.5, Height(hill, 32, 30), 1e-5);
+            Assert.AreEqual(6.0, Height(hill, 36, 30), 1e-5);
+        }
+
+        [Test]
+        public void RoadsWithTerrainAlignmentFitTheTerrainAndLeaveTheOriginalAlone()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var originalTerrain = File.ReadAllBytes(Path.Combine(mapFolder, "tile_0_0.map.terrain"));
+            // 2 m above the 5 % slope at x 100, which lies at 5 m: a cutting through the rising ground to the east.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var change = session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+
+            CollectionAssert.AreEquivalent(new[] { summary.Tiles[0], summary.Tiles[1] }.Where(tile => tile.X == 0), change.TerrainTiles);
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            var terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            Assert.AreEqual(1.7, terrain[20, 46], 1e-4);
+            Assert.AreEqual(2.15, terrain[21, 46], 1e-4);
+            // Far from the road the ground is as it was.
+            Assert.AreEqual(0.05 * 250, terrain[50, 46], 1e-4);
+            Assert.IsTrue(summary.Tiles[0].Splines.Where(spline => change.SplineIds.Contains(spline.Id)).All(spline => spline.AlignsTerrain));
+            var tileFile = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
+            Assert.AreEqual(plan.Pieces.Count, tileFile.Records.Count(record => record.Name == "spline_terrain_align_2" && record.GetField(0) == "1"));
+            // Splines of the original map keep the terrain they have.
+            Assert.IsFalse(session.ShapesTerrain(summary.Tiles[0].Splines.Single(spline => spline.Id == 10)));
+
+            // Undo returns to the original terrain, redo fits it again.
+            session.Undo(summary, change);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            session.Redo(summary, change);
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
+
+            // Deleting the road piece by piece gives the original terrain back.
+            foreach (var id in change.SplineIds.AsEnumerable().Reverse())
+            {
+                var spline = summary.Tiles[0].Splines.Single(candidate => candidate.Id == id);
+                Assert.IsTrue(session.DeleteSpline(summary, summary.Tiles[0], spline).Succeeded);
+            }
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(tileFileHasAlignment(session));
+            CollectionAssert.AreEqual(originalTerrain, File.ReadAllBytes(Path.Combine(mapFolder, "tile_0_0.map.terrain")));
+        }
+
+        [Test]
+        public void TerrainCanBeFittedToABuiltRoadLaterAndReleasedAgain()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var built = session.CreateRoad(summary, plan, @"Splines\road.sli", null, null);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+
+            var piece = summary.Tiles[0].Splines.Single(spline => spline.Id == built.SplineIds[1]);
+            var road = session.BuiltRoadOf(summary, piece);
+            CollectionAssert.AreEquivalent(built.SplineIds, road.Select(pair => pair.Value.Id));
+            // Spline 10 of the original map is never part of a road built here.
+            Assert.IsFalse(session.IsBuiltHere(summary.Tiles[0].Splines.Single(spline => spline.Id == 10)));
+
+            var fit = session.SetTerrainAlignment(summary, road, true);
+            Assert.AreEqual(OmsiSplineChangeKind.TerrainAlignment, fit.Kind);
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsTrue(tileFileHasAlignment(session));
+            Assert.IsNull(session.SetTerrainAlignment(summary, session.BuiltRoadOf(summary, piece), true));
+
+            session.Undo(summary, fit);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(tileFileHasAlignment(session));
+            session.Redo(summary, fit);
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
+
+            var release = session.SetTerrainAlignment(summary, session.BuiltRoadOf(summary, piece), false);
+            Assert.AreEqual(plan.Pieces.Count, release.SplineIds.Count);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(tileFileHasAlignment(session));
+        }
+
+        private static bool tileFileHasAlignment(OmsiMapSession session)
+        {
+            var tileFile = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
+            return tileFile.Records.Any(record => record.Name == "spline_terrain_align_2");
+        }
+
+        private static double Height(float[] heights, int column, int row)
+        {
+            return heights[row * OmsiTerrain.Resolution + column];
         }
 
         private OmsiMapSession OpenProject()
