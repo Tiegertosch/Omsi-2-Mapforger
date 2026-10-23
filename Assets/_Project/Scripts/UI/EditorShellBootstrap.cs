@@ -78,6 +78,13 @@ namespace OmsiMapEditor.UI
         private VisualElement exportDialog;
         private TextField exportFolderField;
         private TextField exportNameField;
+        private VisualElement newMapDialog;
+        private Label newMapTemplateLabel;
+        private TextField newMapFolderField;
+        private TextField newMapNameField;
+        private Label newMapTargetLabel;
+        private Button newMapConfirmButton;
+        private string newMapTemplatePath;
         private Label exportTargetLabel;
         private Button exportConfirmButton;
         private VisualElement editMenu;
@@ -139,6 +146,15 @@ namespace OmsiMapEditor.UI
             exportTargetLabel = root.Q<Label>("export-target-label");
             exportConfirmButton = root.Q<Button>("export-confirm-button");
             var exportCancelButton = root.Q<Button>("export-cancel-button");
+            var newMapMenuItem = root.Q<Button>("new-map-menu-item");
+            newMapDialog = root.Q<VisualElement>("new-map-dialog");
+            newMapTemplateLabel = root.Q<Label>("new-map-template-label");
+            newMapFolderField = root.Q<TextField>("new-map-folder-field");
+            newMapNameField = root.Q<TextField>("new-map-name-field");
+            newMapTargetLabel = root.Q<Label>("new-map-target-label");
+            newMapConfirmButton = root.Q<Button>("new-map-confirm-button");
+            var newMapTemplateButton = root.Q<Button>("new-map-template-button");
+            var newMapCancelButton = root.Q<Button>("new-map-cancel-button");
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
             var viewMenu = root.Q<VisualElement>("view-menu");
@@ -170,6 +186,7 @@ namespace OmsiMapEditor.UI
                 var welcome = new WelcomeScreen();
                 welcome.OpenProjectRequested += OpenProject;
                 welcome.OpenMapRequested += OpenMap;
+                welcome.NewMapRequested += () => OpenNewMapDialog(null);
                 welcome.RecentChosen += OpenRecent;
                 emptyState.Add(welcome);
             }
@@ -258,6 +275,26 @@ namespace OmsiMapEditor.UI
                     HidePopup(fileMenu);
                     OpenMap();
                 };
+            if (newMapMenuItem != null)
+                newMapMenuItem.clicked += () =>
+                {
+                    HidePopup(fileMenu);
+                    OpenNewMapDialog(null);
+                };
+            if (newMapTemplateButton != null)
+                newMapTemplateButton.clicked += ChooseNewMapTemplate;
+            newMapFolderField?.RegisterValueChangedCallback(evt =>
+            {
+                // The display name follows the folder name until it is changed by hand.
+                if (newMapNameField != null && newMapNameField.value == evt.previousValue)
+                    newMapNameField.SetValueWithoutNotify(evt.newValue);
+                UpdateNewMapTarget();
+            });
+            newMapNameField?.RegisterValueChangedCallback(_ => UpdateNewMapTarget());
+            if (newMapConfirmButton != null)
+                newMapConfirmButton.clicked += CreateNewMap;
+            if (newMapCancelButton != null)
+                newMapCancelButton.clicked += () => HidePopup(newMapDialog);
             if (openProjectMenuItem != null)
                 openProjectMenuItem.clicked += () =>
                 {
@@ -476,6 +513,7 @@ namespace OmsiMapEditor.UI
         /// <c>-fold project|inspector|both</c> to collapse panels,
         /// <c>-place Sceneryobjects\...\object.sco</c> with the
         /// preview at the centre of the view,
+        /// <c>-newMap [template global.cfg]</c> without a map to show the new-map dialog,
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
         /// </summary>
@@ -493,6 +531,8 @@ namespace OmsiMapEditor.UI
             var quit = Array.IndexOf(args, "-quit") >= 0;
             if (mapPath == null && projectPath == null)
             {
+                if (Array.IndexOf(args, "-newMap") >= 0)
+                    OpenNewMapDialog(Argument("-newMap", 1) is string template && !template.StartsWith("-", StringComparison.Ordinal) ? template : null);
                 // Without a map a screenshot shows the welcome screen.
                 var welcomeShot = Argument("-screenshot", 1);
                 if (welcomeShot == null)
@@ -1095,9 +1135,10 @@ namespace OmsiMapEditor.UI
 
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (evt.keyCode == KeyCode.Escape && IsShown(exportDialog))
+            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog)))
             {
                 HidePopup(exportDialog);
+                HidePopup(newMapDialog);
                 evt.StopPropagation();
                 return;
             }
@@ -1112,7 +1153,7 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog))
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog))
                 return;
 
             if (!(evt.ctrlKey || evt.commandKey))
@@ -1598,6 +1639,132 @@ namespace OmsiMapEditor.UI
             exportNameField.SetValueWithoutNotify(displayName + " (Mapforge)");
             UpdateExportTarget();
             exportDialog.style.display = DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// Opens the dialog for a new map. The template is the given map, else the open map, else the map opened last;
+        /// the user can choose another one.
+        /// </summary>
+        private void OpenNewMapDialog(string templateGlobalConfigPath)
+        {
+            if (newMapDialog == null || newMapFolderField == null || newMapNameField == null)
+                return;
+            newMapTemplatePath = templateGlobalConfigPath ?? currentSummary?.GlobalConfigPath;
+            if (newMapTemplatePath == null)
+                foreach (var entry in RecentFiles.Load())
+                {
+                    newMapTemplatePath = entry.IsProject ? ProjectMap(entry.Path) : entry.Path;
+                    if (newMapTemplatePath != null && File.Exists(newMapTemplatePath))
+                        break;
+                    newMapTemplatePath = null;
+                }
+            newMapFolderField.SetValueWithoutNotify("New map");
+            newMapNameField.SetValueWithoutNotify("New map");
+            UpdateNewMapTarget();
+            newMapDialog.style.display = DisplayStyle.Flex;
+        }
+
+        /// <summary>The global.cfg a project file points to, or null when it cannot be read.</summary>
+        private static string ProjectMap(string projectPath)
+        {
+            try
+            {
+                return File.Exists(projectPath) ? JsonUtility.FromJson<MapforgeProject>(File.ReadAllText(projectPath))?.globalConfigPath : null;
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                return null;
+            }
+        }
+
+        private void ChooseNewMapTemplate()
+        {
+            var path = WindowsFileDialog.OpenFile("Choose a map as template for the new map", WindowsFileDialog.GlobalConfigFilter);
+            if (string.IsNullOrEmpty(path))
+                return;
+            newMapTemplatePath = path;
+            UpdateNewMapTarget();
+        }
+
+        /// <summary>The problem that keeps the new map from being created, or null; also the folder it would go to.</summary>
+        private string NewMapProblem(out string target)
+        {
+            target = null;
+            if (string.IsNullOrEmpty(newMapTemplatePath) || !File.Exists(newMapTemplatePath))
+                return "Choose a map of your OMSI installation as template; the new map goes next to it.";
+            var mapsFolder = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(newMapTemplatePath)));
+            var folderName = newMapFolderField.value ?? string.Empty;
+            var problem = OmsiNewMap.CheckFolderName(mapsFolder, folderName);
+            if (problem != null)
+                return problem;
+            target = Path.Combine(mapsFolder, folderName);
+            return string.IsNullOrWhiteSpace(newMapNameField.value) ? "Enter the name OMSI shows for the new map." : null;
+        }
+
+        private void UpdateNewMapTarget()
+        {
+            if (newMapTargetLabel == null)
+                return;
+            var problem = NewMapProblem(out var target);
+            if (newMapTemplateLabel != null)
+                newMapTemplateLabel.text = string.IsNullOrEmpty(newMapTemplatePath)
+                    ? "No template chosen"
+                    : "Template: " + Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(newMapTemplatePath)));
+            newMapTargetLabel.text = problem ?? "Creates the map folder:\n" + target + "\nThen choose where to save its project.";
+            newMapTargetLabel.EnableInClassList("export-problem", problem != null);
+            newMapConfirmButton?.SetEnabled(problem == null);
+        }
+
+        /// <summary>Creates the map, saves a project for it where the user says, and opens it for editing.</summary>
+        private void CreateNewMap()
+        {
+            var problem = NewMapProblem(out _);
+            if (problem != null)
+            {
+                SetStatus(problem);
+                return;
+            }
+            OmsiNewMapReport report;
+            try
+            {
+                report = OmsiNewMap.Create(newMapTemplatePath, newMapFolderField.value, newMapNameField.value, DateTime.Now);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not create the map: " + exception.Message);
+                return;
+            }
+            HidePopup(newMapDialog);
+
+            try
+            {
+                var projectPath = WindowsFileDialog.SaveFile("Save the project of the new map", WindowsFileDialog.ProjectFilter,
+                    WindowsFileDialog.ProjectExtension, SanitizeFileName(newMapFolderField.value) + "." + WindowsFileDialog.ProjectExtension);
+                if (string.IsNullOrEmpty(projectPath))
+                {
+                    LoadMap(report.GlobalConfigPath, string.Empty, null, false);
+                    RememberCurrent();
+                    SetStatus("Created " + report.MapFolder + ". Save it as a project to edit it.");
+                    return;
+                }
+                var fullProjectPath = Path.GetFullPath(projectPath);
+                var project = new MapforgeProject
+                {
+                    projectName = Path.GetFileNameWithoutExtension(fullProjectPath),
+                    globalConfigPath = report.GlobalConfigPath
+                };
+                File.WriteAllText(fullProjectPath, JsonUtility.ToJson(project, true), new System.Text.UTF8Encoding(false));
+                LoadMap(report.GlobalConfigPath, project.projectName, fullProjectPath, false);
+                RememberCurrent();
+                SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template, and the project " +
+                          fullProjectPath + ". Select '" + newMapNameField.value.Trim() + "' in OMSI to try it.");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("The map was created in " + report.MapFolder + ", but it could not be opened: " + exception.Message);
+            }
         }
 
         private string ExportTargetFolder(out string problem)

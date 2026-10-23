@@ -177,6 +177,8 @@
 .panel-list .unity-collection-view__item--selected { background-color: var(--mf-color-panel-hover); border-left-width: 3px; border-left-color: var(--mf-color-accent); }
 .panel-row { flex-grow: 1; flex-direction: row; align-items: center; padding-left: var(--mf-space-1); padding-right: var(--mf-space-1); }
 .panel-row-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-text-secondary); flex-shrink: 0; }
+.dialog-row { flex-direction: row; align-items: center; margin: 4px 0; }
+.dialog-row-text { flex-grow: 1; flex-shrink: 1; margin: 0 8px; }
 .panel-row-thumbnail { width: 36px; height: 36px; margin-right: var(--mf-space-2); flex-shrink: 0; background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); -unity-background-scale-mode: scale-to-fit; }
 .panel-row-texts { flex-grow: 1; flex-shrink: 1; overflow: hidden; justify-content: center; }
 .panel-row-texts > Label { margin: 0; padding: 0; }

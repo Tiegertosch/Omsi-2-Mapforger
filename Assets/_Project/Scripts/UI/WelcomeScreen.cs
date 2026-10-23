@@ -5,8 +5,8 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The start view before a map is open: cards to open a project or an OMSI map, a card for new maps marked as
-    /// planned, and the projects and maps opened last. It only reports choices; the shell opens them.
+    /// The start view before a map is open: cards to open a project or an OMSI map or to create a new map, and the
+    /// projects and maps opened last. It only reports choices; the shell opens them.
     /// </summary>
     internal sealed class WelcomeScreen : VisualElement
     {
@@ -29,7 +29,8 @@ namespace OmsiMapEditor.UI
                 () => OpenProjectRequested?.Invoke(), null));
             cards.Add(Card("map", "Open OMSI map", "Look at a map of your OMSI installation. Save it as a project to edit it.",
                 () => OpenMapRequested?.Invoke(), null));
-            cards.Add(Card("plus", "New map", "Start an empty map with its first tile.", null, "Planned"));
+            cards.Add(Card("plus", "New map", "Start an empty map with its first tile, based on a map of your installation.",
+                () => NewMapRequested?.Invoke(), null));
             Add(cards);
 
             var recentHeading = new Label("Recent");
@@ -43,6 +44,7 @@ namespace OmsiMapEditor.UI
 
         public event Action OpenProjectRequested;
         public event Action OpenMapRequested;
+        public event Action NewMapRequested;
         public event Action<RecentFile> RecentChosen;
 
         /// <summary>Lists the projects and maps opened last; ones whose file is gone are shown but cannot be opened.</summary>

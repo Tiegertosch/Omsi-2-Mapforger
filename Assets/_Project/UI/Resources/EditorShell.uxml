@@ -47,6 +47,7 @@
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="file-menu" class="menu-popup file-menu">
+            <ui:Button name="new-map-menu-item" text="New map..." class="menu-popup-item" />
             <ui:Button name="open-project-menu-item" text="Open Mapforge project..." class="menu-popup-item" />
             <ui:Button name="save-project-menu-item" text="Save map project as..." class="menu-popup-item" />
             <ui:Button name="export-menu-item" text="Export to OMSI..." class="menu-popup-item" />
@@ -94,6 +95,23 @@
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="export-cancel-button" text="Cancel" class="map-control-button" />
                     <ui:Button name="export-confirm-button" text="Export" class="map-control-button dialog-primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="new-map-dialog" class="dialog-overlay" style="display: none;">
+            <ui:VisualElement class="dialog">
+                <ui:Label text="New map" class="popup-title" />
+                <ui:Label text="Creates a map folder in the maps folder of your OMSI installation with one empty tile on flat ground. AI lists, drivers, parked cars, holidays and the settings of global.cfg come from the template map; its tiles, timetables and entry points do not. The template is not changed." class="popup-description" />
+                <ui:VisualElement class="dialog-row">
+                    <ui:Label name="new-map-template-label" class="popup-description dialog-row-text" />
+                    <ui:Button name="new-map-template-button" text="Choose template..." class="map-control-button" />
+                </ui:VisualElement>
+                <ui:TextField name="new-map-folder-field" label="Folder name" class="dialog-field" />
+                <ui:TextField name="new-map-name-field" label="Name in OMSI" class="dialog-field" />
+                <ui:Label name="new-map-target-label" class="popup-description export-target" />
+                <ui:VisualElement class="dialog-buttons">
+                    <ui:Button name="new-map-cancel-button" text="Cancel" class="map-control-button" />
+                    <ui:Button name="new-map-confirm-button" text="Create" class="map-control-button dialog-primary" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
