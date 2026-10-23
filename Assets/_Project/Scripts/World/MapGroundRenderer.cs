@@ -14,7 +14,8 @@ namespace OmsiMapEditor.World
     /// extruded from their .sli profiles into one mesh per texture, at their real heights. Where OMSI cuts the terrain
     /// away, under crossings with a terrain hole and along spline profiles with one, a hole mask per tile leaves the
     /// ground out. An orthographic camera looks straight down and renders into the screen rectangle of the map view,
-    /// below the UI.
+    /// below the UI. The masks of the ground textures are read only for tiles near the view and dropped again for tiles
+    /// long out of it, so large maps load fast and keep a bounded amount of them in memory.
     /// </summary>
     public sealed class MapGroundRenderer : MonoBehaviour
     {
@@ -37,6 +38,15 @@ namespace OmsiMapEditor.World
         /// <summary>Texture uploads per frame stop after this many milliseconds, so the UI stays responsive.</summary>
         private const float UploadBudgetMilliseconds = 8f;
 
+        /// <summary>At most this many tiles keep their masks; the ones out of view longest are dropped first.</summary>
+        private const int MaximumMaskTiles = 96;
+
+        /// <summary>From above, masks are read only while the view shows at most this many metres from top to bottom.</summary>
+        private const float MaskViewMeters = 3000f;
+
+        /// <summary>Tiles a decode task reads at once, so nearby tiles show their masks soon.</summary>
+        private const int MaskTilesPerTask = 12;
+
         private sealed class LayerData
         {
             public OmsiGroundTexture Definition;
@@ -49,8 +59,8 @@ namespace OmsiMapEditor.World
             public int X;
             public int Y;
 
-            /// <summary>Masks by ground texture index; the first texture has none.</summary>
-            public readonly List<KeyValuePair<int, OmsiImage>> Masks = new List<KeyValuePair<int, OmsiImage>>();
+            /// <summary>Mask files by ground texture index, read when the tile comes into view; the first texture has none.</summary>
+            public readonly List<KeyValuePair<int, string>> MaskPaths = new List<KeyValuePair<int, string>>();
 
             public readonly List<SplineBatch> Splines = new List<SplineBatch>();
 
@@ -95,6 +105,44 @@ namespace OmsiMapEditor.World
             public readonly Dictionary<string, OmsiSplineLineKind> LineKinds = new Dictionary<string, OmsiSplineLineKind>(StringComparer.OrdinalIgnoreCase);
             public int LineSplineCount;
         }
+
+        /// <summary>A built tile: where it is, its ground mesh, and the mask layers it has while it is near the view.</summary>
+        private sealed class TileState
+        {
+            public long Key;
+            public int X;
+            public int Y;
+            public Vector3 Position;
+            public Mesh Mesh;
+            public List<KeyValuePair<int, string>> MaskPaths;
+            public readonly List<GameObject> MaskLayers = new List<GameObject>();
+            public readonly List<UnityEngine.Object> MaskResources = new List<UnityEngine.Object>();
+            public bool MasksLoaded;
+            public bool MasksLoading;
+            public float LastWanted;
+        }
+
+        /// <summary>Decoded masks of a tile, waiting to be uploaded.</summary>
+        private sealed class DecodedMasks
+        {
+            public long Key;
+            public readonly List<KeyValuePair<int, OmsiImage>> Masks = new List<KeyValuePair<int, OmsiImage>>();
+        }
+
+        private readonly Dictionary<long, TileState> tileStates = new Dictionary<long, TileState>();
+        private readonly Queue<DecodedMasks> decodedMasks = new Queue<DecodedMasks>();
+        private Task<List<DecodedMasks>> maskTask;
+        private IOmsiFileSource maskSource;
+        private float nextMaskCheck;
+        private readonly List<string> maskProblems = new List<string>();
+
+        // The last view, for choosing the tiles whose masks are read: map-relative centre, and either the size seen
+        // from above or the 3D camera's distance.
+        private Vector2 viewCenter;
+        private Vector2 viewHalfSize;
+        private float orbitDistance;
+        private bool viewIsOrbit;
+        private bool hasViewForMasks;
 
         private Camera groundCamera;
         private Transform groundRoot;
@@ -148,7 +196,11 @@ namespace OmsiMapEditor.World
         public IReadOnlyDictionary<string, OmsiSplineLineKind> SplineLineKinds { get; private set; } =
             new Dictionary<string, OmsiSplineLineKind>();
 
-        public bool IsLoading => loading != null || pending != null;
+        /// <summary>
+        /// True while the map's ground is read or built, and while masks of tiles in view are still read or uploaded, so
+        /// a screenshot waits for them.
+        /// </summary>
+        public bool IsLoading => loading != null || pending != null || maskTask != null || decodedMasks.Count > 0 || MasksWanted();
 
         /// <summary>The camera looking down on the map view; other renderers draw into it too.</summary>
         public Camera ViewCamera => groundCamera;
@@ -204,6 +256,7 @@ namespace OmsiMapEditor.World
             tileSize = summary.TileSizeMeters;
             this.originX = originX;
             this.originY = originY;
+            maskSource = source;
             // Copies, so the worker never sees a list the editor changes.
             var tiles = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>>();
             foreach (var tile in summary.Tiles)
@@ -314,6 +367,14 @@ namespace OmsiMapEditor.World
             tileMaterials.Clear();
             holeTextures.Clear();
             holes = null;
+            foreach (var state in tileStates.Values)
+                foreach (var resource in state.MaskResources)
+                    Destroy(resource);
+            tileStates.Clear();
+            decodedMasks.Clear();
+            maskTask = null;
+            maskSource = null;
+            maskProblems.Clear();
             SplineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
             splineMaterials.Clear();
             terrains.Clear();
@@ -374,6 +435,10 @@ namespace OmsiMapEditor.World
             groundCamera.farClipPlane = 20000f;
             groundCamera.backgroundColor = SkyColour;
             groundCamera.pixelRect = screenRect;
+            viewCenter = new Vector2(target.x, target.z);
+            orbitDistance = distance;
+            viewIsOrbit = true;
+            hasViewForMasks = true;
             var rotation = Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
             groundCamera.transform.SetPositionAndRotation(target - rotation * Vector3.forward * distance, rotation);
         }
@@ -398,6 +463,10 @@ namespace OmsiMapEditor.World
             groundCamera.backgroundColor = MapBackgroundColour;
             groundCamera.pixelRect = screenRect;
             groundCamera.orthographicSize = viewHeightMeters * 0.5f;
+            viewCenter = center;
+            viewHalfSize = new Vector2(viewHeightMeters * 0.5f * screenRect.width / screenRect.height, viewHeightMeters * 0.5f);
+            viewIsOrbit = false;
+            hasViewForMasks = true;
             groundCamera.transform.SetPositionAndRotation(new Vector3(center.x, CameraHeight, center.y), Quaternion.Euler(90f, 0f, 0f));
         }
 
@@ -425,6 +494,212 @@ namespace OmsiMapEditor.World
 
             if (pending != null)
                 ContinueBuild();
+            else
+                UpdateMasks();
+        }
+
+        /// <summary>
+        /// Reads the masks of tiles near the view in the background, uploads finished ones within the frame budget and
+        /// drops masks of tiles long out of view once too many are loaded.
+        /// </summary>
+        private void UpdateMasks()
+        {
+            if (maskTask != null && maskTask.IsCompleted)
+            {
+                var task = maskTask;
+                maskTask = null;
+                if (task.IsFaulted)
+                    Debug.LogException(task.Exception);
+                else
+                    foreach (var decoded in task.Result)
+                        decodedMasks.Enqueue(decoded);
+                lock (maskProblems)
+                {
+                    if (maskProblems.Count > 0)
+                        Debug.LogWarning("Ground masks could not be read:\n" + string.Join("\n", maskProblems));
+                    maskProblems.Clear();
+                }
+            }
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            while (decodedMasks.Count > 0 && watch.Elapsed.TotalMilliseconds < UploadBudgetMilliseconds)
+                AddMaskLayers(decodedMasks.Dequeue());
+
+            if (Time.unscaledTime < nextMaskCheck || maskTask != null || maskSource == null)
+                return;
+            nextMaskCheck = Time.unscaledTime + 0.2f;
+            var wanted = WantedMaskTiles();
+            foreach (var state in wanted)
+                state.LastWanted = Time.unscaledTime;
+            var toRead = wanted.FindAll(state => !state.MasksLoaded && !state.MasksLoading && state.MaskPaths.Count > 0);
+            if (toRead.Count > MaskTilesPerTask)
+                toRead.RemoveRange(MaskTilesPerTask, toRead.Count - MaskTilesPerTask);
+            if (toRead.Count > 0)
+            {
+                var requests = new List<KeyValuePair<long, List<KeyValuePair<int, string>>>>();
+                foreach (var state in toRead)
+                {
+                    state.MasksLoading = true;
+                    requests.Add(new KeyValuePair<long, List<KeyValuePair<int, string>>>(state.Key, state.MaskPaths));
+                }
+                var source = maskSource;
+                var problems = maskProblems;
+                maskTask = Task.Run(() => DecodeMasks(requests, source, problems));
+            }
+            DropFarMasks(wanted);
+        }
+
+        /// <summary>True when a tile in view still waits for its masks.</summary>
+        private bool MasksWanted()
+        {
+            if (maskSource == null || pending != null)
+                return false;
+            foreach (var state in WantedMaskTiles())
+                if (!state.MasksLoaded && state.MaskPaths.Count > 0)
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Tiles near the view, nearest first and at most <see cref="MaximumMaskTiles"/>: from above those the view shows
+        /// plus a tile around it, unless the view is so far out that masks would not show; in 3D those within a few times
+        /// the camera's distance of the point it looks at.
+        /// </summary>
+        private List<TileState> WantedMaskTiles()
+        {
+            var wanted = new List<TileState>();
+            if (!hasViewForMasks || tileStates.Count == 0 || !groundVisible)
+                return wanted;
+            var size = (float)tileSize;
+            float halfWidth, halfHeight;
+            if (viewIsOrbit)
+            {
+                halfWidth = halfHeight = Mathf.Min(orbitDistance * 4f, 4000f) + size;
+            }
+            else
+            {
+                if (viewHalfSize.y * 2f > MaskViewMeters)
+                    return wanted;
+                halfWidth = viewHalfSize.x + size;
+                halfHeight = viewHalfSize.y + size;
+            }
+            foreach (var state in tileStates.Values)
+            {
+                var centerX = state.Position.x + size * 0.5f;
+                var centerY = state.Position.z + size * 0.5f;
+                if (Mathf.Abs(centerX - viewCenter.x) <= halfWidth + size * 0.5f && Mathf.Abs(centerY - viewCenter.y) <= halfHeight + size * 0.5f)
+                    wanted.Add(state);
+            }
+            wanted.Sort((first, second) => DistanceToView(first, size).CompareTo(DistanceToView(second, size)));
+            if (wanted.Count > MaximumMaskTiles)
+                wanted.RemoveRange(MaximumMaskTiles, wanted.Count - MaximumMaskTiles);
+            return wanted;
+        }
+
+        private float DistanceToView(TileState state, float size)
+        {
+            return (new Vector2(state.Position.x + size * 0.5f, state.Position.z + size * 0.5f) - viewCenter).sqrMagnitude;
+        }
+
+        /// <summary>Drops the masks of tiles out of view, those out of it longest first, until at most the maximum remain.</summary>
+        private void DropFarMasks(List<TileState> wanted)
+        {
+            var loaded = new List<TileState>();
+            foreach (var state in tileStates.Values)
+                if (state.MasksLoaded)
+                    loaded.Add(state);
+            if (loaded.Count <= MaximumMaskTiles)
+                return;
+            var keep = new HashSet<TileState>(wanted);
+            loaded.RemoveAll(keep.Contains);
+            loaded.Sort((first, second) => first.LastWanted.CompareTo(second.LastWanted));
+            var excess = loaded.Count + keep.Count - MaximumMaskTiles;
+            for (var index = 0; index < excess && index < loaded.Count; index++)
+                RemoveMaskLayers(loaded[index]);
+        }
+
+        private static List<DecodedMasks> DecodeMasks(List<KeyValuePair<long, List<KeyValuePair<int, string>>>> requests, IOmsiFileSource source,
+            List<string> problems)
+        {
+            var result = new List<DecodedMasks>();
+            foreach (var request in requests)
+            {
+                var decoded = new DecodedMasks { Key = request.Key };
+                foreach (var pair in request.Value)
+                {
+                    try
+                    {
+                        if (OmsiImageReader.TryDecode(source.ReadAllBytes(pair.Value), out var mask))
+                            decoded.Masks.Add(new KeyValuePair<int, OmsiImage>(pair.Key, mask));
+                    }
+                    catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
+                                                      exception is UnauthorizedAccessException)
+                    {
+                        lock (problems)
+                            problems.Add(pair.Value + ": " + exception.Message);
+                    }
+                }
+                result.Add(decoded);
+            }
+            return result;
+        }
+
+        /// <summary>Puts the decoded masks of a tile on the map as one layer each, with the tile's terrain holes.</summary>
+        private void AddMaskLayers(DecodedMasks decoded)
+        {
+            if (!tileStates.TryGetValue(decoded.Key, out var state) || groundRoot == null)
+                return;
+            state.MasksLoading = false;
+            state.MasksLoaded = true;
+            tileMaterials.TryGetValue(state.Key, out var renderers);
+            holeTextures.TryGetValue(state.Key, out var holeTexture);
+            foreach (var pair in decoded.Masks)
+            {
+                if (!layerMaterials.TryGetValue(pair.Key, out var layerMaterial))
+                    continue;
+                var material = new Material(layerMaterial);
+                var texture = UploadMask(pair.Value);
+                material.SetTexture("_Mask", texture);
+                if (holeTexture != null)
+                    SetHoles(material, holeTexture);
+                state.MaskResources.Add(material);
+                state.MaskResources.Add(texture);
+                var meshRenderer = AddQuad("Tile " + state.X + ", " + state.Y + " layer " + pair.Key, state.Position, material, state.Mesh);
+                state.MaskLayers.Add(meshRenderer.gameObject);
+                renderers?.Add(meshRenderer);
+            }
+        }
+
+        private void RemoveMaskLayers(TileState state)
+        {
+            if (tileMaterials.TryGetValue(state.Key, out var renderers))
+                renderers.RemoveAll(meshRenderer => meshRenderer == null || state.MaskLayers.Contains(meshRenderer.gameObject));
+            foreach (var layer in state.MaskLayers)
+                Destroy(layer);
+            foreach (var resource in state.MaskResources)
+                Destroy(resource);
+            state.MaskLayers.Clear();
+            state.MaskResources.Clear();
+            state.MasksLoaded = false;
+        }
+
+        /// <summary>A mask as a texture with mipmaps that its tile owns, so it can be dropped with the tile's masks.</summary>
+        private Texture2D UploadMask(OmsiImage image)
+        {
+            var format = image.Channels == 1 ? TextureFormat.R8 : TextureFormat.RGBA32;
+            var texture = new Texture2D(image.Width, image.Height, format, true)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Trilinear,
+                anisoLevel = 4
+            };
+            var rowBytes = image.Width * image.Channels;
+            var flipped = new byte[image.Pixels.Length];
+            for (var row = 0; row < image.Height; row++)
+                Buffer.BlockCopy(image.Pixels, row * rowBytes, flipped, (image.Height - 1 - row) * rowBytes, rowBytes);
+            texture.SetPixelData(flipped, 0);
+            texture.Apply(true, true);
+            return texture;
         }
 
         private static GroundData Read(List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord[]>> tiles, List<OmsiHolePlacement> placements,
@@ -459,22 +734,14 @@ namespace OmsiMapEditor.World
                 {
                     data.Problems.Add(terrainPath + ": " + exception.Message);
                 }
+                // Masks are only listed here; they are read when their tile comes into view.
                 foreach (var layer in data.Layers)
                 {
                     if (!layer.Definition.HasMask)
                         continue;
                     var maskPath = layer.Definition.MaskPath(tile.FileName);
-                    if (!source.FileExists(maskPath))
-                        continue;
-                    try
-                    {
-                        if (OmsiImageReader.TryDecode(source.ReadAllBytes(maskPath), out var mask))
-                            tileData.Masks.Add(new KeyValuePair<int, OmsiImage>(layer.Definition.Index, mask));
-                    }
-                    catch (InvalidDataException exception)
-                    {
-                        data.Problems.Add(maskPath + ": " + exception.Message);
-                    }
+                    if (source.FileExists(maskPath))
+                        tileData.MaskPaths.Add(new KeyValuePair<int, string>(layer.Definition.Index, maskPath));
                 }
                 AddSplines(tileData, pair.Value, profiles, installationRoot, data);
                 data.Tiles.Add(tileData);
@@ -647,8 +914,8 @@ namespace OmsiMapEditor.World
             pending = null;
             var masks = 0;
             foreach (var tile in data.Tiles)
-                masks += tile.Masks.Count;
-            var report = "Ground textures ready: " + data.Layers.Count + " texture(s), " + masks + " tile mask(s), " +
+                masks += tile.MaskPaths.Count;
+            var report = "Ground textures ready: " + data.Layers.Count + " texture(s), " + masks + " tile mask(s) read as their tiles come into view, " +
                          data.DrawnSplineCount + " of " + data.SplineCount + " splines with surfaces" +
                          (data.LineSplineCount > 0 ? ", " + data.LineSplineCount + " overhead lines and fences" : string.Empty) +
                          (data.HoleTileCount > 0 ? ", terrain holes in " + data.HoleTileCount + " tile(s)" : string.Empty);
@@ -674,15 +941,7 @@ namespace OmsiMapEditor.World
             tileMaterials[key] = renderers;
             if (layerMaterials.TryGetValue(0, out var baseMaterial))
                 renderers.Add(AddQuad("Tile " + tile.X + ", " + tile.Y, position, baseMaterial, mesh));
-            foreach (var pair in tile.Masks)
-            {
-                if (!layerMaterials.TryGetValue(pair.Key, out var layerMaterial))
-                    continue;
-                var material = new Material(layerMaterial);
-                material.SetTexture("_Mask", Upload(pair.Value, null, TextureWrapMode.Clamp));
-                owned.Add(material);
-                renderers.Add(AddQuad("Tile " + tile.X + ", " + tile.Y + " layer " + pair.Key, position, material, mesh));
-            }
+            tileStates[key] = new TileState { Key = key, X = tile.X, Y = tile.Y, Position = position, Mesh = mesh, MaskPaths = tile.MaskPaths };
             if (tile.Holes != null)
                 ApplyHoles(key, renderers, tile.Holes);
             foreach (var batch in tile.Splines)

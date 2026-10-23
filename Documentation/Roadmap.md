@@ -59,7 +59,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Text-`.x`-Modelle mit Texturkoordinaten, Normalen und Materialien lesen, auch Materialverweise
 - [x] Modelle beim Ziehen und Drehen mitbewegen, auf dem Gelände unter der neuen Position
 - [x] Bäume als Kuppel mit dem Kronenausschnitt ihrer Seitentextur zeigen statt als Scheibe in Durchschnittsfarbe
-- Speicher und Ladezeit der Bodentexturen großer Karten begrenzen, etwa Masken erst laden, wenn ihre Kachel sichtbar wird
+- [x] Speicher und Ladezeit der Bodentexturen großer Karten begrenzen: Masken werden erst gelesen, wenn ihre Kachel in die Nähe des Ausschnitts kommt (von oben bis 3 km Bildhöhe, in 3D im Umkreis des Kamerablicks), höchstens 96 Kacheln behalten sie, die am längsten unsichtbaren geben sie zuerst wieder ab
 - Geometrie- und Straßenwerkzeuge entwerfen
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
 - Validierungsberichte und Integritätsprüfungen ergänzen
