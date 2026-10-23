@@ -25,6 +25,9 @@ namespace OmsiMapEditor.OMSI
 
         public double Height => AtEnd ? Spline.EndHeight : Spline.Height;
 
+        /// <summary>The gradient a road continuing from this end starts with, in percent: onwards at the end, backwards at the start.</summary>
+        public double OutwardGradientPercent => AtEnd ? Spline.GradientAtPercent(Spline.LengthMeters) : -Spline.GradientAtPercent(0.0);
+
         /// <summary>The world position of this end.</summary>
         public OmsiMapPoint Position(double tileSizeMeters)
         {

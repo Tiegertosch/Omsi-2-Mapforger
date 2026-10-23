@@ -19,6 +19,7 @@ namespace OmsiMapEditor.UI
         private readonly List<string> profiles = new List<string>();
         private readonly List<string> shown = new List<string>();
         private readonly Button followButton;
+        private readonly Button smoothButton;
         private readonly Button manualButton;
         private readonly TextField endHeightField;
         private readonly TextField pieceLengthField;
@@ -94,9 +95,19 @@ namespace OmsiMapEditor.UI
             };
             followButton.AddToClassList("panel-tab");
             modes.Add(followButton);
+            smoothButton = new Button(() => SetHeightMode(OmsiRoadHeightMode.Smooth))
+            {
+                text = "Smooth",
+                tooltip = "Follows the terrain averaged over 100 m, with the gradient changing steadily and no kinks, also where the road continues another. " +
+                          "With Fit terrain the ground is cut or banked up to the road."
+            };
+            smoothButton.AddToClassList("panel-tab");
+            modes.Add(smoothButton);
             manualButton = new Button(() => SetHeightMode(OmsiRoadHeightMode.Manual))
             {
-                text = "Manual height", tooltip = "The height runs evenly from the start to the end height below, whatever the terrain does."
+                text = "Manual height",
+                tooltip = "The height runs evenly from the start to the end height below, whatever the terrain does. " +
+                          "Switch off Fit terrain for bridges and overpasses, so the ground stays as it is."
             };
             manualButton.AddToClassList("panel-tab");
             modes.Add(manualButton);
@@ -191,10 +202,11 @@ namespace OmsiMapEditor.UI
             SettingsChanged?.Invoke();
         }
 
-        private void SetHeightMode(OmsiRoadHeightMode mode)
+        public void SetHeightMode(OmsiRoadHeightMode mode)
         {
             HeightMode = mode;
             followButton.EnableInClassList("panel-tab-active", mode == OmsiRoadHeightMode.FollowTerrain);
+            smoothButton.EnableInClassList("panel-tab-active", mode == OmsiRoadHeightMode.Smooth);
             manualButton.EnableInClassList("panel-tab-active", mode == OmsiRoadHeightMode.Manual);
             endHeightField.SetEnabled(mode == OmsiRoadHeightMode.Manual);
             SettingsChanged?.Invoke();

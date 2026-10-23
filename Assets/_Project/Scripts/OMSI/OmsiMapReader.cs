@@ -330,6 +330,9 @@ namespace OmsiMapEditor.OMSI
 
             var isSplineH = string.Equals(section.Name, "spline_h", StringComparison.OrdinalIgnoreCase);
             var heightDifference = 0.0;
+            var startGradient = 0.0;
+            var endGradient = 0.0;
+            var gradients = values.Count > 12 && TryDouble(values, 11, out startGradient) && TryDouble(values, 12, out endGradient);
             if (isSplineH && values.Count > 13 && TryDouble(values, 13, out var difference))
                 heightDifference = difference;
             else if (!isSplineH && values.Count > 12 && TryDouble(values, 11, out var gradientStart) && TryDouble(values, 12, out var gradientEnd))
@@ -345,6 +348,8 @@ namespace OmsiMapEditor.OMSI
                 LocalY = y,
                 Height = height,
                 EndHeight = height + heightDifference,
+                GradientStartPercent = gradients ? startGradient : 0.0,
+                GradientEndPercent = gradients ? endGradient : 0.0,
                 HeadingDegrees = heading,
                 LengthMeters = length,
                 RadiusMeters = radius,

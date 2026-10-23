@@ -611,7 +611,8 @@ namespace OmsiMapEditor.UI
         /// preview at the centre of the view,
         /// <c>-newMap [template global.cfg]</c> without a map to show the new-map dialog,
         /// <c>-road tileX tileY x1 y1 x2 y2 ...</c> to click road points with the road tool (the last point is only
-        /// pointed at unless <c>-roadBuild</c> follows), <c>-selectSpline id</c>,
+        /// pointed at unless <c>-roadBuild</c> follows, <c>-roadMode follow|smooth|manual</c> chooses the heights),
+        /// <c>-selectSpline id</c>,
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
         /// </summary>
@@ -729,6 +730,9 @@ namespace OmsiMapEditor.UI
                     points.Add(OmsiMapGeometry.TileLocalToWorld(roadTileX, roadTileY, roadLocalX, roadLocalY, currentSummary.TileSizeMeters));
                 }
                 SetTool(EditorTool.Road);
+                if (roadPanel != null && Enum.TryParse<OmsiRoadHeightMode>(Argument("-roadMode", 1) == "follow" ? "FollowTerrain" : Argument("-roadMode", 1) ?? string.Empty, true,
+                        out var roadMode))
+                    roadPanel.SetHeightMode(roadMode);
                 // The profile list fills once the installation is listed.
                 var scanStarted = Time.realtimeSinceStartup;
                 while (installationScan != null && !installationScan.IsCompleted && Time.realtimeSinceStartup - scanStarted < 120f)
@@ -1420,6 +1424,7 @@ namespace OmsiMapEditor.UI
             var request = new OmsiRoadRequest
             {
                 StartX = roadStart.X, StartY = roadStart.Y, StartHeadingDegrees = roadStartHeading, StartHeight = roadStartHeight, EndX = end.X, EndY = end.Y,
+                StartGradientPercent = roadStartJoin?.OutwardGradientPercent,
                 HeightMode = roadPanel.HeightMode, MaximumPieceLength = roadPanel.PieceLength, GradientWarningPercent = roadPanel.GradientWarningPercent,
                 EndHeight = endJoin?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
                 // Driving into the joined spline continues opposite to the way a road would leave it.

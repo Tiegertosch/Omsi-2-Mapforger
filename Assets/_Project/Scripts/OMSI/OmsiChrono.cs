@@ -349,6 +349,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = record.AssetPath, Id = record.Id, PreviousId = record.PreviousId, NextId = record.NextId, LocalX = record.LocalX,
                 LocalY = record.LocalY, Height = record.Height, EndHeight = record.EndHeight, HeadingDegrees = record.HeadingDegrees,
+                GradientStartPercent = record.GradientStartPercent, GradientEndPercent = record.GradientEndPercent,
                 LengthMeters = record.LengthMeters, RadiusMeters = record.RadiusMeters, IsSplineH = record.IsSplineH, IsMirrored = record.IsMirrored,
                 AlignsTerrain = record.AlignsTerrain
             };

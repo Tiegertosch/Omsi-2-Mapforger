@@ -11,7 +11,13 @@ namespace OmsiMapEditor.OMSI
         FollowTerrain,
 
         /// <summary>The height runs evenly from the start height to a given end height, whatever the terrain does.</summary>
-        Manual
+        Manual,
+
+        /// <summary>
+        /// The height follows the terrain smoothed over a stretch of road, with the gradient changing steadily across piece
+        /// boundaries instead of in steps; at a joined start it continues the height and gradient of the road it joins.
+        /// </summary>
+        Smooth
     }
 
     public enum OmsiRoadIssueSeverity
@@ -87,7 +93,7 @@ namespace OmsiMapEditor.OMSI
             return new OmsiSplineRecord
             {
                 LocalX = StartX, LocalY = StartY, Height = StartHeight, HeadingDegrees = HeadingDegrees, LengthMeters = LengthMeters,
-                RadiusMeters = RadiusMeters, EndHeight = EndHeight
+                RadiusMeters = RadiusMeters, EndHeight = EndHeight, GradientStartPercent = GradientStartPercent, GradientEndPercent = GradientEndPercent
             };
         }
     }
@@ -103,6 +109,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The height at the start, such as the end of the road it continues; null takes the terrain there.</summary>
         public double? StartHeight { get; set; }
+
+        /// <summary>The gradient in percent the road it continues ends with; smooth roads start with it, others report a change.</summary>
+        public double? StartGradientPercent { get; set; }
 
         public double EndX { get; set; }
         public double EndY { get; set; }
@@ -123,6 +132,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Gradients steeper than this, in percent, are reported as a warning; it is a check, not a rule.</summary>
         public double GradientWarningPercent { get; set; } = 10.0;
+
+        /// <summary>Smooth roads follow the terrain averaged over this many metres.</summary>
+        public double SmoothingMeters { get; set; } = 100.0;
     }
 
     /// <summary>A road as it would be built: its pieces, where it ends and what should be checked.</summary>
@@ -162,6 +174,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Headings closer than this meet without a kink.</summary>
         private const double JoinToleranceDegrees = 2.0;
+
+        /// <summary>A change of gradient larger than this, in percentage points, at a joined start is noted.</summary>
+        private const double GradientChangeNote = 2.0;
+
+        /// <summary>Smooth roads sample the terrain this often.</summary>
+        private const double SmoothSampleStep = 2.5;
 
         /// <param name="terrain">The terrain heights, or null when the map has none.</param>
         public static OmsiRoadPlan Plan(OmsiRoadRequest request, IOmsiTerrainHeights terrain)
@@ -205,23 +223,39 @@ namespace OmsiMapEditor.OMSI
             boundaries[count, 0] = request.EndX;
             boundaries[count, 1] = request.EndY;
 
-            var heights = Heights(request, terrain, boundaries, count, plan);
+            var pieceLength = length / count;
+            double[] heights;
+            double[] gradients;
+            if (request.HeightMode == OmsiRoadHeightMode.Smooth)
+                SmoothProfile(request, terrain, full, length, count, plan, out heights, out gradients);
+            else
+            {
+                heights = Heights(request, terrain, boundaries, count, plan);
+                gradients = null;
+            }
             for (var index = 0; index < count; index++)
             {
-                var pieceLength = length / count;
-                var gradient = (heights[index + 1] - heights[index]) / pieceLength * 100.0;
+                var even = (heights[index + 1] - heights[index]) / pieceLength * 100.0;
+                var startGradient = gradients?[index] ?? even;
+                var endGradient = gradients?[index + 1] ?? even;
                 plan.Pieces.Add(new OmsiSplinePiece
                 {
                     StartX = boundaries[index, 0], StartY = boundaries[index, 1], StartHeight = heights[index], HeadingDegrees = headings[index],
-                    LengthMeters = pieceLength, RadiusMeters = radius, GradientStartPercent = gradient, GradientEndPercent = gradient
+                    LengthMeters = pieceLength, RadiusMeters = radius, GradientStartPercent = startGradient, GradientEndPercent = endGradient
                 });
-                plan.MaximumGradientPercent = Math.Max(plan.MaximumGradientPercent, Math.Abs(gradient));
-                if (Math.Abs(gradient) > request.GradientWarningPercent)
+                var steepest = Math.Abs(startGradient) > Math.Abs(endGradient) ? startGradient : endGradient;
+                plan.MaximumGradientPercent = Math.Max(plan.MaximumGradientPercent, Math.Abs(steepest));
+                if (Math.Abs(steepest) > request.GradientWarningPercent)
                     plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
-                        "Gradient of " + Percent(gradient) + " is steeper than " + Percent(request.GradientWarningPercent) + ".",
+                        "Gradient of " + Percent(steepest) + " is steeper than " + Percent(request.GradientWarningPercent) + ".",
                         (boundaries[index, 0] + boundaries[index + 1, 0]) / 2.0, (boundaries[index, 1] + boundaries[index + 1, 1]) / 2.0));
             }
             plan.EndHeight = heights[count];
+            if (request.StartGradientPercent.HasValue && plan.Pieces.Count > 0 &&
+                Math.Abs(plan.Pieces[0].GradientStartPercent - request.StartGradientPercent.Value) > GradientChangeNote)
+                plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Note,
+                    "The gradient changes from " + Signed(request.StartGradientPercent.Value) + " to " + Signed(plan.Pieces[0].GradientStartPercent) +
+                    " where the road continues; Smooth avoids the kink.", request.StartX, request.StartY));
 
             if (request.HeightMode == OmsiRoadHeightMode.Manual && terrain != null)
                 CheckAgainstTerrain(plan, terrain);
@@ -339,6 +373,141 @@ namespace OmsiMapEditor.OMSI
                     : before >= 0 ? heights[before] : after <= count ? heights[after] : 0.0;
             }
             return heights;
+        }
+
+        /// <summary>
+        /// Heights and gradients of a smooth road at every piece boundary. The terrain under the centre line is averaged
+        /// over <see cref="OmsiRoadRequest.SmoothingMeters"/>; near a fixed start or end the curve is bent towards that
+        /// height, and at a joined start towards its gradient, with a smooth step so no new kink appears. The gradient at
+        /// each boundary is the slope of that curve, and the heights follow from the gradients piece by piece as OMSI
+        /// computes them, so height and gradient are continuous. A fixed end height is met by spreading the small
+        /// remainder evenly over the gradients after the start.
+        /// </summary>
+        private static void SmoothProfile(OmsiRoadRequest request, IOmsiTerrainHeights terrain, OmsiSplinePiece full, double length, int count,
+            OmsiRoadPlan plan, out double[] heights, out double[] gradients)
+        {
+            // Terrain along the road; samples without terrain take their neighbours' heights and are reported once.
+            var samples = Math.Max(2, (int)Math.Ceiling(length / SmoothSampleStep));
+            var ground = new double[samples + 1];
+            var known = new bool[samples + 1];
+            var anyKnown = false;
+            var reported = false;
+            for (var index = 0; index <= samples; index++)
+            {
+                full.PointAt(length * index / samples, out var x, out var y, out _);
+                if (terrain != null && terrain.TryGetHeight(x, y, out var height))
+                {
+                    ground[index] = height;
+                    known[index] = anyKnown = true;
+                }
+                else if (!reported && !(index == 0 && request.StartHeight.HasValue) && !(index == samples && request.EndHeight.HasValue))
+                {
+                    reported = true;
+                    plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "The road leaves the terrain; there is no height to smooth.", x, y));
+                }
+            }
+            if (!anyKnown)
+            {
+                var fallback = request.StartHeight ?? request.EndHeight ?? 0.0;
+                if (!request.StartHeight.HasValue && !request.EndHeight.HasValue && !reported)
+                    plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "The start lies outside the terrain and has no height.", request.StartX, request.StartY));
+                for (var index = 0; index <= samples; index++)
+                    ground[index] = fallback;
+            }
+            else
+                FillGaps(ground, known);
+
+            // Moving average with a triangular weight over the smoothing length; the ends repeat their edge value.
+            var radius = Math.Max(1, (int)Math.Round(request.SmoothingMeters / 2.0 / (length / samples)));
+            var smooth = new double[samples + 1];
+            for (var index = 0; index <= samples; index++)
+            {
+                double sum = 0.0, weights = 0.0;
+                for (var offset = -radius; offset <= radius; offset++)
+                {
+                    var weight = radius + 1 - Math.Abs(offset);
+                    sum += ground[Math.Max(0, Math.Min(samples, index + offset))] * weight;
+                    weights += weight;
+                }
+                smooth[index] = sum / weights;
+            }
+
+            Func<double, double> profile = distance =>
+            {
+                var position = distance / length * samples;
+                var lower = Math.Max(0, Math.Min(samples - 1, (int)Math.Floor(position)));
+                var fraction = position - lower;
+                return smooth[lower] + (smooth[lower + 1] - smooth[lower]) * fraction;
+            };
+            var blend = Math.Min(request.SmoothingMeters, length);
+            var startSlope = (profile(Math.Min(length, 1.0)) - profile(0.0)) / Math.Min(length, 1.0);
+            var startHeight = request.StartHeight ?? profile(0.0);
+            var startGradient = request.StartGradientPercent.HasValue ? request.StartGradientPercent.Value / 100.0 : startSlope;
+            var endHeight = request.EndHeight ?? profile(length);
+            Func<double, double> target = distance =>
+            {
+                // Bent towards the start height and gradient near the start and towards the end height near the end.
+                var fromStart = 1.0 - SmoothStep(distance / blend);
+                var fromEnd = SmoothStep((distance - (length - blend)) / blend);
+                return profile(distance) + (startHeight - profile(0.0) + (startGradient - startSlope) * distance) * fromStart +
+                       (endHeight - profile(length) - (startHeight - profile(0.0) + (startGradient - startSlope) * length) * (1.0 - SmoothStep(length / blend))) * fromEnd;
+            };
+
+            heights = new double[count + 1];
+            gradients = new double[count + 1];
+            var pieceLength = length / count;
+            // The slope over one piece length, so short bumps between boundaries do not tilt a single boundary.
+            var slopeStep = pieceLength / 2.0;
+            for (var index = 0; index <= count; index++)
+            {
+                var distance = pieceLength * index;
+                var before = Math.Max(0.0, distance - slopeStep);
+                var after = Math.Min(length, distance + slopeStep);
+                gradients[index] = (target(after) - target(before)) / (after - before) * 100.0;
+            }
+            gradients[0] = startGradient * 100.0;
+            heights[0] = startHeight;
+            for (var index = 0; index < count; index++)
+                heights[index + 1] = heights[index] + pieceLength * (gradients[index] + gradients[index + 1]) / 200.0;
+            if (request.EndHeight.HasValue)
+            {
+                // Every gradient after the start changes by the same amount; piece 0 gains it once, the others twice.
+                var change = (endHeight - heights[count]) * 200.0 / (pieceLength * (2 * count - 1));
+                for (var index = 1; index <= count; index++)
+                    gradients[index] += change;
+                for (var index = 0; index < count; index++)
+                    heights[index + 1] = heights[index] + pieceLength * (gradients[index] + gradients[index + 1]) / 200.0;
+                heights[count] = endHeight;
+            }
+        }
+
+        /// <summary>0 before 0, 1 after 1 and an S-curve with flat ends in between.</summary>
+        private static double SmoothStep(double value)
+        {
+            var t = Math.Max(0.0, Math.Min(1.0, value));
+            return t * t * (3.0 - 2.0 * t);
+        }
+
+        private static void FillGaps(double[] values, bool[] known)
+        {
+            for (var index = 0; index < values.Length; index++)
+            {
+                if (known[index])
+                    continue;
+                int before = index - 1, after = index + 1;
+                while (before >= 0 && !known[before])
+                    before--;
+                while (after < values.Length && !known[after])
+                    after++;
+                values[index] = before >= 0 && after < values.Length
+                    ? values[before] + (values[after] - values[before]) * (index - before) / (after - before)
+                    : before >= 0 ? values[before] : values[after];
+            }
+        }
+
+        private static string Signed(double value)
+        {
+            return (value >= 0 ? "+" : string.Empty) + value.ToString("0.0", CultureInfo.InvariantCulture) + " %";
         }
 
         /// <summary>Manual heights can leave the terrain; report where the road would run underground or high above it.</summary>

@@ -134,6 +134,63 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void SmoothRoadsKeepHeightAndGradientContinuousAndContinueAJoinedRoad()
+        {
+            Func<double, double, double?> bumpy = (x, y) => 4.0 + Math.Sin(y / 9.0) * 3.0 + y * 0.04;
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, EndX = 0, EndY = 200, HeightMode = OmsiRoadHeightMode.Smooth, StartHeight = 4, StartGradientPercent = 6
+            }, new FakeTerrain(bumpy));
+            Assert.IsFalse(plan.HasErrors, string.Join("; ", plan.Issues));
+            Assert.AreEqual(8, plan.Pieces.Count);
+            Assert.AreEqual(4.0, plan.Pieces[0].StartHeight, 1e-12);
+            Assert.AreEqual(6.0, plan.Pieces[0].GradientStartPercent, 1e-9);
+            for (var index = 0; index + 1 < plan.Pieces.Count; index++)
+            {
+                Assert.AreEqual(plan.Pieces[index].EndHeight, plan.Pieces[index + 1].StartHeight, 1e-9, "height at boundary " + index);
+                Assert.AreEqual(plan.Pieces[index].GradientEndPercent, plan.Pieces[index + 1].GradientStartPercent, 1e-9, "gradient at boundary " + index);
+            }
+            // The bumps of 3 m every 57 m are averaged out: the steepest gradient stays far below that of following the
+            // terrain in steps, which climbs and falls with every bump.
+            var stepped = OmsiRoadPlanner.Plan(new OmsiRoadRequest { StartX = 0, StartY = 0, EndX = 0, EndY = 200, StartHeight = 4 },
+                new FakeTerrain(bumpy));
+            Assert.Less(plan.MaximumGradientPercent, stepped.MaximumGradientPercent / 2.0);
+            Assert.Less(plan.MaximumGradientPercent, 12.0);
+            // The smooth road stays near the ground on average, within the bumps.
+            plan.Pieces[4].PointAt(0.0, out var x, out var y, out var height);
+            Assert.AreEqual(bumpy(x, y).Value, height, 3.5);
+
+            // Joining a road at the end keeps the end height exactly.
+            var joined = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, EndX = 0, EndY = 80, HeightMode = OmsiRoadHeightMode.Smooth, StartHeight = 4, EndHeight = 9
+            }, new FakeTerrain(bumpy));
+            Assert.AreEqual(9.0, joined.EndHeight, 1e-9);
+            Assert.AreEqual(9.0, joined.Pieces[joined.Pieces.Count - 1].EndHeight, 1e-9);
+
+            // Following the terrain in steps notes the kink where it continues a road with another gradient.
+            var kinked = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, EndX = 0, EndY = 50, StartHeight = 4, StartGradientPercent = 8
+            }, new FakeTerrain((px, py) => 4.0));
+            Assert.That(kinked.Issues.Select(issue => issue.ToString()), Has.Some.Contains("Note: The gradient changes from +8.0 % to +0.0 %"));
+        }
+
+        [Test]
+        public void SplineHeightsFollowTheirGradientsAndEndHeight()
+        {
+            var spline = new OmsiSplineRecord { Height = 1, LengthMeters = 100, GradientStartPercent = 0, GradientEndPercent = 4, EndHeight = 3 };
+            Assert.AreEqual(1.0, spline.HeightAt(0), 1e-12);
+            Assert.AreEqual(1.0 + 50 * (0 + 2) / 200.0, spline.HeightAt(50), 1e-12);
+            Assert.AreEqual(3.0, spline.HeightAt(100), 1e-12);
+            Assert.AreEqual(4.0, spline.GradientAtPercent(100), 1e-12);
+            // A [spline_h] whose stated end height differs: corrected evenly along the spline.
+            var stated = new OmsiSplineRecord { Height = 1, LengthMeters = 100, GradientStartPercent = 0, GradientEndPercent = 4, EndHeight = 4 };
+            Assert.AreEqual(4.0, stated.HeightAt(100), 1e-12);
+            Assert.AreEqual(5.0, stated.GradientAtPercent(100), 1e-12);
+        }
+
+        [Test]
         public void ArcLeavesTangentiallyAndReachesThePoint()
         {
             // Heading north from 0, 0 to 20, 20 turns right by 90° on a radius of 20 m.

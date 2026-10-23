@@ -163,8 +163,7 @@ namespace OmsiMapEditor.OMSI
             place = null;
             if (!Nearest(road, x, y, out var along, out var lateral, out var beyondEnd))
                 return false;
-            var spline = road.Spline;
-            var roadHeight = spline.Height + (spline.EndHeight - spline.Height) * along / Math.Max(1e-9, spline.LengthMeters);
+            var roadHeight = road.Spline.HeightAt(along);
             // Past the ends the road edge is the end itself, so the slopes round off around it.
             var edge = beyondEnd ? 0.0 : lateral >= 0 ? road.Right : -road.Left;
             var outside = Math.Abs(lateral) - edge;

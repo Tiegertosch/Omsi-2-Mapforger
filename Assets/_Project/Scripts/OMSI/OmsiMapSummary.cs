@@ -148,6 +148,37 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Absolute height at the end: the start height plus the height difference of the record.</summary>
         public double EndHeight { get; internal set; }
 
+        /// <summary>Gradient in percent at the start and the end; it changes evenly in between (fields 11 and 12).</summary>
+        public double GradientStartPercent { get; internal set; }
+
+        public double GradientEndPercent { get; internal set; }
+
+        /// <summary>
+        /// The height after <paramref name="distance"/> metres: the start height plus the gradient running evenly from
+        /// start to end, corrected evenly so the end has <see cref="EndHeight"/>, as [spline_h] states it directly.
+        /// </summary>
+        public double HeightAt(double distance)
+        {
+            if (!(LengthMeters > 0.0))
+                return Height;
+            return Height + Rise(distance) + (EndHeight - Height - Rise(LengthMeters)) * distance / LengthMeters;
+        }
+
+        /// <summary>The gradient in percent after <paramref name="distance"/> metres, with the same correction as <see cref="HeightAt"/>.</summary>
+        public double GradientAtPercent(double distance)
+        {
+            if (!(LengthMeters > 0.0))
+                return 0.0;
+            var gradient = GradientStartPercent + (GradientEndPercent - GradientStartPercent) * distance / LengthMeters;
+            return gradient + (EndHeight - Height - Rise(LengthMeters)) / LengthMeters * 100.0;
+        }
+
+        private double Rise(double distance)
+        {
+            var gradient = GradientStartPercent + (GradientEndPercent - GradientStartPercent) * distance / LengthMeters;
+            return distance * (GradientStartPercent + gradient) / 200.0;
+        }
+
         public double HeadingDegrees { get; internal set; }
         public double LengthMeters { get; internal set; }
 
