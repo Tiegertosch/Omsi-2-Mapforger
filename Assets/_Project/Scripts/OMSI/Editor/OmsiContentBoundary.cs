@@ -39,8 +39,8 @@ namespace OmsiMapEditor.OMSI.Editor
         private const string EditorToolsDefinitionPath = "Assets/_Project/Scripts/OMSI/Editor/Editor.OMSI.Editor.asmdef";
 
         /// <summary>
-        /// The reviewed player files: one line per file with its SHA-256 and project path, as sha256sum writes them. It
-        /// lies outside Resources, so it does not enter the player itself.
+        /// The reviewed player files: one line per file with its SHA-256 and project path, as sha256sum writes them; text
+        /// files are hashed with LF line ends. It lies outside Resources, so it does not enter the player itself.
         /// </summary>
         public const string ReviewListPath = "Assets/_Project/Settings/PlayerAssetReview.txt";
 
@@ -231,9 +231,28 @@ namespace OmsiMapEditor.OMSI.Editor
                 if (!normalizedPath.StartsWith("Assets/", StringComparison.Ordinal) || AssetDatabase.IsValidFolder(normalizedPath) ||
                     IsCodeOrMetadata(normalizedPath) || !File.Exists(normalizedPath))
                     continue;
-                result[normalizedPath] = HashFile(Path.GetFullPath(normalizedPath));
+                result[normalizedPath] = HashReviewedFile(Path.GetFullPath(normalizedPath));
             }
             return result;
+        }
+
+        /// <summary>
+        /// SHA-256 of a file as it is reviewed: text files, those without a zero byte, with CRLF line ends read as LF, so
+        /// that a checkout with or without Git's line end conversion gives the same value.
+        /// </summary>
+        private static string HashReviewedFile(string path)
+        {
+            var bytes = File.ReadAllBytes(path);
+            if (Array.IndexOf(bytes, (byte)0) < 0)
+            {
+                var text = new List<byte>(bytes.Length);
+                for (var index = 0; index < bytes.Length; index++)
+                    if (bytes[index] != 13 || index + 1 >= bytes.Length || bytes[index + 1] != 10)
+                        text.Add(bytes[index]);
+                bytes = text.ToArray();
+            }
+            using (var sha256 = SHA256.Create())
+                return BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", string.Empty);
         }
 
         /// <summary>
