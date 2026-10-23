@@ -2311,6 +2311,9 @@ namespace OmsiMapEditor.UI
             title.AddToClassList("inspector-title");
             inspectorPanel.Add(title);
             AddInspectorValue("File", selectedTile.FileName);
+            if (currentSummary.UsesWorldCoordinates)
+                AddInspectorValue("South-west corner", OmsiWorldTiles.DescribeCorner(selectedTile.X, selectedTile.Y) + ", edge " +
+                                                       OmsiWorldTiles.EdgeMeters(selectedTile.Y + 0.5).ToString("F2") + " m");
             AddInspectorValue("Status", selectedTile.IsAvailable ? "Available" : "Missing");
             AddInspectorValue("Objects", selectedTile.ObjectCount.ToString());
             AddInspectorValue("Splines", selectedTile.SplineCount.ToString());

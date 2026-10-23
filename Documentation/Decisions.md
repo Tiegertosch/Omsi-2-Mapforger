@@ -50,7 +50,7 @@
 
 ## ADR 007: Gemessene Kachelkante für `[worldcoordinates]`-Karten
 
-**Status:** Angenommen, 20. Oktober 2026.
+**Status:** Angenommen, 20. Oktober 2026. Die gemessene Kante ist seit ADR 019 aus den Kachelnummern abgeleitet.
 
 **Entscheidung:** Karten mit `[worldcoordinates]` werden mit einer festen Kachelkante von 371,9 m auf beiden Achsen dargestellt. Klassische Karten behalten 300 m. Die Spline-Verbindungsprüfung gilt mit einer Toleranz von 0,5 m als bestanden.
 
@@ -143,3 +143,11 @@
 **Entscheidung:** Wo OMSI das Gelände ausschneidet, unter Objekten mit `[terrainhole]` und entlang von Splines mit `[terrainholeprofile]`, verwirft der Boden-Shader die Pixel einer Lochmaske je Kachel. Die Maske entsteht von oben aus dem Lochmodell bzw. aus den Bändern des Lochprofils, mit 1.024 Pixeln Kantenlänge, und wird um 0,75 m verkleinert. Spline-Profile werden mit ihren senkrechten Streifen gebaut, damit die Wände eines Trogs das Loch säumen. Profile, deren Punkte höchstens 0,6 m auseinander liegen, zeigt die Vektorebene als Linie statt als Spline: ab 2,5 m Höhe als gestrichelte Leitung, mit mindestens 1 m Höhe vom Boden als Zaun oder Mauer.
 
 **Grund:** Das Gelände ist ein Raster mit 5 m Abstand; ein Ausschnitt im Netz würde ganze Rasterfelder kosten oder neue Dreiecke brauchen, die Maske dagegen schneidet pixelgenau und kostet nur Kacheln mit Loch Speicher (in Berlin-Spandau 45 Kreuzungen und 9 Gleistrog-Splines). Ohne Verkleinerung schien an den Rändern der Kreuzungen der Himmel durch, weil die Lochmodelle etwas größer sind als ihre Fahrbahn. Ohne die Trogwände sah man durch das Loch ins Leere. Leitungen und Zäune stehen senkrecht und haben von oben keine Fläche; als orange Spline-Linie sahen sie aus wie Straßen. In Berlin-Spandau sind es 353 Leitungen und 196 Zäune und Mauern, Bordsteine und Fahrbahnmarkierungen bleiben wegen ihrer geringen Höhe Flächen.
+
+## ADR 019: `[worldcoordinates]`-Kacheln sind Web-Mercator-Kacheln
+
+**Status:** Angenommen, 23. Oktober 2026. Ergänzt ADR 007.
+
+**Entscheidung:** Die Kachelnummern einer `[worldcoordinates]`-Karte sind die Kacheln der Web-Mercator-Projektion der Zoomstufe 16, wie Webkarten sie zählen, aber von Greenwich nach Osten und vom Äquator nach Norden. Eine Kachel ist am Äquator 611,5 m breit und schrumpft mit dem Kosinus der Breite; Positionen in einer Kachel sind Meter im Maßstab ihrer eigenen Breite. Die Spline-Verbindungsprüfung rechnet Endpunkte so in Kachelspalten und -zeilen um und misst ihren Abstand dort. Die Karte wird weiter als ebenes Raster gezeichnet, mit der Kante der mittleren Kachelzeile statt eines festen Werts. Der Inspector nennt Breite und Länge der Südwestecke und die Kante der gewählten Kachel.
+
+**Grund:** Die in ADR 007 gemessenen 371,9 m sind genau die Kante einer Zoom-16-Kachel auf 52,5° Breite, und die Kachel 2402, 11279 liegt bei 52,53° N und 13,19° E, in Falkensee bei Spandau. Mit diesem Modell treffen 1.464 von 1.467 Verbindungen in Berlin-Spandau auf unter 5 cm zusammen, im Median auf 0,1 mm; mit der festen Kante waren es 34 von 354 Verbindungen über Kachelgrenzen. Ein ebenes Raster kann den Maßstabswechsel zwischen den Zeilen (2,7 cm je Zeile) nicht abbilden: Kanten je Zeile verbessern den Median, schieben aber weit von der Mitte entfernte Spalten bis 0,8 m auseinander. Exakt wäre nur eine Darstellung mit eigener Drehung und Streckung je Kachel; das beträfe Zeichnen, Auswählen und Bearbeiten überall und lohnt für wenige Zentimeter nicht. Die mittlere Zeile ergibt für Berlin-Spandau 371,93 m und passt sich bei Karten auf anderen Breiten von selbst an.

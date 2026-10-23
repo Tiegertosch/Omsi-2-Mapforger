@@ -8,13 +8,6 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Tile edge of classic maps without [worldcoordinates].</summary>
         public const double ClassicTileSizeMeters = 300.0;
 
-        /// <summary>
-        /// Tile edge of [worldcoordinates] maps, measured from Berlin-Spandau's cross-tile spline links.
-        /// OMSI derives these tiles from geographic coordinates, so the true edge varies slightly with latitude;
-        /// this constant keeps the measured links within about 0.35 m.
-        /// </summary>
-        public const double WorldCoordinateTileSizeMeters = 371.9;
-
         public string Name { get; internal set; }
         public string FriendlyName { get; internal set; }
         public string Description { get; internal set; }
@@ -22,9 +15,13 @@ namespace OmsiMapEditor.OMSI
         public string GlobalConfigPath { get; internal set; }
         public List<OmsiTileSummary> Tiles { get; } = new List<OmsiTileSummary>();
         public List<string> Warnings { get; } = new List<string>();
+        /// <summary>
+        /// The edge of the tiles in metres: 300 for classic maps; for [worldcoordinates] maps the edge of their middle row
+        /// of Web Mercator tiles (<see cref="OmsiWorldTiles.GridEdgeMeters"/>), about 371.9 m for Berlin-Spandau.
+        /// </summary>
         public double TileSizeMeters { get; internal set; } = ClassicTileSizeMeters;
 
-        /// <summary>True when global.cfg contains [worldcoordinates] and the wider tile grid applies.</summary>
+        /// <summary>True when global.cfg contains [worldcoordinates]: the tiles are Web Mercator tiles (<see cref="OmsiWorldTiles"/>).</summary>
         public bool UsesWorldCoordinates { get; internal set; }
 
         /// <summary>The [NextIDCode] value of global.cfg, or null when it is missing.</summary>

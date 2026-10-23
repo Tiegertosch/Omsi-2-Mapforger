@@ -145,7 +145,7 @@ Steigungsknicke sind in OMSI also erlaubt; die Höhe bleibt trotzdem stetig. Die
 | `[description]` | Freitext bis `[end]` | belegt |
 | `[version]` | 14 | |
 | `[NextIDCode]` | nächste freie ID | siehe unten |
-| `[worldcoordinates]` | ohne Feld; 371,9-m-Kacheln | belegt, ADR 007 |
+| `[worldcoordinates]` | ohne Feld; Web-Mercator-Kacheln der Zoomstufe 16, in Berlin-Spandau rund 371,9 m | belegt, ADR 007 und ADR 019 |
 | `[dynhelperactive]`, `[realrail]` | Flags ohne Feld | Bedeutung offen |
 | `[backgroundimage]` | Flag, Bildpfad, Breite, Höhe, zwei Versätze | Vermutung; in beiden Karten ohne Bild |
 | `[mapcam]` | Kachel-X, Kachel-Y, x, Höhe, y, drei Kamerawerte | Kachelkoordinaten belegt (2402, 11280 in Berlin-Spandau); Kamerawerte vermutlich Richtung, Neigung, Abstand |

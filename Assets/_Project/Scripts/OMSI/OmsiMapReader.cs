@@ -52,11 +52,7 @@ namespace OmsiMapEditor.OMSI
                 FriendlyName = FirstValue(sections, "friendlyname"),
                 Description = SectionText(sections, "description")
             };
-            if (HasSection(sections, "worldcoordinates"))
-            {
-                summary.UsesWorldCoordinates = true;
-                summary.TileSizeMeters = OmsiMapSummary.WorldCoordinateTileSizeMeters;
-            }
+            summary.UsesWorldCoordinates = HasSection(sections, "worldcoordinates");
 
             foreach (var mapSection in sections)
             {
@@ -108,6 +104,8 @@ namespace OmsiMapEditor.OMSI
 
             if (summary.Tiles.Count == 0)
                 summary.Warnings.Add("No valid [map] tile entries were found in global.cfg.");
+            if (summary.UsesWorldCoordinates)
+                summary.TileSizeMeters = OmsiWorldTiles.GridEdgeMeters(summary.Tiles.ConvertAll(tile => tile.Y));
 
             if (int.TryParse(FirstValue(sections, "NextIDCode"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var nextIdCode))
             {

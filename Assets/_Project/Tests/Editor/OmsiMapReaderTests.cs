@@ -179,13 +179,16 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void WorldCoordinateMapsUseTheWiderTileGrid()
         {
-            WriteOmsiText("global.cfg", "[worldcoordinates]", "", "[map]", "0", "0", "tile_0_0.map", "");
-            WriteOmsiText("tile_0_0.map", "[version]", "14", "");
+            // Rows of Berlin-Spandau: the edge of the middle row comes out as the 371.9 m measured from its splines.
+            WriteOmsiText("global.cfg", "[worldcoordinates]", "", "[map]", "2402", "11279", "tile_2402_11279.map", "",
+                "[map]", "2402", "11280", "tile_2402_11280.map", "", "[map]", "2402", "11290", "tile_2402_11290.map", "");
+            WriteOmsiText("tile_2402_11279.map", "[version]", "14", "");
 
             var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
 
             Assert.IsTrue(summary.UsesWorldCoordinates);
-            Assert.AreEqual(OmsiMapSummary.WorldCoordinateTileSizeMeters, summary.TileSizeMeters, 1e-9);
+            Assert.AreEqual(OmsiWorldTiles.EdgeMeters(11280.5), summary.TileSizeMeters, 1e-9);
+            Assert.AreEqual(371.9, summary.TileSizeMeters, 0.1);
             Assert.IsFalse(summary.Warnings.Any(warning => warning.Contains("worldcoordinates")));
         }
 

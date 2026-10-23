@@ -51,8 +51,8 @@ namespace OmsiMapEditor.OMSI
     public static class OmsiSplineContinuity
     {
         /// <summary>
-        /// Default tolerance. Classic maps meet to the millimetre; world-coordinate maps stay within about 0.35 m
-        /// because their tile edge is a measured approximation.
+        /// Default tolerance. Classic maps meet to the millimetre; world-coordinate maps, measured in their Web Mercator
+        /// tiles, within a few centimetres.
         /// </summary>
         public const double DefaultToleranceMeters = 0.5;
 
@@ -62,6 +62,10 @@ namespace OmsiMapEditor.OMSI
             public OmsiSplineRecord Record;
             public OmsiMapPoint Start;
             public OmsiMapPoint End;
+
+            /// <summary>The endpoints in metres from the tile corner, for the exact geometry of world-coordinate maps.</summary>
+            public OmsiMapPoint LocalStart;
+            public OmsiMapPoint LocalEnd;
         }
 
         public static OmsiSplineContinuityReport Check(OmsiMapSummary summary, double toleranceMeters = DefaultToleranceMeters)
@@ -83,29 +87,33 @@ namespace OmsiMapEditor.OMSI
                         continue;
                     }
 
-                    splinesById.Add(spline.Id, new PlacedSpline
+                    var placed = new PlacedSpline
                     {
                         Tile = tile,
                         Record = spline,
                         Start = OmsiMapGeometry.GetSplineEndpoint(tile, spline, summary.TileSizeMeters, false),
                         End = OmsiMapGeometry.GetSplineEndpoint(tile, spline, summary.TileSizeMeters, true)
-                    });
+                    };
+                    placed.LocalStart = new OmsiMapPoint(placed.Start.X - tile.X * summary.TileSizeMeters, placed.Start.Y - tile.Y * summary.TileSizeMeters);
+                    placed.LocalEnd = new OmsiMapPoint(placed.End.X - tile.X * summary.TileSizeMeters, placed.End.Y - tile.Y * summary.TileSizeMeters);
+                    splinesById.Add(spline.Id, placed);
                 }
             }
 
             var checkedPairs = new HashSet<long>();
             foreach (var spline in splinesById.Values)
             {
-                CheckLink(spline, spline.Record.PreviousId, spline.Start, splinesById, checkedPairs, report);
-                CheckLink(spline, spline.Record.NextId, spline.End, splinesById, checkedPairs, report);
+                CheckLink(spline, spline.Record.PreviousId, false, splinesById, checkedPairs, report, summary.UsesWorldCoordinates);
+                CheckLink(spline, spline.Record.NextId, true, splinesById, checkedPairs, report, summary.UsesWorldCoordinates);
             }
 
             report.Gaps.Sort((left, right) => right.DistanceMeters.CompareTo(left.DistanceMeters));
             return report;
         }
 
-        private static void CheckLink(PlacedSpline spline, int neighbourId, OmsiMapPoint endpoint,
-            Dictionary<int, PlacedSpline> splinesById, HashSet<long> checkedPairs, OmsiSplineContinuityReport report)
+        /// <param name="worldTiles">Measures in the Web Mercator tiles of a world-coordinate map instead of the even grid.</param>
+        private static void CheckLink(PlacedSpline spline, int neighbourId, bool atEnd,
+            Dictionary<int, PlacedSpline> splinesById, HashSet<long> checkedPairs, OmsiSplineContinuityReport report, bool worldTiles)
         {
             if (neighbourId == 0 || neighbourId == spline.Record.Id)
                 return;
@@ -119,7 +127,9 @@ namespace OmsiMapEditor.OMSI
             if (!checkedPairs.Add(PairKey(spline.Record.Id, neighbourId)))
                 return;
 
-            var distance = Math.Min(Distance(endpoint, neighbour.Start), Distance(endpoint, neighbour.End));
+            var distance = worldTiles
+                ? Math.Min(WorldDistance(spline, atEnd, neighbour, false), WorldDistance(spline, atEnd, neighbour, true))
+                : Math.Min(Distance(atEnd ? spline.End : spline.Start, neighbour.Start), Distance(atEnd ? spline.End : spline.Start, neighbour.End));
             report.LinkCount++;
             report.LargestGapMeters = Math.Max(report.LargestGapMeters, distance);
             if (distance <= report.ToleranceMeters)
@@ -143,6 +153,13 @@ namespace OmsiMapEditor.OMSI
             var low = Math.Min(first, second);
             var high = Math.Max(first, second);
             return ((long)low << 32) | (uint)high;
+        }
+
+        private static double WorldDistance(PlacedSpline first, bool firstEnd, PlacedSpline second, bool secondEnd)
+        {
+            var a = firstEnd ? first.LocalEnd : first.LocalStart;
+            var b = secondEnd ? second.LocalEnd : second.LocalStart;
+            return OmsiWorldTiles.DistanceMeters(first.Tile.X, first.Tile.Y, a.X, a.Y, second.Tile.X, second.Tile.Y, b.X, b.Y);
         }
 
         private static double Distance(OmsiMapPoint first, OmsiMapPoint second)

@@ -78,7 +78,7 @@ namespace OmsiMapEditor.Tests
         public void CrossTileLinkUsesTheMapTileSize()
         {
             // The same records meet on a 371.9 m world-coordinate grid but not on the classic 300 m grid.
-            var worldMap = Map(OmsiMapSummary.WorldCoordinateTileSizeMeters);
+            var worldMap = Map(371.9);
             Tile(worldMap, 0, 0).Splines.Add(Spline(1, 0, 2, 361.9, 100, 90, 20, 0));
             Tile(worldMap, 1, 0).Splines.Add(Spline(2, 1, 0, 10, 100, 90, 20, 0));
             var classicMap = Map(OmsiMapSummary.ClassicTileSizeMeters);
