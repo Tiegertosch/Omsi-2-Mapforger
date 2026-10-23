@@ -207,6 +207,14 @@
 .panel-info { margin-top: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .panel-info-warning { color: var(--mf-color-warning); }
 .panel-toggle { margin: 0 0 var(--mf-space-2); }
+.road-panel { position: absolute; left: 296px; bottom: 0; width: 360px; height: 360px; }
+.road-profile { margin-bottom: var(--mf-space-2); -unity-font: url("Fonts/Inter-SemiBold.ttf"); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.road-fields { flex-direction: row; justify-content: space-between; margin-top: var(--mf-space-1); }
+.road-field { flex-direction: column; width: 31%; margin: 0; }
+.road-field > Label { min-width: 0; margin-bottom: 2px; font-size: 10px; color: var(--mf-color-text-secondary); }
+.road-field .unity-base-text-field__input { height: 26px; padding-left: 6px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.road-field .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
+.road-field:disabled { opacity: 0.45; }
 .panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
 .panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }

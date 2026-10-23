@@ -28,6 +28,9 @@ namespace OmsiMapEditor.UI
             public double[] After;
             public OmsiObjectChange Change;
 
+            /// <summary>Splines built or deleted; undone and redone as one step.</summary>
+            public OmsiSplineChange SplineChange;
+
             /// <summary>Several steps done together, such as moving a selection; undone in reverse order.</summary>
             public List<ObjectEditStep> Group;
         }
@@ -73,6 +76,24 @@ namespace OmsiMapEditor.UI
         private int routesGeneration;
         private string highlightedLine;
         private readonly Dictionary<string, Button> lineEntries = new Dictionary<string, Button>(StringComparer.Ordinal);
+
+        // Road tool: the road being drawn starts at roadStart, continuing a spline end when roadStartJoin is set. Each
+        // click builds the road to the click as splines and continues from its end; Esc ends the road.
+        private RoadToolPanel roadPanel;
+        private bool roadStarted;
+        private OmsiMapPoint roadStart;
+        private double? roadStartHeading;
+        private double? roadStartHeight;
+        private OmsiSplineEnd roadStartJoin;
+        private OmsiMapPoint? roadPointer;
+        private OmsiTerrainSampler roadTerrain;
+
+        /// <summary>A road snaps to a free spline end within this many pixels.</summary>
+        private const float RoadSnapPixels = 12f;
+
+        // A spline clicked in the map; it is shown in the inspector and can be deleted.
+        private OmsiTileSummary selectedSplineTile;
+        private OmsiSplineRecord selectedSpline;
 
         // Chrono view: the map as OMSI loads it on a date, with the variants active then laid over the base map. It is
         // read-only; the base map stays in baseSummary and returns unchanged.
@@ -220,6 +241,11 @@ namespace OmsiMapEditor.UI
                 objectsPanel.ObjectChosen += StartPlacement;
                 objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
                 objectsPanelHost.Add(objectsPanel);
+                roadPanel = new RoadToolPanel();
+                roadPanel.style.display = DisplayStyle.None;
+                roadPanel.CloseRequested += () => SetTool(EditorTool.Drag);
+                roadPanel.SettingsChanged += UpdateRoadPreview;
+                objectsPanelHost.Add(roadPanel);
             }
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -269,6 +295,13 @@ namespace OmsiMapEditor.UI
                 mapCanvas.ObjectsBoxSelected += AddToSelection;
                 mapCanvas.ObjectsEdited += CommitEdits;
                 mapCanvas.PlacementRequested += PlaceChosenObject;
+                mapCanvas.SplineClicked += SelectSpline;
+                mapCanvas.RoadPointerMoved += (x, y) =>
+                {
+                    roadPointer = new OmsiMapPoint(x, y);
+                    UpdateRoadPreview();
+                };
+                mapCanvas.RoadClicked += BuildRoadTo;
                 mapCanvas.PointerInfoChanged += text =>
                 {
                     if (pointerInfoLabel != null)
@@ -498,6 +531,8 @@ namespace OmsiMapEditor.UI
         {
             if (mapCanvas == null || groundRenderer == null || currentSummary == null)
                 return;
+            if (activeTool == EditorTool.Road)
+                SetTool(EditorTool.Drag);
             // The 3D view consists of the textured scene, so it shows textures and keeps the choice from above for later.
             if (mapCanvas.ThreeDimensional)
             {
@@ -575,6 +610,8 @@ namespace OmsiMapEditor.UI
         /// <c>-place Sceneryobjects\...\object.sco</c> with the
         /// preview at the centre of the view,
         /// <c>-newMap [template global.cfg]</c> without a map to show the new-map dialog,
+        /// <c>-road tileX tileY x1 y1 x2 y2 ...</c> to click road points with the road tool (the last point is only
+        /// pointed at unless <c>-roadBuild</c> follows), <c>-selectSpline id</c>,
         /// <c>-screenshot file.png</c>, taken once ground, objects and outlines are loaded, and
         /// <c>-quit</c>.
         /// </summary>
@@ -678,6 +715,41 @@ namespace OmsiMapEditor.UI
                 var chronoStarted = Time.realtimeSinceStartup;
                 while (chronoTask != null && Time.realtimeSinceStartup - chronoStarted < 120f)
                     yield return null;
+            }
+
+            var roadAt = Array.IndexOf(args, "-road");
+            if (roadAt >= 0 && int.TryParse(Argument("-road", 1), out var roadTileX) && int.TryParse(Argument("-road", 2), out var roadTileY))
+            {
+                var points = new List<OmsiMapPoint>();
+                for (var index = roadAt + 3; index + 1 < args.Length; index += 2)
+                {
+                    if (!double.TryParse(args[index], NumberStyles.Float, CultureInfo.InvariantCulture, out var roadLocalX) ||
+                        !double.TryParse(args[index + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var roadLocalY))
+                        break;
+                    points.Add(OmsiMapGeometry.TileLocalToWorld(roadTileX, roadTileY, roadLocalX, roadLocalY, currentSummary.TileSizeMeters));
+                }
+                SetTool(EditorTool.Road);
+                // The profile list fills once the installation is listed.
+                var scanStarted = Time.realtimeSinceStartup;
+                while (installationScan != null && !installationScan.IsCompleted && Time.realtimeSinceStartup - scanStarted < 120f)
+                    yield return null;
+                yield return null;
+                var build = Array.IndexOf(args, "-roadBuild") >= 0;
+                for (var index = 0; index < points.Count; index++)
+                {
+                    roadPointer = points[index];
+                    if (index < points.Count - 1 || build)
+                        BuildRoadTo(points[index].X, points[index].Y);
+                    else
+                        UpdateRoadPreview();
+                }
+            }
+
+            if (int.TryParse(Argument("-selectSpline", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var splineId))
+            {
+                var splineTile = currentSummary.Tiles.Find(tile => tile.Splines.Exists(spline => spline.Id == splineId));
+                if (splineTile != null)
+                    SelectSpline(splineTile, splineTile.Splines.Find(spline => spline.Id == splineId));
             }
 
             if (Array.IndexOf(args, "-routes") >= 0)
@@ -883,6 +955,13 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void PresentSummary(OmsiMapSummary summary, bool keepView)
         {
+            // Roads are drawn on the summary shown; another map or a chrono view ends the road tool and the spline selection.
+            if (activeTool == EditorTool.Road)
+            {
+                activeTool = EditorTool.Drag;
+                EndRoadTool();
+            }
+            ClearSelectedSpline();
             var previousTile = selectedTile;
             var previousObjectId = selectedObject?.Id;
             currentSummary = summary;
@@ -1148,6 +1227,313 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
+        private void SelectSpline(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            if (tile == null || spline == null)
+                return;
+            selection.Clear();
+            selectedSplineTile = tile;
+            selectedSpline = spline;
+            mapCanvas?.SetSelectedSpline(spline);
+            ApplySelection(tile);
+            SetStatus("Selected spline #" + spline.Id + " (" + spline.AssetPath + ")" +
+                      (CanEdit ? "; Del deletes it." : " - " + (chronoDate != null ? "chrono view, read-only" : "read-only; save a project to edit")));
+        }
+
+        private void ClearSelectedSpline()
+        {
+            if (selectedSpline == null)
+                return;
+            selectedSpline = null;
+            selectedSplineTile = null;
+            mapCanvas?.SetSelectedSpline(null);
+        }
+
+        /// <summary>Deletes the selected spline as one undo step; joined splines get an open end, references keep it.</summary>
+        private void DeleteSelectedSpline()
+        {
+            if (selectedSpline == null || selectedSplineTile == null)
+                return;
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("delete splines"));
+                return;
+            }
+            OmsiSplineChangeResult result;
+            try
+            {
+                result = session.DeleteSpline(currentSummary, selectedSplineTile, selectedSpline);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not delete spline #" + selectedSpline.Id + ": " + exception.Message);
+                return;
+            }
+            if (!result.Succeeded)
+            {
+                var reasons = new List<string>();
+                foreach (var blocker in result.Blockers)
+                    if (reasons.Count < 3)
+                        reasons.Add(blocker.ToString());
+                SetStatus("Spline #" + selectedSpline.Id + " stays: " + result.Blockers.Count + " reference(s) still need it, such as " + string.Join("; ", reasons) + ".");
+                return;
+            }
+            var id = selectedSpline.Id;
+            PushHistory(new ObjectEditStep { SplineChange = result.Change });
+            ClearSelectedSpline();
+            RefreshSplineViews(result.Change);
+            RenderInspector();
+            SetStatus("Deleted spline #" + id + "; Ctrl+Z brings it back.");
+        }
+
+        /// <summary>Draws the changed splines again from above and in 3D and updates the counts.</summary>
+        private void RefreshSplineViews(OmsiSplineChange change)
+        {
+            mapCanvas?.RefreshSplines();
+            if (groundRenderer != null && !groundRenderer.RefreshSplines(change.Tiles))
+                Debug.Log("Spline surfaces follow when the ground has finished loading.");
+            if (selectedSpline != null)
+            {
+                // Undo and redo read the tiles again; the selected record is found again by its ID, or the selection ends.
+                var id = selectedSpline.Id;
+                var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+                if (tile == null)
+                    ClearSelectedSpline();
+                else
+                {
+                    selectedSplineTile = tile;
+                    selectedSpline = tile.Splines.Find(spline => spline.Id == id);
+                    mapCanvas?.SetSelectedSpline(selectedSpline);
+                }
+            }
+            UpdateCounts();
+            foreach (var tile in change.Tiles)
+                UpdateBrowserEntry(tile);
+            UpdateMapStateLabel();
+            RenderInspector();
+            if (routes != null || routesTask != null)
+                ScheduleRoutesRebuild();
+        }
+
+        private void BeginRoadTool()
+        {
+            if (roadPanel == null || mapCanvas == null || currentSummary == null)
+                return;
+            StartInstallationScan();
+            UpdateRoadProfiles();
+            roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
+            objectsPanel.style.display = DisplayStyle.None;
+            roadPanel.style.display = DisplayStyle.Flex;
+            objectsPanelHost.style.display = DisplayStyle.Flex;
+            EndRoad();
+            mapCanvas.BeginRoad();
+            SetStatus("Road: click to start a road, on a free spline end to continue it; click again for each bend, Esc ends the road.");
+        }
+
+        private void EndRoadTool()
+        {
+            EndRoad();
+            mapCanvas?.EndRoad();
+            if (roadPanel != null)
+                roadPanel.style.display = DisplayStyle.None;
+            if (objectsPanelHost != null && !objectsPanelOpen)
+                objectsPanelHost.style.display = DisplayStyle.None;
+            roadTerrain = null;
+        }
+
+        /// <summary>Ends the road being drawn; the next click starts a new one.</summary>
+        private void EndRoad()
+        {
+            roadStarted = false;
+            roadStartJoin = null;
+            roadStartHeading = null;
+            roadStartHeight = null;
+            UpdateRoadPreview();
+        }
+
+        /// <summary>The spline profiles of the installation and of the map, with the map's counts, for the road panel.</summary>
+        private void UpdateRoadProfiles()
+        {
+            if (roadPanel == null || currentSummary == null)
+                return;
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tile in currentSummary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    counts.TryGetValue(spline.AssetPath, out var count);
+                    counts[spline.AssetPath] = count + 1;
+                }
+            roadPanel.SetProfiles(installationCatalog?.SplineProfiles, counts);
+        }
+
+        private OmsiSplineEnd SnapEnd(OmsiMapPoint point)
+        {
+            var reach = Math.Max(0.5, RoadSnapPixels * (mapCanvas?.MetersPerPixel ?? 1f));
+            var end = OmsiSplineEnd.FindFree(currentSummary, point.X, point.Y, reach);
+            // The road never joins the end it starts from.
+            if (end != null && roadStartJoin != null && ReferenceEquals(end.Spline, roadStartJoin.Spline) && end.AtEnd == roadStartJoin.AtEnd)
+                return null;
+            return end;
+        }
+
+        /// <summary>The road from the current start to <paramref name="target"/>, joining a free spline end there if there is one.</summary>
+        private OmsiRoadPlan PlanRoad(OmsiMapPoint target, out OmsiSplineEnd endJoin)
+        {
+            endJoin = SnapEnd(target);
+            var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? target;
+            var request = new OmsiRoadRequest
+            {
+                StartX = roadStart.X, StartY = roadStart.Y, StartHeadingDegrees = roadStartHeading, StartHeight = roadStartHeight, EndX = end.X, EndY = end.Y,
+                HeightMode = roadPanel.HeightMode, MaximumPieceLength = roadPanel.PieceLength, GradientWarningPercent = roadPanel.GradientWarningPercent,
+                EndHeight = endJoin?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
+                // Driving into the joined spline continues opposite to the way a road would leave it.
+                EndJoinHeadingDegrees = endJoin != null ? endJoin.OutwardHeadingDegrees + 180.0 : (double?)null
+            };
+            return OmsiRoadPlanner.Plan(request, roadTerrain);
+        }
+
+        /// <summary>Plans the road to the pointer and shows it, or the spline end a click would start from.</summary>
+        private void UpdateRoadPreview()
+        {
+            if (mapCanvas == null || roadPanel == null || activeTool != EditorTool.Road || currentSummary == null)
+                return;
+            if (!roadPointer.HasValue)
+            {
+                mapCanvas.ClearRoadPreview();
+                return;
+            }
+            if (!roadStarted)
+            {
+                var join = SnapEnd(roadPointer.Value);
+                mapCanvas.SetRoadPreview(null, true, null, join?.Position(currentSummary.TileSizeMeters), null);
+                roadPanel.ShowPlan(join != null
+                    ? "Click to continue spline #" + join.Spline.Id + " from its " + (join.AtEnd ? "end" : "start") + "."
+                    : "Click to start a road. Free spline ends show as circles; starting on one continues it.", false);
+                return;
+            }
+
+            var offset = Math.Sqrt((roadPointer.Value.X - roadStart.X) * (roadPointer.Value.X - roadStart.X) +
+                                   (roadPointer.Value.Y - roadStart.Y) * (roadPointer.Value.Y - roadStart.Y));
+            if (offset < OmsiRoadPlanner.MinimumLength)
+            {
+                // Right after a click the pointer still rests on the new start.
+                mapCanvas.SetRoadPreview(null, true, null, null, roadStart);
+                roadPanel.ShowPlan("Click where the road should go next; Esc ends it.", false);
+                return;
+            }
+            var plan = PlanRoad(roadPointer.Value, out var endJoin);
+            var pieces = new List<OmsiMapPoint[]>();
+            foreach (var piece in plan.Pieces)
+            {
+                var steps = Math.Max(2, (int)Math.Ceiling(piece.LengthMeters / 2.0));
+                var points = new OmsiMapPoint[steps + 1];
+                for (var step = 0; step <= steps; step++)
+                {
+                    piece.PointAt(piece.LengthMeters * step / steps, out var x, out var y, out _);
+                    points[step] = new OmsiMapPoint(x, y);
+                }
+                pieces.Add(points);
+            }
+            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues, endJoin?.Position(currentSummary.TileSizeMeters), roadStart);
+            roadPanel.ShowPlan(DescribePlan(plan, endJoin), plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
+        }
+
+        private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin)
+        {
+            var text = plan.Pieces.Count == 0
+                ? "No road here."
+                : plan.LengthMeters.ToString("F1") + " m in " + plan.Pieces.Count + " spline(s), " +
+                  (plan.Pieces[0].RadiusMeters == 0 ? "straight" : "radius " + Math.Abs(plan.Pieces[0].RadiusMeters).ToString("F0") + " m") +
+                  ", gradient up to " + plan.MaximumGradientPercent.ToString("F1") + " %, end height " + plan.EndHeight.ToString("F2") + " m" +
+                  (endJoin != null ? "; joins spline #" + endJoin.Spline.Id : string.Empty) + ".";
+            foreach (var issue in plan.Issues)
+                text += "\n" + issue.Severity + ": " + issue.Message;
+            return text;
+        }
+
+        /// <summary>A click with the road tool: starts a road, or builds it to the click and continues from its end.</summary>
+        private void BuildRoadTo(double x, double y)
+        {
+            if (currentSummary == null || roadPanel == null)
+                return;
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("build roads"));
+                return;
+            }
+            var point = new OmsiMapPoint(x, y);
+            roadPointer = point;
+            if (!roadStarted)
+            {
+                var join = SnapEnd(point);
+                roadStartJoin = join;
+                roadStart = join?.Position(currentSummary.TileSizeMeters) ?? point;
+                roadStartHeading = join?.OutwardHeadingDegrees;
+                roadStartHeight = join?.Height;
+                if (join == null && roadPanel.HeightMode == OmsiRoadHeightMode.Manual)
+                    roadStartHeight = roadTerrain != null && roadTerrain.TryGetHeight(point.X, point.Y, out var ground) ? ground : roadPanel.EndHeight;
+                if (roadPanel.HeightMode == OmsiRoadHeightMode.Manual && roadStartHeight.HasValue)
+                    roadPanel.SuggestEndHeight(roadStartHeight.Value);
+                roadStarted = true;
+                UpdateRoadPreview();
+                SetStatus(join != null ? "Continuing spline #" + join.Spline.Id + ". Click where the road should go; Esc ends it."
+                    : "Road started. Click where it should go; it leaves straight towards the first click and then bends tangentially.");
+                return;
+            }
+
+            if (roadPanel.Profile == null)
+            {
+                SetStatus("Choose a spline profile in the road panel first.");
+                return;
+            }
+            var plan = PlanRoad(point, out var endJoin);
+            if (plan.HasErrors)
+            {
+                SetStatus("This road cannot be built: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                return;
+            }
+            OmsiSplineChange change;
+            try
+            {
+                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, roadStartJoin, endJoin);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The road could not be built: " + exception.Message);
+                return;
+            }
+            PushHistory(new ObjectEditStep { SplineChange = change });
+            RefreshSplineViews(change);
+
+            var warnings = plan.Issues.FindAll(issue => issue.Severity != OmsiRoadIssueSeverity.Note).Count;
+            var built = "Built " + plan.LengthMeters.ToString("F1") + " m of road in " + change.SplineIds.Count + " spline(s)" +
+                        (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty);
+            if (endJoin != null)
+            {
+                EndRoad();
+                SetStatus(built + ", joined to spline #" + endJoin.Spline.Id + ". Click to start the next road.");
+                return;
+            }
+            // The road continues from the end of its last spline.
+            var lastId = change.SplineIds[change.SplineIds.Count - 1];
+            var lastTile = currentSummary.Tiles.Find(tile => tile.Splines.Exists(spline => spline.Id == lastId));
+            var last = lastTile?.Splines.Find(spline => spline.Id == lastId);
+            if (last == null)
+            {
+                EndRoad();
+                SetStatus(built + ".");
+                return;
+            }
+            roadStartJoin = new OmsiSplineEnd(lastTile, last, true);
+            roadStart = roadStartJoin.Position(currentSummary.TileSizeMeters);
+            roadStartHeading = roadStartJoin.OutwardHeadingDegrees;
+            roadStartHeight = roadStartJoin.Height;
+            UpdateRoadPreview();
+            SetStatus(built + ". Click to go on, Esc ends the road, Ctrl+Z takes it back.");
+        }
+
         /// <summary>Builds the routes again 300 ms after the last edit; edits in between push the build back.</summary>
         private void ScheduleRoutesRebuild()
         {
@@ -1245,6 +1631,7 @@ namespace OmsiMapEditor.UI
                 return;
 
             selection.Clear();
+            ClearSelectedSpline();
             ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, null);
@@ -1257,6 +1644,8 @@ namespace OmsiMapEditor.UI
             var previousTile = selectedTile;
             selectedTile = tile;
             selectedObject = selection.Count > 0 ? selection[selection.Count - 1].Record : null;
+            if (selection.Count > 0)
+                ClearSelectedSpline();
             if (!ReferenceEquals(previousTile, tile))
             {
                 SetTileHighlight(previousTile, false);
@@ -1469,7 +1858,18 @@ namespace OmsiMapEditor.UI
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
-                if (evt.keyCode == KeyCode.Escape && mapCanvas != null && mapCanvas.IsPlacing)
+                if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
+                {
+                    if (roadStarted)
+                    {
+                        EndRoad();
+                        SetStatus("Road ended. Click to start the next one, Esc leaves the road tool.");
+                    }
+                    else
+                        SetTool(EditorTool.Drag);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && mapCanvas != null && mapCanvas.IsPlacing)
                 {
                     StopPlacement();
                     SetStatus("Placement stopped.");
@@ -1491,9 +1891,19 @@ namespace OmsiMapEditor.UI
                     SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
                     evt.StopPropagation();
                 }
+                else if (evt.keyCode == KeyCode.R && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Road ? EditorTool.Drag : EditorTool.Road);
+                    evt.StopPropagation();
+                }
                 else if (evt.keyCode == KeyCode.Delete && selection.Count > 0)
                 {
                     DeleteSelectedObjects();
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Delete && selectedSpline != null)
+                {
+                    DeleteSelectedSpline();
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Q || evt.keyCode == KeyCode.W || evt.keyCode == KeyCode.E)
@@ -1562,6 +1972,16 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (step.SplineChange != null)
+            {
+                if (undo)
+                    session.Undo(currentSummary, step.SplineChange);
+                else
+                    session.Redo(currentSummary, step.SplineChange);
+                RefreshSplineViews(step.SplineChange);
+                return;
+            }
+
             if (step.Change != null)
             {
                 if (undo)
@@ -1596,6 +2016,9 @@ namespace OmsiMapEditor.UI
                 CollectIds(step, ids);
                 return "the change of " + ids.Count + " objects";
             }
+            if (step.SplineChange != null)
+                return (step.SplineChange.Kind == OmsiSplineChangeKind.Creation ? "the road of " : "the deletion of ") +
+                       (step.SplineChange.SplineIds.Count == 1 ? "spline #" + step.SplineChange.SplineIds[0] : step.SplineChange.SplineIds.Count + " splines");
             if (step.Change == null)
                 return "the change of object #" + step.ObjectId;
             switch (step.Change.Kind)
@@ -1614,6 +2037,8 @@ namespace OmsiMapEditor.UI
             if (step.Group != null)
                 foreach (var part in step.Group)
                     CollectIds(part, ids);
+            else if (step.SplineChange != null)
+                ids.UnionWith(step.SplineChange.SplineIds);
             else
                 ids.Add(step.Change?.Record.Id ?? step.ObjectId);
         }
@@ -1731,9 +2156,12 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (activeTool == EditorTool.Road)
+                SetTool(EditorTool.Drag);
             UpdateObjectsCatalog();
             StartInstallationScan();
             objectsPanelOpen = true;
+            objectsPanel.style.display = DisplayStyle.Flex;
             objectsPanelHost.style.display = DisplayStyle.Flex;
             objectsPanel.FocusSearch();
             UpdateToolbar();
@@ -1791,6 +2219,8 @@ namespace OmsiMapEditor.UI
                               installationCatalog.Objects.Count + " objects, " + installationCatalog.Thumbnails.Count + " nEditor previews.");
                 }
                 objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
+                if (activeTool == EditorTool.Road)
+                    UpdateRoadProfiles();
             }).Every(150);
         }
 
@@ -2201,15 +2631,27 @@ namespace OmsiMapEditor.UI
                 return;
             if (tool != EditorTool.Drag && (!CanEdit))
             {
-                SetStatus(ReadOnlyMessage("move or rotate objects"));
+                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : "move or rotate objects"));
+                return;
+            }
+            if (tool == EditorTool.Road && mapCanvas != null && mapCanvas.ThreeDimensional)
+            {
+                SetStatus("Roads are built in the view from above; switch off 3D first.");
                 return;
             }
             // Another tool ends placing and closes the object library.
             ShowObjectsPanel(false);
+            var wasRoad = activeTool == EditorTool.Road;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
+            if (tool == EditorTool.Road)
+                BeginRoadTool();
+            else if (wasRoad)
+                EndRoadTool();
             UpdateToolbar();
+            if (tool == EditorTool.Road)
+                return;
             SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
                 : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."
                 : "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.");
@@ -2837,6 +3279,8 @@ namespace OmsiMapEditor.UI
                 AddSelectionSummary(records);
             else if (selectedObject != null)
                 AddObjectEditor(records, selectedObject);
+            else if (selectedSpline != null)
+                AddSplineDetails(records, selectedSpline);
             else if (IsTileEdited(selectedTile))
                 AddRevertTileButton(records);
 
@@ -2876,7 +3320,11 @@ namespace OmsiMapEditor.UI
                 var details = "#" + spline.Id + "  " + spline.AssetPath + "\n" +
                               "X " + spline.LocalX.ToString("F1") + "  Y " + spline.LocalY.ToString("F1") +
                               "  " + spline.LengthMeters.ToString("F1") + " m  •  R " + spline.RadiusMeters.ToString("F1") + " m";
-                AddInspectorRecord(records, details, "inspector-record");
+                var record = AddInspectorRecord(records, details, "inspector-record");
+                record.AddToClassList("inspector-record-clickable");
+                record.EnableInClassList("inspector-record-selected", ReferenceEquals(spline, selectedSpline));
+                var capturedSpline = spline;
+                record.RegisterCallback<ClickEvent>(_ => SelectSpline(selectedTile, capturedSpline));
             }
             inspectorPanel.Add(records);
         }
@@ -3001,6 +3449,36 @@ namespace OmsiMapEditor.UI
             field.AddToClassList("inspector-edit-field");
             container.Add(field);
             return field;
+        }
+
+        /// <summary>The selected spline: its profile, geometry, heights and neighbours, and the way to delete it.</summary>
+        private void AddSplineDetails(VisualElement container, OmsiSplineRecord spline)
+        {
+            var editor = new VisualElement();
+            editor.AddToClassList("inspector-edit");
+            var heading = new Label("SELECTED SPLINE");
+            heading.AddToClassList("inspector-section-heading");
+            editor.Add(heading);
+            var gradient = spline.LengthMeters > 0 ? (spline.EndHeight - spline.Height) / spline.LengthMeters * 100.0 : 0.0;
+            var text = "#" + spline.Id + "  " + spline.AssetPath + "\n" +
+                       "Length " + spline.LengthMeters.ToString("F1") + " m  •  " +
+                       (spline.RadiusMeters == 0 ? "straight" : "radius " + spline.RadiusMeters.ToString("F1") + " m") + "  •  heading " +
+                       spline.HeadingDegrees.ToString("F1") + "°\n" +
+                       "Height " + spline.Height.ToString("F2") + " to " + spline.EndHeight.ToString("F2") + " m  •  mean gradient " +
+                       gradient.ToString("F1") + " %\n" +
+                       "Joined at start: " + (spline.PreviousId == 0 ? "open" : "#" + spline.PreviousId) + "  •  at end: " +
+                       (spline.NextId == 0 ? "open" : "#" + spline.NextId);
+            var details = new Label(text);
+            details.AddToClassList("inspector-edit-name");
+            editor.Add(details);
+            if (CanEdit)
+            {
+                var delete = new Button(DeleteSelectedSpline) { text = "Delete spline" };
+                delete.AddToClassList("map-control-button");
+                delete.AddToClassList("inspector-edit-delete");
+                editor.Add(delete);
+            }
+            container.Add(editor);
         }
 
         private void AddRevertTileButton(VisualElement container)

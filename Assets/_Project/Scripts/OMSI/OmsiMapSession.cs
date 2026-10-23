@@ -88,7 +88,7 @@ namespace OmsiMapEditor.OMSI
     /// An opened map: read-only when opened directly, editable through the project workspace when opened as a
     /// project. Edits are saved into the workspace immediately (ADR 009).
     /// </summary>
-    public sealed class OmsiMapSession
+    public sealed partial class OmsiMapSession
     {
         // Read once on the first placement; it remembers every ID handed out since, also of undone placements.
         private OmsiIdAllocator ids;

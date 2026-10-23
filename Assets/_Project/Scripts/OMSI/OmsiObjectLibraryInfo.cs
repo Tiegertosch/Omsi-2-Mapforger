@@ -19,6 +19,9 @@ namespace OmsiMapEditor.OMSI
 
         public List<string> Objects { get; private set; } = new List<string>();
 
+        /// <summary>The spline profiles (.sli) below <c>Splines</c>, relative to the installation, for building roads.</summary>
+        public List<string> SplineProfiles { get; } = new List<string>();
+
         /// <summary>The <c>[groups]</c> of each object that lists any, by object path.</summary>
         public Dictionary<string, List<string>> Groups { get; } = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -49,6 +52,13 @@ namespace OmsiMapEditor.OMSI
                     }
                 }
                 catalog.Objects.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+            var splines = Path.Combine(installationRoot, "Splines");
+            if (Directory.Exists(splines))
+            {
+                foreach (var path in Directory.EnumerateFiles(splines, "*.sli", SearchOption.AllDirectories))
+                    catalog.SplineProfiles.Add(path.Substring(installationRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                catalog.SplineProfiles.Sort(StringComparer.OrdinalIgnoreCase);
             }
             catalog.Origins = OmsiContentOrigins.ForInstallation(installationRoot, steamRoots);
             catalog.Thumbnails = NEditorThumbnails.ForInstallation(installationRoot);

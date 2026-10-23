@@ -60,7 +60,10 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Modelle beim Ziehen und Drehen mitbewegen, auf dem Gelände unter der neuen Position
 - [x] Bäume als Kuppel mit dem Kronenausschnitt ihrer Seitentextur zeigen statt als Scheibe in Durchschnittsfarbe
 - [x] Speicher und Ladezeit der Bodentexturen großer Karten begrenzen: Masken werden erst gelesen, wenn ihre Kachel in die Nähe des Ausschnitts kommt (von oben bis 3 km Bildhöhe, in 3D im Umkreis des Kamerablicks), höchstens 96 Kacheln behalten sie, die am längsten unsichtbaren geben sie zuerst wieder ab
-- Geometrie- und Straßenwerkzeuge entwerfen
+- Straßenbau nach den Briefings vom 23. Oktober 2026, Straßen als OMSI-Splines (ADR 021):
+  - [x] Etappe 1: Straßenwerkzeug (R) in der Draufsicht; Profil aus den `.sli`-Dateien wählen, Punkte klicken, Vorschau als tangentialer Bogen, an freie Spline-Enden andocken; Höhen „Gelände folgen“ oder „Manuell“, Stücke von höchstens 25 m, Warnungen zu Steigung, Knick, Gelände; Splines anklicken, im Inspector ansehen, mit Entf löschen; Rückgängig für Bauen und Löschen
+  - Etappe 2: Vorhandene Splines bearbeiten (Enden verschieben, Radius, Höhen), geglätteter Höhenverlauf ohne Steigungsknicke, Modus „unabhängig vom Gelände“ für Brücken, Bauen in 3D
+  - Etappe 3: Straßen an Kreuzungsobjekte (`[splinehelper]`) anschließen und prüfen; Korridor für spätere Geländeanpassung (Einschnitt, Aufschüttung) nicht destruktiv vorbereiten
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
 - [x] Validierungsberichte und Integritätsprüfungen ergänzen: Bericht unter **Tools** mit zehn Themen (Import, Spline-Verbindungen, IDs und `[NextIDCode]`, Einstiegspunkte samt Index und Winkel, Anhängungen und verwaiste Wiederholungen, `[varparent]`-Ziele, fehlende Objekt- und Spline-Dateien, Fahrplan, Chrono-Auswahlen, DLC-Objekte), im Hintergrund berechnet, mit Sprung zur Kachel und „Copy report“
 - [x] Freigabeschritt für Player-Assets vor einer öffentlichen Auslieferung wieder einführen (siehe ADR 005): Freigabeliste `PlayerAssetReview.txt` mit SHA-256 je Player-Datei, normaler Build warnt, Release-Build bricht ab, Menübefehl „Record Reviewed Player Assets...“
@@ -74,7 +77,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Typisierte Zugriffe für Objekte, Splines und Anhängungen auf dem verlustfreien Modell aufbauen
 - [x] Neue IDs aus `[NextIDCode]` und höchster vorhandener ID vergeben; ein veralteter `[NextIDCode]` wird beim Lesen gemeldet
 - [x] Strukturelle Änderungen ermöglichen: Datensätze einfügen und löschen, Beschriftungsanzahl und `mirror` ändern und abhängige Indizes nachführen
-- Splines mit Nachbarn löschen und die Nachbarverweise in anderen Kacheln mitführen; bisher wird das Löschen dann verweigert
+- [x] Splines mit Nachbarn löschen und die Nachbarverweise in anderen Kacheln mitführen: die Nachbarn bekommen ein offenes Ende; Anhängungen, Fahrplan und Chrono verhindern das Löschen (ADR 021)
 - [x] Erste Bearbeitung in der App: Objekte auswählen, Position und Richtung ändern, in der Arbeitskopie speichern, Kachel zurücksetzen und als eigene Karte exportieren
 - [x] Exportierte Karte in OMSI laden und die geänderten Objekte im Spiel prüfen (20. Oktober 2026: verschobene Scheune in Grundorf im Spiel sichtbar)
 - [x] Durchgehende 2D-Draufsicht mit Zoom und Verschieben; Objekte per Ziehen verschieben, am Griff drehen und Änderungen rückgängig machen
@@ -87,7 +90,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Mehrere Objekte gemeinsam drehen
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
 - Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen; bisher wird 0 geschrieben und ein Hinweis angezeigt
-- Andere Elemente anlegen und löschen: angehängte Objekte, Spline-Anhängungen und Splines
+- Andere Elemente anlegen und löschen: angehängte Objekte und Spline-Anhängungen (Splines: siehe Straßenbau)
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht
 - [x] Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern: Bereich „Chrono“ im Projekt-Panel mit Datum, Variantenliste und „Base map“, Überlagerung im Hintergrund, Linienwege aus dem Fahrplan des Datums, Ansicht schreibgeschützt (ADR 020)

@@ -164,6 +164,8 @@ namespace OmsiMapEditor.UI
 
         private sealed class SplinePath
         {
+            public OmsiTileSummary Tile;
+            public OmsiSplineRecord Record;
             public string AssetPath;
             public Vector2[] Points;
             public Rect Bounds;
@@ -200,6 +202,19 @@ namespace OmsiMapEditor.UI
 
         /// <summary>Stop names are written from this scale on, or further out for the stops of the highlighted line.</summary>
         private const float StopLabelMetersPerPixel = 1.2f;
+
+        // Road drawing: the canvas reports the pointer and clicks in world metres; the shell plans the road and hands back
+        // what to draw. Previews are only drawn, never part of the map until the shell builds them.
+        private bool roadMode;
+        private readonly List<Vector2[]> roadPreview = new List<Vector2[]>();
+        private bool roadPreviewValid;
+        private readonly List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>> roadIssues = new List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>>();
+        private Vector2? roadSnap;
+        private Vector2? roadStart;
+        private OmsiSplineRecord selectedSpline;
+
+        /// <summary>Free spline ends are drawn while building roads from this scale on.</summary>
+        private const float FreeEndMetersPerPixel = 2f;
         private const float HighlightedStopLabelMetersPerPixel = 6f;
 
         /// <summary>Average width of a character of a stop name at 12 px, for keeping names apart.</summary>
@@ -373,6 +388,15 @@ namespace OmsiMapEditor.UI
 
         /// <summary>Empty space inside a tile was clicked.</summary>
         public event Action<OmsiTileSummary> TileClicked;
+
+        /// <summary>A spline was clicked where no object is.</summary>
+        public event Action<OmsiTileSummary, OmsiSplineRecord> SplineClicked;
+
+        /// <summary>While building roads: the pointer moved to a world position, east and north in metres.</summary>
+        public event Action<double, double> RoadPointerMoved;
+
+        /// <summary>While building roads: a left click at a world position.</summary>
+        public event Action<double, double> RoadClicked;
 
         /// <summary>The selection was moved, or its object rotated, by dragging and the pointer was released.</summary>
         public event Action<List<MapObjectEdit>> ObjectsEdited;
@@ -591,6 +615,79 @@ namespace OmsiMapEditor.UI
             placementPointer = null;
             NotifyPlacementPreview();
             MarkDirtyRepaint();
+        }
+
+        public bool IsBuildingRoad => roadMode;
+
+        /// <summary>Starts road mode: clicks and pointer moves go to the road tool instead of selecting or panning with the left button.</summary>
+        public void BeginRoad()
+        {
+            CancelDrag();
+            roadMode = true;
+            MarkDirtyRepaint();
+        }
+
+        public void EndRoad()
+        {
+            roadMode = false;
+            ClearRoadPreview();
+        }
+
+        /// <summary>
+        /// The planned road to draw: its pieces as world polylines, whether it can be built, the issues to mark, the spline
+        /// end it would snap to and where it starts.
+        /// </summary>
+        public void SetRoadPreview(IEnumerable<OmsiMapPoint[]> pieces, bool valid, IEnumerable<OmsiRoadIssue> issues, OmsiMapPoint? snap, OmsiMapPoint? start)
+        {
+            roadPreview.Clear();
+            roadIssues.Clear();
+            if (pieces != null)
+                foreach (var piece in pieces)
+                {
+                    var points = new Vector2[piece.Length];
+                    for (var index = 0; index < piece.Length; index++)
+                        points[index] = WorldToMap(piece[index]);
+                    roadPreview.Add(points);
+                }
+            if (issues != null)
+                foreach (var issue in issues)
+                    roadIssues.Add(new KeyValuePair<Vector2, OmsiRoadIssueSeverity>(WorldToMap(new OmsiMapPoint(issue.WorldX, issue.WorldY)), issue.Severity));
+            roadPreviewValid = valid;
+            roadSnap = snap.HasValue ? WorldToMap(snap.Value) : (Vector2?)null;
+            roadStart = start.HasValue ? WorldToMap(start.Value) : (Vector2?)null;
+            MarkDirtyRepaint();
+        }
+
+        public void ClearRoadPreview()
+        {
+            roadPreview.Clear();
+            roadIssues.Clear();
+            roadSnap = null;
+            roadStart = null;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>The spline drawn as selected, or null.</summary>
+        public void SetSelectedSpline(OmsiSplineRecord spline)
+        {
+            selectedSpline = spline;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Draws the splines again after splines were built, deleted, undone or redone.</summary>
+        public void RefreshSplines()
+        {
+            splines.Clear();
+            if (summary != null)
+                foreach (var tile in summary.Tiles)
+                    foreach (var spline in tile.Splines)
+                        AddSplinePath(tile, spline);
+            MarkDirtyRepaint();
+        }
+
+        private Vector2 WorldToMap(OmsiMapPoint point)
+        {
+            return new Vector2((float)(point.X - originX), (float)(point.Y - originY));
         }
 
         public void SetMap(OmsiMapSummary map, bool keepView)
@@ -907,26 +1004,27 @@ namespace OmsiMapEditor.UI
             mapBounds = new Rect(0f, 0f, (float)((maxX - minX + 1) * tileSize), (float)((maxY - minY + 1) * tileSize));
 
             foreach (var tile in summary.Tiles)
-            {
                 foreach (var spline in tile.Splines)
-                {
-                    var world = OmsiMapGeometry.BuildSplinePolyline(tile, spline, tileSize);
-                    if (world.Length < 2)
-                        continue;
-                    var points = new Vector2[world.Length];
-                    var bounds = new Rect((float)(world[0].X - originX), (float)(world[0].Y - originY), 0f, 0f);
-                    for (var index = 0; index < world.Length; index++)
-                    {
-                        points[index] = new Vector2((float)(world[index].X - originX), (float)(world[index].Y - originY));
-                        bounds.xMin = Mathf.Min(bounds.xMin, points[index].x);
-                        bounds.yMin = Mathf.Min(bounds.yMin, points[index].y);
-                        bounds.xMax = Mathf.Max(bounds.xMax, points[index].x);
-                        bounds.yMax = Mathf.Max(bounds.yMax, points[index].y);
-                    }
-                    splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
-                    splines.Add(new SplinePath { AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind });
-                }
+                    AddSplinePath(tile, spline);
+        }
+
+        private void AddSplinePath(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            var world = OmsiMapGeometry.BuildSplinePolyline(tile, spline, tileSize);
+            if (world.Length < 2)
+                return;
+            var points = new Vector2[world.Length];
+            var bounds = new Rect((float)(world[0].X - originX), (float)(world[0].Y - originY), 0f, 0f);
+            for (var index = 0; index < world.Length; index++)
+            {
+                points[index] = new Vector2((float)(world[index].X - originX), (float)(world[index].Y - originY));
+                bounds.xMin = Mathf.Min(bounds.xMin, points[index].x);
+                bounds.yMin = Mathf.Min(bounds.yMin, points[index].y);
+                bounds.xMax = Mathf.Max(bounds.xMax, points[index].x);
+                bounds.yMax = Mathf.Max(bounds.yMax, points[index].y);
             }
+            splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
+            splines.Add(new SplinePath { Tile = tile, Record = spline, AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind });
         }
 
         private Vector2 ToMap(OmsiTileSummary tile, double localX, double localY)
@@ -983,6 +1081,8 @@ namespace OmsiMapEditor.UI
             var splinesDone = watch.Elapsed.TotalMilliseconds;
             DrawObjects(context, painter, visible);
             DrawRoutes(context, painter, visible);
+            DrawSelectedSpline(painter);
+            DrawRoad(painter, visible);
             var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
             DrawArrows(painter);
@@ -1206,6 +1306,150 @@ namespace OmsiMapEditor.UI
                 context.DrawText(stop.Name, at + new Vector2(1f, 1f), 12f, stopOutlineColor, null);
                 context.DrawText(stop.Name, at, 12f, routeColor, null);
             }
+        }
+
+        private void DrawSelectedSpline(Painter2D painter)
+        {
+            if (selectedSpline == null)
+                return;
+            var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
+            if (path == null)
+                return;
+            painter.strokeColor = selectedObjectColor;
+            painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
+            StrokePolyline(painter, path.Points);
+        }
+
+        /// <summary>
+        /// While building roads: the free spline ends a road can join, the planned road in the placement colour or red
+        /// when it cannot be built, its issues as dots and the end it would snap to as a ring.
+        /// </summary>
+        private void DrawRoad(Painter2D painter, Rect visible)
+        {
+            if (!roadMode)
+                return;
+            if (metersPerPixel <= FreeEndMetersPerPixel)
+            {
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 1.5f;
+                painter.BeginPath();
+                foreach (var spline in splines)
+                {
+                    if (!spline.Bounds.Overlaps(visible) || spline.LineKind != OmsiSplineLineKind.None)
+                        continue;
+                    if (spline.Record.PreviousId == 0)
+                        AddCircle(painter, MapToScreen(spline.Points[0]), 4f);
+                    if (spline.Record.NextId == 0)
+                        AddCircle(painter, MapToScreen(spline.Points[spline.Points.Length - 1]), 4f);
+                }
+                painter.Stroke();
+            }
+
+            if (roadPreview.Count > 0)
+            {
+                painter.strokeColor = handleFillColor;
+                painter.lineWidth = 6f;
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                foreach (var piece in roadPreview)
+                    StrokePolyline(painter, piece);
+                painter.strokeColor = roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.lineWidth = 3f;
+                foreach (var piece in roadPreview)
+                    StrokePolyline(painter, piece);
+                // Piece boundaries, where each spline of the road begins.
+                painter.fillColor = roadPreviewValid ? placementColor : selectedObjectColor;
+                foreach (var piece in roadPreview)
+                {
+                    painter.BeginPath();
+                    AddCircle(painter, MapToScreen(piece[0]), 2.5f);
+                    painter.Fill();
+                }
+            }
+            if (roadStart.HasValue)
+            {
+                painter.fillColor = placementColor;
+                painter.BeginPath();
+                AddCircle(painter, MapToScreen(roadStart.Value), 4f);
+                painter.Fill();
+            }
+            foreach (var issue in roadIssues)
+            {
+                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? selectedObjectColor
+                    : issue.Value == OmsiRoadIssueSeverity.Warning ? selectedTileColor : wireColor;
+                painter.BeginPath();
+                AddCircle(painter, MapToScreen(issue.Key), 5f);
+                painter.Fill();
+            }
+            if (roadSnap.HasValue)
+            {
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 2.5f;
+                painter.BeginPath();
+                AddCircle(painter, MapToScreen(roadSnap.Value), 9f);
+                painter.Stroke();
+            }
+        }
+
+        private void StrokePolyline(Painter2D painter, Vector2[] points)
+        {
+            if (points.Length < 2)
+                return;
+            painter.BeginPath();
+            var last = MapToScreen(points[0]);
+            painter.MoveTo(last);
+            for (var index = 1; index < points.Length; index++)
+            {
+                var point = MapToScreen(points[index]);
+                if ((point - last).sqrMagnitude < 1f && index < points.Length - 1)
+                    continue;
+                painter.LineTo(point);
+                last = point;
+            }
+            painter.Stroke();
+        }
+
+        private static void AddCircle(Painter2D painter, Vector2 center, float radius)
+        {
+            painter.MoveTo(center + new Vector2(radius, 0f));
+            painter.Arc(center, radius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+        }
+
+        /// <summary>The spline nearest to a screen position within the pick radius, for clicks where no object is.</summary>
+        private bool TryPickSpline(Vector2 screen, out OmsiTileSummary pickedTile, out OmsiSplineRecord pickedSpline)
+        {
+            pickedTile = null;
+            pickedSpline = null;
+            var map = ScreenToMap(screen);
+            var reach = PickRadius * metersPerPixel;
+            var nearest = reach;
+            foreach (var spline in splines)
+            {
+                var bounds = spline.Bounds;
+                if (map.x < bounds.xMin - reach || map.x > bounds.xMax + reach || map.y < bounds.yMin - reach || map.y > bounds.yMax + reach)
+                    continue;
+                for (var index = 1; index < spline.Points.Length; index++)
+                {
+                    var distance = DistanceToSegment(map, spline.Points[index - 1], spline.Points[index]);
+                    if (distance <= nearest)
+                    {
+                        nearest = distance;
+                        pickedTile = spline.Tile;
+                        pickedSpline = spline.Record;
+                    }
+                }
+            }
+            return pickedSpline != null;
+        }
+
+        private static float DistanceToSegment(Vector2 point, Vector2 from, Vector2 to)
+        {
+            var segment = to - from;
+            var lengthSquared = segment.sqrMagnitude;
+            var t = lengthSquared < 1e-12f ? 0f : Mathf.Clamp01(Vector2.Dot(point - from, segment) / lengthSquared);
+            return Vector2.Distance(point, from + segment * t);
         }
 
         private void StrokeRouteLanes(Painter2D painter, Rect visible, bool highlighted, Color color, float width)
@@ -1541,6 +1785,14 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (roadMode)
+            {
+                var world = ScreenToMap(position);
+                RoadClicked?.Invoke(world.x + originX, world.y + originY);
+                evt.StopPropagation();
+                return;
+            }
+
             if (!(evt.ctrlKey || evt.commandKey) && ArrowAt(position, out var arrow))
             {
                 StartArrowDrag(arrow, evt.pointerId, position);
@@ -1567,6 +1819,14 @@ namespace OmsiMapEditor.UI
             if (toggle)
             {
                 BeginDrag(DragMode.Box, evt.pointerId, position);
+                evt.StopPropagation();
+                return;
+            }
+
+            if (TryPickSpline(position, out var splineTile, out var spline))
+            {
+                SplineClicked?.Invoke(splineTile, spline);
+                BeginDrag(DragMode.Pan, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
             }
@@ -2316,6 +2576,11 @@ namespace OmsiMapEditor.UI
             var position = (Vector2)evt.localPosition;
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
+                if (roadMode && !ThreeDimensional)
+                {
+                    var world = ScreenToMap(position);
+                    RoadPointerMoved?.Invoke(world.x + originX, world.y + originY);
+                }
                 SetPlacementPointer(position);
                 UpdateHoveredHandles(position);
                 NotifyPointerInfo(position);

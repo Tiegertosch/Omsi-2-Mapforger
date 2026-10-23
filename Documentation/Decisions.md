@@ -161,3 +161,22 @@
 **Entscheidung:** Die App zeigt eine Karte auf Wunsch so, wie OMSI sie an einem Datum lädt: Die an diesem Tag gültigen Chrono-Varianten werden in Namensreihenfolge über eine Kopie der Basiskarte gelegt (`OmsiChrono.Overlay`), Fahrplan und Linienwege kommen aus den Fahrplänen dieser Varianten (`OmsiTimetable.ReadForVariants`). Die Chrono-Ansicht ist schreibgeschützt: Ziehen, Werkzeuge, Platzieren, Löschen, Inspector-Felder, Zurücksetzen von Kacheln sowie Rückgängig und Wiederholen sind gesperrt (`CanEdit`), bis **Base map** zur Basiskarte zurückkehrt. Die Basiskarte und ihre Bearbeitungen bleiben unterdessen unverändert im Speicher; Export, Speichern und die Kartenprüfung betreffen immer die Basiskarte.
 
 **Grund:** Chrono-Änderungslisten wählen Elemente der Basiskarte über ihre ID aus und löschen oder tauschen sie; ein Objekt, das nur eine Variante anlegt, gehört in deren Änderungsliste, nicht in die Kachel. Bearbeiten in der überlagerten Ansicht müsste daher bei jeder Änderung entscheiden, ob sie die Kachel oder eine Variante betrifft, und Verschiebungen von Elementen, die eine Variante löscht oder tauscht, hätten keinen eindeutigen Ort. Eine reine Ansicht beantwortet die häufigste Frage – wie sieht die Karte an diesem Tag aus, welche Linien fahren – ohne dieses Risiko für die verlustfreie Arbeitskopie (ADR 008). Bearbeiten von Varianten bleibt eine eigene, spätere Aufgabe.
+
+## ADR 021: Straßen sind OMSI-Splines
+
+**Status:** Angenommen, 23. Oktober 2026, nach Wahl des Nutzers.
+
+**Entscheidung:** Das Straßenwerkzeug baut Straßen direkt als `[spline]`-Datensätze. Ein eigenes Netz aus Knoten und Bézier-Segmenten gibt es nicht. Segmente sind die Splines, Knoten ihre Enden, und die Verbindungen sind die Vorgänger- und Nachfolger-IDs, die OMSI selbst speichert. Eine gezogene Straße ist ein Kreisbogen, der tangential aus seinem Start hervorgeht und den geklickten Punkt erreicht, oder eine Gerade, wenn sie frei beginnt. Sie wird in gleich lange Stücke von höchstens 25 m geteilt (einstellbar). Höhen und Geländehöhen sind getrennte Werte:
+- **Gelände folgen:** Jede Stückgrenze liegt auf dem Gelände.
+- **Manuell:** Die Höhe läuft gleichmäßig vom Start zur eingegebenen Endhöhe.
+
+In beiden Modi hat jedes Stück eine gleichbleibende Steigung (Feld 11 und 12). Das Gelände wird nie verändert. Punkte außerhalb des Geländes sind Fehler, keine Höhe 0. Steigungen über einer Warnschwelle (10 %), Knicke an angeschlossenen Enden und Straßen unter oder hoch über dem Gelände werden als strukturierte Befunde mit Position gemeldet.
+
+Neue Splines kommen ans Ende der Kachel, in der ihr Start liegt, mit neuen kartenweiten IDs. Beim Andocken an ein freies Spline-Ende werden die IDs gegenseitig gesetzt. Ein gelöschter Spline öffnet die Enden seiner Nachbarn, auch in anderen Kacheln. Anhängungen auf ihm sowie Fahrplan- und Chrono-Verweise verhindern das Löschen. Rückgängig und Wiederholen laufen über die Dateistände. Gebaut wird in Etappe 1 nur in der Draufsicht.
+
+**Grund:**
+- Vorschau und Datei sind dasselbe: Was der Editor zeigt, schreibt er genau so, ohne Näherung von Bézier-Kurven durch Bögen beim Export.
+- Vorhandene Straßen jeder Karte gehören sofort zum Netz, weil ihre Nachbar-IDs es schon beschreiben.
+- Profil, Spuren und Darstellung kommen aus den vorhandenen `.sli`-Dateien und Renderern.
+- Geteilte Stücke mit eigener Steigung sind der einfachste Weg, mit OMSIs Splines (eine Steigung am Anfang und eine am Ende) dem Gelände zu folgen; Steigungsknicke an den Grenzen erlaubt OMSI (Formatbefund: 1.324 von 1.438 Verbindungen in Berlin-Spandau ohne Knick).
+- Ein glatter Höhenverlauf, Böschungen und Kreuzungsanschlüsse bauen auf denselben Datensätzen auf (Etappen 2 und 3).

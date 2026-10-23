@@ -149,6 +149,12 @@ namespace OmsiMapEditor.World
         private Shader shader;
         private Shader splineShader;
         private readonly Dictionary<string, Material> splineMaterials = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
+
+        // The spline meshes of each tile, so changed splines can be built again without reading the whole map.
+        private readonly Dictionary<long, List<GameObject>> tileSplineObjects = new Dictionary<long, List<GameObject>>();
+        private string loadedInstallationRoot;
+        private OmsiSplineProfileCatalog refreshProfiles;
+        private readonly Dictionary<string, SplineTextureData> refreshTextures = new Dictionary<string, SplineTextureData>(StringComparer.OrdinalIgnoreCase);
         private Mesh tileMesh;
         private double tileSize;
         private double originX;
@@ -254,6 +260,7 @@ namespace OmsiMapEditor.World
                 return;
 
             tileSize = summary.TileSizeMeters;
+            loadedInstallationRoot = installationRoot;
             this.originX = originX;
             this.originY = originY;
             maskSource = source;
@@ -378,6 +385,60 @@ namespace OmsiMapEditor.World
             SplineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
             splineMaterials.Clear();
             terrains.Clear();
+            tileSplineObjects.Clear();
+            refreshProfiles = null;
+            refreshTextures.Clear();
+        }
+
+        /// <summary>
+        /// Builds the spline surfaces of some tiles again from their current splines, after roads were built, deleted,
+        /// undone or redone. Other tiles stay as they are. While the map is still loading, the load reads the new state.
+        /// </summary>
+        /// <returns>False when the ground is not built yet; the next load includes the change.</returns>
+        public bool RefreshSplines(IEnumerable<OmsiTileSummary> tiles)
+        {
+            if (tiles == null || groundRoot == null || loading != null || pending != null || string.IsNullOrEmpty(loadedInstallationRoot))
+                return false;
+            refreshProfiles = refreshProfiles ?? new OmsiSplineProfileCatalog(loadedInstallationRoot);
+            var data = new GroundData();
+            foreach (var pair in refreshTextures)
+                data.SplineTextures[pair.Key] = pair.Value;
+            var kinds = new Dictionary<string, OmsiSplineLineKind>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in SplineLineKinds)
+                kinds[pair.Key] = pair.Value;
+            foreach (var tile in tiles)
+            {
+                if (tile == null || !tile.IsAvailable)
+                    continue;
+                var key = TileKey(tile.X, tile.Y);
+                if (tileSplineObjects.TryGetValue(key, out var objects))
+                {
+                    foreach (var item in objects)
+                    {
+                        var mesh = item.GetComponent<MeshFilter>()?.sharedMesh;
+                        if (mesh != null)
+                        {
+                            owned.Remove(mesh);
+                            Destroy(mesh);
+                        }
+                        Destroy(item);
+                    }
+                    objects.Clear();
+                }
+                var tileData = new TileData { X = tile.X, Y = tile.Y };
+                AddSplines(tileData, tile.Splines.ToArray(), refreshProfiles, loadedInstallationRoot, data);
+                var position = new Vector3((float)(tile.X * tileSize - originX), 0f, (float)(tile.Y * tileSize - originY));
+                foreach (var batch in tileData.Splines)
+                    AddSplineBatch("Tile " + tile.X + ", " + tile.Y + " splines", position, batch, data.SplineTextures, key);
+            }
+            foreach (var pair in data.SplineTextures)
+                refreshTextures[pair.Key] = pair.Value;
+            foreach (var pair in data.LineKinds)
+                kinds[pair.Key] = pair.Value;
+            SplineLineKinds = kinds;
+            if (data.Problems.Count > 0 || refreshProfiles.Problems.Count > 0)
+                Debug.LogWarning("Splines drawn again with problems:\n" + string.Join("\n", data.Problems) + "\n" + string.Join("\n", refreshProfiles.Problems));
+            return true;
         }
 
         /// <summary>
@@ -945,7 +1006,7 @@ namespace OmsiMapEditor.World
             if (tile.Holes != null)
                 ApplyHoles(key, renderers, tile.Holes);
             foreach (var batch in tile.Splines)
-                AddSplineBatch("Tile " + tile.X + ", " + tile.Y + " splines", position, batch);
+                AddSplineBatch("Tile " + tile.X + ", " + tile.Y + " splines", position, batch, pending.SplineTextures, key);
         }
 
         private static void SetHoles(Material material, Texture2D holes)
@@ -969,9 +1030,9 @@ namespace OmsiMapEditor.World
             return texture;
         }
 
-        private void AddSplineBatch(string name, Vector3 position, SplineBatch batch)
+        private void AddSplineBatch(string name, Vector3 position, SplineBatch batch, Dictionary<string, SplineTextureData> textures, long tileKey)
         {
-            var material = SplineMaterial(batch.TextureKey);
+            var material = SplineMaterial(batch.TextureKey, textures);
             if (material == null)
                 return;
             var mesh = new Mesh { name = name };
@@ -993,14 +1054,20 @@ namespace OmsiMapEditor.World
             meshRenderer.receiveShadows = false;
             meshRenderer.lightProbeUsage = LightProbeUsage.Off;
             meshRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            if (!tileSplineObjects.TryGetValue(tileKey, out var objects))
+            {
+                objects = new List<GameObject>();
+                tileSplineObjects.Add(tileKey, objects);
+            }
+            objects.Add(item);
         }
 
         /// <summary>One material per spline texture, shared by all tiles.</summary>
-        private Material SplineMaterial(string key)
+        private Material SplineMaterial(string key, Dictionary<string, SplineTextureData> textures)
         {
             if (splineMaterials.TryGetValue(key, out var material))
                 return material;
-            if (splineShader == null || pending == null || !pending.SplineTextures.TryGetValue(key, out var texture))
+            if (splineShader == null || textures == null || !textures.TryGetValue(key, out var texture))
                 return null;
 
             material = new Material(splineShader);

@@ -107,6 +107,23 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// Removes an element and the records that modify it unless <paramref name="blockers"/> name references that
+        /// still need it; the caller decides which references to the element it resolves itself, such as the
+        /// neighbour IDs of a deleted spline.
+        /// </summary>
+        internal static OmsiRemovalResult RemoveWithBlockers(OmsiRecordFile tile, OmsiTileRecordView element, int tileIndex,
+            OmsiRecordFile globalConfig, IEnumerable<OmsiReference> blockers)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (element == null)
+                throw new ArgumentNullException(nameof(element));
+            if (globalConfig == null)
+                throw new ArgumentNullException(nameof(globalConfig));
+            return Detach(tile, element, tileIndex, globalConfig, new List<OmsiReference>(blockers ?? new OmsiReference[0]), null);
+        }
+
+        /// <summary>
         /// Moves an [object] with its rules to the end of another tile and sets its position there. The ID stays, so
         /// timetables and bus stops keep finding it. Nothing changes while references tie the object to its tile:
         /// attached objects, variable parents, chrono selections and entry points; they are returned instead.
