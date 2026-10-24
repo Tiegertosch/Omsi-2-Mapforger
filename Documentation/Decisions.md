@@ -242,3 +242,15 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 **Grund:**
 - Ein OMSI-Spline hat nur einen Vorgänger und einen Nachfolger. Ein dritter Ast an einem geteilten Spline hängt ohne Verknüpfung, die Fahrbahnen überlappen, die KI biegt nicht ab. Echte Karten zweigen Fahrbahnen über Kreuzungsobjekte ab: In Berlin-Spandau liegen nur 39 freie Enden auf Gelenken und 68 mitten auf Splines, fast alle Gehwege, Dämme und Gleise; in Grundorf keines.
 - Das kurze Stück mit zwei Bögen macht das Einsetzen unabhängig von Krümmung und Gefälle der Straße; ein gerader Kreuzungsarm träfe eine Kurve sonst daneben.
+
+## ADR 026: Erzeugte Objekte liegen unter Sceneryobjects\Mapforge in der Installation
+
+**Status:** Angenommen, 24. Oktober 2026, Wahl des Nutzers. Etappe 4b; im Spiel bestätigt (Nutzer, 24. Oktober 2026): OMSI zeichnet das erzeugte Stück texturiert, ein Fußgänger nutzte seine Pfade, ein Bus fuhr ohne Probleme darüber.
+
+**Entscheidung:** Objekte, die der Editor erzeugt, zuerst Kreuzungen, schreibt er sofort nach `Sceneryobjects\Mapforge\<Projekt>\<Name>\` der OMSI-Installation: `<Name>.sco` in Windows-1252, das Modell als Text-`.x` in `model\model.x` und Kopien der benötigten Texturen samt gleichnamiger `.dds` in `texture`. Vorhandene Dateien werden nie überschrieben; ein belegter Name bekommt eine Nummer. Die Karte nennt das Objekt wie jedes andere mit diesem Pfad. Die Originalkarte bleibt unberührt (Regel 1); wer die Karte weitergibt, gibt den Ordner `Sceneryobjects\Mapforge\<Projekt>` mit, wie Kartenpakete ihre Objekte unter `Sceneryobjects\<Karte>` mitbringen. Für den ersten Test erzeugt **Edit > Create test junction from road profile** ein gerades 12-m-Stück im Profil des Straßenwerkzeugs: Flächen aus der Extrusion des Profils (dieselbe wie für Splines), zwei `[splinehelper]` an den Enden mit diesem Profil, die `[path]` des Profils als Fahr- und Gehwege (gegenläufige Spuren vom anderen Ende aus, beidseitige einmal mit Richtung 2), dazu wie bei `Einm_Altonaer` `[rendertype] surface`, `[fixed]`, `[surface]` und das Modell als `[collision_mesh]`.
+
+**Grund:**
+- Alle installierten Karten nennen Objekte relativ zum OMSI-Hauptordner, belegt nur unter `Sceneryobjects` (71.076) und `Vehicles` (216); kein Objekt liegt in einem Kartenordner. Ein Pfad in den Kartenordner enthielte dessen Namen, den der Export ändert, und ist in OMSI unbelegt.
+- Kartenpakete legen ihre eigenen Objekte unter `Sceneryobjects\<Karte>` ab (in der Installation etwa `HafenCityHamburg`); `Mapforge\<Projekt>` folgt dem und trennt erzeugte Objekte von allem anderen.
+- Sofort geschrieben finden Editor und OMSI das Objekt wie jedes andere, ohne eigenen Suchweg.
+- Format belegt an echten Dateien: Die Flächen der Kreuzungsmodelle drehen wie die Profil-Extrusion, (b − a) × (c − a) zeigt aus der Fläche (78 von 78 nach oben gerichteten Dreiecken von `Einm_altonaer.o3d`); `[path]` hat zwölf Felder: x, y, Höhe, Kurs, Radius, Länge, zwei Steigungen, Art, Breite, Richtung, Blinker.

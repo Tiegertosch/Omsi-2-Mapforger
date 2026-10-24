@@ -265,6 +265,7 @@ namespace OmsiMapEditor.UI
             var placeObjectMenuItem = root.Q<Button>("place-object-menu-item");
             var deleteObjectMenuItem = root.Q<Button>("delete-object-menu-item");
             var refitTerrainMenuItem = root.Q<Button>("refit-terrain-menu-item");
+            var testJunctionMenuItem = root.Q<Button>("test-junction-menu-item");
             var undoMenuItem = root.Q<Button>("undo-menu-item");
             var redoMenuItem = root.Q<Button>("redo-menu-item");
             objectsPanelHost = root.Q<VisualElement>("tool-panel-host");
@@ -490,6 +491,12 @@ namespace OmsiMapEditor.UI
                 {
                     HidePopup(editMenu);
                     RefitRoadTerrain();
+                };
+            if (testJunctionMenuItem != null)
+                testJunctionMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    CreateTestJunction();
                 };
             if (undoMenuItem != null)
                 undoMenuItem.clicked += () =>
@@ -878,6 +885,14 @@ namespace OmsiMapEditor.UI
             if (placeAsset != null)
             {
                 StartPlacement(placeAsset);
+                mapCanvas?.PointPlacementAtCenter();
+                if (Array.IndexOf(args, "-placeCommit") >= 0)
+                    mapCanvas?.ClickPlacement();
+            }
+            var testProfile = Argument("-testJunction", 1);
+            if (testProfile != null)
+            {
+                CreateTestJunction(testProfile);
                 mapCanvas?.PointPlacementAtCenter();
                 if (Array.IndexOf(args, "-placeCommit") >= 0)
                     mapCanvas?.ClickPlacement();
@@ -1481,6 +1496,48 @@ namespace OmsiMapEditor.UI
         /// Fits the terrain anew around every road built here with terrain alignment, such as roads built before the way of
         /// fitting changed. The terrain follows from the original terrain and the roads alone, so this is no undo step.
         /// </summary>
+        /// <summary>
+        /// Makes a straight junction object in the profile chosen in the road tool, stores it under Sceneryobjects\Mapforge
+        /// in the installation (ADR 026) and starts placing it, so it can be inserted into a road and tried in OMSI.
+        /// </summary>
+        /// <param name="profilePath">The profile to use; null takes the one chosen in the road tool.</param>
+        private void CreateTestJunction(string profilePath = null)
+        {
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("create junctions"));
+                return;
+            }
+            profilePath = profilePath ?? roadPanel?.Profile;
+            if (profilePath == null)
+            {
+                SetStatus("Choose a spline profile in the road tool (R) first; the test junction is made in that profile.");
+                return;
+            }
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            string assetPath;
+            try
+            {
+                var profile = new OmsiSplineProfileCatalog(root).Get(profilePath);
+                if (profile == null)
+                {
+                    SetStatus("The profile " + profilePath + " could not be read.");
+                    return;
+                }
+                var name = "Test " + Path.GetFileNameWithoutExtension(profilePath);
+                var generated = OmsiJunctionGenerator.StraightPiece(profilePath, profile, 12.0, "Mapforge " + name);
+                assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, name, generated);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The test junction could not be created: " + exception.Message);
+                return;
+            }
+            StartPlacement(assetPath);
+            SetStatus("Created " + assetPath + " in your OMSI installation. Click on a road to insert it, then export the map and try it in OMSI.");
+        }
+
         private void RefitRoadTerrain()
         {
             if (!CanEdit)

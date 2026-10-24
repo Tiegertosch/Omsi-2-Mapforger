@@ -77,7 +77,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Nach Spieltest (Nutzer, 24. Oktober 2026): Kreuzungen und `[absheight]`-Objekte auf Geländehöhe platziert statt auf 0 m; zwischen Straßen auf verschiedener Höhe Rampe von Bordstein zu Bordstein statt Wand
   - Etappe 4, Kreuzungen als eigene Objekte (Wunsch des Nutzers vom 24. Oktober 2026):
     - [x] 4a (ADR 025): Splines teilen; vorhandenes Kreuzungsobjekt in eine Straße einsetzen: Vorschau rastet auf der Straße ein, Seitenarme zur Seite des Zeigers, Alt platziert frei; Klick schneidet die Straße 5 m hinter den Anschlusspunkten und führt kurze Stücke mit zwei Bögen an die Punkte, ein Rückgängig-Schritt
-    - 4b: Machbarkeit erzeugter Objekte: einfache Platte mit Splinehelpern und Fahrpfad, Speicherort im Kartenordner prüfen, Test in OMSI, ADR
+    - [x] 4b (ADR 026): Machbarkeit erzeugter Objekte: „Edit > Create test junction from road profile“ erzeugt ein gerades 12-m-Stück im Profil des Straßenwerkzeugs mit Splinehelpern und Fahrpfaden unter `Sceneryobjects\Mapforge\<Projekt>` und startet das Platzieren; im Spiel bestätigt: gezeichnet, Pfade genutzt, befahrbar (Nutzer, 24. Oktober 2026)
     - 4c: Kreuzungsgeometrie aus den Profilen der Arme (Fahrbahn, Bordsteine, Gehwege, Eckradien, Texturen), Geländeloch, Splinehelper, Fahrpfade aller Abbiegebeziehungen
     - 4d: Dynamisch: Treffen oder Kreuzen sich Straßen beim Bauen, Kreuzung vorschlagen, Straßen kürzen, Objekt erzeugen und anschließen; nach Verschieben eines Arms neu erzeugen
   - Gelände-Werkzeuge: Kanten an sehr steilen Stellen glätten, etwa zwischen den Ästen einer Kehre am Hang, die das 5-m-Raster nicht ohne Stufe abbilden kann (mit dem Nutzer vereinbart, 24. Oktober 2026)
