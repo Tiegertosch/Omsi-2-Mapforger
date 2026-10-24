@@ -277,7 +277,7 @@ namespace OmsiMapEditor.UI
 
         private OmsiTileSummary selectedTile;
 
-        // The selection; the primary object is the last one and the only one with a rotation handle.
+        // The selection; the primary object is the last one, the one the inspector and a single rotation handle show.
         private OmsiObjectRecord selectedObject;
         private readonly List<MapSelectionItem> selection = new List<MapSelectionItem>();
         private readonly HashSet<OmsiObjectRecord> selectedRecords = new HashSet<OmsiObjectRecord>();
@@ -296,6 +296,13 @@ namespace OmsiMapEditor.UI
         private double previewHeading;
         private double previewPitch;
         private double previewBank;
+
+        // Several selected objects turn together: their positions swing clockwise around the middle of the selection
+        // and every heading changes by the same angle. The pivot is in map metres and kept in double, so a turn far
+        // from the map origin saves to the millimetre.
+        private double groupPivotX;
+        private double groupPivotY;
+        private double groupTurn;
 
         // 3D view: a move slides over the horizontal plane through the grabbed point; a turn follows the pointer
         // around the ring's centre, adding up the angle step by step so it may go round more than once.
@@ -464,6 +471,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The selected object is being turned on a ring in the 3D view; heading, pitch and bank follow.</summary>
         public event Action<OmsiTileSummary, OmsiObjectRecord, double, double, double> OrientationPreviewed;
+
+        /// <summary>Several selected objects are being turned together; their poses as they would be saved, the edit follows on release.</summary>
+        public event Action<List<MapObjectEdit>> GroupTurnPreviewed;
 
         /// <summary>A move or turn ended, whether it was released or cancelled.</summary>
         public event Action PreviewEnded;
@@ -1903,15 +1913,23 @@ namespace OmsiMapEditor.UI
                 painter.Arc(screen, 7f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
             }
             painter.Stroke();
-            if (!HasRotationHandle())
+            // A group shows its handle only with the rotate tool: its line points at the turn, not at a heading.
+            if (!HasRotationHandle() || (TurnsGroup && !CanRotate))
                 return;
 
-            var objectScreen = SelectedObjectScreen();
+            var objectScreen = RotationOriginScreen();
             var handle = HandleScreen(objectScreen);
             painter.BeginPath();
             painter.MoveTo(objectScreen);
             painter.LineTo(handle);
             painter.Stroke();
+            if (TurnsGroup)
+            {
+                painter.fillColor = selectedObjectColor;
+                painter.BeginPath();
+                painter.Arc(objectScreen, 3f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                painter.Fill();
+            }
 
             if (CanRotate)
             {
@@ -1991,6 +2009,11 @@ namespace OmsiMapEditor.UI
         /// <summary>Where an object is drawn: shifted by the drag while it belongs to the moved selection.</summary>
         private Vector2 DrawnPosition(OmsiTileSummary tile, OmsiObjectRecord item)
         {
+            if (IsTurningGroup && selectedRecords.Contains(item))
+            {
+                GroupTurnOffset(tile, item, groupTurn, out var offsetX, out var offsetY);
+                return ToMap(tile, item.LocalX + offsetX, item.LocalY + offsetY);
+            }
             return dragMode == DragMode.Move && selectedRecords.Contains(item)
                 ? ToMap(tile, item.LocalX + previewLocalX - dragStartLocalX, item.LocalY + previewLocalY - dragStartLocalY)
                 : ToMap(tile, item.LocalX, item.LocalY);
@@ -1998,13 +2021,95 @@ namespace OmsiMapEditor.UI
 
         private double DrawnHeading(OmsiObjectRecord item)
         {
+            if (IsTurningGroup && selectedRecords.Contains(item))
+                return item.HeadingDegrees + groupTurn;
             return dragMode == DragMode.Rotate && ReferenceEquals(item, selectedObject) ? previewHeading : item.HeadingDegrees;
         }
 
-        /// <summary>Only a single selected object can be rotated by its handle.</summary>
+        /// <summary>A single selected object turns about itself; several turn together around their middle.</summary>
         private bool HasRotationHandle()
         {
-            return selection.Count == 1 && selectedObject != null && selectedTile != null;
+            return selectedObject != null && (TurnsGroup || selectedTile != null);
+        }
+
+        private bool TurnsGroup => selection.Count > 1;
+
+        private bool IsTurningGroup => TurnsGroup && (dragMode == DragMode.Rotate || dragMode == DragMode.Turn);
+
+        /// <summary>The middle of the box around the selected objects' positions in map metres, around which a group turns.</summary>
+        private void SelectionMiddle(out double x, out double y)
+        {
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var item in selection)
+            {
+                var itemX = item.Tile.X * tileSize + item.Record.LocalX - originX;
+                var itemY = item.Tile.Y * tileSize + item.Record.LocalY - originY;
+                minX = Math.Min(minX, itemX);
+                minY = Math.Min(minY, itemY);
+                maxX = Math.Max(maxX, itemX);
+                maxY = Math.Max(maxY, itemY);
+            }
+            x = (minX + maxX) * 0.5;
+            y = (minY + maxY) * 0.5;
+        }
+
+        /// <summary>The pivot of a group on the map: fixed while it turns, else the middle of the selection.</summary>
+        private Vector2 GroupPivot()
+        {
+            double x = groupPivotX, y = groupPivotY;
+            if (!IsTurningGroup)
+                SelectionMiddle(out x, out y);
+            return new Vector2((float)x, (float)y);
+        }
+
+        /// <summary>How far an object of a group moves when the group turns clockwise by an angle around its pivot.</summary>
+        private void GroupTurnOffset(OmsiTileSummary tile, OmsiObjectRecord item, double degrees, out double offsetX, out double offsetY)
+        {
+            var x = tile.X * tileSize + item.LocalX - originX - groupPivotX;
+            var y = tile.Y * tileSize + item.LocalY - originY - groupPivotY;
+            var radians = degrees * Math.PI / 180.0;
+            var sin = Math.Sin(radians);
+            var cos = Math.Cos(radians);
+            offsetX = x * cos + y * sin - x;
+            offsetY = -x * sin + y * cos - y;
+        }
+
+        /// <summary>The selected objects turned by <see cref="groupTurn"/> around the pivot, as they would be saved.</summary>
+        private List<MapObjectEdit> GroupTurnEdits()
+        {
+            var edits = new List<MapObjectEdit>(selection.Count);
+            foreach (var item in selection)
+            {
+                GroupTurnOffset(item.Tile, item.Record, groupTurn, out var offsetX, out var offsetY);
+                edits.Add(new MapObjectEdit
+                {
+                    Tile = item.Tile,
+                    Record = item.Record,
+                    LocalX = item.Record.LocalX + offsetX,
+                    LocalY = item.Record.LocalY + offsetY,
+                    Height = item.Record.Height,
+                    HeadingDegrees = ((item.Record.HeadingDegrees + groupTurn) % 360.0 + 360.0) % 360.0,
+                    PitchDegrees = item.Record.PitchDegrees,
+                    BankDegrees = item.Record.BankDegrees
+                });
+            }
+            return edits;
+        }
+
+        /// <summary>
+        /// Turns the selected objects together by an angle, clockwise around the middle of their positions, and saves
+        /// it like a finished drag of the rotation handle. False when fewer than two objects are selected.
+        /// </summary>
+        public bool TurnSelection(double degrees)
+        {
+            if (!AllowEditing || !TurnsGroup)
+                return false;
+            SelectionMiddle(out groupPivotX, out groupPivotY);
+            groupTurn = degrees;
+            ObjectsEdited?.Invoke(GroupTurnEdits());
+            groupTurn = 0.0;
+            MarkDirtyRepaint();
+            return true;
         }
 
         private Vector2 SelectedObjectScreen()
@@ -2012,10 +2117,20 @@ namespace OmsiMapEditor.UI
             return MapToScreen(DrawnPosition(selectedTile, selectedObject));
         }
 
-        private Vector2 HandleScreen(Vector2 objectScreen)
+        /// <summary>Where the rotation handle starts: at the only selected object, or at the pivot of a group.</summary>
+        private Vector2 RotationOriginScreen()
         {
-            var heading = (float)(DrawnHeading(selectedObject) * Math.PI / 180.0);
-            return objectScreen + new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading)) * HandleDistance;
+            if (!TurnsGroup)
+                return SelectedObjectScreen();
+            return MapToScreen(GroupPivot());
+        }
+
+        /// <summary>The handle of a single object points along its heading; that of a group starts north and shows the turn.</summary>
+        private Vector2 HandleScreen(Vector2 originScreen)
+        {
+            var degrees = !TurnsGroup ? DrawnHeading(selectedObject) : IsTurningGroup ? groupTurn : 0.0;
+            var heading = (float)(degrees * Math.PI / 180.0);
+            return originScreen + new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading)) * HandleDistance;
         }
 
         private bool IsDraggingObject()
@@ -2099,9 +2214,12 @@ namespace OmsiMapEditor.UI
             }
 
             if (CanRotate && HasRotationHandle() &&
-                Vector2.Distance(position, HandleScreen(SelectedObjectScreen())) <= HandleRadius + 3f)
+                Vector2.Distance(position, HandleScreen(RotationOriginScreen())) <= HandleRadius + 3f)
             {
-                StartObjectDrag(DragMode.Rotate, selectedObject, evt.pointerId, position);
+                if (TurnsGroup)
+                    StartGroupTurn(DragMode.Rotate, evt.pointerId, position);
+                else
+                    StartObjectDrag(DragMode.Rotate, selectedObject, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
             }
@@ -2511,38 +2629,76 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Centre and radius of the rotation rings: at the pivot of the only selected object, around its model and at
-        /// least <see cref="MinimumRingPixels"/> across on screen. False when there are no rings to show.
+        /// least <see cref="MinimumRingPixels"/> across on screen; for several objects around their middle, taking them
+        /// all in. False when there are no rings to show.
         /// </summary>
         private bool TryGetRings(MapOrbitCamera camera, out Vector3 centre, out float radius)
         {
             centre = default;
             radius = 0f;
-            if (!CanRotate || selection.Count != 1 || selectedObject == null || ObjectRenderer == null ||
-                dragMode == DragMode.Move || !ObjectRenderer.TryGetPlacement(selectedObject, out var frame, out var bounds))
+            if (!CanRotate || selectedObject == null || ObjectRenderer == null || dragMode == DragMode.Move)
                 return false;
-            centre = frame.GetColumn(3);
+            float reach;
+            if (TurnsGroup)
+            {
+                var pivot = GroupPivot();
+                var height = 0f;
+                reach = 0f;
+                foreach (var item in selection)
+                {
+                    var position = DrawnPosition(item.Tile, item.Record);
+                    var extent = 1f;
+                    if (ObjectRenderer.TryGetPlacement(item.Record, out var itemFrame, out var itemBounds))
+                    {
+                        height += itemFrame.GetColumn(3).y;
+                        extent = Mathf.Max(Mathf.Abs(itemBounds.min.x), Mathf.Abs(itemBounds.max.x), Mathf.Abs(itemBounds.min.z), Mathf.Abs(itemBounds.max.z));
+                    }
+                    else
+                    {
+                        height += OnGround(position, 0f).y;
+                    }
+                    reach = Mathf.Max(reach, Vector2.Distance(position, pivot) + extent);
+                }
+                centre = new Vector3(pivot.x, height / selection.Count, pivot.y);
+            }
+            else
+            {
+                if (!ObjectRenderer.TryGetPlacement(selectedObject, out var frame, out var bounds))
+                    return false;
+                centre = frame.GetColumn(3);
+                reach = Mathf.Max(Mathf.Abs(bounds.min.x), Mathf.Abs(bounds.max.x), Mathf.Abs(bounds.min.z), Mathf.Abs(bounds.max.z)) * 1.15f;
+            }
             var depth = camera.Depth(centre);
             if (depth <= 1f)
                 return false;
-            var reach = Mathf.Max(Mathf.Abs(bounds.min.x), Mathf.Abs(bounds.max.x), Mathf.Abs(bounds.min.z), Mathf.Abs(bounds.max.z));
-            radius = Mathf.Max(reach * 1.15f, MinimumRingPixels / camera.PixelsPerMeter(depth));
+            radius = Mathf.Max(reach, MinimumRingPixels / camera.PixelsPerMeter(depth));
             return true;
         }
 
-        /// <summary>All three rings; objects that join splines, like crossings, keep pitch and bank and get only heading.</summary>
+        /// <summary>
+        /// All three rings; objects that join splines, like crossings, keep pitch and bank and get only heading, and so
+        /// does a group, which turns about the vertical through its middle.
+        /// </summary>
         private IEnumerable<RingAxis> VisibleRings()
         {
             yield return RingAxis.Heading;
-            if (!ObjectRenderer.HasSplineHelper(selectedObject.AssetPath))
+            if (!TurnsGroup && !ObjectRenderer.HasSplineHelper(selectedObject.AssetPath))
             {
                 yield return RingAxis.Pitch;
                 yield return RingAxis.Bank;
             }
         }
 
-        /// <summary>The selected object's orientation, as previewed while a ring is dragged.</summary>
+        /// <summary>The selected object's orientation, as previewed while a ring is dragged; for a group the turn so far.</summary>
         private void CurrentOrientation(out double heading, out double pitch, out double bank)
         {
+            if (TurnsGroup)
+            {
+                heading = IsTurningGroup ? groupTurn : 0.0;
+                pitch = 0.0;
+                bank = 0.0;
+                return;
+            }
             var turning = dragMode == DragMode.Turn;
             heading = turning ? previewHeading : selectedObject.HeadingDegrees;
             pitch = turning ? previewPitch : selectedObject.PitchDegrees;
@@ -2610,6 +2766,18 @@ namespace OmsiMapEditor.UI
 
         private void StartTurn(RingAxis ring, Vector3 ringPoint, int pointerId, Vector2 position)
         {
+            if (TurnsGroup)
+            {
+                TryGetRings(OrbitCamera(), out turnCentre, out _);
+                activeRing = RingAxis.Heading;
+                turnAxis = Vector3.up;
+                turnLastVector = Vector3.ProjectOnPlane(ringPoint - turnCentre, turnAxis);
+                turnStartAngle = 0.0;
+                turnAngle = 0.0;
+                StartGroupTurn(DragMode.Turn, pointerId, position);
+                ShowAngle(position);
+                return;
+            }
             ObjectRenderer.TryGetPlacement(selectedObject, out var frame, out _);
             previewHeading = selectedObject.HeadingDegrees;
             previewPitch = selectedObject.PitchDegrees;
@@ -2650,10 +2818,21 @@ namespace OmsiMapEditor.UI
                     previewBank = HalfTurn(angle);
                     break;
                 default:
-                    previewHeading = (angle % 360.0 + 360.0) % 360.0;
+                    if (TurnsGroup)
+                        groupTurn = HalfTurn(angle);
+                    else
+                        previewHeading = (angle % 360.0 + 360.0) % 360.0;
                     break;
             }
             ShowAngle(position);
+        }
+
+        /// <summary>Starts turning the selection together around its middle, by the rotation handle or the heading ring.</summary>
+        private void StartGroupTurn(DragMode mode, int pointerId, Vector2 position)
+        {
+            SelectionMiddle(out groupPivotX, out groupPivotY);
+            groupTurn = 0.0;
+            BeginDrag(mode, pointerId, position);
         }
 
         /// <summary>An angle between -180° and 180°.</summary>
@@ -2665,6 +2844,11 @@ namespace OmsiMapEditor.UI
         /// <summary>Shows the angle of the ring being dragged next to the pointer.</summary>
         private void ShowAngle(Vector2 position)
         {
+            if (TurnsGroup)
+            {
+                ShowDragLabel(position, "Turn " + groupTurn.ToString("+0.0;-0.0;0.0") + "°");
+                return;
+            }
             var name = activeRing == RingAxis.Pitch ? "Pitch" : activeRing == RingAxis.Bank ? "Bank" : "Heading";
             var value = activeRing == RingAxis.Pitch ? previewPitch : activeRing == RingAxis.Bank ? previewBank : previewHeading;
             ShowDragLabel(position, name + " " + value.ToString("0.0") + "°");
@@ -2953,19 +3137,29 @@ namespace OmsiMapEditor.UI
             }
             else if (dragMode == DragMode.Rotate)
             {
-                var direction = position - SelectedObjectScreen();
+                var direction = position - RotationOriginScreen();
                 if (direction.sqrMagnitude > 4f)
                 {
                     var heading = Math.Atan2(direction.x, -direction.y) * 180.0 / Math.PI;
                     if (evt.shiftKey)
                         heading = Math.Round(heading / 15.0) * 15.0;
-                    previewHeading = (heading % 360.0 + 360.0) % 360.0;
+                    if (TurnsGroup)
+                    {
+                        groupTurn = HalfTurn(heading);
+                        ShowAngle(position);
+                    }
+                    else
+                    {
+                        previewHeading = (heading % 360.0 + 360.0) % 360.0;
+                    }
                 }
             }
 
             dragLastPointer = position;
             if (dragMode == DragMode.Move)
                 MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY, previewHeightOffset);
+            else if (IsTurningGroup)
+                GroupTurnPreviewed?.Invoke(GroupTurnEdits());
             else if (dragMode == DragMode.Rotate)
                 HeadingPreviewed?.Invoke(selectedTile, selectedObject, previewHeading);
             else if (dragMode == DragMode.Turn)
@@ -3007,6 +3201,10 @@ namespace OmsiMapEditor.UI
                         BankDegrees = item.Record.BankDegrees
                     });
                 }
+            }
+            else if (IsTurningGroup)
+            {
+                edits = GroupTurnEdits();
             }
             else if (finished == DragMode.Rotate)
             {
@@ -3227,6 +3425,11 @@ namespace OmsiMapEditor.UI
                   "   y " + (map.Value.y - TileRect(tile).yMin).ToString("0.0");
         }
 
+        private string TurnInfo()
+        {
+            return selection.Count + " objects   turned " + groupTurn.ToString("+0.0;-0.0;0.0") + "° around " + DescribeMapPosition(GroupPivot());
+        }
+
         private void NotifyPointerInfo(Vector2? screen)
         {
             if (PointerInfoChanged == null || summary == null)
@@ -3236,7 +3439,9 @@ namespace OmsiMapEditor.UI
             {
                 var view = "3D view   distance " + OrbitDistance.ToString("0") + " m   heading " + OrbitYaw.ToString("0") + "°   tilt " +
                            OrbitPitch.ToString("0") + "°";
-                if (dragMode == DragMode.Turn)
+                if (IsTurningGroup)
+                    view = TurnInfo() + "      " + view;
+                else if (dragMode == DragMode.Turn)
                     view = "#" + selectedObject.Id + "   heading " + previewHeading.ToString("0.0") + "°   pitch " + previewPitch.ToString("0.0") +
                            "°   bank " + previewBank.ToString("0.0") + "°      " + view;
                 else if (dragMode == DragMode.Move)
@@ -3260,7 +3465,9 @@ namespace OmsiMapEditor.UI
             }
 
             var text = DescribeMapPosition(ScreenToMap(screen.Value));
-            if (dragMode == DragMode.Move && selection.Count > 1)
+            if (IsTurningGroup)
+                text = TurnInfo();
+            else if (dragMode == DragMode.Move && selection.Count > 1)
                 text = selection.Count + " objects   moved x " + (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") +
                        "   y " + (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00");
             else if (IsDraggingObject())

@@ -568,6 +568,17 @@ namespace OmsiMapEditor.UI
                 {
                     item.LocalX, item.LocalY, item.Height, heading, pitch, bank
                 });
+                mapCanvas.GroupTurnPreviewed += edits =>
+                {
+                    foreach (var edit in edits)
+                        objectRenderer.PreviewPlacement(edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height, edit.HeadingDegrees,
+                            edit.PitchDegrees, edit.BankDegrees);
+                    PreviewJunctionMarkers(item =>
+                    {
+                        var edit = edits.Find(candidate => ReferenceEquals(candidate.Record, item));
+                        return edit == null ? null : new[] { edit.LocalX, edit.LocalY, edit.Height, edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees };
+                    });
+                };
                 mapCanvas.PreviewEnded += () => PreviewJunctionMarkers(null);
                 mapCanvas.ObjectRenderer = objectRenderer;
                 objectRenderer.PreviewReady += (path, image) => objectsPanel?.SetPreview(path, image);
@@ -770,14 +781,18 @@ namespace OmsiMapEditor.UI
                 mapCanvas?.SetOrbit(yaw, pitch, distance);
             }
 
-            if (int.TryParse(Argument("-select", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var selectId))
+            // Several IDs select several objects, as Ctrl+click does.
+            for (var offset = 1; int.TryParse(Argument("-select", offset), NumberStyles.Integer, CultureInfo.InvariantCulture, out var selectId); offset++)
             {
                 foreach (var tile in currentSummary.Tiles)
                 {
                     var item = tile.Objects.Find(candidate => candidate.Id == selectId);
                     if (item == null)
                         continue;
-                    SelectObject(tile, item, false);
+                    if (offset == 1)
+                        SelectObject(tile, item, false);
+                    else
+                        ToggleObject(tile, item);
                     break;
                 }
             }
@@ -785,6 +800,10 @@ namespace OmsiMapEditor.UI
             var toolName = Argument("-tool", 1);
             if (toolName != null && Enum.TryParse<EditorTool>(toolName, true, out var chosenTool))
                 SetTool(chosenTool);
+
+            if (double.TryParse(Argument("-turnSelection", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var turnDegrees) &&
+                mapCanvas != null && !mapCanvas.TurnSelection(turnDegrees))
+                Debug.LogWarning("-turnSelection needs a project and at least two selected objects.");
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
                 SetTextures(false);
@@ -4478,7 +4497,8 @@ namespace OmsiMapEditor.UI
                 editor.Add(delete);
             }
             var hint = new Label(canEdit
-                ? "Drag one of them on the map to move all. Ctrl+click adds or removes an object, Esc clears the selection."
+                ? "Drag one of them on the map to move all; with Rotate (E) the handle in their middle turns them together. " +
+                  "Ctrl+click adds or removes an object, Esc clears the selection."
                 : "Read-only. Save a Mapforge project (File > Save map project as...) to edit this map.");
             hint.AddToClassList("muted");
             hint.AddToClassList("inspector-edit-hint");

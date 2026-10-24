@@ -910,7 +910,8 @@ namespace OmsiMapEditor.World
             placementsDirty = true;
         }
 
-        private void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double height,
+        /// <summary>Draws an object at a preview position and orientation until the drag ends, such as one of a group being turned.</summary>
+        public void PreviewPlacement(OmsiTileSummary tile, OmsiObjectRecord item, double localX, double localY, double height,
             double headingDegrees, double pitchDegrees, double bankDegrees)
         {
             if (tile == null || item == null || !instanceOf.TryGetValue(item, out var place))
