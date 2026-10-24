@@ -590,6 +590,68 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TerrainUnderAJunctionPlacedHereFollowsItsCarriagewayOnceAFittedRoadJoinsIt()
+        {
+            // A junction 20 m square whose one connection point lies 10 m behind its origin, facing back.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            // Placed here: its ID lies above those of the original map. Its point is at 100, 260, where the road ends.
+            var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 270, Height = 2 };
+            summary.Tiles[0].Objects.Add(junction);
+            Assert.AreEqual(string.Empty, session.JunctionTerrainState(summary).Replace("500 0 0 100 270 2 0 0 0;", string.Empty));
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+
+            var terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            // Under the junction, where the ground lies at 5 m and more: 5 cm below its carriageway at 2 m.
+            Assert.AreEqual(1.95, terrain[20, 54], 1e-4);
+            Assert.AreEqual(1.95, terrain[21, 55], 1e-4);
+            // 5 m beside it on the shoulder: 5 cm below the kerb of the profile it suggests, 0.15 m high.
+            Assert.AreEqual(2.10, terrain[23, 54], 1e-4);
+            // 10 m beside it the cutting rises 1:1.5 from the shoulder, which reaches a grid diagonal.
+            Assert.AreEqual(2.10 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[24, 54], 1e-4);
+
+            // Moved away from the road end, the junction is no longer joined: fitted again, the free road end rounds its
+            // shoulder and slopes off around itself there instead.
+            junction.LocalX = 150;
+            Assert.AreEqual(1, session.RefitAllTerrain(summary).Count);
+            terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            Assert.AreEqual(2.10 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[20, 54], 1e-4);
+            // A junction of the original map keeps its terrain even when a fitted road joins it.
+            junction.LocalX = 100;
+            junction.Id = 90;
+            session.RefitAllTerrain(summary);
+            terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            Assert.AreEqual(5.0, terrain[20, 54], 1e-4);
+        }
+
+        [Test]
+        public void TheMapCheckSumsUpTheConnectionPointsOfJunctions()
+        {
+            // One point where spline 10 starts, 2 m high and facing along it, and one 10 m to the left with nothing there.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "junction.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n0\r\n0\r\n\r\n[splinehelper]\r\nSplines\\road.sli\r\n-10\r\n0\r\n0\r\n270\r\n");
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+            summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\junction.sco", Id = 90, LocalX = 100, LocalY = 100, Height = 2 });
+
+            var section = OmsiMapCheck.Run(summary, new OmsiFolderSource(mapFolder), installation).Sections.Single(candidate => candidate.Title == "Junctions");
+
+            Assert.AreEqual(OmsiCheckStatus.Note, section.Status);
+            Assert.AreEqual("1 of 2 connection points of 1 junction objects are connected; 0 to review, 0 invalid, 1 free.", section.Summary);
+            CollectionAssert.AreEqual(new[] { "free: #90 junction in tile 0, 0: Point 2 is not connected." }, section.Findings);
+            Assert.AreSame(summary.Tiles[0], section.Tile);
+        }
+
+        [Test]
         public void TerrainCanBeFittedToABuiltRoadLaterAndReleasedAgain()
         {
             var session = OpenProject();

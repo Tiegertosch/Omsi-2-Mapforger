@@ -139,6 +139,7 @@ namespace OmsiMapEditor.OMSI
         private int? firstNewId;
         private OmsiSplineProfileCatalog shapeProfiles;
         private OmsiJunctionCatalog shapeJunctions;
+        private OmsiObjectOutlineCatalog shapeOutlines;
 
         /// <summary>How the terrain is fitted to roads built with terrain alignment.</summary>
         public OmsiTerrainShapeSettings TerrainShape { get; } = new OmsiTerrainShapeSettings();
@@ -537,23 +538,28 @@ namespace OmsiMapEditor.OMSI
             var size = summary.TileSizeMeters;
             var reach = TerrainShape.MaximumReachMeters + TerrainShape.ShoulderMeters + 30.0;
             var roads = new List<OmsiShapedRoad>();
+            var junctions = new List<OmsiShapedJunction>();
             foreach (var tile in summary.Tiles)
                 foreach (var spline in tile.Splines)
                 {
                     if (!ShapesTerrain(spline))
                         continue;
-                    var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigPath)));
-                    shapeProfiles = shapeProfiles ?? new OmsiSplineProfileCatalog(installation);
-                    shapeJunctions = shapeJunctions ?? new OmsiJunctionCatalog(installation);
-                    var profile = shapeProfiles.Get(spline.AssetPath);
-                    if (profile != null && profile.RightEdge - profile.LeftEdge > 0.0)
-                        roads.Add(new OmsiShapedRoad(tile, spline, profile, size)
+                    var profile = ShapeCatalogs().Get(spline.AssetPath);
+                    if (profile == null || profile.RightEdge - profile.LeftEdge <= 0.0)
+                        continue;
+                    var startPort = PortAt(summary, new OmsiSplineEnd(tile, spline, false));
+                    var endPort = PortAt(summary, new OmsiSplineEnd(tile, spline, true));
+                    roads.Add(new OmsiShapedRoad(tile, spline, profile, size) { StartsAtObject = startPort != null, EndsAtObject = endPort != null });
+                    foreach (var port in new[] { startPort, endPort })
+                        if (port != null && port.Object.Id >= FirstNewId() && !junctions.Exists(junction => ReferenceEquals(junction.Object, port.Object)))
                         {
-                            StartsAtObject = MeetsObject(summary, new OmsiSplineEnd(tile, spline, false)),
-                            EndsAtObject = MeetsObject(summary, new OmsiSplineEnd(tile, spline, true))
-                        });
+                            var junction = ShapedJunction(port.Tile, port.Object, size);
+                            if (junction != null)
+                                junctions.Add(junction);
+                        }
                 }
             roads.Sort((left, right) => left.Spline.Id.CompareTo(right.Spline.Id));
+            junctions.Sort((left, right) => left.Object.Id.CompareTo(right.Object.Id));
 
             var targets = new List<OmsiTileSummary>();
             foreach (var changed in change.Tiles)
@@ -572,7 +578,9 @@ namespace OmsiMapEditor.OMSI
                 var south = tile.Y * size;
                 var nearby = roads.FindAll(road => road.MaxX + road.HalfWidth + reach >= west && road.MinX - road.HalfWidth - reach <= west + size &&
                                                    road.MaxY + road.HalfWidth + reach >= south && road.MinY - road.HalfWidth - reach <= south + size);
-                OmsiTerrainShaping.Shape(heights, tile.X, tile.Y, size, nearby, TerrainShape);
+                var nearbyJunctions = junctions.FindAll(junction => junction.OriginX + junction.Reach + reach >= west && junction.OriginX - junction.Reach - reach <= west + size &&
+                                                                    junction.OriginY + junction.Reach + reach >= south && junction.OriginY - junction.Reach - reach <= south + size);
+                OmsiTerrainShaping.Shape(heights, tile.X, tile.Y, size, nearby, TerrainShape, nearbyJunctions);
                 var bytes = OmsiTerrain.Encode(heights);
                 if (SameBytes(bytes, workspace.ReadAllBytes(path)))
                     continue;
@@ -581,9 +589,69 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        /// <summary>True when a spline end lies on a connection point of a placed object, such as a junction (ADR 024).</summary>
-        private bool MeetsObject(OmsiMapSummary summary, OmsiSplineEnd end)
+        /// <summary>The spline profiles of the installation, with the connection points and outlines of its objects alongside.</summary>
+        private OmsiSplineProfileCatalog ShapeCatalogs()
         {
+            if (shapeProfiles == null)
+            {
+                var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigPath)));
+                shapeProfiles = new OmsiSplineProfileCatalog(installation);
+                shapeJunctions = new OmsiJunctionCatalog(installation);
+                shapeOutlines = new OmsiObjectOutlineCatalog(installation);
+            }
+            return shapeProfiles;
+        }
+
+        /// <summary>
+        /// A junction object to fit the terrain to: its footprint and the highest kerb among the profiles it suggests at its
+        /// connection points; null when its model gives no footprint.
+        /// </summary>
+        private OmsiShapedJunction ShapedJunction(OmsiTileSummary tile, OmsiObjectRecord item, double tileSize)
+        {
+            var outline = shapeOutlines.Get(item.AssetPath);
+            if (outline.Contours.Count == 0)
+                return null;
+            var edge = 0.0;
+            foreach (var helper in shapeJunctions.Helpers(item.AssetPath))
+            {
+                var profile = shapeProfiles.Get(helper.SplinePath);
+                if (profile != null)
+                    edge = Math.Max(edge, helper.Height + profile.EdgeHeight);
+            }
+            return new OmsiShapedJunction(tile, item, outline.Contours, edge, tileSize);
+        }
+
+        /// <summary>
+        /// Where the editor-placed junction objects lie that roads built here with terrain alignment join, as text: when it
+        /// changes, such as after a junction was moved, placed or deleted, the terrain has to be fitted again.
+        /// </summary>
+        public string JunctionTerrainState(OmsiMapSummary summary)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (Workspace == null)
+                return string.Empty;
+            var text = new System.Text.StringBuilder();
+            foreach (var tile in summary.Tiles)
+                foreach (var item in tile.Objects)
+                {
+                    if (item.Id < FirstNewId())
+                        continue;
+                    ShapeCatalogs();
+                    if (shapeJunctions.Helpers(item.AssetPath).Count == 0)
+                        continue;
+                    text.Append(item.Id).Append(' ').Append(tile.X).Append(' ').Append(tile.Y).Append(' ')
+                        .Append(OmsiNumberFormat.Format(item.LocalX)).Append(' ').Append(OmsiNumberFormat.Format(item.LocalY)).Append(' ')
+                        .Append(OmsiNumberFormat.Format(item.Height)).Append(' ').Append(OmsiNumberFormat.Format(item.HeadingDegrees)).Append(' ')
+                        .Append(OmsiNumberFormat.Format(item.PitchDegrees)).Append(' ').Append(OmsiNumberFormat.Format(item.BankDegrees)).Append(';');
+                }
+            return text.ToString();
+        }
+
+        /// <summary>The connection point of a placed object, such as a junction, that a spline end lies on (ADR 024); or null.</summary>
+        private OmsiJunctionPort PortAt(OmsiMapSummary summary, OmsiSplineEnd end)
+        {
+            ShapeCatalogs();
             var size = summary.TileSizeMeters;
             var position = end.Position(size);
             var tileX = (int)Math.Floor(position.X / size);
@@ -599,10 +667,10 @@ namespace OmsiMapEditor.OMSI
                         var dx = port.Position.X - position.X;
                         var dy = port.Position.Y - position.Y;
                         if (dx * dx + dy * dy <= tolerance * tolerance)
-                            return true;
+                            return port;
                     }
             }
-            return false;
+            return null;
         }
 
         private static void Link(EditedFiles files, OmsiSplineEnd join, int newId, List<OmsiTileSummary> tiles)

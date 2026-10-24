@@ -96,6 +96,99 @@ namespace OmsiMapEditor.OMSI
     }
 
     /// <summary>
+    /// A junction object the terrain is fitted to: its footprint from above in the object frame, its carriageway on the
+    /// object's plane and the height of its kerbs above that plane.
+    /// </summary>
+    public sealed class OmsiShapedJunction
+    {
+        private readonly double originX;
+        private readonly double originY;
+        private readonly double height;
+        private readonly double sinHeading;
+        private readonly double cosHeading;
+        private readonly double sinPitch;
+        private readonly double cosPitch;
+        private readonly double sinBank;
+        private readonly IReadOnlyList<OmsiMapPoint[]> contours;
+
+        public OmsiShapedJunction(OmsiTileSummary tile, OmsiObjectRecord item, IReadOnlyList<OmsiMapPoint[]> contours, double edgeHeight, double tileSizeMeters)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            Object = item ?? throw new ArgumentNullException(nameof(item));
+            this.contours = contours ?? throw new ArgumentNullException(nameof(contours));
+            EdgeHeight = edgeHeight;
+            var origin = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, item.LocalX, item.LocalY, tileSizeMeters);
+            originX = origin.X;
+            originY = origin.Y;
+            height = item.Height;
+            sinHeading = Math.Sin(item.HeadingDegrees * Math.PI / 180.0);
+            cosHeading = Math.Cos(item.HeadingDegrees * Math.PI / 180.0);
+            sinPitch = Math.Sin(item.PitchDegrees * Math.PI / 180.0);
+            cosPitch = Math.Cos(item.PitchDegrees * Math.PI / 180.0);
+            sinBank = Math.Sin(item.BankDegrees * Math.PI / 180.0);
+            var reach = 0.0;
+            foreach (var contour in contours)
+                foreach (var point in contour)
+                    reach = Math.Max(reach, Math.Sqrt(point.X * point.X + point.Y * point.Y));
+            Reach = reach;
+        }
+
+        public OmsiObjectRecord Object { get; }
+
+        /// <summary>The kerbs above the carriageway, from the profiles the object suggests at its connection points.</summary>
+        public double EdgeHeight { get; }
+
+        /// <summary>The furthest corner of the footprint from the object's origin.</summary>
+        internal double Reach { get; }
+
+        internal double OriginX => originX;
+        internal double OriginY => originY;
+
+        /// <summary>
+        /// Metres outside the footprint, zero or less inside it, and the height of the object's plane at a world position.
+        /// </summary>
+        internal bool Locate(double x, double y, out double outside, out double planeHeight)
+        {
+            outside = 0.0;
+            planeHeight = 0.0;
+            if (contours.Count == 0)
+                return false;
+            // Into the object frame: x right, y forward; heading turns clockwise from north.
+            var east = x - originX;
+            var north = y - originY;
+            var localX = east * cosHeading - north * sinHeading;
+            var localY = east * sinHeading + north * cosHeading;
+            var inside = false;
+            var nearest = double.MaxValue;
+            foreach (var contour in contours)
+                for (int index = 0, previous = contour.Length - 1; index < contour.Length; previous = index++)
+                {
+                    var a = contour[previous];
+                    var b = contour[index];
+                    if ((a.Y > localY) != (b.Y > localY) && localX < a.X + (localY - a.Y) * (b.X - a.X) / (b.Y - a.Y))
+                        inside = !inside;
+                    nearest = Math.Min(nearest, SegmentDistance(localX, localY, a, b));
+                }
+            outside = inside ? -nearest : nearest;
+            // The same turns as the object: bank lifts its right side, then pitch lowers its front.
+            planeHeight = height + localX * sinBank * cosPitch - localY * sinPitch;
+            return true;
+        }
+
+        private static double SegmentDistance(double x, double y, OmsiMapPoint a, OmsiMapPoint b)
+        {
+            var dx = b.X - a.X;
+            var dy = b.Y - a.Y;
+            var lengthSquared = dx * dx + dy * dy;
+            var t = lengthSquared < 1e-12 ? 0.0 : Math.Max(0.0, Math.Min(1.0, ((x - a.X) * dx + (y - a.Y) * dy) / lengthSquared));
+            var px = a.X + dx * t - x;
+            var py = a.Y + dy * t - y;
+            return Math.Sqrt(px * px + py * py);
+        }
+    }
+
+    /// <summary>
     /// Fits the terrain heights of a tile to roads without touching anything else: under a road and on a shoulder beside it
     /// the terrain lies just below the height of the profile's edge, such as the top of a kerb, as OMSI's editor leaves it; OMSI
     /// cuts the terrain away under roads marked with [spline_terrain_align_2] and closes the cut up to the road edge, so
@@ -105,7 +198,9 @@ namespace OmsiMapEditor.OMSI
     /// result depends only on the base terrain and the roads. Where a road ends on a connection point of an object, such as a
     /// junction, the object goes on with the carriageway at the height of the spline: the terrain beyond that end stays as it
     /// is, and under the road within a grid diagonal of it the terrain lies below the spline, so no grid triangle reaching
-    /// into the object rises above its carriageway.
+    /// into the object rises above its carriageway. A junction object joined by such a road is fitted like a road whose
+    /// carriageway is the object's footprint: below it the terrain lies just under the object's plane, beside it on a
+    /// shoulder at its kerbs, with slopes beyond.
     /// </summary>
     public static class OmsiTerrainShaping
     {
@@ -114,7 +209,8 @@ namespace OmsiMapEditor.OMSI
         /// to the roads.
         /// </summary>
         /// <returns>The number of grid points that changed.</returns>
-        public static int Shape(float[] heights, int tileX, int tileY, double tileSize, IEnumerable<OmsiShapedRoad> roads, OmsiTerrainShapeSettings settings)
+        public static int Shape(float[] heights, int tileX, int tileY, double tileSize, IEnumerable<OmsiShapedRoad> roads, OmsiTerrainShapeSettings settings,
+            IEnumerable<OmsiShapedJunction> junctions = null)
         {
             if (heights == null || heights.Length != OmsiTerrain.Resolution * OmsiTerrain.Resolution)
                 throw new ArgumentException("A terrain has 61 × 61 heights.", nameof(heights));
@@ -122,6 +218,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(roads));
             settings = settings ?? new OmsiTerrainShapeSettings();
             var list = new List<OmsiShapedRoad>(roads);
+            var objects = junctions == null ? new List<OmsiShapedJunction>() : new List<OmsiShapedJunction>(junctions);
             var step = tileSize / (OmsiTerrain.Resolution - 1);
             var shoulder = Math.Max(settings.ShoulderMeters, step * Math.Sqrt(2.0));
             var changed = 0;
@@ -140,6 +237,15 @@ namespace OmsiMapEditor.OMSI
                             continue;
                         if (Locate(road, x, y, shoulder, settings, out var place))
                             near.Add(place);
+                    }
+                    foreach (var junction in objects)
+                    {
+                        var reach = junction.Reach + settings.MaximumReachMeters;
+                        if (Math.Abs(x - junction.OriginX) > reach || Math.Abs(y - junction.OriginY) > reach)
+                            continue;
+                        if (!junction.Locate(x, y, out var outside, out var planeHeight) || outside > settings.MaximumReachMeters)
+                            continue;
+                        near.Add(new Place { Outside = outside, RoadHeight = planeHeight, EdgeHeight = planeHeight + junction.EdgeHeight, NearObject = true });
                     }
                     if (near.Count == 0)
                         continue;
@@ -178,7 +284,10 @@ namespace OmsiMapEditor.OMSI
             public double RoadHeight;
             public double EdgeHeight;
 
-            /// <summary>True within <c>shoulder</c> of an end on a connection point of an object.</summary>
+            /// <summary>
+            /// True within <c>shoulder</c> of a road end on a connection point of an object, and under a junction object:
+            /// the terrain beneath lies below the carriageway rather than the kerbs.
+            /// </summary>
             public bool NearObject;
         }
 

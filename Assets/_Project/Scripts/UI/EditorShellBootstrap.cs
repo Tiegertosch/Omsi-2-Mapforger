@@ -96,6 +96,8 @@ namespace OmsiMapEditor.UI
         // The connection points of the scenery objects of the open map's installation.
         private OmsiJunctionCatalog junctionCatalog;
         private OmsiSplineProfileCatalog roadProfiles;
+        // Where the editor-placed junctions lay when the terrain was last fitted to them; null until the first edit.
+        private string junctionTerrainState;
         private string roadProfilesRoot;
         // Where the selected object is while it is dragged or turned, as in Values(), so its connection points follow; null otherwise.
         private double[] junctionPreview;
@@ -1011,6 +1013,7 @@ namespace OmsiMapEditor.UI
             var summary = newSession.Read();
 
             session = newSession;
+            junctionTerrainState = null;
             baseSummary = summary;
             chronoDate = null;
             chronoGeneration++;
@@ -2182,6 +2185,7 @@ namespace OmsiMapEditor.UI
                     selection[index].Tile = tile;
             }
             ApplySelection(selection.Count > 0 ? selection[selection.Count - 1].Tile : selectedTile);
+            RefitTerrainAtJunctions();
             mapCanvas?.Refresh();
             objectRenderer?.RefreshPlacements();
             groundRenderer?.RefreshTerrainHoles(currentSummary);
@@ -2192,6 +2196,39 @@ namespace OmsiMapEditor.UI
                 UpdateBrowserEntry(tile);
             UpdateCounts();
             UpdateMapStateLabel();
+        }
+
+        /// <summary>
+        /// Fits the terrain again when an editor-placed junction moved, appeared or went, since fitted roads may join it
+        /// (ADR 022). The terrain follows from the original and the roads, so this is no undo step of its own.
+        /// </summary>
+        private void RefitTerrainAtJunctions()
+        {
+            if (!CanEdit || currentSummary == null)
+                return;
+            if (!currentSummary.Tiles.Exists(tile => tile.Splines.Exists(spline => spline.AlignsTerrain && session.ShapesTerrain(spline))))
+                return;
+            List<OmsiTileSummary> tiles;
+            try
+            {
+                var state = session.JunctionTerrainState(currentSummary);
+                if (state == junctionTerrainState)
+                    return;
+                junctionTerrainState = state;
+                tiles = session.RefitAllTerrain(currentSummary);
+            }
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The terrain could not be fitted to the junctions: " + exception.Message);
+                return;
+            }
+            if (tiles.Count == 0)
+                return;
+            groundRenderer?.RefreshTerrain(tiles);
+            objectRenderer?.RefreshTerrain(tiles, session.Source);
+            if (roadTerrain != null)
+                roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
         }
 
         private OmsiTileSummary TileHolding(MapSelectionItem item)

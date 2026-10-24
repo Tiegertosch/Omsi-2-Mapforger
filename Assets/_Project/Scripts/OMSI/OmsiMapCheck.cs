@@ -73,7 +73,8 @@ namespace OmsiMapEditor.OMSI
     /// <summary>
     /// Checks a map for what the format study suggests: import warnings, spline connections, map-wide unique IDs and the
     /// ID counter, entry points on their object, attachments on existing parents and splines, variable parents that
-    /// exist, object and spline files the installation has, the timetable and the selections of the chrono variants.
+    /// exist, object and spline files the installation has, the connection points of junction objects, the timetable and
+    /// the selections of the chrono variants.
     /// Reads the map files again, so it belongs on a worker thread; nothing is written.
     /// </summary>
     public static class OmsiMapCheck
@@ -98,7 +99,10 @@ namespace OmsiMapEditor.OMSI
             report.Sections.Add(Attachments(summary, tiles));
             report.Sections.Add(VariableParents(summary, tiles));
             if (!string.IsNullOrEmpty(installationRoot))
+            {
                 report.Sections.Add(Files(summary, installationRoot));
+                report.Sections.Add(Junctions(summary, installationRoot));
+            }
             var variants = OmsiChrono.ReadVariants(source);
             report.Sections.Add(Timetable(summary, source, variants));
             report.Sections.Add(Chrono(summary, source, variants));
@@ -414,6 +418,44 @@ namespace OmsiMapEditor.OMSI
             }
             section.Status = missing > 0 ? OmsiCheckStatus.Problem : OmsiCheckStatus.Passed;
             section.Summary = paths.Count - missing + " of " + paths.Count + " object and spline files are installed.";
+            return section;
+        }
+
+        /// <summary>
+        /// The connection points of junction objects with their state (ADR 024): invalid ones first, then those to review,
+        /// then free ones, which may be meant as open ends.
+        /// </summary>
+        private static OmsiCheckSection Junctions(OmsiMapSummary summary, string installationRoot)
+        {
+            var section = new OmsiCheckSection("Junctions");
+            var checks = OmsiJunctionCatalog.Check(summary, new OmsiJunctionCatalog(installationRoot).AllPorts(summary));
+            var objects = new HashSet<OmsiObjectRecord>();
+            var counts = new Dictionary<OmsiJunctionPortState, int>();
+            foreach (OmsiJunctionPortState state in Enum.GetValues(typeof(OmsiJunctionPortState)))
+                counts[state] = 0;
+            foreach (var check in checks)
+            {
+                objects.Add(check.Port.Object);
+                counts[check.State]++;
+            }
+            foreach (var state in new[] { OmsiJunctionPortState.Invalid, OmsiJunctionPortState.NeedsReview, OmsiJunctionPortState.Unconnected })
+                foreach (var check in checks)
+                {
+                    if (check.State != state)
+                        continue;
+                    section.Tile = section.Tile ?? check.Port.Tile;
+                    Add(section, (state == OmsiJunctionPortState.Invalid ? "invalid: " : state == OmsiJunctionPortState.NeedsReview ? "review: " : "free: ") +
+                                 "#" + check.Port.Object.Id + " " + Path.GetFileNameWithoutExtension(check.Port.Object.AssetPath ?? string.Empty) + " in tile " +
+                                 check.Port.Tile.X + ", " + check.Port.Tile.Y + ": " + check.Message);
+                }
+            section.Status = counts[OmsiJunctionPortState.Invalid] > 0 ? OmsiCheckStatus.Problem
+                : counts[OmsiJunctionPortState.NeedsReview] > 0 || counts[OmsiJunctionPortState.Unconnected] > 0 ? OmsiCheckStatus.Note
+                : OmsiCheckStatus.Passed;
+            section.Summary = checks.Count == 0
+                ? "No object of the map has connection points."
+                : counts[OmsiJunctionPortState.Connected] + " of " + checks.Count + " connection points of " + objects.Count + " junction objects are connected; " +
+                  counts[OmsiJunctionPortState.NeedsReview] + " to review, " + counts[OmsiJunctionPortState.Invalid] + " invalid, " +
+                  counts[OmsiJunctionPortState.Unconnected] + " free.";
             return section;
         }
 
