@@ -8,9 +8,17 @@ namespace OmsiMapEditor.OMSI
     {
         /// <summary>
         /// Beside the road the terrain stays at the height of the profile's edge, such as the top of a kerb, for this many
-        /// metres before slopes begin; OMSI's own aligned roads in Berlin-Spandau keep about 10 m flat.
+        /// metres before slopes begin, and at least one diagonal of the terrain grid: every grid triangle that reaches over
+        /// the pavement then lies flat, rather than rising through it towards a slope. OMSI's own aligned roads in
+        /// Berlin-Spandau keep about 10 m flat.
         /// </summary>
         public double ShoulderMeters { get; set; } = 2.0;
+
+        /// <summary>
+        /// Under the road and on the shoulder the terrain lies this far below the profile's edge, so where it reaches under
+        /// the pavement it does not flicker with it; OMSI closes its cut up to the edge with a step this small.
+        /// </summary>
+        public double BelowEdgeMeters { get; set; } = 0.05;
 
         /// <summary>Embankments and cuttings rise one metre over this many metres from the shoulder (1:1.5).</summary>
         public double SlopeRatio { get; set; } = 1.5;
@@ -80,7 +88,7 @@ namespace OmsiMapEditor.OMSI
 
     /// <summary>
     /// Fits the terrain heights of a tile to roads without touching anything else: under a road and on a shoulder beside it
-    /// the terrain lies at the height of the profile's edge, such as the top of a kerb, as OMSI's editor leaves it; OMSI
+    /// the terrain lies just below the height of the profile's edge, such as the top of a kerb, as OMSI's editor leaves it; OMSI
     /// cuts the terrain away under roads marked with [spline_terrain_align_2] and closes the cut up to the road edge, so
     /// ground lower than the edge would show there as a wall. Further out the terrain is kept within a slope from the
     /// shoulder, which cuts into higher ground and builds an embankment over lower ground, and beyond it stays as it was. A
@@ -103,6 +111,7 @@ namespace OmsiMapEditor.OMSI
             settings = settings ?? new OmsiTerrainShapeSettings();
             var list = new List<OmsiShapedRoad>(roads);
             var step = tileSize / (OmsiTerrain.Resolution - 1);
+            var shoulder = Math.Max(settings.ShoulderMeters, step * Math.Sqrt(2.0));
             var changed = 0;
             var near = new List<Place>();
             for (var row = 0; row < OmsiTerrain.Resolution; row++)
@@ -130,12 +139,13 @@ namespace OmsiMapEditor.OMSI
                         if (place.Outside <= 0.0 && (under == null || place.Outside < under.Outside))
                             under = place;
                     if (under != null)
-                        height = under.EdgeHeight;
+                        height = under.EdgeHeight - settings.BelowEdgeMeters;
                     else
                         foreach (var place in near)
                         {
-                            var spread = Math.Max(0.0, place.Outside - settings.ShoulderMeters) / settings.SlopeRatio;
-                            height = Math.Max(place.EdgeHeight - spread, Math.Min(place.EdgeHeight + spread, height));
+                            var level = place.EdgeHeight - settings.BelowEdgeMeters;
+                            var spread = Math.Max(0.0, place.Outside - shoulder) / settings.SlopeRatio;
+                            height = Math.Max(level - spread, Math.Min(level + spread, height));
                         }
                     if (Math.Abs(height - heights[index]) > 1e-4)
                     {

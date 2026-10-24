@@ -411,15 +411,16 @@ namespace OmsiMapEditor.Tests
             var flat = new float[OmsiTerrain.Resolution * OmsiTerrain.Resolution];
             var changed = OmsiTerrainShaping.Shape(flat, 0, 0, 300, new[] { road }, new OmsiTerrainShapeSettings());
             Assert.Greater(changed, 0);
-            // Grid points every 5 m: column 30 is x 150 under the road, column 31 is 1 m outside its edge on the shoulder; both
-            // lie at the height of the kerb, as OMSI cuts the terrain away under the road.
-            Assert.AreEqual(2.15, Height(flat, 30, 30), 1e-5);
-            Assert.AreEqual(2.15, Height(flat, 31, 30), 1e-5);
-            // 6 m outside: the slope of 1:1.5 from the shoulder would end below the ground, so the ground stays.
-            Assert.AreEqual(0.0, Height(flat, 32, 30), 1e-5);
-            // 5 m beyond the north end on its line the slopes round off around the end: 3 m past the shoulder they fall
-            // 2 m, from 2.15 to 0.15.
-            Assert.AreEqual(0.15, Height(flat, 30, 41), 1e-5);
+            // Grid points every 5 m: column 30 is x 150 under the road, columns 31 and 32 are 1 m and 6 m outside its edge on
+            // the shoulder, which reaches a grid diagonal of 7.07 m; all lie 5 cm below the kerb, as OMSI cuts the terrain
+            // away under the road.
+            Assert.AreEqual(2.10, Height(flat, 30, 30), 1e-5);
+            Assert.AreEqual(2.10, Height(flat, 31, 30), 1e-5);
+            Assert.AreEqual(2.10, Height(flat, 32, 30), 1e-5);
+            // 11 m outside: the slope of 1:1.5 from the shoulder would end below the ground, so the ground stays.
+            Assert.AreEqual(0.0, Height(flat, 33, 30), 1e-5);
+            // Beyond the north end on its line the shoulder and slopes round off around the end: flat at 5 m, ground at 15 m.
+            Assert.AreEqual(2.10, Height(flat, 30, 41), 1e-5);
             Assert.AreEqual(0.0, Height(flat, 30, 43), 1e-5);
             // Far away nothing changes.
             Assert.AreEqual(0.0, Height(flat, 0, 0), 0.0);
@@ -427,9 +428,9 @@ namespace OmsiMapEditor.Tests
             // The same road through a hill at 6 m: a cutting.
             var hill = Enumerable.Repeat(6f, OmsiTerrain.Resolution * OmsiTerrain.Resolution).ToArray();
             OmsiTerrainShaping.Shape(hill, 0, 0, 300, new[] { road }, new OmsiTerrainShapeSettings());
-            Assert.AreEqual(2.15, Height(hill, 30, 30), 1e-5);
-            Assert.AreEqual(2.15, Height(hill, 31, 30), 1e-5);
-            Assert.AreEqual(2.15 + 4.0 / 1.5, Height(hill, 32, 30), 1e-5);
+            Assert.AreEqual(2.10, Height(hill, 30, 30), 1e-5);
+            Assert.AreEqual(2.10, Height(hill, 32, 30), 1e-5);
+            Assert.AreEqual(2.10 + (11.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, Height(hill, 33, 30), 1e-5);
             Assert.AreEqual(6.0, Height(hill, 36, 30), 1e-5);
         }
 
@@ -449,8 +450,8 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEquivalent(new[] { summary.Tiles[0], summary.Tiles[1] }.Where(tile => tile.X == 0), change.TerrainTiles);
             Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
             var terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
-            Assert.AreEqual(2.15, terrain[20, 46], 1e-4);
-            Assert.AreEqual(2.15, terrain[21, 46], 1e-4);
+            Assert.AreEqual(2.10, terrain[20, 46], 1e-4);
+            Assert.AreEqual(2.10, terrain[21, 46], 1e-4);
             // Far from the road the ground is as it was.
             Assert.AreEqual(0.05 * 250, terrain[50, 46], 1e-4);
             Assert.IsTrue(summary.Tiles[0].Splines.Where(spline => change.SplineIds.Contains(spline.Id)).All(spline => spline.AlignsTerrain));
@@ -464,7 +465,7 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.IsEmpty(session.RefitAllTerrain(summary));
             CollectionAssert.AreEqual(fitted, session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
             // After the way of fitting changed, fitting again reshapes the tile, and changing it back restores it.
-            session.TerrainShape.ShoulderMeters = 6.0;
+            session.TerrainShape.ShoulderMeters = 10.0;
             Assert.AreEqual(1, session.RefitAllTerrain(summary).Count);
             CollectionAssert.AreNotEqual(fitted, session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
             session.TerrainShape.ShoulderMeters = 2.0;

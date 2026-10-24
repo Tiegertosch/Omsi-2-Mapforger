@@ -116,8 +116,8 @@ namespace OmsiMapEditor.UI
             fitTerrainToggle = new Toggle("Fit terrain to the road")
             {
                 value = true,
-                tooltip = "Lays the ground under the road and a shoulder beside it at kerb height, as OMSI cuts it away under the road, " +
-                          "and cuts or banks up slopes of 1:1.5 beside it. " +
+                tooltip = "Lays the ground under the road and a shoulder of about 7 m beside it just below kerb height, as OMSI cuts it away " +
+                          "under the road, and cuts or banks up slopes of 1:1.5 beyond. " +
                           "The original terrain stays in the original map; deleting the road brings it back."
             };
             fitTerrainToggle.AddToClassList("panel-toggle");
