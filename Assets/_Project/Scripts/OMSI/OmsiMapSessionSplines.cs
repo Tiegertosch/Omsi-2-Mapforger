@@ -448,6 +448,23 @@ namespace OmsiMapEditor.OMSI
             return result;
         }
 
+        /// <summary>
+        /// Fits the terrain anew around every road built here with terrain alignment, such as after the way of fitting
+        /// changed. The original terrain stays in the original map.
+        /// </summary>
+        /// <returns>The tiles whose terrain changed.</returns>
+        public List<OmsiTileSummary> RefitAllTerrain(OmsiMapSummary summary)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            var change = new OmsiSplineChange(OmsiSplineChangeKind.TerrainAlignment);
+            foreach (var tile in summary.Tiles)
+                if (tile.Splines.Exists(ShapesTerrain))
+                    change.Tiles.Add(tile);
+            ReshapeTerrain(summary, change);
+            return new List<OmsiTileSummary>(change.TerrainTiles);
+        }
+
         /// <summary>Computes the terrain of a tile and its neighbours anew from the roads the map has now.</summary>
         private void RefitTerrainAround(OmsiMapSummary summary, OmsiTileSummary tile)
         {

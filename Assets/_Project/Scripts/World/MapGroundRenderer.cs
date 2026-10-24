@@ -309,7 +309,7 @@ namespace OmsiMapEditor.World
                 {
                     splines.Add(new KeyValuePair<long, OmsiSplineRecord>(OmsiTerrainHoleCatalog.TileKey(tile.X, tile.Y), spline));
                     var profile = holes.Profiles.Get(spline.AssetPath);
-                    if (profile != null && profile.TerrainHoles.Count > 0)
+                    if (profile != null && (profile.TerrainHoles.Count > 0 || spline.AlignsTerrain))
                         ids.Append(spline.Id).Append(',');
                 }
             var signature = HoleSignature(holes.Catalog, placements) + "|" + ids;

@@ -186,11 +186,11 @@ Neue Splines kommen ans Ende der Kachel, in der ihr Start liegt, mit neuen karte
 **Status:** Angenommen, 23. Oktober 2026, auf Wunsch des Nutzers vor Etappe 2 gezogen. Ergänzt ADR 021.
 
 **Entscheidung:** Neue Straßen passen das Gelände standardmäßig an („Fit terrain to the road“ im Straßen-Panel). Das Gelände bekommt drei Zonen:
-- Unter der Fahrbahn, über die ganze Breite des `.sli`-Querschnitts, liegt es 0,3 m unter dem Spline.
+- Unter der Fahrbahn, über die ganze Breite des `.sli`-Querschnitts, liegt es auf Höhe des Profilrands (seit 24. Oktober 2026; zuvor 0,3 m unter dem Spline).
 - Daneben folgt ein Randstreifen von 2 m auf der Höhe des Profilrands, etwa der Bordsteinoberkante.
 - Dahinter hält eine Böschung von 1:1,5 das Gelände in einem Kegel um diese Randhöhe: Höheres Gelände wird eingeschnitten, tieferes aufgeschüttet, bis höchstens 40 m.
 
-Ein Rasterpunkt unter irgendeiner Straße nimmt deren Höhe; Böschungen anderer Stücke heben ihn nie an. Weil das Gelände unter der Fahrbahn tiefer liegt als sie, braucht die Straße kein Ausschneiden.
+Ein Rasterpunkt unter irgendeiner Straße nimmt deren Höhe; Böschungen anderer Stücke heben oder senken ihn nie. Unter der Kontur des Profils, also unter seinen Streifen, schneidet die Kartenansicht das Gelände aus, wie OMSI es tut. Es reicht dabei nur 0,3 m unter die Ränder statt 0,75 m wie bei Kreuzungslöchern, damit es am Hang nicht durch den Gehweg ragt. Breiten ohne Streifen, etwa ein Grünstreifen zwischen Fahrbahn und Gehweg oder ein 0,9 m schmaler Mittelstreifen, behalten ihr Gelände. „Edit > Fit terrain to built roads again“ berechnet das Gelände an allen im Editor gebauten Straßen neu, etwa an Straßen, die vor einer Änderung der Anpassung gebaut wurden. Weil das Gelände allein aus Original und Straßen folgt, ist das kein Rückgängig-Schritt.
 
 Das ursprüngliche Gelände bleibt in der Originalkarte. Nach jedem Bauen, Löschen, Rückgängig, Wiederholen und Kachel-Zurücksetzen wird das Gelände der betroffenen Kacheln und ihrer Nachbarn neu berechnet, und zwar aus dem Original plus allen im Editor gebauten Straßen mit Anpassung. Gleicht es dem Original, verschwindet die Kopie in der Arbeitskopie wieder.
 
@@ -200,4 +200,5 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Ein Gelände mit 5 m Rasterabstand kann eine 25-m-Stückelung und Querhänge nicht nachzeichnen; ohne Anpassung stößt es durch die Fahrbahn (Rückmeldung des Nutzers mit Bild vom 23. Oktober 2026).
 - Das Briefing verlangt die Trennung von Original-Gelände, Straßendaten, abgeleiteter Anpassung und angezeigter Oberfläche: Straßen können verschoben und gelöscht werden, ohne Gelände zu verlieren.
 - Das Kennzeichen und die Form folgen dem Befund in Berlin-Spandau: An den 203 so gekennzeichneten Splines liegt das gespeicherte Gelände bis etwa 10 m neben der Mitte 0,15 bis 0,25 m über dem Spline, auf Höhe der Gehwege dieser Profile (Fahrbahn +0,10 m, Gehweg +0,25 m), und läuft über 20 bis 30 m aus. OMSIs Editor formt das Gelände also an solche Splines an und kennzeichnet sie.
-- Was OMSI im Spiel mit dem Kennzeichen tut, ist nicht bekannt und noch im Spiel zu prüfen. Ein erster Versuch, das Gelände in der Kartenansicht unter gekennzeichneten Splines über die ganze Profilbreite auszuschneiden, legte in Berlin-Spandau neben der Fahrbahn Himmel frei, wo das Profil von dieser Seite nichts zeichnet. Er wurde verworfen: Ausgeschnitten wird nur, was `[terrainhole]` und `[terrainholeprofile]` belegen (ADR 018).
+- Im Spiel schneidet OMSI das Gelände unter gekennzeichneten Splines aus und schließt den Schnitt senkrecht bis zum Profilrand. Mit 0,3 m Absenkung zeigte sich dort eine senkrechte Wand aus gestrecktem Gras (Spieltest des Nutzers mit Bild vom 24. Oktober 2026). Auf Höhe des Profilrands, wie OMSIs Editor es hinterlässt, hat diese Wand keine Höhe.
+- Ein erster Versuch, im Editor über die ganze Profilbreite auszuschneiden, legte in Berlin-Spandau Himmel frei: `str_6spur_falkenseer2_2.sli` lässt zwischen Gehweg und Fahrbahn 9 m ohne Streifen. Darum wird nur die Kontur ausgeschnitten, wie openOMSI das Element beschreibt.

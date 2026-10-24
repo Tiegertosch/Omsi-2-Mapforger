@@ -316,6 +316,49 @@ namespace OmsiMapEditor.OMSI
             return mesh;
         }
 
+        /// <summary>
+        /// The terrain OMSI cuts away under a spline marked with [spline_terrain_align] or [spline_terrain_align_2]: its
+        /// contour, the widths its strips cover seen from above. Widths without a strip, such as a grass verge between a
+        /// road and its pavement, keep their terrain. Each covered width shrinks by <paramref name="insetMeters"/> on both
+        /// sides, so the terrain reaches under its edges; widths left without area are dropped.
+        /// </summary>
+        public static OmsiSurfaceMesh BuildAlignmentHole(OmsiSplineRecord spline, OmsiSplineProfile profile, double insetMeters = 0.0)
+        {
+            var mesh = new OmsiSurfaceMesh();
+            var length = spline.LengthMeters;
+            if (!(length > 0.0) || double.IsInfinity(length))
+                return mesh;
+            var widths = new List<KeyValuePair<double, double>>();
+            foreach (var strip in profile.Strips)
+                for (var point = 0; point + 1 < strip.Points.Count; point++)
+                {
+                    var left = Math.Min(strip.Points[point].X, strip.Points[point + 1].X);
+                    var right = Math.Max(strip.Points[point].X, strip.Points[point + 1].X);
+                    if (right - left >= MinimumWidth)
+                        widths.Add(new KeyValuePair<double, double>(left, right));
+                }
+            if (widths.Count == 0)
+                return mesh;
+            widths.Sort((first, second) => first.Key.CompareTo(second.Key));
+            var merged = new List<KeyValuePair<double, double>> { widths[0] };
+            for (var index = 1; index < widths.Count; index++)
+            {
+                var last = merged[merged.Count - 1];
+                if (widths[index].Key <= last.Value + MinimumWidth)
+                    merged[merged.Count - 1] = new KeyValuePair<double, double>(last.Key, Math.Max(last.Value, widths[index].Value));
+                else
+                    merged.Add(widths[index]);
+            }
+
+            var turn = Math.Abs(spline.RadiusMeters) > 0.001 ? length / Math.Abs(spline.RadiusMeters) : 0.0;
+            var steps = Math.Max(1, Math.Min(512, (int)Math.Ceiling(turn / MaximumStepRadians)));
+            foreach (var width in merged)
+                if (width.Value - width.Key - 2.0 * insetMeters >= MinimumWidth)
+                    AddRibbon(mesh, spline, new OmsiProfilePoint { X = width.Key + insetMeters }, new OmsiProfilePoint { X = width.Value - insetMeters },
+                        spline.IsMirrored ? -1.0 : 1.0, steps);
+            return mesh;
+        }
+
         /// <summary>One piece of the cross-section swept along the spline as a band of quads.</summary>
         private static void AddRibbon(OmsiSurfaceMesh mesh, OmsiSplineRecord spline, OmsiProfilePoint left, OmsiProfilePoint right,
             double mirror, int steps)

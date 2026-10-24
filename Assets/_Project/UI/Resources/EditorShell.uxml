@@ -58,6 +58,7 @@
         <ui:VisualElement name="edit-menu" class="menu-popup edit-menu">
             <ui:Button name="place-object-menu-item" text="Place object..." class="menu-popup-item" />
             <ui:Button name="delete-object-menu-item" text="Delete selection    Del" class="menu-popup-item" />
+            <ui:Button name="refit-terrain-menu-item" text="Fit terrain to built roads again" class="menu-popup-item" />
             <ui:Label class="menu-divider" />
             <ui:Button name="undo-menu-item" text="Undo    Ctrl+Z" class="menu-popup-item" />
             <ui:Button name="redo-menu-item" text="Redo    Ctrl+Y" class="menu-popup-item" />

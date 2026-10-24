@@ -235,6 +235,7 @@ namespace OmsiMapEditor.UI
             var inspectorMenuItem = root.Q<Button>("inspector-menu-item");
             var placeObjectMenuItem = root.Q<Button>("place-object-menu-item");
             var deleteObjectMenuItem = root.Q<Button>("delete-object-menu-item");
+            var refitTerrainMenuItem = root.Q<Button>("refit-terrain-menu-item");
             var undoMenuItem = root.Q<Button>("undo-menu-item");
             var redoMenuItem = root.Q<Button>("redo-menu-item");
             objectsPanelHost = root.Q<VisualElement>("tool-panel-host");
@@ -449,6 +450,12 @@ namespace OmsiMapEditor.UI
                 {
                     HidePopup(editMenu);
                     DeleteSelectedObjects();
+                };
+            if (refitTerrainMenuItem != null)
+                refitTerrainMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    RefitRoadTerrain();
                 };
             if (undoMenuItem != null)
                 undoMenuItem.clicked += () =>
@@ -764,6 +771,14 @@ namespace OmsiMapEditor.UI
                     else
                         UpdateRoadPreview();
                 }
+            }
+
+            if (Array.IndexOf(args, "-refitTerrain") >= 0)
+            {
+                var groundStarted = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundStarted < 300f)
+                    yield return null;
+                RefitRoadTerrain();
             }
 
             if (int.TryParse(Argument("-selectSpline", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var splineId))
@@ -1403,6 +1418,43 @@ namespace OmsiMapEditor.UI
             PushHistory(new ObjectEditStep { SplineChange = change });
             RefreshSplineViews(change);
             SetStatus((align ? "Terrain fitted to " : "Terrain no longer fitted to ") + change.SplineIds.Count + " spline(s) of this road; Ctrl+Z takes it back.");
+        }
+
+        /// <summary>
+        /// Fits the terrain anew around every road built here with terrain alignment, such as roads built before the way of
+        /// fitting changed. The terrain follows from the original terrain and the roads alone, so this is no undo step.
+        /// </summary>
+        private void RefitRoadTerrain()
+        {
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("fit the terrain"));
+                return;
+            }
+            List<OmsiTileSummary> tiles;
+            try
+            {
+                tiles = session.RefitAllTerrain(currentSummary);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("The terrain could not be fitted: " + exception.Message);
+                return;
+            }
+            if (tiles.Count == 0)
+            {
+                SetStatus("The terrain already fits all roads built here.");
+                return;
+            }
+            groundRenderer?.RefreshTerrain(tiles);
+            objectRenderer?.RefreshTerrain(tiles, session.Source);
+            if (roadTerrain != null)
+                roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
+            foreach (var tile in tiles)
+                UpdateBrowserEntry(tile);
+            UpdateMapStateLabel();
+            SetStatus("Terrain fitted again on " + tiles.Count + " tile(s).");
         }
 
         /// <summary>Draws the changed splines again from above and in 3D and updates the counts.</summary>

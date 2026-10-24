@@ -222,27 +222,45 @@ namespace OmsiMapEditor.OMSI
             foreach (var pair in splines)
             {
                 var profile = profiles.Get(pair.Value.AssetPath);
-                if (profile == null || profile.TerrainHoles.Count == 0)
-                    continue;
-                var mesh = OmsiSplineSurface.BuildTerrainHoles(pair.Value, profile);
-                var tileX = (int)(pair.Key >> 32);
-                var tileY = (int)(uint)pair.Key;
-                var transformed = new double[mesh.Triangles.Count * 2];
-                for (var corner = 0; corner < mesh.Triangles.Count; corner++)
-                {
-                    var vertex = mesh.Triangles[corner];
-                    transformed[corner * 2] = tileX * tileSize + mesh.Positions[vertex * 3];
-                    transformed[corner * 2 + 1] = tileY * tileSize + mesh.Positions[vertex * 3 + 2];
-                }
-                AddWorldTriangles(masks, transformed, availableTiles, tileSize);
+                if (profile != null && profile.TerrainHoles.Count > 0)
+                    AddSplineTriangles(masks, pair.Key, OmsiSplineSurface.BuildTerrainHoles(pair.Value, profile), availableTiles, tileSize);
             }
             foreach (var mask in masks.Values)
                 mask.Shrink(EdgeAllowanceMeters, tileSize);
+
+            // Without a hole profile a terrain alignment cuts the contour of the cross-section, as OMSI does. It is cut
+            // after shrinking, inset by only AlignmentOverlapMeters, so narrow gaps such as a central reservation stay
+            // closed and the terrain, which lies at kerb height there, does not rise through the pavement on a slope.
+            foreach (var pair in splines)
+            {
+                var profile = profiles.Get(pair.Value.AssetPath);
+                if (profile != null && profile.TerrainHoles.Count == 0 && pair.Value.AlignsTerrain)
+                    AddSplineTriangles(masks, pair.Key, OmsiSplineSurface.BuildAlignmentHole(pair.Value, profile, AlignmentOverlapMeters), availableTiles,
+                        tileSize);
+            }
             return masks;
+        }
+
+        private static void AddSplineTriangles(Dictionary<long, OmsiTerrainHoleMask> masks, long tileKey, OmsiSurfaceMesh mesh, ISet<long> availableTiles,
+            double tileSize)
+        {
+            var tileX = (int)(tileKey >> 32);
+            var tileY = (int)(uint)tileKey;
+            var transformed = new double[mesh.Triangles.Count * 2];
+            for (var corner = 0; corner < mesh.Triangles.Count; corner++)
+            {
+                var vertex = mesh.Triangles[corner];
+                transformed[corner * 2] = tileX * tileSize + mesh.Positions[vertex * 3];
+                transformed[corner * 2 + 1] = tileY * tileSize + mesh.Positions[vertex * 3 + 2];
+            }
+            AddWorldTriangles(masks, transformed, availableTiles, tileSize);
         }
 
         /// <summary>Holes are cut this much smaller than their meshes, so no gap opens at the edges of crossings.</summary>
         public const double EdgeAllowanceMeters = 0.75;
+
+        /// <summary>How far the terrain reaches under the edges of a spline that terrain alignment cuts out.</summary>
+        public const double AlignmentOverlapMeters = 0.3;
 
         public static long TileKey(int x, int y)
         {

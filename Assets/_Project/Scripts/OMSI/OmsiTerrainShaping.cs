@@ -6,9 +6,6 @@ namespace OmsiMapEditor.OMSI
     /// <summary>How the terrain is fitted to a road.</summary>
     public sealed class OmsiTerrainShapeSettings
     {
-        /// <summary>Under the road the terrain lies this far below the spline, so it never shows through the surface.</summary>
-        public double SinkMeters { get; set; } = 0.3;
-
         /// <summary>
         /// Beside the road the terrain stays at the height of the profile's edge, such as the top of a kerb, for this many
         /// metres before slopes begin; OMSI's own aligned roads in Berlin-Spandau keep about 10 m flat.
@@ -82,11 +79,13 @@ namespace OmsiMapEditor.OMSI
     }
 
     /// <summary>
-    /// Fits the terrain heights of a tile to roads without touching anything else: under a road the terrain lies a little
-    /// below it, beside it the terrain is kept within a slope from the road edge, which cuts into higher ground and builds
-    /// an embankment over lower ground, and further out it stays as it was. A grid point under any road takes that road's
-    /// height, so slopes of neighbouring pieces never lift the ground under a road; the result depends only on the base
-    /// terrain and the roads.
+    /// Fits the terrain heights of a tile to roads without touching anything else: under a road and on a shoulder beside it
+    /// the terrain lies at the height of the profile's edge, such as the top of a kerb, as OMSI's editor leaves it; OMSI
+    /// cuts the terrain away under roads marked with [spline_terrain_align_2] and closes the cut up to the road edge, so
+    /// ground lower than the edge would show there as a wall. Further out the terrain is kept within a slope from the
+    /// shoulder, which cuts into higher ground and builds an embankment over lower ground, and beyond it stays as it was. A
+    /// grid point under any road takes that road's height, so slopes of neighbouring pieces never lift or lower it; the
+    /// result depends only on the base terrain and the roads.
     /// </summary>
     public static class OmsiTerrainShaping
     {
@@ -131,7 +130,7 @@ namespace OmsiMapEditor.OMSI
                         if (place.Outside <= 0.0 && (under == null || place.Outside < under.Outside))
                             under = place;
                     if (under != null)
-                        height = under.RoadHeight - settings.SinkMeters;
+                        height = under.EdgeHeight;
                     else
                         foreach (var place in near)
                         {

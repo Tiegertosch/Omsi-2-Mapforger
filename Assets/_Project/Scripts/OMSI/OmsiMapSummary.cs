@@ -196,7 +196,8 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// True when [spline_terrain_align] or [spline_terrain_align_2] follows the spline: the terrain was fitted to it, as
-        /// OMSI's editor marks such roads. What OMSI does with the mark while driving is not known.
+        /// OMSI's editor marks such roads, and OMSI cuts the terrain away under it and closes the cut up to the road edge
+        /// (seen in OMSI by the user on 24 October 2026).
         /// </summary>
         public bool AlignsTerrain { get; internal set; }
     }

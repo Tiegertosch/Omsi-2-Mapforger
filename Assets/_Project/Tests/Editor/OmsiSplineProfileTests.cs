@@ -88,6 +88,27 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TerrainAlignmentCutsTheContourAndKeepsAVergeWithoutAStrip()
+        {
+            // A pavement from -10 to -8, a grass verge without a strip, a kerb face at -4 and a lane from -4 to 0.
+            const string verge = "[texture]\r\nside.bmp\r\n" +
+                                 "[profile]\r\n0\r\n[profilepnt]\r\n-10\r\n0.25\r\n0\r\n1\r\n[profilepnt]\r\n-8\r\n0.25\r\n1\r\n1\r\n" +
+                                 "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.25\r\n0\r\n1\r\n[profilepnt]\r\n-4\r\n0.1\r\n1\r\n1\r\n" +
+                                 "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.1\r\n0\r\n1\r\n[profilepnt]\r\n0\r\n0.1\r\n1\r\n1\r\n";
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(verge), "verge.sli");
+            // Northbound: profile x is east.
+            var spline = new OmsiSplineRecord { HeadingDegrees = 0, LengthMeters = 10 };
+
+            var hole = OmsiSplineSurface.BuildAlignmentHole(spline, profile, 0.5);
+
+            // Each covered width is inset by 0.5 m on both sides; the verge stays.
+            var east = Enumerable.Range(0, hole.VertexCount).Select(vertex => Math.Round(hole.Positions[vertex * 3], 6)).Distinct().OrderBy(x => x).ToArray();
+            CollectionAssert.AreEqual(new[] { -9.5, -8.5, -3.5, -0.5 }, east);
+            // A width too narrow for the inset is dropped.
+            Assert.AreEqual(4, OmsiSplineSurface.BuildAlignmentHole(spline, profile, 1.5).VertexCount);
+        }
+
+        [Test]
         public void MirroredSplinesTurnTheirCrossSectionOverAndCurvesAreSampled()
         {
             var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Street), @"Splines\Test\street.sli");
