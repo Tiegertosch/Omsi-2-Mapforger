@@ -251,9 +251,10 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Opposite connection points face away from each other within this many degrees.</summary>
         private const double OppositeToleranceDegrees = 15.0;
 
+        /// <param name="throughPair">The two connection points to lay on the road, by their place among the object's; null chooses.</param>
         /// <returns>The plan, or null when the object has fewer than two connection points.</returns>
         public static OmsiJunctionInsertionPlan Plan(OmsiMapSummary summary, OmsiJunctionCatalog catalog, string assetPath, OmsiTileSummary tile,
-            OmsiSplineRecord spline, double distance, double pointerX, double pointerY)
+            OmsiSplineRecord spline, double distance, double pointerX, double pointerY, int[] throughPair = null)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -294,6 +295,11 @@ namespace OmsiMapEditor.OMSI
                         pairSecond = second;
                     }
                 }
+            if (throughPair != null)
+            {
+                pairFirst = throughPair[0];
+                pairSecond = throughPair[1];
+            }
             if (pairFirst < 0)
             {
                 plan.Problem = "The object has no two connection points facing away from each other to lay along a road.";
@@ -371,6 +377,193 @@ namespace OmsiMapEditor.OMSI
         private static double Normalize360(double degrees)
         {
             return (degrees % 360.0 + 360.0) % 360.0;
+        }
+    }
+
+    /// <summary>Where a road being planned crosses an existing road: the point on that road and the new road's way there.</summary>
+    public sealed class OmsiRoadCrossing
+    {
+        /// <summary>The point on the existing road.</summary>
+        public OmsiSplinePoint Road { get; internal set; }
+
+        /// <summary>How far along the planned road the crossing lies, in metres.</summary>
+        public double Along { get; internal set; }
+
+        /// <summary>The planned road's heading at the crossing.</summary>
+        public double HeadingDegrees { get; internal set; }
+    }
+
+    /// <summary>
+    /// Finds where roads being built meet existing roads, so a junction can be made there (stage 4d, ADR 028), and the arms
+    /// such a junction needs. Only roads count: profiles with a carriageway at least 3 m wide and a lane for vehicles, not
+    /// rails, wires, fences or footpaths.
+    /// </summary>
+    public static class OmsiRoadJunctions
+    {
+        /// <summary>True for a profile with a carriageway at least 3 m wide and a lane for vehicles.</summary>
+        public static bool IsRoad(OmsiSplineProfile profile)
+        {
+            if (profile == null || !profile.Lanes.Exists(lane => lane.Kind == 0))
+                return false;
+            var sections = OmsiProfileSections.Of(profile);
+            return sections.RoadTexture >= 0 && sections.RoadLeft + sections.RoadRight >= 3.0;
+        }
+
+        /// <summary>The road whose carriageway lies under a world position, or null.</summary>
+        public static OmsiSplinePoint RoadAt(OmsiMapSummary summary, OmsiSplineProfileCatalog profiles, double x, double y)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (profiles == null)
+                throw new ArgumentNullException(nameof(profiles));
+            var point = OmsiSplinePoint.Nearest(summary, x, y, 10.0);
+            if (point == null)
+                return null;
+            var profile = profiles.Get(point.Spline.AssetPath);
+            if (!IsRoad(profile))
+                return null;
+            var sections = OmsiProfileSections.Of(profile);
+            return point.Offset <= Math.Max(sections.RoadLeft, sections.RoadRight) ? point : null;
+        }
+
+        /// <summary>
+        /// The first place where a planned road crosses the centre line of an existing road, at least <paramref name="skip"/>
+        /// metres from either end of the planned road; splines in <paramref name="ignore"/>, such as the ones it joins, do
+        /// not count. Null when it crosses none.
+        /// </summary>
+        public static OmsiRoadCrossing FirstCrossing(OmsiMapSummary summary, OmsiSplineProfileCatalog profiles, OmsiRoadPlan plan, double skip,
+            ICollection<int> ignore)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (plan == null || plan.Pieces.Count == 0)
+                return null;
+            // The planned road as a line every half metre, with distance and heading at each point.
+            var course = new List<double[]>();
+            var travelled = 0.0;
+            double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var piece in plan.Pieces)
+            {
+                var steps = Math.Max(1, (int)Math.Ceiling(piece.LengthMeters / 0.5));
+                for (var step = course.Count == 0 ? 0 : 1; step <= steps; step++)
+                {
+                    var along = piece.LengthMeters * step / steps;
+                    piece.PointAt(along, out var x, out var y, out _);
+                    var heading = piece.RadiusMeters == 0.0 ? piece.HeadingDegrees : piece.HeadingDegrees + along / piece.RadiusMeters * 180.0 / Math.PI;
+                    course.Add(new[] { x, y, travelled + along, heading });
+                    minX = Math.Min(minX, x);
+                    minY = Math.Min(minY, y);
+                    maxX = Math.Max(maxX, x);
+                    maxY = Math.Max(maxY, y);
+                }
+                travelled += piece.LengthMeters;
+            }
+
+            var size = summary.TileSizeMeters;
+            OmsiRoadCrossing best = null;
+            foreach (var tile in summary.Tiles)
+            {
+                if ((tile.X + 1) * size < minX - 1.0 || tile.X * size > maxX + 1.0 || (tile.Y + 1) * size < minY - 1.0 || tile.Y * size > maxY + 1.0)
+                    continue;
+                foreach (var spline in tile.Splines)
+                {
+                    if (ignore != null && ignore.Contains(spline.Id))
+                        continue;
+                    var origin = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, spline.LocalX, spline.LocalY, size);
+                    if (origin.X + spline.LengthMeters < minX || origin.X - spline.LengthMeters > maxX ||
+                        origin.Y + spline.LengthMeters < minY || origin.Y - spline.LengthMeters > maxY)
+                        continue;
+                    if (!IsRoad(profiles.Get(spline.AssetPath)))
+                        continue;
+                    var steps = Math.Max(1, (int)Math.Ceiling(spline.LengthMeters));
+                    var previous = Point(tile, spline, 0.0, size);
+                    for (var step = 1; step <= steps; step++)
+                    {
+                        var along = spline.LengthMeters * step / steps;
+                        var current = Point(tile, spline, along, size);
+                        for (var index = 1; index < course.Count; index++)
+                        {
+                            var a = course[index - 1];
+                            var b = course[index];
+                            if (!Intersect(a[0], a[1], b[0], b[1], previous.X, previous.Y, current.X, current.Y, out var t, out var u))
+                                continue;
+                            var at = a[2] + (b[2] - a[2]) * t;
+                            if (at < skip || at > travelled - skip || best != null && at >= best.Along)
+                                continue;
+                            best = new OmsiRoadCrossing
+                            {
+                                Road = new OmsiSplinePoint { Tile = tile, Spline = spline, Distance = along - spline.LengthMeters / steps * (1.0 - u), Offset = 0.0 },
+                                Along = at, HeadingDegrees = a[3] + OmsiRoadPlanner.Normalize(b[3] - a[3]) * t
+                            };
+                        }
+                        previous = current;
+                    }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The arms of a junction where a road meets an existing one: the existing road's two arms ahead (0°) and back
+        /// (180°), marked main, and one arm per heading of the new road, relative to the existing road's heading.
+        /// </summary>
+        public static List<OmsiJunctionArm> Arms(string mainProfilePath, OmsiSplineProfile mainProfile, string sideProfilePath, OmsiSplineProfile sideProfile,
+            IEnumerable<double> sideHeadings)
+        {
+            var arms = new List<OmsiJunctionArm>
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0.0, ProfilePath = mainProfilePath, Profile = mainProfile, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 180.0, ProfilePath = mainProfilePath, Profile = mainProfile, Main = true }
+            };
+            foreach (var heading in sideHeadings)
+                arms.Add(new OmsiJunctionArm { HeadingDegrees = (heading % 360.0 + 360.0) % 360.0, ProfilePath = sideProfilePath, Profile = sideProfile });
+            return arms;
+        }
+
+        /// <summary>The heading of a side road relative to the main road, kept between 35° and 145° off it on its side.</summary>
+        public static double SideHeading(double relativeDegrees)
+        {
+            var relative = OmsiRoadPlanner.Normalize(relativeDegrees);
+            var side = relative < 0.0 ? -1.0 : 1.0;
+            return side * Math.Max(35.0, Math.Min(145.0, Math.Abs(relative)));
+        }
+
+        /// <summary>The places of the helpers ahead and back (0° and 180°) among an object's connection points, or null.</summary>
+        public static int[] MainPair(IReadOnlyList<OmsiSplineHelper> helpers)
+        {
+            int ahead = -1, back = -1;
+            for (var index = 0; index < helpers.Count; index++)
+            {
+                var heading = OmsiRoadPlanner.Normalize(helpers[index].HeadingDegrees);
+                if (Math.Abs(heading) < 0.5 && ahead < 0)
+                    ahead = index;
+                else if (Math.Abs(Math.Abs(heading) - 180.0) < 0.5 && back < 0)
+                    back = index;
+            }
+            return ahead >= 0 && back >= 0 ? new[] { back, ahead } : null;
+        }
+
+        private static OmsiMapPoint Point(OmsiTileSummary tile, OmsiSplineRecord spline, double along, double size)
+        {
+            OmsiMapGeometry.GetLocalFrameAt(spline, along, out var local, out _);
+            return OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, local.X, local.Y, size);
+        }
+
+        /// <summary>Where segment a-b meets segment c-d, as fractions along each; false when they do not meet.</summary>
+        private static bool Intersect(double ax, double ay, double bx, double by, double cx, double cy, double dx, double dy, out double t, out double u)
+        {
+            t = 0.0;
+            u = 0.0;
+            var rx = bx - ax;
+            var ry = by - ay;
+            var sx = dx - cx;
+            var sy = dy - cy;
+            var denominator = rx * sy - ry * sx;
+            if (Math.Abs(denominator) < 1e-12)
+                return false;
+            t = ((cx - ax) * sy - (cy - ay) * sx) / denominator;
+            u = ((cx - ax) * ry - (cy - ay) * rx) / denominator;
+            return t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0;
         }
     }
 }

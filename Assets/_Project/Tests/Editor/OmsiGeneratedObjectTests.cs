@@ -159,6 +159,51 @@ namespace OmsiMapEditor.Tests
             Assert.IsTrue(found);
         }
 
+        // A narrower cobbled street: a 6 m carriageway of cobbles, pavements 2 m wide and 0.15 m high, a lane each way.
+        private const string Cobbled =
+            "[texture]\r\nside.bmp\r\n[texture]\r\ncobbles.bmp\r\n" +
+            "[profile]\r\n0\r\n[profilepnt]\r\n-5\r\n0.15\r\n0\r\n0.2\r\n[profilepnt]\r\n-3\r\n0.15\r\n1\r\n0.2\r\n" +
+            "[profile]\r\n0\r\n[profilepnt]\r\n-3\r\n0.15\r\n0\r\n0.2\r\n[profilepnt]\r\n-3\r\n0.1\r\n1\r\n0.2\r\n" +
+            "[profile]\r\n1\r\n[profilepnt]\r\n-3\r\n0.1\r\n0\r\n0.1\r\n[profilepnt]\r\n3\r\n0.1\r\n1\r\n0.1\r\n" +
+            "[profile]\r\n0\r\n[profilepnt]\r\n3\r\n0.1\r\n0\r\n0.2\r\n[profilepnt]\r\n3\r\n0.15\r\n1\r\n0.2\r\n" +
+            "[profile]\r\n0\r\n[profilepnt]\r\n3\r\n0.15\r\n0\r\n0.2\r\n[profilepnt]\r\n5\r\n0.15\r\n1\r\n0.2\r\n" +
+            "[path]\r\n0\r\n-1.5\r\n0.1\r\n3\r\n1\r\n[path]\r\n0\r\n1.5\r\n0.1\r\n3\r\n0\r\n";
+
+        [Test]
+        public void AJunctionOfTwoRoadsKeepsEachSurfaceAndBlendsThePavementsRoundTheCorners()
+        {
+            var road = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var street = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Cobbled), @"Splines\Test\street.sli");
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 90, ProfilePath = ProfilePath, Profile = road, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 270, ProfilePath = ProfilePath, Profile = road, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 0, ProfilePath = @"Splines\Test\street.sli", Profile = street }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            // The road's asphalt runs across up to its kerb 4 m north; the street keeps its cobbles from there.
+            var asphalt = layout.Meshes.Single(mesh => mesh.Texture == "plain.bmp");
+            var cobbles = layout.Meshes.Single(mesh => mesh.Texture == "cobbles.bmp");
+            Assert.IsTrue(Covers(asphalt, 0, 0) && Covers(asphalt, 0, 3.5));
+            Assert.IsFalse(Covers(asphalt, 0, 4.5));
+            Assert.IsTrue(Covers(cobbles, 0, 4.5) && Covers(cobbles, 0, 9));
+            Assert.IsFalse(Covers(cobbles, 0, 3.5));
+            // The street's end has its own cross-section: cobbles 3 m either side, its pavement 0.15 m high.
+            var side = layout.Arms.Single(arm => arm.HeadingDegrees == 0);
+            Assert.IsTrue(HasVertex(cobbles, 0, side.Length, -3, 0.1) && HasVertex(cobbles, 0, side.Length, 3, 0.1));
+            var pavement = layout.Meshes.First(mesh => mesh.Texture == "side.bmp");
+            Assert.IsTrue(HasVertex(pavement, 0, side.Length, 5, 0.15));
+            Assert.IsTrue(HasVertex(pavement, 0, side.Length, -5, 0.15));
+            var east = layout.Arms.Single(arm => arm.HeadingDegrees == 90);
+            Assert.IsTrue(HasVertex(pavement, east.Length, 7, 0, 0.25) || HasVertex(pavement, east.Length, -7, 0, 0.25));
+            // Each arm's lanes come from its own profile.
+            var lanes = layout.Paths.Where(path => path.Kind == 0).ToList();
+            var into = Along(side, side.Length, -1.5);
+            Assert.IsTrue(lanes.Any(path => Math.Abs(path.X - into[0]) < 1e-6 && Math.Abs(path.Y - into[1]) < 1e-6));
+        }
+
         [Test]
         public void AGeneratedJunctionReadsBackWithAConnectionPointAtTheEndOfEachArm()
         {

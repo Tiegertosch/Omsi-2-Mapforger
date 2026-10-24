@@ -805,6 +805,52 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEqual(tileBytes, session.Workspace.ReadAllBytes("tile_0_0.map"));
         }
 
+        [Test]
+        public void RoadsMeetingOtherRoadsAreFoundWhereTheyEndOnOrCrossThem()
+        {
+            // The map's road profile, now with a lane each way: an 8 m carriageway, a road for junctions.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            File.WriteAllText(Path.Combine(installation, "Splines", "road.sli"),
+                "[texture]\r\nroad.bmp\r\n\r\n[profile]\r\n0\r\n\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n" +
+                "[path]\r\n0\r\n-2\r\n0.15\r\n3.5\r\n1\r\n[path]\r\n0\r\n2\r\n0.15\r\n3.5\r\n0\r\n");
+            File.WriteAllText(Path.Combine(installation, "Splines", "rail.sli"),
+                "[texture]\r\nrail.bmp\r\n\r\n[profile]\r\n0\r\n\r\n[profilepnt]\r\n-1.5\r\n0.2\r\n0\r\n1\r\n\r\n[profilepnt]\r\n1.5\r\n0.2\r\n1\r\n1\r\n" +
+                "[path]\r\n2\r\n0\r\n0.2\r\n1.4\r\n2\r\n");
+            var profiles = new OmsiSplineProfileCatalog(installation);
+            Assert.IsTrue(OmsiRoadJunctions.IsRoad(profiles.Get(@"Splines\road.sli")));
+            Assert.IsFalse(OmsiRoadJunctions.IsRoad(profiles.Get(@"Splines\rail.sli")));
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+
+            // Spline 10 runs north from 100, 100 to 100, 150. A road east at 125 crosses it 20 m from its start.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest { StartX = 80, StartY = 125, EndX = 120, EndY = 125, HeightMode = OmsiRoadHeightMode.Manual }, null);
+            var crossing = OmsiRoadJunctions.FirstCrossing(summary, profiles, plan, 1.0, new int[0]);
+            Assert.AreEqual(10, crossing.Road.Spline.Id);
+            Assert.AreEqual(25.0, crossing.Road.Distance, 1e-6);
+            Assert.AreEqual(20.0, crossing.Along, 1e-6);
+            Assert.AreEqual(90.0, crossing.HeadingDegrees, 1e-6);
+            // Ignored, or too near an end of the new road, it does not count.
+            Assert.IsNull(OmsiRoadJunctions.FirstCrossing(summary, profiles, plan, 1.0, new[] { 10 }));
+            Assert.IsNull(OmsiRoadJunctions.FirstCrossing(summary, profiles, plan, 25.0, new int[0]));
+
+            // An end on its carriageway lies on it; 6 m beside it, past its 4 m half width, does not.
+            Assert.AreEqual(10, OmsiRoadJunctions.RoadAt(summary, profiles, 101, 140).Spline.Id);
+            Assert.IsNull(OmsiRoadJunctions.RoadAt(summary, profiles, 106, 140));
+
+            // Side arms stay between 35° and 145° off the road, on their side.
+            Assert.AreEqual(35.0, OmsiRoadJunctions.SideHeading(10), 1e-9);
+            Assert.AreEqual(-145.0, OmsiRoadJunctions.SideHeading(-170), 1e-9);
+            Assert.AreEqual(90.0, OmsiRoadJunctions.SideHeading(450), 1e-9);
+
+            // A junction of the road and a street joining at 60°: the road's arms ahead and back are the pair to lay on it.
+            var road = profiles.Get(@"Splines\road.sli");
+            var junction = OmsiJunctionGenerator.Junction(OmsiRoadJunctions.Arms(@"Splines\road.sli", road, @"Splines\road.sli", road, new[] { 60.0 }), null, "Joined");
+            var helpers = OmsiSceneryObject.Parse(OmsiTextFile.Encode(junction.Sco, OmsiTextEncoding.Windows1252)).SplineHelpers;
+            var pair = OmsiRoadJunctions.MainPair(helpers);
+            Assert.AreEqual(180.0, Math.Abs(OmsiRoadPlanner.Normalize(helpers[pair[0]].HeadingDegrees)), 1e-6);
+            Assert.AreEqual(0.0, OmsiRoadPlanner.Normalize(helpers[pair[1]].HeadingDegrees), 1e-6);
+            Assert.AreEqual(3, helpers.Count);
+        }
+
         private static double Distance(OmsiMapPoint a, OmsiMapPoint b)
         {
             return Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));

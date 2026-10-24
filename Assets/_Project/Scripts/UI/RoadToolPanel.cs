@@ -26,6 +26,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField gradientField;
         private readonly Label profileLabel;
         private readonly Toggle fitTerrainToggle;
+        private readonly Toggle junctionsToggle;
         private readonly Label planLabel;
         private IReadOnlyDictionary<string, int> used = new Dictionary<string, int>();
 
@@ -124,6 +125,17 @@ namespace OmsiMapEditor.UI
             fitTerrainToggle.AddToClassList("road-fit-terrain");
             Add(fitTerrainToggle);
 
+            junctionsToggle = new Toggle("Make junctions where roads meet")
+            {
+                value = true,
+                tooltip = "A road ending on another road joins it with a new T junction; a road crossing another gets crossroads there. " +
+                          "The junctions are made in the profiles of both roads and stored under Sceneryobjects\\Mapforge in your OMSI installation."
+            };
+            junctionsToggle.AddToClassList("panel-toggle");
+            junctionsToggle.AddToClassList("road-fit-terrain");
+            junctionsToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
+            Add(junctionsToggle);
+
             var fields = new VisualElement();
             fields.AddToClassList("road-fields");
             endHeightField = AddField(fields, "End height (m)", "0", "Height at the end of each new piece of road in manual mode");
@@ -150,6 +162,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>True when the terrain should be fitted to new roads.</summary>
         public bool FitTerrain => fitTerrainToggle.value;
+
+        /// <summary>True when roads meeting other roads should be joined with new junctions (ADR 028).</summary>
+        public bool MakeJunctions => junctionsToggle.value;
 
         /// <summary>The end height for manual mode, or null while the field holds no number.</summary>
         public double? EndHeight => Number(endHeightField, double.MinValue);

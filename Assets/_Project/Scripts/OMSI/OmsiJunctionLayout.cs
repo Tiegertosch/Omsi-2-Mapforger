@@ -149,6 +149,12 @@ namespace OmsiMapEditor.OMSI
         public string ProfilePath { get; set; }
         public OmsiSplineProfile Profile { get; set; }
 
+        /// <summary>
+        /// True for the arms of the road going straight through: its surface runs across the junction, and arms of other
+        /// roads keep theirs from its kerb outwards. Without one, an arm with an arm opposite counts.
+        /// </summary>
+        public bool Main { get; set; }
+
         /// <summary>Distance from the centre to the connection point, set by the layout.</summary>
         public double Length { get; internal set; }
     }
@@ -259,28 +265,75 @@ namespace OmsiMapEditor.OMSI
                 foreach (var point in corners[index].Kerb)
                     ring.Add(point);
             }
-            // The carriageway follows an arm of the road going straight through, one with an arm opposite, else the first.
-            var main = 0;
-            for (var index = Arms.Count - 1; index >= 0; index--)
-                if (Arms.Exists(other => Math.Abs(OmsiRoadPlanner.Normalize(other.HeadingDegrees - Arms[index].HeadingDegrees - 180.0)) < 15.0))
-                    main = index;
-            var height = sections[main].RoadHeight;
-            var profile = Arms[main].Profile;
-            var own = profile.Textures[sections[main].RoadTexture].Path;
+            // The main road's surface runs across; an arm of another surface keeps its own beyond the main road's kerb on its side.
+            var main = MainArm();
+            var across = Point.Along(Arms[main], 0.0, 1.0);
+            var rest = ring;
+            var regions = new List<KeyValuePair<int, List<Point>>>();
+            for (var index = 0; index < Arms.Count; index++)
+            {
+                if (index == main || Opposite(index, main) || SameSurface(sections[index], Arms[index], sections[main], Arms[main]))
+                    continue;
+                var outward = Point.Along(Arms[index], 1.0, 0.0);
+                var side = Math.Sign(outward.X * across.X + outward.Y * across.Y);
+                if (side == 0)
+                    continue;
+                var kerb = side > 0 ? sections[main].RoadRight : sections[main].RoadLeft;
+                Func<Point, double> beyond = point => side * (point.X * across.X + point.Y * across.Y) - kerb;
+                var own = Clip(rest, beyond);
+                rest = Clip(rest, point => -beyond(point));
+                if (own.Count >= 3)
+                    regions.Add(new KeyValuePair<int, List<Point>>(index, own));
+            }
+            regions.Insert(0, new KeyValuePair<int, List<Point>>(main, rest));
+            foreach (var region in regions)
+                Surface(region.Value, region.Key, sections[region.Key], roadTexture);
+        }
+
+        /// <summary>The arm whose road goes straight through: one marked main, else one with an arm opposite, else the first.</summary>
+        private int MainArm()
+        {
+            var marked = Arms.FindIndex(arm => arm.Main);
+            if (marked >= 0)
+                return marked;
+            for (var index = 0; index < Arms.Count; index++)
+                if (Arms.Exists(other => Opposite(Arms.IndexOf(other), index)))
+                    return index;
+            return 0;
+        }
+
+        private bool Opposite(int first, int second)
+        {
+            return first != second && Math.Abs(OmsiRoadPlanner.Normalize(Arms[first].HeadingDegrees - Arms[second].HeadingDegrees - 180.0)) < 15.0;
+        }
+
+        private static bool SameSurface(OmsiProfileSections first, OmsiJunctionArm firstArm, OmsiProfileSections second, OmsiJunctionArm secondArm)
+        {
+            return string.Equals(firstArm.Profile.Textures[first.RoadTexture].Path, secondArm.Profile.Textures[second.RoadTexture].Path, StringComparison.OrdinalIgnoreCase) &&
+                   Math.Abs(first.RoadMetersPerU - second.RoadMetersPerU) < 1e-6 && Math.Abs(first.RoadHeight - second.RoadHeight) < 1e-6;
+        }
+
+        /// <summary>
+        /// Lays a part of the carriageway with an arm's surface: its texture, or plain asphalt in place of an asphalt with
+        /// markings, at its road height, across and along that arm as its profile lays it, so features such as gutters
+        /// meet its kerbs.
+        /// </summary>
+        private void Surface(List<Point> ring, int arm, OmsiProfileSections section, string roadTexture)
+        {
+            var own = Arms[arm].Profile.Textures[section.RoadTexture].Path;
             var plain = roadTexture != null && System.IO.Path.GetFileName(own).IndexOf("asph", StringComparison.OrdinalIgnoreCase) >= 0;
             var file = plain ? roadTexture : own;
             // Plain asphalt repeats 8 m across and 15 m along, as road profiles lay it; the profile's own texture as it does.
-            // The profile's texture lies across as it does on that arm's road, so features such as gutters meet its kerbs.
-            var metersPerU = plain ? 8.0 : sections[main].RoadMetersPerU;
-            var vPerMeter = plain ? 1.0 / 15.0 : sections[main].RoadVPerMeter;
-            var uOffset = plain ? 0.0 : sections[main].RoadU - sections[main].RoadUAtX / metersPerU;
-            var across = Point.Along(Arms[main], 0.0, 1.0);
+            var metersPerU = plain ? 8.0 : section.RoadMetersPerU;
+            var vPerMeter = plain ? 1.0 / 15.0 : section.RoadVPerMeter;
+            var uOffset = plain ? 0.0 : section.RoadU - section.RoadUAtX / metersPerU;
+            var across = Point.Along(Arms[arm], 0.0, 1.0);
             var mesh = MeshFor(file, "road");
             var offset = mesh.Positions.Count / 3;
             foreach (var point in ring)
             {
                 mesh.Positions.Add(point.X);
-                mesh.Positions.Add(height);
+                mesh.Positions.Add(section.RoadHeight);
                 mesh.Positions.Add(point.Y);
                 // Across and along that arm: its right and its heading.
                 var right = point.X * across.X + point.Y * across.Y;
@@ -290,6 +343,27 @@ namespace OmsiMapEditor.OMSI
             }
             foreach (var triangle in Triangulate(ring))
                 AddUpward(mesh, offset + triangle[0], offset + triangle[1], offset + triangle[2]);
+        }
+
+        /// <summary>The part of a polygon where <paramref name="inside"/> is zero or more (Sutherland-Hodgman against one line).</summary>
+        private static List<Point> Clip(List<Point> ring, Func<Point, double> inside)
+        {
+            var result = new List<Point>();
+            for (var index = 0; index < ring.Count; index++)
+            {
+                var current = ring[index];
+                var next = ring[(index + 1) % ring.Count];
+                var a = inside(current);
+                var b = inside(next);
+                if (a >= 0)
+                    result.Add(current);
+                if (a >= 0 != b >= 0)
+                {
+                    var t = a / (a - b);
+                    result.Add(new Point(current.X + (next.X - current.X) * t, current.Y + (next.Y - current.Y) * t));
+                }
+            }
+            return result;
         }
 
         private void BuildPavements(List<OmsiProfileSections> sections, Corner[] corners)
@@ -314,14 +388,21 @@ namespace OmsiMapEditor.OMSI
 
                 var pavement = MeshFor(profile.Textures[section.PavementTexture].Path, "pavement");
                 var kerb = section.KerbTexture >= 0 ? MeshFor(profile.Textures[section.KerbTexture].Path, "kerb") : null;
+                // Pavement and road heights run from one arm's to the other's round the corner, so each end meets its road.
+                var total = 0.0;
+                for (var point = 1; point < full.Count; point++)
+                    total += full[point].DistanceTo(full[point - 1]);
                 var along = 0.0;
                 for (var point = 0; point < full.Count; point++)
                 {
                     if (point > 0)
                         along += full[point].DistanceTo(full[point - 1]);
+                    var share = total > 1e-9 ? along / total : 0.0;
+                    var pavementHeight = first.PavementHeight + (second.PavementHeight - first.PavementHeight) * share;
+                    var roadHeight = first.RoadHeight + (second.RoadHeight - first.RoadHeight) * share;
                     var start = pavement.Positions.Count / 3;
-                    Add(pavement, outer[point], section.PavementHeight, section.PavementU1, along * section.PavementVPerMeter);
-                    Add(pavement, full[point], section.PavementHeight, section.PavementU0, along * section.PavementVPerMeter);
+                    Add(pavement, outer[point], pavementHeight, section.PavementU1, along * section.PavementVPerMeter);
+                    Add(pavement, full[point], pavementHeight, section.PavementU0, along * section.PavementVPerMeter);
                     if (point > 0)
                     {
                         AddUpward(pavement, start - 2, start - 1, start);
@@ -330,8 +411,8 @@ namespace OmsiMapEditor.OMSI
                     if (kerb != null)
                     {
                         var kerbStart = kerb.Positions.Count / 3;
-                        Add(kerb, full[point], section.PavementHeight, section.KerbU0, along * section.KerbVPerMeter);
-                        Add(kerb, full[point], section.RoadHeight, section.KerbU1, along * section.KerbVPerMeter);
+                        Add(kerb, full[point], pavementHeight, section.KerbU0, along * section.KerbVPerMeter);
+                        Add(kerb, full[point], roadHeight, section.KerbU1, along * section.KerbVPerMeter);
                         if (point > 0)
                         {
                             // The kerb face looks onto the carriageway, away from the pavement.

@@ -266,3 +266,15 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Die Fahrbahntexturen der Profile enthalten Markierungen, die auf einer Fläche wiederholt quer lägen; `str_asphdrk.bmp` ist schlichter Asphalt mit `.cfg` für Nässe und Pfützen, die mitkopiert wird (ebenso `.surf`).
 - Ein Pfad in einer `.sco` ist ein Bogen oder eine Gerade; zwei Bögen verbinden beliebige Spuren knickfrei, wie bei den Straßen.
 - Im ersten Bild teilten Gehweg und Bordstein ihre Textur und damit ein Teilmodell; ihre Bänder vermischten sich zu Fächern. Eigene Teilmodelle je Teil beheben das.
+
+## ADR 028: Kreuzungen entstehen, wo neue Straßen auf Straßen treffen
+
+**Status:** Angenommen, 24. Oktober 2026, Etappe 4d nach dem Plan mit dem Nutzer; gemischte Profile auf seinen Wunsch hier statt im Menü. Vom Nutzer im Editor geprüft: funktioniert bei verschiedenen Winkeln und Profilen; sehr breite Straßen mit Mittelstreifen fehlen noch (siehe unten).
+
+**Entscheidung:** Mit „Make junctions where roads meet“ im Straßen-Panel (an) erzeugt das Straßenwerkzeug Kreuzungen selbst. Endet die neue Straße auf der Fahrbahn einer bestehenden Straße (nicht an einem freien Ende oder Anschlusspunkt), entsteht dort eine T-Kreuzung; ihr Seitenarm zeigt zum Start der neuen Straße, zwischen 35° und 145° gegen die Straße. Kreuzt die neue Straße eine bestehende, entsteht am ersten Schnittpunkt eine Kreuzung mit vier Armen in den tatsächlichen Richtungen, auch schiefwinklig, ab 30° gegeneinander; flacher wird nicht gebaut, mit Hinweis. Als Straße zählt ein Profil mit mindestens 3 m Fahrbahn und einer Fahrspur (`OmsiRoadJunctions.IsRoad`); Gleise, Leitungen, Zäune und Gehwege nicht. Die Kreuzung wird mit den Profilen beider Straßen erzeugt (ADR 026, ADR 027): die Arme der bestehenden Straße bei 0° und 180° als Hauptstraße, deren Belag durchläuft, die Arme der neuen Straße mit ihrem eigenen Belag ab der Bordsteinlinie der Hauptstraße; Gehweg- und Bordsteinhöhen gehen um die Ecken ineinander über. Sie wird wie in ADR 025 in die bestehende Straße eingesetzt, das durchgehende Armpaar vorgegeben; die neue Straße wird bis zum Anschlusspunkt gebaut, bei einer Kreuzung in zwei Teilen, und geht danach weiter wie gewohnt. Alles ist ein Rückgängig-Schritt; scheitert ein Teil, werden die vorigen zurückgenommen. Die Vorschau sagt, was ein Klick erzeugt.
+
+**Grund:**
+- Echte Karten zweigen Fahrbahnen über Kreuzungsobjekte ab (ADR 025); erzeugte Kreuzungen passen sich Winkel und Profilen an, die vorhandenen Objekte nicht.
+- Treffen zwei Straßen verschiedener Art aufeinander, gehört jeder Belag zu seiner Straße; wie in der Wirklichkeit läuft die Hauptstraße durch.
+- Der Schnitt zweier Polylinien (neue Straße alle 0,5 m, bestehende alle 1 m) findet die Kreuzung genau und schnell genug für die Vorschau bei jeder Zeigerbewegung.
+- Unter 30° würden die Ecken spitz und die Arme sehr lang.
