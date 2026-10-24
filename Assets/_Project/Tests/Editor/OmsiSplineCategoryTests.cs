@@ -41,6 +41,26 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ObjectsAreSortedIntoTabsByTheirFileGroupsAndNames()
+        {
+            // The object file decides first: a tree, a junction.
+            Assert.AreEqual(OmsiObjectCategory.Trees, OmsiObjectCategories.Of(@"Sceneryobjects\X\a.sco", new[] { "Buildings" }, true, false));
+            Assert.AreEqual(OmsiObjectCategory.Junctions, OmsiObjectCategories.Of(@"Sceneryobjects\X\a.sco", null, false, true));
+            // The last group first; "tree" inside "Street" does not count, German parts of words do.
+            Assert.AreEqual(OmsiObjectCategory.Lights, OmsiObjectCategories.Of(@"Sceneryobjects\Railroad\m.sco", new[] { "East German Railway", "Lights" }, false, false));
+            Assert.AreEqual(OmsiObjectCategory.Signs, OmsiObjectCategories.Of(@"Sceneryobjects\X\v.sco", new[] { "German Street Side", "Traffic Signs" }, false, false));
+            Assert.AreEqual(OmsiObjectCategory.Trees, OmsiObjectCategories.Of(@"Sceneryobjects\X\s.sco", new[] { "Straßenbäume" }, false, false));
+            // Without a matching group the file name, then the folder.
+            Assert.AreEqual(OmsiObjectCategory.Stops, OmsiObjectCategories.Of(@"Sceneryobjects\Streetobjects\Busstop_Pole.sco", new[] { "BVG" }, false, false));
+            Assert.AreEqual(OmsiObjectCategory.Buildings, OmsiObjectCategories.Of(@"Sceneryobjects\Buildings_X\b1.sco", null, false, false));
+            Assert.AreEqual(OmsiObjectCategory.Other, OmsiObjectCategories.Of(@"Sceneryobjects\Misc\haybale.sco", null, false, false));
+
+            OmsiObjectCategories.ReadMarks("[friendlyname]\r\nX\r\n\r\n  [splinehelper]\r\n", out var isTree, out var hasSplineHelper);
+            Assert.IsFalse(isTree);
+            Assert.IsTrue(hasSplineHelper);
+        }
+
+        [Test]
         public void AnUnreadablePathKeepsItsPlaceWithoutCountingAsALaneForVehicles()
         {
             // A commented explanation opens with [path] in some rail profiles; the rail path follows.

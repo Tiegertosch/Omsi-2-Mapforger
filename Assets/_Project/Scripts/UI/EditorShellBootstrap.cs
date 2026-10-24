@@ -279,6 +279,12 @@ namespace OmsiMapEditor.UI
                 objectsPanel = new ObjectLibraryPanel();
                 objectsPanel.ObjectChosen += StartPlacement;
                 objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
+                objectsPanel.PreviewRequested += path => objectRenderer?.RequestPreview(path);
+                objectsPanel.HeadingChanged += heading =>
+                {
+                    if (mapCanvas != null)
+                        mapCanvas.PlacementHeading = heading;
+                };
                 objectsPanelHost.Add(objectsPanel);
                 roadPanel = new RoadToolPanel();
                 roadPanel.style.display = DisplayStyle.None;
@@ -579,6 +585,7 @@ namespace OmsiMapEditor.UI
                 });
                 mapCanvas.PreviewEnded += () => PreviewJunctionMarkers(null);
                 mapCanvas.ObjectRenderer = objectRenderer;
+                objectRenderer.PreviewReady += (path, image) => objectsPanel?.SetPreview(path, image);
                 mapCanvas.GroundHeight = groundRenderer.HeightAt;
             }
         }
@@ -924,7 +931,7 @@ namespace OmsiMapEditor.UI
             if (screenshot != null)
             {
                 var started = Time.realtimeSinceStartup;
-                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || outlinesBuilding || checkTask != null ||
+                while ((groundRenderer.IsLoading || objectRenderer.IsLoading || objectRenderer.PreviewsPending && Array.IndexOf(args, "-noPreviewWait") < 0 || outlinesBuilding || checkTask != null ||
                         (installationScan != null && !installationScan.IsCompleted)) && Time.realtimeSinceStartup - started < 300f)
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
@@ -2833,6 +2840,7 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.R && mapCanvas != null && mapCanvas.IsPlacing)
                 {
                     mapCanvas.PlacementHeading += evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep;
+                    objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
                     SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
                     evt.StopPropagation();
                 }
@@ -3132,7 +3140,7 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Lists the .sco files below Sceneryobjects of the OMSI installation once, on a worker thread, with their groups
-        /// and the previews nEditor cached, and reads from Steam's file lists which of them belong to the base game, a DLC or
+        /// and kinds, and reads from Steam's file lists which of them belong to the base game, a DLC or
         /// neither.
         /// </summary>
         /// <param name="again">Reads the installation again, such as after the editor made an object.</param>
@@ -3168,7 +3176,7 @@ namespace OmsiMapEditor.UI
                     installationCatalog = scan.Result;
                     contentOrigins = installationCatalog.Origins;
                     Debug.Log("Object origins: " + contentOrigins.Description + " Groups in " + installationCatalog.Groups.Count + " of " +
-                              installationCatalog.Objects.Count + " objects, " + installationCatalog.Thumbnails.Count + " nEditor previews.");
+                              installationCatalog.Objects.Count + " objects.");
                 }
                 objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
                 if (activeTool == EditorTool.Road)
@@ -3215,6 +3223,8 @@ namespace OmsiMapEditor.UI
 
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
+            if (mapCanvas != null)
+                objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
             UpdateToolbar();
             mapCanvas?.Focus();
             SetStatus("Placing " + assetPath + ": click into the map. Shift+click keeps placing, R turns the preview, Esc stops." + (problem ?? string.Empty));

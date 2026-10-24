@@ -13,7 +13,7 @@ namespace OmsiMapEditor.World
     /// object kind becomes one mesh with a material per texture; its placements are drawn with GPU instancing. Objects
     /// stand on the terrain unless their height is absolute. Trees are drawn as a disc of their crown.
     /// </summary>
-    public sealed class MapObjectRenderer : MonoBehaviour
+    public sealed partial class MapObjectRenderer : MonoBehaviour
     {
         /// <summary>Textures are reduced to this edge length; the view from above never needs more.</summary>
         private const int MaximumTextureSize = 1024;
@@ -293,6 +293,7 @@ namespace OmsiMapEditor.World
                 placementsDirty = false;
                 UpdatePlacements();
             }
+            UpdatePreviews();
         }
 
         private void LateUpdate()
@@ -1202,6 +1203,7 @@ namespace OmsiMapEditor.World
         private void OnDestroy()
         {
             Clear();
+            ReleasePreviews();
             if (treeDisc != null)
                 Destroy(treeDisc);
             if (treeCrown != null)

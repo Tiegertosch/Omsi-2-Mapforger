@@ -59,21 +59,21 @@ namespace OmsiMapEditor.UI
 
         public RoadToolPanel()
         {
-            AddToClassList("road-tool");
+            AddToClassList("picker-tool");
             LoadFavorites();
 
             // The options on the left.
             var options = new VisualElement();
             options.AddToClassList("tool-panel");
-            options.AddToClassList("road-options");
+            options.AddToClassList("picker-options");
             var optionsTitle = new Label("Options");
-            optionsTitle.AddToClassList("road-options-title");
+            optionsTitle.AddToClassList("picker-options-title");
             options.Add(optionsTitle);
 
             var heightRow = Row(options, "Height");
             var modes = new VisualElement();
             modes.AddToClassList("panel-tabs");
-            modes.AddToClassList("road-segmented");
+            modes.AddToClassList("picker-segmented");
             followButton = new Button(() => SetHeightMode(OmsiRoadHeightMode.FollowTerrain))
             {
                 text = "Terrain", tooltip = "Every piece of the road starts and ends on the terrain; the terrain itself is not changed."
@@ -108,7 +108,7 @@ namespace OmsiMapEditor.UI
                           "under the road, and cuts or banks up slopes of 1:1.5 beyond. " +
                           "The original terrain stays in the original map; deleting the road brings it back."
             };
-            fitTerrainToggle.AddToClassList("road-option-toggle");
+            fitTerrainToggle.AddToClassList("picker-option-toggle");
             Row(options, "Fit terrain").Add(fitTerrainToggle);
 
             junctionsToggle = new Toggle
@@ -118,7 +118,7 @@ namespace OmsiMapEditor.UI
                           "a road joining one of another width gets a transition. They are made in the profiles of both roads and stored " +
                           "under Sceneryobjects\\Mapforge in your OMSI installation."
             };
-            junctionsToggle.AddToClassList("road-option-toggle");
+            junctionsToggle.AddToClassList("picker-option-toggle");
             junctionsToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             Row(options, "Make junctions").Add(junctionsToggle);
             Add(options);
@@ -126,10 +126,10 @@ namespace OmsiMapEditor.UI
             // The picker beside them.
             var picker = new VisualElement();
             picker.AddToClassList("tool-panel");
-            picker.AddToClassList("road-picker");
+            picker.AddToClassList("picker-panel");
             var header = new VisualElement();
             header.AddToClassList("tool-panel-header");
-            header.AddToClassList("road-picker-header");
+            header.AddToClassList("picker-header");
             var badge = new VisualElement();
             badge.AddToClassList("tool-panel-badge");
             badge.Add(new IconElement("spline"));
@@ -138,16 +138,16 @@ namespace OmsiMapEditor.UI
             titles.AddToClassList("tool-panel-titles");
             profileLabel = new Label("Road");
             profileLabel.AddToClassList("tool-panel-title");
-            profileLabel.AddToClassList("road-profile");
+            profileLabel.AddToClassList("picker-title");
             titles.Add(profileLabel);
             planLabel = new Label("Click the points of a road; Esc ends it");
             planLabel.AddToClassList("tool-panel-subtitle");
-            planLabel.AddToClassList("road-plan");
+            planLabel.AddToClassList("picker-subtitle");
             titles.Add(planLabel);
             header.Add(titles);
             var searchRow = new VisualElement();
             searchRow.AddToClassList("panel-search");
-            searchRow.AddToClassList("road-search");
+            searchRow.AddToClassList("picker-search");
             search = new TextField();
             search.AddToClassList("panel-search-field");
             search.textEdition.placeholder = "Search all roads...";
@@ -165,7 +165,7 @@ namespace OmsiMapEditor.UI
 
             tabRow = new VisualElement();
             tabRow.AddToClassList("panel-tabs");
-            tabRow.AddToClassList("road-tabs");
+            tabRow.AddToClassList("picker-tabs");
             AddTab(Tab.InMap, OmsiSplineCategory.Other, "In map", "Profiles this map uses, most used first");
             AddTab(Tab.Favorites, OmsiSplineCategory.Other, "Favorites", "Profiles you marked with the star");
             foreach (OmsiSplineCategory each in Enum.GetValues(typeof(OmsiSplineCategory)))
@@ -177,12 +177,12 @@ namespace OmsiMapEditor.UI
             {
                 verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible, horizontalScrollerVisibility = ScrollerVisibility.Hidden
             };
-            tiles.AddToClassList("road-tiles");
-            tiles.contentContainer.AddToClassList("road-tiles-content");
+            tiles.AddToClassList("picker-tiles");
+            tiles.contentContainer.AddToClassList("picker-tiles-content");
             picker.Add(tiles);
             emptyLabel = new Label();
             emptyLabel.AddToClassList("panel-info");
-            emptyLabel.AddToClassList("road-empty");
+            emptyLabel.AddToClassList("picker-empty");
             picker.Add(emptyLabel);
             Add(picker);
 
@@ -304,22 +304,22 @@ namespace OmsiMapEditor.UI
         private void SetProfile(string path)
         {
             if (Profile != null && tileByPath.TryGetValue(Profile, out var previous))
-                previous.RemoveFromClassList("road-tile-selected");
+                previous.RemoveFromClassList("picker-tile-selected");
             Profile = path;
             used.TryGetValue(path, out var count);
             profileLabel.text = Path.GetFileNameWithoutExtension(path) + (count > 0 ? "  ·  " + count + " in this map" : string.Empty);
             profileLabel.tooltip = path;
             if (tileByPath.TryGetValue(path, out var tile))
-                tile.AddToClassList("road-tile-selected");
+                tile.AddToClassList("picker-tile-selected");
             SettingsChanged?.Invoke();
         }
 
         private static VisualElement Row(VisualElement parent, string label)
         {
             var row = new VisualElement();
-            row.AddToClassList("road-option");
+            row.AddToClassList("picker-option");
             var text = new Label(label);
-            text.AddToClassList("road-option-label");
+            text.AddToClassList("picker-option-label");
             row.Add(text);
             parent.Add(row);
             return row;
@@ -328,7 +328,7 @@ namespace OmsiMapEditor.UI
         private TextField Field(VisualElement row, string value, string tooltip)
         {
             var field = new TextField { value = value, tooltip = tooltip };
-            field.AddToClassList("road-field");
+            field.AddToClassList("picker-field");
             field.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             row.tooltip = tooltip;
             row.Add(field);
@@ -347,7 +347,7 @@ namespace OmsiMapEditor.UI
         {
             var button = new Button { text = text, tooltip = tooltip };
             button.AddToClassList("panel-tab");
-            button.AddToClassList("road-tab");
+            button.AddToClassList("picker-tab");
             button.clicked += () => ChooseTab(kind, each);
             tabButtons.Add(button, new KeyValuePair<Tab, OmsiSplineCategory>(kind, each));
             tabRow.Add(button);
@@ -458,29 +458,29 @@ namespace OmsiMapEditor.UI
         private VisualElement MakeTile(string path)
         {
             var tile = new VisualElement { tooltip = path };
-            tile.AddToClassList("road-tile");
+            tile.AddToClassList("picker-tile");
             if (string.Equals(path, Profile, StringComparison.OrdinalIgnoreCase))
-                tile.AddToClassList("road-tile-selected");
+                tile.AddToClassList("picker-tile-selected");
             var preview = new VisualElement { name = "preview" };
-            preview.AddToClassList("road-tile-preview");
+            preview.AddToClassList("picker-tile-preview");
             if (previews.TryGetValue(path, out var texture) && texture != null)
                 preview.style.backgroundImage = new StyleBackground(texture);
             else
                 RequestPreview(path);
             tile.Add(preview);
             var name = new Label(Path.GetFileNameWithoutExtension(path));
-            name.AddToClassList("road-tile-name");
+            name.AddToClassList("picker-tile-name");
             tile.Add(name);
             if (used.TryGetValue(path, out var count) && count > 0)
             {
                 var badge = new Label(count.ToString(CultureInfo.InvariantCulture)) { tooltip = count + " splines of this map use it" };
-                badge.AddToClassList("road-tile-count");
+                badge.AddToClassList("picker-tile-count");
                 tile.Add(badge);
             }
             var star = new Button { tooltip = favorites.Contains(path) ? "Remove from favorites" : "Add to favorites" };
             star.AddToClassList("panel-icon-button");
             star.AddToClassList("favorite-button");
-            star.AddToClassList("road-tile-star");
+            star.AddToClassList("picker-tile-star");
             star.EnableInClassList("favorite-on", favorites.Contains(path));
             star.Add(new IconElement("star"));
             star.clicked += () =>
