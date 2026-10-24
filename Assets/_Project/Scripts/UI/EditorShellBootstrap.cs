@@ -2694,10 +2694,19 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            // OMSI stands objects on the terrain, but takes the height of junctions and [absheight] objects as it is: those
+            // get the terrain height under the click, or they would sink into a hill at 0 m.
+            var height = 0.0;
+            if (placementHasAbsoluteHeight)
+            {
+                var world = OmsiMapGeometry.TileLocalToWorld(placement.Tile.X, placement.Tile.Y, placement.LocalX, placement.LocalY, currentSummary.TileSizeMeters);
+                if (new OmsiTerrainSampler(currentSummary, session.Source).TryGetHeight(world.X, world.Y, out var ground))
+                    height = ground;
+            }
             OmsiObjectChange change;
             try
             {
-                change = session.PlaceObject(currentSummary, placement.Tile, placementAsset, placement.LocalX, placement.LocalY, 0, mapCanvas.PlacementHeading);
+                change = session.PlaceObject(currentSummary, placement.Tile, placementAsset, placement.LocalX, placement.LocalY, height, mapCanvas.PlacementHeading);
             }
             catch (Exception exception)
             {
@@ -2715,7 +2724,9 @@ namespace OmsiMapEditor.UI
                 UpdateObjectsCatalog();
             SetStatus("Placed object #" + change.Record.Id + " (" + assetPath + ") in tile " + placement.Tile.X + ", " + placement.Tile.Y +
                       ". Ctrl+Z undoes it." +
-                      (placementHasAbsoluteHeight ? " Its height is absolute, not above the terrain; set Height in the inspector." : string.Empty));
+                      (placementHasAbsoluteHeight
+                          ? " Its height is absolute, not above the terrain, and was set to the terrain under it, " + change.Record.Height.ToString("0.00", CultureInfo.InvariantCulture) + " m."
+                          : string.Empty));
         }
 
         private void StopPlacement()

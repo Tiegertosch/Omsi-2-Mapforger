@@ -259,12 +259,7 @@ namespace OmsiMapEditor.OMSI
                     if (under != null)
                         height = (under.NearObject ? under.RoadHeight : under.EdgeHeight) - settings.BelowEdgeMeters;
                     else
-                        foreach (var place in near)
-                        {
-                            var level = place.EdgeHeight - settings.BelowEdgeMeters;
-                            var spread = Math.Max(0.0, place.Outside - shoulder) / settings.SlopeRatio;
-                            height = Math.Max(level - spread, Math.Min(level + spread, height));
-                        }
+                        height = Beside(near, height, shoulder, settings);
                     if (Math.Abs(height - heights[index]) > 1e-4)
                     {
                         heights[index] = (float)height;
@@ -273,6 +268,34 @@ namespace OmsiMapEditor.OMSI
                 }
             }
             return changed;
+        }
+
+        /// <summary>
+        /// The height of a grid point beside roads: the ground, kept within the slope from every shoulder. Where the slopes
+        /// of roads at different heights leave no height in common, such as between the arms of a hairpin on a hill, the
+        /// terrain runs straight from kerb to kerb, weighted by the distance to each, so it meets every kerb; flat shoulders
+        /// would leave a step at both, and letting the last road win a wall at the kerb of the others.
+        /// </summary>
+        private static double Beside(List<Place> near, double ground, double shoulder, OmsiTerrainShapeSettings settings)
+        {
+            double lowest = double.MinValue, highest = double.MaxValue;
+            foreach (var place in near)
+            {
+                var level = place.EdgeHeight - settings.BelowEdgeMeters;
+                var spread = Math.Max(0.0, place.Outside - shoulder) / settings.SlopeRatio;
+                lowest = Math.Max(lowest, level - spread);
+                highest = Math.Min(highest, level + spread);
+            }
+            if (lowest <= highest)
+                return Math.Max(lowest, Math.Min(highest, ground));
+            double sum = 0.0, weights = 0.0;
+            foreach (var place in near)
+            {
+                var weight = 1.0 / Math.Max(0.01, place.Outside);
+                sum += (place.EdgeHeight - settings.BelowEdgeMeters) * weight;
+                weights += weight;
+            }
+            return sum / weights;
         }
 
         /// <summary>Where a grid point lies relative to one road.</summary>

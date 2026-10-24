@@ -504,6 +504,32 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TerrainBetweenRoadsAtDifferentHeightsRampsFromKerbToKerbInsteadOfLeavingAWall()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(
+                "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n"), @"Splines\road.sli");
+            var tile = new OmsiTileSummary();
+            // Two roads running north 20 m apart, at 2 m and 6 m: their kerbs are 12 m apart, closer than two shoulders.
+            OmsiShapedRoad Road(double x, double height) => new OmsiShapedRoad(tile, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = x, StartY = 100, StartHeight = height, EndX = x, EndY = 200, EndHeight = height, HeightMode = OmsiRoadHeightMode.Manual,
+                MaximumPieceLength = 200
+            }, null).Pieces[0].AsRecord(), profile, 300);
+            var low = Road(150, 2);
+            var high = Road(170, 6);
+            foreach (var order in new[] { new[] { low, high }, new[] { high, low } })
+            {
+                var heights = Enumerable.Repeat(4f, OmsiTerrain.Resolution * OmsiTerrain.Resolution).ToArray();
+                OmsiTerrainShaping.Shape(heights, 0, 0, 300, order, new OmsiTerrainShapeSettings());
+                // No height lies within both slopes: the terrain runs from kerb to kerb, 1 m from one and 11 m from the other
+                // close to the near kerb, halfway in between, whichever road comes first.
+                Assert.AreEqual((2.10 / 1.0 + 6.10 / 11.0) / (1.0 + 1.0 / 11.0), Height(heights, 31, 30), 1e-5);
+                Assert.AreEqual((6.10 / 1.0 + 2.10 / 11.0) / (1.0 + 1.0 / 11.0), Height(heights, 33, 30), 1e-5);
+                Assert.AreEqual(4.10, Height(heights, 32, 30), 1e-5);
+            }
+        }
+
+        [Test]
         public void RoadsWithTerrainAlignmentFitTheTerrainAndLeaveTheOriginalAlone()
         {
             var session = OpenProject();

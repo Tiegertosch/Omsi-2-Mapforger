@@ -307,9 +307,9 @@ namespace OmsiMapEditor.World
 
             if (previewAsset != null && previewPosition.HasValue && kinds.TryGetValue(previewAsset, out var preview) && preview.Mesh != null)
             {
-                // Stands where PlaceObject puts it: on the terrain unless absolute, at height 0, upright.
+                // Stands where placing puts it: on the terrain, upright; an absolute height is set to the terrain there.
                 var position = previewPosition.Value;
-                var ground = preview.Model.HasAbsoluteHeight ? 0.0 : GroundAt(position.x + originX, position.y + originY);
+                var ground = GroundAt(position.x + originX, position.y + originY);
                 var frame = Matrix4x4.TRS(new Vector3(position.x, (float)ground, position.y),
                     Orientation(previewHeading, 0.0, 0.0), Vector3.one);
                 var crossed = ThreeDimensional && preview.CrossMaterial != null;
