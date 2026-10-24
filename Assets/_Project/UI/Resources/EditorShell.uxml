@@ -60,6 +60,8 @@
             <ui:Button name="delete-object-menu-item" text="Delete selection    Del" class="menu-popup-item" />
             <ui:Button name="refit-terrain-menu-item" text="Fit terrain to built roads again" class="menu-popup-item" />
             <ui:Button name="test-junction-menu-item" text="Create test junction from road profile" class="menu-popup-item" tooltip="Makes a straight 12 m junction object in the profile chosen in the road tool, under Sceneryobjects\Mapforge in your OMSI installation, and starts placing it." />
+            <ui:Button name="tee-junction-menu-item" text="Create T junction from road profile" class="menu-popup-item" tooltip="Makes a T junction with rounded kerbs, pavements and lanes for every way through in the profile chosen in the road tool, and starts placing it." />
+            <ui:Button name="cross-junction-menu-item" text="Create crossroads from road profile" class="menu-popup-item" tooltip="Makes a junction of four arms with rounded kerbs, pavements and lanes for every way through in the profile chosen in the road tool, and starts placing it." />
             <ui:Label class="menu-divider" />
             <ui:Button name="undo-menu-item" text="Undo    Ctrl+Z" class="menu-popup-item" />
             <ui:Button name="redo-menu-item" text="Redo    Ctrl+Y" class="menu-popup-item" />

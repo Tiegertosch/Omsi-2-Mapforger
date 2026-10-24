@@ -44,6 +44,9 @@ namespace OmsiMapEditor.UI
         /// <summary>A junction being placed snaps onto a road whose centre line passes this close to the pointer.</summary>
         private const double JunctionSnapMeters = 4.0;
 
+        /// <summary>Plain asphalt without markings from the base game, for the carriageway of generated junctions.</summary>
+        private const string PlainAsphalt = @"Splines\Marcel\texture\str_asphdrk.bmp";
+
         private OmsiMapSummary currentSummary;
         private readonly Dictionary<OmsiTileSummary, Button> browserEntries = new Dictionary<OmsiTileSummary, Button>();
         private readonly List<ObjectEditStep> undoSteps = new List<ObjectEditStep>();
@@ -266,6 +269,8 @@ namespace OmsiMapEditor.UI
             var deleteObjectMenuItem = root.Q<Button>("delete-object-menu-item");
             var refitTerrainMenuItem = root.Q<Button>("refit-terrain-menu-item");
             var testJunctionMenuItem = root.Q<Button>("test-junction-menu-item");
+            var teeJunctionMenuItem = root.Q<Button>("tee-junction-menu-item");
+            var crossJunctionMenuItem = root.Q<Button>("cross-junction-menu-item");
             var undoMenuItem = root.Q<Button>("undo-menu-item");
             var redoMenuItem = root.Q<Button>("redo-menu-item");
             objectsPanelHost = root.Q<VisualElement>("tool-panel-host");
@@ -497,6 +502,18 @@ namespace OmsiMapEditor.UI
                 {
                     HidePopup(editMenu);
                     CreateTestJunction();
+                };
+            if (teeJunctionMenuItem != null)
+                teeJunctionMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    CreateTestJunction(null, 3);
+                };
+            if (crossJunctionMenuItem != null)
+                crossJunctionMenuItem.clicked += () =>
+                {
+                    HidePopup(editMenu);
+                    CreateTestJunction(null, 4);
                 };
             if (undoMenuItem != null)
                 undoMenuItem.clicked += () =>
@@ -892,7 +909,8 @@ namespace OmsiMapEditor.UI
             var testProfile = Argument("-testJunction", 1);
             if (testProfile != null)
             {
-                CreateTestJunction(testProfile);
+                var armsArgument = Argument("-testJunction", 2);
+                CreateTestJunction(testProfile, armsArgument == "3" ? 3 : armsArgument == "4" ? 4 : 0);
                 mapCanvas?.PointPlacementAtCenter();
                 if (Array.IndexOf(args, "-placeCommit") >= 0)
                     mapCanvas?.ClickPlacement();
@@ -1501,7 +1519,8 @@ namespace OmsiMapEditor.UI
         /// in the installation (ADR 026) and starts placing it, so it can be inserted into a road and tried in OMSI.
         /// </summary>
         /// <param name="profilePath">The profile to use; null takes the one chosen in the road tool.</param>
-        private void CreateTestJunction(string profilePath = null)
+        /// <param name="arms">0 for a straight piece, 3 for a T junction, 4 for crossroads.</param>
+        private void CreateTestJunction(string profilePath = null, int arms = 0)
         {
             if (!CanEdit)
             {
@@ -1524,8 +1543,21 @@ namespace OmsiMapEditor.UI
                     SetStatus("The profile " + profilePath + " could not be read.");
                     return;
                 }
-                var name = "Test " + Path.GetFileNameWithoutExtension(profilePath);
-                var generated = OmsiJunctionGenerator.StraightPiece(profilePath, profile, 12.0, "Mapforge " + name);
+                var kind = arms == 3 ? "T junction " : arms == 4 ? "Crossroads " : "Test ";
+                var name = kind + Path.GetFileNameWithoutExtension(profilePath);
+                OmsiGeneratedObject generated;
+                if (arms >= 3)
+                {
+                    // The plain asphalt of the base game, where installed, so no lane markings run across the junction.
+                    var plain = File.Exists(Path.Combine(root, PlainAsphalt)) ? PlainAsphalt : null;
+                    var headings = arms == 3 ? new[] { 90.0, 270.0, 0.0 } : new[] { 0.0, 90.0, 180.0, 270.0 };
+                    var layoutArms = new List<OmsiJunctionArm>();
+                    foreach (var heading in headings)
+                        layoutArms.Add(new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = profilePath, Profile = profile });
+                    generated = OmsiJunctionGenerator.Junction(layoutArms, plain, "Mapforge " + name);
+                }
+                else
+                    generated = OmsiJunctionGenerator.StraightPiece(profilePath, profile, 12.0, "Mapforge " + name);
                 assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, name, generated);
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
@@ -1534,6 +1566,11 @@ namespace OmsiMapEditor.UI
                 SetStatus("The test junction could not be created: " + exception.Message);
                 return;
             }
+            // Placing needs the clicks the road tool would take, and the library lists the new object after reading the
+            // installation again.
+            if (activeTool == EditorTool.Road)
+                SetTool(EditorTool.Drag);
+            StartInstallationScan(true);
             StartPlacement(assetPath);
             SetStatus("Created " + assetPath + " in your OMSI installation. Click on a road to insert it, then export the map and try it in OMSI.");
         }
@@ -2668,10 +2705,11 @@ namespace OmsiMapEditor.UI
         /// and the previews nEditor cached, and reads from Steam's file lists which of them belong to the base game, a DLC or
         /// neither.
         /// </summary>
-        private void StartInstallationScan()
+        /// <param name="again">Reads the installation again, such as after the editor made an object.</param>
+        private void StartInstallationScan(bool again = false)
         {
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
-            if (installationScan != null && string.Equals(root, installationScanRoot, StringComparison.OrdinalIgnoreCase))
+            if (!again && installationScan != null && string.Equals(root, installationScanRoot, StringComparison.OrdinalIgnoreCase))
                 return;
 
             installationScanRoot = root;

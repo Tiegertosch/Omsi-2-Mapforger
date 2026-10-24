@@ -208,6 +208,41 @@ namespace OmsiMapEditor.OMSI
             return generated;
         }
 
+        /// <summary>
+        /// A junction of its arms (stage 4c): carriageway, rounded kerbs and pavements from the arms' profiles, a
+        /// connection point at the end of each arm suggesting its profile, and lanes for every way through.
+        /// </summary>
+        /// <param name="roadTexture">A plain carriageway texture relative to the installation, or null for the first arm's.</param>
+        public static OmsiGeneratedObject Junction(IEnumerable<OmsiJunctionArm> arms, string roadTexture, string friendlyName)
+        {
+            var layout = OmsiJunctionLayout.Build(arms, roadTexture);
+            var generated = new OmsiGeneratedObject { Model = OmsiXWriter.Write(layout.Meshes) };
+            generated.Textures.AddRange(layout.Textures.Values);
+
+            var sco = new StringBuilder();
+            sco.Append("Made by OMSI Map Editor (Mapforge): a junction of ").Append(layout.Arms.Count).Append(" arms.\r\n\r\n");
+            Section(sco, "friendlyname", friendlyName);
+            Section(sco, "groups", "1", "Mapforge");
+            Section(sco, "rendertype", "surface");
+            Section(sco, "fixed");
+            Section(sco, "surface");
+            foreach (var arm in layout.Arms)
+            {
+                var radians = arm.HeadingDegrees * Math.PI / 180.0;
+                Section(sco, "splinehelper", arm.ProfilePath.Trim(), OmsiXWriter.Number(Math.Sin(radians) * arm.Length), "0",
+                    OmsiXWriter.Number(Math.Cos(radians) * arm.Length), OmsiXWriter.Number(arm.HeadingDegrees), "0", "0");
+            }
+            foreach (var path in layout.Paths)
+                Section(sco, "path", OmsiXWriter.Number(path.X), OmsiXWriter.Number(path.Y), OmsiXWriter.Number(path.Height),
+                    OmsiXWriter.Number(path.HeadingDegrees), OmsiXWriter.Number(path.RadiusMeters), OmsiXWriter.Number(path.LengthMeters), "0", "0",
+                    path.Kind.ToString(CultureInfo.InvariantCulture), OmsiXWriter.Number(path.Width), path.Direction.ToString(CultureInfo.InvariantCulture),
+                    path.Blinker.ToString(CultureInfo.InvariantCulture));
+            Section(sco, "mesh", "model.x");
+            Section(sco, "collision_mesh", "model.x");
+            generated.Sco = sco.ToString();
+            return generated;
+        }
+
         private static void Section(StringBuilder text, string name, params string[] lines)
         {
             text.Append('[').Append(name).Append("]\r\n");
@@ -246,8 +281,8 @@ namespace OmsiMapEditor.OMSI
             File.WriteAllText(Path.Combine(folder, "model", "model.x"), generated.Model, new UTF8Encoding(false));
             foreach (var texture in generated.Textures)
             {
-                // OMSI prefers a .dds of the same name; copy it along when the profile has one.
-                foreach (var source in new[] { texture, Path.ChangeExtension(texture, ".dds") })
+                // OMSI prefers a .dds of the same name; a .cfg sets wetness and puddles, a .surf the kind of surface.
+                foreach (var source in new[] { texture, Path.ChangeExtension(texture, ".dds"), texture + ".cfg", texture + ".surf" })
                 {
                     var from = OmsiRelativePath.Resolve(installationRoot, source);
                     var to = Path.Combine(folder, "texture", Path.GetFileName(from));

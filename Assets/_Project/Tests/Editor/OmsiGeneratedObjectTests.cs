@@ -84,6 +84,149 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ATeeJunctionHasRoundedCornersArmsMatchingTheRoadAndLanesForEveryWayThrough()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var arms = new[] { 90.0, 270.0, 0.0 }.Select(heading => new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile })
+                .ToList();
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            // The kerbs of neighbouring arms meet 4 m out and are rounded with 6 m, which reaches 10 m along each; the
+            // pavements' outer edges with 3 m reach as far. Every arm ends 2 m beyond, 12 m from the centre.
+            Assert.IsTrue(layout.Arms.All(arm => Math.Abs(arm.Length - 12.0) < 1e-9), string.Join(", ", layout.Arms.Select(arm => arm.Length)));
+            var road = layout.Meshes.Single(mesh => mesh.Texture == "plain.bmp");
+            // Pavements and kerb faces share a texture here but stay separate strips.
+            var sides = layout.Meshes.Where(mesh => mesh.Texture == "side.bmp").ToList();
+            Assert.AreEqual(2, sides.Count);
+            var pavement = sides[0];
+            Assert.AreEqual(@"Splines\Test\texture\plain.bmp", layout.Textures["plain.bmp"]);
+            // At each connection point the cross-section is the road's: carriageway edges at 0.1 m, pavement edges at 0.25 m.
+            Assert.IsTrue(HasVertex(road, 0, 12, -4, 0.1) && HasVertex(road, 0, 12, 4, 0.1));
+            Assert.IsTrue(HasVertex(pavement, 12, 0, 0, 0.25) || HasVertex(pavement, 12, -7, 0, 0.25));
+            // The centre and the side arm are carriageway; the pavement runs along the straight side.
+            Assert.IsTrue(Covers(road, 0, 0));
+            Assert.IsTrue(Covers(road, 0, 10));
+            Assert.IsFalse(Covers(road, 0, -5.5));
+            Assert.IsTrue(Covers(pavement, 0, -5.5));
+            Assert.IsFalse(Covers(road, 6, 6));
+            // Round the corner between the side arm and the arm to its right the pavement is a band between the kerb,
+            // rounded with 6 m about 10, 10, and its outer edge, rounded with 3 m.
+            Assert.IsTrue(Covers(pavement, 6.82, 6.82));
+            Assert.IsFalse(Covers(pavement, 8.5, 8.5));
+            Assert.IsFalse(Covers(pavement, 5.2, 5.2));
+            Assert.IsTrue(road.Triangles.Count > 0 && pavement.Triangles.Count > 0);
+
+            // A lane from every way in to every way out on another arm, each chain starting at its lane and ending at the
+            // other, with blinkers for left and right turns and none straight on.
+            var lanes = layout.Paths.Where(path => path.Kind == 0).ToList();
+            foreach (var from in layout.Arms)
+                foreach (var to in layout.Arms.Where(arm => arm != from))
+                {
+                    var start = Along(from, from.Length, -2);
+                    var end = Along(to, to.Length, 2);
+                    Assert.IsTrue(lanes.Any(path => Math.Abs(path.X - start[0]) < 1e-6 && Math.Abs(path.Y - start[1]) < 1e-6),
+                        "no lane from " + from.HeadingDegrees + " to " + to.HeadingDegrees);
+                    Assert.IsTrue(lanes.Any(path => EndsAt(path, end[0], end[1])), "no lane into " + to.HeadingDegrees + " from " + from.HeadingDegrees);
+                }
+            CollectionAssert.IsSubsetOf(new[] { 0, 2, 3 }, lanes.Select(path => path.Blinker).Distinct().ToArray());
+            // Footpaths round all three corners, walked both ways.
+            Assert.IsTrue(layout.Paths.Where(path => path.Kind == 1).All(path => path.Direction == 2));
+            Assert.GreaterOrEqual(layout.Paths.Count(path => path.Kind == 1), 3);
+        }
+
+        [Test]
+        public void ACobbledCarriagewayKeepsItsTextureLaidAsTheProfileLaysIt()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile.Replace("asphalt.bmp", "cobbles.bmp")), ProfilePath);
+            var arms = new[] { 90.0, 270.0, 0.0 }.Select(heading => new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile });
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            var road = layout.Meshes.Single(mesh => mesh.Texture == "cobbles.bmp");
+            Assert.IsFalse(layout.Textures.ContainsKey("plain.bmp"));
+            // The profile lays u from 0 at its left kerb to 1 at its right one and v at 0.1 per metre. The carriageway follows
+            // the road going straight through, the arm heading right (90°): its end at its left kerb, 12 m right and 4 m
+            // ahead, has u 0 and v 1.2.
+            var found = false;
+            for (var index = 0; index < road.Positions.Count / 3; index++)
+                if (Math.Abs(road.Positions[index * 3] - 12.0) < 1e-6 && Math.Abs(road.Positions[index * 3 + 2] - 4.0) < 1e-6)
+                {
+                    Assert.AreEqual(0.0, road.Uvs[index * 2], 1e-9);
+                    Assert.AreEqual(1.2, road.Uvs[index * 2 + 1], 1e-9);
+                    found = true;
+                }
+            Assert.IsTrue(found);
+        }
+
+        [Test]
+        public void AGeneratedJunctionReadsBackWithAConnectionPointAtTheEndOfEachArm()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var arms = new[] { 0.0, 90.0, 180.0, 270.0 }.Select(heading => new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile });
+
+            var junction = OmsiJunctionGenerator.Junction(arms, null, "Crossroads");
+
+            var sco = OmsiSceneryObject.Parse(OmsiTextFile.Encode(junction.Sco, OmsiTextEncoding.Windows1252));
+            Assert.AreEqual(4, sco.SplineHelpers.Count);
+            foreach (var helper in sco.SplineHelpers)
+            {
+                var radians = helper.HeadingDegrees * Math.PI / 180.0;
+                Assert.AreEqual(12.0, Math.Sqrt(helper.X * helper.X + helper.Y * helper.Y), 1e-6);
+                Assert.AreEqual(Math.Sin(radians) * 12.0, helper.X, 1e-6);
+                Assert.AreEqual(Math.Cos(radians) * 12.0, helper.Y, 1e-6);
+            }
+            Assert.Greater(sco.Paths.Count, 12);
+            var mesh = OmsiXMesh.Parse(Encoding.UTF8.GetBytes(junction.Model));
+            // Without a plain texture the carriageway takes the profile's own.
+            CollectionAssert.Contains(mesh.Materials.Select(material => material.Texture).ToArray(), "asphalt.bmp");
+            for (var index = 0; index < mesh.Positions.Count; index++)
+                if (Math.Abs(mesh.Positions[index][1] - 0.1) < 1e-4 && Math.Abs(mesh.Positions[index][0]) < 3.9 && Math.Abs(mesh.Positions[index][2]) < 3.9)
+                    Assert.Greater(mesh.Normals[index][1], 0.99f);
+        }
+
+        private static double[] Along(OmsiJunctionArm arm, double along, double right)
+        {
+            var radians = arm.HeadingDegrees * Math.PI / 180.0;
+            return new[] { Math.Sin(radians) * along + Math.Cos(radians) * right, Math.Cos(radians) * along - Math.Sin(radians) * right };
+        }
+
+        private static bool EndsAt(OmsiJunctionPath path, double x, double y)
+        {
+            var piece = new OmsiSplinePiece { StartX = path.X, StartY = path.Y, HeadingDegrees = path.HeadingDegrees, LengthMeters = path.LengthMeters, RadiusMeters = path.RadiusMeters };
+            piece.PointAt(path.LengthMeters, out var endX, out var endY, out _);
+            return Math.Abs(endX - x) < 1e-4 && Math.Abs(endY - y) < 1e-4;
+        }
+
+        private static bool HasVertex(OmsiGeneratedMesh mesh, double along, double alongY, double right, double height)
+        {
+            // Points are given as (x, forward); "along" lists x, "alongY" forward, "right" an extra x offset.
+            for (var index = 0; index < mesh.Positions.Count; index += 3)
+                if (Math.Abs(mesh.Positions[index] - (along + right)) < 1e-6 && Math.Abs(mesh.Positions[index + 2] - alongY) < 1e-6 &&
+                    Math.Abs(mesh.Positions[index + 1] - height) < 1e-6)
+                    return true;
+            return false;
+        }
+
+        private static bool Covers(OmsiGeneratedMesh mesh, double x, double y)
+        {
+            for (var index = 0; index < mesh.Triangles.Count; index += 3)
+            {
+                double[] P(int vertex) => new[] { mesh.Positions[vertex * 3], mesh.Positions[vertex * 3 + 2] };
+                var a = P(mesh.Triangles[index]);
+                var b = P(mesh.Triangles[index + 1]);
+                var c = P(mesh.Triangles[index + 2]);
+                double Side(double[] u, double[] v) => (v[0] - u[0]) * (y - u[1]) - (v[1] - u[1]) * (x - u[0]);
+                var d1 = Side(a, b);
+                var d2 = Side(b, c);
+                var d3 = Side(c, a);
+                if ((d1 >= -1e-9 && d2 >= -1e-9 && d3 >= -1e-9) || (d1 <= 1e-9 && d2 <= 1e-9 && d3 <= 1e-9))
+                    return true;
+            }
+            return false;
+        }
+
+        [Test]
         public void TheStoreKeepsEachObjectInItsOwnFolderUnderMapforgeAndNeverOverwrites()
         {
             var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
