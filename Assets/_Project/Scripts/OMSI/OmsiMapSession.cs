@@ -515,6 +515,9 @@ namespace OmsiMapEditor.OMSI
         {
             var workspace = RequireWorkspace();
             var tilePath = OmsiRelativePath.Normalize(tileFileName);
+            // Without its file the map would still list an added tile; deleting it takes it out of the list.
+            if (IsTileAdded(tilePath))
+                throw new InvalidOperationException(tilePath + " was added in this project and has no original; delete the tile instead.");
             workspace.Revert(tilePath);
             if (workspace.IsModified(GlobalConfigFileName))
                 RestoreEntryPoints(workspace, tilePath);

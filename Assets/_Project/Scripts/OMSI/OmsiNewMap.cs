@@ -181,16 +181,28 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public static byte[] CreateFirstTile(DateTime createdAt)
         {
+            var text = TileHeader(createdAt);
+            // Detail level, file, ID, x, y, height, heading, pitch, bank and no labels.
+            text.Append("[object]\r\n0\r\n").Append(EntryPointObject).Append("\r\n").Append(EntryPointId.ToString(CultureInfo.InvariantCulture))
+                .Append("\r\n150\r\n150\r\n0\r\n0\r\n0\r\n0\r\n0\r\n\r\n");
+            return OmsiTextFile.Encode(text.ToString(), OmsiTextEncoding.Utf16LittleEndian);
+        }
+
+        /// <summary>An empty tile as OMSI writes one, UTF-16 with byte order mark, version and empty terrain sections.</summary>
+        public static byte[] CreateEmptyTile(DateTime createdAt)
+        {
+            return OmsiTextFile.Encode(TileHeader(createdAt).ToString(), OmsiTextEncoding.Utf16LittleEndian);
+        }
+
+        private static StringBuilder TileHeader(DateTime createdAt)
+        {
             var text = new StringBuilder();
             text.Append("File created with OMSI Map Editor on ").Append(createdAt.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture)).Append("\r\n\r\n");
             text.Append("[version]\r\n").Append(TileVersion.ToString(CultureInfo.InvariantCulture)).Append("\r\n\r\n");
             text.Append("[terrain]\r\n\r\n\r\n");
             text.Append("[variable_terrainlightmap]\r\n\r\n");
             text.Append("[variable_terrain]\r\n\r\n");
-            // Detail level, file, ID, x, y, height, heading, pitch, bank and no labels.
-            text.Append("[object]\r\n0\r\n").Append(EntryPointObject).Append("\r\n").Append(EntryPointId.ToString(CultureInfo.InvariantCulture))
-                .Append("\r\n150\r\n150\r\n0\r\n0\r\n0\r\n0\r\n0\r\n\r\n");
-            return OmsiTextFile.Encode(text.ToString(), OmsiTextEncoding.Utf16LittleEndian);
+            return text;
         }
 
         /// <summary>A terrain file with every one of the 61 × 61 heights at <paramref name="height"/> metres.</summary>

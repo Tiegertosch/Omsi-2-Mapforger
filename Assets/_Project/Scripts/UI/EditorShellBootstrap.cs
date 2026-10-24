@@ -36,6 +36,9 @@ namespace OmsiMapEditor.UI
 
             /// <summary>What the step did, for the status bar, when the parts do not say it well; or null.</summary>
             public string Description;
+
+            /// <summary>A tile added or deleted; the map is read again, so it stays the only step in the history.</summary>
+            public OmsiTileChange TileChange;
         }
 
         private const int HistoryLimit = 200;
@@ -337,6 +340,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.PlacementSnapper = SnapPlacement;
                 mapCanvas.ObjectSelected += (tile, item) => SelectObject(tile, item, false);
                 mapCanvas.TileClicked += tile => SelectTile(tile, false);
+                mapCanvas.TileAddRequested += AddTile;
                 mapCanvas.ObjectToggled += ToggleObject;
                 mapCanvas.ObjectsBoxSelected += AddToSelection;
                 mapCanvas.ObjectsEdited += CommitEdits;
@@ -862,6 +866,17 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 RefitRoadTerrain();
             }
+
+            if (int.TryParse(Argument("-addTile", 1), out var addX) && int.TryParse(Argument("-addTile", 2), out var addY))
+                AddTile(addX, addY);
+            if (int.TryParse(Argument("-deleteTile", 1), out var deleteX) && int.TryParse(Argument("-deleteTile", 2), out var deleteY))
+            {
+                var doomed = currentSummary.Tiles.Find(tile => tile.X == deleteX && tile.Y == deleteY);
+                if (doomed != null)
+                    DeleteTile(doomed);
+            }
+            if (int.TryParse(Argument("-hoverTileAdder", 1), out var hoverX) && int.TryParse(Argument("-hoverTileAdder", 2), out var hoverY))
+                mapCanvas?.HoverTileAdder(hoverX, hoverY);
 
             if (int.TryParse(Argument("-selectSpline", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var splineId))
             {
@@ -2894,6 +2909,11 @@ namespace OmsiMapEditor.UI
 
             var step = from[from.Count - 1];
             from.RemoveAt(from.Count - 1);
+            if (step.TileChange != null)
+            {
+                StepTile(step, to, undo);
+                return;
+            }
             var touched = new List<MapSelectionItem>();
             try
             {
@@ -2955,6 +2975,80 @@ namespace OmsiMapEditor.UI
             Touch(touched, tile, item);
         }
 
+        /// <summary>Undoes or redoes an added or deleted tile; reading the map again clears the history, so the step is put back alone.</summary>
+        private void StepTile(ObjectEditStep step, List<ObjectEditStep> to, bool undo)
+        {
+            try
+            {
+                session.ApplyTileChange(step.TileChange, undo);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not " + (undo ? "undo" : "redo") + " " + DescribeStep(step) + ": " + exception.Message);
+                return;
+            }
+            ReloadMap();
+            to.Add(step);
+            SetStatus((undo ? "Undid " : "Redid ") + DescribeStep(step) + ".");
+        }
+
+        /// <summary>Adds an empty tile at a free place beside the map, its terrain running on from its neighbours.</summary>
+        private void AddTile(int x, int y)
+        {
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("add tiles"));
+                return;
+            }
+            OmsiTileChange change;
+            try
+            {
+                change = session.AddTile(currentSummary, x, y);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not add tile " + x + ", " + y + ": " + exception.Message);
+                return;
+            }
+            ReloadMap();
+            PushHistory(new ObjectEditStep { TileChange = change });
+            var tile = currentSummary.Tiles.Find(candidate => candidate.X == x && candidate.Y == y);
+            if (tile != null)
+                SelectTile(tile, false);
+            SetStatus("Added tile " + x + ", " + y + " with terrain running on from its neighbours. Ctrl+Z takes it back; earlier steps can no longer be undone.");
+        }
+
+        /// <summary>Takes a tile out of the map, as long as nothing outside it needs it; otherwise says what does.</summary>
+        private void DeleteTile(OmsiTileSummary tile)
+        {
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("delete tiles"));
+                return;
+            }
+            OmsiTileDeletionResult result;
+            try
+            {
+                result = session.DeleteTile(currentSummary, tile);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not delete tile " + tile.X + ", " + tile.Y + ": " + exception.Message);
+                return;
+            }
+            if (!result.Succeeded)
+            {
+                SetStatus("Tile " + tile.X + ", " + tile.Y + " stays: " + JoinLimited(new List<string>(result.Blockers)) + ".");
+                return;
+            }
+            ReloadMap();
+            PushHistory(new ObjectEditStep { TileChange = result.Change });
+            SetStatus("Deleted tile " + tile.X + ", " + tile.Y + " from the map. Ctrl+Z brings it back; earlier steps can no longer be undone.");
+        }
+
         private static void Touch(List<MapSelectionItem> touched, OmsiTileSummary tile, OmsiObjectRecord item)
         {
             if (!touched.Exists(entry => ReferenceEquals(entry.Record, item)))
@@ -2965,6 +3059,8 @@ namespace OmsiMapEditor.UI
         {
             if (step.Description != null)
                 return step.Description;
+            if (step.TileChange != null)
+                return (step.TileChange.Added ? "the new tile " : "the deletion of tile ") + step.TileChange.X + ", " + step.TileChange.Y;
             if (step.Group != null)
             {
                 var ids = new HashSet<int>();
@@ -3421,6 +3517,11 @@ namespace OmsiMapEditor.UI
             if (!CanEdit)
             {
                 SetStatus(ReadOnlyMessage("revert tile edits"));
+                return;
+            }
+            if (session.IsTileAdded(selectedTile.FileName))
+            {
+                SetStatus(selectedTile.FileName + " was added in this project; delete the tile to take it out again.");
                 return;
             }
             try
@@ -4343,8 +4444,8 @@ namespace OmsiMapEditor.UI
                 AddObjectEditor(records, selectedObject);
             else if (selectedSpline != null)
                 AddSplineDetails(records, selectedSpline);
-            else if (IsTileEdited(selectedTile))
-                AddRevertTileButton(records);
+            else
+                AddTileButtons(records);
 
             var objectsHeading = new Label("OBJECT PLACEMENTS");
             objectsHeading.AddToClassList("inspector-section-heading");
@@ -4490,8 +4591,7 @@ namespace OmsiMapEditor.UI
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);
-                if (IsTileEdited(selectedTile))
-                    AddRevertTileButton(editor);
+                AddRevertTileButton(editor);
             }
             else
             {
@@ -4614,12 +4714,52 @@ namespace OmsiMapEditor.UI
             container.Add(editor);
         }
 
+        /// <summary>Reverting the edits of the selected tile; a tile this project added has no original to go back to.</summary>
         private void AddRevertTileButton(VisualElement container)
         {
+            if (!IsTileEdited(selectedTile) || session.IsTileAdded(selectedTile.FileName))
+                return;
             var revert = new Button(RevertSelectedTile) { text = "Revert tile edits" };
             revert.AddToClassList("map-control-button");
             revert.AddToClassList("inspector-edit-revert");
             container.Add(revert);
+        }
+
+        /// <summary>
+        /// Reverting the edits of an original tile, and deleting the tile; deleting asks for a second click within a few
+        /// seconds, as it takes the whole tile out of the map.
+        /// </summary>
+        private void AddTileButtons(VisualElement container)
+        {
+            AddRevertTileButton(container);
+            if (!CanEdit)
+                return;
+            var tile = selectedTile;
+            var armed = false;
+            Button delete = null;
+            delete = new Button(() =>
+            {
+                if (armed)
+                {
+                    DeleteTile(tile);
+                    return;
+                }
+                armed = true;
+                delete.text = "Click again to delete tile " + tile.X + ", " + tile.Y;
+                delete.schedule.Execute(() =>
+                {
+                    armed = false;
+                    delete.text = "Delete tile";
+                }).StartingIn(4000);
+            })
+            {
+                text = "Delete tile",
+                tooltip = "Takes the tile out of the map. Later tiles move up in the list and everything naming them follows. " +
+                          "A tile stays while an entry point, timetable or something in another tile needs it."
+            };
+            delete.AddToClassList("map-control-button");
+            delete.AddToClassList("inspector-edit-delete");
+            container.Add(delete);
         }
     }
 }

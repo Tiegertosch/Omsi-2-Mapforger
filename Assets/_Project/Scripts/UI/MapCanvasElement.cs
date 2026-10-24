@@ -74,7 +74,7 @@ namespace OmsiMapEditor.UI
     /// Ctrl+drag select several objects, which then move together. In placement mode a preview of the chosen object
     /// follows the pointer and a click reports where it should go.
     /// </summary>
-    internal sealed class MapCanvasElement : VisualElement
+    internal sealed partial class MapCanvasElement : VisualElement
     {
         private const float PickRadius = 8f;
         private const float HandleDistance = 30f;
@@ -333,7 +333,11 @@ namespace OmsiMapEditor.UI
             RegisterCallback<PointerMoveEvent>(OnPointerMove);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
             RegisterCallback<PointerCaptureOutEvent>(_ => CancelDrag());
-            RegisterCallback<PointerLeaveEvent>(_ => SetPlacementPointer(null));
+            RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                SetPlacementPointer(null);
+                ClearHoveredAdder();
+            });
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
@@ -1183,6 +1187,7 @@ namespace OmsiMapEditor.UI
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
             DrawJunctionMarkers(painter, visible);
+            DrawTileAdders(painter);
             var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
             DrawArrows(painter);
@@ -2071,6 +2076,12 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (ClickAdder(position))
+            {
+                evt.StopPropagation();
+                return;
+            }
+
             var splineHandle = SplineHandleAt(position);
             if (splineHandle.HasValue)
             {
@@ -2186,6 +2197,8 @@ namespace OmsiMapEditor.UI
                     RequestPlacement(new Vector2(ground.Value.x, ground.Value.z), keepPlacing);
                 return;
             }
+            if (!toggle && ClickAdder(position))
+                return;
 
             if (!toggle && RingAt(camera, position, out var ring, out var ringPoint))
             {
@@ -2690,6 +2703,7 @@ namespace OmsiMapEditor.UI
                 return;
             var camera = OrbitCamera();
             DrawTileBorder3D(painter, camera);
+            DrawTileAdders(painter);
             DrawMarkers3D(painter, camera);
             DrawPlacement3D(painter, camera);
             DrawRoad3D(painter, camera);
@@ -2880,6 +2894,7 @@ namespace OmsiMapEditor.UI
                 }
                 SetPlacementPointer(position, evt.altKey);
                 UpdateHoveredHandles(position);
+                UpdateHoveredAdder(position);
                 NotifyPointerInfo(position);
                 return;
             }
