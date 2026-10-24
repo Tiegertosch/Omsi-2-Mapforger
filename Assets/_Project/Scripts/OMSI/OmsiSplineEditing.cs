@@ -149,9 +149,12 @@ namespace OmsiMapEditor.OMSI
         /// spline keeps the height at its other end, and where that end is joined also its gradient there, so the road
         /// beyond stays smooth. OMSI changes a spline's gradient evenly along it, so with both other ends joined the two
         /// splines meet with different gradients, which is reported; where an other end is free, that spline follows the
-        /// gradient of the joint instead. Gradients steeper than <paramref name="gradientWarningPercent"/> are reported.
+        /// gradient of the joint instead. An other end on a connection point among <paramref name="ports"/> counts as joined
+        /// and meets it level, as junction objects lie level; an end on such a point keeps its height, as the object would
+        /// not follow. Gradients steeper than <paramref name="gradientWarningPercent"/> are reported.
         /// </summary>
-        public static OmsiJointMove PlanJointHeight(OmsiMapSummary summary, OmsiSplineEnd end, double height, double gradientWarningPercent = 10.0)
+        public static OmsiJointMove PlanJointHeight(OmsiMapSummary summary, OmsiSplineEnd end, double height, IEnumerable<OmsiJunctionPort> ports = null,
+            double gradientWarningPercent = 10.0)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -165,20 +168,34 @@ namespace OmsiMapEditor.OMSI
             }
             var size = summary.TileSizeMeters;
             var at = end.Position(size);
+            var portList = ports == null ? new List<OmsiJunctionPort>() : new List<OmsiJunctionPort>(ports);
+            var portAtJoint = PortAt(portList, at);
+            if (portAtJoint != null)
+            {
+                move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error,
+                    "This end of spline #" + end.Spline.Id + " sits on a connection point of object #" + portAtJoint.Object.Id +
+                    ", which would not follow; move the object to change the height there.", at.X, at.Y));
+                return move;
+            }
 
             // Travel runs from the far end of the spline through the joint to the far end of its neighbour.
             var far = new OmsiSplineEnd(end.Tile, end.Spline, !end.AtEnd);
             var neighbour = Neighbour(summary, end);
             var neighbourFar = neighbour == null ? null : new OmsiSplineEnd(neighbour.Tile, neighbour.Spline, !neighbour.AtEnd);
-            var farJoined = Neighbour(summary, far) != null;
-            var neighbourFarJoined = neighbourFar != null && Neighbour(summary, neighbourFar) != null;
+            var farOnPort = PortAt(portList, far.Position(size)) != null;
+            var neighbourFarOnPort = neighbourFar != null && PortAt(portList, neighbourFar.Position(size)) != null;
+            var farJoined = farOnPort || Neighbour(summary, far) != null;
+            var neighbourFarJoined = neighbourFar != null && (neighbourFarOnPort || Neighbour(summary, neighbourFar) != null);
+            // The gradient a joined other end keeps: level on a connection point, else the one it has.
+            var keptFarGradient = farOnPort ? 0.0 : -far.OutwardGradientPercent;
+            var keptNeighbourFarGradient = neighbourFar == null || neighbourFarOnPort ? 0.0 : neighbourFar.OutwardGradientPercent;
             var length = end.Spline.LengthMeters;
             var rise = (height - far.Height) / length * 100.0;
             double farGradient, jointGradient, neighbourJointGradient = 0.0, neighbourFarGradient = 0.0;
             if (neighbour == null)
             {
                 // A free joint: the spline keeps its gradient at a joined far end, or else rises evenly.
-                farGradient = farJoined ? -far.OutwardGradientPercent : rise;
+                farGradient = farJoined ? keptFarGradient : rise;
                 jointGradient = 2.0 * rise - farGradient;
             }
             else
@@ -187,7 +204,7 @@ namespace OmsiMapEditor.OMSI
                 var neighbourRise = (neighbourFar.Height - height) / neighbourLength * 100.0;
                 if (farJoined)
                 {
-                    farGradient = -far.OutwardGradientPercent;
+                    farGradient = keptFarGradient;
                     jointGradient = 2.0 * rise - farGradient;
                     if (!neighbourFarJoined)
                     {
@@ -196,13 +213,13 @@ namespace OmsiMapEditor.OMSI
                     }
                     else
                     {
-                        neighbourFarGradient = neighbourFar.OutwardGradientPercent;
+                        neighbourFarGradient = keptNeighbourFarGradient;
                         neighbourJointGradient = 2.0 * neighbourRise - neighbourFarGradient;
                     }
                 }
                 else if (neighbourFarJoined)
                 {
-                    neighbourFarGradient = neighbourFar.OutwardGradientPercent;
+                    neighbourFarGradient = keptNeighbourFarGradient;
                     neighbourJointGradient = 2.0 * neighbourRise - neighbourFarGradient;
                     jointGradient = neighbourJointGradient;
                     farGradient = 2.0 * rise - jointGradient;
@@ -379,6 +396,22 @@ namespace OmsiMapEditor.OMSI
                     return new OmsiSplineEnd(tile, spline, Distance(finish, point) < Distance(start, point));
                 }
             return null;
+        }
+
+        /// <summary>The connection point at a world position, within <see cref="TouchToleranceMeters"/>, or null.</summary>
+        private static OmsiJunctionPort PortAt(List<OmsiJunctionPort> ports, OmsiMapPoint point)
+        {
+            OmsiJunctionPort best = null;
+            var bestDistance = TouchToleranceMeters;
+            foreach (var port in ports)
+            {
+                var distance = Distance(port.Position, point);
+                if (distance > bestDistance)
+                    continue;
+                best = port;
+                bestDistance = distance;
+            }
+            return best;
         }
 
         /// <summary>

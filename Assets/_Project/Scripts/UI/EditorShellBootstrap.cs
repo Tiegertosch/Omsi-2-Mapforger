@@ -1541,7 +1541,8 @@ namespace OmsiMapEditor.UI
                 var target = atEnd ? endHeight : startHeight;
                 if (Math.Abs(target - (atEnd ? spline.EndHeight : spline.Height)) < 0.0005)
                     continue;
-                var plan = OmsiSplineEditing.PlanJointHeight(currentSummary, new OmsiSplineEnd(tile, spline, atEnd), target);
+                var plan = OmsiSplineEditing.PlanJointHeight(currentSummary, new OmsiSplineEnd(tile, spline, atEnd), target,
+                    Junctions()?.PortsAround(currentSummary, tile));
                 if (plan.HasErrors)
                 {
                     failure = plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message;

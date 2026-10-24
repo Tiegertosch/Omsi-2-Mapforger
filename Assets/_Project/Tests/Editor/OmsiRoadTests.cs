@@ -1171,6 +1171,37 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEquivalent(new[] { 10, 12 }, move.Splines.Select(geometry => geometry.Spline.Id));
         }
 
+        [Test]
+        public void ARoadEndOnAJunctionPointKeepsItsHeightAndTheRoadMeetsThePointLevel()
+        {
+            // A junction at the end of spline 10, 100, 150, with its point at its origin facing south into the spline.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "junction.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n0\r\n180\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\junction.sco", Id = 90, LocalX = 100, LocalY = 150, Height = 2 };
+            tile.Objects.Add(junction);
+            var ports = new OmsiJunctionCatalog(installation).Ports(tile, junction, 300);
+            var spline10 = tile.Splines.Single(spline => spline.Id == 10);
+
+            var onPoint = OmsiSplineEditing.PlanJointHeight(summary, new OmsiSplineEnd(tile, spline10, true), 3.0, ports);
+            Assert.IsTrue(onPoint.HasErrors);
+            Assert.That(onPoint.Issues.Select(issue => issue.Message), Has.Some.Contains("connection point of object #90"));
+
+            // Raising the free start by 1 m: the spline still meets the point level, rising 4 % at the start.
+            var geometry = OmsiSplineEditing.PlanJointHeight(summary, new OmsiSplineEnd(tile, spline10, false), 3.0, ports).Splines.Single();
+            Assert.AreEqual(3.0, geometry.Height, 1e-9);
+            Assert.AreEqual(-4.0, geometry.GradientStartPercent, 1e-9);
+            Assert.AreEqual(0.0, geometry.GradientEndPercent, 1e-9);
+            // Without the point the far end is free and the spline falls evenly.
+            var free = OmsiSplineEditing.PlanJointHeight(summary, new OmsiSplineEnd(tile, spline10, false), 3.0).Splines.Single();
+            Assert.AreEqual(-2.0, free.GradientStartPercent, 1e-9);
+            Assert.AreEqual(-2.0, free.GradientEndPercent, 1e-9);
+        }
+
         private static bool tileFileHasAlignment(OmsiMapSession session)
         {
             var tileFile = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
