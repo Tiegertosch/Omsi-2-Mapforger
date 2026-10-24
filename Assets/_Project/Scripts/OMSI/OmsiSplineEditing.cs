@@ -18,6 +18,12 @@ namespace OmsiMapEditor.OMSI
         public double GradientStartPercent { get; internal set; }
         public double GradientEndPercent { get; internal set; }
 
+        /// <summary>
+        /// True for the second of two arcs a spline becomes: a new spline split off it, carrying on to its old end; the
+        /// spline itself keeps the first arc.
+        /// </summary>
+        public bool SplitOff { get; internal set; }
+
         /// <summary>The spline with this geometry, for drawing a preview; the placed record is not changed.</summary>
         public OmsiSplineRecord Preview()
         {
@@ -60,16 +66,14 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Gradients closer than this, in percentage points, meet without a noticeable bump.</summary>
         private const double GradientChangeTolerancePercent = 0.5;
 
-        /// <summary>A joined spline that would turn by more than this to stay tangential keeps its far heading instead.</summary>
-        private const double MaximumTangentialTurnDegrees = 90.0;
-
         /// <summary>
         /// Plans moving the end of a placed spline to a new point. The moved spline and the spline joined at that end keep
         /// their other ends and how far they turn, so their shape follows the joint without bending; kinks this leaves are
-        /// reported. With <paramref name="tangential"/> the joint stays free of kinks instead: the moved spline keeps its
-        /// heading at a joined other end and bends in an arc, or runs straight from a free one, and the spline joined at
-        /// the moved end starts there tangentially. Where that would turn the joined spline by more than a right angle, as
-        /// when a joint is pulled back, it keeps the heading at its other end and the kink at the moved joint is reported.
+        /// reported. With <paramref name="tangential"/> nothing kinks instead: the joint keeps the heading the road passes
+        /// it with, and each spline runs to it from its other end, as one arc from a free end, and from a joined end, whose
+        /// heading stays too, as two arcs where one cannot meet both; the second arc is then a new spline split off
+        /// (<see cref="OmsiSplineGeometry.SplitOff"/>, written by <see cref="OmsiMapSession.ApplyJointMove"/>). A free
+        /// joint keeps the heading at the spline's joined other end and bends to the point, or runs straight from a free one.
         /// </summary>
         public static OmsiJointMove PlanJointMove(OmsiMapSummary summary, OmsiSplineEnd end, double worldX, double worldY, bool tangential = false)
         {
@@ -314,61 +318,148 @@ namespace OmsiMapEditor.OMSI
         {
             var move = new OmsiJointMove();
             var size = summary.TileSizeMeters;
-            var joint = end.Position(size);
             var nodeHeight = end.Height;
-
-            // The moved spline, planned from its other end towards the new point.
+            var joint = new OmsiMapPoint(worldX, worldY);
             var far = new OmsiSplineEnd(end.Tile, end.Spline, !end.AtEnd);
             var farPoint = far.Position(size);
-            // Leaving the far end into the spline: opposite to the way a road would leave the spline there.
-            var farHeading = far.OutwardHeadingDegrees + 180.0;
-            var farJoined = Neighbour(summary, far) != null;
-            if (!farJoined)
-                farHeading = OmsiRoadPlanner.ChordHeading(farPoint.X, farPoint.Y, worldX, worldY);
-            // The record starts at the far end when the moved end is its end.
-            if (!Plan(move, end.Tile, end.Spline, farPoint, farHeading, far.Height, worldX, worldY, nodeHeight, size, end.AtEnd, out var arrival))
-                return move;
-
-            // The spline joined at the moved end continues tangentially from the new point to its own other end.
             var neighbour = Neighbour(summary, end);
             if (neighbour == null)
-                return move;
-            var neighbourFar = new OmsiSplineEnd(neighbour.Tile, neighbour.Spline, !neighbour.AtEnd);
-            var neighbourFarPoint = neighbourFar.Position(size);
-            // The neighbour's record starts at the joint when it touches the joint with its start.
-            OmsiRoadPlanner.TangentArc(worldX, worldY, arrival, neighbourFarPoint.X, neighbourFarPoint.Y, out _, out _, out var tangentialArrival);
-            if (Math.Abs(OmsiRoadPlanner.Normalize(tangentialArrival - arrival)) > MaximumTangentialTurnDegrees ||
-                Math.Abs(tangentialArrival - arrival) > 180.0)
             {
-                // Pulled back: the neighbour keeps its far end and heading, and bends from there to the joint.
-                var neighbourFarHeading = Neighbour(summary, neighbourFar) == null
-                    ? OmsiRoadPlanner.ChordHeading(neighbourFarPoint.X, neighbourFarPoint.Y, worldX, worldY)
-                    : neighbourFar.OutwardHeadingDegrees + 180.0;
-                if (!Plan(move, neighbour.Tile, neighbour.Spline, neighbourFarPoint, neighbourFarHeading, neighbourFar.Height, worldX, worldY,
-                        nodeHeight, size, neighbour.AtEnd, out var backArrival))
-                    return move;
-                // The neighbour arrives at the joint heading backwards along the road; it should continue the moved spline.
-                var jointKink = Math.Abs(OmsiRoadPlanner.Normalize(backArrival + 180.0 - arrival));
-                if (jointKink > KinkToleranceDegrees)
-                    move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
-                        "Spline #" + end.Spline.Id + " and #" + neighbour.Spline.Id + " now meet with a kink of " + jointKink.ToString("0") + "°.",
-                        worldX, worldY));
+                // A free end: the spline keeps its heading at a joined other end and bends to the point, or runs straight.
+                var farHeading = Neighbour(summary, far) != null
+                    ? far.OutwardHeadingDegrees + 180.0
+                    : OmsiRoadPlanner.ChordHeading(farPoint.X, farPoint.Y, worldX, worldY);
+                Plan(move, end.Tile, end.Spline, farPoint, farHeading, far.Height, worldX, worldY, nodeHeight, size, end.AtEnd, out _);
                 return move;
             }
-            if (!Plan(move, neighbour.Tile, neighbour.Spline, new OmsiMapPoint(worldX, worldY), arrival, nodeHeight, neighbourFarPoint.X,
-                    neighbourFarPoint.Y, neighbourFar.Height, size, !neighbour.AtEnd, out var neighbourArrival))
+
+            // The joint keeps the heading the road passes it with; each spline runs to it from its other end without a kink.
+            var through = end.OutwardHeadingDegrees;
+            if (!PlanSmooth(move, summary, far, joint, through, nodeHeight, size, true))
                 return move;
-            if (Neighbour(summary, neighbourFar) != null)
+            PlanSmooth(move, summary, new OmsiSplineEnd(neighbour.Tile, neighbour.Spline, !neighbour.AtEnd), joint, through, nodeHeight, size, false);
+            return move;
+        }
+
+        /// <summary>
+        /// Plans a spline between its other end <paramref name="far"/> and the joint, which the road passes with heading
+        /// <paramref name="through"/>, arriving at the joint from the far end or leaving it towards it. A joined far end keeps
+        /// its heading as well, so the spline becomes two arcs where one cannot meet both headings: the second one a new
+        /// spline split off it (<see cref="OmsiSplineGeometry.SplitOff"/>). A free far end gets one arc from the joint.
+        /// </summary>
+        private static bool PlanSmooth(OmsiJointMove move, OmsiMapSummary summary, OmsiSplineEnd far, OmsiMapPoint joint, double through, double nodeHeight,
+            double size, bool arriving)
+        {
+            var farPoint = far.Position(size);
+            // The record starts at the joint when the far end is the record's end.
+            var recordStartsAtJoint = far.AtEnd;
+            if (Neighbour(summary, far) == null)
             {
-                // Continuing into the next spline means leaving the neighbour's far end the way that spline goes on.
-                var onwards = neighbourFar.OutwardHeadingDegrees;
-                var kink = Math.Abs(OmsiRoadPlanner.Normalize(onwards - neighbourArrival));
+                // From the joint along the road, backwards when the spline arrives at it.
+                return Plan(move, far.Tile, far.Spline, joint, arriving ? through + 180.0 : through, nodeHeight, farPoint.X, farPoint.Y, far.Height, size,
+                    recordStartsAtJoint, out _);
+            }
+            if (Distance(farPoint, joint) < OmsiRoadPlanner.MinimumLength)
+            {
+                move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "Spline #" + far.Spline.Id + " would become too short.", joint.X, joint.Y));
+                return false;
+            }
+            // Travel from the far end to the joint, or from the joint to the far end, with the headings at both.
+            var pieces = arriving
+                ? OmsiRoadPlanner.Biarc(farPoint.X, farPoint.Y, far.OutwardHeadingDegrees + 180.0, joint.X, joint.Y, through)
+                : OmsiRoadPlanner.Biarc(joint.X, joint.Y, through, farPoint.X, farPoint.Y, far.OutwardHeadingDegrees);
+            if (pieces.Count == 2 && SameCircle(pieces[0], pieces[1]))
+                pieces = new List<OmsiSplinePiece> { Joined(pieces[0], pieces[1]) };
+            if (pieces.Count == 2 && Math.Min(pieces[0].LengthMeters, pieces[1].LengthMeters) < MinimumArcMeters)
+            {
+                // Too short a second arc to be a spline of its own: one arc, with the small kink it leaves reported.
+                var start = arriving ? farPoint : joint;
+                var heading = arriving ? far.OutwardHeadingDegrees + 180.0 : through;
+                var end = arriving ? joint : farPoint;
+                if (!Plan(move, far.Tile, far.Spline, start, heading, arriving ? far.Height : nodeHeight, end.X, end.Y, arriving ? nodeHeight : far.Height, size,
+                        arriving != recordStartsAtJoint, out var arrival))
+                    return false;
+                var wanted = arriving ? through : far.OutwardHeadingDegrees;
+                var kink = Math.Abs(OmsiRoadPlanner.Normalize(arrival - wanted));
                 if (kink > KinkToleranceDegrees)
                     move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
-                        "Spline #" + neighbour.Spline.Id + " now meets the next spline with a kink of " + kink.ToString("0") + "°.",
-                        neighbourFarPoint.X, neighbourFarPoint.Y));
+                        "Spline #" + far.Spline.Id + " now meets the next spline with a kink of " + kink.ToString("0") + "°.", end.X, end.Y));
+                return true;
             }
-            return move;
+            foreach (var piece in pieces)
+                if (piece.RadiusMeters != 0.0 && piece.LengthMeters > Math.PI * Math.Abs(piece.RadiusMeters))
+                    move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning, "Spline #" + far.Spline.Id + " would turn by more than half a circle.",
+                        joint.X, joint.Y));
+            AddPieces(move, far.Tile, far.Spline, pieces, arriving ? far.Height : nodeHeight, arriving ? nodeHeight : far.Height, size,
+                arriving != recordStartsAtJoint);
+            return true;
+        }
+
+        /// <summary>A second arc shorter than this is not split off; the spline stays one arc.</summary>
+        private const double MinimumArcMeters = 1.0;
+
+        /// <summary>True when two arcs lie on one circle, or both on one straight line, so one spline can be both.</summary>
+        private static bool SameCircle(OmsiSplinePiece first, OmsiSplinePiece second)
+        {
+            if (first.RadiusMeters == 0.0 || second.RadiusMeters == 0.0)
+                return first.RadiusMeters == 0.0 && second.RadiusMeters == 0.0 &&
+                       Math.Abs(OmsiRoadPlanner.Normalize(first.HeadingDegrees - second.HeadingDegrees)) < 1e-6;
+            return Math.Abs(first.RadiusMeters - second.RadiusMeters) < 1e-6 * Math.Max(1.0, Math.Abs(first.RadiusMeters));
+        }
+
+        private static OmsiSplinePiece Joined(OmsiSplinePiece first, OmsiSplinePiece second)
+        {
+            return new OmsiSplinePiece
+            {
+                StartX = first.StartX, StartY = first.StartY, HeadingDegrees = first.HeadingDegrees, RadiusMeters = first.RadiusMeters,
+                LengthMeters = first.LengthMeters + second.LengthMeters
+            };
+        }
+
+        /// <summary>
+        /// Stores arcs planned in travel order as a spline, the way its record runs: the first part keeps the spline, a
+        /// second one is split off. Heights run evenly from the first point to the last.
+        /// </summary>
+        private static void AddPieces(OmsiJointMove move, OmsiTileSummary tile, OmsiSplineRecord spline, List<OmsiSplinePiece> pieces, double fromHeight,
+            double toHeight, double size, bool recordStartsAtFrom)
+        {
+            var length = 0.0;
+            foreach (var piece in pieces)
+                length += piece.LengthMeters;
+            var gradient = (toHeight - fromHeight) / length * 100.0;
+            // The parts as the record runs, each with its start, heading, radius and start height.
+            var parts = new List<double[]>();
+            var travelled = 0.0;
+            foreach (var piece in pieces)
+            {
+                var height = fromHeight + travelled * gradient / 100.0;
+                if (recordStartsAtFrom)
+                {
+                    parts.Add(new[] { piece.StartX, piece.StartY, piece.HeadingDegrees, piece.RadiusMeters, piece.LengthMeters, height });
+                }
+                else
+                {
+                    // Against travel: the part starts where the piece ends, turned round, bending the other way.
+                    piece.PointAt(piece.LengthMeters, out var endX, out var endY, out _);
+                    var endHeading = piece.RadiusMeters == 0.0
+                        ? piece.HeadingDegrees
+                        : piece.HeadingDegrees + piece.LengthMeters / piece.RadiusMeters * 180.0 / Math.PI;
+                    parts.Insert(0, new[] { endX, endY, endHeading + 180.0, -piece.RadiusMeters, piece.LengthMeters,
+                        height + piece.LengthMeters * gradient / 100.0 });
+                }
+                travelled += piece.LengthMeters;
+            }
+            var recordGradient = recordStartsAtFrom ? gradient : -gradient;
+            for (var index = 0; index < parts.Count; index++)
+            {
+                var part = parts[index];
+                move.Splines.Add(new OmsiSplineGeometry
+                {
+                    Tile = tile, Spline = spline, LocalX = part[0] - tile.X * size, LocalY = part[1] - tile.Y * size, Height = part[5],
+                    HeadingDegrees = (part[2] % 360.0 + 360.0) % 360.0, LengthMeters = part[4], RadiusMeters = part[3],
+                    GradientStartPercent = recordGradient, GradientEndPercent = recordGradient, SplitOff = index > 0
+                });
+            }
         }
 
         /// <summary>

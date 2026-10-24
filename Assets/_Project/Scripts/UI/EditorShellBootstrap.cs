@@ -1480,7 +1480,10 @@ namespace OmsiMapEditor.UI
                     ? (alt ? "Straightening spline #" : "Bending spline #") + draggedSplineEnd.Spline.Id + (alt ? string.Empty : "; Alt runs it straight")
                     : "Moving the " + (draggedSplineEnd.AtEnd ? "end" : "start") + " of spline #" + draggedSplineEnd.Spline.Id +
                       (move.Splines.Count > 1 ? " and the spline joined there" : string.Empty) +
-                      (alt ? " without a kink at the joint" : "; Alt keeps the joint free of kinks");
+                      (alt ? " without kinks" : "; Alt keeps the road free of kinks");
+                var twoArcs = move.Splines.FindAll(geometry => geometry.SplitOff);
+                if (twoArcs.Count > 0)
+                    text += "; #" + string.Join(", #", twoArcs.ConvertAll(split => split.Spline.Id)) + " becomes two arcs";
                 foreach (var issue in move.Issues)
                     text += "; " + issue.Message;
                 SetStatus(text);
@@ -1500,24 +1503,44 @@ namespace OmsiMapEditor.UI
                 SetStatus("Spline #" + id + " stays: " + move.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
                 return;
             }
-            OmsiSplineChange change;
+            List<OmsiSplineChange> changes;
+            IReadOnlyList<OmsiReference> blockers;
             try
             {
-                change = session.UpdateSplines(currentSummary, move.Splines);
+                changes = session.ApplyJointMove(currentSummary, move, out blockers);
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is ArgumentException || exception is IOException)
             {
                 Debug.LogException(exception);
+                RefreshAfterChange(null);
                 SetStatus("Spline #" + id + " could not be moved: " + exception.Message);
                 return;
             }
-            if (change == null)
+            if (changes == null)
+            {
+                RefreshAfterChange(null);
+                SetStatus("Spline #" + id + " stays: a spline would be split into two arcs, but " + DescribeReferences(blockers) +
+                          " still need it whole. Drag without Alt to keep the shapes instead.");
                 return;
-            PushHistory(new ObjectEditStep { SplineChange = change });
-            RefreshSplineViews(change);
+            }
+            if (changes.Count == 0)
+                return;
+            var parts = new List<ObjectEditStep>();
+            var moved = new List<int>();
+            foreach (var change in changes)
+            {
+                parts.Add(new ObjectEditStep { SplineChange = change });
+                RefreshSplineViews(change);
+                foreach (var changedId in change.SplineIds)
+                    if (changedId != id && !moved.Contains(changedId))
+                        moved.Add(changedId);
+            }
+            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = "moving spline #" + id });
             var warnings = move.Issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
-            SetStatus((bendingSpline ? "Bent spline #" : "Moved spline #") + id + (change.SplineIds.Count > 1 ? " and #" + change.SplineIds[1] : string.Empty) +
-                      (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + " Ctrl+Z takes it back.");
+            var splits = move.Splines.FindAll(geometry => geometry.SplitOff);
+            SetStatus((bendingSpline ? "Bent spline #" : "Moved spline #") + id + (moved.Count > 0 ? " and #" + string.Join(", #", moved) : string.Empty) +
+                      (splits.Count > 0 ? "; split #" + string.Join(", #", splits.ConvertAll(split => split.Spline.Id)) + " into two arcs to stay free of kinks" : string.Empty) +
+                      (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + ". Ctrl+Z takes it back.");
         }
 
         /// <summary>

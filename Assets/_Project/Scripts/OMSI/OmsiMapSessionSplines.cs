@@ -543,6 +543,74 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// Writes a planned joint move (<see cref="OmsiSplineEditing.PlanJointMove"/>): splits each spline that becomes two
+        /// arcs, then writes the new geometry of every spline and part. Returns the changes in the order they were made, for
+        /// undo from the last; when a spline cannot be split, as objects ride on it, nothing stays changed and the
+        /// references are returned in <paramref name="blockers"/>.
+        /// </summary>
+        public List<OmsiSplineChange> ApplyJointMove(OmsiMapSummary summary, OmsiJointMove move, out IReadOnlyList<OmsiReference> blockers)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (move == null)
+                throw new ArgumentNullException(nameof(move));
+            blockers = new OmsiReference[0];
+            var size = summary.TileSizeMeters;
+            var changes = new List<OmsiSplineChange>();
+            var geometries = new List<OmsiSplineGeometry>();
+            try
+            {
+                foreach (var geometry in move.Splines)
+                {
+                    if (!geometry.SplitOff)
+                    {
+                        geometries.Add(geometry);
+                        continue;
+                    }
+                    // Each change reads the splines again, so the spline is found anew by its ID.
+                    var tile = summary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == geometry.Spline.Id));
+                    var record = tile?.Splines.Find(spline => spline.Id == geometry.Spline.Id);
+                    if (record == null)
+                        throw new InvalidOperationException("Spline " + geometry.Spline.Id + " was not found to split.");
+                    var result = SplitSpline(summary, tile, record, record.LengthMeters / 2.0);
+                    if (!result.Succeeded)
+                    {
+                        blockers = result.Blockers;
+                        UndoAll(summary, changes);
+                        return null;
+                    }
+                    changes.Add(result.Change);
+                    var newId = result.Change.SplineIds[result.Change.SplineIds.Count - 1];
+                    var newTile = summary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == newId));
+                    var newRecord = newTile.Splines.Find(spline => spline.Id == newId);
+                    geometries.Add(new OmsiSplineGeometry
+                    {
+                        Tile = newTile, Spline = newRecord,
+                        LocalX = geometry.LocalX + (geometry.Tile.X - newTile.X) * size, LocalY = geometry.LocalY + (geometry.Tile.Y - newTile.Y) * size,
+                        Height = geometry.Height, HeadingDegrees = geometry.HeadingDegrees, LengthMeters = geometry.LengthMeters,
+                        RadiusMeters = geometry.RadiusMeters, GradientStartPercent = geometry.GradientStartPercent, GradientEndPercent = geometry.GradientEndPercent
+                    });
+                }
+                var update = UpdateSplines(summary, geometries);
+                if (update != null)
+                    changes.Add(update);
+                return changes;
+            }
+            catch
+            {
+                UndoAll(summary, changes);
+                throw;
+            }
+        }
+
+        private void UndoAll(OmsiMapSummary summary, List<OmsiSplineChange> changes)
+        {
+            for (var index = changes.Count - 1; index >= 0; index--)
+                Undo(summary, changes[index]);
+            changes.Clear();
+        }
+
+        /// <summary>
         /// Fits the terrain to splines built in this editor, or stops fitting it: adds or removes [spline_terrain_align_2]
         /// after each of them and computes the terrain around them anew. Splines of the original map are left as they are.
         /// </summary>
