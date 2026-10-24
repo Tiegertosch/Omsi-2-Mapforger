@@ -196,6 +196,14 @@ namespace OmsiMapEditor.OMSI
                     medianRight = to;
                 }
             }
+            // Road surface at road height across the middle of the gap, such as a hatched area, makes it no median.
+            if (!double.IsNaN(medianLeft))
+            {
+                var middleOfGap = (medianLeft + medianRight) / 2.0;
+                if (level.Exists(pair => pair.Key.X <= middleOfGap && pair.Value.X >= middleOfGap && Math.Abs(pair.Key.Height - height) <= KerbRise &&
+                                         Math.Abs(pair.Value.Height - height) <= KerbRise))
+                    medianLeft = double.NaN;
+            }
             if (!double.IsNaN(medianLeft))
             {
                 for (var grown = true; grown;)

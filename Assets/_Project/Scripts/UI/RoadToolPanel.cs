@@ -2,22 +2,31 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using OmsiMapEditor.OMSI;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The panel of the road tool: the spline profile (.sli) to build with, where the heights come from, and what the road
-    /// under the pointer would look like. Profiles the map already uses come first, with their counts. The shell plans
-    /// and builds the road; the panel only holds the settings and shows the plan.
+    /// The road tool's panels, laid out as in Cities: Skylines: on the left the options (heights, terrain, junctions,
+    /// piece length, gradient warning), beside them the road picker with tabs by kind of road, a search and a tile with a
+    /// preview for each spline profile (.sli). The profiles are sorted into tabs and their previews drawn from their
+    /// textures on worker threads. The shell plans and builds the road; the panel only holds the settings and shows the plan.
     /// </summary>
     internal sealed class RoadToolPanel : VisualElement
     {
+        private enum Tab { InMap, Favorites, Category }
+
+        private const string FavoritesKey = "Mapforge.RoadFavorites";
+        private const int PreviewWidth = 96;
+        private const int PreviewHeight = 64;
+
         private readonly TextField search;
-        private readonly ListView list;
-        private readonly List<string> profiles = new List<string>();
-        private readonly List<string> shown = new List<string>();
+        private readonly VisualElement tabRow;
+        private readonly ScrollView tiles;
+        private readonly Label emptyLabel;
         private readonly Button followButton;
         private readonly Button smoothButton;
         private readonly Button manualButton;
@@ -28,126 +37,157 @@ namespace OmsiMapEditor.UI
         private readonly Toggle fitTerrainToggle;
         private readonly Toggle junctionsToggle;
         private readonly Label planLabel;
+        private readonly List<string> profiles = new List<string>();
+        private readonly HashSet<string> favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, VisualElement> tileByPath = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Texture2D> previews = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<Button, KeyValuePair<Tab, OmsiSplineCategory>> tabButtons = new Dictionary<Button, KeyValuePair<Tab, OmsiSplineCategory>>();
         private IReadOnlyDictionary<string, int> used = new Dictionary<string, int>();
+        private Dictionary<string, OmsiSplineCategory> categories;
+        private string installationRoot;
+        private Tab tab = Tab.InMap;
+        private OmsiSplineCategory category = OmsiSplineCategory.TwoLanes;
+        private bool tabChosen;
+
+        // Previews are drawn one after another on a worker thread; finished pixels wait here for the main thread.
+        private readonly object previewLock = new object();
+        private readonly Queue<string> previewQueue = new Queue<string>();
+        private readonly HashSet<string> previewRequested = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<KeyValuePair<string, byte[]>> previewsDone = new List<KeyValuePair<string, byte[]>>();
+        private Task previewWorker;
+        private Task<Dictionary<string, OmsiSplineCategory>> sorting;
 
         public RoadToolPanel()
         {
-            AddToClassList("tool-panel");
-            AddToClassList("road-panel");
+            AddToClassList("road-tool");
+            LoadFavorites();
 
-            var header = new VisualElement();
-            header.AddToClassList("tool-panel-header");
-            var badge = new VisualElement();
-            badge.AddToClassList("tool-panel-badge");
-            badge.Add(new IconElement("spline"));
-            header.Add(badge);
-            var titles = new VisualElement();
-            titles.AddToClassList("tool-panel-titles");
-            var title = new Label("Road");
-            title.AddToClassList("tool-panel-title");
-            titles.Add(title);
-            var subtitle = new Label("Click the points of a road; Esc ends it");
-            subtitle.AddToClassList("tool-panel-subtitle");
-            titles.Add(subtitle);
-            header.Add(titles);
-            var close = new Button(() => CloseRequested?.Invoke()) { tooltip = "Close the road tool (R)" };
-            close.AddToClassList("panel-icon-button");
-            close.Add(new IconElement("x"));
-            header.Add(close);
-            Add(header);
+            // The options on the left.
+            var options = new VisualElement();
+            options.AddToClassList("tool-panel");
+            options.AddToClassList("road-options");
+            var optionsTitle = new Label("Options");
+            optionsTitle.AddToClassList("road-options-title");
+            options.Add(optionsTitle);
 
-            profileLabel = new Label();
-            profileLabel.AddToClassList("road-profile");
-            Add(profileLabel);
-
-            var searchRow = new VisualElement();
-            searchRow.AddToClassList("panel-search");
-            search = new TextField();
-            search.AddToClassList("panel-search-field");
-            search.textEdition.placeholder = "Search spline profiles...";
-            search.RegisterValueChangedCallback(_ => Refresh());
-            searchRow.Add(search);
-            var searchIcon = new IconElement("search");
-            searchIcon.AddToClassList("panel-search-icon");
-            searchRow.Add(searchIcon);
-            Add(searchRow);
-
-            list = new ListView
-            {
-                fixedItemHeight = 36,
-                selectionType = SelectionType.Single,
-                itemsSource = shown,
-                makeItem = MakeRow,
-                bindItem = BindRow
-            };
-            list.AddToClassList("panel-list");
-            list.selectionChanged += _ =>
-            {
-                if (list.selectedIndex >= 0 && list.selectedIndex < shown.Count)
-                    SetProfile(shown[list.selectedIndex]);
-            };
-            Add(list);
-
+            var heightRow = Row(options, "Height");
             var modes = new VisualElement();
             modes.AddToClassList("panel-tabs");
+            modes.AddToClassList("road-segmented");
             followButton = new Button(() => SetHeightMode(OmsiRoadHeightMode.FollowTerrain))
             {
-                text = "Follow terrain", tooltip = "Every piece of the road starts and ends on the terrain; the terrain itself is not changed."
+                text = "Terrain", tooltip = "Every piece of the road starts and ends on the terrain; the terrain itself is not changed."
             };
-            followButton.AddToClassList("panel-tab");
-            modes.Add(followButton);
             smoothButton = new Button(() => SetHeightMode(OmsiRoadHeightMode.Smooth))
             {
                 text = "Smooth",
                 tooltip = "Follows the terrain averaged over 100 m, with the gradient changing steadily and no kinks, also where the road continues another. " +
                           "With Fit terrain the ground is cut or banked up to the road."
             };
-            smoothButton.AddToClassList("panel-tab");
-            modes.Add(smoothButton);
             manualButton = new Button(() => SetHeightMode(OmsiRoadHeightMode.Manual))
             {
-                text = "Manual height",
+                text = "Manual",
                 tooltip = "The height runs evenly from the start to the end height below, whatever the terrain does. " +
                           "Switch off Fit terrain for bridges and overpasses, so the ground stays as it is."
             };
-            manualButton.AddToClassList("panel-tab");
-            modes.Add(manualButton);
-            Add(modes);
+            foreach (var button in new[] { followButton, smoothButton, manualButton })
+            {
+                button.AddToClassList("panel-tab");
+                modes.Add(button);
+            }
+            heightRow.Add(modes);
 
-            fitTerrainToggle = new Toggle("Fit terrain to the road")
+            endHeightField = Field(Row(options, "End height (m)"), "0", "Height at the end of each new piece of road in manual mode");
+            pieceLengthField = Field(Row(options, "Piece length (m)"), "25", "Longer roads are split into splines of at most this length, so they can follow the terrain");
+            gradientField = Field(Row(options, "Warn above (%)"), "10", "Gradients steeper than this are marked; a check, not a rule");
+
+            fitTerrainToggle = new Toggle
             {
                 value = true,
                 tooltip = "Lays the ground under the road and a shoulder of about 7 m beside it just below kerb height, as OMSI cuts it away " +
                           "under the road, and cuts or banks up slopes of 1:1.5 beyond. " +
                           "The original terrain stays in the original map; deleting the road brings it back."
             };
-            fitTerrainToggle.AddToClassList("panel-toggle");
-            fitTerrainToggle.AddToClassList("road-fit-terrain");
-            Add(fitTerrainToggle);
+            fitTerrainToggle.AddToClassList("road-option-toggle");
+            Row(options, "Fit terrain").Add(fitTerrainToggle);
 
-            junctionsToggle = new Toggle("Make junctions where roads meet")
+            junctionsToggle = new Toggle
             {
                 value = true,
-                tooltip = "A road ending on another road joins it with a new T junction; a road crossing another gets crossroads there. " +
-                          "The junctions are made in the profiles of both roads and stored under Sceneryobjects\\Mapforge in your OMSI installation."
+                tooltip = "A road ending on another road joins it with a new T junction; a road crossing another gets crossroads there; " +
+                          "a road joining one of another width gets a transition. They are made in the profiles of both roads and stored " +
+                          "under Sceneryobjects\\Mapforge in your OMSI installation."
             };
-            junctionsToggle.AddToClassList("panel-toggle");
-            junctionsToggle.AddToClassList("road-fit-terrain");
+            junctionsToggle.AddToClassList("road-option-toggle");
             junctionsToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
-            Add(junctionsToggle);
+            Row(options, "Make junctions").Add(junctionsToggle);
+            Add(options);
 
-            var fields = new VisualElement();
-            fields.AddToClassList("road-fields");
-            endHeightField = AddField(fields, "End height (m)", "0", "Height at the end of each new piece of road in manual mode");
-            pieceLengthField = AddField(fields, "Piece length (m)", "25", "Longer roads are split into splines of at most this length, so they can follow the terrain");
-            gradientField = AddField(fields, "Warn above (%)", "10", "Gradients steeper than this are marked; a check, not a rule");
-            Add(fields);
+            // The picker beside them.
+            var picker = new VisualElement();
+            picker.AddToClassList("tool-panel");
+            picker.AddToClassList("road-picker");
+            var header = new VisualElement();
+            header.AddToClassList("tool-panel-header");
+            header.AddToClassList("road-picker-header");
+            var badge = new VisualElement();
+            badge.AddToClassList("tool-panel-badge");
+            badge.Add(new IconElement("spline"));
+            header.Add(badge);
+            var titles = new VisualElement();
+            titles.AddToClassList("tool-panel-titles");
+            profileLabel = new Label("Road");
+            profileLabel.AddToClassList("tool-panel-title");
+            profileLabel.AddToClassList("road-profile");
+            titles.Add(profileLabel);
+            planLabel = new Label("Click the points of a road; Esc ends it");
+            planLabel.AddToClassList("tool-panel-subtitle");
+            planLabel.AddToClassList("road-plan");
+            titles.Add(planLabel);
+            header.Add(titles);
+            var searchRow = new VisualElement();
+            searchRow.AddToClassList("panel-search");
+            searchRow.AddToClassList("road-search");
+            search = new TextField();
+            search.AddToClassList("panel-search-field");
+            search.textEdition.placeholder = "Search all roads...";
+            search.RegisterValueChangedCallback(_ => Refresh());
+            searchRow.Add(search);
+            var searchIcon = new IconElement("search");
+            searchIcon.AddToClassList("panel-search-icon");
+            searchRow.Add(searchIcon);
+            header.Add(searchRow);
+            var close = new Button(() => CloseRequested?.Invoke()) { tooltip = "Close the road tool (R)" };
+            close.AddToClassList("panel-icon-button");
+            close.Add(new IconElement("x"));
+            header.Add(close);
+            picker.Add(header);
 
-            planLabel = new Label();
-            planLabel.AddToClassList("panel-info");
-            Add(planLabel);
+            tabRow = new VisualElement();
+            tabRow.AddToClassList("panel-tabs");
+            tabRow.AddToClassList("road-tabs");
+            AddTab(Tab.InMap, OmsiSplineCategory.Other, "In map", "Profiles this map uses, most used first");
+            AddTab(Tab.Favorites, OmsiSplineCategory.Other, "Favorites", "Profiles you marked with the star");
+            foreach (OmsiSplineCategory each in Enum.GetValues(typeof(OmsiSplineCategory)))
+                AddTab(Tab.Category, each, OmsiSplineCategories.Name(each), TabTooltip(each));
+            picker.Add(tabRow);
+
+            // The scroll bar always shows, so the tiles keep their places whatever the tab holds.
+            tiles = new ScrollView(ScrollViewMode.Vertical)
+            {
+                verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible, horizontalScrollerVisibility = ScrollerVisibility.Hidden
+            };
+            tiles.AddToClassList("road-tiles");
+            tiles.contentContainer.AddToClassList("road-tiles-content");
+            picker.Add(tiles);
+            emptyLabel = new Label();
+            emptyLabel.AddToClassList("panel-info");
+            emptyLabel.AddToClassList("road-empty");
+            picker.Add(emptyLabel);
+            Add(picker);
 
             SetHeightMode(OmsiRoadHeightMode.FollowTerrain);
+            schedule.Execute(TakePreviews).Every(100);
         }
 
         /// <summary>The panel wants to close the road tool.</summary>
@@ -173,9 +213,29 @@ namespace OmsiMapEditor.UI
 
         public double GradientWarningPercent => Number(gradientField, 0.0) ?? 10.0;
 
+        /// <summary>The OMSI installation whose profiles and textures the picker reads; read again when another opens.</summary>
+        public void SetInstallation(string root)
+        {
+            if (string.Equals(root, installationRoot, StringComparison.OrdinalIgnoreCase))
+                return;
+            installationRoot = root;
+            categories = null;
+            sorting = null;
+            lock (previewLock)
+            {
+                previewQueue.Clear();
+                previewRequested.Clear();
+                previewsDone.Clear();
+            }
+            foreach (var texture in previews.Values)
+                if (texture != null)
+                    UnityEngine.Object.Destroy(texture);
+            previews.Clear();
+        }
+
         /// <summary>
         /// The profiles to offer: those of the installation and those the map uses, with their use counts. The most used
-        /// profile of the map is chosen unless one is chosen already.
+        /// profile of the map is chosen unless one is chosen already. The profiles are sorted into tabs in the background.
         /// </summary>
         public void SetProfiles(IEnumerable<string> installationProfiles, IReadOnlyDictionary<string, int> mapProfiles)
         {
@@ -193,6 +253,9 @@ namespace OmsiMapEditor.UI
                         profiles.Add(path);
             if (Profile == null && profiles.Count > 0)
                 SetProfile(profiles[0]);
+            if (!tabChosen)
+                tab = used.Count > 0 ? Tab.InMap : Tab.Category;
+            StartSorting();
             Refresh();
         }
 
@@ -206,23 +269,26 @@ namespace OmsiMapEditor.UI
         public void ShowPlan(string text, bool problem)
         {
             planLabel.text = text;
+            planLabel.tooltip = text;
             planLabel.EnableInClassList("panel-info-warning", problem);
         }
 
-        /// <summary>Chooses a profile by its path relative to the installation, as a click in the list does; for command-line checks.</summary>
+        /// <summary>Chooses a profile by its path relative to the installation, as a click on its tile does; for command-line checks.</summary>
         public void ChooseProfile(string path)
         {
             if (!string.IsNullOrWhiteSpace(path))
                 SetProfile(path.Trim());
         }
 
-        private void SetProfile(string path)
+        /// <summary>Shows a tab by its name, such as "Median" or "In map"; for command-line checks.</summary>
+        public void ShowTab(string name)
         {
-            Profile = path;
-            used.TryGetValue(path, out var count);
-            profileLabel.text = "Profile: " + Path.GetFileNameWithoutExtension(path) + (count > 0 ? "  (" + count + " in this map)" : string.Empty);
-            profileLabel.tooltip = path;
-            SettingsChanged?.Invoke();
+            foreach (var pair in tabButtons)
+                if (string.Equals(pair.Key.text, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    ChooseTab(pair.Value.Key, pair.Value.Value);
+                    return;
+                }
         }
 
         public void SetHeightMode(OmsiRoadHeightMode mode)
@@ -231,16 +297,41 @@ namespace OmsiMapEditor.UI
             followButton.EnableInClassList("panel-tab-active", mode == OmsiRoadHeightMode.FollowTerrain);
             smoothButton.EnableInClassList("panel-tab-active", mode == OmsiRoadHeightMode.Smooth);
             manualButton.EnableInClassList("panel-tab-active", mode == OmsiRoadHeightMode.Manual);
-            endHeightField.SetEnabled(mode == OmsiRoadHeightMode.Manual);
+            endHeightField.parent.SetEnabled(mode == OmsiRoadHeightMode.Manual);
             SettingsChanged?.Invoke();
         }
 
-        private TextField AddField(VisualElement parent, string label, string value, string tooltip)
+        private void SetProfile(string path)
         {
-            var field = new TextField(label) { value = value, tooltip = tooltip };
+            if (Profile != null && tileByPath.TryGetValue(Profile, out var previous))
+                previous.RemoveFromClassList("road-tile-selected");
+            Profile = path;
+            used.TryGetValue(path, out var count);
+            profileLabel.text = Path.GetFileNameWithoutExtension(path) + (count > 0 ? "  ·  " + count + " in this map" : string.Empty);
+            profileLabel.tooltip = path;
+            if (tileByPath.TryGetValue(path, out var tile))
+                tile.AddToClassList("road-tile-selected");
+            SettingsChanged?.Invoke();
+        }
+
+        private static VisualElement Row(VisualElement parent, string label)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("road-option");
+            var text = new Label(label);
+            text.AddToClassList("road-option-label");
+            row.Add(text);
+            parent.Add(row);
+            return row;
+        }
+
+        private TextField Field(VisualElement row, string value, string tooltip)
+        {
+            var field = new TextField { value = value, tooltip = tooltip };
             field.AddToClassList("road-field");
             field.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
-            parent.Add(field);
+            row.tooltip = tooltip;
+            row.Add(field);
             return field;
         }
 
@@ -252,47 +343,278 @@ namespace OmsiMapEditor.UI
                 : (double?)null;
         }
 
+        private void AddTab(Tab kind, OmsiSplineCategory each, string text, string tooltip)
+        {
+            var button = new Button { text = text, tooltip = tooltip };
+            button.AddToClassList("panel-tab");
+            button.AddToClassList("road-tab");
+            button.clicked += () => ChooseTab(kind, each);
+            tabButtons.Add(button, new KeyValuePair<Tab, OmsiSplineCategory>(kind, each));
+            tabRow.Add(button);
+        }
+
+        private static string TabTooltip(OmsiSplineCategory each)
+        {
+            switch (each)
+            {
+                case OmsiSplineCategory.OneWay: return "Roads whose lanes all run one way, also one carriageway of a dual road";
+                case OmsiSplineCategory.TwoLanes: return "Roads with one or two lanes, both ways";
+                case OmsiSplineCategory.FourLanes: return "Roads with three or four lanes";
+                case OmsiSplineCategory.SixLanes: return "Roads with five or more lanes";
+                case OmsiSplineCategory.Median: return "Roads with a median between their carriageways";
+                case OmsiSplineCategory.Rail: return "Rails and tram tracks";
+                case OmsiSplineCategory.Path: return "Footpaths and pavements";
+                default: return "Wires, fences, walls and helpers only the OMSI editor shows";
+            }
+        }
+
+        private void ChooseTab(Tab kind, OmsiSplineCategory each)
+        {
+            tab = kind;
+            category = each;
+            tabChosen = true;
+            search.SetValueWithoutNotify(string.Empty);
+            Refresh();
+        }
+
+        /// <summary>Sorts the profiles into their tabs on a worker thread, once per installation and list of profiles.</summary>
+        private void StartSorting()
+        {
+            if (installationRoot == null || profiles.Count == 0)
+                return;
+            if (categories != null && profiles.TrueForAll(categories.ContainsKey))
+                return;
+            if (sorting != null && !sorting.IsCompleted)
+                return;
+            var root = installationRoot;
+            var paths = new List<string>(profiles);
+            var known = categories;
+            var task = Task.Run(() =>
+            {
+                var catalog = new OmsiSplineProfileCatalog(root);
+                var result = known != null
+                    ? new Dictionary<string, OmsiSplineCategory>(known, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, OmsiSplineCategory>(StringComparer.OrdinalIgnoreCase);
+                foreach (var path in paths)
+                    if (!result.ContainsKey(path))
+                        result[path] = OmsiSplineCategories.Of(catalog.Get(path));
+                return result;
+            });
+            sorting = task;
+            IVisualElementScheduledItem poll = null;
+            poll = schedule.Execute(() =>
+            {
+                if (!task.IsCompleted)
+                    return;
+                poll.Pause();
+                if (!ReferenceEquals(task, sorting))
+                    return;
+                if (task.IsFaulted)
+                {
+                    Debug.LogException(task.Exception);
+                    categories = new Dictionary<string, OmsiSplineCategory>(StringComparer.OrdinalIgnoreCase);
+                }
+                else
+                    categories = task.Result;
+                if (!tabChosen && tab == Tab.Category && Profile != null && categories.TryGetValue(Profile, out var chosen))
+                    category = chosen;
+                Refresh();
+            }).Every(100);
+        }
+
+        /// <summary>Builds the tiles of the current tab, or of every profile matching the search.</summary>
         private void Refresh()
         {
-            shown.Clear();
             var text = search.value?.Trim() ?? string.Empty;
+            foreach (var pair in tabButtons)
+                pair.Key.EnableInClassList("panel-tab-active", text.Length == 0 && pair.Value.Key == tab && (tab != Tab.Category || pair.Value.Value == category));
+            tiles.Clear();
+            tileByPath.Clear();
+            var shown = new List<string>();
             foreach (var path in profiles)
-                if (text.Length == 0 || path.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                if (text.Length > 0)
+                {
+                    if (path.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+                        shown.Add(path);
+                    continue;
+                }
+                if (tab == Tab.InMap && used.ContainsKey(path) || tab == Tab.Favorites && favorites.Contains(path) ||
+                    tab == Tab.Category && categories != null && categories.TryGetValue(path, out var each) && each == category)
                     shown.Add(path);
-            list.RefreshItems();
-            var index = Profile == null ? -1 : shown.IndexOf(Profile);
-            if (index >= 0)
-                list.SetSelectionWithoutNotify(new[] { index });
+            }
+            foreach (var path in shown)
+                tiles.Add(MakeTile(path));
+            emptyLabel.text = shown.Count > 0 ? string.Empty
+                : text.Length > 0 ? "No profile matches \"" + text + "\"."
+                : tab == Tab.Category && categories == null ? "Sorting the profiles of the installation..."
+                : tab == Tab.InMap ? "This map uses no spline profiles yet."
+                : tab == Tab.Favorites ? "Mark profiles with the star to find them here."
+                : "No profile of this kind in the installation.";
+            // The empty note lies over the tile area, which keeps its size.
+            emptyLabel.style.display = shown.Count > 0 ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        private VisualElement MakeTile(string path)
+        {
+            var tile = new VisualElement { tooltip = path };
+            tile.AddToClassList("road-tile");
+            if (string.Equals(path, Profile, StringComparison.OrdinalIgnoreCase))
+                tile.AddToClassList("road-tile-selected");
+            var preview = new VisualElement { name = "preview" };
+            preview.AddToClassList("road-tile-preview");
+            if (previews.TryGetValue(path, out var texture) && texture != null)
+                preview.style.backgroundImage = new StyleBackground(texture);
             else
-                list.ClearSelection();
+                RequestPreview(path);
+            tile.Add(preview);
+            var name = new Label(Path.GetFileNameWithoutExtension(path));
+            name.AddToClassList("road-tile-name");
+            tile.Add(name);
+            if (used.TryGetValue(path, out var count) && count > 0)
+            {
+                var badge = new Label(count.ToString(CultureInfo.InvariantCulture)) { tooltip = count + " splines of this map use it" };
+                badge.AddToClassList("road-tile-count");
+                tile.Add(badge);
+            }
+            var star = new Button { tooltip = favorites.Contains(path) ? "Remove from favorites" : "Add to favorites" };
+            star.AddToClassList("panel-icon-button");
+            star.AddToClassList("favorite-button");
+            star.AddToClassList("road-tile-star");
+            star.EnableInClassList("favorite-on", favorites.Contains(path));
+            star.Add(new IconElement("star"));
+            star.clicked += () =>
+            {
+                if (!favorites.Remove(path))
+                    favorites.Add(path);
+                SaveFavorites();
+                Refresh();
+            };
+            tile.Add(star);
+            tile.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (evt.target is VisualElement target && (target == star || star.Contains(target)))
+                    return;
+                SetProfile(path);
+            });
+            tileByPath[path] = tile;
+            return tile;
         }
 
-        private static VisualElement MakeRow()
+        /// <summary>Queues a profile's preview; a single worker draws them in turn, reading each texture once.</summary>
+        private void RequestPreview(string path)
         {
-            var row = new VisualElement();
-            row.AddToClassList("panel-row");
-            var icon = new IconElement("spline");
-            icon.AddToClassList("panel-row-icon");
-            row.Add(icon);
-            var texts = new VisualElement();
-            texts.AddToClassList("panel-row-texts");
-            var name = new Label { name = "row-name" };
-            name.AddToClassList("panel-row-name");
-            texts.Add(name);
-            var detail = new Label { name = "row-detail" };
-            detail.AddToClassList("panel-row-detail");
-            texts.Add(detail);
-            row.Add(texts);
-            return row;
+            if (installationRoot == null)
+                return;
+            lock (previewLock)
+            {
+                if (!previewRequested.Add(path))
+                    return;
+                previewQueue.Enqueue(path);
+                if (previewWorker != null && !previewWorker.IsCompleted)
+                    return;
+            }
+            var root = installationRoot;
+            previewWorker = Task.Run(() => DrawPreviews(root));
         }
 
-        private void BindRow(VisualElement row, int index)
+        private void DrawPreviews(string root)
         {
-            var path = shown[index];
-            used.TryGetValue(path, out var count);
-            row.Q<Label>("row-name").text = Path.GetFileNameWithoutExtension(path);
-            row.Q<Label>("row-detail").text = (count > 0 ? count + " in this map  •  " : string.Empty) + Path.GetDirectoryName(path);
-            row.tooltip = path;
+            var catalog = new OmsiSplineProfileCatalog(root);
+            var images = new Dictionary<string, OmsiImage>(StringComparer.OrdinalIgnoreCase);
+            while (true)
+            {
+                string path;
+                lock (previewLock)
+                {
+                    if (previewQueue.Count == 0 || !string.Equals(root, installationRoot, StringComparison.OrdinalIgnoreCase))
+                        return;
+                    path = previewQueue.Dequeue();
+                }
+                byte[] pixels = null;
+                try
+                {
+                    var profile = catalog.Get(path);
+                    if (profile != null)
+                        pixels = OmsiSplineThumbnail.Render(profile, texture => ReadTexture(root, texture, images), PreviewWidth, PreviewHeight);
+                }
+                catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is ArgumentException ||
+                                                  exception is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("Could not draw the preview of " + path + ": " + exception.Message);
+                }
+                lock (previewLock)
+                    previewsDone.Add(new KeyValuePair<string, byte[]>(path, pixels));
+            }
+        }
+
+        /// <summary>A texture of the installation, decoded once and reduced, or null when it cannot be read.</summary>
+        private static OmsiImage ReadTexture(string root, string relativePath, Dictionary<string, OmsiImage> images)
+        {
+            if (images.TryGetValue(relativePath, out var cached))
+                return cached;
+            OmsiImage image = null;
+            try
+            {
+                var file = OmsiRelativePath.Resolve(root, relativePath);
+                // OMSI prefers a .dds of the same name.
+                var dds = Path.ChangeExtension(file, ".dds");
+                var bytes = File.Exists(dds) ? File.ReadAllBytes(dds) : File.Exists(file) ? File.ReadAllBytes(file) : null;
+                if (bytes != null && OmsiImageReader.TryDecode(bytes, out var decoded))
+                    image = decoded.Reduce(256);
+            }
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is ArgumentException ||
+                                              exception is UnauthorizedAccessException)
+            {
+                image = null;
+            }
+            images[relativePath] = image;
+            return image;
+        }
+
+        /// <summary>Turns finished previews into textures on the main thread and shows them on their tiles.</summary>
+        private void TakePreviews()
+        {
+            List<KeyValuePair<string, byte[]>> done;
+            lock (previewLock)
+            {
+                if (previewsDone.Count == 0)
+                    return;
+                done = new List<KeyValuePair<string, byte[]>>(previewsDone);
+                previewsDone.Clear();
+            }
+            foreach (var pair in done)
+            {
+                Texture2D texture = null;
+                if (pair.Value != null)
+                {
+                    // The pixels run from the top row down; Unity textures from the bottom row up.
+                    var flipped = new byte[pair.Value.Length];
+                    var stride = PreviewWidth * 4;
+                    for (var row = 0; row < PreviewHeight; row++)
+                        Buffer.BlockCopy(pair.Value, row * stride, flipped, (PreviewHeight - 1 - row) * stride, stride);
+                    texture = new Texture2D(PreviewWidth, PreviewHeight, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                    texture.LoadRawTextureData(flipped);
+                    texture.Apply(false, true);
+                }
+                previews[pair.Key] = texture;
+                if (texture != null && tileByPath.TryGetValue(pair.Key, out var tile))
+                    tile.Q<VisualElement>("preview").style.backgroundImage = new StyleBackground(texture);
+            }
+        }
+
+        private void LoadFavorites()
+        {
+            favorites.Clear();
+            foreach (var path in PlayerPrefs.GetString(FavoritesKey, string.Empty).Split('\n'))
+                if (path.Trim().Length > 0)
+                    favorites.Add(path.Trim());
+        }
+
+        private void SaveFavorites()
+        {
+            PlayerPrefs.SetString(FavoritesKey, string.Join("\n", favorites));
+            PlayerPrefs.Save();
         }
     }
 }

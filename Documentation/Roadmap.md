@@ -39,6 +39,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Objekte-Bibliothek: DLC-Objekte nach Steams Dateilisten ausblenden oder kennzeichnen, User-Content bleibt sichtbar; Kartenprüfung nennt DLC-Objekte (ADR 016)
 - [x] Ordner von Hand als DLC markieren, für außerhalb von Steam gekaufte Add-ons: Etikett-Knopf an jedem Ordner der Bibliothek, je Benutzer gespeichert; Bibliothek, „Hide DLC objects“, „In map“ und Kartenprüfung zählen markierte Ordner als DLC, Dateien des Basisspiels bleiben Basisspiel
 - [x] Objekte-Bibliothek: Vorschaubilder der Objekte aus `Sceneryobjects\nEditorThumbnails` (angelegt vom Drittanbieter-Editor nEditor, nicht von OMSI), Reiter „Groups“ mit den `[groups]` der `.sco`-Dateien, große Gruppen zuerst
+- [x] Straßenmenü wie in Cities: Skylines (ADR 029): Optionen links, Straßenauswahl mit Reitern nach Art (automatisch aus den Spuren), „In map“, „Favorites“, Suche und Kacheln mit Vorschaubildern aus den Texturen
 - [x] Farben der Vektorebene an das Corporate Design anpassen: Auswahl rot, gewählte Kachel gold, Splines orange, Objekte blau, Bäume und Platzieren grün; die Farben kommen aus den Design-Tokens
 
 ## Später

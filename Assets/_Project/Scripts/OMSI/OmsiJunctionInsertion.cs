@@ -400,10 +400,14 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public static class OmsiRoadJunctions
     {
-        /// <summary>True for a profile with a carriageway at least 3 m wide and a lane for vehicles.</summary>
+        /// <summary>
+        /// True for a profile with a carriageway at least 3 m wide and a lane for vehicles; not for rails and tram tracks,
+        /// also in a street, since a junction made here would have no rails.
+        /// </summary>
         public static bool IsRoad(OmsiSplineProfile profile)
         {
-            if (profile == null || !profile.Lanes.Exists(lane => lane.Kind == 0))
+            var category = OmsiSplineCategories.Of(profile);
+            if (category == OmsiSplineCategory.Rail || category == OmsiSplineCategory.Path || category == OmsiSplineCategory.Other)
                 return false;
             var sections = OmsiProfileSections.Of(profile);
             return sections.RoadTexture >= 0 && sections.RoadLeft + sections.RoadRight >= 3.0;

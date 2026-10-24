@@ -49,7 +49,7 @@ namespace OmsiMapEditor.OMSI
     /// <summary>A lane of a spline type: [path] in the .sli, which vehicles and pedestrians follow.</summary>
     public sealed class OmsiSplineLane
     {
-        /// <summary>0 for roads, 1 for pedestrians, further values for rails and others.</summary>
+        /// <summary>0 for roads, 1 for pedestrians, 2 for rails; <see cref="OmsiSplineProfile.UnreadableLane"/> when unreadable.</summary>
         public int Kind { get; internal set; }
 
         /// <summary>Distance from the spline, positive to the right.</summary>
@@ -93,6 +93,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The height of the cross-section at its outer edges, such as the top of a kerb, averaged over both sides.</summary>
         public double EdgeHeight { get; private set; }
+
+        /// <summary>The kind of a lane whose [path] could not be read.</summary>
+        public const int UnreadableLane = -1;
 
         /// <summary>The lanes in the order of the file; timetables name them by this index.</summary>
         public List<OmsiSplineLane> Lanes { get; } = new List<OmsiSplineLane>();
@@ -224,8 +227,9 @@ namespace OmsiMapEditor.OMSI
                             result.TerrainHoles[result.TerrainHoles.Count - 1].Add(holeX);
                         break;
                     case "path":
-                        // Kind, x, height, width and direction; a lane that cannot be read still keeps the index of the next.
-                        var lane = new OmsiSplineLane();
+                        // Kind, x, height, width and direction. A lane that cannot be read, such as the [path] that opens a
+                        // commented explanation in some rail profiles, keeps the index of the next with a kind of its own.
+                        var lane = new OmsiSplineLane { Kind = UnreadableLane };
                         if (values.Count >= 5 && TryNumbers(values, out var laneValues))
                         {
                             lane.Kind = (int)laneValues[0];

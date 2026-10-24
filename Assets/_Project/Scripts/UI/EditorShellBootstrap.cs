@@ -834,6 +834,9 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 yield return null;
                 roadPanel?.ChooseProfile(Argument("-roadProfile", 1));
+                var roadTab = Argument("-roadTab", 1);
+                if (roadTab != null)
+                    roadPanel?.ShowTab(roadTab);
                 var build = Array.IndexOf(args, "-roadBuild") >= 0;
                 for (var index = 0; index < points.Count; index++)
                 {
@@ -1771,6 +1774,7 @@ namespace OmsiMapEditor.UI
                     counts.TryGetValue(spline.AssetPath, out var count);
                     counts[spline.AssetPath] = count + 1;
                 }
+            roadPanel.SetInstallation(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath));
             roadPanel.SetProfiles(installationCatalog?.SplineProfiles, counts);
         }
 
