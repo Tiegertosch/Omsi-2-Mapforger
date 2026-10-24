@@ -883,6 +883,10 @@ namespace OmsiMapEditor.UI
                 var splineTile = currentSummary.Tiles.Find(tile => tile.Splines.Exists(spline => spline.Id == splineId));
                 if (splineTile != null)
                     SelectSpline(splineTile, splineTile.Splines.Find(spline => spline.Id == splineId));
+                if (selectedSpline != null &&
+                    double.TryParse(Argument("-splineHeights", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var startHeight) &&
+                    double.TryParse(Argument("-splineHeights", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var endHeight))
+                    SetSplineHeights(startHeight, endHeight);
             }
 
             if (int.TryParse(Argument("-moveSplineEnd", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var moveId) &&
@@ -1508,6 +1512,80 @@ namespace OmsiMapEditor.UI
             var warnings = move.Issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
             SetStatus((bendingSpline ? "Bent spline #" : "Moved spline #") + id + (change.SplineIds.Count > 1 ? " and #" + change.SplineIds[1] : string.Empty) +
                       (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + " Ctrl+Z takes it back.");
+        }
+
+        /// <summary>
+        /// Gives the ends of the selected spline new heights, as one undo step: a changed end takes the spline joined
+        /// there along, and each spline keeps the height at its other end (<see cref="OmsiSplineEditing.PlanJointHeight"/>).
+        /// </summary>
+        private void SetSplineHeights(double startHeight, double endHeight)
+        {
+            if (selectedSpline == null || currentSummary == null)
+                return;
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("change spline heights"));
+                return;
+            }
+            var id = selectedSpline.Id;
+            var steps = new List<ObjectEditStep>();
+            var warnings = new List<string>();
+            string failure = null;
+            foreach (var atEnd in new[] { false, true })
+            {
+                // A change reads the tiles again, so the spline is looked up anew for its second end.
+                var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+                var spline = tile?.Splines.Find(candidate => candidate.Id == id);
+                if (spline == null)
+                    break;
+                var target = atEnd ? endHeight : startHeight;
+                if (Math.Abs(target - (atEnd ? spline.EndHeight : spline.Height)) < 0.0005)
+                    continue;
+                var plan = OmsiSplineEditing.PlanJointHeight(currentSummary, new OmsiSplineEnd(tile, spline, atEnd), target);
+                if (plan.HasErrors)
+                {
+                    failure = plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message;
+                    break;
+                }
+                OmsiSplineChange change;
+                try
+                {
+                    change = session.UpdateSplines(currentSummary, plan.Splines);
+                }
+                catch (Exception exception) when (exception is InvalidOperationException || exception is ArgumentException || exception is IOException)
+                {
+                    Debug.LogException(exception);
+                    failure = exception.Message;
+                    break;
+                }
+                if (change == null)
+                    continue;
+                steps.Add(new ObjectEditStep { SplineChange = change });
+                RefreshSplineViews(change);
+                foreach (var issue in plan.Issues)
+                    warnings.Add(issue.Message);
+            }
+
+            if (steps.Count > 0)
+                PushHistory(steps.Count == 1 ? steps[0] : new ObjectEditStep { Group = steps, Description = "Heights of spline #" + id });
+            if (failure != null)
+            {
+                SetStatus("The heights of spline #" + id + " could not be changed: " + failure +
+                          (steps.Count > 0 ? " The change before it was saved; Ctrl+Z undoes it." : string.Empty));
+                return;
+            }
+            if (steps.Count == 0)
+            {
+                SetStatus("The heights of spline #" + id + " are unchanged.");
+                return;
+            }
+            var joined = new List<string>();
+            foreach (var step in steps)
+                foreach (var changedId in step.SplineChange.SplineIds)
+                    if (changedId != id && !joined.Contains("#" + changedId))
+                        joined.Add("#" + changedId);
+            SetStatus("Changed the heights of spline #" + id + (joined.Count > 0 ? " and " + string.Join(", ", joined) : string.Empty) +
+                      (warnings.Count > 0 ? "; " + string.Join("; ", warnings) : ".") + " Ctrl+Z takes it back.");
         }
 
         /// <summary>Fits the terrain to the road of the selected spline, or stops fitting it, as one undo step.</summary>
@@ -4625,6 +4703,18 @@ namespace OmsiMapEditor.UI
             return field;
         }
 
+        /// <summary>The spline joined at an end of the selected spline: by ID, or touching it without one, or open.</summary>
+        private string DescribeJoin(OmsiSplineRecord spline, bool atEnd)
+        {
+            var id = atEnd ? spline.NextId : spline.PreviousId;
+            if (id != 0)
+                return "#" + id;
+            var touching = selectedSplineTile == null || currentSummary == null
+                ? null
+                : OmsiSplineEditing.Neighbour(currentSummary, new OmsiSplineEnd(selectedSplineTile, spline, atEnd));
+            return touching == null ? "open" : "#" + touching.Spline.Id + " (touching, no ID)";
+        }
+
         /// <summary>The selected spline: its profile, geometry, heights and neighbours, and the way to delete it.</summary>
         private void AddSplineDetails(VisualElement container, OmsiSplineRecord spline)
         {
@@ -4640,12 +4730,28 @@ namespace OmsiMapEditor.UI
                        spline.HeadingDegrees.ToString("F1") + "°\n" +
                        "Height " + spline.Height.ToString("F2") + " to " + spline.EndHeight.ToString("F2") + " m  •  mean gradient " +
                        gradient.ToString("F1") + " %\n" +
-                       "Joined at start: " + (spline.PreviousId == 0 ? "open" : "#" + spline.PreviousId) + "  •  at end: " +
-                       (spline.NextId == 0 ? "open" : "#" + spline.NextId) +
+                       "Joined at start: " + DescribeJoin(spline, false) + "  •  at end: " + DescribeJoin(spline, true) +
                        (spline.AlignsTerrain ? "\nTerrain fitted to it" + (session != null && session.IsBuiltHere(spline) ? " by this editor" : " (original map)") : string.Empty);
             var details = new Label(text);
             details.AddToClassList("inspector-edit-name");
             editor.Add(details);
+            if (CanEdit)
+            {
+                var startField = AddEditField(editor, "Start height", spline.Height);
+                var endField = AddEditField(editor, "End height", spline.EndHeight);
+                var apply = new Button(() =>
+                {
+                    if (TryParseField(startField, "Start height", out var start) && TryParseField(endField, "End height", out var end))
+                        SetSplineHeights(start, end);
+                })
+                {
+                    text = "Apply heights",
+                    tooltip = "Raises or lowers the ends of this spline together with the splines joined there; their other ends keep their height."
+                };
+                apply.AddToClassList("map-control-button");
+                apply.AddToClassList("inspector-edit-apply");
+                editor.Add(apply);
+            }
             if (CanEdit && session.IsBuiltHere(spline))
             {
                 var aligned = spline.AlignsTerrain;

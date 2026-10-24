@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -49,6 +50,15 @@ namespace OmsiMapEditor.OMSI
     {
         /// <summary>Headings closer than this meet without a kink.</summary>
         private const double KinkToleranceDegrees = 2.0;
+
+        /// <summary>Spline ends closer than this meet, even when neither names the other as its neighbour.</summary>
+        private const double TouchToleranceMeters = 0.05;
+
+        /// <summary>A touching spline end continues the road when it turns by at most this much; more is a branch.</summary>
+        private const double TouchTurnDegrees = 45.0;
+
+        /// <summary>Gradients closer than this, in percentage points, meet without a noticeable bump.</summary>
+        private const double GradientChangeTolerancePercent = 0.5;
 
         /// <summary>A joined spline that would turn by more than this to stay tangential keeps its far heading instead.</summary>
         private const double MaximumTangentialTurnDegrees = 90.0;
@@ -134,6 +144,120 @@ namespace OmsiMapEditor.OMSI
             return move;
         }
 
+        /// <summary>
+        /// Plans a new height for a spline end and for the spline joined there; positions and shapes stay. Each changed
+        /// spline keeps the height at its other end, and where that end is joined also its gradient there, so the road
+        /// beyond stays smooth. OMSI changes a spline's gradient evenly along it, so with both other ends joined the two
+        /// splines meet with different gradients, which is reported; where an other end is free, that spline follows the
+        /// gradient of the joint instead. Gradients steeper than <paramref name="gradientWarningPercent"/> are reported.
+        /// </summary>
+        public static OmsiJointMove PlanJointHeight(OmsiMapSummary summary, OmsiSplineEnd end, double height, double gradientWarningPercent = 10.0)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (end == null)
+                throw new ArgumentNullException(nameof(end));
+            var move = new OmsiJointMove();
+            if (double.IsNaN(height) || double.IsInfinity(height))
+            {
+                move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "The height must be a number.", 0.0, 0.0));
+                return move;
+            }
+            var size = summary.TileSizeMeters;
+            var at = end.Position(size);
+
+            // Travel runs from the far end of the spline through the joint to the far end of its neighbour.
+            var far = new OmsiSplineEnd(end.Tile, end.Spline, !end.AtEnd);
+            var neighbour = Neighbour(summary, end);
+            var neighbourFar = neighbour == null ? null : new OmsiSplineEnd(neighbour.Tile, neighbour.Spline, !neighbour.AtEnd);
+            var farJoined = Neighbour(summary, far) != null;
+            var neighbourFarJoined = neighbourFar != null && Neighbour(summary, neighbourFar) != null;
+            var length = end.Spline.LengthMeters;
+            var rise = (height - far.Height) / length * 100.0;
+            double farGradient, jointGradient, neighbourJointGradient = 0.0, neighbourFarGradient = 0.0;
+            if (neighbour == null)
+            {
+                // A free joint: the spline keeps its gradient at a joined far end, or else rises evenly.
+                farGradient = farJoined ? -far.OutwardGradientPercent : rise;
+                jointGradient = 2.0 * rise - farGradient;
+            }
+            else
+            {
+                var neighbourLength = neighbour.Spline.LengthMeters;
+                var neighbourRise = (neighbourFar.Height - height) / neighbourLength * 100.0;
+                if (farJoined)
+                {
+                    farGradient = -far.OutwardGradientPercent;
+                    jointGradient = 2.0 * rise - farGradient;
+                    if (!neighbourFarJoined)
+                    {
+                        neighbourJointGradient = jointGradient;
+                        neighbourFarGradient = 2.0 * neighbourRise - jointGradient;
+                    }
+                    else
+                    {
+                        neighbourFarGradient = neighbourFar.OutwardGradientPercent;
+                        neighbourJointGradient = 2.0 * neighbourRise - neighbourFarGradient;
+                    }
+                }
+                else if (neighbourFarJoined)
+                {
+                    neighbourFarGradient = neighbourFar.OutwardGradientPercent;
+                    neighbourJointGradient = 2.0 * neighbourRise - neighbourFarGradient;
+                    jointGradient = neighbourJointGradient;
+                    farGradient = 2.0 * rise - jointGradient;
+                }
+                else
+                {
+                    // Both far ends free: the joint takes the gradient from one far end to the other.
+                    jointGradient = (neighbourFar.Height - far.Height) / (length + neighbourLength) * 100.0;
+                    farGradient = 2.0 * rise - jointGradient;
+                    neighbourJointGradient = jointGradient;
+                    neighbourFarGradient = 2.0 * neighbourRise - jointGradient;
+                }
+            }
+
+            AddHeights(move, size, end, height, farGradient, jointGradient);
+            if (neighbour != null)
+            {
+                // The neighbour's gradients run away from the joint; towards it they change sign.
+                AddHeights(move, size, neighbour, height, -neighbourFarGradient, -neighbourJointGradient);
+                var change = Math.Abs(neighbourJointGradient - jointGradient);
+                if (change > GradientChangeTolerancePercent)
+                    move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                        "Spline #" + end.Spline.Id + " and #" + neighbour.Spline.Id + " now meet with gradients " + Percent(change) +
+                        " apart, as both their other ends stay joined.", at.X, at.Y));
+            }
+            foreach (var geometry in move.Splines)
+            {
+                var steepest = Math.Max(Math.Abs(geometry.GradientStartPercent), Math.Abs(geometry.GradientEndPercent));
+                if (steepest > gradientWarningPercent)
+                    move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                        "Spline #" + geometry.Spline.Id + " gets a gradient of " + Percent(steepest) + ", steeper than " +
+                        Percent(gradientWarningPercent) + ".", at.X, at.Y));
+            }
+            return move;
+        }
+
+        /// <summary>
+        /// The new heights of a spline with one end at a joint: gradients are given along travel from its far end to the
+        /// joint and stored the way the record runs.
+        /// </summary>
+        private static void AddHeights(OmsiJointMove move, double size, OmsiSplineEnd joint, double height, double farGradient, double jointGradient)
+        {
+            var spline = joint.Spline;
+            // The record's start is the far end when the joint is the record's end.
+            var startsAtFar = joint.AtEnd;
+            move.Splines.Add(new OmsiSplineGeometry
+            {
+                Tile = joint.Tile, Spline = spline, LocalX = spline.LocalX, LocalY = spline.LocalY,
+                Height = startsAtFar ? new OmsiSplineEnd(joint.Tile, spline, false).Height : height,
+                HeadingDegrees = spline.HeadingDegrees, LengthMeters = spline.LengthMeters, RadiusMeters = spline.RadiusMeters,
+                GradientStartPercent = startsAtFar ? farGradient : -jointGradient,
+                GradientEndPercent = startsAtFar ? jointGradient : -farGradient
+            });
+        }
+
         /// <summary>The middle of a placed spline in world metres, where its handle for bending sits.</summary>
         public static OmsiMapPoint CurvePoint(OmsiTileSummary tile, OmsiSplineRecord spline, double tileSizeMeters)
         {
@@ -158,8 +282,6 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         private static void ReportKink(OmsiJointMove move, OmsiMapSummary summary, OmsiSplineEnd end, double outwardHeading, OmsiMapPoint at)
         {
-            if (end.IsFree)
-                return;
             var other = Neighbour(summary, end);
             if (other == null)
                 return;
@@ -183,7 +305,7 @@ namespace OmsiMapEditor.OMSI
             var farPoint = far.Position(size);
             // Leaving the far end into the spline: opposite to the way a road would leave the spline there.
             var farHeading = far.OutwardHeadingDegrees + 180.0;
-            var farJoined = !far.IsFree;
+            var farJoined = Neighbour(summary, far) != null;
             if (!farJoined)
                 farHeading = OmsiRoadPlanner.ChordHeading(farPoint.X, farPoint.Y, worldX, worldY);
             // The record starts at the far end when the moved end is its end.
@@ -202,7 +324,7 @@ namespace OmsiMapEditor.OMSI
                 Math.Abs(tangentialArrival - arrival) > 180.0)
             {
                 // Pulled back: the neighbour keeps its far end and heading, and bends from there to the joint.
-                var neighbourFarHeading = neighbourFar.IsFree
+                var neighbourFarHeading = Neighbour(summary, neighbourFar) == null
                     ? OmsiRoadPlanner.ChordHeading(neighbourFarPoint.X, neighbourFarPoint.Y, worldX, worldY)
                     : neighbourFar.OutwardHeadingDegrees + 180.0;
                 if (!Plan(move, neighbour.Tile, neighbour.Spline, neighbourFarPoint, neighbourFarHeading, neighbourFar.Height, worldX, worldY,
@@ -219,7 +341,7 @@ namespace OmsiMapEditor.OMSI
             if (!Plan(move, neighbour.Tile, neighbour.Spline, new OmsiMapPoint(worldX, worldY), arrival, nodeHeight, neighbourFarPoint.X,
                     neighbourFarPoint.Y, neighbourFar.Height, size, !neighbour.AtEnd, out var neighbourArrival))
                 return move;
-            if (!neighbourFar.IsFree)
+            if (Neighbour(summary, neighbourFar) != null)
             {
                 // Continuing into the next spline means leaving the neighbour's far end the way that spline goes on.
                 var onwards = neighbourFar.OutwardHeadingDegrees;
@@ -232,12 +354,15 @@ namespace OmsiMapEditor.OMSI
             return move;
         }
 
-        /// <summary>The spline end joined to <paramref name="end"/> by neighbour ID, or null.</summary>
+        /// <summary>
+        /// The spline end joined to <paramref name="end"/>: by neighbour ID, or else one that touches it and continues the
+        /// road (<see cref="Touching"/>); null when there is none.
+        /// </summary>
         public static OmsiSplineEnd Neighbour(OmsiMapSummary summary, OmsiSplineEnd end)
         {
             var id = end.AtEnd ? end.Spline.NextId : end.Spline.PreviousId;
             if (id == 0)
-                return null;
+                return Touching(summary, end);
             var point = end.Position(summary.TileSizeMeters);
             foreach (var tile in summary.Tiles)
                 foreach (var spline in tile.Splines)
@@ -254,6 +379,40 @@ namespace OmsiMapEditor.OMSI
                     return new OmsiSplineEnd(tile, spline, Distance(finish, point) < Distance(start, point));
                 }
             return null;
+        }
+
+        /// <summary>
+        /// The end of another spline lying at <paramref name="end"/> without either naming the other, as splines of the
+        /// original maps often meet at tile borders: within <see cref="TouchToleranceMeters"/>, itself without a neighbour
+        /// ID and leaving the joint the opposite way within <see cref="TouchTurnDegrees"/>, so it continues the road
+        /// rather than branching off. The nearest such end, or null.
+        /// </summary>
+        private static OmsiSplineEnd Touching(OmsiMapSummary summary, OmsiSplineEnd end)
+        {
+            var size = summary.TileSizeMeters;
+            var point = end.Position(size);
+            var outward = end.OutwardHeadingDegrees;
+            OmsiSplineEnd best = null;
+            var bestDistance = TouchToleranceMeters;
+            foreach (var tile in summary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (ReferenceEquals(spline, end.Spline))
+                        continue;
+                    for (var side = 0; side < 2; side++)
+                    {
+                        var candidate = new OmsiSplineEnd(tile, spline, side == 1);
+                        if (!candidate.IsFree)
+                            continue;
+                        var distance = Distance(candidate.Position(size), point);
+                        if (distance > bestDistance ||
+                            Math.Abs(OmsiRoadPlanner.Normalize(candidate.OutwardHeadingDegrees - outward - 180.0)) > TouchTurnDegrees)
+                            continue;
+                        best = candidate;
+                        bestDistance = distance;
+                    }
+                }
+            return best;
         }
 
         /// <summary>
@@ -304,6 +463,11 @@ namespace OmsiMapEditor.OMSI
                 GradientStartPercent = gradient, GradientEndPercent = gradient
             });
             return true;
+        }
+
+        private static string Percent(double value)
+        {
+            return value.ToString("0.0", CultureInfo.InvariantCulture) + " %";
         }
 
         private static double Distance(OmsiMapPoint a, OmsiMapPoint b)

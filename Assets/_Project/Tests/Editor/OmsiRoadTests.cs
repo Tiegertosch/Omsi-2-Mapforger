@@ -1041,6 +1041,136 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(45.24, moved.LengthMeters / moved.RadiusMeters * 180.0 / Math.PI, 0.01);
         }
 
+        [Test]
+        public void RaisingAJointKeepsTheFarEndsAndMeetsSmoothlyWhereOneFarEndIsFree()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 150, 1.0);
+            // Two 20 m pieces north of spline 10, all level at 2 m.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 190, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2, MaximumPieceLength = 20
+            }, null), @"Splines\road.sli", end, null);
+            var tileBefore = session.Workspace.ReadAllBytes("tile_0_0.map");
+            var tile = summary.Tiles[0];
+            var joint = new OmsiSplineEnd(tile, tile.Splines.Single(spline => spline.Id == 10), true);
+
+            var plan = OmsiSplineEditing.PlanJointHeight(summary, joint, 3.0);
+            Assert.IsFalse(plan.HasErrors, string.Join("; ", plan.Issues));
+            Assert.AreEqual(2, plan.Splines.Count);
+            var change = session.UpdateSplines(summary, plan.Splines);
+
+            var spline10 = tile.Splines.Single(spline => spline.Id == 10);
+            var first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var second = tile.Splines.Single(spline => spline.Id == road.SplineIds[1]);
+            Assert.AreEqual(2.0, spline10.Height, 1e-9);
+            Assert.AreEqual(3.0, spline10.EndHeight, 1e-9);
+            Assert.AreEqual(3.0, first.Height, 1e-9);
+            Assert.AreEqual(2.0, first.EndHeight, 1e-9);
+            // The piece beyond keeps meeting level; spline 10, free at its start, follows the gradient of the joint.
+            Assert.AreEqual(0.0, first.GradientAtPercent(first.LengthMeters), 1e-9);
+            Assert.AreEqual(first.GradientAtPercent(0.0), spline10.GradientAtPercent(spline10.LengthMeters), 1e-9);
+            Assert.AreEqual(-10.0, first.GradientAtPercent(0.0), 1e-9);
+            Assert.AreEqual(2.0, second.Height, 1e-9);
+            Assert.That(plan.Issues.Select(issue => issue.Message), Has.Some.Contains("steeper than 10.0 %"));
+            Assert.That(plan.Issues.Select(issue => issue.Message), Has.None.Contains("apart"));
+            var continuity = OmsiSplineContinuity.Check(session.Read());
+            Assert.AreEqual(continuity.LinkCount, continuity.ConnectedCount);
+
+            session.Undo(summary, change);
+            CollectionAssert.AreEqual(tileBefore, session.Workspace.ReadAllBytes("tile_0_0.map"));
+        }
+
+        [Test]
+        public void ChangingTheHeightOfAFreeEndKeepsTheGradientAtTheJoinedOtherEnd()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 150, 1.0);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 170, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2
+            }, null), @"Splines\road.sli", end, null);
+            var tile = summary.Tiles[0];
+            var start = new OmsiSplineEnd(tile, tile.Splines.Single(spline => spline.Id == 10), false);
+
+            var plan = OmsiSplineEditing.PlanJointHeight(summary, start, 1.0);
+            var geometry = plan.Splines.Single();
+            Assert.AreEqual(1.0, geometry.Height, 1e-9);
+            // 1 m over 50 m with a level end: the gradient runs from 4 % at the start to 0 at the joined end.
+            Assert.AreEqual(4.0, geometry.GradientStartPercent, 1e-9);
+            Assert.AreEqual(0.0, geometry.GradientEndPercent, 1e-9);
+            Assert.IsEmpty(plan.Issues);
+        }
+
+        [Test]
+        public void RaisingAJointBetweenSplinesJoinedOnBothSidesReportsTheChangeOfGradient()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 150, 1.0);
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 210, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2, MaximumPieceLength = 20
+            }, null), @"Splines\road.sli", end, null);
+            Assert.AreEqual(3, road.SplineIds.Count);
+            var tile = summary.Tiles[0];
+            var first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var joint = new OmsiSplineEnd(tile, first, true);
+
+            var plan = OmsiSplineEditing.PlanJointHeight(summary, joint, 2.5);
+            Assert.AreEqual(2, plan.Splines.Count);
+            session.UpdateSplines(summary, plan.Splines);
+            first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var second = tile.Splines.Single(spline => spline.Id == road.SplineIds[1]);
+            Assert.AreEqual(2.5, first.EndHeight, 1e-9);
+            Assert.AreEqual(2.5, second.Height, 1e-9);
+            Assert.AreEqual(0.0, first.GradientAtPercent(0.0), 1e-9);
+            Assert.AreEqual(0.0, second.GradientAtPercent(second.LengthMeters), 1e-9);
+            // 0.5 m over 20 m with level far ends: +5 % arriving, -5 % leaving.
+            Assert.AreEqual(5.0, first.GradientAtPercent(first.LengthMeters), 1e-9);
+            Assert.AreEqual(-5.0, second.GradientAtPercent(0.0), 1e-9);
+            Assert.That(plan.Issues.Select(issue => issue.Message), Has.Some.Contains("10.0 % apart"));
+        }
+
+        [Test]
+        public void SplinesMeetingEndToEndWithoutNeighbourIdsMoveAndRiseTogether()
+        {
+            // Spline 12 runs 20 m south from 100, 170 and ends where spline 10 ends; neither names the other, as at the
+            // tile borders of Grundorf.
+            WriteUtf16("tile_0_0.map", "[version]", "14", "",
+                "[spline]", "0", @"Splines\road.sli", "10", "0", "0", "100", "0", "100", "0", "50", "0", "0", "0", "0", "0", "0", "0", "0", "",
+                "[spline]", "0", @"Splines\road.sli", "12", "0", "0", "100", "0", "170", "180", "20", "0", "0", "0", "0", "0", "0", "0", "0", "");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var joint = new OmsiSplineEnd(tile, tile.Splines.Single(spline => spline.Id == 10), true);
+
+            var touching = OmsiSplineEditing.Neighbour(summary, joint);
+            Assert.AreEqual(12, touching.Spline.Id);
+            Assert.IsTrue(touching.AtEnd);
+
+            var plan = OmsiSplineEditing.PlanJointHeight(summary, joint, 1.0);
+            Assert.AreEqual(2, plan.Splines.Count);
+            session.UpdateSplines(summary, plan.Splines);
+            var spline10 = tile.Splines.Single(spline => spline.Id == 10);
+            var spline12 = tile.Splines.Single(spline => spline.Id == 12);
+            Assert.AreEqual(1.0, spline10.EndHeight, 1e-9);
+            Assert.AreEqual(1.0, spline12.EndHeight, 1e-9);
+            Assert.AreEqual(0.0, spline10.Height, 1e-9);
+            Assert.AreEqual(0.0, spline12.Height, 1e-9);
+            // Both other ends are free, so the joint takes the gradient from one to the other: level here.
+            Assert.AreEqual(0.0, spline10.GradientAtPercent(spline10.LengthMeters), 1e-9);
+            Assert.AreEqual(0.0, spline12.GradientAtPercent(spline12.LengthMeters), 1e-9);
+
+            var move = OmsiSplineEditing.PlanJointMove(summary, new OmsiSplineEnd(tile, spline10, true), 105, 150);
+            CollectionAssert.AreEquivalent(new[] { 10, 12 }, move.Splines.Select(geometry => geometry.Spline.Id));
+        }
+
         private static bool tileFileHasAlignment(OmsiMapSession session)
         {
             var tileFile = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
