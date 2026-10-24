@@ -23,6 +23,7 @@ namespace OmsiMapEditor.OMSI
             { "worldcoordinates", 0 },
             { "dynhelperactive", 0 },
             { "realrail", 0 },
+            { "LHT", 0 },
             { "backgroundimage", 6 },
             { "mapcam", 8 },
             { "moneysystem", 1 },

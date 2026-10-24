@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -119,6 +120,102 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(OmsiTextEncoding.Utf16LittleEndian, tileEncoding);
             StringAssert.Contains("[version]\r\n14\r\n", tileText);
             Assert.AreEqual(4 + 61 * 61 * 4, File.ReadAllBytes(Path.Combine(target, "tile_0_0.map.terrain")).Length);
+        }
+
+        [Test]
+        public void TakesTheChosenSizeHeightTrafficYearsMoneySeasonsAndGround()
+        {
+            var templatePath = Path.Combine(templateFolder, "global.cfg");
+            var options = OmsiNewMapOptions.FromTemplate(templatePath);
+            Assert.AreEqual(@"Money\DM\DM.cfg", options.MoneySystem);
+            Assert.AreEqual(@"texture\gras.bmp", options.GroundTexture);
+            Assert.IsFalse(options.LeftHandTraffic);
+            options.Description = "Hills and fields.\nLine 1: Town <=> Village";
+            options.Size = 3;
+            options.GroundHeight = 42.5f;
+            options.LeftHandTraffic = true;
+            options.RealRail = true;
+            options.CarTraffic = 0.5;
+            options.PassengerTraffic = 2.0;
+            options.FirstYear = 1990;
+            options.LastYear = 1995;
+            options.YearOffset = -30;
+            options.MoneySystem = @"Money\Euro\Euro.cfg";
+            options.TicketPack = @"TicketPacks\Hamburg\Hamburg.otp";
+            options.Seasons = OmsiSeasonPreset.MildWinter;
+            options.GroundTexture = @"Texture\feld01.bmp";
+
+            var report = OmsiNewMap.Create(templatePath, "Hills", "Hills", options, new DateTime(2026, 10, 24));
+
+            var summary = OmsiMapReader.Read(report.GlobalConfigPath);
+            Assert.AreEqual(9, summary.Tiles.Count);
+            Assert.AreEqual(0, summary.Tiles[0].X);
+            Assert.AreEqual(0, summary.Tiles[0].Y);
+            CollectionAssert.AreEquivalent(new[] { -1, 0, 1 }, summary.Tiles.Select(tile => tile.X).Distinct().ToArray());
+            CollectionAssert.AreEquivalent(new[] { -1, 0, 1 }, summary.Tiles.Select(tile => tile.Y).Distinct().ToArray());
+            Assert.IsTrue(summary.Tiles.All(tile => tile.HasTerrain && tile.TerrainMinHeight == 42.5f && tile.TerrainMaxHeight == 42.5f));
+            Assert.AreEqual(1, summary.Tiles.Sum(tile => tile.ObjectCount));
+            StringAssert.Contains("Line 1: Town <=> Village", summary.Description);
+
+            var config = OmsiRecordFile.Load(report.GlobalConfigPath, OmsiGlobalConfigLayouts.Instance);
+            OmsiRecord Single(string name) => config.Records.Single(record => record.Name == name);
+            List<OmsiRecord> All(string name) => config.Records.Where(record => record.Name == name).ToList();
+            Assert.AreEqual(1, All("LHT").Count);
+            Assert.AreEqual(1, All("realrail").Count);
+            CollectionAssert.AreEqual(new[] { "1990", "1995" }, Single("years").AllValues().Take(2).ToArray());
+            Assert.AreEqual("-30", Single("realyearoffset").GetField(0));
+            Assert.AreEqual(@"Money\Euro\Euro.cfg", Single("moneysystem").GetField(0));
+            Assert.AreEqual(@"TicketPacks\Hamburg\Hamburg.otp", Single("ticketpack").GetField(0));
+            Assert.AreEqual(@"Texture\feld01.bmp", Single("groundtex").GetField(0));
+            Assert.AreEqual(@"texture\gras_det.bmp", Single("groundtex").GetField(1));
+            // A mild year: four seasons, none with snow, each below its comment; the template's comment is gone.
+            var seasons = All("addseason");
+            CollectionAssert.AreEqual(new[] { "3", "1", "2", "3" }, seasons.Select(season => season.GetField(0)).ToArray());
+            var text = OmsiTextFile.Decode(File.ReadAllBytes(report.GlobalConfigPath), out _);
+            StringAssert.Contains("\r\n Winter:\r\n[addseason]\r\n3\r\n0\r\n75\r\n", text);
+            Assert.AreEqual(4, text.Split(new[] { " Winter:", " Spring:", " Autumn:" }, StringSplitOptions.None).Length - 1);
+            // The template has no curves: the standard day, halved for cars and doubled for passengers.
+            var cars = All("trafficdensity_road");
+            Assert.AreEqual(11, cars.Count);
+            CollectionAssert.AreEqual(new[] { "7.000", "0.750" }, cars[3].AllValues().Take(2).ToArray());
+            CollectionAssert.AreEqual(new[] { "7.000", "2.400" }, All("trafficdensity_passenger")[3].AllValues().Take(2).ToArray());
+            // The entry point stands on the ground, the camera 50 m above it.
+            Assert.AreEqual("42.500", Single("entrypoints").GetField(5));
+            Assert.AreEqual("92.5", Single("mapcam").GetField(3));
+            Assert.AreEqual("tile_0_0.map", All("map")[0].GetField(2));
+            Assert.AreEqual(9, All("map").Count);
+            var check = OmsiMapCheck.Run(summary, new OmsiFolderSource(report.MapFolder), null);
+            Assert.AreEqual(OmsiCheckStatus.Passed, check.Sections.Single(section => section.Title == "Entry points").Status);
+
+            // Summer only takes all seasons out; an unchanged option keeps the template's line.
+            options.Seasons = OmsiSeasonPreset.SummerOnly;
+            options.MoneySystem = @"Money\DM\DM.cfg";
+            var summer = OmsiRecordFile.Parse(OmsiNewMap.CreateGlobalConfig(OmsiRecordFile.Load(templatePath, OmsiGlobalConfigLayouts.Instance), "S", "S",
+                options, DateTime.Now), OmsiGlobalConfigLayouts.Instance);
+            Assert.IsFalse(summer.Records.Any(record => record.Name == "addseason"));
+            StringAssert.DoesNotContain("Winter", OmsiTextFile.Decode(summer.ToBytes(), out _));
+            Assert.AreEqual(@"Money\DM\DM.cfg", summer.Records.Single(record => record.Name == "moneysystem").GetField(0));
+        }
+
+        [Test]
+        public void ListsMoneyTicketsAndGroundTexturesOfTheInstallation()
+        {
+            var root = Directory.GetParent(mapsFolder).FullName;
+            Directory.CreateDirectory(Path.Combine(root, "Money", "DM"));
+            Directory.CreateDirectory(Path.Combine(root, "Money", "Euro"));
+            Directory.CreateDirectory(Path.Combine(root, "TicketPacks", "Berlin_1"));
+            Directory.CreateDirectory(Path.Combine(root, "Texture"));
+            foreach (var file in new[] { @"Money\DM\DM.cfg", @"Money\Euro\Euro.cfg", @"Money\Euro\readme.txt", @"TicketPacks\Berlin_1\Berlin_1.otp",
+                         @"Texture\gras.bmp", @"Texture\gras.dds", @"Texture\gras_det.bmp", @"Texture\feld01.bmp", @"Texture\noise_low.bmp", @"Texture\wall.bmp",
+                         @"Texture\Sand.dds" })
+                File.WriteAllText(Path.Combine(root, file), "x");
+
+            CollectionAssert.AreEqual(new[] { @"Money\DM\DM.cfg", @"Money\Euro\Euro.cfg" }, OmsiNewMapContent.Files(root, "Money", ".cfg"));
+            CollectionAssert.AreEqual(new[] { @"TicketPacks\Berlin_1\Berlin_1.otp" }, OmsiNewMapContent.Files(root, "TicketPacks", ".otp"));
+            Assert.AreEqual(root, OmsiNewMapContent.InstallationOf(Path.Combine(templateFolder, "global.cfg")));
+            // The template's ground first, then ground-like textures, each once, without detail, noise and walls.
+            var template = OmsiRecordFile.Load(Path.Combine(templateFolder, "global.cfg"), OmsiGlobalConfigLayouts.Instance);
+            CollectionAssert.AreEqual(new[] { @"texture\gras.bmp", @"Texture\feld01.bmp", @"Texture\Sand.dds" }, OmsiNewMapContent.GroundTextures(root, template));
         }
 
         [Test]

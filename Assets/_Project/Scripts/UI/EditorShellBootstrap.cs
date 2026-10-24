@@ -168,12 +168,7 @@ namespace OmsiMapEditor.UI
         private Task<OmsiMapCheckReport> checkTask;
         private OmsiMapCheckReport lastCheck;
         private VisualElement newMapDialog;
-        private Label newMapTemplateLabel;
-        private TextField newMapFolderField;
-        private TextField newMapNameField;
-        private Label newMapTargetLabel;
-        private Button newMapConfirmButton;
-        private string newMapTemplatePath;
+        private NewMapDialog newMapForm;
         private Label exportTargetLabel;
         private Button exportConfirmButton;
         private VisualElement editMenu;
@@ -255,13 +250,13 @@ namespace OmsiMapEditor.UI
                 checkCloseButton.clicked += () => HidePopup(checkDialog);
             var newMapMenuItem = root.Q<Button>("new-map-menu-item");
             newMapDialog = root.Q<VisualElement>("new-map-dialog");
-            newMapTemplateLabel = root.Q<Label>("new-map-template-label");
-            newMapFolderField = root.Q<TextField>("new-map-folder-field");
-            newMapNameField = root.Q<TextField>("new-map-name-field");
-            newMapTargetLabel = root.Q<Label>("new-map-target-label");
-            newMapConfirmButton = root.Q<Button>("new-map-confirm-button");
-            var newMapTemplateButton = root.Q<Button>("new-map-template-button");
-            var newMapCancelButton = root.Q<Button>("new-map-cancel-button");
+            if (newMapDialog != null)
+            {
+                newMapForm = new NewMapDialog();
+                newMapForm.Cancelled += () => HidePopup(newMapDialog);
+                newMapForm.CreateRequested += CreateNewMap;
+                newMapDialog.Add(newMapForm);
+            }
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
             var viewMenu = root.Q<VisualElement>("view-menu");
@@ -429,20 +424,6 @@ namespace OmsiMapEditor.UI
                     HidePopup(fileMenu);
                     OpenNewMapDialog(null);
                 };
-            if (newMapTemplateButton != null)
-                newMapTemplateButton.clicked += ChooseNewMapTemplate;
-            newMapFolderField?.RegisterValueChangedCallback(evt =>
-            {
-                // The display name follows the folder name until it is changed by hand.
-                if (newMapNameField != null && newMapNameField.value == evt.previousValue)
-                    newMapNameField.SetValueWithoutNotify(evt.newValue);
-                UpdateNewMapTarget();
-            });
-            newMapNameField?.RegisterValueChangedCallback(_ => UpdateNewMapTarget());
-            if (newMapConfirmButton != null)
-                newMapConfirmButton.clicked += CreateNewMap;
-            if (newMapCancelButton != null)
-                newMapCancelButton.clicked += () => HidePopup(newMapDialog);
             if (openProjectMenuItem != null)
                 openProjectMenuItem.clicked += () =>
                 {
@@ -3567,20 +3548,18 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void OpenNewMapDialog(string templateGlobalConfigPath)
         {
-            if (newMapDialog == null || newMapFolderField == null || newMapNameField == null)
+            if (newMapDialog == null || newMapForm == null)
                 return;
-            newMapTemplatePath = templateGlobalConfigPath ?? currentSummary?.GlobalConfigPath;
-            if (newMapTemplatePath == null)
+            var templatePath = templateGlobalConfigPath ?? currentSummary?.GlobalConfigPath;
+            if (templatePath == null)
                 foreach (var entry in RecentFiles.Load())
                 {
-                    newMapTemplatePath = entry.IsProject ? ProjectMap(entry.Path) : entry.Path;
-                    if (newMapTemplatePath != null && File.Exists(newMapTemplatePath))
+                    templatePath = entry.IsProject ? ProjectMap(entry.Path) : entry.Path;
+                    if (templatePath != null && File.Exists(templatePath))
                         break;
-                    newMapTemplatePath = null;
+                    templatePath = null;
                 }
-            newMapFolderField.SetValueWithoutNotify("New map");
-            newMapNameField.SetValueWithoutNotify("New map");
-            UpdateNewMapTarget();
+            newMapForm.Open(templatePath);
             newMapDialog.style.display = DisplayStyle.Flex;
         }
 
@@ -3597,57 +3576,13 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void ChooseNewMapTemplate()
-        {
-            var path = WindowsFileDialog.OpenFile("Choose a map as template for the new map", WindowsFileDialog.GlobalConfigFilter);
-            if (string.IsNullOrEmpty(path))
-                return;
-            newMapTemplatePath = path;
-            UpdateNewMapTarget();
-        }
-
-        /// <summary>The problem that keeps the new map from being created, or null; also the folder it would go to.</summary>
-        private string NewMapProblem(out string target)
-        {
-            target = null;
-            if (string.IsNullOrEmpty(newMapTemplatePath) || !File.Exists(newMapTemplatePath))
-                return "Choose a map of your OMSI installation as template; the new map goes next to it.";
-            var mapsFolder = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(newMapTemplatePath)));
-            var folderName = newMapFolderField.value ?? string.Empty;
-            var problem = OmsiNewMap.CheckFolderName(mapsFolder, folderName);
-            if (problem != null)
-                return problem;
-            target = Path.Combine(mapsFolder, folderName);
-            return string.IsNullOrWhiteSpace(newMapNameField.value) ? "Enter the name OMSI shows for the new map." : null;
-        }
-
-        private void UpdateNewMapTarget()
-        {
-            if (newMapTargetLabel == null)
-                return;
-            var problem = NewMapProblem(out var target);
-            if (newMapTemplateLabel != null)
-                newMapTemplateLabel.text = string.IsNullOrEmpty(newMapTemplatePath)
-                    ? "No template chosen"
-                    : "Template: " + Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(newMapTemplatePath)));
-            newMapTargetLabel.text = problem ?? "Creates the map folder:\n" + target + "\nThen choose where to save its project.";
-            newMapTargetLabel.EnableInClassList("export-problem", problem != null);
-            newMapConfirmButton?.SetEnabled(problem == null);
-        }
-
         /// <summary>Creates the map, saves a project for it where the user says, and opens it for editing.</summary>
-        private void CreateNewMap()
+        private void CreateNewMap(string templatePath, string folderName, string friendlyName, OmsiNewMapOptions options)
         {
-            var problem = NewMapProblem(out _);
-            if (problem != null)
-            {
-                SetStatus(problem);
-                return;
-            }
             OmsiNewMapReport report;
             try
             {
-                report = OmsiNewMap.Create(newMapTemplatePath, newMapFolderField.value, newMapNameField.value, DateTime.Now);
+                report = OmsiNewMap.Create(templatePath, folderName, friendlyName, options, DateTime.Now);
             }
             catch (Exception exception)
             {
@@ -3660,7 +3595,7 @@ namespace OmsiMapEditor.UI
             try
             {
                 var projectPath = WindowsFileDialog.SaveFile("Save the project of the new map", WindowsFileDialog.ProjectFilter,
-                    WindowsFileDialog.ProjectExtension, SanitizeFileName(newMapFolderField.value) + "." + WindowsFileDialog.ProjectExtension);
+                    WindowsFileDialog.ProjectExtension, SanitizeFileName(folderName) + "." + WindowsFileDialog.ProjectExtension);
                 if (string.IsNullOrEmpty(projectPath))
                 {
                     LoadMap(report.GlobalConfigPath, string.Empty, null, false);
@@ -3678,7 +3613,7 @@ namespace OmsiMapEditor.UI
                 LoadMap(report.GlobalConfigPath, project.projectName, fullProjectPath, false);
                 RememberCurrent();
                 SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template, and the project " +
-                          fullProjectPath + ". Select '" + newMapNameField.value.Trim() + "' in OMSI to try it.");
+                          fullProjectPath + ". Select '" + friendlyName + "' in OMSI to try it.");
             }
             catch (Exception exception)
             {
