@@ -214,7 +214,7 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
-        public void ContinuedRoadKeepsHeightAndHeadingAndReportsKinksAtJoins()
+        public void ContinuedRoadKeepsHeightAndHeadingAndMeetsJoinedRoadsWithoutAKink()
         {
             var terrain = new FakeTerrain((x, y) => 0.02 * y);
             var first = OmsiRoadPlanner.Plan(new OmsiRoadRequest { StartX = 0, StartY = 0, EndX = 0, EndY = 40 }, terrain);
@@ -226,18 +226,63 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(first.EndHeadingDegrees, second.Pieces[0].HeadingDegrees, 1e-12);
             CollectionAssert.IsEmpty(second.Issues.Where(issue => issue.Message.Contains("kink")));
 
-            // Joining a road that continues east at the end: arriving at 90° is smooth, at 45° it is a kink.
+            // Joining a road that continues east at the end: arriving at 90° fits one arc, which both arcs then lie on.
             var smooth = OmsiRoadPlanner.Plan(new OmsiRoadRequest
             {
                 StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 20, EndY = 20, EndJoinHeadingDegrees = 90, EndHeight = 7
             }, terrain);
             CollectionAssert.IsEmpty(smooth.Issues.Where(issue => issue.Message.Contains("kink")));
             Assert.AreEqual(7.0, smooth.EndHeight, 1e-12);
-            var kinked = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            Assert.IsTrue(smooth.Pieces.All(piece => Math.Abs(piece.RadiusMeters - 20.0) < 1e-9));
+            AssertSmooth(smooth, 20, 20, 90);
+            // Arriving at 45° no single arc fits: two arcs meet both headings, where one arc used to leave a kink of 45°.
+            var twoArcs = OmsiRoadPlanner.Plan(new OmsiRoadRequest
             {
-                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 20, EndY = 20, EndJoinHeadingDegrees = 45
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 20, EndY = 20, EndJoinHeadingDegrees = 45, EndHeight = 7
             }, terrain);
-            Assert.That(kinked.Issues.Select(issue => issue.Message), Has.Some.Contains("kink of 45°"));
+            CollectionAssert.IsEmpty(twoArcs.Issues.Where(issue => issue.Message.Contains("kink")));
+            Assert.AreEqual(45.0, twoArcs.EndHeadingDegrees, 1e-9);
+            Assert.AreEqual(7.0, twoArcs.EndHeight, 1e-9);
+            AssertSmooth(twoArcs, 20, 20, 45);
+            // A road beside the joined one and parallel to it: an S-curve of two arcs turning opposite ways.
+            var sideways = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 10, EndY = 60, EndJoinHeadingDegrees = 0, HeightMode = OmsiRoadHeightMode.Smooth,
+                EndHeight = 1.2
+            }, terrain);
+            CollectionAssert.IsEmpty(sideways.Issues.Where(issue => issue.Severity != OmsiRoadIssueSeverity.Note));
+            Assert.Greater(sideways.Pieces.First().RadiusMeters, 0.0);
+            Assert.Less(sideways.Pieces.Last().RadiusMeters, 0.0);
+            Assert.AreEqual(1.2, sideways.EndHeight, 1e-9);
+            AssertSmooth(sideways, 10, 60, 0);
+            // In line with both headings the road stays straight.
+            var straight = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 0, EndY = 30, EndJoinHeadingDegrees = 0
+            }, terrain);
+            Assert.IsTrue(straight.Pieces.All(piece => piece.RadiusMeters == 0.0));
+            AssertSmooth(straight, 0, 30, 0);
+            // A point straight behind would need an endless radius, with one arc and with two: refused, nothing is built.
+            var behind = OmsiRoadPlanner.Plan(new OmsiRoadRequest { StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 0, EndY = -30 }, terrain);
+            Assert.IsTrue(behind.HasErrors);
+            CollectionAssert.IsEmpty(behind.Pieces);
+            var behindJoined = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 0, EndY = -30, EndJoinHeadingDegrees = 0
+            }, terrain);
+            Assert.That(behindJoined.Issues.Select(issue => issue.Message), Has.Some.Contains("straight behind"));
+            CollectionAssert.IsEmpty(behindJoined.Pieces);
+            // A curve tighter than half the road's width folds its inner edge over: reported, still built.
+            var tight = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 8, EndY = 0, EndJoinHeadingDegrees = 180, HalfWidthMeters = 5.5
+            }, terrain);
+            Assert.That(tight.Issues.Select(issue => issue.Message), Has.Some.Contains("tighter than half the road's width (5.5 m)"));
+            AssertSmooth(tight, 8, 0, 180);
+            Assert.IsFalse(OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 20, EndY = 0, EndJoinHeadingDegrees = 180, HalfWidthMeters = 5.5
+            }, terrain).Issues.Exists(issue => issue.Message.Contains("tighter")));
 
             // With a free start the road is planned from the joined end: it arrives along the joined road and starts at the
             // requested point, its pieces running from start to end and their heights meeting.
@@ -514,6 +559,37 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TerrainIsLeftAloneBeyondARoadEndOnAJunctionAndLiesBelowTheSplineBeforeIt()
+        {
+            // A junction whose one connection point lies at its origin, facing south.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "junction.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n0\r\n180\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\junction.sco", Id = 90, LocalX = 100, LocalY = 260, Height = 2 });
+            // 2 m high at x 100, where the ground lies at 5 m, ending on the junction's point.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+
+            var terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            // Under the road 15 m before the end: 5 cm below the kerb, as everywhere.
+            Assert.AreEqual(2.10, terrain[20, 49], 1e-4);
+            // 5 m before the end, within a grid diagonal: 5 cm below the spline, under the junction's carriageway.
+            Assert.AreEqual(1.95, terrain[20, 51], 1e-4);
+            // Beside it the shoulder stays at the kerb.
+            Assert.AreEqual(2.10, terrain[21, 51], 1e-4);
+            // 5 m beyond the end, inside the junction, the ground stays as it was.
+            Assert.AreEqual(5.0, terrain[20, 53], 1e-4);
+            // The start is free, so slopes still round off around it.
+            Assert.AreEqual(2.10, terrain[20, 39], 1e-4);
+        }
+
+        [Test]
         public void TerrainCanBeFittedToABuiltRoadLaterAndReleasedAgain()
         {
             var session = OpenProject();
@@ -698,6 +774,28 @@ namespace OmsiMapEditor.Tests
         {
             var tileFile = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
             return tileFile.Records.Any(record => record.Name == "spline_terrain_align_2");
+        }
+
+        /// <summary>
+        /// Every piece starts where the one before ends, with its heading and height, and the last ends at the point with
+        /// the heading.
+        /// </summary>
+        private static void AssertSmooth(OmsiRoadPlan plan, double endX, double endY, double endHeading)
+        {
+            for (var index = 0; index < plan.Pieces.Count; index++)
+            {
+                var piece = plan.Pieces[index];
+                piece.PointAt(piece.LengthMeters, out var x, out var y, out var height);
+                var heading = piece.RadiusMeters == 0.0 ? piece.HeadingDegrees : piece.HeadingDegrees + piece.LengthMeters / piece.RadiusMeters * 180.0 / Math.PI;
+                var nextX = index + 1 < plan.Pieces.Count ? plan.Pieces[index + 1].StartX : endX;
+                var nextY = index + 1 < plan.Pieces.Count ? plan.Pieces[index + 1].StartY : endY;
+                var nextHeading = index + 1 < plan.Pieces.Count ? plan.Pieces[index + 1].HeadingDegrees : endHeading;
+                Assert.AreEqual(nextX, x, 1e-6, "x at the end of piece " + index);
+                Assert.AreEqual(nextY, y, 1e-6, "y at the end of piece " + index);
+                Assert.AreEqual(0.0, OmsiRoadPlanner.Normalize(nextHeading - heading), 1e-6, "heading at the end of piece " + index);
+                if (index + 1 < plan.Pieces.Count)
+                    Assert.AreEqual(plan.Pieces[index + 1].StartHeight, height, 1e-6, "height at the end of piece " + index);
+            }
         }
 
         private static double Height(float[] heights, int column, int row)

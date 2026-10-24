@@ -73,6 +73,15 @@ namespace OmsiMapEditor.OMSI
 
         public double EdgeHeight { get; }
 
+        /// <summary>
+        /// True when the start lies on a connection point of an object, such as a junction: the object goes on from there,
+        /// so the terrain beyond the start is left as it is.
+        /// </summary>
+        public bool StartsAtObject { get; set; }
+
+        /// <summary>The same for the end.</summary>
+        public bool EndsAtObject { get; set; }
+
         /// <summary>The centre line, one point per metre or less.</summary>
         internal OmsiMapPoint[] Points { get; }
 
@@ -93,7 +102,10 @@ namespace OmsiMapEditor.OMSI
     /// ground lower than the edge would show there as a wall. Further out the terrain is kept within a slope from the
     /// shoulder, which cuts into higher ground and builds an embankment over lower ground, and beyond it stays as it was. A
     /// grid point under any road takes that road's height, so slopes of neighbouring pieces never lift or lower it; the
-    /// result depends only on the base terrain and the roads.
+    /// result depends only on the base terrain and the roads. Where a road ends on a connection point of an object, such as a
+    /// junction, the object goes on with the carriageway at the height of the spline: the terrain beyond that end stays as it
+    /// is, and under the road within a grid diagonal of it the terrain lies below the spline, so no grid triangle reaching
+    /// into the object rises above its carriageway.
     /// </summary>
     public static class OmsiTerrainShaping
     {
@@ -126,7 +138,7 @@ namespace OmsiMapEditor.OMSI
                         var reach = road.HalfWidth + settings.MaximumReachMeters;
                         if (x < road.MinX - reach || x > road.MaxX + reach || y < road.MinY - reach || y > road.MaxY + reach)
                             continue;
-                        if (Locate(road, x, y, settings, out var place))
+                        if (Locate(road, x, y, shoulder, settings, out var place))
                             near.Add(place);
                     }
                     if (near.Count == 0)
@@ -139,7 +151,7 @@ namespace OmsiMapEditor.OMSI
                         if (place.Outside <= 0.0 && (under == null || place.Outside < under.Outside))
                             under = place;
                     if (under != null)
-                        height = under.EdgeHeight - settings.BelowEdgeMeters;
+                        height = (under.NearObject ? under.RoadHeight : under.EdgeHeight) - settings.BelowEdgeMeters;
                     else
                         foreach (var place in near)
                         {
@@ -165,12 +177,19 @@ namespace OmsiMapEditor.OMSI
 
             public double RoadHeight;
             public double EdgeHeight;
+
+            /// <summary>True within <c>shoulder</c> of an end on a connection point of an object.</summary>
+            public bool NearObject;
         }
 
-        private static bool Locate(OmsiShapedRoad road, double x, double y, OmsiTerrainShapeSettings settings, out Place place)
+        private static bool Locate(OmsiShapedRoad road, double x, double y, double shoulder, OmsiTerrainShapeSettings settings, out Place place)
         {
             place = null;
             if (!Nearest(road, x, y, out var along, out var lateral, out var beyondEnd))
+                return false;
+            var atStart = along < road.Spline.LengthMeters / 2.0;
+            var atObject = atStart ? road.StartsAtObject : road.EndsAtObject;
+            if (beyondEnd && atObject)
                 return false;
             var roadHeight = road.Spline.HeightAt(along);
             // Past the ends the road edge is the end itself, so the slopes round off around it.
@@ -178,7 +197,11 @@ namespace OmsiMapEditor.OMSI
             var outside = Math.Abs(lateral) - edge;
             if (outside > settings.MaximumReachMeters)
                 return false;
-            place = new Place { Outside = outside, RoadHeight = roadHeight, EdgeHeight = roadHeight + road.EdgeHeight };
+            var fromEnd = atStart ? along : road.Spline.LengthMeters - along;
+            place = new Place
+            {
+                Outside = outside, RoadHeight = roadHeight, EdgeHeight = roadHeight + road.EdgeHeight, NearObject = atObject && fromEnd <= shoulder
+            };
             return true;
         }
 

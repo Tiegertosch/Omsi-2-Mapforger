@@ -95,6 +95,10 @@ namespace OmsiMapEditor.UI
 
         // The connection points of the scenery objects of the open map's installation.
         private OmsiJunctionCatalog junctionCatalog;
+        private OmsiSplineProfileCatalog roadProfiles;
+        private string roadProfilesRoot;
+        // Where the selected object is while it is dragged or turned, as in Values(), so its connection points follow; null otherwise.
+        private double[] junctionPreview;
         private string junctionCatalogRoot;
         private OmsiMapPoint? roadPointer;
         private OmsiTerrainSampler roadTerrain;
@@ -525,6 +529,19 @@ namespace OmsiMapEditor.UI
                 mapCanvas.OrientationPreviewed += objectRenderer.PreviewOrientation;
                 mapCanvas.PlacementPreviewed += objectRenderer.SetPlacementPreview;
                 mapCanvas.PreviewEnded += objectRenderer.EndPreview;
+                mapCanvas.MovePreviewed += (items, offsetX, offsetY, offsetHeight) => PreviewJunctionMarkers(item => new[]
+                {
+                    item.LocalX + offsetX, item.LocalY + offsetY, item.Height + offsetHeight, item.HeadingDegrees, item.PitchDegrees, item.BankDegrees
+                });
+                mapCanvas.HeadingPreviewed += (tile, record, heading) => PreviewJunctionMarkers(item => new[]
+                {
+                    item.LocalX, item.LocalY, item.Height, heading, item.PitchDegrees, item.BankDegrees
+                });
+                mapCanvas.OrientationPreviewed += (tile, record, heading, pitch, bank) => PreviewJunctionMarkers(item => new[]
+                {
+                    item.LocalX, item.LocalY, item.Height, heading, pitch, bank
+                });
+                mapCanvas.PreviewEnded += () => PreviewJunctionMarkers(null);
                 mapCanvas.ObjectRenderer = objectRenderer;
                 mapCanvas.GroundHeight = groundRenderer.HeightAt;
             }
@@ -1595,12 +1612,22 @@ namespace OmsiMapEditor.UI
             if (selectedObject != null && selectedTile != null && currentSummary != null && selection.Count <= 1)
             {
                 var catalog = Junctions();
-                var ports = catalog?.Ports(selectedTile, selectedObject, currentSummary.TileSizeMeters);
+                var pose = junctionPreview;
+                var ports = catalog == null ? null
+                    : pose == null ? catalog.Ports(selectedTile, selectedObject, currentSummary.TileSizeMeters)
+                    : catalog.Ports(selectedTile, selectedObject, currentSummary.TileSizeMeters, pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]);
                 if (ports != null && ports.Count > 0)
                     foreach (var check in OmsiJunctionCatalog.Check(currentSummary, ports, null, catalog.PortsAround(currentSummary, selectedTile)))
                         markers.Add(Marker(check));
             }
             mapCanvas.SetJunctionMarkers(markers);
+        }
+
+        /// <summary>Moves the connection points of the selected object along while it is dragged or turned; null ends that.</summary>
+        private void PreviewJunctionMarkers(Func<OmsiObjectRecord, double[]> pose)
+        {
+            junctionPreview = pose != null && selectedObject != null ? pose(selectedObject) : null;
+            RefreshJunctionMarkers();
         }
 
         private static JunctionMarker Marker(OmsiJunctionPortCheck check)
@@ -1706,9 +1733,25 @@ namespace OmsiMapEditor.UI
                 EndHeight = endJoin?.Height ?? endPort?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
                 // Driving into the joined spline or junction continues opposite to the way a road would leave it.
                 EndJoinHeadingDegrees = endJoin != null ? endJoin.OutwardHeadingDegrees + 180.0
-                    : endPort != null ? endPort.OutwardHeadingDegrees + 180.0 : (double?)null
+                    : endPort != null ? endPort.OutwardHeadingDegrees + 180.0 : (double?)null,
+                HalfWidthMeters = RoadProfileHalfWidth()
             };
             return OmsiRoadPlanner.Plan(request, roadTerrain);
+        }
+
+        /// <summary>Half the width of the chosen road profile, or null when there is none or it cannot be read.</summary>
+        private double? RoadProfileHalfWidth()
+        {
+            if (roadPanel?.Profile == null || currentSummary == null)
+                return null;
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            if (roadProfiles == null || !string.Equals(root, roadProfilesRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                roadProfiles = new OmsiSplineProfileCatalog(root);
+                roadProfilesRoot = root;
+            }
+            var profile = roadProfiles.Get(roadPanel.Profile);
+            return profile != null && profile.RightEdge > profile.LeftEdge ? Math.Max(-profile.LeftEdge, profile.RightEdge) : (double?)null;
         }
 
         /// <summary>Plans the road to the pointer and shows it, or the spline end a click would start from.</summary>

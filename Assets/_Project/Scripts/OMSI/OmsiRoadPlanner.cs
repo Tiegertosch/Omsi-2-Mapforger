@@ -135,6 +135,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Smooth roads follow the terrain averaged over this many metres.</summary>
         public double SmoothingMeters { get; set; } = 100.0;
+
+        /// <summary>
+        /// Half the width of the road's profile, or null when unknown: an arc tighter than this folds its inner edge over,
+        /// in OMSI as here, and is reported.
+        /// </summary>
+        public double? HalfWidthMeters { get; set; }
     }
 
     /// <summary>A road as it would be built: its pieces, where it ends and what should be checked.</summary>
@@ -172,6 +178,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A road this far above the terrain is noted, as it would need a bridge or embankment.</summary>
         private const double AboveTerrainNote = 3.0;
 
+        /// <summary>An arc turning further than this is refused: its radius grows without bound as the turn nears a full circle.</summary>
+        private const double MaximumTurnDegrees = 350.0;
+
         /// <summary>Headings closer than this meet without a kink.</summary>
         private const double JoinToleranceDegrees = 2.0;
 
@@ -194,7 +203,8 @@ namespace OmsiMapEditor.OMSI
                     StartX = request.EndX, StartY = request.EndY, StartHeadingDegrees = request.EndJoinHeadingDegrees.Value + 180.0,
                     StartHeight = request.EndHeight, EndX = request.StartX, EndY = request.StartY, EndHeight = request.StartHeight,
                     HeightMode = request.HeightMode, MaximumPieceLength = request.MaximumPieceLength,
-                    GradientWarningPercent = request.GradientWarningPercent, SmoothingMeters = request.SmoothingMeters
+                    GradientWarningPercent = request.GradientWarningPercent, SmoothingMeters = request.SmoothingMeters,
+                    HalfWidthMeters = request.HalfWidthMeters
                 }, terrain), request);
             var plan = new OmsiRoadPlan();
             if (!AllFinite(request.StartX, request.StartY, request.EndX, request.EndY))
@@ -211,47 +221,84 @@ namespace OmsiMapEditor.OMSI
             }
 
             var heading = request.StartHeadingDegrees ?? ChordHeading(request.StartX, request.StartY, request.EndX, request.EndY);
-            TangentArc(request.StartX, request.StartY, heading, request.EndX, request.EndY, out var length, out var radius, out var endHeading);
+            // With a heading at both ends one arc would meet the end with a kink, which leaves a gap at the joint where OMSI
+            // draws each spline square to its own end; two arcs meet both headings without one.
+            var arcs = request.StartHeadingDegrees.HasValue && request.EndJoinHeadingDegrees.HasValue
+                ? Biarc(request.StartX, request.StartY, heading, request.EndX, request.EndY, request.EndJoinHeadingDegrees.Value)
+                : new List<OmsiSplinePiece> { Arc(request.StartX, request.StartY, heading, request.EndX, request.EndY) };
+            var length = 0.0;
+            foreach (var arc in arcs)
+            {
+                length += arc.LengthMeters;
+                // A point straight behind the heading would need an endless radius.
+                if (arc.RadiusMeters != 0.0 && Math.Abs(arc.LengthMeters / arc.RadiusMeters) * 180.0 / Math.PI > MaximumTurnDegrees)
+                {
+                    plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "The point lies almost straight behind the road; set a point beside it first.",
+                        request.EndX, request.EndY));
+                    return plan;
+                }
+                if (arc.RadiusMeters != 0.0 && request.HalfWidthMeters.HasValue && Math.Abs(arc.RadiusMeters) < request.HalfWidthMeters.Value)
+                    plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                        "The curve radius of " + Meters(Math.Abs(arc.RadiusMeters)) + " is tighter than half the road's width (" + Meters(request.HalfWidthMeters.Value) +
+                        "); its inner edge folds over.", arc.StartX, arc.StartY));
+                if (Math.Abs(arc.RadiusMeters) > 0.0 && arc.LengthMeters > Math.PI * Math.Abs(arc.RadiusMeters))
+                    plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning, "The curve turns by more than half a circle; set a point in between.",
+                        request.EndX, request.EndY));
+            }
+            var endHeading = EndHeading(arcs[arcs.Count - 1]);
             plan.LengthMeters = length;
             plan.EndHeadingDegrees = endHeading;
-            if (Math.Abs(radius) > 0.0 && length > Math.PI * Math.Abs(radius))
-                plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning, "The curve turns by more than half a circle; set a point in between.",
-                    request.EndX, request.EndY));
 
-            var count = Math.Max(1, (int)Math.Ceiling(length / Math.Max(1.0, request.MaximumPieceLength)));
-            var full = new OmsiSplinePiece { StartX = request.StartX, StartY = request.StartY, HeadingDegrees = heading, LengthMeters = length, RadiusMeters = radius };
-            var boundaries = new double[count + 1, 2];
-            var headings = new double[count + 1];
-            for (var index = 0; index <= count; index++)
+            // Each arc is split into equal pieces of at most the piece length; a piece never reaches over a joint of arcs.
+            var starts = new List<OmsiSplinePiece>();
+            foreach (var arc in arcs)
             {
-                full.PointAt(length * index / count, out var x, out var y, out _);
-                boundaries[index, 0] = x;
-                boundaries[index, 1] = y;
-                headings[index] = radius == 0.0 ? heading : heading + length * index / count / radius * 180.0 / Math.PI;
+                var arcCount = Math.Max(1, (int)Math.Ceiling(arc.LengthMeters / Math.Max(1.0, request.MaximumPieceLength)));
+                for (var index = 0; index < arcCount; index++)
+                {
+                    var along = arc.LengthMeters * index / arcCount;
+                    double x = arc.StartX, y = arc.StartY;
+                    if (index > 0)
+                        arc.PointAt(along, out x, out y, out _);
+                    starts.Add(new OmsiSplinePiece
+                    {
+                        StartX = x, StartY = y, LengthMeters = arc.LengthMeters / arcCount, RadiusMeters = arc.RadiusMeters,
+                        HeadingDegrees = arc.RadiusMeters == 0.0 ? arc.HeadingDegrees : arc.HeadingDegrees + along / arc.RadiusMeters * 180.0 / Math.PI
+                    });
+                }
+            }
+            var count = starts.Count;
+            var boundaries = new double[count + 1, 2];
+            var distances = new double[count + 1];
+            for (var index = 0; index < count; index++)
+            {
+                boundaries[index, 0] = starts[index].StartX;
+                boundaries[index, 1] = starts[index].StartY;
+                distances[index + 1] = distances[index] + starts[index].LengthMeters;
             }
             // The last boundary is the requested end point itself, so the road ends exactly where it was asked to.
             boundaries[count, 0] = request.EndX;
             boundaries[count, 1] = request.EndY;
 
-            var pieceLength = length / count;
             double[] heights;
             double[] gradients;
             if (request.HeightMode == OmsiRoadHeightMode.Smooth)
-                SmoothProfile(request, terrain, full, length, count, plan, out heights, out gradients);
+                SmoothProfile(request, terrain, arcs, distances, plan, out heights, out gradients);
             else
             {
-                heights = Heights(request, terrain, boundaries, count, plan);
+                heights = Heights(request, terrain, boundaries, distances, plan);
                 gradients = null;
             }
             for (var index = 0; index < count; index++)
             {
+                var pieceLength = starts[index].LengthMeters;
                 var even = (heights[index + 1] - heights[index]) / pieceLength * 100.0;
                 var startGradient = gradients?[index] ?? even;
                 var endGradient = gradients?[index + 1] ?? even;
                 plan.Pieces.Add(new OmsiSplinePiece
                 {
-                    StartX = boundaries[index, 0], StartY = boundaries[index, 1], StartHeight = heights[index], HeadingDegrees = headings[index],
-                    LengthMeters = pieceLength, RadiusMeters = radius, GradientStartPercent = startGradient, GradientEndPercent = endGradient
+                    StartX = boundaries[index, 0], StartY = boundaries[index, 1], StartHeight = heights[index], HeadingDegrees = starts[index].HeadingDegrees,
+                    LengthMeters = pieceLength, RadiusMeters = starts[index].RadiusMeters, GradientStartPercent = startGradient, GradientEndPercent = endGradient
                 });
                 var steepest = Math.Abs(startGradient) > Math.Abs(endGradient) ? startGradient : endGradient;
                 plan.MaximumGradientPercent = Math.Max(plan.MaximumGradientPercent, Math.Abs(steepest));
@@ -345,6 +392,71 @@ namespace OmsiMapEditor.OMSI
             endHeadingDegrees = headingDegrees + 2.0 * deflection * 180.0 / Math.PI;
         }
 
+        /// <summary>The tangent arc from a point with a heading to an end point, as a piece without heights.</summary>
+        private static OmsiSplinePiece Arc(double startX, double startY, double headingDegrees, double endX, double endY)
+        {
+            TangentArc(startX, startY, headingDegrees, endX, endY, out var length, out var radius, out _);
+            return new OmsiSplinePiece { StartX = startX, StartY = startY, HeadingDegrees = headingDegrees, LengthMeters = length, RadiusMeters = radius };
+        }
+
+        private static double EndHeading(OmsiSplinePiece piece)
+        {
+            return piece.RadiusMeters == 0.0 ? piece.HeadingDegrees : piece.HeadingDegrees + piece.LengthMeters / piece.RadiusMeters * 180.0 / Math.PI;
+        }
+
+        /// <summary>
+        /// Two arcs from a start with a heading to an end reached with another heading, meeting without a kink: the biarc
+        /// whose arcs have tangent legs of equal length (Ryan Juckett, "Biarc Interpolation"). When one arc already meets
+        /// both headings, both arcs lie on its circle; a straight line in line with both headings stays one piece.
+        /// </summary>
+        public static List<OmsiSplinePiece> Biarc(double startX, double startY, double startHeadingDegrees, double endX, double endY, double endHeadingDegrees)
+        {
+            var t1x = Math.Sin(startHeadingDegrees * Math.PI / 180.0);
+            var t1y = Math.Cos(startHeadingDegrees * Math.PI / 180.0);
+            var t2x = Math.Sin(endHeadingDegrees * Math.PI / 180.0);
+            var t2y = Math.Cos(endHeadingDegrees * Math.PI / 180.0);
+            var vx = endX - startX;
+            var vy = endY - startY;
+            var vv = vx * vx + vy * vy;
+            var denominator = 2.0 * (1.0 - (t1x * t2x + t1y * t2y));
+            double jointX, jointY;
+            if (denominator < 1e-9)
+            {
+                // Both headings alike: in line with them a straight piece; across them two half circles.
+                var along = vx * t2x + vy * t2y;
+                if (Math.Abs(vx * t1y - vy * t1x) < 1e-6 && along > 0.0)
+                    return new List<OmsiSplinePiece> { Arc(startX, startY, startHeadingDegrees, endX, endY) };
+                if (Math.Abs(along) < 1e-9)
+                {
+                    jointX = startX + vx / 2.0;
+                    jointY = startY + vy / 2.0;
+                }
+                else
+                {
+                    var leg = vv / (4.0 * along);
+                    jointX = (startX + endX + leg * (t1x - t2x)) / 2.0;
+                    jointY = (startY + endY + leg * (t1y - t2y)) / 2.0;
+                }
+            }
+            else
+            {
+                var vt = vx * (t1x + t2x) + vy * (t1y + t2y);
+                var leg = (-vt + Math.Sqrt(vt * vt + denominator * vv)) / denominator;
+                jointX = (startX + endX + leg * (t1x - t2x)) / 2.0;
+                jointY = (startY + endY + leg * (t1y - t2y)) / 2.0;
+            }
+            var first = Arc(startX, startY, startHeadingDegrees, jointX, jointY);
+            var second = Arc(jointX, jointY, EndHeading(first), endX, endY);
+            var result = new List<OmsiSplinePiece>();
+            if (first.LengthMeters > 1e-6)
+                result.Add(first);
+            if (second.LengthMeters > 1e-6)
+                result.Add(second);
+            if (result.Count == 0)
+                result.Add(Arc(startX, startY, startHeadingDegrees, endX, endY));
+            return result;
+        }
+
         /// <summary>The heading of the line from start to end; 0 points north and the angle grows clockwise.</summary>
         public static double ChordHeading(double startX, double startY, double endX, double endY)
         {
@@ -362,8 +474,9 @@ namespace OmsiMapEditor.OMSI
             return value;
         }
 
-        private static double[] Heights(OmsiRoadRequest request, IOmsiTerrainHeights terrain, double[,] boundaries, int count, OmsiRoadPlan plan)
+        private static double[] Heights(OmsiRoadRequest request, IOmsiTerrainHeights terrain, double[,] boundaries, double[] distances, OmsiRoadPlan plan)
         {
+            var count = distances.Length - 1;
             var heights = new double[count + 1];
             var known = new bool[count + 1];
             var start = request.StartHeight ?? TerrainHeight(terrain, boundaries[0, 0], boundaries[0, 1]);
@@ -381,7 +494,7 @@ namespace OmsiMapEditor.OMSI
                 var end = request.EndHeight ?? heights[0];
                 for (var index = 1; index <= count; index++)
                 {
-                    heights[index] = heights[0] + (end - heights[0]) * index / count;
+                    heights[index] = heights[0] + (end - heights[0]) * distances[index] / distances[count];
                     known[index] = known[0];
                 }
                 return heights;
@@ -430,9 +543,11 @@ namespace OmsiMapEditor.OMSI
         /// computes them, so height and gradient are continuous. A fixed end height is met by spreading the small
         /// remainder evenly over the gradients after the start.
         /// </summary>
-        private static void SmoothProfile(OmsiRoadRequest request, IOmsiTerrainHeights terrain, OmsiSplinePiece full, double length, int count,
+        private static void SmoothProfile(OmsiRoadRequest request, IOmsiTerrainHeights terrain, List<OmsiSplinePiece> arcs, double[] distances,
             OmsiRoadPlan plan, out double[] heights, out double[] gradients)
         {
+            var count = distances.Length - 1;
+            var length = distances[count];
             // Terrain along the road; samples without terrain take their neighbours' heights and are reported once.
             var samples = Math.Max(2, (int)Math.Ceiling(length / SmoothSampleStep));
             var ground = new double[samples + 1];
@@ -441,7 +556,7 @@ namespace OmsiMapEditor.OMSI
             var reported = false;
             for (var index = 0; index <= samples; index++)
             {
-                full.PointAt(length * index / samples, out var x, out var y, out _);
+                CoursePoint(arcs, length * index / samples, out var x, out var y);
                 if (terrain != null && terrain.TryGetHeight(x, y, out var height))
                 {
                     ground[index] = height;
@@ -502,12 +617,11 @@ namespace OmsiMapEditor.OMSI
 
             heights = new double[count + 1];
             gradients = new double[count + 1];
-            var pieceLength = length / count;
-            // The slope over one piece length, so short bumps between boundaries do not tilt a single boundary.
-            var slopeStep = pieceLength / 2.0;
             for (var index = 0; index <= count; index++)
             {
-                var distance = pieceLength * index;
+                var distance = distances[index];
+                // The slope over one piece length, so short bumps between boundaries do not tilt a single boundary.
+                var slopeStep = (index < count ? distances[index + 1] - distance : distance - distances[index - 1]) / 2.0;
                 var before = Math.Max(0.0, distance - slopeStep);
                 var after = Math.Min(length, distance + slopeStep);
                 gradients[index] = (target(after) - target(before)) / (after - before) * 100.0;
@@ -515,17 +629,34 @@ namespace OmsiMapEditor.OMSI
             gradients[0] = startGradient * 100.0;
             heights[0] = startHeight;
             for (var index = 0; index < count; index++)
-                heights[index + 1] = heights[index] + pieceLength * (gradients[index] + gradients[index + 1]) / 200.0;
+                heights[index + 1] = heights[index] + (distances[index + 1] - distances[index]) * (gradients[index] + gradients[index + 1]) / 200.0;
             if (request.EndHeight.HasValue)
             {
                 // Every gradient after the start changes by the same amount; piece 0 gains it once, the others twice.
-                var change = (endHeight - heights[count]) * 200.0 / (pieceLength * (2 * count - 1));
+                var change = (endHeight - heights[count]) * 200.0 / (2.0 * length - distances[1]);
                 for (var index = 1; index <= count; index++)
                     gradients[index] += change;
                 for (var index = 0; index < count; index++)
-                    heights[index + 1] = heights[index] + pieceLength * (gradients[index] + gradients[index + 1]) / 200.0;
+                    heights[index + 1] = heights[index] + (distances[index + 1] - distances[index]) * (gradients[index] + gradients[index + 1]) / 200.0;
                 heights[count] = endHeight;
             }
+        }
+
+        /// <summary>The position <paramref name="distance"/> metres along consecutive arcs.</summary>
+        private static void CoursePoint(List<OmsiSplinePiece> arcs, double distance, out double x, out double y)
+        {
+            for (var index = 0; index < arcs.Count; index++)
+            {
+                var arc = arcs[index];
+                if (distance <= arc.LengthMeters || index == arcs.Count - 1)
+                {
+                    arc.PointAt(Math.Max(0.0, Math.Min(distance, arc.LengthMeters)), out x, out y, out _);
+                    return;
+                }
+                distance -= arc.LengthMeters;
+            }
+            x = arcs[0].StartX;
+            y = arcs[0].StartY;
         }
 
         /// <summary>0 before 0, 1 after 1 and an S-curve with flat ends in between.</summary>

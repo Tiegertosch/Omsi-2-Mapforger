@@ -133,6 +133,18 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The connection points of one placed object, turned with its heading, pitch and bank.</summary>
         public List<OmsiJunctionPort> Ports(OmsiTileSummary tile, OmsiObjectRecord item, double tileSizeMeters)
         {
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            return Ports(tile, item, tileSizeMeters, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees, item.PitchDegrees, item.BankDegrees);
+        }
+
+        /// <summary>
+        /// The connection points the object would have at another place and orientation, such as while it is being dragged;
+        /// the points still name the object itself.
+        /// </summary>
+        public List<OmsiJunctionPort> Ports(OmsiTileSummary tile, OmsiObjectRecord item, double tileSizeMeters, double localX, double localY, double objectHeight,
+            double headingDegrees, double pitchDegrees, double bankDegrees)
+        {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
             if (item == null)
@@ -141,21 +153,20 @@ namespace OmsiMapEditor.OMSI
             var list = Helpers(item.AssetPath);
             if (list.Count == 0)
                 return result;
-            var origin = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, item.LocalX, item.LocalY, tileSizeMeters);
-            var bank = item.BankDegrees * Math.PI / 180.0;
-            var pitch = item.PitchDegrees * Math.PI / 180.0;
+            var origin = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, localX, localY, tileSizeMeters);
+            var bank = bankDegrees * Math.PI / 180.0;
+            var pitch = pitchDegrees * Math.PI / 180.0;
             for (var index = 0; index < list.Count; index++)
             {
                 var helper = list[index];
-                OmsiTerrainHoleCatalog.Rotate(helper.X, helper.Height, helper.Y, item.HeadingDegrees, item.PitchDegrees, item.BankDegrees,
-                    out var east, out var north);
+                OmsiTerrainHoleCatalog.Rotate(helper.X, helper.Height, helper.Y, headingDegrees, pitchDegrees, bankDegrees, out var east, out var north);
                 // The same turns for the height: bank about the forward axis, then pitch, which lowers the front.
                 var raised = helper.X * Math.Sin(bank) + helper.Height * Math.Cos(bank);
                 var height = raised * Math.Cos(pitch) - helper.Y * Math.Sin(pitch);
                 result.Add(new OmsiJunctionPort
                 {
                     Tile = tile, Object = item, Index = index, ProfilePath = helper.SplinePath, Position = new OmsiMapPoint(origin.X + east, origin.Y + north),
-                    Height = item.Height + height, OutwardHeadingDegrees = Normalize360(item.HeadingDegrees + helper.HeadingDegrees)
+                    Height = objectHeight + height, OutwardHeadingDegrees = Normalize360(headingDegrees + helper.HeadingDegrees)
                 });
             }
             return result;

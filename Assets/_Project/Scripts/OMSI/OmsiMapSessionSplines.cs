@@ -138,6 +138,7 @@ namespace OmsiMapEditor.OMSI
         // Splines with IDs from here on were built in this editor; only their terrain alignment is computed here.
         private int? firstNewId;
         private OmsiSplineProfileCatalog shapeProfiles;
+        private OmsiJunctionCatalog shapeJunctions;
 
         /// <summary>How the terrain is fitted to roads built with terrain alignment.</summary>
         public OmsiTerrainShapeSettings TerrainShape { get; } = new OmsiTerrainShapeSettings();
@@ -541,11 +542,16 @@ namespace OmsiMapEditor.OMSI
                 {
                     if (!ShapesTerrain(spline))
                         continue;
-                    shapeProfiles = shapeProfiles ?? new OmsiSplineProfileCatalog(
-                        OmsiObjectOutlineCatalog.InstallationRootOfMap(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigPath))));
+                    var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigPath)));
+                    shapeProfiles = shapeProfiles ?? new OmsiSplineProfileCatalog(installation);
+                    shapeJunctions = shapeJunctions ?? new OmsiJunctionCatalog(installation);
                     var profile = shapeProfiles.Get(spline.AssetPath);
                     if (profile != null && profile.RightEdge - profile.LeftEdge > 0.0)
-                        roads.Add(new OmsiShapedRoad(tile, spline, profile, size));
+                        roads.Add(new OmsiShapedRoad(tile, spline, profile, size)
+                        {
+                            StartsAtObject = MeetsObject(summary, new OmsiSplineEnd(tile, spline, false)),
+                            EndsAtObject = MeetsObject(summary, new OmsiSplineEnd(tile, spline, true))
+                        });
                 }
             roads.Sort((left, right) => left.Spline.Id.CompareTo(right.Spline.Id));
 
@@ -573,6 +579,30 @@ namespace OmsiMapEditor.OMSI
                 workspace.Save(path, bytes);
                 change.TerrainTiles.Add(tile);
             }
+        }
+
+        /// <summary>True when a spline end lies on a connection point of a placed object, such as a junction (ADR 024).</summary>
+        private bool MeetsObject(OmsiMapSummary summary, OmsiSplineEnd end)
+        {
+            var size = summary.TileSizeMeters;
+            var position = end.Position(size);
+            var tileX = (int)Math.Floor(position.X / size);
+            var tileY = (int)Math.Floor(position.Y / size);
+            var tolerance = new OmsiJunctionTolerances().PositionMeters;
+            foreach (var tile in summary.Tiles)
+            {
+                if (Math.Abs(tile.X - tileX) > 1 || Math.Abs(tile.Y - tileY) > 1)
+                    continue;
+                foreach (var item in tile.Objects)
+                    foreach (var port in shapeJunctions.Ports(tile, item, size))
+                    {
+                        var dx = port.Position.X - position.X;
+                        var dy = port.Position.Y - position.Y;
+                        if (dx * dx + dy * dy <= tolerance * tolerance)
+                            return true;
+                    }
+            }
+            return false;
         }
 
         private static void Link(EditedFiles files, OmsiSplineEnd join, int newId, List<OmsiTileSummary> tiles)
