@@ -504,18 +504,21 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// The arms of a junction where a road meets an existing one: the existing road's two arms ahead (0°) and back
-        /// (180°), marked main, and one arm per heading of the new road, relative to the existing road's heading.
+        /// The arms of a junction where a road meets an existing one, relative to the existing road's heading: its arms
+        /// ahead (0°) and back (180°), marked main, the one back seeing the road come towards it; then the new road's arms,
+        /// those it arrives on and those it leaves on.
         /// </summary>
         public static List<OmsiJunctionArm> Arms(string mainProfilePath, OmsiSplineProfile mainProfile, string sideProfilePath, OmsiSplineProfile sideProfile,
-            IEnumerable<double> sideHeadings)
+            IEnumerable<double> arriving, IEnumerable<double> leaving)
         {
             var arms = new List<OmsiJunctionArm>
             {
                 new OmsiJunctionArm { HeadingDegrees = 0.0, ProfilePath = mainProfilePath, Profile = mainProfile, Main = true },
-                new OmsiJunctionArm { HeadingDegrees = 180.0, ProfilePath = mainProfilePath, Profile = mainProfile, Main = true }
+                new OmsiJunctionArm { HeadingDegrees = 180.0, ProfilePath = mainProfilePath, Profile = mainProfile, Main = true, Mirrored = true }
             };
-            foreach (var heading in sideHeadings)
+            foreach (var heading in arriving)
+                arms.Add(new OmsiJunctionArm { HeadingDegrees = (heading % 360.0 + 360.0) % 360.0, ProfilePath = sideProfilePath, Profile = sideProfile, Mirrored = true });
+            foreach (var heading in leaving)
                 arms.Add(new OmsiJunctionArm { HeadingDegrees = (heading % 360.0 + 360.0) % 360.0, ProfilePath = sideProfilePath, Profile = sideProfile });
             return arms;
         }

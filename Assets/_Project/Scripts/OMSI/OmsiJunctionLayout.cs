@@ -11,7 +11,10 @@ namespace OmsiMapEditor.OMSI
     {
         public double RoadHeight { get; private set; }
 
-        /// <summary>The carriageway reaches this far left and right of the spline, in metres, both positive.</summary>
+        /// <summary>
+        /// The carriageway reaches this far left and right of the spline, in metres; positive on its own side, negative when
+        /// the carriageway lies wholly on the other side, as on one carriageway of a dual road drawn from its median.
+        /// </summary>
         public double RoadLeft { get; private set; }
 
         public double RoadRight { get; private set; }
@@ -43,11 +46,49 @@ namespace OmsiMapEditor.OMSI
         public double KerbU1 { get; private set; }
         public double KerbVPerMeter { get; private set; }
 
+        /// <summary>A rise of more than this is a kerb; less, such as a gutter or the camber of a road, stays carriageway.</summary>
+        private const double KerbRise = 0.03;
+
+        /// <summary>
+        /// The median between the carriageways of a dual road, its left and right edge in metres right of the spline, at
+        /// the kerbs; NaN without one.
+        /// </summary>
+        public double MedianLeft { get; private set; } = double.NaN;
+
+        public double MedianRight { get; private set; } = double.NaN;
+
+        public bool HasMedian => !double.IsNaN(MedianLeft);
+
+        /// <summary>
+        /// The carriageway on one side of the median only, up to its kerb, with no pavement on that side, for a junction
+        /// that leaves the median and the far carriageway running through.
+        /// </summary>
+        internal OmsiProfileSections NearHalf(bool right)
+        {
+            var half = (OmsiProfileSections)MemberwiseClone();
+            if (right)
+            {
+                half.RoadLeft = -MedianRight;
+                half.OuterLeft = half.RoadLeft;
+            }
+            else
+            {
+                half.RoadRight = MedianLeft;
+                half.OuterRight = half.RoadRight;
+            }
+            half.MedianLeft = double.NaN;
+            half.MedianRight = double.NaN;
+            return half;
+        }
+
         public bool HasPavements => PavementTexture >= 0 && (OuterLeft > RoadLeft + 0.05 || OuterRight > RoadRight + 0.05);
 
         /// <summary>
-        /// Reads the sections of a profile: the carriageway is the level run of strips through the spline, a kerb an upright
-        /// strip at its edge, a pavement the level strips beyond it. Profiles without a level run through the spline have none.
+        /// Reads the sections of a profile. The carriageway reaches over every lane for vehicles, from the outermost on the
+        /// left to the outermost on the right, and on over level strips at its height beside them such as gutters; a median
+        /// between lanes becomes carriageway, as it does in a junction. Its surface is the strip under the lane nearest the
+        /// spline. A kerb is an upright strip, a pavement the raised level strip next to the carriageway. A profile without
+        /// lanes for vehicles takes the level run of strips through the spline as carriageway.
         /// </summary>
         public static OmsiProfileSections Of(OmsiSplineProfile profile)
         {
@@ -75,20 +116,51 @@ namespace OmsiMapEditor.OMSI
                     }
                 }
 
-            // The carriageway: the level strip through the spline, grown outwards over strips at its height that touch it.
-            var centre = level.FindIndex(pair => pair.Key.X <= 0.0 && pair.Value.X >= 0.0);
-            if (centre < 0)
-                centre = level.FindIndex(pair => true);
-            if (centre < 0)
+            if (level.Count == 0)
                 return sections;
-            var height = level[centre].Key.Height;
-            double left = level[centre].Key.X, right = level[centre].Value.X;
+            // The surface under the vehicle lane nearest the spline, or the level strip through the spline without lanes.
+            double left, right;
+            var middle = 0.0;
+            var vehicleLanes = profile.Lanes.FindAll(lane => lane.Kind == 0 && lane.Width > 0.0);
+            if (vehicleLanes.Count > 0)
+            {
+                left = double.MaxValue;
+                right = double.MinValue;
+                middle = vehicleLanes[0].X;
+                foreach (var lane in vehicleLanes)
+                {
+                    left = Math.Min(left, lane.X - lane.Width / 2.0);
+                    right = Math.Max(right, lane.X + lane.Width / 2.0);
+                    if (Math.Abs(lane.X) < Math.Abs(middle))
+                        middle = lane.X;
+                }
+            }
+            else
+            {
+                left = 0.0;
+                right = 0.0;
+            }
+            var centre = -1;
+            var nearest = double.MaxValue;
+            for (var index = 0; index < level.Count; index++)
+            {
+                var gap = Math.Max(0.0, Math.Max(level[index].Key.X - middle, middle - level[index].Value.X));
+                if (gap < nearest)
+                {
+                    nearest = gap;
+                    centre = index;
+                }
+            }
+            var height = (level[centre].Key.Height + level[centre].Value.Height) / 2.0;
+            left = Math.Min(left, level[centre].Key.X);
+            right = Math.Max(right, level[centre].Value.X);
+            // Grown outwards over level strips at its height that touch it, such as gutters, up to a kerb or a rise.
             for (var grown = true; grown;)
             {
                 grown = false;
                 foreach (var pair in level)
                 {
-                    if (Math.Abs(pair.Key.Height - height) > 0.02 || Math.Abs(pair.Value.Height - height) > 0.02)
+                    if (Math.Abs(pair.Key.Height - height) > KerbRise || Math.Abs(pair.Value.Height - height) > KerbRise)
                         continue;
                     if (pair.Value.X >= left - 0.01 && pair.Key.X < left - 0.01)
                     {
@@ -103,8 +175,54 @@ namespace OmsiMapEditor.OMSI
                 }
             }
             sections.RoadHeight = height;
-            sections.RoadLeft = Math.Max(0.0, -left);
-            sections.RoadRight = Math.Max(0.0, right);
+            sections.RoadLeft = -left;
+            sections.RoadRight = right;
+
+            // A median: the widest gap of at least 0.5 m between neighbouring vehicle lanes running opposite ways, out to the
+            // kerbs over gutters at road height; a gap of road surface only, such as a hatched area, is none.
+            var sorted = new List<OmsiSplineLane>(vehicleLanes);
+            sorted.Sort((a, b) => a.X.CompareTo(b.X));
+            double medianLeft = double.NaN, medianRight = double.NaN, widest = 0.5;
+            for (var index = 1; index < sorted.Count; index++)
+            {
+                var a = sorted[index - 1];
+                var b = sorted[index];
+                var from = a.X + a.Width / 2.0;
+                var to = b.X - b.Width / 2.0;
+                if (to - from >= widest && a.Direction != b.Direction && a.Direction != 2 && b.Direction != 2)
+                {
+                    widest = to - from;
+                    medianLeft = from;
+                    medianRight = to;
+                }
+            }
+            if (!double.IsNaN(medianLeft))
+            {
+                for (var grown = true; grown;)
+                {
+                    grown = false;
+                    foreach (var pair in level)
+                    {
+                        if (Math.Abs(pair.Key.Height - height) > KerbRise || Math.Abs(pair.Value.Height - height) > KerbRise)
+                            continue;
+                        if (pair.Key.X <= medianLeft + 0.01 && pair.Value.X > medianLeft + 0.01 && pair.Value.X <= medianRight)
+                        {
+                            medianLeft = pair.Value.X;
+                            grown = true;
+                        }
+                        if (pair.Value.X >= medianRight - 0.01 && pair.Key.X < medianRight - 0.01 && pair.Key.X >= medianLeft)
+                        {
+                            medianRight = pair.Key.X;
+                            grown = true;
+                        }
+                    }
+                }
+                if (medianRight - medianLeft >= 0.3)
+                {
+                    sections.MedianLeft = medianLeft;
+                    sections.MedianRight = medianRight;
+                }
+            }
             sections.RoadTexture = levelTextures[centre];
             var span = Math.Abs(level[centre].Value.U - level[centre].Key.U);
             if (span > 1e-6)
@@ -116,21 +234,31 @@ namespace OmsiMapEditor.OMSI
             sections.OuterLeft = Math.Max(sections.RoadLeft, -profile.LeftEdge);
             sections.OuterRight = Math.Max(sections.RoadRight, profile.RightEdge);
 
-            // A pavement: the level strip just beyond the carriageway, on either side, above it.
+            // A pavement: the raised level strip next to the carriageway, on either side, the nearest one.
+            var pavement = -1;
+            var pavementGap = 1.0;
             for (var index = 0; index < level.Count; index++)
             {
                 var pair = level[index];
-                var outside = pair.Key.X >= right - 0.01 || pair.Value.X <= left + 0.01;
-                if (!outside || pair.Key.Height <= height + 0.02)
+                if (Math.Min(pair.Key.Height, pair.Value.Height) <= height + KerbRise)
                     continue;
-                sections.PavementTexture = levelTextures[index];
+                var gap = pair.Key.X >= right - 0.05 ? pair.Key.X - right : pair.Value.X <= left + 0.05 ? left - pair.Value.X : double.MaxValue;
+                if (gap < pavementGap)
+                {
+                    pavementGap = gap;
+                    pavement = index;
+                }
+            }
+            if (pavement >= 0)
+            {
+                var pair = level[pavement];
+                sections.PavementTexture = levelTextures[pavement];
                 sections.PavementHeight = pair.Key.Height;
-                var inner = pair.Key.X >= right - 0.01 ? pair.Key : pair.Value;
-                var outer = pair.Key.X >= right - 0.01 ? pair.Value : pair.Key;
+                var inner = pair.Key.X >= right - 0.05 ? pair.Key : pair.Value;
+                var outer = pair.Key.X >= right - 0.05 ? pair.Value : pair.Key;
                 sections.PavementU0 = inner.U;
                 sections.PavementU1 = outer.U;
                 sections.PavementVPerMeter = inner.VPerMeter;
-                break;
             }
             if (sections.PavementTexture < 0)
             {
@@ -154,6 +282,12 @@ namespace OmsiMapEditor.OMSI
         /// roads keep theirs from its kerb outwards. Without one, an arm with an arm opposite counts.
         /// </summary>
         public bool Main { get; set; }
+
+        /// <summary>
+        /// True when the road runs towards the junction on this arm, against the arm's heading: its profile is then turned
+        /// over as seen from the arm, which matters for profiles that differ left and right.
+        /// </summary>
+        public bool Mirrored { get; set; }
 
         /// <summary>Distance from the centre to the connection point, set by the layout.</summary>
         public double Length { get; internal set; }
@@ -217,7 +351,13 @@ namespace OmsiMapEditor.OMSI
             if (arms == null)
                 throw new ArgumentNullException(nameof(arms));
             var layout = new OmsiJunctionLayout();
-            layout.Arms.AddRange(arms);
+            // Arms whose road runs towards the junction see their profile turned over.
+            foreach (var arm in arms)
+                layout.Arms.Add(new OmsiJunctionArm
+                {
+                    HeadingDegrees = arm.HeadingDegrees, ProfilePath = arm.ProfilePath, Main = arm.Main, Mirrored = arm.Mirrored,
+                    Profile = arm.Mirrored && arm.Profile != null ? arm.Profile.Mirrored() : arm.Profile
+                });
             if (layout.Arms.Count < 2)
                 throw new ArgumentException("A junction needs at least two arms.", nameof(arms));
             layout.Arms.Sort((a, b) => Normalize360(a.HeadingDegrees).CompareTo(Normalize360(b.HeadingDegrees)));
@@ -231,6 +371,14 @@ namespace OmsiMapEditor.OMSI
                     throw new ArgumentException("The profile " + arm.ProfilePath + " has no carriageway to build a junction from.", nameof(arms));
                 sections.Add(section);
             }
+
+            // Two arms facing away from each other make a transition between their cross-sections.
+            if (layout.Arms.Count == 2 && layout.Opposite(0, 1))
+            {
+                layout.BuildTransition(sections, roadTexture);
+                return layout;
+            }
+            var through = layout.TakeNearHalf(sections);
 
             var count = layout.Arms.Count;
             var corners = new Corner[count];
@@ -251,7 +399,248 @@ namespace OmsiMapEditor.OMSI
             layout.BuildPavements(sections, corners);
             layout.BuildLanes(sections);
             layout.BuildFootpaths(sections, corners);
+            if (through != null)
+                layout.BuildThrough(through);
             return layout;
+        }
+
+        /// <summary>The part of the main road a junction leaves running through: its profile from one bound to the other, along an arm.</summary>
+        private sealed class ThroughPart
+        {
+            public int Ahead;
+            public int Back;
+            public double From;
+            public double To;
+        }
+
+        /// <summary>
+        /// On a main road with a median, a junction whose other arms all lie on one side takes only the carriageway on that
+        /// side, up to the median, and leaves the median and the far carriageway running through, as junctions on dual
+        /// roads are built (left turns would cross the median). Narrows the main arms' sections to that side and returns
+        /// what runs through, or null for a junction across the whole road.
+        /// </summary>
+        private ThroughPart TakeNearHalf(List<OmsiProfileSections> sections)
+        {
+            var mains = new List<int>();
+            var others = new List<int>();
+            for (var index = 0; index < Arms.Count; index++)
+                (Arms[index].Main ? mains : others).Add(index);
+            if (mains.Count != 2 || others.Count == 0 || !Opposite(mains[0], mains[1]))
+                return null;
+            // The arm the main road runs out along, whose profile is as drawn.
+            var ahead = Arms[mains[0]].Mirrored && !Arms[mains[1]].Mirrored ? mains[1] : mains[0];
+            var back = ahead == mains[0] ? mains[1] : mains[0];
+            var drawn = sections[ahead];
+            if (!drawn.HasMedian)
+                return null;
+            var right = true;
+            for (var index = 0; index < others.Count; index++)
+            {
+                var side = OmsiRoadPlanner.Normalize(Arms[others[index]].HeadingDegrees - Arms[ahead].HeadingDegrees) > 0.0;
+                if (index > 0 && side != right)
+                    return null;
+                right = side;
+            }
+            foreach (var main in mains)
+            {
+                var onRight = OmsiRoadPlanner.Normalize(Arms[others[0]].HeadingDegrees - Arms[main].HeadingDegrees) > 0.0;
+                if (!sections[main].HasMedian)
+                    return null;
+                sections[main] = sections[main].NearHalf(onRight);
+            }
+            var profile = Arms[ahead].Profile;
+            return right
+                ? new ThroughPart { Ahead = ahead, Back = back, From = profile.LeftEdge, To = drawn.MedianRight }
+                : new ThroughPart { Ahead = ahead, Back = back, From = drawn.MedianLeft, To = profile.RightEdge };
+        }
+
+        /// <summary>The median and the far carriageway as the road's profile runs, straight through the junction, with their lanes.</summary>
+        private void BuildThrough(ThroughPart part)
+        {
+            var ahead = Arms[part.Ahead];
+            var back = Arms[part.Back];
+            var clipped = ahead.Profile.Clipped(part.From, part.To);
+            var length = ahead.Length + back.Length;
+            var start = Point.Along(ahead, -back.Length, 0.0);
+            var spline = new OmsiSplineRecord { LocalX = start.X, LocalY = start.Y, HeadingDegrees = ahead.HeadingDegrees, LengthMeters = length };
+            foreach (var surface in OmsiSplineSurface.Build(spline, clipped, true))
+            {
+                var mesh = MeshFor(clipped.Textures[surface.TextureIndex].Path, "through");
+                var offset = mesh.Positions.Count / 3;
+                mesh.Positions.AddRange(surface.Positions);
+                mesh.Uvs.AddRange(surface.Uvs);
+                foreach (var index in surface.Triangles)
+                    mesh.Triangles.Add(offset + index);
+            }
+            foreach (var lane in clipped.Lanes)
+            {
+                var against = lane.Direction == 1;
+                var from = Point.Along(ahead, against ? ahead.Length : -back.Length, lane.X);
+                Paths.Add(new OmsiJunctionPath
+                {
+                    X = from.X, Y = from.Y, Height = lane.Height, HeadingDegrees = Normalize360(ahead.HeadingDegrees + (against ? 180.0 : 0.0)),
+                    RadiusMeters = 0.0, LengthMeters = length, Kind = lane.Kind, Width = lane.Width, Direction = lane.Direction == 2 ? 2 : 0
+                });
+            }
+        }
+
+        /// <summary>
+        /// The length of a transition between two cross-sections: four times the largest change of an edge, at least 8 m
+        /// and at most 40 m.
+        /// </summary>
+        public static double TransitionLength(OmsiProfileSections first, OmsiProfileSections second)
+        {
+            return Math.Max(8.0, Math.Min(40.0, 4.0 * EdgeChange(first, second)));
+        }
+
+        /// <summary>
+        /// How far the carriageway or pavement edges of two arms facing away from each other lie apart, at most: zero when
+        /// one road goes on into the other without a step.
+        /// </summary>
+        public static double EdgeChange(OmsiProfileSections first, OmsiProfileSections second)
+        {
+            // Seen along the first arm, the second arm's left and right swap.
+            return Math.Max(Math.Max(Math.Abs(first.RoadLeft - second.RoadRight), Math.Abs(first.RoadRight - second.RoadLeft)),
+                Math.Max(Math.Abs(first.OuterLeft - second.OuterRight), Math.Abs(first.OuterRight - second.OuterLeft)));
+        }
+
+        /// <summary>
+        /// A straight piece from the second arm's cross-section to the first's: carriageway, kerbs and pavements narrow or
+        /// widen in an S without a kink at either end, each half of the carriageway in its road's surface; lanes and
+        /// footpaths lead to the nearest ones on the other side, so a lane that ends merges into its neighbour.
+        /// </summary>
+        private void BuildTransition(List<OmsiProfileSections> sections, string roadTexture)
+        {
+            var first = sections[0];
+            var second = sections[1];
+            var length = TransitionLength(first, second);
+            Arms[0].Length = length / 2.0;
+            Arms[1].Length = length / 2.0;
+            // Along the first arm, from the second arm's end (share 0) to the first's (share 1); right is the first arm's right.
+            const int steps = 16;
+            var roadLeft = new List<Point>();
+            var roadRight = new List<Point>();
+            var outerLeft = new List<Point>();
+            var outerRight = new List<Point>();
+            var roadHeights = new List<double>();
+            var pavementHeights = new List<double>();
+            for (var step = 0; step <= steps; step++)
+            {
+                var share = (double)step / steps;
+                var ease = share * share * (3.0 - 2.0 * share);
+                var along = -length / 2.0 + length * share;
+                roadLeft.Add(Point.Along(Arms[0], along, -Lerp(second.RoadRight, first.RoadLeft, ease)));
+                roadRight.Add(Point.Along(Arms[0], along, Lerp(second.RoadLeft, first.RoadRight, ease)));
+                outerLeft.Add(Point.Along(Arms[0], along, -Lerp(second.OuterRight, first.OuterLeft, ease)));
+                outerRight.Add(Point.Along(Arms[0], along, Lerp(second.OuterLeft, first.OuterRight, ease)));
+                roadHeights.Add(Lerp(second.RoadHeight, first.RoadHeight, ease));
+                pavementHeights.Add(Lerp(second.PavementHeight, first.PavementHeight, ease));
+            }
+
+            // The carriageway: each half in its own road's surface, or one piece when both are alike.
+            if (SameSurface(first, Arms[0], second, Arms[1]))
+                Surface(Outline(roadLeft, roadRight, 0, steps), 0, first, roadTexture);
+            else
+            {
+                Surface(Outline(roadLeft, roadRight, 0, steps / 2), 1, second, roadTexture);
+                Surface(Outline(roadLeft, roadRight, steps / 2, steps), 0, first, roadTexture);
+            }
+
+            // Pavements and kerbs on both sides, in the textures of the arm that has pavements.
+            var section = first.HasPavements ? first : second;
+            var profile = (first.HasPavements ? Arms[0] : Arms[1]).Profile;
+            if (section.HasPavements)
+            {
+                var pavement = MeshFor(profile.Textures[section.PavementTexture].Path, "pavement");
+                var kerb = section.KerbTexture >= 0 ? MeshFor(profile.Textures[section.KerbTexture].Path, "kerb") : null;
+                Strip(pavement, kerb, section, roadLeft, outerLeft, roadHeights, pavementHeights);
+                Strip(pavement, kerb, section, roadRight, outerRight, roadHeights, pavementHeights);
+            }
+
+            // Lanes and footpaths both ways, each to the nearest on the other side, and every one on the other side reached.
+            Connect(Arms[0], Arms[1], 0);
+            Connect(Arms[1], Arms[0], 0);
+            Connect(Arms[0], Arms[1], 1);
+        }
+
+        private static List<Point> Outline(List<Point> left, List<Point> right, int from, int to)
+        {
+            var ring = new List<Point>();
+            for (var index = from; index <= to; index++)
+                ring.Add(left[index]);
+            for (var index = to; index >= from; index--)
+                ring.Add(right[index]);
+            return ring;
+        }
+
+        /// <summary>A pavement band between a kerb line and an outer edge, with its kerb face, along a transition.</summary>
+        private static void Strip(OmsiGeneratedMesh pavement, OmsiGeneratedMesh kerb, OmsiProfileSections section, List<Point> inner, List<Point> outer,
+            List<double> roadHeights, List<double> pavementHeights)
+        {
+            var along = 0.0;
+            for (var point = 0; point < inner.Count; point++)
+            {
+                if (point > 0)
+                    along += inner[point].DistanceTo(inner[point - 1]);
+                // Where a side has no pavement the band has no width; such triangles are left out when added.
+                var start = pavement.Positions.Count / 3;
+                Add(pavement, outer[point], pavementHeights[point], section.PavementU1, along * section.PavementVPerMeter);
+                Add(pavement, inner[point], pavementHeights[point], section.PavementU0, along * section.PavementVPerMeter);
+                if (point > 0)
+                {
+                    AddUpward(pavement, start - 2, start - 1, start);
+                    AddUpward(pavement, start - 1, start + 1, start);
+                }
+                if (kerb != null)
+                {
+                    var kerbStart = kerb.Positions.Count / 3;
+                    Add(kerb, inner[point], pavementHeights[point], section.KerbU0, along * section.KerbVPerMeter);
+                    Add(kerb, inner[point], roadHeights[point], section.KerbU1, along * section.KerbVPerMeter);
+                    if (point > 0)
+                    {
+                        var towards = inner[point].Minus(outer[point]);
+                        AddFacing(kerb, kerbStart - 2, kerbStart - 1, kerbStart, towards);
+                        AddFacing(kerb, kerbStart - 1, kerbStart + 1, kerbStart, towards);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Paths of one kind from the arm <paramref name="from"/> through to <paramref name="to"/>: vehicle lanes (kind 0)
+        /// one way, from each lane in to the nearest lane out and into every lane out from the nearest lane in; footpaths
+        /// (kind 1) once, walked both ways.
+        /// </summary>
+        private void Connect(OmsiJunctionArm from, OmsiJunctionArm to, int kind)
+        {
+            // Lanes in on the first arm and out on the second, side by side across the second arm.
+            var incoming = from.Profile.Lanes.FindAll(lane => lane.Kind == kind && (kind == 1 || lane.Direction != 0));
+            var outgoing = to.Profile.Lanes.FindAll(lane => lane.Kind == kind && (kind == 1 || lane.Direction != 1));
+            if (incoming.Count == 0 || outgoing.Count == 0)
+                return;
+            var pairs = new List<KeyValuePair<OmsiSplineLane, OmsiSplineLane>>();
+            foreach (var lane in incoming)
+                pairs.Add(new KeyValuePair<OmsiSplineLane, OmsiSplineLane>(lane, Nearest(outgoing, -lane.X)));
+            foreach (var lane in outgoing)
+                if (!pairs.Exists(pair => pair.Value == lane))
+                    pairs.Add(new KeyValuePair<OmsiSplineLane, OmsiSplineLane>(Nearest(incoming, -lane.X), lane));
+            foreach (var pair in pairs)
+                AddArcs(Point.Along(from, from.Length, pair.Key.X), from.HeadingDegrees + 180.0, Point.Along(to, to.Length, pair.Value.X), to.HeadingDegrees,
+                    pair.Key.Height, kind, pair.Key.Width, kind == 1 ? 2 : 0, 0);
+        }
+
+        private static OmsiSplineLane Nearest(List<OmsiSplineLane> lanes, double x)
+        {
+            var best = lanes[0];
+            foreach (var lane in lanes)
+                if (Math.Abs(lane.X - x) < Math.Abs(best.X - x))
+                    best = lane;
+            return best;
+        }
+
+        private static double Lerp(double from, double to, double share)
+        {
+            return from + (to - from) * share;
         }
 
         private void BuildCarriageway(List<OmsiProfileSections> sections, Corner[] corners, string roadTexture)
@@ -366,60 +755,77 @@ namespace OmsiMapEditor.OMSI
             return result;
         }
 
+        /// <summary>
+        /// Pavements round each corner, with a kerb face onto the carriageway. Along the straight part of each arm the
+        /// pavement is its road's, so whatever its texture shows, such as a cycle path, runs on straight up to the corner;
+        /// the rounded part takes the pavement of the side road, a plain one where a main road meets it, else the first
+        /// arm's with a pavement. Heights run from one arm's to the other's, so each end meets its road.
+        /// </summary>
         private void BuildPavements(List<OmsiProfileSections> sections, Corner[] corners)
         {
             for (var index = 0; index < corners.Length; index++)
             {
                 var corner = corners[index];
+                var next = (index + 1) % corners.Length;
                 var first = sections[index];
-                var second = sections[(index + 1) % corners.Length];
-                var section = first.HasPavements ? first : second;
-                if (!section.HasPavements || corner.Outer.Count != corner.Kerb.Count)
+                var second = sections[next];
+                if (!first.HasPavements && !second.HasPavements || corner.Outer.Count != corner.Kerb.Count)
                     continue;
-                var profile = (first.HasPavements ? Arms[index] : Arms[(index + 1) % corners.Length]).Profile;
+                // No pavement on either side, as along a median that runs through: no band and no kerb.
+                if (first.OuterRight - first.RoadRight < 0.05 && second.OuterLeft - second.RoadLeft < 0.05)
+                    continue;
+                var round = Arms[index].Main != Arms[next].Main
+                    ? (Arms[index].Main ? next : index)
+                    : (first.HasPavements ? index : next);
+                if (!sections[round].HasPavements)
+                    round = round == index ? next : index;
+
                 var full = new List<Point>();
                 var outer = new List<Point>();
                 full.Add(Point.Along(Arms[index], Arms[index].Length, first.RoadRight));
                 full.AddRange(corner.Kerb);
-                full.Add(Point.Along(Arms[(index + 1) % corners.Length], Arms[(index + 1) % corners.Length].Length, -second.RoadLeft));
+                full.Add(Point.Along(Arms[next], Arms[next].Length, -second.RoadLeft));
                 outer.Add(Point.Along(Arms[index], Arms[index].Length, first.OuterRight));
                 outer.AddRange(corner.Outer);
-                outer.Add(Point.Along(Arms[(index + 1) % corners.Length], Arms[(index + 1) % corners.Length].Length, -second.OuterLeft));
+                outer.Add(Point.Along(Arms[next], Arms[next].Length, -second.OuterLeft));
 
-                var pavement = MeshFor(profile.Textures[section.PavementTexture].Path, "pavement");
-                var kerb = section.KerbTexture >= 0 ? MeshFor(profile.Textures[section.KerbTexture].Path, "kerb") : null;
-                // Pavement and road heights run from one arm's to the other's round the corner, so each end meets its road.
-                var total = 0.0;
+                var distances = new double[full.Count];
                 for (var point = 1; point < full.Count; point++)
-                    total += full[point].DistanceTo(full[point - 1]);
-                var along = 0.0;
-                for (var point = 0; point < full.Count; point++)
+                    distances[point] = distances[point - 1] + full[point].DistanceTo(full[point - 1]);
+                var total = distances[full.Count - 1];
+                for (var segment = 0; segment + 1 < full.Count; segment++)
                 {
-                    if (point > 0)
-                        along += full[point].DistanceTo(full[point - 1]);
-                    var share = total > 1e-9 ? along / total : 0.0;
-                    var pavementHeight = first.PavementHeight + (second.PavementHeight - first.PavementHeight) * share;
-                    var roadHeight = first.RoadHeight + (second.RoadHeight - first.RoadHeight) * share;
+                    // The straight part next to each arm is that arm's; the rest is the rounded part's.
+                    var owner = segment == 0 ? index : segment == full.Count - 2 ? next : round;
+                    if (!sections[owner].HasPavements)
+                        owner = round;
+                    var section = sections[owner];
+                    var profile = Arms[owner].Profile;
+                    var pavement = MeshFor(profile.Textures[section.PavementTexture].Path, "pavement");
+                    var kerb = section.KerbTexture >= 0 ? MeshFor(profile.Textures[section.KerbTexture].Path, "kerb") : null;
                     var start = pavement.Positions.Count / 3;
-                    Add(pavement, outer[point], pavementHeight, section.PavementU1, along * section.PavementVPerMeter);
-                    Add(pavement, full[point], pavementHeight, section.PavementU0, along * section.PavementVPerMeter);
-                    if (point > 0)
+                    var kerbStart = kerb != null ? kerb.Positions.Count / 3 : 0;
+                    foreach (var point in new[] { segment, segment + 1 })
                     {
-                        AddUpward(pavement, start - 2, start - 1, start);
-                        AddUpward(pavement, start - 1, start + 1, start);
+                        var share = total > 1e-9 ? distances[point] / total : 0.0;
+                        var pavementHeight = first.PavementHeight + (second.PavementHeight - first.PavementHeight) * share;
+                        var roadHeight = first.RoadHeight + (second.RoadHeight - first.RoadHeight) * share;
+                        Add(pavement, outer[point], pavementHeight, section.PavementU1, distances[point] * section.PavementVPerMeter);
+                        Add(pavement, full[point], pavementHeight, section.PavementU0, distances[point] * section.PavementVPerMeter);
+                        if (kerb != null)
+                        {
+                            Add(kerb, full[point], pavementHeight, section.KerbU0, distances[point] * section.KerbVPerMeter);
+                            Add(kerb, full[point], roadHeight, section.KerbU1, distances[point] * section.KerbVPerMeter);
+                        }
                     }
+                    AddUpward(pavement, start, start + 1, start + 2);
+                    AddUpward(pavement, start + 1, start + 3, start + 2);
                     if (kerb != null)
                     {
-                        var kerbStart = kerb.Positions.Count / 3;
-                        Add(kerb, full[point], pavementHeight, section.KerbU0, along * section.KerbVPerMeter);
-                        Add(kerb, full[point], roadHeight, section.KerbU1, along * section.KerbVPerMeter);
-                        if (point > 0)
-                        {
-                            // The kerb face looks onto the carriageway, away from the pavement.
-                            var towards = full[point].Minus(outer[point]);
-                            AddFacing(kerb, kerbStart - 2, kerbStart - 1, kerbStart, towards);
-                            AddFacing(kerb, kerbStart - 1, kerbStart + 1, kerbStart, towards);
-                        }
+                        // The kerb face looks onto the carriageway, away from the pavement.
+                        var towards = full[segment].Minus(outer[segment]);
+                        AddFacing(kerb, kerbStart, kerbStart + 1, kerbStart + 2, towards);
+                        AddFacing(kerb, kerbStart + 1, kerbStart + 3, kerbStart + 2, towards);
                     }
                 }
             }
@@ -438,11 +844,16 @@ namespace OmsiMapEditor.OMSI
                         continue;
                     foreach (var inbound in Arms[from].Profile.Lanes)
                     {
+                        // Only lanes on the arm's carriageway; on a dual road the far one runs through.
+                        if (!Within(inbound, sections[from], false))
+                            continue;
                         // Lanes used both ways lead in and out.
                         if (inbound.Kind != 0 || inbound.Direction == 0)
                             continue;
                         foreach (var outbound in Arms[to].Profile.Lanes)
                         {
+                            if (!Within(outbound, sections[to], false))
+                                continue;
                             if (outbound.Kind != 0 || outbound.Direction == 1)
                                 continue;
                             var start = Point.Along(Arms[from], Arms[from].Length, inbound.X);
@@ -465,16 +876,24 @@ namespace OmsiMapEditor.OMSI
                 var second = Arms[(index + 1) % Arms.Count];
                 OmsiSplineLane right = null, left = null;
                 foreach (var lane in first.Profile.Lanes)
-                    if (lane.Kind == 1 && lane.X > 0.0 && (right == null || lane.X > right.X))
+                    if (lane.Kind == 1 && lane.X > 0.0 && Within(lane, sections[index], true) && (right == null || lane.X > right.X))
                         right = lane;
                 foreach (var lane in second.Profile.Lanes)
-                    if (lane.Kind == 1 && lane.X < 0.0 && (left == null || lane.X < left.X))
+                    if (lane.Kind == 1 && lane.X < 0.0 && Within(lane, sections[(index + 1) % Arms.Count], true) && (left == null || lane.X < left.X))
                         left = lane;
                 if (right == null || left == null)
                     continue;
                 AddArcs(Point.Along(first, first.Length, right.X), first.HeadingDegrees + 180.0, Point.Along(second, second.Length, left.X), second.HeadingDegrees,
                     right.Height, 1, right.Width, 2, 0);
             }
+        }
+
+        /// <summary>True when a lane lies on the arm's carriageway, or for footpaths within its outer edges.</summary>
+        private static bool Within(OmsiSplineLane lane, OmsiProfileSections section, bool outer)
+        {
+            var left = outer ? section.OuterLeft : section.RoadLeft;
+            var right = outer ? section.OuterRight : section.RoadRight;
+            return lane.X >= -left - 0.01 && lane.X <= right + 0.01;
         }
 
         private void AddArcs(Point start, double startHeading, Point end, double endHeading, double height, int kind, double width, int direction, int blinker)

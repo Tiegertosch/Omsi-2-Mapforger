@@ -110,13 +110,24 @@ namespace OmsiMapEditor.OMSI
                         throw new InvalidOperationException("The cut road end was not found after cutting.");
                     var port = pair.Value;
                     var position = join.Position(size);
-                    var piece = OmsiRoadPlanner.Plan(new OmsiRoadRequest
-                    {
-                        StartX = position.X, StartY = position.Y, StartHeadingDegrees = join.OutwardHeadingDegrees, StartHeight = join.Height,
-                        EndX = port.Position.X, EndY = port.Position.Y, EndHeight = port.Height, EndJoinHeadingDegrees = port.OutwardHeadingDegrees + 180.0,
-                        HeightMode = OmsiRoadHeightMode.Manual
-                    }, null);
-                    steps.Add(CreateRoad(summary, piece, plan.ProfilePath, join, null, plan.AlignsTerrain));
+                    // The piece runs the way the road does: on from a road ending at the cut, or from the point into a road
+                    // starting there, so profiles that differ left and right stay the right way round.
+                    var piece = join.AtEnd
+                        ? OmsiRoadPlanner.Plan(new OmsiRoadRequest
+                        {
+                            StartX = position.X, StartY = position.Y, StartHeadingDegrees = join.OutwardHeadingDegrees, StartHeight = join.Height,
+                            EndX = port.Position.X, EndY = port.Position.Y, EndHeight = port.Height, EndJoinHeadingDegrees = port.OutwardHeadingDegrees + 180.0,
+                            HeightMode = OmsiRoadHeightMode.Manual
+                        }, null)
+                        : OmsiRoadPlanner.Plan(new OmsiRoadRequest
+                        {
+                            StartX = port.Position.X, StartY = port.Position.Y, StartHeadingDegrees = port.OutwardHeadingDegrees, StartHeight = port.Height,
+                            EndX = position.X, EndY = position.Y, EndHeight = join.Height, EndJoinHeadingDegrees = join.OutwardHeadingDegrees + 180.0,
+                            HeightMode = OmsiRoadHeightMode.Manual
+                        }, null);
+                    steps.Add(join.AtEnd
+                        ? CreateRoad(summary, piece, plan.ProfilePath, join, null, plan.AlignsTerrain)
+                        : CreateRoad(summary, piece, plan.ProfilePath, null, join, plan.AlignsTerrain));
                 }
                 return new OmsiJunctionInsertionResult(steps, placed.Record, new OmsiReference[0]);
             }

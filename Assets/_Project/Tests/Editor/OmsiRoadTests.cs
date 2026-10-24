@@ -789,6 +789,10 @@ namespace OmsiMapEditor.Tests
                 OmsiMapGeometry.GetLocalFrameAt(piece, piece.LengthMeters / 2.0, out var middle, out _);
                 Assert.IsFalse(middle.X > 99 && middle.X < 101 && middle.Y > 223 && middle.Y < 237, "spline " + piece.Id + " runs under the junction");
             }
+            // Every piece runs north as the road did, also the one after the junction, so a profile that differs left and
+            // right stays the right way round.
+            foreach (var piece in summary.Tiles[0].Splines.Where(candidate => candidate.Id >= road.SplineIds[0]))
+                Assert.AreEqual(0.0, OmsiRoadPlanner.Normalize(piece.HeadingDegrees), 1e-6, "spline " + piece.Id);
             var freeEnds = summary.Tiles[0].Splines.Where(candidate => candidate.Id >= road.SplineIds[0])
                 .SelectMany(candidate => new[] { new OmsiSplineEnd(summary.Tiles[0], candidate, false), new OmsiSplineEnd(summary.Tiles[0], candidate, true) })
                 .Count(end => end.IsFree);
@@ -843,7 +847,7 @@ namespace OmsiMapEditor.Tests
 
             // A junction of the road and a street joining at 60°: the road's arms ahead and back are the pair to lay on it.
             var road = profiles.Get(@"Splines\road.sli");
-            var junction = OmsiJunctionGenerator.Junction(OmsiRoadJunctions.Arms(@"Splines\road.sli", road, @"Splines\road.sli", road, new[] { 60.0 }), null, "Joined");
+            var junction = OmsiJunctionGenerator.Junction(OmsiRoadJunctions.Arms(@"Splines\road.sli", road, @"Splines\road.sli", road, new[] { 60.0 }, new double[0]), null, "Joined");
             var helpers = OmsiSceneryObject.Parse(OmsiTextFile.Encode(junction.Sco, OmsiTextEncoding.Windows1252)).SplineHelpers;
             var pair = OmsiRoadJunctions.MainPair(helpers);
             Assert.AreEqual(180.0, Math.Abs(OmsiRoadPlanner.Normalize(helpers[pair[0]].HeadingDegrees)), 1e-6);

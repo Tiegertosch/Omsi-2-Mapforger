@@ -209,6 +209,13 @@ namespace OmsiMapEditor.UI
             planLabel.EnableInClassList("panel-info-warning", problem);
         }
 
+        /// <summary>Chooses a profile by its path relative to the installation, as a click in the list does; for command-line checks.</summary>
+        public void ChooseProfile(string path)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+                SetProfile(path.Trim());
+        }
+
         private void SetProfile(string path)
         {
             Profile = path;

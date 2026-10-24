@@ -169,6 +169,92 @@ namespace OmsiMapEditor.Tests
             "[profile]\r\n0\r\n[profilepnt]\r\n3\r\n0.15\r\n0\r\n0.2\r\n[profilepnt]\r\n5\r\n0.15\r\n1\r\n0.2\r\n" +
             "[path]\r\n0\r\n-1.5\r\n0.1\r\n3\r\n1\r\n[path]\r\n0\r\n1.5\r\n0.1\r\n3\r\n0\r\n";
 
+        // Two carriageways of two lanes each, 3 to 10 m either side, a raised grass median between, pavements beyond.
+        private const string Dual =
+            "[texture]\r\nside.bmp\r\n[texture]\r\nasphalt.bmp\r\n[texture]\r\ngrass.bmp\r\n" +
+            "[profile]\r\n0\r\n[profilepnt]\r\n-13\r\n0.25\r\n0\r\n0.2\r\n[profilepnt]\r\n-10\r\n0.25\r\n1\r\n0.2\r\n" +
+            "[profile]\r\n1\r\n[profilepnt]\r\n-10\r\n0.1\r\n0\r\n0.1\r\n[profilepnt]\r\n-1.5\r\n0.1\r\n1\r\n0.1\r\n" +
+            "[profile]\r\n2\r\n[profilepnt]\r\n-1.5\r\n0.25\r\n0\r\n0.2\r\n[profilepnt]\r\n1.5\r\n0.25\r\n1\r\n0.2\r\n" +
+            "[profile]\r\n1\r\n[profilepnt]\r\n1.5\r\n0.1\r\n0\r\n0.1\r\n[profilepnt]\r\n10\r\n0.1\r\n1\r\n0.1\r\n" +
+            "[profile]\r\n0\r\n[profilepnt]\r\n10\r\n0.25\r\n0\r\n0.2\r\n[profilepnt]\r\n13\r\n0.25\r\n1\r\n0.2\r\n" +
+            "[path]\r\n0\r\n-8\r\n0.1\r\n3.5\r\n1\r\n[path]\r\n0\r\n-4.5\r\n0.1\r\n3.5\r\n1\r\n" +
+            "[path]\r\n0\r\n4.5\r\n0.1\r\n3.5\r\n0\r\n[path]\r\n0\r\n8\r\n0.1\r\n3.5\r\n0\r\n";
+
+        [Test]
+        public void TheCarriagewayOfAWideRoadReachesOverAllItsLanesAcrossTheMedian()
+        {
+            var dual = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Dual), @"Splines\Test\dual.sli");
+
+            var sections = OmsiProfileSections.Of(dual);
+
+            Assert.AreEqual(10.0, sections.RoadLeft, 1e-6);
+            Assert.AreEqual(10.0, sections.RoadRight, 1e-6);
+            Assert.AreEqual(0.1, sections.RoadHeight, 1e-6);
+            Assert.AreEqual("asphalt.bmp", dual.Textures[sections.RoadTexture].Path.Split('\\').Last());
+            Assert.AreEqual(13.0, sections.OuterRight, 1e-6);
+            Assert.AreEqual(0.25, sections.PavementHeight, 1e-6);
+
+            // One carriageway drawn from its median: the spline at the median kerb, lanes from 0.5 to 10.5 m to the right.
+            var half = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(
+                "[texture]\r\nside.bmp\r\n[texture]\r\nasphalt.bmp\r\n" +
+                "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.25\r\n0\r\n0.2\r\n[profilepnt]\r\n0\r\n0.25\r\n1\r\n0.2\r\n" +
+                "[profile]\r\n1\r\n[profilepnt]\r\n0\r\n0.1\r\n0\r\n0.1\r\n[profilepnt]\r\n11\r\n0.1\r\n1\r\n0.1\r\n" +
+                "[profile]\r\n0\r\n[profilepnt]\r\n11\r\n0.25\r\n0\r\n0.2\r\n[profilepnt]\r\n15\r\n0.25\r\n1\r\n0.2\r\n" +
+                "[path]\r\n0\r\n2\r\n0.1\r\n3\r\n0\r\n[path]\r\n0\r\n5.5\r\n0.1\r\n3\r\n0\r\n[path]\r\n0\r\n9\r\n0.1\r\n3\r\n0\r\n"), @"Splines\Test\half.sli");
+
+            sections = OmsiProfileSections.Of(half);
+
+            Assert.AreEqual(0.0, sections.RoadLeft, 1e-6);
+            Assert.AreEqual(11.0, sections.RoadRight, 1e-6);
+            Assert.AreEqual(4.0, sections.OuterLeft, 1e-6);
+            Assert.AreEqual(15.0, sections.OuterRight, 1e-6);
+
+            // Seen from the other way the carriageway lies to the left and its lanes run against the spline.
+            var turned = half.Mirrored();
+            sections = OmsiProfileSections.Of(turned);
+            Assert.AreEqual(11.0, sections.RoadLeft, 1e-6);
+            Assert.AreEqual(0.0, sections.RoadRight, 1e-6);
+            Assert.AreEqual(15.0, sections.OuterLeft, 1e-6);
+            Assert.AreEqual(-15.0, turned.LeftEdge, 1e-6);
+            Assert.AreEqual(4.0, turned.RightEdge, 1e-6);
+            Assert.IsTrue(turned.Lanes.All(lane => lane.X < 0 && lane.Direction == 1));
+        }
+
+        [Test]
+        public void ATeeJunctionOnARoadWithAMedianTakesOnlyTheCarriagewayOnItsSide()
+        {
+            var dual = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Dual), @"Splines\Test\dual.sli");
+            var street = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Cobbled), @"Splines\Test\street.sli");
+            Assert.AreEqual(-1.5, OmsiProfileSections.Of(dual).MedianLeft, 1e-6);
+            Assert.AreEqual(1.5, OmsiProfileSections.Of(dual).MedianRight, 1e-6);
+            // The dual road runs north; a street joins from the east.
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0, ProfilePath = @"Splines\Test\dual.sli", Profile = dual, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 180, ProfilePath = @"Splines\Test\dual.sli", Profile = dual, Main = true, Mirrored = true },
+                new OmsiJunctionArm { HeadingDegrees = 90, ProfilePath = @"Splines\Test\street.sli", Profile = street, Mirrored = true }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            // The junction's carriageway reaches from the eastern kerb to the median; the median and the western
+            // carriageway run through as the road lays them.
+            var road = layout.Meshes.Single(mesh => mesh.Texture == "plain.bmp");
+            Assert.IsTrue(Covers(road, 5, 0) && Covers(road, 2, 3));
+            Assert.IsFalse(Covers(road, 0, 0) || Covers(road, -5, 0));
+            Assert.IsTrue(layout.Meshes.Single(mesh => mesh.Texture == "grass.bmp").Triangles.Count > 0);
+            Assert.IsTrue(Covers(layout.Meshes.Single(mesh => mesh.Texture == "grass.bmp"), 0, 0));
+            Assert.IsTrue(Covers(layout.Meshes.Single(mesh => mesh.Texture == "asphalt.bmp"), -5, 0));
+            // The western lanes run straight through, southbound; nobody turns left across the median.
+            var north = layout.Arms.Single(arm => arm.HeadingDegrees == 0);
+            var south = layout.Arms.Single(arm => arm.HeadingDegrees == 180);
+            Assert.IsTrue(layout.Paths.Any(path => Math.Abs(path.X - -8) < 1e-6 && Math.Abs(path.Y - north.Length) < 1e-6 &&
+                                                   Math.Abs(path.HeadingDegrees - 180) < 1e-6 && Math.Abs(path.LengthMeters - (north.Length + south.Length)) < 1e-6));
+            Assert.IsFalse(layout.Paths.Any(path => path.Blinker == 2));
+            Assert.IsTrue(layout.Paths.Any(path => path.Blinker == 3));
+            Assert.IsFalse(layout.Paths.Any(path => path.Kind == 0 && path.X < -1.5 && path.RadiusMeters != 0.0));
+        }
+
         [Test]
         public void AJunctionOfTwoRoadsKeepsEachSurfaceAndBlendsThePavementsRoundTheCorners()
         {
@@ -202,6 +288,65 @@ namespace OmsiMapEditor.Tests
             var lanes = layout.Paths.Where(path => path.Kind == 0).ToList();
             var into = Along(side, side.Length, -1.5);
             Assert.IsTrue(lanes.Any(path => Math.Abs(path.X - into[0]) < 1e-6 && Math.Abs(path.Y - into[1]) < 1e-6));
+        }
+
+        [Test]
+        public void TheMainRoadsPavementRunsOnStraightAndTheCornersTakeTheSideRoads()
+        {
+            // The main road's pavement texture might show a cycle path; the street has a plain one of its own.
+            var road = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var street = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Cobbled.Replace("side.bmp", "walk.bmp")), @"Splines\Test\street.sli");
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 90, ProfilePath = ProfilePath, Profile = road, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 270, ProfilePath = ProfilePath, Profile = road, Main = true, Mirrored = true },
+                new OmsiJunctionArm { HeadingDegrees = 0, ProfilePath = @"Splines\Test\street.sli", Profile = street, Mirrored = true }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, null);
+
+            var east = layout.Arms.Single(arm => arm.HeadingDegrees == 90);
+            var main = layout.Meshes.Where(mesh => mesh.Texture == "side.bmp").ToList();
+            var plain = layout.Meshes.Where(mesh => mesh.Texture == "walk.bmp").ToList();
+            // Next to the east arm's end, on its north pavement, the road's own pavement; round the corner the street's.
+            Assert.IsTrue(main.Any(mesh => Covers(mesh, east.Length - 0.3, 5.5)));
+            Assert.IsFalse(plain.Any(mesh => Covers(mesh, east.Length - 0.3, 5.5)));
+            Assert.IsTrue(plain.Any(mesh => Covers(mesh, 5.65, 6.28)));
+            Assert.IsFalse(main.Any(mesh => Covers(mesh, 5.65, 6.28)));
+            // Along the straight side of the T the road's pavement runs through.
+            Assert.IsTrue(main.Any(mesh => Covers(mesh, 0, -5.5)));
+        }
+
+        [Test]
+        public void ATransitionNarrowsFromOneRoadToTheOtherAndLeadsEveryLaneOn()
+        {
+            var road = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var street = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Cobbled), @"Splines\Test\street.sli");
+            // The street ahead, the road behind; the road runs towards the transition, the street away from it.
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0, ProfilePath = @"Splines\Test\street.sli", Profile = street },
+                new OmsiJunctionArm { HeadingDegrees = 180, ProfilePath = ProfilePath, Profile = road, Mirrored = true }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            // The pavements' outer edges change most, from 7 m to 5 m: four times that is 8 m, the shortest transition.
+            Assert.IsTrue(layout.Arms.All(arm => Math.Abs(arm.Length - 4.0) < 1e-9));
+            var cobbles = layout.Meshes.Single(mesh => mesh.Texture == "cobbles.bmp");
+            var asphalt = layout.Meshes.Single(mesh => mesh.Texture == "plain.bmp");
+            // Each end has its road's cross-section: cobbles 3 m either side ahead, asphalt 4 m behind.
+            Assert.IsTrue(HasVertex(cobbles, -3, 4, 0, 0.1) && HasVertex(cobbles, 3, 4, 0, 0.1));
+            Assert.IsTrue(HasVertex(asphalt, -4, -4, 0, 0.1) && HasVertex(asphalt, 4, -4, 0, 0.1));
+            Assert.IsTrue(Covers(asphalt, 0, -2) && Covers(cobbles, 0, 2));
+            var pavement = layout.Meshes.First(mesh => mesh.Texture == "side.bmp");
+            Assert.IsTrue(HasVertex(pavement, 5, 4, 0, 0.15) && HasVertex(pavement, 7, -4, 0, 0.25));
+            // A lane each way, driving on the right: northbound in from the road on its east side, southbound in from the
+            // street on its west side, each out on the matching side of the other end.
+            var lanes = layout.Paths.Where(path => path.Kind == 0).ToList();
+            Assert.IsTrue(lanes.Any(path => Math.Abs(path.X - -1.5) < 1e-6 && Math.Abs(path.Y - 4) < 1e-6), "no lane in from the street");
+            Assert.IsTrue(lanes.Any(path => Math.Abs(path.X - 2) < 1e-6 && Math.Abs(path.Y - -4) < 1e-6), "no lane in from the road");
+            Assert.IsTrue(lanes.Any(path => EndsAt(path, 1.5, 4)) && lanes.Any(path => EndsAt(path, -2, -4)));
         }
 
         [Test]

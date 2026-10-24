@@ -98,6 +98,89 @@ namespace OmsiMapEditor.OMSI
         public List<OmsiSplineLane> Lanes { get; } = new List<OmsiSplineLane>();
 
         /// <summary>
+        /// The cross-section turned over, as a spline with "mirror" or one running the other way shows it: left and right
+        /// swap, and lanes along the spline run against it and the other way round.
+        /// </summary>
+        public OmsiSplineProfile Mirrored()
+        {
+            var result = new OmsiSplineProfile
+            {
+                EditorOnly = EditorOnly, LineKind = LineKind, LeftEdge = -RightEdge, RightEdge = -LeftEdge, EdgeHeight = EdgeHeight
+            };
+            result.Textures.AddRange(Textures);
+            foreach (var strip in Strips)
+            {
+                var turned = new OmsiProfileStrip { TextureIndex = strip.TextureIndex };
+                for (var index = strip.Points.Count - 1; index >= 0; index--)
+                {
+                    var point = strip.Points[index];
+                    point.X = -point.X;
+                    turned.Points.Add(point);
+                }
+                result.Strips.Add(turned);
+            }
+            foreach (var hole in TerrainHoles)
+            {
+                var turned = new List<double>();
+                for (var index = hole.Count - 1; index >= 0; index--)
+                    turned.Add(-hole[index]);
+                result.TerrainHoles.Add(turned);
+            }
+            foreach (var lane in Lanes)
+                result.Lanes.Add(new OmsiSplineLane
+                {
+                    Kind = lane.Kind, X = -lane.X, Height = lane.Height, Width = lane.Width,
+                    Direction = lane.Direction == 0 ? 1 : lane.Direction == 1 ? 0 : lane.Direction
+                });
+            return result;
+        }
+
+        /// <summary>
+        /// The part of the cross-section between two distances right of the spline: strips cut at the bounds, upright
+        /// strips within them, and the lanes whose middle lies within them.
+        /// </summary>
+        public OmsiSplineProfile Clipped(double from, double to)
+        {
+            var result = new OmsiSplineProfile { EditorOnly = EditorOnly, LineKind = LineKind, EdgeHeight = EdgeHeight };
+            result.Textures.AddRange(Textures);
+            double left = double.MaxValue, right = double.MinValue;
+            foreach (var strip in Strips)
+                for (var index = 0; index + 1 < strip.Points.Count; index++)
+                {
+                    var a = strip.Points[index];
+                    var b = strip.Points[index + 1];
+                    var low = Math.Min(a.X, b.X);
+                    var high = Math.Max(a.X, b.X);
+                    if (high < from - 1e-6 || low > to + 1e-6)
+                        continue;
+                    var piece = new OmsiProfileStrip { TextureIndex = strip.TextureIndex };
+                    piece.Points.Add(Cut(a, b, Math.Max(from, Math.Min(to, a.X))));
+                    piece.Points.Add(Cut(a, b, Math.Max(from, Math.Min(to, b.X))));
+                    result.Strips.Add(piece);
+                    left = Math.Min(left, Math.Max(from, low));
+                    right = Math.Max(right, Math.Min(to, high));
+                }
+            result.LeftEdge = left == double.MaxValue ? 0.0 : left;
+            result.RightEdge = right == double.MinValue ? 0.0 : right;
+            foreach (var lane in Lanes)
+                if (lane.X >= from && lane.X <= to)
+                    result.Lanes.Add(lane);
+            return result;
+        }
+
+        /// <summary>The point of a profile segment at a distance right of the spline, its height and texture coordinates in proportion.</summary>
+        private static OmsiProfilePoint Cut(OmsiProfilePoint a, OmsiProfilePoint b, double x)
+        {
+            if (Math.Abs(b.X - a.X) < 1e-9)
+                return new OmsiProfilePoint { X = x, Height = a.Height, U = a.U, VPerMeter = a.VPerMeter };
+            var share = (x - a.X) / (b.X - a.X);
+            return new OmsiProfilePoint
+            {
+                X = x, Height = a.Height + (b.Height - a.Height) * share, U = a.U + (b.U - a.U) * share, VPerMeter = a.VPerMeter + (b.VPerMeter - a.VPerMeter) * share
+            };
+        }
+
+        /// <summary>
         /// Reads a .sli file. Texture names are resolved against the <c>texture</c> folder next to
         /// <paramref name="assetPath"/>, the path the tile files use.
         /// </summary>

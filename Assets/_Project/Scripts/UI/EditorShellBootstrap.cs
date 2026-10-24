@@ -833,6 +833,7 @@ namespace OmsiMapEditor.UI
                 while (installationScan != null && !installationScan.IsCompleted && Time.realtimeSinceStartup - scanStarted < 120f)
                     yield return null;
                 yield return null;
+                roadPanel?.ChooseProfile(Argument("-roadProfile", 1));
                 var build = Array.IndexOf(args, "-roadBuild") >= 0;
                 for (var index = 0; index < points.Count; index++)
                 {
@@ -2034,6 +2035,135 @@ namespace OmsiMapEditor.UI
             RefreshAfterChange(null);
         }
 
+        /// <summary>
+        /// The arms of a transition at a free spline end (ADR 028): ahead (0°) the road panel's profile, which the new road
+        /// leaves on or arrives on, behind (180°) the profile of the spline at the end, turned over when that spline runs
+        /// towards the end.
+        /// </summary>
+        private List<OmsiJunctionArm> TransitionArms(OmsiSplineEnd join, bool arriving)
+        {
+            var profiles = RoadProfiles();
+            return new List<OmsiJunctionArm>
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0.0, ProfilePath = roadPanel.Profile, Profile = profiles.Get(roadPanel.Profile), Mirrored = arriving },
+                new OmsiJunctionArm { HeadingDegrees = 180.0, ProfilePath = join.Spline.AssetPath, Profile = profiles.Get(join.Spline.AssetPath), Mirrored = join.AtEnd }
+            };
+        }
+
+        private static OmsiProfileSections SectionsOf(OmsiJunctionArm arm)
+        {
+            return OmsiProfileSections.Of(arm.Mirrored ? arm.Profile.Mirrored() : arm.Profile);
+        }
+
+        /// <summary>True when a road joining a free spline end of another road differs in width from it, so a transition goes between them.</summary>
+        private bool NeedsTransition(OmsiSplineEnd join, bool arriving)
+        {
+            if (join == null || !roadPanel.MakeJunctions || roadPanel.Profile == null || !CanEdit ||
+                string.Equals(join.Spline.AssetPath?.Trim(), roadPanel.Profile.Trim(), StringComparison.OrdinalIgnoreCase))
+                return false;
+            var arms = TransitionArms(join, arriving);
+            if (!OmsiRoadJunctions.IsRoad(arms[0].Profile) || !OmsiRoadJunctions.IsRoad(arms[1].Profile))
+                return false;
+            return OmsiJunctionLayout.EdgeChange(SectionsOf(arms[0]), SectionsOf(arms[1])) >= 0.25;
+        }
+
+        /// <summary>
+        /// Makes a transition from the road panel's profile to the spline at a free end and places it on that end, running on
+        /// from it; returns the connection point the new road joins, or null with the reason shown.
+        /// </summary>
+        private OmsiJunctionPort PlaceTransition(OmsiSplineEnd join, bool arriving, List<object> steps)
+        {
+            var arms = TransitionArms(join, arriving);
+            var length = OmsiJunctionLayout.TransitionLength(SectionsOf(arms[0]), SectionsOf(arms[1]));
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            string assetPath;
+            try
+            {
+                var plain = File.Exists(Path.Combine(root, PlainAsphalt)) ? PlainAsphalt : null;
+                var name = "Transition " + Path.GetFileNameWithoutExtension(arms[0].ProfilePath) + " x " + Path.GetFileNameWithoutExtension(arms[1].ProfilePath);
+                assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, name, OmsiJunctionGenerator.Junction(arms, plain, "Mapforge " + name));
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The transition could not be made: " + exception.Message);
+                return null;
+            }
+            // The transition runs on from the end, its far half towards the new road.
+            var size = currentSummary.TileSizeMeters;
+            var heading = join.OutwardHeadingDegrees;
+            var end = join.Position(size);
+            var radians = heading * Math.PI / 180.0;
+            var x = end.X + Math.Sin(radians) * length / 2.0;
+            var y = end.Y + Math.Cos(radians) * length / 2.0;
+            var tile = currentSummary.Tiles.Find(candidate => candidate.IsAvailable && candidate.X == (int)Math.Floor(x / size) && candidate.Y == (int)Math.Floor(y / size)) ??
+                       join.Tile;
+            try
+            {
+                var change = session.PlaceObject(currentSummary, tile, assetPath, x - tile.X * size, y - tile.Y * size, join.Height, heading);
+                steps.Add(change);
+                roadPorts = null;
+                return PortFacing(change.Record, heading);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The transition could not be placed: " + exception.Message);
+                return null;
+            }
+        }
+
+        /// <summary>Builds the road with a transition at the free spline end it starts from, ends at, or both.</summary>
+        private void BuildWithTransitions(OmsiMapPoint target, OmsiSplineEnd endJoin, OmsiJunctionPort endPort, bool atStart, bool atEnd)
+        {
+            var steps = new List<object>();
+            var start = roadStart;
+            var startHeading = roadStartHeading;
+            var startHeight = roadStartHeight;
+            var startGradient = roadStartJoin?.OutwardGradientPercent;
+            var startJoin = roadStartJoin;
+            if (atStart)
+            {
+                var port = PlaceTransition(roadStartJoin, false, steps);
+                if (port == null)
+                    return;
+                start = port.Position;
+                startHeading = port.OutwardHeadingDegrees;
+                startHeight = port.Height;
+                startGradient = null;
+                startJoin = null;
+            }
+            var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
+            if (atEnd)
+            {
+                var port = PlaceTransition(endJoin, true, steps);
+                if (port == null)
+                {
+                    RevertSteps(steps);
+                    return;
+                }
+                end = port.Position;
+                endJoin = null;
+                endPort = port;
+            }
+            var change = BuildRoadPart(start, startHeading, startHeight, startGradient, startJoin, end, endJoin, endPort, steps);
+            if (change == null)
+            {
+                RevertSteps(steps);
+                return;
+            }
+            PushSteps(steps, "the road with " + (atStart && atEnd ? "two transitions" : "a transition"));
+            var message = "Built the road with " + (atStart && atEnd ? "transitions" : "a transition") + " to the road of another width. Ctrl+Z takes it all back.";
+            if (endJoin != null || endPort != null)
+            {
+                EndRoad();
+                SetStatus(message);
+                return;
+            }
+            ContinueRoadFrom(change);
+            SetStatus(message + " Click to go on, Esc ends the road.");
+        }
+
         /// <summary>Ends the road on another road with a new T junction: the junction goes into that road, the new road runs to its side arm.</summary>
         private void BuildTee(OmsiSplinePoint target)
         {
@@ -2041,8 +2171,9 @@ namespace OmsiMapEditor.UI
             var chain = OmsiSplineChain.Around(currentSummary, target.Tile, target.Spline, 1.0);
             chain.FrameAt(target.Distance, out var point, out var heading, out _);
             var side = OmsiRoadJunctions.SideHeading(OmsiRoadPlanner.ChordHeading(point.X, point.Y, roadStart.X, roadStart.Y) - heading);
+            // The new road arrives on the side arm.
             var arms = OmsiRoadJunctions.Arms(target.Spline.AssetPath, profiles.Get(target.Spline.AssetPath), roadPanel.Profile, profiles.Get(roadPanel.Profile),
-                new[] { side });
+                new[] { side }, new double[0]);
             var steps = new List<object>();
             var startJoinId = roadStartJoin?.Spline.Id;
             var junction = InsertGeneratedJunction(arms, target, roadStart, steps);
@@ -2082,8 +2213,9 @@ namespace OmsiMapEditor.UI
             var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
             var endJoinId = endJoin?.Spline.Id;
             var endJoinAtEnd = endJoin?.AtEnd ?? false;
+            // The new road arrives on the arm facing its start and leaves on the one ahead.
             var arms = OmsiRoadJunctions.Arms(road.Spline.AssetPath, profiles.Get(road.Spline.AssetPath), roadPanel.Profile, profiles.Get(roadPanel.Profile),
-                new[] { relative, relative + 180.0 });
+                new[] { relative + 180.0 }, new[] { relative });
             var steps = new List<object>();
             var startJoinId = roadStartJoin?.Spline.Id;
             var junction = InsertGeneratedJunction(arms, road, roadStart, steps);
@@ -2202,6 +2334,7 @@ namespace OmsiMapEditor.UI
             FindJunction(plan, roadPointer.Value, endJoin, endPort, out var tee, out var crossing);
             var meets = tee != null ? " Ends on spline #" + tee.Spline.Id + ": a click joins it with a new T junction."
                 : crossing != null ? " Crosses spline #" + crossing.Road.Spline.Id + " after " + crossing.Along.ToString("F0") + " m: a click makes crossroads there."
+                : NeedsTransition(roadStartJoin, false) || NeedsTransition(endJoin, true) ? " Joins a road of another width: a click puts a transition between them."
                 : string.Empty;
             roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort) + meets, plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
         }
@@ -2271,6 +2404,13 @@ namespace OmsiMapEditor.UI
             if (crossing != null)
             {
                 BuildCrossing(crossing, point);
+                return;
+            }
+            var transitionAtStart = NeedsTransition(roadStartJoin, false);
+            var transitionAtEnd = NeedsTransition(endJoin, true);
+            if (transitionAtStart || transitionAtEnd)
+            {
+                BuildWithTransitions(point, endJoin, endPort, transitionAtStart, transitionAtEnd);
                 return;
             }
             OmsiSplineChange change;
