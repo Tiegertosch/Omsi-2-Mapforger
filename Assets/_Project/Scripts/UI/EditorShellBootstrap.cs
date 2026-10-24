@@ -85,6 +85,17 @@ namespace OmsiMapEditor.UI
         private double? roadStartHeading;
         private double? roadStartHeight;
         private OmsiSplineEnd roadStartJoin;
+
+        // The connection point of a junction object the road starts from, or null.
+        private OmsiJunctionPort roadStartPort;
+
+        // While the road tool is on: every connection point of the map and what it is joined to; null rebuilds them.
+        private List<OmsiJunctionPort> roadPorts;
+        private List<OmsiJunctionPortCheck> roadPortChecks;
+
+        // The connection points of the scenery objects of the open map's installation.
+        private OmsiJunctionCatalog junctionCatalog;
+        private string junctionCatalogRoot;
         private OmsiMapPoint? roadPointer;
         private OmsiTerrainSampler roadTerrain;
 
@@ -1486,6 +1497,8 @@ namespace OmsiMapEditor.UI
                     roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
             }
             groundRenderer?.RefreshTerrainHoles(currentSummary);
+            if (roadPorts != null)
+                UpdateRoadPorts();
             if (selectedSpline != null)
             {
                 // Undo and redo read the tiles again; the selected record is found again by its ID, or the selection ends.
@@ -1521,7 +1534,10 @@ namespace OmsiMapEditor.UI
             objectsPanelHost.style.display = DisplayStyle.Flex;
             EndRoad();
             mapCanvas.BeginRoad();
-            SetStatus("Road: click to start a road, on a free spline end to continue it; click again for each bend, Esc ends the road.");
+            roadPorts = null;
+            UpdateRoadPorts();
+            SetStatus("Road: click to start a road, on a free spline end to continue it or on a free connection point of a junction; " +
+                      "click again for each bend, Esc ends the road.");
         }
 
         private void EndRoadTool()
@@ -1533,6 +1549,66 @@ namespace OmsiMapEditor.UI
             if (objectsPanelHost != null && !objectsPanelOpen)
                 objectsPanelHost.style.display = DisplayStyle.None;
             roadTerrain = null;
+            roadPorts = null;
+            roadPortChecks = null;
+            RefreshJunctionMarkers();
+        }
+
+        /// <summary>The connection points of the installation's objects, read again when another installation is open.</summary>
+        private OmsiJunctionCatalog Junctions()
+        {
+            if (currentSummary == null)
+                return null;
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            if (junctionCatalog == null || !string.Equals(root, junctionCatalogRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                junctionCatalog = new OmsiJunctionCatalog(root);
+                junctionCatalogRoot = root;
+            }
+            return junctionCatalog;
+        }
+
+        /// <summary>Reads every connection point of the map, if needed, and checks what each is joined to now.</summary>
+        private void UpdateRoadPorts()
+        {
+            var catalog = Junctions();
+            if (catalog == null)
+                return;
+            roadPorts = roadPorts ?? catalog.AllPorts(currentSummary);
+            roadPortChecks = OmsiJunctionCatalog.Check(currentSummary, roadPorts);
+            RefreshJunctionMarkers();
+        }
+
+        /// <summary>
+        /// Shows the connection points that matter now: the free ones while building roads, and all points of a selected
+        /// junction object with their state.
+        /// </summary>
+        private void RefreshJunctionMarkers()
+        {
+            if (mapCanvas == null)
+                return;
+            var markers = new List<JunctionMarker>();
+            if (activeTool == EditorTool.Road && roadPortChecks != null)
+                foreach (var check in roadPortChecks)
+                    if (check.State != OmsiJunctionPortState.Connected)
+                        markers.Add(Marker(check));
+            if (selectedObject != null && selectedTile != null && currentSummary != null && selection.Count <= 1)
+            {
+                var catalog = Junctions();
+                var ports = catalog?.Ports(selectedTile, selectedObject, currentSummary.TileSizeMeters);
+                if (ports != null && ports.Count > 0)
+                    foreach (var check in OmsiJunctionCatalog.Check(currentSummary, ports, null, catalog.PortsAround(currentSummary, selectedTile)))
+                        markers.Add(Marker(check));
+            }
+            mapCanvas.SetJunctionMarkers(markers);
+        }
+
+        private static JunctionMarker Marker(OmsiJunctionPortCheck check)
+        {
+            return new JunctionMarker
+            {
+                Position = check.Port.Position, Height = (float)check.Port.Height, HeadingDegrees = (float)check.Port.OutwardHeadingDegrees, State = check.State
+            };
         }
 
         /// <summary>Ends the road being drawn; the next click starts a new one.</summary>
@@ -1540,6 +1616,7 @@ namespace OmsiMapEditor.UI
         {
             roadStarted = false;
             roadStartJoin = null;
+            roadStartPort = null;
             roadStartHeading = null;
             roadStartHeight = null;
             UpdateRoadPreview();
@@ -1573,19 +1650,63 @@ namespace OmsiMapEditor.UI
             return end;
         }
 
-        /// <summary>The road from the current start to <paramref name="target"/>, joining a free spline end there if there is one.</summary>
-        private OmsiRoadPlan PlanRoad(OmsiMapPoint target, out OmsiSplineEnd endJoin)
+        /// <summary>The free connection point of a junction object a road would snap to at a point, or null.</summary>
+        private OmsiJunctionPort SnapPort(OmsiMapPoint point)
         {
-            endJoin = SnapEnd(target);
-            var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? target;
+            if (roadPorts == null)
+                UpdateRoadPorts();
+            if (roadPorts == null || roadPorts.Count == 0)
+                return null;
+            var reach = mapCanvas != null && mapCanvas.ThreeDimensional
+                ? Math.Max(1.0, mapCanvas.OrbitDistance * 0.02)
+                : Math.Max(0.5, RoadSnapPixels * (mapCanvas?.MetersPerPixel ?? 1f));
+            var port = OmsiJunctionCatalog.FindFree(currentSummary, roadPorts, point.X, point.Y, reach);
+            // The road never ends at the point it starts from.
+            if (port != null && roadStartPort != null && ReferenceEquals(port.Object, roadStartPort.Object) && port.Index == roadStartPort.Index)
+                return null;
+            return port;
+        }
+
+        /// <summary>The free spline end or connection point a road snaps to at a point, whichever is nearer.</summary>
+        private void Snap(OmsiMapPoint point, out OmsiSplineEnd join, out OmsiJunctionPort port)
+        {
+            join = SnapEnd(point);
+            port = SnapPort(point);
+            if (join == null || port == null)
+                return;
+            if (Distance(port.Position, point) < Distance(join.Position(currentSummary.TileSizeMeters), point))
+                join = null;
+            else
+                port = null;
+        }
+
+        private static double Distance(OmsiMapPoint a, OmsiMapPoint b)
+        {
+            return Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+        }
+
+        private static string DescribePort(OmsiJunctionPort port)
+        {
+            return "connection point " + (port.Index + 1) + " of #" + port.Object.Id + " " + Path.GetFileNameWithoutExtension(port.Object.AssetPath);
+        }
+
+        /// <summary>
+        /// The road from the current start to <paramref name="target"/>, joining a free spline end or connection point there
+        /// if there is one.
+        /// </summary>
+        private OmsiRoadPlan PlanRoad(OmsiMapPoint target, out OmsiSplineEnd endJoin, out OmsiJunctionPort endPort)
+        {
+            Snap(target, out endJoin, out endPort);
+            var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
             var request = new OmsiRoadRequest
             {
                 StartX = roadStart.X, StartY = roadStart.Y, StartHeadingDegrees = roadStartHeading, StartHeight = roadStartHeight, EndX = end.X, EndY = end.Y,
                 StartGradientPercent = roadStartJoin?.OutwardGradientPercent,
                 HeightMode = roadPanel.HeightMode, MaximumPieceLength = roadPanel.PieceLength, GradientWarningPercent = roadPanel.GradientWarningPercent,
-                EndHeight = endJoin?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
-                // Driving into the joined spline continues opposite to the way a road would leave it.
-                EndJoinHeadingDegrees = endJoin != null ? endJoin.OutwardHeadingDegrees + 180.0 : (double?)null
+                EndHeight = endJoin?.Height ?? endPort?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
+                // Driving into the joined spline or junction continues opposite to the way a road would leave it.
+                EndJoinHeadingDegrees = endJoin != null ? endJoin.OutwardHeadingDegrees + 180.0
+                    : endPort != null ? endPort.OutwardHeadingDegrees + 180.0 : (double?)null
             };
             return OmsiRoadPlanner.Plan(request, roadTerrain);
         }
@@ -1602,11 +1723,14 @@ namespace OmsiMapEditor.UI
             }
             if (!roadStarted)
             {
-                var join = SnapEnd(roadPointer.Value);
-                mapCanvas.SetRoadPreview(null, true, null, join?.Position(currentSummary.TileSizeMeters), null);
+                Snap(roadPointer.Value, out var join, out var port);
+                mapCanvas.SetRoadPreview(null, true, null, join?.Position(currentSummary.TileSizeMeters) ?? port?.Position, null);
                 roadPanel.ShowPlan(join != null
                     ? "Click to continue spline #" + join.Spline.Id + " from its " + (join.AtEnd ? "end" : "start") + "."
-                    : "Click to start a road. Free spline ends show as circles; starting on one continues it.", false);
+                    : port != null
+                        ? "Click to start a road at " + DescribePort(port) + "; it suggests the profile " + Path.GetFileNameWithoutExtension(port.ProfilePath) + "."
+                        : "Click to start a road. Free spline ends show as circles and free connection points of junctions as diamonds; " +
+                          "starting on one continues it.", false);
                 return;
             }
 
@@ -1619,7 +1743,7 @@ namespace OmsiMapEditor.UI
                 roadPanel.ShowPlan("Click where the road should go next; Esc ends it.", false);
                 return;
             }
-            var plan = PlanRoad(roadPointer.Value, out var endJoin);
+            var plan = PlanRoad(roadPointer.Value, out var endJoin, out var endPort);
             var pieces = new List<OmsiMapPoint[]>();
             var heights = new List<double[]>();
             foreach (var piece in plan.Pieces)
@@ -1636,19 +1760,19 @@ namespace OmsiMapEditor.UI
                 pieces.Add(points);
                 heights.Add(pointHeights);
             }
-            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues, endJoin?.Position(currentSummary.TileSizeMeters), roadStart,
-                heights);
-            roadPanel.ShowPlan(DescribePlan(plan, endJoin), plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
+            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues,
+                endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position, roadStart, heights);
+            roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort), plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
         }
 
-        private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin)
+        private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin, OmsiJunctionPort endPort)
         {
             var text = plan.Pieces.Count == 0
                 ? "No road here."
                 : plan.LengthMeters.ToString("F1") + " m in " + plan.Pieces.Count + " spline(s), " +
                   (plan.Pieces[0].RadiusMeters == 0 ? "straight" : "radius " + Math.Abs(plan.Pieces[0].RadiusMeters).ToString("F0") + " m") +
                   ", gradient up to " + plan.MaximumGradientPercent.ToString("F1") + " %, end height " + plan.EndHeight.ToString("F2") + " m" +
-                  (endJoin != null ? "; joins spline #" + endJoin.Spline.Id : string.Empty) + ".";
+                  (endJoin != null ? "; joins spline #" + endJoin.Spline.Id : endPort != null ? "; joins " + DescribePort(endPort) : string.Empty) + ".";
             foreach (var issue in plan.Issues)
                 text += "\n" + issue.Severity + ": " + issue.Message;
             return text;
@@ -1668,18 +1792,20 @@ namespace OmsiMapEditor.UI
             roadPointer = point;
             if (!roadStarted)
             {
-                var join = SnapEnd(point);
+                Snap(point, out var join, out var port);
                 roadStartJoin = join;
-                roadStart = join?.Position(currentSummary.TileSizeMeters) ?? point;
-                roadStartHeading = join?.OutwardHeadingDegrees;
-                roadStartHeight = join?.Height;
-                if (join == null && roadPanel.HeightMode == OmsiRoadHeightMode.Manual)
+                roadStartPort = port;
+                roadStart = join?.Position(currentSummary.TileSizeMeters) ?? port?.Position ?? point;
+                roadStartHeading = join?.OutwardHeadingDegrees ?? port?.OutwardHeadingDegrees;
+                roadStartHeight = join?.Height ?? port?.Height;
+                if (join == null && port == null && roadPanel.HeightMode == OmsiRoadHeightMode.Manual)
                     roadStartHeight = roadTerrain != null && roadTerrain.TryGetHeight(point.X, point.Y, out var ground) ? ground : roadPanel.EndHeight;
                 if (roadPanel.HeightMode == OmsiRoadHeightMode.Manual && roadStartHeight.HasValue)
                     roadPanel.SuggestEndHeight(roadStartHeight.Value);
                 roadStarted = true;
                 UpdateRoadPreview();
                 SetStatus(join != null ? "Continuing spline #" + join.Spline.Id + ". Click where the road should go; Esc ends it."
+                    : port != null ? "Road started at " + DescribePort(port) + ", leaving it the way the point faces. Click where it should go; Esc ends it."
                     : "Road started. Click where it should go; it leaves straight towards the first click and then bends tangentially.");
                 return;
             }
@@ -1689,7 +1815,7 @@ namespace OmsiMapEditor.UI
                 SetStatus("Choose a spline profile in the road panel first.");
                 return;
             }
-            var plan = PlanRoad(point, out var endJoin);
+            var plan = PlanRoad(point, out var endJoin, out var endPort);
             if (plan.HasErrors)
             {
                 SetStatus("This road cannot be built: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
@@ -1712,10 +1838,10 @@ namespace OmsiMapEditor.UI
             var warnings = plan.Issues.FindAll(issue => issue.Severity != OmsiRoadIssueSeverity.Note).Count;
             var built = "Built " + plan.LengthMeters.ToString("F1") + " m of road in " + change.SplineIds.Count + " spline(s)" +
                         (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty);
-            if (endJoin != null)
+            if (endJoin != null || endPort != null)
             {
                 EndRoad();
-                SetStatus(built + ", joined to spline #" + endJoin.Spline.Id + ". Click to start the next road.");
+                SetStatus(built + ", joined to " + (endJoin != null ? "spline #" + endJoin.Spline.Id : DescribePort(endPort)) + ". Click to start the next road.");
                 return;
             }
             // The road continues from the end of its last spline.
@@ -1729,6 +1855,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             roadStartJoin = new OmsiSplineEnd(lastTile, last, true);
+            roadStartPort = null;
             roadStart = roadStartJoin.Position(currentSummary.TileSizeMeters);
             roadStartHeading = roadStartJoin.OutwardHeadingDegrees;
             roadStartHeight = roadStartJoin.Height;
@@ -3447,6 +3574,7 @@ namespace OmsiMapEditor.UI
                 return;
 
             inspectorPanel.Clear();
+            RefreshJunctionMarkers();
 
             if (selectedTile == null)
             {
@@ -3600,6 +3728,7 @@ namespace OmsiMapEditor.UI
             var name = new Label("#" + item.Id + "  " + item.AssetPath);
             name.AddToClassList("inspector-edit-name");
             editor.Add(name);
+            AddJunctionDetails(editor, item);
 
             var xField = AddEditField(editor, "X (m)", item.LocalX);
             var yField = AddEditField(editor, "Y (m)", item.LocalY);
@@ -3642,6 +3771,62 @@ namespace OmsiMapEditor.UI
             }
 
             container.Add(editor);
+        }
+
+        /// <summary>
+        /// The connection points of a junction object and what each is joined to, with a symbol and text per state; nothing
+        /// for objects without [splinehelper].
+        /// </summary>
+        private void AddJunctionDetails(VisualElement container, OmsiObjectRecord item)
+        {
+            var catalog = Junctions();
+            if (catalog == null || selectedTile == null)
+                return;
+            var problem = catalog.Problem(item.AssetPath);
+            if (problem != null)
+            {
+                var unresolved = new Label("Unresolved: " + problem + " The object stays placed as it is.");
+                unresolved.AddToClassList("muted");
+                unresolved.AddToClassList("inspector-edit-hint");
+                container.Add(unresolved);
+                return;
+            }
+            var ports = catalog.Ports(selectedTile, item, currentSummary.TileSizeMeters);
+            if (ports.Count == 0)
+                return;
+            var checks = OmsiJunctionCatalog.Check(currentSummary, ports, null, catalog.PortsAround(currentSummary, selectedTile));
+            var heading = new Label("CONNECTION POINTS  " + checks.FindAll(check => check.State == OmsiJunctionPortState.Connected).Count + " of " +
+                                    checks.Count + " connected");
+            heading.AddToClassList("inspector-section-heading");
+            container.Add(heading);
+            foreach (var check in checks)
+            {
+                var row = new VisualElement();
+                row.AddToClassList("junction-row");
+                var swatch = new VisualElement();
+                swatch.AddToClassList("junction-swatch");
+                swatch.AddToClassList("junction-swatch-" + check.State.ToString().ToLowerInvariant());
+                row.Add(swatch);
+                var text = new Label(StateName(check.State) + ": " + check.Message);
+                text.AddToClassList("junction-text");
+                row.Add(text);
+                container.Add(row);
+            }
+        }
+
+        private static string StateName(OmsiJunctionPortState state)
+        {
+            switch (state)
+            {
+                case OmsiJunctionPortState.Connected:
+                    return "Connected";
+                case OmsiJunctionPortState.NeedsReview:
+                    return "Needs review";
+                case OmsiJunctionPortState.Invalid:
+                    return "Invalid";
+                default:
+                    return "Unconnected";
+            }
         }
 
         private static TextField AddEditField(VisualElement container, string label, double value)

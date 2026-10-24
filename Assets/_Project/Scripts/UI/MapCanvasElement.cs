@@ -38,6 +38,15 @@ namespace OmsiMapEditor.UI
         public bool KeepPlacing;
     }
 
+    /// <summary>A connection point of a junction object to draw: where it is, which way a road leaves it and its state.</summary>
+    internal struct JunctionMarker
+    {
+        public OmsiMapPoint Position;
+        public float Height;
+        public float HeadingDegrees;
+        public OmsiJunctionPortState State;
+    }
+
     /// <summary>A handle of the selected spline: one of its ends, or its middle, which bends it.</summary>
     internal enum SplineHandleKind
     {
@@ -225,6 +234,8 @@ namespace OmsiMapEditor.UI
         private bool roadPreviewValid;
         private readonly List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>> roadIssues = new List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>>();
         private Vector2? roadSnap;
+
+        private readonly List<JunctionMarker> junctionMarkers = new List<JunctionMarker>();
         private Vector2? roadStart;
         private OmsiSplineRecord selectedSpline;
 
@@ -700,6 +711,15 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>The connection points of junction objects to draw, replacing those drawn before.</summary>
+        public void SetJunctionMarkers(IEnumerable<JunctionMarker> markers)
+        {
+            junctionMarkers.Clear();
+            if (markers != null)
+                junctionMarkers.AddRange(markers);
+            MarkDirtyRepaint();
+        }
+
         public void ClearRoadPreview()
         {
             roadPreview.Clear();
@@ -1130,6 +1150,7 @@ namespace OmsiMapEditor.UI
             DrawRoutes(context, painter, visible);
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
+            DrawJunctionMarkers(painter, visible);
             var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
             DrawArrows(painter);
@@ -1548,6 +1569,59 @@ namespace OmsiMapEditor.UI
                 AddCircle(painter, snap, 9f);
                 painter.Stroke();
             }
+        }
+
+        /// <summary>Connection points of junction objects as diamonds with a stroke the way a road leaves them, coloured by state.</summary>
+        private void DrawJunctionMarkers(Painter2D painter, Rect visible)
+        {
+            foreach (var marker in junctionMarkers)
+            {
+                var map = WorldToMap(marker.Position);
+                if (!visible.Contains(map))
+                    continue;
+                var heading = marker.HeadingDegrees * Mathf.Deg2Rad;
+                var ahead = map + new Vector2(Mathf.Sin(heading), Mathf.Cos(heading)) * (14f * metersPerPixel);
+                DrawJunctionMarker(painter, MapToScreen(map), MapToScreen(ahead), marker.State);
+            }
+        }
+
+        private void DrawJunctionMarkers3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            const float lift = 0.3f;
+            foreach (var marker in junctionMarkers)
+            {
+                var map = WorldToMap(marker.Position);
+                var heading = marker.HeadingDegrees * Mathf.Deg2Rad;
+                var ahead = map + new Vector2(Mathf.Sin(heading), Mathf.Cos(heading)) * 2f;
+                if (camera.TryProject(new Vector3(map.x, marker.Height + lift, map.y), out var screen) &&
+                    camera.TryProject(new Vector3(ahead.x, marker.Height + lift, ahead.y), out var tip))
+                    DrawJunctionMarker(painter, screen, tip, marker.State);
+            }
+        }
+
+        private void DrawJunctionMarker(Painter2D painter, Vector2 screen, Vector2 tip, OmsiJunctionPortState state)
+        {
+            var color = state == OmsiJunctionPortState.Connected ? placementColor
+                : state == OmsiJunctionPortState.NeedsReview ? selectedTileColor
+                : state == OmsiJunctionPortState.Invalid ? selectedObjectColor
+                : wireColor;
+            painter.strokeColor = color;
+            painter.lineWidth = 2f;
+            painter.lineCap = LineCap.Round;
+            painter.BeginPath();
+            painter.MoveTo(screen);
+            painter.LineTo(tip);
+            painter.Stroke();
+            const float size = 6f;
+            painter.fillColor = handleFillColor;
+            painter.BeginPath();
+            painter.MoveTo(screen + new Vector2(0f, -size));
+            painter.LineTo(screen + new Vector2(size, 0f));
+            painter.LineTo(screen + new Vector2(0f, size));
+            painter.LineTo(screen + new Vector2(-size, 0f));
+            painter.ClosePath();
+            painter.Fill();
+            painter.Stroke();
         }
 
         private float GroundAt(Vector2 map)
@@ -2581,6 +2655,7 @@ namespace OmsiMapEditor.UI
             DrawMarkers3D(painter, camera);
             DrawPlacement3D(painter, camera);
             DrawRoad3D(painter, camera);
+            DrawJunctionMarkers3D(painter, camera);
             DrawBox(painter);
             painter.lineWidth = 1.5f;
             painter.strokeColor = selectedObjectColor;

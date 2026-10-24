@@ -235,9 +235,33 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(7.0, smooth.EndHeight, 1e-12);
             var kinked = OmsiRoadPlanner.Plan(new OmsiRoadRequest
             {
-                StartX = 0, StartY = 0, EndX = 20, EndY = 20, EndJoinHeadingDegrees = 90
+                StartX = 0, StartY = 0, StartHeadingDegrees = 0, EndX = 20, EndY = 20, EndJoinHeadingDegrees = 45
             }, terrain);
             Assert.That(kinked.Issues.Select(issue => issue.Message), Has.Some.Contains("kink of 45°"));
+
+            // With a free start the road is planned from the joined end: it arrives along the joined road and starts at the
+            // requested point, its pieces running from start to end and their heights meeting.
+            var backwards = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, EndX = 20, EndY = 20, EndJoinHeadingDegrees = 90, EndHeight = 7, MaximumPieceLength = 10
+            }, terrain);
+            CollectionAssert.IsEmpty(backwards.Issues.Where(issue => issue.Message.Contains("kink")));
+            Assert.AreEqual(0.0, backwards.Pieces[0].StartX, 1e-12);
+            Assert.AreEqual(0.0, backwards.Pieces[0].StartY, 1e-12);
+            var last = backwards.Pieces[backwards.Pieces.Count - 1];
+            last.PointAt(last.LengthMeters, out var endX, out var endY, out var endHeight);
+            Assert.AreEqual(20.0, endX, 1e-6);
+            Assert.AreEqual(20.0, endY, 1e-6);
+            Assert.AreEqual(7.0, endHeight, 1e-9);
+            OmsiMapGeometry.GetLocalFrameAt(last.AsRecord(), last.LengthMeters, out _, out var arrival);
+            Assert.AreEqual(90.0, OmsiRoadPlanner.Normalize(arrival * 180.0 / Math.PI), 1e-6);
+            for (var index = 1; index < backwards.Pieces.Count; index++)
+            {
+                backwards.Pieces[index - 1].PointAt(backwards.Pieces[index - 1].LengthMeters, out var x, out var y, out var height);
+                Assert.AreEqual(backwards.Pieces[index].StartX, x, 1e-6);
+                Assert.AreEqual(backwards.Pieces[index].StartY, y, 1e-6);
+                Assert.AreEqual(backwards.Pieces[index].StartHeight, height, 1e-9);
+            }
         }
 
         [Test]

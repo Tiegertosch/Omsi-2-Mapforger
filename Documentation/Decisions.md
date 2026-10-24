@@ -216,3 +216,15 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Der Nutzer fand das tangentiale Mitbiegen des Nachbarn ungewohnt und nannte MoveIt als Vorbild (Rückmeldung vom 24. Oktober 2026). Dort behält jedes Segment seinen Kurvenpunkt, wenn ein Knoten wandert; Alt rastet ein.
 - OMSI speichert Splines als Kreisbögen, nicht als Bézierkurven. Ein Bogen ist durch Sehne und Drehung festgelegt; die Drehung zu erhalten bewahrt seine Form, auch wenn das Gelenk weit wandert. Ein fester Kurvenpunkt dagegen ergäbe beim Zurückziehen Schleifen.
 - Ein Bogen hat nur einen freien Wert, daher ein Mittelgriff je Spline; S-Kurven entstehen aus zwei Splines.
+
+## ADR 024: Straßen schließen an Kreuzungsobjekte über ihre Splinehelper an
+
+**Status:** Angenommen, 24. Oktober 2026. Erste Stufe von Etappe 3 aus dem Kreuzungsbriefing.
+
+**Entscheidung:** Eine Kreuzung bleibt ein gewöhnliches `[object]`; ihre Anschlusspunkte kommen aus den `[splinehelper]` ihrer `.sco`, gedreht mit dem Objekt, und werden nicht in die Karte kopiert. Eine Straße ist angeschlossen, wenn ein Spline-Ende auf dem Punkt liegt, mit seiner Höhe und Richtung; die Nachbar-ID bleibt 0. Der Editor prüft jeden Punkt und meldet Connected, Needs review, Invalid oder Unconnected mit Symbol und Text; Punkte zweier Objekte, die Stirn an Stirn liegen, gelten als verbunden. Die Toleranzen (5 cm, 1°, 5 cm Höhe, 2 m Suchabstand) sind Prüfungen des Editors, keine Regeln von OMSI. Das Straßenwerkzeug rastet an freien Punkten ein; das Profil des Punkts wird nur vorgeschlagen.
+
+**Grund:**
+- Befund an echten Karten: In Grundorf liegen alle 36 Punkte exakt an Spline-Enden oder an einem Punkt einer anderen Kreuzung; in Berlin-Spandau 837 von 1.171, alle mit Nachbar-ID 0. OMSI speichert also keine Verknüpfung, die Lage selbst ist der Anschluss.
+- In Spandau weicht das Profil an 333 Anschlüssen vom vorgeschlagenen ab; es zu erzwingen widerspräche echten Karten.
+- Die 233 Prüffälle in Spandau (Lage, Weichen, Höhe) stammen aus der Originalkarte. Als „Needs review“ mit Erklärung sind sie sichtbar, ohne als Fehler zu gelten.
+- Eine Straße mit freiem Start wird vom angeschlossenen Ende aus geplant, damit sie wie in echten Karten ohne Knick ankommt. Mit fester Richtung an beiden Enden bleibt der Knick gemeldet, bis zwei Bögen möglich sind.

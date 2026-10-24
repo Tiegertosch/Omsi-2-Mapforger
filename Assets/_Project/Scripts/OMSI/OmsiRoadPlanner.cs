@@ -186,6 +186,16 @@ namespace OmsiMapEditor.OMSI
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
+            // A free start and a joined end: the road is planned from the end, so it meets the joined road or junction
+            // without a kink, and then turned round to run from the start.
+            if (!request.StartHeadingDegrees.HasValue && request.EndJoinHeadingDegrees.HasValue)
+                return Reversed(Plan(new OmsiRoadRequest
+                {
+                    StartX = request.EndX, StartY = request.EndY, StartHeadingDegrees = request.EndJoinHeadingDegrees.Value + 180.0,
+                    StartHeight = request.EndHeight, EndX = request.StartX, EndY = request.StartY, EndHeight = request.StartHeight,
+                    HeightMode = request.HeightMode, MaximumPieceLength = request.MaximumPieceLength,
+                    GradientWarningPercent = request.GradientWarningPercent, SmoothingMeters = request.SmoothingMeters
+                }, terrain), request);
             var plan = new OmsiRoadPlan();
             if (!AllFinite(request.StartX, request.StartY, request.EndX, request.EndY))
             {
@@ -273,6 +283,43 @@ namespace OmsiMapEditor.OMSI
                     plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "The road geometry has invalid values.", piece.StartX, piece.StartY));
                     break;
                 }
+            return plan;
+        }
+
+        /// <summary>A plan from the end of <paramref name="request"/> to its start, turned round to run from the start.</summary>
+        private static OmsiRoadPlan Reversed(OmsiRoadPlan backwards, OmsiRoadRequest request)
+        {
+            var plan = new OmsiRoadPlan
+            {
+                LengthMeters = backwards.LengthMeters, EndHeadingDegrees = request.EndJoinHeadingDegrees ?? 0.0,
+                MaximumGradientPercent = backwards.MaximumGradientPercent
+            };
+            plan.Issues.AddRange(backwards.Issues);
+            var count = backwards.Pieces.Count;
+            for (var index = 0; index < count; index++)
+            {
+                var piece = backwards.Pieces[count - 1 - index];
+                // Each piece starts where the next one of the backward plan starts, and the first at the requested start.
+                double startX, startY;
+                if (index == 0)
+                {
+                    startX = request.StartX;
+                    startY = request.StartY;
+                }
+                else
+                {
+                    startX = backwards.Pieces[count - index].StartX;
+                    startY = backwards.Pieces[count - index].StartY;
+                }
+                var turn = piece.RadiusMeters == 0.0 ? 0.0 : piece.LengthMeters / piece.RadiusMeters * 180.0 / Math.PI;
+                plan.Pieces.Add(new OmsiSplinePiece
+                {
+                    StartX = startX, StartY = startY, StartHeight = piece.EndHeight, HeadingDegrees = (piece.HeadingDegrees + turn + 180.0) % 360.0,
+                    LengthMeters = piece.LengthMeters, RadiusMeters = -piece.RadiusMeters, GradientStartPercent = -piece.GradientEndPercent,
+                    GradientEndPercent = -piece.GradientStartPercent
+                });
+            }
+            plan.EndHeight = plan.Pieces.Count > 0 ? backwards.Pieces[0].StartHeight : request.EndHeight ?? 0.0;
             return plan;
         }
 

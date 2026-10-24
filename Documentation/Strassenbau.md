@@ -22,7 +22,7 @@ Der Nutzer hat am 23. und 24. Oktober 2026 drei Entwicklungsbriefings übergeben
 | Straßenkörper mit Breite und Querschnitt | aus dem `.sli`-Profil, texturiert in 2D und 3D |
 | Gelände an Straßen anpassen, nicht zerstörend: Original, Straßen, abgeleitete Anpassung und angezeigte Oberfläche getrennt | ADR 022, auf Wunsch des Nutzers vorgezogen |
 | Andocken an Knoten; später Andocken an Segmente mit Teilen | Andocken an freie Spline-Enden in Etappe 1; Teilen offen |
-| Kreuzungen später, Anschlüsse vorbereiten | Etappe 3 |
+| Kreuzungen später, Anschlüsse vorbereiten | Etappe 3a: Anschluss an `[splinehelper]`-Punkte (ADR 024) |
 
 ## Kreuzungen (Briefing 3)
 
@@ -31,6 +31,7 @@ Kernsatz: Eine Kreuzung ist eine bearbeitbare Platzierung eines echten OMSI-Obje
 - **Ressource und Instanz trennen:** Die Instanz verweist auf die `.sco`, kopiert deren Geometrie nicht. Eine fehlende Ressource lässt die Instanz bestehen, als ungelöst markiert.
 - **Anschlussprofil:** Anschlusspunkte in Objektkoordinaten mit Position, Richtung nach außen, Höhe und Bezeichnung; geprüfte und vom Nutzer angelegte, ungeprüfte Profile unterscheiden; Profil mit Versionsnummer, wiederverwendbar je Ressource.
 - **Befund im Projekt:** OMSI-Kreuzungsobjekte nennen ihre Anschlüsse als `[splinehelper]` in der `.sco` (Spline-Profil, x, Höhe, y, Richtung); `OmsiSceneryObject.SplineHelpers` liest sie bereits. Sie sind die erste Quelle geprüfter Anschlussprofile. Objekte ohne `[splinehelper]` gelten als „Unknown“, bis ein Profil angelegt ist.
+- **Befund an echten Karten (24. Oktober 2026):** Angeschlossene Spline-Enden liegen exakt auf dem gedrehten Punkt, mit seiner Höhe und Richtung; ihre Nachbar-ID bleibt 0, eine ID-Verknüpfung zum Objekt gibt es nicht. Das Profil am Punkt ist nur ein Vorschlag (in Spandau bei 333 von 858 Anschlüssen ein anderes). Kreuzungen dürfen Stirn an Stirn liegen. Umsetzung in ADR 024.
 - **Ablauf:** Ressource wählen, platzieren und drehen mit den vorhandenen Werkzeugen, Anschlusspunkt wählen, Straßenende anschließen, prüfen. Nichts wird stillschweigend verschoben, Einrasten nur ausdrücklich.
 - **Prüfung:** Status `Valid`, `NeedsReview`, `Invalid`, `Unconnected`, `Unknown`, mit Symbol und Text, nicht nur Farbe; Abweichung von Position, Richtung und Höhe mit einstellbaren Toleranzen, die nicht als OMSI-Regel ausgegeben werden.
 - **Export:** Kreuzung als `[object]`, Straßen als `[spline]`; Umrechnung an genau einer Stelle; vor dem Anspruch auf Kompatibilität mit einer bekannten Karte vergleichen und in OMSI laden.
