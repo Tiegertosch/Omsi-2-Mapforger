@@ -40,12 +40,10 @@ namespace OmsiMapEditor.OMSI
     }
 
     /// <summary>
-    /// Plans moving the end of a placed spline to a new point, as OMSI stores splines: straight lines and circular arcs.
-    /// The moved spline keeps its other end; where that end is joined to another spline it also keeps its heading there and
-    /// bends in an arc, where it is free it runs straight. A spline joined at the moved end starts there tangentially and
-    /// keeps its own other end; a kink where that end meets the next spline is reported. Where that would turn the joined
-    /// spline by more than a right angle, as when a joint is pulled back, it keeps the heading at its other end instead and
-    /// the kink at the moved joint is reported. Heights stay at both ends of each spline and run evenly in between.
+    /// Plans changes to placed splines, as OMSI stores them: straight lines and circular arcs. An arc is fixed by its chord
+    /// and by how far it turns, so a spline can keep its shape while its ends move, as MoveIt does in Cities: Skylines.
+    /// Heights stay at both ends of each spline and run evenly in between. Kinks where a changed spline meets another are
+    /// reported.
     /// </summary>
     public static class OmsiSplineEditing
     {
@@ -55,12 +53,126 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A joined spline that would turn by more than this to stay tangential keeps its far heading instead.</summary>
         private const double MaximumTangentialTurnDegrees = 90.0;
 
-        public static OmsiJointMove PlanJointMove(OmsiMapSummary summary, OmsiSplineEnd end, double worldX, double worldY)
+        /// <summary>
+        /// Plans moving the end of a placed spline to a new point. The moved spline and the spline joined at that end keep
+        /// their other ends and how far they turn, so their shape follows the joint without bending; kinks this leaves are
+        /// reported. With <paramref name="tangential"/> the joint stays free of kinks instead: the moved spline keeps its
+        /// heading at a joined other end and bends in an arc, or runs straight from a free one, and the spline joined at
+        /// the moved end starts there tangentially. Where that would turn the joined spline by more than a right angle, as
+        /// when a joint is pulled back, it keeps the heading at its other end and the kink at the moved joint is reported.
+        /// </summary>
+        public static OmsiJointMove PlanJointMove(OmsiMapSummary summary, OmsiSplineEnd end, double worldX, double worldY, bool tangential = false)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
             if (end == null)
                 throw new ArgumentNullException(nameof(end));
+            if (tangential)
+                return PlanTangentialJointMove(summary, end, worldX, worldY);
+            var move = new OmsiJointMove();
+            var size = summary.TileSizeMeters;
+            var nodeHeight = end.Height;
+
+            // The moved spline, from its other end to the new point, keeps how far it turns.
+            var far = new OmsiSplineEnd(end.Tile, end.Spline, !end.AtEnd);
+            var farPoint = far.Position(size);
+            var leave = OmsiRoadPlanner.ChordHeading(farPoint.X, farPoint.Y, worldX, worldY) - Turn(end.Spline, end.AtEnd) / 2.0;
+            if (!Plan(move, end.Tile, end.Spline, farPoint, leave, far.Height, worldX, worldY, nodeHeight, size, end.AtEnd, out var arrival))
+                return move;
+            ReportKink(move, summary, far, leave + 180.0, farPoint);
+
+            // The spline joined at the moved end, from the new point to its own other end, keeps how far it turns as well.
+            var neighbour = Neighbour(summary, end);
+            if (neighbour == null)
+                return move;
+            var neighbourFar = new OmsiSplineEnd(neighbour.Tile, neighbour.Spline, !neighbour.AtEnd);
+            var neighbourFarPoint = neighbourFar.Position(size);
+            var neighbourLeave = OmsiRoadPlanner.ChordHeading(worldX, worldY, neighbourFarPoint.X, neighbourFarPoint.Y) -
+                                 Turn(neighbour.Spline, !neighbour.AtEnd) / 2.0;
+            if (!Plan(move, neighbour.Tile, neighbour.Spline, new OmsiMapPoint(worldX, worldY), neighbourLeave, nodeHeight, neighbourFarPoint.X,
+                    neighbourFarPoint.Y, neighbourFar.Height, size, !neighbour.AtEnd, out var neighbourArrival))
+                return move;
+            var jointKink = Math.Abs(OmsiRoadPlanner.Normalize(neighbourLeave - arrival));
+            if (jointKink > KinkToleranceDegrees)
+                move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                    "Spline #" + end.Spline.Id + " and #" + neighbour.Spline.Id + " now meet with a kink of " + jointKink.ToString("0") + "°.",
+                    worldX, worldY));
+            ReportKink(move, summary, neighbourFar, neighbourArrival, neighbourFarPoint);
+            return move;
+        }
+
+        /// <summary>
+        /// Plans bending a placed spline through a point between its ends, which stay where they are; with
+        /// <paramref name="straight"/> the spline runs straight instead. Kinks this leaves at joined ends are reported.
+        /// </summary>
+        public static OmsiJointMove PlanBend(OmsiMapSummary summary, OmsiTileSummary tile, OmsiSplineRecord spline, double worldX, double worldY,
+            bool straight = false)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            var move = new OmsiJointMove();
+            var size = summary.TileSizeMeters;
+            var start = new OmsiSplineEnd(tile, spline, false);
+            var finish = new OmsiSplineEnd(tile, spline, true);
+            var from = start.Position(size);
+            var to = finish.Position(size);
+            var through = new OmsiMapPoint(worldX, worldY);
+            // An arc turns by twice the change between the chords to and from any point on it.
+            var turn = 0.0;
+            if (!straight && Distance(from, through) > OmsiRoadPlanner.MinimumLength / 2.0 && Distance(through, to) > OmsiRoadPlanner.MinimumLength / 2.0)
+                turn = 2.0 * OmsiRoadPlanner.Normalize(OmsiRoadPlanner.ChordHeading(worldX, worldY, to.X, to.Y) -
+                                                       OmsiRoadPlanner.ChordHeading(from.X, from.Y, worldX, worldY));
+            var leave = OmsiRoadPlanner.ChordHeading(from.X, from.Y, to.X, to.Y) - turn / 2.0;
+            if (!Plan(move, tile, spline, from, leave, start.Height, to.X, to.Y, finish.Height, size, true, out var arrival))
+                return move;
+            ReportKink(move, summary, start, leave + 180.0, from);
+            ReportKink(move, summary, finish, arrival, to);
+            return move;
+        }
+
+        /// <summary>The middle of a placed spline in world metres, where its handle for bending sits.</summary>
+        public static OmsiMapPoint CurvePoint(OmsiTileSummary tile, OmsiSplineRecord spline, double tileSizeMeters)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            OmsiMapGeometry.GetLocalFrameAt(spline, spline.LengthMeters / 2.0, out var local, out _);
+            return new OmsiMapPoint(tile.X * tileSizeMeters + local.X, tile.Y * tileSizeMeters + local.Y);
+        }
+
+        /// <summary>How far a spline turns in degrees, positive to the right, travelled along its record or against it.</summary>
+        private static double Turn(OmsiSplineRecord spline, bool alongRecord)
+        {
+            var turn = Math.Abs(spline.RadiusMeters) > 0.001 ? spline.LengthMeters / spline.RadiusMeters * 180.0 / Math.PI : 0.0;
+            return alongRecord ? turn : -turn;
+        }
+
+        /// <summary>
+        /// Reports a kink where a changed spline, now leaving <paramref name="end"/> outwards with
+        /// <paramref name="outwardHeading"/>, meets the spline joined there, which stays as it is.
+        /// </summary>
+        private static void ReportKink(OmsiJointMove move, OmsiMapSummary summary, OmsiSplineEnd end, double outwardHeading, OmsiMapPoint at)
+        {
+            if (end.IsFree)
+                return;
+            var other = Neighbour(summary, end);
+            if (other == null)
+                return;
+            // The joined spline leaves the joint outwards from itself, into the changed spline; without a kink that is the
+            // opposite of the changed spline's outward heading.
+            var kink = Math.Abs(OmsiRoadPlanner.Normalize(other.OutwardHeadingDegrees - outwardHeading - 180.0));
+            if (kink > KinkToleranceDegrees)
+                move.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                    "Spline #" + end.Spline.Id + " now meets #" + other.Spline.Id + " with a kink of " + kink.ToString("0") + "°.", at.X, at.Y));
+        }
+
+        private static OmsiJointMove PlanTangentialJointMove(OmsiMapSummary summary, OmsiSplineEnd end, double worldX, double worldY)
+        {
             var move = new OmsiJointMove();
             var size = summary.TileSizeMeters;
             var joint = end.Position(size);

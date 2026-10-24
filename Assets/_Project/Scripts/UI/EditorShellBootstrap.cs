@@ -94,6 +94,9 @@ namespace OmsiMapEditor.UI
         // The end of the selected spline being dragged with its handle.
         private OmsiSplineEnd draggedSplineEnd;
 
+        // True while the middle handle of the dragged spline bends it, rather than one of its ends moving.
+        private bool bendingSpline;
+
         // A spline clicked in the map; it is shown in the inspector and can be deleted.
         private OmsiTileSummary selectedSplineTile;
         private OmsiSplineRecord selectedSpline;
@@ -306,16 +309,20 @@ namespace OmsiMapEditor.UI
                     UpdateRoadPreview();
                 };
                 mapCanvas.RoadClicked += BuildRoadTo;
-                mapCanvas.SplineEndDragStarted += atEnd => draggedSplineEnd = selectedSpline != null && selectedSplineTile != null
-                    ? new OmsiSplineEnd(selectedSplineTile, selectedSpline, atEnd)
-                    : null;
-                mapCanvas.SplineEndDragged += (x, y) => PreviewSplineEnd(x, y, false);
-                mapCanvas.SplineEndDropped += (x, y) => PreviewSplineEnd(x, y, true);
+                mapCanvas.SplineEndDragStarted += handle =>
+                {
+                    bendingSpline = handle == SplineHandleKind.Curve;
+                    draggedSplineEnd = selectedSpline != null && selectedSplineTile != null
+                        ? new OmsiSplineEnd(selectedSplineTile, selectedSpline, handle == SplineHandleKind.End)
+                        : null;
+                };
+                mapCanvas.SplineEndDragged += (x, y, alt) => PreviewSplineEnd(x, y, false, alt);
+                mapCanvas.SplineEndDropped += (x, y, alt) => PreviewSplineEnd(x, y, true, alt);
                 mapCanvas.SplineEndDragCancelled += () =>
                 {
                     draggedSplineEnd = null;
                     mapCanvas.ClearRoadPreview();
-                    SetStatus("Moving the spline end cancelled.");
+                    SetStatus((bendingSpline ? "Bending the spline" : "Moving the spline end") + " cancelled.");
                 };
                 mapCanvas.PointerInfoChanged += text =>
                 {
@@ -797,9 +804,10 @@ namespace OmsiMapEditor.UI
                 if (moveTile != null)
                 {
                     SelectSpline(moveTile, moveTile.Splines.Find(spline => spline.Id == moveId));
-                    draggedSplineEnd = new OmsiSplineEnd(moveTile, selectedSpline, Argument("-moveSplineEnd", 2) != "start");
+                    bendingSpline = Argument("-moveSplineEnd", 2) == "curve";
+                    draggedSplineEnd = new OmsiSplineEnd(moveTile, selectedSpline, Argument("-moveSplineEnd", 2) == "end");
                     var target = OmsiMapGeometry.TileLocalToWorld(moveTileX, moveTileY, moveX, moveY, currentSummary.TileSizeMeters);
-                    PreviewSplineEnd(target.X, target.Y, Array.IndexOf(args, "-moveCommit") >= 0);
+                    PreviewSplineEnd(target.X, target.Y, Array.IndexOf(args, "-moveCommit") >= 0, Array.IndexOf(args, "-moveAlt") >= 0);
                 }
             }
 
@@ -1339,22 +1347,28 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// While a spline end is dragged: plans the joint at the pointer and shows the changed splines; on release builds it
-        /// as one undo step, unless the plan has errors.
+        /// While a spline handle is dragged: plans the joint, or the bend through the pointer, and shows the changed
+        /// splines; on release builds it as one undo step, unless the plan has errors. With Alt the joint stays free of
+        /// kinks, or the bent spline runs straight.
         /// </summary>
-        private void PreviewSplineEnd(double x, double y, bool commit)
+        private void PreviewSplineEnd(double x, double y, bool commit, bool alt)
         {
             if (draggedSplineEnd == null || currentSummary == null || mapCanvas == null)
                 return;
-            var move = OmsiSplineEditing.PlanJointMove(currentSummary, draggedSplineEnd, x, y);
+            var move = bendingSpline
+                ? OmsiSplineEditing.PlanBend(currentSummary, draggedSplineEnd.Tile, draggedSplineEnd.Spline, x, y, alt)
+                : OmsiSplineEditing.PlanJointMove(currentSummary, draggedSplineEnd, x, y, alt);
             var pieces = new List<OmsiMapPoint[]>();
             foreach (var geometry in move.Splines)
                 pieces.Add(OmsiMapGeometry.BuildSplinePolyline(geometry.Tile, geometry.Preview(), currentSummary.TileSizeMeters));
             if (!commit)
             {
                 mapCanvas.SetRoadPreview(pieces, !move.HasErrors, move.Issues, null, null);
-                var text = "Moving the " + (draggedSplineEnd.AtEnd ? "end" : "start") + " of spline #" + draggedSplineEnd.Spline.Id +
-                           (move.Splines.Count > 1 ? " and the spline joined there" : string.Empty);
+                var text = bendingSpline
+                    ? (alt ? "Straightening spline #" : "Bending spline #") + draggedSplineEnd.Spline.Id + (alt ? string.Empty : "; Alt runs it straight")
+                    : "Moving the " + (draggedSplineEnd.AtEnd ? "end" : "start") + " of spline #" + draggedSplineEnd.Spline.Id +
+                      (move.Splines.Count > 1 ? " and the spline joined there" : string.Empty) +
+                      (alt ? " without a kink at the joint" : "; Alt keeps the joint free of kinks");
                 foreach (var issue in move.Issues)
                     text += "; " + issue.Message;
                 SetStatus(text);
@@ -1390,7 +1404,7 @@ namespace OmsiMapEditor.UI
             PushHistory(new ObjectEditStep { SplineChange = change });
             RefreshSplineViews(change);
             var warnings = move.Issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
-            SetStatus("Moved spline #" + id + (change.SplineIds.Count > 1 ? " and #" + change.SplineIds[1] : string.Empty) +
+            SetStatus((bendingSpline ? "Bent spline #" : "Moved spline #") + id + (change.SplineIds.Count > 1 ? " and #" + change.SplineIds[1] : string.Empty) +
                       (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + " Ctrl+Z takes it back.");
         }
 

@@ -202,3 +202,17 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Das Kennzeichen und die Form folgen dem Befund in Berlin-Spandau: An den 203 so gekennzeichneten Splines liegt das gespeicherte Gelände bis etwa 10 m neben der Mitte 0,15 bis 0,25 m über dem Spline, auf Höhe der Gehwege dieser Profile (Fahrbahn +0,10 m, Gehweg +0,25 m), und läuft über 20 bis 30 m aus. OMSIs Editor formt das Gelände also an solche Splines an und kennzeichnet sie.
 - Im Spiel schneidet OMSI das Gelände unter gekennzeichneten Splines aus und schließt den Schnitt senkrecht bis zum Profilrand. Mit 0,3 m Absenkung zeigte sich dort eine senkrechte Wand aus gestrecktem Gras (Spieltest des Nutzers mit Bild vom 24. Oktober 2026). Auf Höhe des Profilrands, wie OMSIs Editor es hinterlässt, hat diese Wand keine Höhe.
 - Ein erster Versuch, im Editor über die ganze Profilbreite auszuschneiden, legte in Berlin-Spandau Himmel frei: `str_6spur_falkenseer2_2.sli` lässt zwischen Gehweg und Fahrbahn 9 m ohne Streifen. Darum wird nur die Kontur ausgeschnitten, wie openOMSI das Element beschreibt.
+
+## ADR 023: Spline-Griffe wie MoveIt
+
+**Status:** Angenommen, 24. Oktober 2026, auf Wunsch des Nutzers. Ändert Etappe 2b von ADR 021.
+
+**Entscheidung:** Spline-Enden und Gelenke werden gezogen wie mit MoveIt in Cities: Skylines.
+- Beim Ziehen eines Gelenks behalten der gezogene Spline und der Nachbar ihr anderes Ende und ihre Gesamtdrehung; nur ihre Sehne folgt dem Gelenk. Knicke am Gelenk und an den anderen Enden werden gemeldet.
+- Mit gedrückter Alt-Taste bleibt das Gelenk knickfrei: das bisherige Verfahren, bei dem der Nachbar tangential anschließt.
+- Ein runder Griff in der Mitte jedes Splines biegt ihn als Bogen durch den Zeiger; beide Enden und ihre Höhen bleiben. Mit Alt wird er gerade.
+
+**Grund:**
+- Der Nutzer fand das tangentiale Mitbiegen des Nachbarn ungewohnt und nannte MoveIt als Vorbild (Rückmeldung vom 24. Oktober 2026). Dort behält jedes Segment seinen Kurvenpunkt, wenn ein Knoten wandert; Alt rastet ein.
+- OMSI speichert Splines als Kreisbögen, nicht als Bézierkurven. Ein Bogen ist durch Sehne und Drehung festgelegt; die Drehung zu erhalten bewahrt seine Form, auch wenn das Gelenk weit wandert. Ein fester Kurvenpunkt dagegen ergäbe beim Zurückziehen Schleifen.
+- Ein Bogen hat nur einen freien Wert, daher ein Mittelgriff je Spline; S-Kurven entstehen aus zwei Splines.

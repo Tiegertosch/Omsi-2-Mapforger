@@ -38,6 +38,14 @@ namespace OmsiMapEditor.UI
         public bool KeepPlacing;
     }
 
+    /// <summary>A handle of the selected spline: one of its ends, or its middle, which bends it.</summary>
+    internal enum SplineHandleKind
+    {
+        Start,
+        End,
+        Curve
+    }
+
     /// <summary>
     /// Continuous top-down view of a whole map in world metres. Pans and zooms, draws tiles, splines and objects that
     /// are visible, selects objects and, when editing is allowed, moves or rotates them by dragging, as the active
@@ -405,19 +413,17 @@ namespace OmsiMapEditor.UI
         /// <summary>While building roads: a left click at a world position.</summary>
         public event Action<double, double> RoadClicked;
 
-        /// <summary>A handle at the end (true) or start (false) of the selected spline is being dragged.</summary>
-        public event Action<bool> SplineEndDragStarted;
+        /// <summary>A handle of the selected spline is being dragged.</summary>
+        public event Action<SplineHandleKind> SplineEndDragStarted;
 
-        /// <summary>The dragged spline end is at a world position.</summary>
-        public event Action<double, double> SplineEndDragged;
+        /// <summary>The dragged spline handle is at a world position; true while Alt is held.</summary>
+        public event Action<double, double, bool> SplineEndDragged;
 
-        /// <summary>The dragged spline end was let go at a world position.</summary>
-        public event Action<double, double> SplineEndDropped;
+        /// <summary>The dragged spline handle was let go at a world position; true while Alt is held.</summary>
+        public event Action<double, double, bool> SplineEndDropped;
 
-        /// <summary>Dragging a spline end was cancelled; nothing changes.</summary>
+        /// <summary>Dragging a spline handle was cancelled; nothing changes.</summary>
         public event Action SplineEndDragCancelled;
-
-        private bool draggedSplineAtEnd;
 
         /// <summary>The selection was moved, or its object rotated, by dragging and the pointer was released.</summary>
         public event Action<List<MapObjectEdit>> ObjectsEdited;
@@ -1364,6 +1370,15 @@ namespace OmsiMapEditor.UI
                 StrokePolyline(painter, path.Points);
             if (!SplineHandlesShown)
                 return;
+            // A round handle in the middle bends the spline.
+            var middle = MapToScreen(WorldToMap(OmsiSplineEditing.CurvePoint(path.Tile, path.Record, summary.TileSizeMeters)));
+            painter.fillColor = handleFillColor;
+            painter.strokeColor = selectedObjectColor;
+            painter.lineWidth = 2f;
+            painter.BeginPath();
+            AddCircle(painter, middle, HandleRadius);
+            painter.Fill();
+            painter.Stroke();
             // Square handles at both ends: drag one to move that end.
             foreach (var end in new[] { path.Points[0], path.Points[path.Points.Length - 1] })
             {
@@ -1384,8 +1399,8 @@ namespace OmsiMapEditor.UI
 
         private bool SplineHandlesShown => selectedSpline != null && AllowEditing && !roadMode && placementAsset == null && !ThreeDimensional;
 
-        /// <summary>The handle of the selected spline under a screen position: its end (true), its start (false) or none.</summary>
-        private bool? SplineHandleAt(Vector2 screen)
+        /// <summary>The handle of the selected spline under a screen position, or none.</summary>
+        private SplineHandleKind? SplineHandleAt(Vector2 screen)
         {
             if (!SplineHandlesShown)
                 return null;
@@ -1393,9 +1408,12 @@ namespace OmsiMapEditor.UI
             if (path == null)
                 return null;
             if (Vector2.Distance(screen, MapToScreen(path.Points[path.Points.Length - 1])) <= HandleRadius + 3f)
-                return true;
+                return SplineHandleKind.End;
             if (Vector2.Distance(screen, MapToScreen(path.Points[0])) <= HandleRadius + 3f)
-                return false;
+                return SplineHandleKind.Start;
+            var middle = OmsiSplineEditing.CurvePoint(path.Tile, path.Record, summary.TileSizeMeters);
+            if (Vector2.Distance(screen, MapToScreen(WorldToMap(middle))) <= HandleRadius + 3f)
+                return SplineHandleKind.Curve;
             return null;
         }
 
@@ -1946,9 +1964,8 @@ namespace OmsiMapEditor.UI
             var splineHandle = SplineHandleAt(position);
             if (splineHandle.HasValue)
             {
-                draggedSplineAtEnd = splineHandle.Value;
                 BeginDrag(DragMode.SplineEnd, evt.pointerId, position);
-                SplineEndDragStarted?.Invoke(draggedSplineAtEnd);
+                SplineEndDragStarted?.Invoke(splineHandle.Value);
                 evt.StopPropagation();
                 return;
             }
@@ -2770,7 +2787,7 @@ namespace OmsiMapEditor.UI
                     break;
                 case DragMode.SplineEnd:
                     var dragged = ScreenToMap(position);
-                    SplineEndDragged?.Invoke(dragged.x + originX, dragged.y + originY);
+                    SplineEndDragged?.Invoke(dragged.x + originX, dragged.y + originY, evt.altKey);
                     break;
                 case DragMode.Pan:
                     var delta = position - dragLastPointer;
@@ -2839,7 +2856,7 @@ namespace OmsiMapEditor.UI
             {
                 var dropped = ScreenToMap((Vector2)evt.localPosition);
                 EndDrag();
-                SplineEndDropped?.Invoke(dropped.x + originX, dropped.y + originY);
+                SplineEndDropped?.Invoke(dropped.x + originX, dropped.y + originY, evt.altKey);
                 MarkDirtyRepaint();
                 evt.StopPropagation();
                 return;
