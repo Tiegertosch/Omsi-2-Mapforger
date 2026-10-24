@@ -836,6 +836,15 @@ namespace OmsiMapEditor.Tests
             Assert.IsNull(OmsiRoadJunctions.FirstCrossing(summary, profiles, plan, 1.0, new[] { 10 }));
             Assert.IsNull(OmsiRoadJunctions.FirstCrossing(summary, profiles, plan, 25.0, new int[0]));
 
+            // Further east it crosses spline 11 too, which runs north from 200, 100: both in the order the road meets them.
+            var longer = OmsiRoadPlanner.Plan(new OmsiRoadRequest { StartX = 80, StartY = 125, EndX = 220, EndY = 125, HeightMode = OmsiRoadHeightMode.Manual }, null);
+            var crossings = OmsiRoadJunctions.Crossings(summary, profiles, longer, 1.0, new int[0]);
+            CollectionAssert.AreEqual(new[] { 10, 11 }, crossings.Select(each => each.Road.Spline.Id));
+            Assert.AreEqual(20.0, crossings[0].Along, 1e-6);
+            Assert.AreEqual(120.0, crossings[1].Along, 1e-6);
+            Assert.AreEqual(25.0, crossings[1].Road.Distance, 1e-6);
+            CollectionAssert.AreEqual(new[] { 11 }, OmsiRoadJunctions.Crossings(summary, profiles, longer, 1.0, new[] { 10 }).Select(each => each.Road.Spline.Id));
+
             // An end on its carriageway lies on it; 6 m beside it, past its 4 m half width, does not.
             Assert.AreEqual(10, OmsiRoadJunctions.RoadAt(summary, profiles, 101, 140).Spline.Id);
             Assert.IsNull(OmsiRoadJunctions.RoadAt(summary, profiles, 106, 140));

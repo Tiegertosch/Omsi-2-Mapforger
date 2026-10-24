@@ -329,3 +329,13 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Der alte Dialog konnte nur Namen vergeben; alles andere musste man nach dem Anlegen in `global.cfg` von Hand ändern. Für Testkarten (Größe, Höhe, Boden) und neue Projekte (Zeit, Währung, Linksverkehr) gehört es an den Anfang.
 - Werte der Vorlage als Ausgangspunkt halten die Vorlage als Quelle für alles, was der Dialog nicht kennt, und eine nicht angefasste Einstellung ändert nichts.
 - „Nur Sommer“ ist in OMSI eine Karte ohne `[addseason]`; alle installierten Karten haben einen Schneewinter mit dieser Abfolge, die Tage unterscheiden sich wenig; übernommen sind die von Grundorf.
+
+## ADR 033: Mehrere Kreuzungen auf einer neuen Straße
+
+**Status:** Angenommen, 24. Oktober 2026, auf Wunsch des Nutzers (offener Punkt aus ADR 028); vom Nutzer im Editor geprüft.
+
+**Entscheidung:** Ein Klick mit dem Straßenwerkzeug baut an jeder Straße, die die neue Straße auf dem Weg kreuzt, eine Kreuzung mit vier Armen, und endet sie auf einer Straße, dort zusätzlich eine T-Kreuzung (bisher nur eine Kreuzung, und eine T-Kreuzung am Ende verdrängte jede Kreuzung davor). Gebaut wird der Reihe nach: Die erste gekreuzte Straße bekommt ihre Kreuzung, die neue Straße wird bis zu deren hinterem Arm gebaut, dann wird vom vorderen Arm aus neu geplant und die nächste Kreuzung gesucht. `OmsiRoadJunctions.Crossings` liefert dafür alle Schnittpunkte in Fahrtrichtung (`FirstCrossing` ist der erste davon). Die Mittellinie der Straße, auf der die neue endet, zählt in den letzten 20 m nicht als Kreuzung. Kreuzt die Straße eine davon flacher als 30°, wird nichts gebaut, mit Hinweis; mehr als zwölf Kreuzungen in einem Klick ebenso. Alles bleibt ein Rückgängig-Schritt; scheitert ein Teil, werden die vorigen zurückgenommen. Die Vorschau nennt alle Kreuzungen mit ihrem Abstand.
+
+**Grund:**
+- Lange Straßen über mehrere Querstraßen in einem Zug zu ziehen ist der übliche Fall; bisher entstand nur an der ersten eine Kreuzung, die übrigen wurden ohne Verbindung überbaut.
+- Neu planen nach jeder Kreuzung statt alle Schnittpunkte der ersten Planung zu nutzen: Jede Kreuzung verschiebt den Weg um ihre Arme, und die Straße verlässt sie in Richtung ihres vorderen Arms; die übrigen Schnittpunkte liegen danach woanders.

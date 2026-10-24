@@ -438,10 +438,23 @@ namespace OmsiMapEditor.OMSI
         public static OmsiRoadCrossing FirstCrossing(OmsiMapSummary summary, OmsiSplineProfileCatalog profiles, OmsiRoadPlan plan, double skip,
             ICollection<int> ignore)
         {
+            var crossings = Crossings(summary, profiles, plan, skip, ignore);
+            return crossings.Count > 0 ? crossings[0] : null;
+        }
+
+        /// <summary>
+        /// Every place where a planned road crosses the centre line of an existing road, in the order the road meets them,
+        /// at least <paramref name="skip"/> metres from either end of the planned road; splines in <paramref name="ignore"/>
+        /// do not count. A road crossed twice, as by a bend, is listed twice.
+        /// </summary>
+        public static List<OmsiRoadCrossing> Crossings(OmsiMapSummary summary, OmsiSplineProfileCatalog profiles, OmsiRoadPlan plan, double skip,
+            ICollection<int> ignore)
+        {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
+            var found = new List<OmsiRoadCrossing>();
             if (plan == null || plan.Pieces.Count == 0)
-                return null;
+                return found;
             // The planned road as a line every half metre, with distance and heading at each point.
             var course = new List<double[]>();
             var travelled = 0.0;
@@ -464,7 +477,6 @@ namespace OmsiMapEditor.OMSI
             }
 
             var size = summary.TileSizeMeters;
-            OmsiRoadCrossing best = null;
             foreach (var tile in summary.Tiles)
             {
                 if ((tile.X + 1) * size < minX - 1.0 || tile.X * size > maxX + 1.0 || (tile.Y + 1) * size < minY - 1.0 || tile.Y * size > maxY + 1.0)
@@ -492,19 +504,25 @@ namespace OmsiMapEditor.OMSI
                             if (!Intersect(a[0], a[1], b[0], b[1], previous.X, previous.Y, current.X, current.Y, out var t, out var u))
                                 continue;
                             var at = a[2] + (b[2] - a[2]) * t;
-                            if (at < skip || at > travelled - skip || best != null && at >= best.Along)
+                            if (at < skip || at > travelled - skip)
                                 continue;
-                            best = new OmsiRoadCrossing
+                            found.Add(new OmsiRoadCrossing
                             {
                                 Road = new OmsiSplinePoint { Tile = tile, Spline = spline, Distance = along - spline.LengthMeters / steps * (1.0 - u), Offset = 0.0 },
                                 Along = at, HeadingDegrees = a[3] + OmsiRoadPlanner.Normalize(b[3] - a[3]) * t
-                            };
+                            });
                         }
                         previous = current;
                     }
                 }
             }
-            return best;
+            // Where the lines meet at a corner of either, the same crossing is found twice; the first one stays.
+            found.Sort((first, second) => first.Along.CompareTo(second.Along));
+            var result = new List<OmsiRoadCrossing>();
+            foreach (var crossing in found)
+                if (!result.Exists(kept => kept.Road.Spline.Id == crossing.Road.Spline.Id && Math.Abs(kept.Along - crossing.Along) < 1.0))
+                    result.Add(crossing);
+            return result;
         }
 
         /// <summary>

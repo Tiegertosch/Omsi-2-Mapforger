@@ -853,9 +853,15 @@ namespace OmsiMapEditor.UI
                 {
                     roadPointer = points[index];
                     if (index < points.Count - 1 || build)
+                    {
                         BuildRoadTo(points[index].X, points[index].Y);
+                        // Later messages replace the status, so a check by command line reads each click's outcome in the log.
+                        Debug.Log("Road click " + (index + 1) + ": " + statusLabel?.text);
+                    }
                     else
+                    {
                         UpdateRoadPreview();
+                    }
                 }
             }
 
@@ -1983,14 +1989,16 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// What a road to the target would meet (ADR 028): a road its end lies on, else the first road it crosses; neither
-        /// when junctions are switched off, the road ends on a free spline end or connection point, or a profile is no road.
+        /// What a road to the target would meet (ADR 028, ADR 033): a road its end lies on and the roads it crosses on the
+        /// way; nothing when junctions are switched off or a profile is no road, and no T junction when the road ends on a
+        /// free spline end or connection point. The crossings are found on the road as planned now; building plans each
+        /// part again from the junction before it.
         /// </summary>
         private void FindJunction(OmsiRoadPlan plan, OmsiMapPoint target, OmsiSplineEnd endJoin, OmsiJunctionPort endPort, out OmsiSplinePoint tee,
-            out OmsiRoadCrossing crossing)
+            out List<OmsiRoadCrossing> crossings)
         {
             tee = null;
-            crossing = null;
+            crossings = new List<OmsiRoadCrossing>();
             if (!roadPanel.MakeJunctions || plan.HasErrors || plan.Pieces.Count == 0 || roadPanel.Profile == null || !CanEdit)
                 return;
             var profiles = RoadProfiles();
@@ -2003,8 +2011,9 @@ namespace OmsiMapEditor.UI
                 ignore.Add(endJoin.Spline.Id);
             if (endJoin == null && endPort == null)
                 tee = OmsiRoadJunctions.RoadAt(currentSummary, profiles, target.X, target.Y);
-            if (tee == null)
-                crossing = OmsiRoadJunctions.FirstCrossing(currentSummary, profiles, plan, 1.0, ignore);
+            foreach (var crossing in OmsiRoadJunctions.Crossings(currentSummary, profiles, plan, 1.0, ignore))
+                if (tee == null || crossing.Road.Spline.Id != tee.Spline.Id || crossing.Along < plan.LengthMeters - TeeReachMeters)
+                    crossings.Add(crossing);
         }
 
         /// <summary>
@@ -2269,82 +2278,125 @@ namespace OmsiMapEditor.UI
             SetStatus(message + " Click to go on, Esc ends the road.");
         }
 
-        /// <summary>Ends the road on another road with a new T junction: the junction goes into that road, the new road runs to its side arm.</summary>
-        private void BuildTee(OmsiSplinePoint target)
-        {
-            var profiles = RoadProfiles();
-            var chain = OmsiSplineChain.Around(currentSummary, target.Tile, target.Spline, 1.0);
-            chain.FrameAt(target.Distance, out var point, out var heading, out _);
-            var side = OmsiRoadJunctions.SideHeading(OmsiRoadPlanner.ChordHeading(point.X, point.Y, roadStart.X, roadStart.Y) - heading);
-            // The new road arrives on the side arm.
-            var arms = OmsiRoadJunctions.Arms(target.Spline.AssetPath, profiles.Get(target.Spline.AssetPath), roadPanel.Profile, profiles.Get(roadPanel.Profile),
-                new[] { side }, new double[0]);
-            var steps = new List<object>();
-            var startJoinId = roadStartJoin?.Spline.Id;
-            var junction = InsertGeneratedJunction(arms, target, roadStart, steps);
-            if (junction == null)
-                return;
-            var startJoin = RefindStartJoin(startJoinId);
-            var port = PortFacing(junction, junction.HeadingDegrees + side);
-            if (startJoinId.HasValue && startJoin == null ||
-                BuildRoadPart(roadStart, roadStartHeading, roadStartHeight, startJoin?.OutwardGradientPercent, startJoin, port.Position, null, port, steps) == null)
-            {
-                RevertSteps(steps);
-                return;
-            }
-            PushSteps(steps, "the T junction #" + junction.Id + " and the road to it");
-            EndRoad();
-            SetStatus("Built the road and joined it to the road with a new T junction (#" + junction.Id + "). Ctrl+Z takes both back.");
-        }
-
         /// <summary>
-        /// Builds a road crossing another with new crossroads at the crossing: they go into the crossed road, and the new road
-        /// runs in two parts to their arms and on to the target.
+        /// Builds a road that crosses other roads, ends on one, or both (ADR 028, ADR 033): new crossroads go into each
+        /// crossed road in turn, the road runs in parts from arm to arm, planned again from each junction, and a road it
+        /// ends on gets a new T junction. All of it is one undo step; when a part fails, the parts before it are taken back.
         /// </summary>
-        private void BuildCrossing(OmsiRoadCrossing crossing, OmsiMapPoint target)
+        private void BuildJunctions(OmsiMapPoint target, bool endsOnRoad)
         {
             var profiles = RoadProfiles();
-            var road = crossing.Road;
-            var chain = OmsiSplineChain.Around(currentSummary, road.Tile, road.Spline, 1.0);
-            chain.FrameAt(road.Distance, out _, out var heading, out _);
-            var relative = OmsiRoadPlanner.Normalize(crossing.HeadingDegrees - heading);
-            if (Math.Abs(relative) < 30.0 || Math.Abs(relative) > 150.0)
-            {
-                SetStatus("The road crosses spline #" + road.Spline.Id + " at " + Math.Abs(relative).ToString("0") +
-                          "°, too shallow for crossroads; switch off Make junctions to build it without one.");
-                return;
-            }
             Snap(target, out var endJoin, out var endPort);
-            var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
             var endJoinId = endJoin?.Spline.Id;
             var endJoinAtEnd = endJoin?.AtEnd ?? false;
-            // The new road arrives on the arm facing its start and leaves on the one ahead.
-            var arms = OmsiRoadJunctions.Arms(road.Spline.AssetPath, profiles.Get(road.Spline.AssetPath), roadPanel.Profile, profiles.Get(roadPanel.Profile),
-                new[] { relative + 180.0 }, new[] { relative });
             var steps = new List<object>();
+            var junctionIds = new List<int>();
+            var crossedIds = new List<int>();
+            var start = roadStart;
+            var startHeading = roadStartHeading;
+            var startHeight = roadStartHeight;
             var startJoinId = roadStartJoin?.Spline.Id;
-            var junction = InsertGeneratedJunction(arms, road, roadStart, steps);
-            if (junction == null)
-                return;
-            var startJoin = RefindStartJoin(startJoinId);
-            var back = PortFacing(junction, crossing.HeadingDegrees + 180.0);
-            var ahead = PortFacing(junction, crossing.HeadingDegrees);
-            if (endJoinId.HasValue)
-            {
-                var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == endJoinId.Value));
-                var spline = tile?.Splines.Find(candidate => candidate.Id == endJoinId.Value);
-                endJoin = spline != null ? new OmsiSplineEnd(tile, spline, endJoinAtEnd) : null;
-            }
             OmsiSplineChange last = null;
-            if (startJoinId.HasValue && startJoin == null || endJoinId.HasValue && endJoin == null ||
-                BuildRoadPart(roadStart, roadStartHeading, roadStartHeight, startJoin?.OutwardGradientPercent, startJoin, back.Position, null, back, steps) == null ||
-                (last = BuildRoadPart(ahead.Position, ahead.OutwardHeadingDegrees, ahead.Height, null, null, end, endJoin, endPort, steps)) == null)
+            while (true)
+            {
+                // Splines are read again after every part, so the joined ends are found again by their IDs.
+                var startJoin = RefindStartJoin(startJoinId);
+                if (startJoinId.HasValue && startJoin == null || !RefindEnd(endJoinId, endJoinAtEnd, out endJoin))
+                {
+                    FailJunctions(steps, "a spline the road joins changed on the way.");
+                    return;
+                }
+                var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
+                var plan = PlanRoadBetween(start, startHeading, startHeight, startJoin?.OutwardGradientPercent, end, endJoin, endPort);
+                if (plan.HasErrors)
+                {
+                    FailJunctions(steps, plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                    return;
+                }
+                var crossing = NextCrossing(plan, target, startJoin, endJoin, endsOnRoad);
+                if (crossing == null)
+                    break;
+                if (junctionIds.Count >= MaximumJunctionsPerRoad)
+                {
+                    FailJunctions(steps, "it crosses more than " + MaximumJunctionsPerRoad + " roads; build it in shorter parts.");
+                    return;
+                }
+                var road = crossing.Road;
+                var relative = CrossingAngle(crossing);
+                if (Math.Abs(relative) < 30.0 || Math.Abs(relative) > 150.0)
+                {
+                    FailJunctions(steps, "it crosses spline #" + road.Spline.Id + " at " + Math.Abs(relative).ToString("0") +
+                                         "°, too shallow for crossroads; switch off Make junctions to build it without one.");
+                    return;
+                }
+                // The new road arrives on the arm facing its start and leaves on the one ahead.
+                var arms = OmsiRoadJunctions.Arms(road.Spline.AssetPath, profiles.Get(road.Spline.AssetPath), roadPanel.Profile, profiles.Get(roadPanel.Profile),
+                    new[] { relative + 180.0 }, new[] { relative });
+                var junction = InsertGeneratedJunction(arms, road, start, steps);
+                if (junction == null)
+                {
+                    FailJunctionAt(steps, road.Spline.Id, junctionIds.Count);
+                    return;
+                }
+                junctionIds.Add(junction.Id);
+                crossedIds.Add(road.Spline.Id);
+                startJoin = RefindStartJoin(startJoinId);
+                var back = PortFacing(junction, crossing.HeadingDegrees + 180.0);
+                var ahead = PortFacing(junction, crossing.HeadingDegrees);
+                if (startJoinId.HasValue && startJoin == null ||
+                    BuildRoadPart(start, startHeading, startHeight, startJoin?.OutwardGradientPercent, startJoin, back.Position, null, back, steps) == null)
+                {
+                    RevertSteps(steps);
+                    return;
+                }
+                // The rest of the road leaves the junction on the arm ahead.
+                start = ahead.Position;
+                startHeading = ahead.OutwardHeadingDegrees;
+                startHeight = ahead.Height;
+                startJoinId = null;
+            }
+
+            var tee = endsOnRoad && endJoin == null && endPort == null ? OmsiRoadJunctions.RoadAt(currentSummary, profiles, target.X, target.Y) : null;
+            var lastStartJoin = RefindStartJoin(startJoinId);
+            if (tee != null)
+            {
+                var chain = OmsiSplineChain.Around(currentSummary, tee.Tile, tee.Spline, 1.0);
+                chain.FrameAt(tee.Distance, out var point, out var heading, out _);
+                var side = OmsiRoadJunctions.SideHeading(OmsiRoadPlanner.ChordHeading(point.X, point.Y, start.X, start.Y) - heading);
+                // The new road arrives on the side arm.
+                var arms = OmsiRoadJunctions.Arms(tee.Spline.AssetPath, profiles.Get(tee.Spline.AssetPath), roadPanel.Profile, profiles.Get(roadPanel.Profile),
+                    new[] { side }, new double[0]);
+                var junction = InsertGeneratedJunction(arms, tee, start, steps);
+                if (junction == null)
+                {
+                    FailJunctionAt(steps, tee.Spline.Id, junctionIds.Count);
+                    return;
+                }
+                lastStartJoin = RefindStartJoin(startJoinId);
+                var port = PortFacing(junction, junction.HeadingDegrees + side);
+                if (startJoinId.HasValue && lastStartJoin == null ||
+                    BuildRoadPart(start, startHeading, startHeight, lastStartJoin?.OutwardGradientPercent, lastStartJoin, port.Position, null, port, steps) == null)
+                {
+                    RevertSteps(steps);
+                    return;
+                }
+                PushSteps(steps, DescribeJunctions(junctionIds.Count, true));
+                EndRoad();
+                SetStatus("Built the road" + (crossedIds.Count > 0 ? " across " + DescribeSplines(crossedIds) + " with new crossroads," : string.Empty) +
+                          " joined to spline #" + tee.Spline.Id + " with a new T junction (#" + junction.Id + "). Ctrl+Z takes it all back.");
+                return;
+            }
+
+            var finalEnd = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
+            if (startJoinId.HasValue && lastStartJoin == null ||
+                (last = BuildRoadPart(start, startHeading, startHeight, lastStartJoin?.OutwardGradientPercent, lastStartJoin, finalEnd, endJoin, endPort, steps)) == null)
             {
                 RevertSteps(steps);
                 return;
             }
-            PushSteps(steps, "the crossroads #" + junction.Id + " and the road through them");
-            var message = "Built the road across spline #" + road.Spline.Id + " with new crossroads (#" + junction.Id + "). Ctrl+Z takes it all back.";
+            PushSteps(steps, DescribeJunctions(junctionIds.Count, false));
+            var message = "Built the road across " + DescribeSplines(crossedIds) + " with new crossroads (#" + string.Join(", #", junctionIds) +
+                          "). Ctrl+Z takes it all back.";
             if (endJoin != null || endPort != null)
             {
                 EndRoad();
@@ -2353,6 +2405,88 @@ namespace OmsiMapEditor.UI
             }
             ContinueRoadFrom(last);
             SetStatus(message + " Click to go on, Esc ends the road.");
+        }
+
+        /// <summary>A road crosses at most this many roads in one click; more would make a long undo step few would want.</summary>
+        private const int MaximumJunctionsPerRoad = 12;
+
+        /// <summary>
+        /// The first road a planned part crosses, other than the splines it joins; with <paramref name="endsOnRoad"/> not the
+        /// road it ends on near its end, where it gets a T junction instead.
+        /// </summary>
+        private OmsiRoadCrossing NextCrossing(OmsiRoadPlan plan, OmsiMapPoint target, OmsiSplineEnd startJoin, OmsiSplineEnd endJoin, bool endsOnRoad)
+        {
+            var profiles = RoadProfiles();
+            var ignore = new HashSet<int>();
+            if (startJoin != null)
+                ignore.Add(startJoin.Spline.Id);
+            if (endJoin != null)
+                ignore.Add(endJoin.Spline.Id);
+            var tee = endsOnRoad ? OmsiRoadJunctions.RoadAt(currentSummary, profiles, target.X, target.Y) : null;
+            foreach (var crossing in OmsiRoadJunctions.Crossings(currentSummary, profiles, plan, 1.0, ignore))
+                if (tee == null || crossing.Road.Spline.Id != tee.Spline.Id || crossing.Along < plan.LengthMeters - TeeReachMeters)
+                    return crossing;
+            return null;
+        }
+
+        /// <summary>Near its end a road ending on another may cross that road's centre line; that is the T junction, not a crossing.</summary>
+        private const double TeeReachMeters = 20.0;
+
+        /// <summary>The angle of a planned road against the road it crosses, from -180° to 180°.</summary>
+        private double CrossingAngle(OmsiRoadCrossing crossing)
+        {
+            var chain = OmsiSplineChain.Around(currentSummary, crossing.Road.Tile, crossing.Road.Spline, 1.0);
+            chain.FrameAt(crossing.Road.Distance, out _, out var heading, out _);
+            return OmsiRoadPlanner.Normalize(crossing.HeadingDegrees - heading);
+        }
+
+        /// <summary>Finds the spline end the road ends on again by its ID; false when it went.</summary>
+        private bool RefindEnd(int? id, bool atEnd, out OmsiSplineEnd end)
+        {
+            end = null;
+            if (!id.HasValue)
+                return true;
+            var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id.Value));
+            var spline = tile?.Splines.Find(candidate => candidate.Id == id.Value);
+            if (spline == null)
+                return false;
+            end = new OmsiSplineEnd(tile, spline, atEnd);
+            return true;
+        }
+
+        /// <summary>
+        /// Takes back what was built when a junction could not go into a road, and says at which road, since a long road
+        /// may cross several.
+        /// </summary>
+        private void FailJunctionAt(List<object> steps, int splineId, int builtBefore)
+        {
+            var reason = statusLabel?.text ?? string.Empty;
+            if (steps.Count > 0)
+                RevertSteps(steps);
+            SetStatus("Nothing was built" + (builtBefore > 0 ? ", also not the " + builtBefore + " crossroads before it" : string.Empty) +
+                      ". At spline #" + splineId + ": " + reason);
+        }
+
+        private void FailJunctions(List<object> steps, string reason)
+        {
+            if (steps.Count > 0)
+                RevertSteps(steps);
+            SetStatus("This road cannot be built: " + reason);
+        }
+
+        private static string DescribeJunctions(int crossroads, bool tee)
+        {
+            var parts = new List<string>();
+            if (crossroads > 0)
+                parts.Add(crossroads == 1 ? "the crossroads" : crossroads + " crossroads");
+            if (tee)
+                parts.Add("the T junction");
+            return string.Join(" and ", parts) + " and the road " + (tee && crossroads == 0 ? "to it" : "through them");
+        }
+
+        private static string DescribeSplines(List<int> ids)
+        {
+            return (ids.Count == 1 ? "spline #" : "splines #") + string.Join(", #", ids);
         }
 
         /// <summary>The spline end the road started from, found again by its ID after splines were read again; null when it went.</summary>
@@ -2436,11 +2570,20 @@ namespace OmsiMapEditor.UI
             }
             mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues,
                 endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position, roadStart, heights);
-            FindJunction(plan, roadPointer.Value, endJoin, endPort, out var tee, out var crossing);
-            var meets = tee != null ? " Ends on spline #" + tee.Spline.Id + ": a click joins it with a new T junction."
-                : crossing != null ? " Crosses spline #" + crossing.Road.Spline.Id + " after " + crossing.Along.ToString("F0") + " m: a click makes crossroads there."
-                : NeedsTransition(roadStartJoin, false) || NeedsTransition(endJoin, true) ? " Joins a road of another width: a click puts a transition between them."
-                : string.Empty;
+            FindJunction(plan, roadPointer.Value, endJoin, endPort, out var tee, out var crossings);
+            var meets = string.Empty;
+            if (crossings.Count == 1)
+                meets = " Crosses spline #" + crossings[0].Road.Spline.Id + " after " + crossings[0].Along.ToString("F0") + " m: a click makes crossroads there.";
+            else if (crossings.Count > 1)
+                meets = " Crosses " + crossings.Count + " roads, after " + string.Join(", ", crossings.ConvertAll(crossing => crossing.Along.ToString("F0"))) +
+                        " m: a click makes crossroads at each.";
+            var shallow = crossings.Find(crossing => Math.Abs(CrossingAngle(crossing)) < 30.0 || Math.Abs(CrossingAngle(crossing)) > 150.0);
+            if (shallow != null)
+                meets += " Spline #" + shallow.Road.Spline.Id + " is crossed too shallowly for crossroads, so the road cannot be built with junctions.";
+            if (tee != null)
+                meets += " Ends on spline #" + tee.Spline.Id + ": a click joins it with a new T junction.";
+            if (meets.Length == 0 && (NeedsTransition(roadStartJoin, false) || NeedsTransition(endJoin, true)))
+                meets = " Joins a road of another width: a click puts a transition between them.";
             roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort) + meets, plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
         }
 
@@ -2500,15 +2643,10 @@ namespace OmsiMapEditor.UI
                 SetStatus("This road cannot be built: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
                 return;
             }
-            FindJunction(plan, point, endJoin, endPort, out var tee, out var crossing);
-            if (tee != null)
+            FindJunction(plan, point, endJoin, endPort, out var tee, out var crossings);
+            if (tee != null || crossings.Count > 0)
             {
-                BuildTee(tee);
-                return;
-            }
-            if (crossing != null)
-            {
-                BuildCrossing(crossing, point);
+                BuildJunctions(point, tee != null);
                 return;
             }
             var transitionAtStart = NeedsTransition(roadStartJoin, false);
