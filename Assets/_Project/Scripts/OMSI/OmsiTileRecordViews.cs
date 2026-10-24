@@ -222,10 +222,25 @@ namespace OmsiMapEditor.OMSI
         public double CantStart { get => GetDouble(cantIndex); set => SetDouble(cantIndex, value); }
         public double CantEnd { get => GetDouble(cantIndex + 1); set => SetDouble(cantIndex + 1, value); }
 
-        /// <summary>Skew exists from tile version 14; null before.</summary>
-        public double? SkewStart => skewIndex.HasValue ? GetDouble(skewIndex.Value) : (double?)null;
+        /// <summary>Skew exists from tile version 14; null before, and setting it there fails.</summary>
+        public double? SkewStart
+        {
+            get => skewIndex.HasValue ? GetDouble(skewIndex.Value) : (double?)null;
+            set => SetDouble(SkewIndex(), value ?? 0.0);
+        }
 
-        public double? SkewEnd => skewIndex.HasValue ? GetDouble(skewIndex.Value + 1) : (double?)null;
+        public double? SkewEnd
+        {
+            get => skewIndex.HasValue ? GetDouble(skewIndex.Value + 1) : (double?)null;
+            set => SetDouble(SkewIndex() + 1, value ?? 0.0);
+        }
+
+        private int SkewIndex()
+        {
+            if (!skewIndex.HasValue)
+                throw new InvalidOperationException("Splines of tiles before version 14 have no skew.");
+            return skewIndex.Value;
+        }
 
         public double AlignmentLength { get => GetDouble(alignmentIndex); set => SetDouble(alignmentIndex, value); }
 

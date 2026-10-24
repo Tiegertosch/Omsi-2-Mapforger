@@ -75,6 +75,11 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Anschluss an Punkte und Spline-Enden mit fester Start- und Endrichtung knickfrei mit zwei Bögen (ADR 024); Gelände bleibt hinter Straßenenden an Kreuzungen unverändert (ADR 022)
   - [x] Etappe 3b: Kreuzungen in der Kartenprüfung (Tools) zusammengefasst (Thema „Junctions“ mit Zählung je Zustand, Liste und Sprung zur Kachel); Gelände an im Editor platzierte Kreuzungen angepasst, an denen eine Straße mit Geländeanpassung hängt (ADR 022), neu berechnet nach Verschieben, Platzieren, Löschen und Rückgängig
   - [x] Nach Spieltest (Nutzer, 24. Oktober 2026): Kreuzungen und `[absheight]`-Objekte auf Geländehöhe platziert statt auf 0 m; zwischen Straßen auf verschiedener Höhe Rampe von Bordstein zu Bordstein statt Wand
+  - Etappe 4, Kreuzungen als eigene Objekte (Wunsch des Nutzers vom 24. Oktober 2026):
+    - [x] 4a (ADR 025): Splines teilen; vorhandenes Kreuzungsobjekt in eine Straße einsetzen: Vorschau rastet auf der Straße ein, Seitenarme zur Seite des Zeigers, Alt platziert frei; Klick schneidet die Straße 5 m hinter den Anschlusspunkten und führt kurze Stücke mit zwei Bögen an die Punkte, ein Rückgängig-Schritt
+    - 4b: Machbarkeit erzeugter Objekte: einfache Platte mit Splinehelpern und Fahrpfad, Speicherort im Kartenordner prüfen, Test in OMSI, ADR
+    - 4c: Kreuzungsgeometrie aus den Profilen der Arme (Fahrbahn, Bordsteine, Gehwege, Eckradien, Texturen), Geländeloch, Splinehelper, Fahrpfade aller Abbiegebeziehungen
+    - 4d: Dynamisch: Treffen oder Kreuzen sich Straßen beim Bauen, Kreuzung vorschlagen, Straßen kürzen, Objekt erzeugen und anschließen; nach Verschieben eines Arms neu erzeugen
   - Gelände-Werkzeuge: Kanten an sehr steilen Stellen glätten, etwa zwischen den Ästen einer Kehre am Hang, die das 5-m-Raster nicht ohne Stufe abbilden kann (mit dem Nutzer vereinbart, 24. Oktober 2026)
 - Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
 - [x] Validierungsberichte und Integritätsprüfungen ergänzen: Bericht unter **Tools** mit elf Themen (Import, Spline-Verbindungen, IDs und `[NextIDCode]`, Einstiegspunkte samt Index und Winkel, Anhängungen und verwaiste Wiederholungen, `[varparent]`-Ziele, fehlende Objekt- und Spline-Dateien, Anschlusspunkte von Kreuzungen, Fahrplan, Chrono-Auswahlen, DLC-Objekte), im Hintergrund berechnet, mit Sprung zur Kachel und „Copy report“
@@ -101,7 +106,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Objekte mit kachelgebundenen Verweisen mitsamt diesen Verweisen umziehen: Einstiegspunkte, Chrono-Auswahl, angehängte Objekte und Variablen-Eltern
 - Mehrere Objekte gemeinsam drehen
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
-- Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen; bisher wird 0 geschrieben und ein Hinweis angezeigt
+- [x] Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen (24. Oktober 2026)
 - Andere Elemente anlegen und löschen: angehängte Objekte und Spline-Anhängungen (Splines: siehe Straßenbau)
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht

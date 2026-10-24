@@ -678,6 +678,139 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void SplittingASplineKeepsTheRoadAndJoinsBothPartsAndTheNeighbour()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tileBefore = File.ReadAllBytes(Path.Combine(mapFolder, "tile_0_0.map"));
+            // A curved road rising from 2 m to 5 m in one piece, and a straight road going on from its end.
+            var curve = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 140, EndY = 250, EndHeight = 5, HeightMode = OmsiRoadHeightMode.Manual,
+                MaximumPieceLength = 200
+            }, null), @"Splines\road.sli", null, null);
+            OmsiSplineRecord Spline(int id) => summary.Tiles[0].Splines.Single(candidate => candidate.Id == id);
+            var curveId = curve.SplineIds.Single();
+            var original = Spline(curveId);
+            var end = new OmsiSplineEnd(summary.Tiles[0], original, true);
+            var endPosition = end.Position(300);
+            var on = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = endPosition.X, StartY = endPosition.Y, StartHeadingDegrees = end.OutwardHeadingDegrees, StartHeight = 5, EndX = 170, EndY = 270,
+                EndHeight = 5, HeightMode = OmsiRoadHeightMode.Manual, MaximumPieceLength = 200
+            }, null), @"Splines\road.sli", end, null);
+            var onId = on.SplineIds.Single();
+            var length = Spline(curveId).LengthMeters;
+            var endHeading = new OmsiSplineEnd(summary.Tiles[0], Spline(curveId), true).OutwardHeadingDegrees;
+
+            var result = session.SplitSpline(summary, summary.Tiles[0], Spline(curveId), 15);
+
+            Assert.IsTrue(result.Succeeded);
+            var newId = result.Change.SplineIds[1];
+            var first = Spline(curveId);
+            var second = Spline(newId);
+            Assert.AreEqual(newId, first.NextId);
+            Assert.AreEqual(curveId, second.PreviousId);
+            Assert.AreEqual(onId, second.NextId);
+            Assert.AreEqual(newId, Spline(onId).PreviousId);
+            Assert.AreEqual(15.0, first.LengthMeters, 1e-6);
+            Assert.AreEqual(length, first.LengthMeters + second.LengthMeters, 1e-6);
+            Assert.AreEqual(first.RadiusMeters, second.RadiusMeters, 1e-9);
+            // The parts meet without a gap, kink or step, and the second ends where the spline ended.
+            var joint = new OmsiSplineEnd(summary.Tiles[0], first, true);
+            var start = new OmsiSplineEnd(summary.Tiles[0], second, false);
+            Assert.AreEqual(0.0, Distance(joint.Position(300), start.Position(300)), 1e-4);
+            Assert.AreEqual(0.0, OmsiRoadPlanner.Normalize(joint.OutwardHeadingDegrees + 180.0 - start.OutwardHeadingDegrees), 1e-4);
+            Assert.AreEqual(first.EndHeight, second.Height, 1e-4);
+            Assert.AreEqual(first.GradientEndPercent, second.GradientStartPercent, 1e-4);
+            Assert.AreEqual(0.0, Distance(endPosition, new OmsiSplineEnd(summary.Tiles[0], second, true).Position(300)), 1e-4);
+            Assert.AreEqual(0.0, OmsiRoadPlanner.Normalize(endHeading - new OmsiSplineEnd(summary.Tiles[0], second, true).OutwardHeadingDegrees), 1e-4);
+            Assert.AreEqual(5.0, second.EndHeight, 1e-4);
+
+            // Undo puts the one spline back, redo splits it again.
+            session.Undo(summary, result.Change);
+            Assert.IsFalse(summary.Tiles[0].Splines.Exists(candidate => candidate.Id == newId));
+            Assert.AreEqual(onId, Spline(curveId).NextId);
+            session.Redo(summary, result.Change);
+            Assert.AreEqual(newId, Spline(onId).PreviousId);
+
+            // Too close to an end, and on a spline with a row of lamps along it, nothing is split.
+            Assert.Throws<InvalidOperationException>(() => session.SplitSpline(summary, summary.Tiles[0], Spline(curveId), 0.2));
+            var blocked = session.SplitSpline(summary, summary.Tiles[0], Spline(11), 10);
+            Assert.IsFalse(blocked.Succeeded);
+            CollectionAssert.IsNotEmpty(blocked.Blockers);
+            // The original map is never written.
+            CollectionAssert.AreEqual(tileBefore, File.ReadAllBytes(Path.Combine(mapFolder, "tile_0_0.map")));
+        }
+
+        [Test]
+        public void AJunctionInsertedIntoARoadSitsOnItsCentreLineAndIsJoinedOnBothSides()
+        {
+            // A T junction: one arm 7 m ahead, two 7 m to the right and left, facing out.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "tee.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n7\r\n0\r\n\r\n" +
+                "[splinehelper]\r\nSplines\\road.sli\r\n7\r\n0\r\n0\r\n90\r\n\r\n" +
+                "[splinehelper]\r\nSplines\\road.sli\r\n-7\r\n0\r\n0\r\n-90\r\n");
+            const string tee = @"Sceneryobjects\Test\tee.sco";
+            var session = OpenProject();
+            var summary = session.Read();
+            // A straight road 100 m north from 100, 180 at 2 m, in four pieces.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 180, StartHeight = 2, EndX = 100, EndY = 280, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var tileBytes = session.Workspace.ReadAllBytes("tile_0_0.map");
+            var catalog = new OmsiJunctionCatalog(installation);
+            // The pointer lies east of the road at 230: the third arm points east.
+            var spline = summary.Tiles[0].Splines.Single(candidate => candidate.Id == road.SplineIds[1]);
+            var plan = OmsiJunctionInsertion.Plan(summary, catalog, tee, summary.Tiles[0], spline, 25.0, 110, 230);
+
+            Assert.IsNull(plan.Problem);
+            Assert.AreEqual(90.0, plan.HeadingDegrees, 1e-6);
+            Assert.AreEqual(100.0, plan.Position.X, 1e-6);
+            Assert.AreEqual(230.0, plan.Position.Y, 1e-6);
+            Assert.AreEqual(2.0, plan.Height, 1e-6);
+            Assert.AreEqual(223.0, plan.PortAtStart.Position.Y, 1e-6);
+            Assert.AreEqual(237.0, plan.PortAtEnd.Position.Y, 1e-6);
+
+            var result = session.InsertJunction(summary, plan);
+
+            Assert.IsTrue(result.Succeeded);
+            var ports = catalog.Ports(summary.Tiles[0], result.Junction, 300);
+            var checks = OmsiJunctionCatalog.Check(summary, ports);
+            Assert.AreEqual(OmsiJunctionPortState.Unconnected, checks[0].State);
+            Assert.AreEqual(OmsiJunctionPortState.Connected, checks[1].State, checks[1].Message);
+            Assert.AreEqual(OmsiJunctionPortState.Connected, checks[2].State, checks[2].Message);
+            // No road runs under the junction, and the road keeps its two open ends plus one at each connection point.
+            foreach (var piece in summary.Tiles[0].Splines.Where(candidate => candidate.Id >= road.SplineIds[0]))
+            {
+                OmsiMapGeometry.GetLocalFrameAt(piece, piece.LengthMeters / 2.0, out var middle, out _);
+                Assert.IsFalse(middle.X > 99 && middle.X < 101 && middle.Y > 223 && middle.Y < 237, "spline " + piece.Id + " runs under the junction");
+            }
+            var freeEnds = summary.Tiles[0].Splines.Where(candidate => candidate.Id >= road.SplineIds[0])
+                .SelectMany(candidate => new[] { new OmsiSplineEnd(summary.Tiles[0], candidate, false), new OmsiSplineEnd(summary.Tiles[0], candidate, true) })
+                .Count(end => end.IsFree);
+            Assert.AreEqual(4, freeEnds);
+
+            // Taking every step back, the last first, leaves the road as it was.
+            foreach (var step in result.Steps.Reverse())
+            {
+                if (step is OmsiSplineChange change)
+                    session.Undo(summary, change);
+                else
+                    session.Undo(summary, (OmsiObjectChange)step);
+            }
+            CollectionAssert.AreEqual(tileBytes, session.Workspace.ReadAllBytes("tile_0_0.map"));
+        }
+
+        private static double Distance(OmsiMapPoint a, OmsiMapPoint b)
+        {
+            return Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+        }
+
+        [Test]
         public void TerrainCanBeFittedToABuiltRoadLaterAndReleasedAgain()
         {
             var session = OpenProject();

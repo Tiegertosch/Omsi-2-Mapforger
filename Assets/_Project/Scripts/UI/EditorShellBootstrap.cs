@@ -33,10 +33,16 @@ namespace OmsiMapEditor.UI
 
             /// <summary>Several steps done together, such as moving a selection; undone in reverse order.</summary>
             public List<ObjectEditStep> Group;
+
+            /// <summary>What the step did, for the status bar, when the parts do not say it well; or null.</summary>
+            public string Description;
         }
 
         private const int HistoryLimit = 200;
         private const double PlacementRotationStep = 15.0;
+
+        /// <summary>A junction being placed snaps onto a road whose centre line passes this close to the pointer.</summary>
+        private const double JunctionSnapMeters = 4.0;
 
         private OmsiMapSummary currentSummary;
         private readonly Dictionary<OmsiTileSummary, Button> browserEntries = new Dictionary<OmsiTileSummary, Button>();
@@ -180,6 +186,9 @@ namespace OmsiMapEditor.UI
         private string installationScanRoot;
         private string placementAsset;
         private bool placementHasAbsoluteHeight;
+        // How the junction being placed would sit in the road under the pointer; null when it places freely.
+        private OmsiJunctionInsertionPlan placementPlan;
+        private string placementSnapMessage;
 
         // Object outlines are computed in the background and kept per OMSI installation.
         private readonly Dictionary<string, OmsiObjectOutline> outlineCache = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
@@ -313,6 +322,7 @@ namespace OmsiMapEditor.UI
             if (mapView != null)
             {
                 mapCanvas = new MapCanvasElement();
+                mapCanvas.PlacementSnapper = SnapPlacement;
                 mapCanvas.ObjectSelected += (tile, item) => SelectObject(tile, item, false);
                 mapCanvas.TileClicked += tile => SelectTile(tile, false);
                 mapCanvas.ObjectToggled += ToggleObject;
@@ -869,6 +879,8 @@ namespace OmsiMapEditor.UI
             {
                 StartPlacement(placeAsset);
                 mapCanvas?.PointPlacementAtCenter();
+                if (Array.IndexOf(args, "-placeCommit") >= 0)
+                    mapCanvas?.ClickPlacement();
             }
 
             var screenshot = Argument("-screenshot", 1);
@@ -2419,6 +2431,8 @@ namespace OmsiMapEditor.UI
 
         private static string DescribeStep(ObjectEditStep step)
         {
+            if (step.Description != null)
+                return step.Description;
             if (step.Group != null)
             {
                 var ids = new HashSet<int>();
@@ -2688,6 +2702,11 @@ namespace OmsiMapEditor.UI
                 StopPlacement();
                 return;
             }
+            if (placement.Snapped && placementPlan != null)
+            {
+                InsertChosenJunction(placement);
+                return;
+            }
             if (placement.Tile == null || !placement.Tile.IsAvailable)
             {
                 SetStatus(placement.Tile == null ? "Click inside a map tile to place the object." : "The tile file " + placement.Tile.FileName + " is missing.");
@@ -2729,8 +2748,96 @@ namespace OmsiMapEditor.UI
                           : string.Empty));
         }
 
+        /// <summary>
+        /// Snaps a junction being placed onto the road under the pointer, with two opposite connection points on its centre
+        /// line and the other arms towards the pointer, and keeps the plan for the click; null places it freely.
+        /// </summary>
+        private PlacementSnap SnapPlacement(double worldX, double worldY)
+        {
+            placementPlan = null;
+            if (placementAsset == null || !CanEdit || currentSummary == null)
+                return null;
+            var catalog = Junctions();
+            if (catalog == null || catalog.Helpers(placementAsset).Count < 2)
+                return null;
+            var point = OmsiSplinePoint.Nearest(currentSummary, worldX, worldY, JunctionSnapMeters);
+            var plan = point == null ? null
+                : OmsiJunctionInsertion.Plan(currentSummary, catalog, placementAsset, point.Tile, point.Spline, point.Distance, worldX, worldY);
+            if (plan == null)
+            {
+                ShowSnapMessage(null);
+                return null;
+            }
+            placementPlan = plan;
+            ShowSnapMessage(plan.Problem ?? "Click to insert the junction into the road; its other arms point to the side of the pointer. Alt places it freely.");
+            return new PlacementSnap { WorldX = plan.Position.X, WorldY = plan.Position.Y, HeadingDegrees = plan.HeadingDegrees, Height = plan.Height };
+        }
+
+        private void ShowSnapMessage(string message)
+        {
+            if (message == placementSnapMessage)
+                return;
+            placementSnapMessage = message;
+            if (message != null)
+                SetStatus(message);
+        }
+
+        /// <summary>
+        /// Inserts the junction being placed into the road it snapped to: cuts the road, places the object and joins both
+        /// sides, as one undo step.
+        /// </summary>
+        private void InsertChosenJunction(MapPlacement placement)
+        {
+            var plan = placementPlan;
+            if (plan.Problem != null)
+            {
+                SetStatus(plan.Problem);
+                return;
+            }
+            OmsiJunctionInsertionResult result;
+            try
+            {
+                result = session.InsertJunction(currentSummary, plan);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The junction could not be inserted: " + exception.Message);
+                return;
+            }
+            if (!result.Succeeded)
+            {
+                SetStatus("The road cannot be cut here: " + DescribeReferences(result.Blockers) + ".");
+                return;
+            }
+
+            var parts = new List<ObjectEditStep>();
+            foreach (var step in result.Steps)
+            {
+                if (step is OmsiSplineChange splineChange)
+                {
+                    parts.Add(new ObjectEditStep { SplineChange = splineChange });
+                    RefreshSplineViews(splineChange);
+                }
+                else if (step is OmsiObjectChange objectChange)
+                    parts.Add(new ObjectEditStep { TileX = objectChange.Tile.X, TileY = objectChange.Tile.Y, ObjectId = objectChange.Record.Id, Change = objectChange });
+            }
+            PushHistory(new ObjectEditStep { Group = parts, Description = "the junction #" + result.Junction.Id + " inserted into the road" });
+
+            var assetPath = placementAsset;
+            if (!placement.KeepPlacing)
+                StopPlacement();
+            var tile = currentSummary.Tiles.Find(candidate => candidate.Objects.Contains(result.Junction));
+            RefreshAfterChange(new[] { new MapSelectionItem { Tile = tile, Record = result.Junction } });
+            if (objectsPanelOpen)
+                UpdateObjectsCatalog();
+            SetStatus("Inserted junction #" + result.Junction.Id + " (" + assetPath + ") into the road and joined it on both sides. Ctrl+Z undoes it.");
+        }
+
         private void StopPlacement()
         {
+            placementPlan = null;
+            placementSnapMessage = null;
             placementAsset = null;
             mapCanvas?.EndPlacement();
             objectsPanel?.ClearChosen();

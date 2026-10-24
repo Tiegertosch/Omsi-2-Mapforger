@@ -85,7 +85,10 @@ namespace OmsiMapEditor.OMSI
         TerrainAlignment,
 
         /// <summary>Splines got a new position, shape or heights.</summary>
-        Geometry
+        Geometry,
+
+        /// <summary>A spline was split in two at a point along it.</summary>
+        Split
     }
 
     /// <summary>
@@ -309,6 +312,186 @@ namespace OmsiMapEditor.OMSI
             if (shaped)
                 ReshapeTerrain(summary, change);
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
+        }
+
+        /// <summary>
+        /// Splits a spline in two at <paramref name="distance"/> metres along it. The spline keeps its ID, its start and
+        /// every field and ends there; a new spline appended to the tile that holds the point carries on to the old end with
+        /// the same profile, curve, gradients, cant and terrain alignment, so the road looks as before. The neighbour at the
+        /// old end is joined to the new spline. Nothing changes while objects ride on the spline or timetables or chrono
+        /// changes name it, since their distances along it would no longer fit; those references are returned.
+        /// </summary>
+        public OmsiSplineChangeResult SplitSpline(OmsiMapSummary summary, OmsiTileSummary tile, OmsiSplineRecord spline, double distance,
+            OmsiReferenceIndex references = null)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            if (!(distance >= OmsiRoadPlanner.MinimumLength && distance <= spline.LengthMeters - OmsiRoadPlanner.MinimumLength))
+                throw new InvalidOperationException("A spline can only be split at least " + OmsiNumberFormat.Format(OmsiRoadPlanner.MinimumLength) +
+                                                    " m from its ends.");
+            if (spline.AlignsTerrain && !ShapesTerrain(spline))
+                throw new InvalidOperationException("Splines of the original map with terrain alignment cannot be split: the new part would fit the terrain " +
+                                                    "as a road built here, and the original map's roads keep their terrain.");
+
+            var workspace = RequireWorkspace();
+            references = references ?? BuildReferenceIndex();
+            var blockers = new List<OmsiReference>();
+            var neighbourFiles = new List<string>();
+            foreach (var reference in references.To(spline.Id))
+            {
+                if (reference.Kind == SplineNeighbourReference)
+                {
+                    if (!neighbourFiles.Contains(reference.File))
+                        neighbourFiles.Add(reference.File);
+                }
+                else
+                    blockers.Add(reference);
+            }
+            if (blockers.Count > 0)
+                return new OmsiSplineChangeResult(null, blockers);
+
+            var size = summary.TileSizeMeters;
+            var files = new EditedFiles(workspace);
+            var config = files.Config(GlobalConfigFileName);
+            var tileFile = files.Tile(tile.FileName);
+            OmsiSplineView first = null;
+            foreach (var candidate in OmsiTileRecords.Of<OmsiSplineView>(tileFile))
+                if (candidate.Id == spline.Id)
+                    first = candidate;
+            if (first == null)
+                throw new InvalidOperationException("Spline " + spline.Id + " was not found in " + tile.FileName + ".");
+
+            // The point, heading, height, gradient and cant where the spline is split.
+            var length = spline.LengthMeters;
+            OmsiMapGeometry.GetLocalFrameAt(spline, distance, out var local, out var headingRadians);
+            var world = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, local.X, local.Y, size);
+            var target = TileAt(summary, world.X, world.Y) ?? tile;
+            var targetFile = files.Tile(target.FileName);
+            if (targetFile.Version >= 0 && targetFile.Version < 11)
+                throw new InvalidOperationException("Splines can only be added to tiles of version 11 or later; " + target.FileName + " has version " +
+                                                    targetFile.Version + ".");
+            var cantStart = first.CantStart;
+            var cantEnd = first.CantEnd;
+            var cant = cantStart + (cantEnd - cantStart) * distance / length;
+            var skewEnd = first.SkewEnd;
+            var oldEnd = new OmsiSplineEnd(tile, spline, true).Position(size);
+            var oldNext = spline.NextId;
+
+            ids = ids ?? OmsiIdAllocator.ForMap(workspace, GlobalConfigFileName);
+            var newId = ids.Allocate();
+
+            // The second part: a copy of the record, so profile, mirror and every unknown field stay, then its own values.
+            var copy = targetFile.CreateRecord(first.Record.Name, FieldsOf(first.Record));
+            targetFile.InsertRecord(targetFile.Records.Count, copy);
+            var second = (OmsiSplineView)OmsiTileRecords.Create(targetFile, copy);
+            var alignment = FollowingAlignment(tileFile, first.Record);
+            if (alignment != null)
+                targetFile.InsertRecord(targetFile.Records.Count, targetFile.CreateRecord(alignment.Name, FieldsOf(alignment)));
+            second.Id = newId;
+            second.PreviousId = spline.Id;
+            second.NextId = oldNext;
+            second.X = world.X - target.X * size;
+            second.Y = world.Y - target.Y * size;
+            second.Height = spline.HeightAt(distance);
+            second.HeadingDegrees = Normalize360(headingRadians * 180.0 / Math.PI);
+            second.LengthMeters = length - distance;
+            second.GradientStartPercent = spline.GradientAtPercent(distance);
+            second.GradientEndPercent = spline.GradientAtPercent(length);
+            second.CantStart = cant;
+            second.CantEnd = cantEnd;
+            if (skewEnd.HasValue)
+                second.SkewStart = 0.0;
+            if (second.IsSplineH)
+                second.HeightDifference = spline.HeightAt(length) - spline.HeightAt(distance);
+
+            // The first part ends at the point. Its gradients take the evenly spread correction of a [spline_h] in.
+            var startGradient = spline.GradientAtPercent(0.0);
+            var splitGradient = spline.GradientAtPercent(distance);
+            var splitHeight = spline.HeightAt(distance);
+            first.LengthMeters = distance;
+            first.GradientStartPercent = startGradient;
+            first.GradientEndPercent = splitGradient;
+            first.NextId = newId;
+            first.CantEnd = cant;
+            if (skewEnd.HasValue)
+                first.SkewEnd = 0.0;
+            if (first.IsSplineH)
+                first.HeightDifference = splitHeight - spline.Height;
+
+            var change = new OmsiSplineChange(OmsiSplineChangeKind.Split);
+            change.SplineIds.Add(spline.Id);
+            change.SplineIds.Add(newId);
+            change.Tiles.Add(tile);
+            if (!change.Tiles.Contains(target))
+                change.Tiles.Add(target);
+
+            // The neighbour at the old end now meets the new spline, at whichever of its ends lies there.
+            if (oldNext != 0)
+                foreach (var file in neighbourFiles)
+                {
+                    var neighbourTile = summary.Tiles.Find(candidate => SamePath(candidate.FileName, file));
+                    foreach (var neighbour in OmsiTileRecords.Of<OmsiSplineView>(files.Tile(file)))
+                    {
+                        if (neighbour.Id != oldNext || ReferenceEquals(neighbour.Record, first.Record))
+                            continue;
+                        var record = neighbourTile?.Splines.Find(candidate => candidate.Id == oldNext);
+                        var startNear = record == null || Distance(new OmsiSplineEnd(neighbourTile, record, false).Position(size), oldEnd) <=
+                                        Distance(new OmsiSplineEnd(neighbourTile, record, true).Position(size), oldEnd);
+                        if (neighbour.PreviousId == spline.Id && (startNear || neighbour.NextId != spline.Id))
+                            neighbour.PreviousId = newId;
+                        else if (neighbour.NextId == spline.Id)
+                            neighbour.NextId = newId;
+                        if (neighbourTile != null && !change.Tiles.Contains(neighbourTile))
+                            change.Tiles.Add(neighbourTile);
+                    }
+                }
+            ids.ApplyTo(config);
+
+            var shaped = ShapesTerrain(spline);
+            files.Collect(change.Files);
+            WriteFiles(change.Files, false);
+            RefreshSplines(summary, change);
+            if (shaped)
+                ReshapeTerrain(summary, change);
+            summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, newId);
+            summary.NextIdCode = ids.NextFreeId;
+            return new OmsiSplineChangeResult(change, new OmsiReference[0]);
+        }
+
+        /// <summary>The [spline_terrain_align] record right after a spline, past its rules, or null.</summary>
+        private static OmsiRecord FollowingAlignment(OmsiRecordFile file, OmsiRecord spline)
+        {
+            for (var index = file.Records.IndexOf(spline) + 1; index < file.Records.Count; index++)
+            {
+                var name = file.Records[index].Name;
+                if (IsAlignment(name))
+                    return file.Records[index];
+                if (!IsModifier(name))
+                    return null;
+            }
+            return null;
+        }
+
+        private static List<string> FieldsOf(OmsiRecord record)
+        {
+            var fields = new List<string>(record.Fields.Count);
+            for (var index = 0; index < record.Fields.Count; index++)
+                fields.Add(record.GetField(index));
+            return fields;
+        }
+
+        private static double Normalize360(double degrees)
+        {
+            return (degrees % 360.0 + 360.0) % 360.0;
+        }
+
+        private static double Distance(OmsiMapPoint a, OmsiMapPoint b)
+        {
+            return Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
         }
 
         /// <summary>

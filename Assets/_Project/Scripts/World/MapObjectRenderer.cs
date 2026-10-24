@@ -114,6 +114,7 @@ namespace OmsiMapEditor.World
         private string previewAsset;
         private Vector2? previewPosition;
         private double previewHeading;
+        private double? previewHeight;
         private readonly Matrix4x4[] previewInstance = new Matrix4x4[1];
 
         // Objects along splines; splines are not edited, so the rows are laid out once per map.
@@ -309,7 +310,7 @@ namespace OmsiMapEditor.World
             {
                 // Stands where placing puts it: on the terrain, upright; an absolute height is set to the terrain there.
                 var position = previewPosition.Value;
-                var ground = GroundAt(position.x + originX, position.y + originY);
+                var ground = previewHeight ?? GroundAt(position.x + originX, position.y + originY);
                 var frame = Matrix4x4.TRS(new Vector3(position.x, (float)ground, position.y),
                     Orientation(previewHeading, 0.0, 0.0), Vector3.one);
                 var crossed = ThreeDimensional && preview.CrossMaterial != null;
@@ -1060,12 +1061,14 @@ namespace OmsiMapEditor.World
         /// position hides it. A kind not read yet is read in the background and appears when it is ready.
         /// </summary>
         /// <param name="mapPosition">Map-relative metres, as the map view reports them.</param>
-        public void SetPlacementPreview(string assetPath, Vector2? mapPosition, double headingDegrees)
+        /// <param name="height">The absolute height it snapped to, such as a junction on a road; null stands it on the terrain.</param>
+        public void SetPlacementPreview(string assetPath, Vector2? mapPosition, double headingDegrees, double? height = null)
         {
             // The kind is read as soon as placement starts, before the pointer reaches the map.
             previewAsset = assetPath;
             previewPosition = mapPosition;
             previewHeading = headingDegrees;
+            previewHeight = height;
         }
 
         /// <summary>

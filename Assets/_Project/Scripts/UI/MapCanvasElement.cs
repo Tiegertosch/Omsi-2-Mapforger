@@ -36,6 +36,18 @@ namespace OmsiMapEditor.UI
 
         /// <summary>Shift was held, so placing should continue with the same object.</summary>
         public bool KeepPlacing;
+
+        /// <summary>The placement snapped, such as a junction onto a road; the position is where it snapped to.</summary>
+        public bool Snapped;
+    }
+
+    /// <summary>Where a placement snaps to: the object's origin in world metres, its heading and absolute height.</summary>
+    internal sealed class PlacementSnap
+    {
+        public double WorldX;
+        public double WorldY;
+        public double HeadingDegrees;
+        public double Height;
     }
 
     /// <summary>A connection point of a junction object to draw: where it is, which way a road leaves it and its state.</summary>
@@ -308,6 +320,7 @@ namespace OmsiMapEditor.UI
         // Placement mode: the object to place and the map position under the pointer, if any.
         private string placementAsset;
         private double placementHeading;
+        private PlacementSnap placementSnap;
         private Vector2? placementPointer;
 
         public MapCanvasElement()
@@ -458,7 +471,13 @@ namespace OmsiMapEditor.UI
         /// The placement preview changed: the object, its map position under the pointer and its heading; a null
         /// position when the pointer is off the map or placement ended.
         /// </summary>
-        public event Action<string, Vector2?, double> PlacementPreviewed;
+        public event Action<string, Vector2?, double, double?> PlacementPreviewed;
+
+        /// <summary>
+        /// Asked with the world position under the pointer while placing; returns where the object snaps to, such as a
+        /// junction onto a road, or null to place it freely. Alt places freely.
+        /// </summary>
+        public Func<double, double, PlacementSnap> PlacementSnapper { get; set; }
 
         /// <summary>Describes the position under the pointer and the scale, for an overlay label.</summary>
         public event Action<string> PointerInfoChanged;
@@ -630,8 +649,13 @@ namespace OmsiMapEditor.UI
 
         private void NotifyPlacementPreview()
         {
-            PlacementPreviewed?.Invoke(placementAsset, placementAsset != null ? placementPointer : null, placementHeading);
+            PlacementPreviewed?.Invoke(placementAsset, placementAsset != null ? PlacementPosition : null, PlacementPreviewHeading, placementSnap?.Height);
         }
+
+        /// <summary>Where the placement preview stands: snapped, or under the pointer.</summary>
+        private Vector2? PlacementPosition => placementSnap != null ? WorldToMap(new OmsiMapPoint(placementSnap.WorldX, placementSnap.WorldY)) : placementPointer;
+
+        private double PlacementPreviewHeading => placementSnap?.HeadingDegrees ?? placementHeading;
 
         /// <summary>Starts placement mode: left clicks report positions instead of selecting objects.</summary>
         public void BeginPlacement(string assetPath, double headingDegrees)
@@ -647,10 +671,18 @@ namespace OmsiMapEditor.UI
             SetPlacementPointer(layout.size * 0.5f);
         }
 
+        /// <summary>Clicks where the placement preview stands, as a user would; for command-line checks.</summary>
+        public void ClickPlacement()
+        {
+            if (placementAsset != null && placementPointer.HasValue)
+                RequestPlacement(placementPointer.Value, false);
+        }
+
         public void EndPlacement()
         {
             placementAsset = null;
             placementPointer = null;
+            placementSnap = null;
             NotifyPlacementPreview();
             MarkDirtyRepaint();
         }
@@ -1888,10 +1920,11 @@ namespace OmsiMapEditor.UI
 
         private void DrawPlacement(Painter2D painter)
         {
-            if (placementAsset == null || !placementPointer.HasValue)
+            if (placementAsset == null || !PlacementPosition.HasValue)
                 return;
 
-            var position = placementPointer.Value;
+            var position = PlacementPosition.Value;
+            var placementHeading = PlacementPreviewHeading;
             var screen = MapToScreen(position);
             painter.strokeColor = placementColor;
             painter.lineWidth = 2f;
@@ -1911,7 +1944,7 @@ namespace OmsiMapEditor.UI
             painter.Stroke();
         }
 
-        private void SetPlacementPointer(Vector2? screen)
+        private void SetPlacementPointer(Vector2? screen, bool free = false)
         {
             if (placementAsset == null)
                 return;
@@ -1924,6 +1957,9 @@ namespace OmsiMapEditor.UI
             {
                 placementPointer = screen.HasValue ? ScreenToMap(screen.Value) : (Vector2?)null;
             }
+            placementSnap = !free && placementPointer.HasValue && PlacementSnapper != null
+                ? PlacementSnapper(placementPointer.Value.x + originX, placementPointer.Value.y + originY)
+                : null;
             NotifyPlacementPreview();
             MarkDirtyRepaint();
         }
@@ -2092,8 +2128,10 @@ namespace OmsiMapEditor.UI
         /// <summary>Reports a placement click at a map position; outside the map the tile is null.</summary>
         private void RequestPlacement(Vector2 map, bool keepPlacing)
         {
+            if (placementSnap != null)
+                map = PlacementPosition.Value;
             var target = TileAt(map);
-            var placement = new MapPlacement { Tile = target, KeepPlacing = keepPlacing };
+            var placement = new MapPlacement { Tile = target, KeepPlacing = keepPlacing, Snapped = placementSnap != null };
             if (target != null)
             {
                 var rect = TileRect(target);
@@ -2752,10 +2790,10 @@ namespace OmsiMapEditor.UI
         /// <summary>The placement preview on the ground under the pointer: the outline in its heading and a heading line.</summary>
         private void DrawPlacement3D(Painter2D painter, MapOrbitCamera camera)
         {
-            if (placementAsset == null || !placementPointer.HasValue)
+            if (placementAsset == null || !PlacementPosition.HasValue)
                 return;
-            var position = placementPointer.Value;
-            var heading = (float)(placementHeading * Math.PI / 180.0);
+            var position = PlacementPosition.Value;
+            var heading = (float)(PlacementPreviewHeading * Math.PI / 180.0);
             var sin = Mathf.Sin(heading);
             var cos = Mathf.Cos(heading);
             painter.strokeColor = placementColor;
@@ -2840,7 +2878,7 @@ namespace OmsiMapEditor.UI
                     if (ground.HasValue)
                         RoadPointerMoved?.Invoke(ground.Value.x + originX, ground.Value.z + originY);
                 }
-                SetPlacementPointer(position);
+                SetPlacementPointer(position, evt.altKey);
                 UpdateHoveredHandles(position);
                 NotifyPointerInfo(position);
                 return;

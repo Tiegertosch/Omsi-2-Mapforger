@@ -21,7 +21,7 @@ Der Nutzer hat am 23. und 24. Oktober 2026 drei Entwicklungsbriefings übergeben
 | Steigung, Sprünge, Knicke, ungültiges Gelände melden | `OmsiRoadPlanner` mit `OmsiRoadIssue` (Hinweis, Warnung, Fehler) |
 | Straßenkörper mit Breite und Querschnitt | aus dem `.sli`-Profil, texturiert in 2D und 3D |
 | Gelände an Straßen anpassen, nicht zerstörend: Original, Straßen, abgeleitete Anpassung und angezeigte Oberfläche getrennt | ADR 022, auf Wunsch des Nutzers vorgezogen |
-| Andocken an Knoten; später Andocken an Segmente mit Teilen | Andocken an freie Spline-Enden in Etappe 1; Teilen offen |
+| Andocken an Knoten; später Andocken an Segmente mit Teilen | Andocken an freie Spline-Enden in Etappe 1; Teilen und Einsetzen von Kreuzungen in Etappe 4a. Befund: Echte Karten zweigen Fahrbahnen über Kreuzungsobjekte ab, nicht über geteilte Splines (Berlin-Spandau: 39 freie Enden auf Gelenken und 68 mitten auf Splines, fast nur Gehwege, Dämme und Gleise); der Nutzer wünscht daher Kreuzungsobjekte, auch selbst erzeugte (Etappe 4b–4d) |
 | Kreuzungen später, Anschlüsse vorbereiten | Etappe 3a: Anschluss an `[splinehelper]`-Punkte (ADR 024) |
 
 ## Kreuzungen (Briefing 3)
