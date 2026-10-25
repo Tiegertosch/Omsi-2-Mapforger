@@ -1844,6 +1844,292 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(1, pictures);
         }
 
+        /// <summary>
+        /// A small TIFF writer for the tests: one picture of one sample a pixel, in strips of some rows or in square tiles,
+        /// the samples given in the file's byte order.
+        /// </summary>
+        private static byte[] Tiff(int width, int height, int bits, int format, byte[] samples, int compression, int predictor, bool bigEndian, int rowsPerStrip = 0,
+            int tileSize = 0, string noData = null)
+        {
+            var bytesPerSample = bits / 8;
+            int blockWidth = tileSize > 0 ? tileSize : width, blockHeight = tileSize > 0 ? tileSize : rowsPerStrip > 0 ? rowsPerStrip : height;
+            int across = (width + blockWidth - 1) / blockWidth, down = (height + blockHeight - 1) / blockHeight;
+            var blocks = new List<byte[]>();
+            for (var by = 0; by < down; by++)
+                for (var bx = 0; bx < across; bx++)
+                {
+                    var rows = tileSize > 0 ? blockHeight : Math.Min(blockHeight, height - by * blockHeight);
+                    var rowBytes = blockWidth * bytesPerSample;
+                    var block = new byte[rows * rowBytes];
+                    for (var row = 0; row < rows; row++)
+                        for (var column = 0; column < blockWidth; column++)
+                        {
+                            int x = bx * blockWidth + column, y = by * blockHeight + row;
+                            if (x < width && y < height)
+                                Array.Copy(samples, (y * width + x) * bytesPerSample, block, row * rowBytes + column * bytesPerSample, bytesPerSample);
+                        }
+                    for (var row = 0; row < rows; row++)
+                    {
+                        var start = row * rowBytes;
+                        if (predictor == 2 && bytesPerSample == 1)
+                            for (var index = rowBytes - 1; index > 0; index--)
+                                block[start + index] = (byte)(block[start + index] - block[start + index - 1]);
+                        else if (predictor == 3)
+                        {
+                            var planes = new byte[rowBytes];
+                            for (var sample = 0; sample < blockWidth; sample++)
+                                for (var b = 0; b < bytesPerSample; b++)
+                                    planes[b * blockWidth + sample] = block[start + sample * bytesPerSample + (bigEndian ? b : bytesPerSample - 1 - b)];
+                            for (var index = rowBytes - 1; index > 0; index--)
+                                planes[index] = (byte)(planes[index] - planes[index - 1]);
+                            Array.Copy(planes, 0, block, start, rowBytes);
+                        }
+                    }
+                    blocks.Add(compression == 8 ? Zlib(block) : compression == 5 ? Lzw(block) : compression == 32773 ? PackBits(block) : block);
+                }
+            var output = new List<byte>();
+            void U16(int value)
+            {
+                if (bigEndian)
+                    output.AddRange(new[] { (byte)(value >> 8), (byte)value });
+                else
+                    output.AddRange(new[] { (byte)value, (byte)(value >> 8) });
+            }
+            void U32(long value)
+            {
+                for (var b = 0; b < 4; b++)
+                    output.Add((byte)(value >> (bigEndian ? 8 * (3 - b) : 8 * b)));
+            }
+            output.AddRange(bigEndian ? new byte[] { (byte)'M', (byte)'M', 0, 42 } : new byte[] { (byte)'I', (byte)'I', 42, 0 });
+            U32(0);
+            var offsets = new List<long>();
+            foreach (var block in blocks)
+            {
+                offsets.Add(output.Count);
+                output.AddRange(block);
+            }
+            var offsetTable = output.Count;
+            foreach (var offset in offsets)
+                U32(offset);
+            var countTable = output.Count;
+            foreach (var block in blocks)
+                U32(block.Length);
+            var noDataAt = output.Count;
+            var noDataBytes = noData != null ? System.Text.Encoding.ASCII.GetBytes(noData + "\0") : new byte[0];
+            output.AddRange(noDataBytes);
+            if (output.Count % 2 == 1)
+                output.Add(0);
+            var directory = output.Count;
+            var entries = new List<long[]>
+            {
+                new long[] { 256, 4, 1, width }, new long[] { 257, 4, 1, height }, new long[] { 258, 3, 1, bits }, new long[] { 259, 3, 1, compression },
+                new long[] { 262, 3, 1, 1 }, new long[] { 277, 3, 1, 1 }, new long[] { 317, 3, 1, predictor }, new long[] { 339, 3, 1, format }
+            };
+            if (tileSize > 0)
+            {
+                entries.Add(new long[] { 322, 4, 1, tileSize });
+                entries.Add(new long[] { 323, 4, 1, tileSize });
+                entries.Add(new long[] { 324, 4, blocks.Count, blocks.Count == 1 ? offsets[0] : offsetTable });
+                entries.Add(new long[] { 325, 4, blocks.Count, blocks.Count == 1 ? blocks[0].Length : countTable });
+            }
+            else
+            {
+                entries.Add(new long[] { 273, 4, blocks.Count, blocks.Count == 1 ? offsets[0] : offsetTable });
+                entries.Add(new long[] { 278, 4, 1, blockHeight });
+                entries.Add(new long[] { 279, 4, blocks.Count, blocks.Count == 1 ? blocks[0].Length : countTable });
+            }
+            if (noData != null)
+                entries.Add(new long[] { 42113, 2, noDataBytes.Length, noDataAt });
+            entries.Sort((a, b) => a[0].CompareTo(b[0]));
+            U16(entries.Count);
+            foreach (var entry in entries)
+            {
+                U16((int)entry[0]);
+                U16((int)entry[1]);
+                U32(entry[2]);
+                if (entry[1] == 3 && entry[2] == 1)
+                {
+                    U16((int)entry[3]);
+                    U16(0);
+                }
+                else
+                    U32(entry[3]);
+            }
+            U32(0);
+            var file = output.ToArray();
+            var at = BitConverter.GetBytes((uint)directory);
+            for (var b = 0; b < 4; b++)
+                file[4 + b] = bigEndian ? at[3 - b] : at[b];
+            return file;
+        }
+
+        private static byte[] Zlib(byte[] data)
+        {
+            using (var output = new MemoryStream())
+            {
+                output.WriteByte(0x78);
+                output.WriteByte(0x9C);
+                using (var deflate = new System.IO.Compression.DeflateStream(output, System.IO.Compression.CompressionMode.Compress, true))
+                    deflate.Write(data, 0, data.Length);
+                output.Write(new byte[4], 0, 4);
+                return output.ToArray();
+            }
+        }
+
+        /// <summary>TIFF's LZW as libtiff writes it: a clear code first, codes one bit wider as soon as the table is full for them.</summary>
+        private static byte[] Lzw(byte[] data)
+        {
+            var codes = new List<KeyValuePair<int, int>>();
+            var table = new Dictionary<string, int>();
+            for (var index = 0; index < 256; index++)
+                table[((char)index).ToString()] = index;
+            var next = 258;
+            var width = 9;
+            codes.Add(new KeyValuePair<int, int>(256, width));
+            var current = string.Empty;
+            foreach (var value in data)
+            {
+                var longer = current + (char)value;
+                if (table.ContainsKey(longer))
+                {
+                    current = longer;
+                    continue;
+                }
+                codes.Add(new KeyValuePair<int, int>(table[current], width));
+                table[longer] = next++;
+                if (next >= 1 << width && width < 12)
+                    width++;
+                current = ((char)value).ToString();
+            }
+            if (current.Length > 0)
+                codes.Add(new KeyValuePair<int, int>(table[current], width));
+            codes.Add(new KeyValuePair<int, int>(257, width));
+            var bits = new List<bool>();
+            foreach (var code in codes)
+                for (var bit = code.Value - 1; bit >= 0; bit--)
+                    bits.Add(((code.Key >> bit) & 1) == 1);
+            var bytes = new byte[(bits.Count + 7) / 8];
+            for (var index = 0; index < bits.Count; index++)
+                if (bits[index])
+                    bytes[index / 8] |= (byte)(0x80 >> (index % 8));
+            return bytes;
+        }
+
+        private static byte[] PackBits(byte[] data)
+        {
+            var output = new List<byte>();
+            for (var index = 0; index < data.Length;)
+            {
+                var run = 1;
+                while (index + run < data.Length && run < 128 && data[index + run] == data[index])
+                    run++;
+                if (run > 1)
+                {
+                    output.Add((byte)(1 - run));
+                    output.Add(data[index]);
+                    index += run;
+                    continue;
+                }
+                var literal = 1;
+                while (index + literal < data.Length && literal < 128 && (index + literal + 1 >= data.Length || data[index + literal] != data[index + literal + 1]))
+                    literal++;
+                output.Add((byte)(literal - 1));
+                for (var copy = 0; copy < literal; copy++)
+                    output.Add(data[index + copy]);
+                index += literal;
+            }
+            return output.ToArray();
+        }
+
+        [Test]
+        public void TiffHeightMapsAreReadInTheirManyKinds()
+        {
+            // 16 bits, uncompressed, little-endian: black and white and a middle.
+            var grey = new byte[3 * 2 * 2];
+            var greyValues = new ushort[] { 0, 65535, 32768, 1000, 2000, 3000 };
+            for (var index = 0; index < greyValues.Length; index++)
+            {
+                grey[index * 2] = (byte)greyValues[index];
+                grey[index * 2 + 1] = (byte)(greyValues[index] >> 8);
+            }
+            var picture = OmsiTiff.Decode(Tiff(3, 2, 16, 1, grey, 1, 1, false), out var range);
+            Assert.IsNull(range);
+            Assert.IsFalse(picture.Coarse);
+            Assert.AreEqual(0f, picture.Values[0]);
+            Assert.AreEqual(1f, picture.Values[1]);
+            Assert.AreEqual(32768 / 65535f, picture.Values[2], 1e-6);
+
+            // 8 bits with LZW and the horizontal predictor, in strips of two rows.
+            var bytes8 = new byte[40 * 5];
+            for (var index = 0; index < bytes8.Length; index++)
+                bytes8[index] = (byte)(index * 7 % 251);
+            var lzw = OmsiTiff.Decode(Tiff(40, 5, 8, 1, bytes8, 5, 2, false, 2), out _);
+            Assert.IsTrue(lzw.Coarse);
+            for (var index = 0; index < bytes8.Length; index++)
+                Assert.AreEqual(bytes8[index] / 255f, lzw.Values[index], 1e-6, "pixel " + index);
+            // The same with PackBits, big-endian.
+            var packed = OmsiTiff.Decode(Tiff(40, 5, 8, 1, bytes8, 32773, 1, true), out _);
+            Assert.AreEqual(bytes8[123] / 255f, packed.Values[123], 1e-6);
+
+            // Heights in metres as big-endian floats, Deflate with the floating point predictor, one point without data.
+            var heights = new[] { 12.5f, 40f, 87.25f, -9999f, 50f, 20f };
+            var floats = new byte[heights.Length * 4];
+            for (var index = 0; index < heights.Length; index++)
+            {
+                var b = BitConverter.GetBytes(heights[index]);
+                for (var k = 0; k < 4; k++)
+                    floats[index * 4 + k] = b[3 - k];
+            }
+            var dem = OmsiTiff.Decode(Tiff(3, 2, 32, 3, floats, 8, 3, true, 0, 0, "-9999"), out range);
+            Assert.IsTrue(range.HasValue);
+            Assert.AreEqual(12.5, range.Value.Lowest, 1e-6);
+            Assert.AreEqual(87.25, range.Value.Highest, 1e-6);
+            Assert.AreEqual(0f, dem.Values[0], 1e-6);
+            Assert.AreEqual(1f, dem.Values[2], 1e-6);
+            Assert.AreEqual((40 - 12.5) / (87.25 - 12.5), dem.Values[1], 1e-6);
+            Assert.AreEqual(0f, dem.Values[3], 1e-6);
+
+            // Signed 16-bit heights in square tiles larger than the picture.
+            var signed = new byte[20 * 20 * 2];
+            for (var index = 0; index < 400; index++)
+            {
+                var value = (short)(index - 100);
+                signed[index * 2] = (byte)value;
+                signed[index * 2 + 1] = (byte)(value >> 8);
+            }
+            var tiled = OmsiTiff.Decode(Tiff(20, 20, 16, 2, signed, 1, 1, false, 0, 16), out range);
+            Assert.AreEqual(-100.0, range.Value.Lowest);
+            Assert.AreEqual(299.0, range.Value.Highest);
+            Assert.AreEqual((17 * 20 + 18 - 0.0) / 399.0, tiled.Values[17 * 20 + 18], 1e-6);
+
+            Assert.Throws<InvalidDataException>(() => OmsiTiff.Decode(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, out _));
+        }
+
+        [Test]
+        public void WaterSlopesWithACornerHeightEachAndPicturesHaveAnOpacityEachTile()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var change = session.SetTileWaterCorners(summary, tile, new[] { 1f, 2f, 3f, 4f });
+            Assert.IsNotNull(change);
+            var water = session.Workspace.ReadAllBytes(OmsiRelativePath.Normalize(tile.FileName) + ".water");
+            Assert.AreEqual(1u, BitConverter.ToUInt32(water, 0));
+            Assert.AreEqual(new[] { 1f, 2f, 3f, 4f }, new[] { BitConverter.ToSingle(water, 4), BitConverter.ToSingle(water, 8), BitConverter.ToSingle(water, 12), BitConverter.ToSingle(water, 16) });
+            CollectionAssert.AreEqual(new[] { 1f, 2f, 3f, 4f }, session.Read().Tiles[0].Water);
+            Assert.Throws<ArgumentException>(() => session.SetTileWaterCorners(summary, tile, new[] { 1f }));
+
+            var settings = new OmsiGeoSettings();
+            settings.SetOpacityOf(2, -3, 0.25);
+            settings.SetOpacityOf(0, 0, 0);
+            settings.SetOpacityOf(5, 5, 1);
+            var parsed = OmsiGeoSettings.Parse(settings.ToString());
+            Assert.AreEqual(0.25, parsed.OpacityOf(2, -3));
+            Assert.AreEqual(0.0, parsed.OpacityOf(0, 0));
+            Assert.AreEqual(1.0, parsed.OpacityOf(5, 5));
+            Assert.AreEqual(2, parsed.TileOpacity.Count);
+        }
+
         [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {

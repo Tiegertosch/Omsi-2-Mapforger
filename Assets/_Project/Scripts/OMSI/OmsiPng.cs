@@ -289,7 +289,8 @@ namespace OmsiMapEditor.OMSI
             return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
         }
 
-        private static byte[] Inflate(byte[] zlib)
+        /// <summary>A zlib stream's data, as PNG and TIFF's Deflate keep it.</summary>
+        internal static byte[] Inflate(byte[] zlib)
         {
             if (zlib.Length < 2)
                 throw new InvalidDataException("The PNG picture has no data.");

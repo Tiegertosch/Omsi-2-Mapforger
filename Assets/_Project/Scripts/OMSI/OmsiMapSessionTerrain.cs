@@ -535,14 +535,25 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public OmsiTerrainChange SetTileWater(OmsiMapSummary summary, OmsiTileSummary tile, double? level)
         {
+            return SetTileWaterCorners(summary, tile, level.HasValue ? new[] { (float)level.Value, (float)level.Value, (float)level.Value, (float)level.Value } : null);
+        }
+
+        /// <summary>
+        /// Gives a tile water with a height at each corner, (0, 0), (edge, 0), (0, edge), (edge, edge) as tile.map.water
+        /// keeps them, so it can slope like a river; null takes it away. One step, or null when nothing changes.
+        /// </summary>
+        public OmsiTerrainChange SetTileWaterCorners(OmsiMapSummary summary, OmsiTileSummary tile, float[] corners)
+        {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
+            if (corners != null && corners.Length != 4)
+                throw new ArgumentException("Water has four corners.", nameof(corners));
             var change = new OmsiTerrainChange();
             change.Tiles.Add(tile);
-            if (level.HasValue)
-                AddWaterFiles(change, tile, level.Value);
+            if (corners != null)
+                AddWaterFiles(change, tile, corners);
             else
                 RemoveWaterFiles(change, tile);
             if (change.Files.Count == 0)
@@ -555,14 +566,25 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The bytes of tile.map.water with one surface at a height at all four corners.</summary>
         internal static byte[] WaterBytes(double level)
         {
+            return WaterBytes(new[] { (float)level, (float)level, (float)level, (float)level });
+        }
+
+        /// <summary>The bytes of tile.map.water with one surface and its four corners' heights.</summary>
+        internal static byte[] WaterBytes(float[] corners)
+        {
             var bytes = new byte[20];
             BitConverter.GetBytes(1u).CopyTo(bytes, 0);
             for (var corner = 0; corner < 4; corner++)
-                BitConverter.GetBytes((float)level).CopyTo(bytes, 4 + corner * 4);
+                BitConverter.GetBytes(corners[corner]).CopyTo(bytes, 4 + corner * 4);
             return bytes;
         }
 
         private void AddWaterFiles(OmsiTerrainChange change, OmsiTileSummary tile, double level)
+        {
+            AddWaterFiles(change, tile, new[] { (float)level, (float)level, (float)level, (float)level });
+        }
+
+        private void AddWaterFiles(OmsiTerrainChange change, OmsiTileSummary tile, float[] corners)
         {
             var workspace = RequireWorkspace();
             var tilePath = OmsiRelativePath.Normalize(tile.FileName);
@@ -578,7 +600,7 @@ namespace OmsiMapEditor.OMSI
             }
             var waterPath = tilePath + ".water";
             var waterBefore = workspace.FileExists(waterPath) ? workspace.ReadAllBytes(waterPath) : null;
-            var waterAfter = WaterBytes(level);
+            var waterAfter = WaterBytes(corners);
             if (waterBefore == null || !SameBytes(waterBefore, waterAfter))
                 change.Files.Add(new OmsiObjectChange.FileState { RelativePath = waterPath, Before = waterBefore, After = waterAfter });
         }

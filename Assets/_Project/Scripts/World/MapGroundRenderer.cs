@@ -161,6 +161,9 @@ namespace OmsiMapEditor.World
         private readonly Dictionary<long, Texture2D> imageryTextures = new Dictionary<long, Texture2D>();
         private readonly Dictionary<long, MeshRenderer> imagerySurfaces = new Dictionary<long, MeshRenderer>();
 
+        // Tiles whose picture lies less opaque than the others or is hidden (0), as a factor on the opacity.
+        private readonly Dictionary<long, float> imageryTileOpacity = new Dictionary<long, float>();
+
         // Full pictures of tiles near the view while zoomed in, shown in place of their smaller copy.
         private readonly Dictionary<long, Texture2D> sharpTextures = new Dictionary<long, Texture2D>();
         private Transform imageryRoot;
@@ -1353,9 +1356,8 @@ namespace OmsiMapEditor.World
             set
             {
                 imageryOpacity = Mathf.Clamp01(value);
-                foreach (var surface in imagerySurfaces.Values)
-                    if (surface != null)
-                        surface.sharedMaterial.SetFloat("_Opacity", imageryOpacity);
+                foreach (var pair in imagerySurfaces)
+                    ApplyTileOpacity(pair.Key, pair.Value);
             }
         }
 
@@ -1368,6 +1370,36 @@ namespace OmsiMapEditor.World
                 if (imageryRoot != null)
                     imageryRoot.gameObject.SetActive(value);
             }
+        }
+
+        /// <summary>A tile's picture less opaque than the others, from 0 (hidden) to 1 (as the others).</summary>
+        public void SetImageryTileOpacity(int tileX, int tileY, float factor)
+        {
+            var key = TileKey(tileX, tileY);
+            factor = Mathf.Clamp01(factor);
+            if (factor >= 1f)
+                imageryTileOpacity.Remove(key);
+            else
+                imageryTileOpacity[key] = factor;
+            if (imagerySurfaces.TryGetValue(key, out var surface))
+                ApplyTileOpacity(key, surface);
+        }
+
+        /// <summary>Every tile's picture as opaque as the others again, as when another map opens.</summary>
+        public void ClearImageryTileOpacity()
+        {
+            imageryTileOpacity.Clear();
+            foreach (var pair in imagerySurfaces)
+                ApplyTileOpacity(pair.Key, pair.Value);
+        }
+
+        private void ApplyTileOpacity(long key, MeshRenderer surface)
+        {
+            if (surface == null)
+                return;
+            var factor = imageryTileOpacity.TryGetValue(key, out var own) ? own : 1f;
+            surface.sharedMaterial.SetFloat("_Opacity", imageryOpacity * factor);
+            surface.enabled = factor > 0f;
         }
 
         /// <summary>How many tiles have a picture from the air.</summary>
@@ -1401,6 +1433,7 @@ namespace OmsiMapEditor.World
             meshRenderer.lightProbeUsage = LightProbeUsage.Off;
             meshRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
             imagerySurfaces[state.Key] = meshRenderer;
+            ApplyTileOpacity(state.Key, meshRenderer);
         }
 
         private void RemoveImagerySurface(long key)

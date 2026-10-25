@@ -235,6 +235,32 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The edge of a tile's picture: 0 for every pixel of the source up to 4096, or 1024, 2048 or 4096.</summary>
         public int PictureSize { get; set; }
 
+        /// <summary>
+        /// Tiles whose picture is hidden or lies less opaque than the others, by tile (x in the high, y in the low 32 bits):
+        /// a factor on <see cref="ImageryOpacity"/> from 0 to 1, 0 for hidden.
+        /// </summary>
+        public Dictionary<long, double> TileOpacity { get; } = new Dictionary<long, double>();
+
+        public static long TileKey(int x, int y)
+        {
+            return ((long)x << 32) | (uint)y;
+        }
+
+        /// <summary>A tile's factor on the opacity, 1 unless it was changed.</summary>
+        public double OpacityOf(int x, int y)
+        {
+            return TileOpacity.TryGetValue(TileKey(x, y), out var factor) ? factor : 1.0;
+        }
+
+        public void SetOpacityOf(int x, int y, double factor)
+        {
+            factor = Math.Max(0.0, Math.Min(1.0, factor));
+            if (factor >= 1.0)
+                TileOpacity.Remove(TileKey(x, y));
+            else
+                TileOpacity[TileKey(x, y)] = factor;
+        }
+
         public static OmsiGeoSettings Parse(string text)
         {
             var settings = new OmsiGeoSettings();
@@ -269,6 +295,14 @@ namespace OmsiMapEditor.OMSI
                 settings.Source = source;
             settings.WithTerrain = values.TryGetValue("terrain", out var terrain) && terrain == "1";
             settings.AutoNewTiles = values.TryGetValue("autonew", out var autoNew) && autoNew == "1";
+            foreach (var line in text.Split('\n'))
+            {
+                var parts = line.Trim().Split(' ');
+                if (parts.Length == 4 && parts[0] == "tile" && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tileX) &&
+                    int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tileY) &&
+                    double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var factor))
+                    settings.SetOpacityOf(tileX, tileY, factor);
+            }
             var size = (int)Number("picture", 0);
             settings.PictureSize = size == 1024 || size == 2048 || size == 4096 ? size : 0;
             return settings;
@@ -299,6 +333,10 @@ namespace OmsiMapEditor.OMSI
             Line("terrain", WithTerrain ? 1 : 0);
             Line("autonew", AutoNewTiles ? 1 : 0);
             Line("picture", PictureSize);
+            foreach (var pair in TileOpacity)
+                text.Append("tile ").Append(((int)(pair.Key >> 32)).ToString(CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(((int)(pair.Key & 0xffffffffL)).ToString(CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(pair.Value.ToString("R", CultureInfo.InvariantCulture)).Append('\n');
             if (!string.IsNullOrEmpty(Source))
                 text.Append("source ").Append(Source).Append('\n');
             return text.ToString();

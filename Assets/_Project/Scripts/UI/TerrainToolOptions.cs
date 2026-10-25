@@ -98,7 +98,7 @@ namespace OmsiMapEditor.UI
             };
             var importButton = new Button(() => ImportRequested?.Invoke())
             {
-                text = "Import...", tooltip = "Lays a grey picture (PNG, 8 or 16 bits) over all tiles, stretched to the map's outer edges"
+                text = "Import...", tooltip = "Lays a grey picture (PNG of 8 or 16 bits, or TIFF; a TIFF of real heights brings its metres) over all tiles, stretched to the map's outer edges"
             };
             foreach (var button in new[] { exportButton, importButton })
             {

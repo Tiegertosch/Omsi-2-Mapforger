@@ -185,6 +185,7 @@ namespace OmsiMapEditor.UI
             picture.OffsetY = fit.OffsetY;
             picture.Scale = Math.Max(0.05, Math.Min(20.0, fit.Scale));
             pictureChangedAt = Time.realtimeSinceStartup;
+            pictureCutGeneration++;
             ShowOwnPictures();
         }
 
@@ -311,7 +312,8 @@ namespace OmsiMapEditor.UI
             }));
         }
 
-        private void LayOwnPiece(int tileX, int tileY, OmsiImage piece)
+        /// <summary>A piece as a texture: its rows from the south, as the ground's UVs; compressed with its transparency.</summary>
+        private static Texture2D OwnPieceTexture(OmsiImage piece, string name)
         {
             var size = piece.Width;
             var rows = new byte[piece.Pixels.Length];
@@ -320,12 +322,51 @@ namespace OmsiMapEditor.UI
                 Array.Copy(piece.Pixels, row * stride, rows, (size - 1 - row) * stride, stride);
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, true)
             {
-                wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = "Own picture " + tileX + ", " + tileY
+                wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = name
             };
             texture.SetPixelData(rows, 0);
             texture.Apply(true, false);
             texture.Compress(true);
             texture.Apply(false, true);
+            return texture;
+        }
+
+        /// <summary>
+        /// Whether a tile's own picture has more detail than its piece shows: then, zoomed in, the piece is cut again at
+        /// the picture's own detail.
+        /// </summary>
+        private bool OwnPictureIsSharper(OmsiTileSummary tile)
+        {
+            var picture = OmsiOwnPictures.On(ownPictures, tile.X, tile.Y);
+            return picture != null && ownPictureImages.TryGetValue(picture.Id, out var image) &&
+                   picture.PieceSize(currentSummary.TileSizeMeters, image.Width) > ImageryPictureSize;
+        }
+
+        private readonly HashSet<long> ownSharpCutting = new HashSet<long>();
+
+        /// <summary>Cuts a tile's piece at the picture's own detail in the background and shows it in place of the smaller piece.</summary>
+        private void CutSharpOwnPiece(OmsiTileSummary tile)
+        {
+            var key = ((long)tile.X << 32) | (uint)tile.Y;
+            var picture = OmsiOwnPictures.On(ownPictures, tile.X, tile.Y)?.Clone();
+            if (picture == null || !ownPictureImages.TryGetValue(picture.Id, out var image) || !ownSharpCutting.Add(key))
+                return;
+            var tileSize = currentSummary.TileSizeMeters;
+            var generation = pictureCutGeneration;
+            int x = tile.X, y = tile.Y;
+            Task.Run(() => picture.Cut(image, x, y, tileSize, picture.PieceSize(tileSize, image.Width))).ContinueWith(task => aerialMainThread.Enqueue(() =>
+            {
+                ownSharpCutting.Remove(key);
+                // The picture was moved or turned meanwhile: its smaller pieces are cut again, this one is out of date.
+                if (generation != pictureCutGeneration || groundRenderer == null || task.IsFaulted)
+                    return;
+                groundRenderer.SetSharpImagery(x, y, OwnPieceTexture(task.Result, "Sharp own picture " + x + ", " + y));
+            }));
+        }
+
+        private void LayOwnPiece(int tileX, int tileY, OmsiImage piece)
+        {
+            var texture = OwnPieceTexture(piece, "Own picture " + tileX + ", " + tileY);
             groundRenderer.SetImagery(tileX, tileY, texture);
             var key = ((long)tileX << 32) | (uint)tileY;
             ownPictureTiles.Add(key);

@@ -11,6 +11,7 @@ namespace OmsiMapEditor.UI
         public const string ProjectFilter = "MapWorks project (*.omproj)\0*.omproj\0";
         public const string ProjectExtension = "omproj";
         public const string PngFilter = "PNG picture (*.png)\0*.png\0All files\0*.*\0";
+        public const string HeightMapFilter = "Height maps (*.png, *.tif, *.tiff)\0*.png;*.tif;*.tiff\0All files\0*.*\0";
         public const string PictureFilter = "Pictures (*.jpg, *.jpeg, *.png, *.bmp, *.tga)\0*.jpg;*.jpeg;*.png;*.bmp;*.tga\0All files\0*.*\0";
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN

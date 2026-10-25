@@ -668,6 +668,47 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
+        /// <summary>
+        /// The tile's picture on the ground, from the air or the user's own: shown or not, and how opaque against the
+        /// others. Kept in the project with the other settings.
+        /// </summary>
+        private void AddImageryTileEditor(VisualElement container, OmsiTileSummary tile)
+        {
+            if (tile == null || session?.Workspace == null || geoSettings == null ||
+                !session.Workspace.IsModified(OmsiMapSession.ImageryPath(tile)) && !HasOwnPicture(tile))
+                return;
+            var heading = new Label("PICTURE ON THE GROUND");
+            heading.AddToClassList("inspector-section-heading");
+            container.Add(heading);
+            var factor = (float)geoSettings.OpacityOf(tile.X, tile.Y);
+            var row = new VisualElement();
+            row.AddToClassList("satellite-row");
+            var show = new Toggle { text = "Show", value = factor > 0f, tooltip = "Shows this tile's picture from the air or own picture" };
+            show.AddToClassList("picker-option-toggle");
+            show.AddToClassList("panel-toggle");
+            row.Add(show);
+            var slider = new Slider(0f, 1f) { value = factor > 0f ? factor : 1f, tooltip = "How opaque this tile's picture lies, against the opacity of all pictures" };
+            slider.AddToClassList("new-map-slider");
+            slider.AddToClassList("satellite-grow");
+            row.Add(slider);
+            var percent = new Label(Mathf.RoundToInt(slider.value * 100f) + " %");
+            percent.AddToClassList("new-map-factor");
+            row.Add(percent);
+            container.Add(row);
+            void Apply()
+            {
+                var value = show.value ? slider.value : 0f;
+                percent.text = Mathf.RoundToInt(slider.value * 100f) + " %";
+                slider.SetEnabled(show.value);
+                geoSettings.SetOpacityOf(tile.X, tile.Y, value);
+                groundRenderer?.SetImageryTileOpacity(tile.X, tile.Y, value);
+                SaveGeo();
+            }
+            slider.SetEnabled(show.value);
+            show.RegisterValueChangedCallback(_ => Apply());
+            slider.RegisterValueChangedCallback(_ => Apply());
+        }
+
         /// <summary>The terrain of the tiles beside the loaded heights bent to meet them, as one step.</summary>
         private void FitSteppedEdges()
         {
@@ -773,7 +814,7 @@ namespace OmsiMapEditor.UI
             if (groundRenderer.ImageryVisible && metresPerPixel < tileSize / ImageryPictureSize * 0.9)
                 foreach (var tile in currentSummary.Tiles)
                 {
-                    if (!tile.IsAvailable || HasOwnPicture(tile) || !session.Workspace.IsModified(OmsiMapSession.ImageryViewPath(tile)))
+                    if (!tile.IsAvailable || (HasOwnPicture(tile) ? !OwnPictureIsSharper(tile) : !session.Workspace.IsModified(OmsiMapSession.ImageryViewPath(tile))))
                         continue;
                     var dx = (tile.X + 0.5) * tileSize - centreX;
                     var dy = (tile.Y + 0.5) * tileSize - centreY;
@@ -787,9 +828,15 @@ namespace OmsiMapEditor.UI
             foreach (var sharp in groundRenderer.SharpTiles())
                 if (!wanted.Exists(pair => pair.Value.X == sharp.Key && pair.Value.Y == sharp.Value))
                     groundRenderer.SetSharpImagery(sharp.Key, sharp.Value, null);
-            var next = wanted.Find(pair => !groundRenderer.HasSharpImagery(pair.Value.X, pair.Value.Y)).Value;
+            var next = wanted.Find(pair => !groundRenderer.HasSharpImagery(pair.Value.X, pair.Value.Y) &&
+                                           !ownSharpCutting.Contains(((long)pair.Value.X << 32) | (uint)pair.Value.Y)).Value;
             if (next == null)
                 return;
+            if (HasOwnPicture(next))
+            {
+                CutSharpOwnPiece(next);
+                return;
+            }
             var bytes = session.ReadImagery(next, out _);
             var texture = new Texture2D(2, 2, TextureFormat.RGB24, true)
             {
@@ -981,6 +1028,10 @@ namespace OmsiMapEditor.UI
             {
                 groundRenderer.ImageryVisible = geoSettings?.ShowImagery ?? true;
                 groundRenderer.ImageryOpacity = (float)(geoSettings?.ImageryOpacity ?? 1.0);
+                groundRenderer.ClearImageryTileOpacity();
+                if (geoSettings != null)
+                    foreach (var pair in geoSettings.TileOpacity)
+                        groundRenderer.SetImageryTileOpacity((int)(pair.Key >> 32), (int)(pair.Key & 0xffffffffL), (float)pair.Value);
             }
             UpdateImageryAttribution();
             if (satelliteWindow != null && IsShown(satelliteWindow))
@@ -1078,6 +1129,31 @@ namespace OmsiMapEditor.UI
             {
                 var index = Array.IndexOf(args, name);
                 return index >= 0 && index + offset < args.Length ? args[index + offset] : null;
+            }
+            // -waterCorners <x> <y> <south-west> <south-east> <north-west> <north-east> gives a tile's water four heights;
+            // -tileOpacity <x> <y> <0..1> sets how opaque one tile's picture lies.
+            if (int.TryParse(Argument("-waterCorners", 1), out var waterX) && int.TryParse(Argument("-waterCorners", 2), out var waterY))
+            {
+                var corners = new float[4];
+                var read = true;
+                for (var corner = 0; corner < 4; corner++)
+                    read &= float.TryParse(Argument("-waterCorners", 3 + corner), NumberStyles.Float, CultureInfo.InvariantCulture, out corners[corner]);
+                var waterTile = currentSummary?.Tiles.Find(tile => tile.X == waterX && tile.Y == waterY);
+                if (read && waterTile != null)
+                {
+                    var waterWait = Time.realtimeSinceStartup;
+                    while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - waterWait < 300f)
+                        yield return null;
+                    SetTileWaterCorners(waterTile, corners);
+                    Debug.Log("Water: " + statusLabel?.text);
+                }
+            }
+            if (int.TryParse(Argument("-tileOpacity", 1), out var opacityX) && int.TryParse(Argument("-tileOpacity", 2), out var opacityY) &&
+                float.TryParse(Argument("-tileOpacity", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var tileOpacity) && geoSettings != null)
+            {
+                geoSettings.SetOpacityOf(opacityX, opacityY, tileOpacity);
+                groundRenderer?.SetImageryTileOpacity(opacityX, opacityY, tileOpacity);
+                SaveGeo();
             }
             if (Array.IndexOf(args, "-satellite") < 0)
                 yield break;

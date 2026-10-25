@@ -3727,14 +3727,17 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null || terrainOptions == null)
                 return;
-            path = path ?? WindowsFileDialog.OpenFile("A height map for the whole map", WindowsFileDialog.PngFilter);
+            path = path ?? WindowsFileDialog.OpenFile("A height map for the whole map", WindowsFileDialog.HeightMapFilter);
             if (string.IsNullOrEmpty(path))
                 return;
             try
             {
-                pendingHeightMap = OmsiPng.DecodeGrey(File.ReadAllBytes(path));
+                var bytes = File.ReadAllBytes(path);
+                OmsiHeightRange? fromPicture = null;
+                pendingHeightMap = OmsiTiff.IsTiff(bytes) ? OmsiTiff.Decode(bytes, out fromPicture) : OmsiPng.DecodeGrey(bytes);
                 var note = Path.ChangeExtension(path, ".txt");
-                var range = (File.Exists(note) ? OmsiHeightMap.ReadRange(File.ReadAllText(note)) : null) ?? new OmsiHeightRange { Lowest = 0, Highest = 100 };
+                // The heights in the .txt beside it, as openMapper writes them; else a TIFF's own heights in metres; else 0 to 100 m.
+                var range = (File.Exists(note) ? OmsiHeightMap.ReadRange(File.ReadAllText(note)) : null) ?? fromPicture ?? new OmsiHeightRange { Lowest = 0, Highest = 100 };
                 var info = string.Empty;
                 if (OmsiHeightMap.Extent(currentSummary, out var minX, out var minY, out var maxX, out var maxY))
                 {
@@ -3829,6 +3832,60 @@ namespace OmsiMapEditor.UI
                 row.Add(remove);
             }
             container.Add(row);
+            if (tile.Water == null)
+                return;
+
+            // Each corner its own height, as tile.map.water keeps them: water that slopes like a river.
+            var corners = new[]
+            {
+                AddEditField(container, "South-west (m)", tile.Water[0]), AddEditField(container, "South-east (m)", tile.Water[1]),
+                AddEditField(container, "North-west (m)", tile.Water[2]), AddEditField(container, "North-east (m)", tile.Water[3])
+            };
+            var setCorners = new Button(() =>
+            {
+                var heights = new float[4];
+                for (var corner = 0; corner < 4; corner++)
+                    if (double.TryParse(corners[corner].value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
+                        heights[corner] = (float)height;
+                    else
+                    {
+                        SetStatus("Type the corners' heights as numbers.");
+                        return;
+                    }
+                SetTileWaterCorners(tile, heights);
+            })
+            {
+                text = "Set corners",
+                tooltip = "Gives each corner of the tile's water its own height, so the water slopes, as along a river. Neighbouring tiles meet where their corners are alike."
+            };
+            setCorners.AddToClassList("map-control-button");
+            setCorners.AddToClassList("inspector-edit-apply");
+            container.Add(setCorners);
+        }
+
+        private void SetTileWaterCorners(OmsiTileSummary tile, float[] corners)
+        {
+            if (!CanEdit)
+                return;
+            OmsiTerrainChange change;
+            try
+            {
+                change = session.SetTileWaterCorners(currentSummary, tile, corners);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The water could not be changed: " + exception.Message);
+                return;
+            }
+            if (change == null)
+                return;
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the water of tile " + tile.X + ", " + tile.Y });
+            RefreshGround(change.Tiles);
+            RenderInspector();
+            SetStatus("Water from " + Math.Min(Math.Min(corners[0], corners[1]), Math.Min(corners[2], corners[3])).ToString("0.##", CultureInfo.InvariantCulture) + " to " +
+                      Math.Max(Math.Max(corners[0], corners[1]), Math.Max(corners[2], corners[3])).ToString("0.##", CultureInfo.InvariantCulture) + " m on tile " + tile.X + ", " +
+                      tile.Y + ". Ctrl+Z takes it back.");
         }
 
         private void SetTileWater(OmsiTileSummary tile, double? level)
@@ -6776,6 +6833,7 @@ namespace OmsiMapEditor.UI
                 return;
             var tile = selectedTile;
             AddWaterEditor(container, tile);
+            AddImageryTileEditor(container, tile);
             var armed = false;
             Button delete = null;
             delete = new Button(() =>
