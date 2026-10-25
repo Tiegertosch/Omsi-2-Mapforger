@@ -13,7 +13,7 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>Creates the UI Toolkit shell when the player starts and connects it to the opened map.</summary>
-    public sealed class EditorShellBootstrap : MonoBehaviour
+    public sealed partial class EditorShellBootstrap : MonoBehaviour
     {
         /// <summary>
         /// One object edit: either changed values, found again by tile coordinates and ID, or a placement or
@@ -527,6 +527,7 @@ namespace OmsiMapEditor.UI
                     HidePopup(viewMenu);
                     SetPanelCollapsed(inspectorFrame, !IsPanelCollapsed(inspectorFrame));
                 };
+            InitializeSatellite(root, viewMenu);
 
             if (fileButton != null)
                 fileButton.clicked += () => TogglePopup(fileMenu, helpMenu, editMenu, viewMenu);
@@ -718,6 +719,7 @@ namespace OmsiMapEditor.UI
         {
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
+            PumpAerial();
             TickTerrain();
             var panelWidth = rootElement.worldBound.width;
             PlaceViewControls();
@@ -1262,6 +1264,8 @@ namespace OmsiMapEditor.UI
                     mapCanvas?.ClickPlacement();
             }
 
+            yield return RunSatelliteArguments(args);
+
             var screenshot = Argument("-screenshot", 1);
             if (screenshot != null)
             {
@@ -1419,6 +1423,7 @@ namespace OmsiMapEditor.UI
             highlightedLine = null;
             routesToggleButton?.SetEnabled(false);
             PresentSummary(summary, keepView);
+            LoadStoredImagery(globalConfigPath + "|" + projectFilePath);
             StartRoutesBuild(summary);
             UpdateMapHeader();
             RenderProjectBrowser();
@@ -4695,6 +4700,7 @@ namespace OmsiMapEditor.UI
             if (tile != null)
                 SelectTile(tile, false);
             SetStatus("Added tile " + x + ", " + y + " with terrain running on from its neighbours. Ctrl+Z takes it back; earlier steps can no longer be undone.");
+            TileAddedForImagery(x, y);
         }
 
         /// <summary>Takes a tile out of the map, as long as nothing outside it needs it; otherwise says what does.</summary>

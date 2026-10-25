@@ -151,7 +151,19 @@ namespace OmsiMapEditor.World
 
         // The water surfaces of tiles with [water], one quad each at their corner heights.
         private Transform waterRoot;
-        private Material waterMaterial;
+        private readonly List<UnityEngine.Object> waterResources = new List<UnityEngine.Object>();
+
+        // The map whose water is drawn, drawn again once the ground's terrain is loaded.
+        private OmsiMapSummary waterSummary;
+
+        // Pictures from the air laid over each tile's ground, drawn over the ground textures and under the splines, with
+        // one opacity for all. The pictures outlive a new load of the same map; their surfaces follow the ground.
+        private readonly Dictionary<long, Texture2D> imageryTextures = new Dictionary<long, Texture2D>();
+        private readonly Dictionary<long, MeshRenderer> imagerySurfaces = new Dictionary<long, MeshRenderer>();
+        private Transform imageryRoot;
+        private float imageryOpacity = 1f;
+        private bool imageryVisible = true;
+        private const int ImageryQueue = 3090;
         private readonly Dictionary<string, Material> splineMaterials = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
 
         // The spline meshes of each tile, so changed splines can be built again without reading the whole map.
@@ -387,6 +399,8 @@ namespace OmsiMapEditor.World
             if (groundRoot != null)
                 Destroy(groundRoot.gameObject);
             groundRoot = null;
+            foreach (var key in new List<long>(imagerySurfaces.Keys))
+                RemoveImagerySurface(key);
             foreach (var item in owned)
                 Destroy(item);
             owned.Clear();
@@ -476,6 +490,8 @@ namespace OmsiMapEditor.World
                 foreach (var layer in state.MaskLayers)
                     if (layer != null)
                         layer.GetComponent<MeshFilter>().sharedMesh = mesh;
+                if (imagerySurfaces.TryGetValue(key, out var overlay) && overlay != null)
+                    overlay.GetComponent<MeshFilter>().sharedMesh = mesh;
                 if (state.Mesh != null && state.Mesh != tileMesh)
                 {
                     owned.Remove(state.Mesh);
@@ -1084,6 +1100,8 @@ namespace OmsiMapEditor.World
                 report += "; " + data.Problems.Count + " problem(s), first: " + data.Problems[0];
             if (data.Problems.Count > 0)
                 Debug.LogWarning(report + "\n" + string.Join("\n", data.Problems));
+            if (waterSummary != null)
+                RefreshWater(waterSummary);
             Loaded?.Invoke(report + ".");
             RunQueuedRefreshes();
         }
@@ -1104,6 +1122,7 @@ namespace OmsiMapEditor.World
             if (layerMaterials.TryGetValue(0, out var baseMaterial))
                 renderers.Add(AddQuad("Tile " + tile.X + ", " + tile.Y, position, baseMaterial, mesh));
             tileStates[key] = new TileState { Key = key, X = tile.X, Y = tile.Y, Position = position, Mesh = mesh, MaskPaths = tile.MaskPaths };
+            AddImagerySurface(tileStates[key]);
             if (tile.Holes != null)
                 ApplyHoles(key, renderers, tile.Holes);
             foreach (var batch in tile.Splines)
@@ -1165,21 +1184,19 @@ namespace OmsiMapEditor.World
 
         /// <summary>
         /// Draws the water of the map's tiles as a see-through blue surface over each tile with [water], at the heights
-        /// of its corners; the ground above it hides it.
+        /// of its corners; it shows only where the tile's ground lies below it.
         /// </summary>
         public void RefreshWater(OmsiMapSummary summary)
         {
+            waterSummary = summary;
             if (waterRoot != null)
             {
-                foreach (Transform child in waterRoot)
-                {
-                    var filter = child.GetComponent<MeshFilter>();
-                    if (filter != null)
-                        Destroy(filter.sharedMesh);
-                }
                 Destroy(waterRoot.gameObject);
                 waterRoot = null;
             }
+            foreach (var resource in waterResources)
+                Destroy(resource);
+            waterResources.Clear();
             if (summary == null || splineShader == null)
                 return;
             var size = (float)summary.TileSizeMeters;
@@ -1192,38 +1209,153 @@ namespace OmsiMapEditor.World
                     waterRoot = new GameObject("Map Water").transform;
                     waterRoot.SetParent(transform, false);
                 }
-                if (waterMaterial == null)
+                // The water shows only where the ground lies below it: from above the ground writes no depth, so a mask
+                // from the tile's terrain points fades it out over a metre of shore.
+                const int points = OmsiTerrain.Resolution;
+                terrains.TryGetValue(TileKey(tile.X, tile.Y), out var terrain);
+                var pixels = new Color32[points * points];
+                for (var row = 0; row < points; row++)
+                    for (var column = 0; column < points; column++)
+                    {
+                        var u = column / (float)(points - 1);
+                        var v = row / (float)(points - 1);
+                        var level = Mathf.Lerp(Mathf.Lerp(tile.Water[0], tile.Water[1], u), Mathf.Lerp(tile.Water[2], tile.Water[3], u), v);
+                        var depth = terrain != null ? level - terrain[column, row] : 1f;
+                        pixels[row * points + column] = new Color32(46, 97, 133, (byte)Mathf.RoundToInt(Mathf.Clamp01(depth + 0.5f) * 184f));
+                    }
+                var mask = new Texture2D(points, points, TextureFormat.RGBA32, false)
                 {
-                    var colour = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-                    colour.SetPixel(0, 0, new Color(0.18f, 0.38f, 0.52f, 0.72f));
-                    colour.Apply();
-                    waterMaterial = new Material(splineShader);
-                    waterMaterial.SetTexture("_MainTex", colour);
-                    waterMaterial.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
-                    waterMaterial.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
-                    waterMaterial.SetFloat("_DepthWrite", 0f);
-                    waterMaterial.SetFloat("_UseAlpha", 1f);
-                    waterMaterial.renderQueue = AlphaSplineQueue + 10;
-                }
-                // Corners (0, 0), (edge, 0), (0, edge), (edge, edge), as tile.map.water keeps them.
-                var mesh = new Mesh { name = "Water " + tile.X + ", " + tile.Y };
+                    wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "Water " + tile.X + ", " + tile.Y
+                };
+                mask.SetPixels32(pixels);
+                mask.Apply(false, true);
+                var material = new Material(splineShader) { renderQueue = AlphaSplineQueue + 10, name = mask.name };
+                material.SetTexture("_MainTex", mask);
+                material.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
+                material.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
+                material.SetFloat("_DepthWrite", 0f);
+                material.SetFloat("_UseAlpha", 1f);
+                // Corners (0, 0), (edge, 0), (0, edge), (edge, edge), as tile.map.water keeps them; the UVs meet the
+                // middles of the mask's edge texels, which lie on the terrain points.
+                var near = 0.5f / points;
+                var far = 1f - near;
+                var mesh = new Mesh { name = mask.name };
                 mesh.vertices = new[]
                 {
                     new Vector3(0f, tile.Water[0], 0f), new Vector3(size, tile.Water[1], 0f), new Vector3(0f, tile.Water[2], size), new Vector3(size, tile.Water[3], size)
                 };
-                mesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one };
+                mesh.uv = new[] { new Vector2(near, near), new Vector2(far, near), new Vector2(near, far), new Vector2(far, far) };
                 mesh.triangles = new[] { 0, 2, 1, 1, 2, 3 };
                 mesh.RecalculateNormals();
                 mesh.RecalculateBounds();
+                waterResources.Add(mask);
+                waterResources.Add(material);
+                waterResources.Add(mesh);
                 var surface = new GameObject(mesh.name) { layer = GroundLayer };
                 surface.transform.SetParent(waterRoot, false);
                 surface.transform.localPosition = new Vector3((float)(tile.X * summary.TileSizeMeters - originX), 0f, (float)(tile.Y * summary.TileSizeMeters - originY));
                 surface.AddComponent<MeshFilter>().sharedMesh = mesh;
                 var renderer = surface.AddComponent<MeshRenderer>();
-                renderer.sharedMaterial = waterMaterial;
+                renderer.sharedMaterial = material;
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
             }
+        }
+
+        /// <summary>
+        /// Lays a picture from the air over a tile's ground, following the terrain; null takes it away. The renderer takes
+        /// the texture over and destroys it when it is replaced or cleared.
+        /// </summary>
+        public void SetImagery(int tileX, int tileY, Texture2D picture)
+        {
+            var key = TileKey(tileX, tileY);
+            RemoveImagerySurface(key);
+            if (imageryTextures.TryGetValue(key, out var old) && old != picture)
+                Destroy(old);
+            imageryTextures.Remove(key);
+            if (picture == null)
+                return;
+            imageryTextures[key] = picture;
+            if (tileStates.TryGetValue(key, out var state))
+                AddImagerySurface(state);
+        }
+
+        /// <summary>Takes every tile's picture from the air away, as when another map opens.</summary>
+        public void ClearImagery()
+        {
+            foreach (var key in new List<long>(imagerySurfaces.Keys))
+                RemoveImagerySurface(key);
+            foreach (var texture in imageryTextures.Values)
+                Destroy(texture);
+            imageryTextures.Clear();
+        }
+
+        /// <summary>How opaque the pictures from the air lie on the ground, 0 to 1.</summary>
+        public float ImageryOpacity
+        {
+            get => imageryOpacity;
+            set
+            {
+                imageryOpacity = Mathf.Clamp01(value);
+                foreach (var surface in imagerySurfaces.Values)
+                    if (surface != null)
+                        surface.sharedMaterial.SetFloat("_Opacity", imageryOpacity);
+            }
+        }
+
+        public bool ImageryVisible
+        {
+            get => imageryVisible;
+            set
+            {
+                imageryVisible = value;
+                if (imageryRoot != null)
+                    imageryRoot.gameObject.SetActive(value);
+            }
+        }
+
+        /// <summary>How many tiles have a picture from the air.</summary>
+        public int ImageryTileCount => imageryTextures.Count;
+
+        private void AddImagerySurface(TileState state)
+        {
+            if (splineShader == null || state.Mesh == null || !imageryTextures.TryGetValue(state.Key, out var picture))
+                return;
+            if (imageryRoot == null)
+            {
+                imageryRoot = new GameObject("Map Imagery").transform;
+                imageryRoot.SetParent(transform, false);
+                imageryRoot.gameObject.SetActive(imageryVisible);
+            }
+            var overlay = new Material(splineShader) { renderQueue = ImageryQueue, name = "Imagery " + state.X + ", " + state.Y };
+            overlay.SetTexture("_MainTex", picture);
+            overlay.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
+            overlay.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
+            overlay.SetFloat("_DepthWrite", 0f);
+            overlay.SetFloat("_UseAlpha", 1f);
+            overlay.SetFloat("_Opacity", imageryOpacity);
+            var surface = new GameObject(overlay.name) { layer = GroundLayer };
+            surface.transform.SetParent(imageryRoot, false);
+            surface.transform.localPosition = state.Position;
+            surface.AddComponent<MeshFilter>().sharedMesh = state.Mesh;
+            var meshRenderer = surface.AddComponent<MeshRenderer>();
+            meshRenderer.sharedMaterial = overlay;
+            meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+            meshRenderer.lightProbeUsage = LightProbeUsage.Off;
+            meshRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            imagerySurfaces[state.Key] = meshRenderer;
+        }
+
+        private void RemoveImagerySurface(long key)
+        {
+            if (!imagerySurfaces.TryGetValue(key, out var surface))
+                return;
+            imagerySurfaces.Remove(key);
+            if (surface == null)
+                return;
+            Destroy(surface.sharedMaterial);
+            Destroy(surface.gameObject);
         }
 
         /// <summary>One material per spline texture, shared by all tiles.</summary>

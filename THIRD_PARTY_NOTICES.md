@@ -15,6 +15,12 @@ Format facts in the documentation also draw on openOMSI's `docs/FORMATS.md`; eac
 The terrain tool in `Assets/_Project/Scripts/OMSI/OmsiTerrainBrush.cs` follows openMapper's Terrain tool: the brush modes with their rates and soft rim, the rolls of the Roughen brush, the ramp, the map-wide sample grid whose tile edges are set in both tiles, and the rule that the ground stays 12 cm below a road beside it.
 
 - Source: <https://github.com/openOMSI-org/openMapper>, file `src/editor.rs` (`brush_terrain`, `ramp`, `rolls`, `world_sample`, `set_world_sample`, `ground_cap`), commit `f9e2aa4ab410196f639ec30912833cb43cb20c68`
+
+The aerial imagery and terrain heights in `Assets/_Project/Scripts/OMSI/OmsiGeo.cs` and `OmsiAerial.cs`, and the "Satellite and terrain" window in `Assets/_Project/Scripts/UI/SatelliteWindow.cs`, `WorldMapElement.cs` and `EditorShellAerial.cs`, follow openMapper's geo module: the placement of a map on WGS 84, the list of sources that need no key with their bounds and resolutions, the choice of the sharpest source, the tile cache and its request limits, the mosaic that enlarges coarser tiles where finer ones are missing, the per-pixel sampling of tile pictures and terrain points, and the window's layout.
+
+- Source: <https://github.com/openOMSI-org/openMapper>, files `src/geo/mod.rs`, `src/geo/sources.rs`, `src/geo/fetch.rs`, `src/geo/imagery.rs`, `src/geo/elevation.rs`, `src/geo/job.rs` and `src/ui_geo.rs`, commit `f9e2aa4ab410196f639ec30912833cb43cb20c68`
+
+The pictures and heights themselves are not part of OMSI MapWorks. They are fetched at run time from the services named in the window, under each service's own terms, and stay in the user's project.
 - Copyright: the openMapper contributors
 - License: GNU Affero General Public License v3.0 (see [LICENSE](LICENSE))
 

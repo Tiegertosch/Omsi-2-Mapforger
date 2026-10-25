@@ -10,6 +10,7 @@ Shader "Mapforge/SplineSurface"
         [Enum(UnityEngine.Rendering.BlendMode)] _DestinationBlend ("Destination blend", Float) = 0
         _DepthWrite ("Write depth", Float) = 1
         _UseAlpha ("Use alpha", Float) = 0
+        _Opacity ("Opacity", Float) = 1
     }
 
     SubShader
@@ -33,6 +34,7 @@ Shader "Mapforge/SplineSurface"
 
             CBUFFER_START(UnityPerMaterial)
                 float _UseAlpha;
+                float _Opacity;
             CBUFFER_END
 
             struct Attributes
@@ -60,6 +62,7 @@ Shader "Mapforge/SplineSurface"
                 half4 colour = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
                 if (_UseAlpha < 0.5)
                     colour.a = 1.0;
+                colour.a *= _Opacity;
                 return colour;
             }
             ENDHLSL

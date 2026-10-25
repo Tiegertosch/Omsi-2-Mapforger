@@ -14,6 +14,7 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 - **Edit scenery:** Place, move, rotate and delete objects, including multi-selection, undo and redo. Hang objects such as signs and lamp heads on the attachment points of others. Browse the objects available in your installation.
 - **Build roads:** Create OMSI spline roads with terrain-following or manually controlled heights. Generate junctions where roads meet and fit terrain to roads built in the editor. Lay rows of objects such as lamps or hedges along roads, then change or delete them.
 - **Shape the ground:** Raise, lower, smooth, flatten or roughen the terrain with a brush, or lay an even ramp between two points, the way openMapper does; level the ground under houses; dig lakes and rivers and give tiles water; export the ground as a 16-bit height map and lay a height map back over the map. Roads fitted to the terrain stay fitted.
+- **See the real place:** Place the map on the Earth and lay pictures from the air over its tiles, from Esri World Imagery or official orthophotos, without any API key, as openMapper does. Take the terrain heights from open elevation data too. The pictures stay in the project and are not exported.
 - **Work with map tiles:** Create a map from an installed map template, then add or remove tiles as the layout grows.
 - **Export safely:** Save edits in a `.omproj` project and export them into a separate OMSI map folder. The original map remains unchanged.
 

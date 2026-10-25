@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Linq;
 using System.Text;
 using NUnit.Framework;
@@ -1204,6 +1205,202 @@ namespace OmsiMapEditor.Tests
             // A [water] tile without its file has its surface at −5 m, as in Omsi.exe.
             session.Workspace.Revert("tile_1_0.map.water");
             CollectionAssert.AreEqual(new[] { -5f, -5f, -5f, -5f }, session.Read().Tiles[1].Water);
+        }
+
+        [Test]
+        public void APlacedMapTurnsItsMetresIntoLatitudesAndLongitudesAndBack()
+        {
+            // The middle of tile 0, 0 at Berlin's Alexanderplatz, north turned 30°.
+            var geo = OmsiGeoreference.Placed(new OmsiGeoAnchor { TileX = 0, TileY = 0, Latitude = 52.5219, Longitude = 13.4132, RotationDegrees = 30 }, 300);
+            var middle = geo.LatLon(150, 150);
+            Assert.AreEqual(52.5219, middle.Latitude, 1e-9);
+            Assert.AreEqual(13.4132, middle.Longitude, 1e-9);
+            foreach (var point in new[] { new OmsiMapPoint(2150, -850), new OmsiMapPoint(-3000, 4000), new OmsiMapPoint(151, 149) })
+            {
+                var position = geo.LatLon(point.X, point.Y);
+                var back = geo.World(position.Latitude, position.Longitude);
+                Assert.AreEqual(point.X, back.X, 1e-3);
+                Assert.AreEqual(point.Y, back.Y, 1e-3);
+            }
+            // Unturned, 1 km north is a thousandth of the length of a degree of latitude there (111,132.954 − 559.822 cos 2φ
+            // + 1.175 cos 4φ metres), and the longitude stays.
+            var straight = OmsiGeoreference.Placed(new OmsiGeoAnchor { Latitude = 52.5219, Longitude = 13.4132 }, 300);
+            var north = straight.LatLon(150, 1150);
+            var phi = 52.5219 * Math.PI / 180.0;
+            Assert.AreEqual(1000.0 / (111132.954 - 559.822 * Math.Cos(2 * phi) + 1.175 * Math.Cos(4 * phi)), north.Latitude - 52.5219, 1e-7);
+            Assert.AreEqual(13.4132, north.Longitude, 1e-9);
+            // A [worldcoordinates] map: the corner of tile 2402, 11279 is the Web Mercator tile corner of zoom 16.
+            var world = OmsiGeoreference.ForWorldCoordinates(371.9);
+            var corner = world.Mercator(2402 * 371.9, 11279 * 371.9);
+            Assert.AreEqual((2402 + 32768) / 65536.0, corner.X, 1e-12);
+            Assert.AreEqual((32768 - 11279) / 65536.0, corner.Y, 1e-12);
+
+            // The settings keep the anchor and the options.
+            var settings = new OmsiGeoSettings
+            {
+                Anchor = new OmsiGeoAnchor { TileX = 2, TileY = -1, Latitude = 48.1, Longitude = 11.5, RotationDegrees = 12.5 }, ImageryOpacity = 0.6,
+                Source = "Bayern DOP40", WithTerrain = true, AutoNewTiles = true
+            };
+            settings.Heights.Relative = false;
+            settings.Heights.Offset = 3;
+            settings.Heights.Base = 517.25;
+            var parsed = OmsiGeoSettings.Parse(settings.ToString());
+            Assert.AreEqual(2, parsed.Anchor.TileX);
+            Assert.AreEqual(-1, parsed.Anchor.TileY);
+            Assert.AreEqual(12.5, parsed.Anchor.RotationDegrees);
+            Assert.AreEqual(0.6, parsed.ImageryOpacity, 1e-12);
+            Assert.IsFalse(parsed.Heights.Relative);
+            Assert.AreEqual(3.0, parsed.Heights.Offset);
+            Assert.AreEqual(517.25, parsed.Heights.Base);
+            Assert.AreEqual("Bayern DOP40", parsed.Source);
+            Assert.IsTrue(parsed.WithTerrain);
+            Assert.IsTrue(parsed.AutoNewTiles);
+            Assert.IsFalse(OmsiGeoSettings.Parse(new OmsiGeoSettings().ToString()).AutoNewTiles);
+            Assert.IsNull(OmsiGeoSettings.Parse(new OmsiGeoSettings().ToString()).Heights.Base);
+            Assert.IsNull(OmsiGeoSettings.Parse(new OmsiGeoSettings().ToString()).Source);
+        }
+
+        [Test]
+        public void ImagerySourcesAskForTheirTilesAndTheSharpestComesFirst()
+        {
+            var berlin = OmsiImagerySource.Imagery.Single(source => source.Name == "Berlin TrueDOP 2024");
+            var esri = OmsiImagerySource.Imagery.Single(source => source.Name == OmsiImagerySource.EsriName);
+            StringAssert.Contains("BBOX=-20037508.343,0.000,0.000,20037508.343&", berlin.TileUrl(1, 0, 0));
+            StringAssert.Contains("WIDTH=512&HEIGHT=512", berlin.TileUrl(1, 0, 0));
+            Assert.AreEqual("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/18/88/140?blankTile=false", esri.TileUrl(18, 140, 88));
+            Assert.IsTrue(berlin.Covers(52.5, 13.4));
+            Assert.IsFalse(berlin.Covers(48.1, 11.5));
+            Assert.AreEqual(18, berlin.UsefulZoom(52.5));
+            Assert.AreEqual("berlin-truedop-2024", berlin.Slug);
+            // Equal detail: the orthophoto before Esri; finer detail first.
+            var ranked = OmsiImagerySource.Rank(new[]
+            {
+                new KeyValuePair<OmsiImagerySource, double?>(esri, 0.3), new KeyValuePair<OmsiImagerySource, double?>(berlin, 0.3),
+                new KeyValuePair<OmsiImagerySource, double?>(OmsiImagerySource.Imagery[3], 0.1)
+            });
+            Assert.AreEqual(new[] { OmsiImagerySource.Imagery[3].Name, berlin.Name, esri.Name }, ranked.Select(pair => pair.Key.Name).ToArray());
+            Assert.AreEqual(128.5f, OmsiImagerySource.TerrariumHeight(128, 128, 128));
+        }
+
+        [Test]
+        public void TilesAreFetchedOnceAndTheirMosaicMakesAPictureWithoutSeams()
+        {
+            var cache = Path.Combine(Path.GetTempPath(), "mapforge-tiles-" + Guid.NewGuid().ToString("N"));
+            var asked = new List<string>();
+            var fetcher = new OmsiTileFetcher(cache, (url, cancel) =>
+            {
+                asked.Add(url);
+                // Zoom 18 has nothing; zoom 17 has a picture.
+                return url.Contains("/tile/18/") ? new KeyValuePair<int, byte[]>(404, new byte[0]) : new KeyValuePair<int, byte[]>(200, new byte[] { 1, 2, 3 });
+            });
+            var esri = OmsiImagerySource.Imagery.Single(source => source.Name == OmsiImagerySource.EsriName);
+            try
+            {
+                Assert.IsNull(fetcher.Tile(esri, 18, 1, 2, CancellationToken.None));
+                Assert.IsNull(fetcher.Tile(esri, 18, 1, 2, CancellationToken.None));
+                CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, fetcher.Tile(esri, 17, 0, 1, CancellationToken.None));
+                CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, fetcher.Tile(esri, 17, 0, 1, CancellationToken.None));
+                Assert.AreEqual(2, asked.Count);
+            }
+            finally
+            {
+                Directory.Delete(cache, true);
+            }
+
+            var places = OmsiTileFetcher.ParsePlaces("[{\"place_id\":1,\"lat\":\"52.5219\",\"lon\":\"13.4132\",\"display_name\":\"Alexanderplatz, Mitte, Berlin\",\"boundingbox\":[\"52.5\",\"52.6\",\"13.4\",\"13.5\"]}," +
+                                                     "{\"lat\":\"48.137\",\"lon\":\"11.575\",\"display_name\":\"M\\u00fcnchen\"}]");
+            Assert.AreEqual(2, places.Count);
+            Assert.AreEqual("Alexanderplatz, Mitte, Berlin", places[0].Name);
+            Assert.AreEqual("München", places[1].Name);
+            Assert.AreEqual(11.575, places[1].Longitude, 1e-9);
+
+            // Source tiles of zoom 2 painted by their column; only column 1 of zoom 2 is missing, so its part comes from zoom 1.
+            OmsiRgbImage Solid(byte value)
+            {
+                var rgb = new byte[16 * 16 * 3];
+                for (var index = 0; index < rgb.Length; index++)
+                    rgb[index] = value;
+                return new OmsiRgbImage(16, 16, rgb);
+            }
+            var mosaic = OmsiMosaic.Fetch(2, new OmsiMapPoint(0.01, 0.3), new OmsiMapPoint(0.6, 0.4), false,
+                (z, x, y) => z == 2 && x == 1 ? null : Solid((byte)(z * 100 + x * 10)), CancellationToken.None);
+            Assert.IsTrue(mosaic.Coarser);
+            var colour = new byte[3];
+            mosaic.Colour(new OmsiMapPoint(0.1, 0.35), colour, 0);
+            Assert.AreEqual(200, colour[0]);
+            mosaic.Colour(new OmsiMapPoint(0.4, 0.35), colour, 0);
+            Assert.AreEqual(100, colour[0]);
+            mosaic.Colour(new OmsiMapPoint(0.55, 0.35), colour, 0);
+            Assert.AreEqual(220, colour[0]);
+            Assert.AreEqual(1024, OmsiAerial.ImageSize(300, 0.3));
+            Assert.AreEqual(512, OmsiAerial.ImageSize(300, 5));
+            Assert.AreEqual(4096, OmsiAerial.ImageSize(371.9, 0.05));
+        }
+
+        [Test]
+        public void HeightsFromTheWorldComeRelativeToTheMiddleTileAndAreTakenBackAsOneStep()
+        {
+            var cache = Path.Combine(Path.GetTempPath(), "mapforge-tiles-" + Guid.NewGuid().ToString("N"));
+            // Terrarium tiles of one grey 128 everywhere: 128.5 m above the sea.
+            var grey = new ushort[256 * 256];
+            for (var index = 0; index < grey.Length; index++)
+                grey[index] = 128 * 257;
+            var png = OmsiPng.EncodeGrey16(256, 256, grey);
+            var fetcher = new OmsiTileFetcher(cache, (url, cancel) => new KeyValuePair<int, byte[]>(200, png));
+            var session = OpenProject();
+            var summary = session.Read();
+            var job = new OmsiAerialJob
+            {
+                Geo = OmsiGeoreference.Placed(new OmsiGeoAnchor { Latitude = 52.5, Longitude = 13.4 }, 300), TileSize = 300, Fetcher = fetcher,
+                Heights = new OmsiGeoHeightOptions { Relative = true, Offset = 2, Smoothing = 10 }
+            };
+            job.Tiles.AddRange(summary.Tiles);
+            var heights = new Dictionary<OmsiTileSummary, float[]>();
+            job.HeightsReady = (tile, values) => heights[tile] = values;
+            try
+            {
+                job.Run(CancellationToken.None);
+            }
+            finally
+            {
+                Directory.Delete(cache, true);
+            }
+            Assert.AreEqual(128.5, job.Base.Value, 1e-9);
+            Assert.AreEqual(2, heights.Count);
+            Assert.IsTrue(heights.Values.All(values => values.All(value => Math.Abs(value - 2.0) < 1e-4)));
+
+            // A base kept from an earlier load is taken off as it is, so tiles loaded later meet the earlier ones.
+            var later = new OmsiAerialJob
+            {
+                Geo = job.Geo, TileSize = 300, Fetcher = new OmsiTileFetcher(cache, (url, cancel) => new KeyValuePair<int, byte[]>(200, png)),
+                Heights = new OmsiGeoHeightOptions { Relative = true, Smoothing = 0, Base = 100 }
+            };
+            later.Tiles.Add(summary.Tiles[1]);
+            float[] laterHeights = null;
+            later.HeightsReady = (tile, values) => laterHeights = values;
+            try
+            {
+                later.Run(CancellationToken.None);
+            }
+            finally
+            {
+                Directory.Delete(cache, true);
+            }
+            Assert.AreEqual(100.0, later.Base.Value);
+            Assert.AreEqual(28.5, laterHeights[0], 1e-4);
+
+            var change = session.ImportTerrainHeights(summary, heights);
+            Assert.AreEqual(2.0, OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain"))[30, 30], 1e-4);
+            session.Undo(summary, change);
+            Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
+
+            // Settings and imagery stay in the project, outside the map.
+            session.SaveGeoSettings(new OmsiGeoSettings { Anchor = new OmsiGeoAnchor { Latitude = 52.5, Longitude = 13.4 } });
+            Assert.AreEqual(52.5, session.ReadGeoSettings().Anchor.Latitude);
+            session.SaveImagery(summary.Tiles[0], new byte[] { 9 }, new OmsiImageryMeta { Source = "Esri World Imagery", Zoom = 19, Stamp = "s" });
+            CollectionAssert.AreEqual(new byte[] { 9 }, session.ReadImagery(summary.Tiles[0], out var meta));
+            Assert.AreEqual(19, meta.Zoom);
+            Assert.AreEqual(@"Mapforge\Imagery\tile_0_0.map.jpg", OmsiMapSession.ImageryPath(summary.Tiles[0]));
         }
 
         [Test]

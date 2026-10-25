@@ -115,13 +115,46 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Reads a PNG as grey values from 0 to 1.</summary>
         public static OmsiGreyPicture DecodeGrey(byte[] bytes)
         {
+            float[] values = null;
+            var width = 0;
+            var depth = Read(bytes, (w, h) =>
+            {
+                width = w;
+                values = new float[w * h];
+            }, (x, y, red, green, blue) => values[y * width + x] = (float)(0.2126 * red + 0.7152 * green + 0.0722 * blue), out var height);
+            return new OmsiGreyPicture(width, height, values, depth < 16);
+        }
+
+        /// <summary>Reads a PNG as 8-bit red, green and blue, as Terrarium height tiles are kept.</summary>
+        public static OmsiRgbImage DecodeRgb(byte[] bytes)
+        {
+            byte[] rgb = null;
+            var width = 0;
+            Read(bytes, (w, h) =>
+            {
+                width = w;
+                rgb = new byte[w * h * 3];
+            }, (x, y, red, green, blue) =>
+            {
+                var index = (y * width + x) * 3;
+                rgb[index] = (byte)Math.Round(red * 255.0);
+                rgb[index + 1] = (byte)Math.Round(green * 255.0);
+                rgb[index + 2] = (byte)Math.Round(blue * 255.0);
+            }, out var height);
+            return new OmsiRgbImage(width, height, rgb);
+        }
+
+        /// <summary>Reads a PNG pixel by pixel as red, green and blue from 0 to 1, rows from the top; returns its bits a channel.</summary>
+        private static int Read(byte[] bytes, Action<int, int> size, Action<int, int, double, double, double> pixel, out int height)
+        {
             if (bytes == null || bytes.Length < Signature.Length + 12)
                 throw new InvalidDataException("The file is too short for a PNG picture.");
             for (var index = 0; index < Signature.Length; index++)
                 if (bytes[index] != Signature[index])
                     throw new InvalidDataException("The file is not a PNG picture.");
 
-            int width = 0, height = 0, depth = 0, colour = -1;
+            int width = 0, depth = 0, colour = -1;
+            height = 0;
             byte[] palette = null;
             var data = new MemoryStream();
             var position = Signature.Length;
@@ -176,7 +209,7 @@ namespace OmsiMapEditor.OMSI
             var raw = Inflate(data.ToArray());
             if (raw.Length < height * (stride + 1))
                 throw new InvalidDataException("The PNG picture's data is incomplete.");
-            var values = new float[width * height];
+            size(width, height);
             var previous = new byte[stride];
             var current = new byte[stride];
             for (var y = 0; y < height; y++)
@@ -184,15 +217,18 @@ namespace OmsiMapEditor.OMSI
                 var row = y * (stride + 1);
                 Unfilter(raw[row], raw, row + 1, current, previous, bytesPerPixel);
                 for (var x = 0; x < width; x++)
-                    values[y * width + x] = (float)Luma(current, x * bytesPerPixel, colour, depth, palette);
+                {
+                    Colour(current, x * bytesPerPixel, colour, depth, palette, out var red, out var green, out var blue);
+                    pixel(x, y, red, green, blue);
+                }
                 var swap = previous;
                 previous = current;
                 current = swap;
             }
-            return new OmsiGreyPicture(width, height, values, depth < 16);
+            return depth;
         }
 
-        private static double Luma(byte[] row, int offset, int colour, int depth, byte[] palette)
+        private static void Colour(byte[] row, int offset, int colour, int depth, byte[] palette, out double red, out double green, out double blue)
         {
             double Sample(int channel)
             {
@@ -202,14 +238,24 @@ namespace OmsiMapEditor.OMSI
             {
                 case 0:
                 case 4:
-                    return Sample(0);
+                    red = green = blue = Sample(0);
+                    return;
                 case 3:
                     var entry = row[offset] * 3;
                     if (entry + 2 >= palette.Length)
-                        return 0.0;
-                    return (0.2126 * palette[entry] + 0.7152 * palette[entry + 1] + 0.0722 * palette[entry + 2]) / 255.0;
+                    {
+                        red = green = blue = 0.0;
+                        return;
+                    }
+                    red = palette[entry] / 255.0;
+                    green = palette[entry + 1] / 255.0;
+                    blue = palette[entry + 2] / 255.0;
+                    return;
                 default:
-                    return 0.2126 * Sample(0) + 0.7152 * Sample(1) + 0.0722 * Sample(2);
+                    red = Sample(0);
+                    green = Sample(1);
+                    blue = Sample(2);
+                    return;
             }
         }
 

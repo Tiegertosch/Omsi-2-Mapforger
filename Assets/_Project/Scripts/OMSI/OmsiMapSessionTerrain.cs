@@ -223,6 +223,77 @@ namespace OmsiMapEditor.OMSI
             return EndTerrainStroke(summary, stroke);
         }
 
+        /// <summary>
+        /// Terrain heights from the world laid on tiles, 61 × 61 each from the south, taking the place of the ground shaped
+        /// by hand; roads fitted to the terrain are fitted in again. One step, or null when nothing changed.
+        /// </summary>
+        public OmsiTerrainChange ImportTerrainHeights(OmsiMapSummary summary, IEnumerable<KeyValuePair<OmsiTileSummary, float[]>> heights)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (heights == null)
+                throw new ArgumentNullException(nameof(heights));
+            const int cells = OmsiTerrain.Resolution - 1;
+            var stroke = BeginTerrainStroke(summary);
+            foreach (var pair in heights)
+            {
+                if (pair.Value == null || pair.Value.Length != OmsiTerrain.Resolution * OmsiTerrain.Resolution)
+                    continue;
+                for (var row = 0; row < OmsiTerrain.Resolution; row++)
+                    for (var column = 0; column < OmsiTerrain.Resolution; column++)
+                        stroke.Shaped.Set((long)pair.Key.X * cells + column, (long)pair.Key.Y * cells + row, pair.Value[row * OmsiTerrain.Resolution + column]);
+            }
+            return EndTerrainStroke(summary, stroke);
+        }
+
+        /// <summary>The project's placement on the Earth and imagery settings (Mapforge\geo.txt), or the defaults.</summary>
+        public OmsiGeoSettings ReadGeoSettings()
+        {
+            var workspace = RequireWorkspace();
+            return workspace.IsModified(OmsiGeoSettings.RelativePath)
+                ? OmsiGeoSettings.Parse(System.Text.Encoding.UTF8.GetString(workspace.ReadAllBytes(OmsiGeoSettings.RelativePath)))
+                : new OmsiGeoSettings();
+        }
+
+        public void SaveGeoSettings(OmsiGeoSettings settings)
+        {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+            RequireWorkspace().Save(OmsiGeoSettings.RelativePath, System.Text.Encoding.UTF8.GetBytes(settings.ToString()));
+        }
+
+        /// <summary>Where a tile's imagery is kept in the project: Mapforge\Imagery\tile_x_y.map.jpg, never exported.</summary>
+        public static string ImageryPath(OmsiTileSummary tile)
+        {
+            return OmsiMapExporter.ProjectDataFolder + "\\Imagery\\" + System.IO.Path.GetFileName(OmsiRelativePath.Normalize(tile.FileName)) + ".jpg";
+        }
+
+        /// <summary>Keeps a tile's imagery (a JPEG) and what it was made from.</summary>
+        public void SaveImagery(OmsiTileSummary tile, byte[] jpeg, OmsiImageryMeta meta)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (jpeg == null)
+                throw new ArgumentNullException(nameof(jpeg));
+            var workspace = RequireWorkspace();
+            workspace.Save(ImageryPath(tile), jpeg);
+            workspace.Save(ImageryPath(tile) + ".txt", System.Text.Encoding.UTF8.GetBytes(meta?.ToString() ?? string.Empty));
+        }
+
+        /// <summary>A tile's imagery (a JPEG), or null when it has none.</summary>
+        public byte[] ReadImagery(OmsiTileSummary tile, out OmsiImageryMeta meta)
+        {
+            meta = null;
+            if (tile == null || Workspace == null)
+                return null;
+            var path = ImageryPath(tile);
+            if (!Workspace.IsModified(path))
+                return null;
+            if (Workspace.IsModified(path + ".txt"))
+                meta = OmsiImageryMeta.Parse(System.Text.Encoding.UTF8.GetString(Workspace.ReadAllBytes(path + ".txt")));
+            return Workspace.ReadAllBytes(path);
+        }
+
         /// <summary>Whether an object keeps its height as written rather than above the ground, as junctions do.</summary>
         private static bool HasAbsoluteHeight(string installation, string assetPath)
         {

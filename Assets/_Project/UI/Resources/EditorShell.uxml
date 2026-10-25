@@ -69,6 +69,7 @@
         <ui:VisualElement name="view-menu" class="menu-popup view-menu">
             <ui:Button name="project-panel-menu-item" text="Project browser" class="menu-popup-item" />
             <ui:Button name="inspector-menu-item" text="Inspector" class="menu-popup-item" />
+            <ui:Button name="satellite-menu-item" text="Satellite and terrain..." class="menu-popup-item" tooltip="Place the map on the Earth and load pictures from the air and terrain heights for its tiles, without any key, as openMapper does." />
             <ui:Label class="menu-divider" />
             <ui:Label text="Colours in the view from above" class="menu-section-label" />
             <ui:VisualElement name="map-legend" class="map-legend">
