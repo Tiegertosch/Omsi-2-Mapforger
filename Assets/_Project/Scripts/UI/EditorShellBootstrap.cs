@@ -174,6 +174,10 @@ namespace OmsiMapEditor.UI
         private ScrollView checkSections;
         private Task<OmsiMapCheckReport> checkTask;
         private OmsiMapCheckReport lastCheck;
+
+        // The objects made for the project as the last check found them, and the topic showing them.
+        private OmsiMadeObjectScan madeObjects;
+        private OmsiCheckSection madeObjectsSection;
         private VisualElement newMapDialog;
         private NewMapDialog newMapForm;
         private Label exportTargetLabel;
@@ -825,7 +829,21 @@ namespace OmsiMapEditor.UI
                 SetTextures(false);
 
             if (Array.IndexOf(args, "-check") >= 0)
+            {
                 ValidateLoadedMap();
+                // -checkTopic <title>: scrolls the report to that topic once it is shown.
+                var topic = Argument("-checkTopic", 1);
+                if (topic != null)
+                {
+                    var checkStarted = Time.realtimeSinceStartup;
+                    while (checkTask != null && Time.realtimeSinceStartup - checkStarted < 300f)
+                        yield return null;
+                    yield return null;
+                    foreach (var box in checkSections.Children())
+                        if (box.Q<Label>(className: "check-section-title")?.text == topic)
+                            checkSections.schedule.Execute(() => checkSections.ScrollTo(box)).StartingIn(100);
+                }
+            }
 
             if (DateTime.TryParseExact(Argument("-chrono", 1) ?? string.Empty, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None,
                     out var chronoArgument))
@@ -4343,7 +4361,18 @@ namespace OmsiMapEditor.UI
             if (checkDialog != null)
                 checkDialog.style.display = DisplayStyle.Flex;
             SetStatus("Checking the map...");
-            var task = Task.Run(() => OmsiMapCheck.Run(summary, source, installationRoot, configName));
+            // The objects made for the project are looked for alongside, reading every map of the installation.
+            OmsiMadeObjectScan made = null;
+            var keep = CanEdit ? MadeObjectsStillNeeded() : null;
+            var projectName = currentProjectName;
+            var workspaceFolder = session.Workspace?.WorkspacePath;
+            var task = Task.Run(() =>
+            {
+                var result = OmsiMapCheck.Run(summary, source, installationRoot, configName);
+                if (keep != null)
+                    made = OmsiMadeObjects.Find(installationRoot, projectName, workspaceFolder, keep);
+                return result;
+            });
             checkTask = task;
             UpdateToolbar();
             IVisualElementScheduledItem poll = null;
@@ -4366,6 +4395,10 @@ namespace OmsiMapEditor.UI
                 }
                 var report = task.Result;
                 report.Sections.Add(DlcSection());
+                madeObjects = made;
+                madeObjectsSection = made == null ? null : MadeObjectsSection(made);
+                if (madeObjectsSection != null)
+                    report.Sections.Add(madeObjectsSection);
                 lastCheck = report;
                 ShowCheckReport(report);
             }).Every(100);
@@ -4408,6 +4441,8 @@ namespace OmsiMapEditor.UI
                     show.AddToClassList("check-section-button");
                     header.Add(show);
                 }
+                if (ReferenceEquals(section, madeObjectsSection) && madeObjects != null && madeObjects.Unused.Count > 0)
+                    header.Add(DeleteMadeObjectsButton());
                 box.Add(header);
                 var summaryLabel = new Label(section.Summary);
                 summaryLabel.AddToClassList("check-section-summary");
@@ -4439,6 +4474,118 @@ namespace OmsiMapEditor.UI
                 list.Add(more);
             }
             Fill(shown);
+        }
+
+        /// <summary>
+        /// The topic of the objects made for the project under Sceneryobjects\Mapforge (ADR 026): those that no map of the
+        /// installation, no export and nothing undo could bring back names any more, such as junctions made again.
+        /// </summary>
+        private OmsiCheckSection MadeObjectsSection(OmsiMadeObjectScan scan)
+        {
+            var section = new OmsiCheckSection("Made objects") { Status = OmsiCheckStatus.Passed };
+            var unused = scan.Unused;
+            var folder = OmsiGeneratedObjectStore.Folder + "\\" + Path.GetFileName(scan.ProjectFolder);
+            if (scan.Objects.Count == 0)
+                section.Summary = "No objects were made for this project under " + folder + ".";
+            else if (unused.Count == 0)
+                section.Summary = "All " + scan.Objects.Count + " object(s) made for this project under " + folder +
+                                  " are named by a map of the installation, an export or the undo history.";
+            else
+            {
+                section.Status = OmsiCheckStatus.Note;
+                section.Summary = unused.Count + " of " + scan.Objects.Count + " object(s) made for this project under " + folder + " (" + Megabytes(scan.UnusedBytes) +
+                                  ") are named by no map of the installation, no export and not by the undo history, such as junctions made again. " +
+                                  "Delete unused removes their folders; maps of other projects with the same name are not looked at.";
+                foreach (var item in unused)
+                    section.Findings.Add(item.Name + " (" + Megabytes(item.Bytes) + ")");
+            }
+            return section;
+        }
+
+        /// <summary>The objects made here that the open project could still bring back: by undo or redo, or while placing one.</summary>
+        private List<string> MadeObjectsStillNeeded()
+        {
+            var keep = new List<string>();
+            if (placementAsset != null)
+                keep.Add(placementAsset);
+            void Collect(ObjectEditStep step)
+            {
+                if (step.Group != null)
+                    foreach (var part in step.Group)
+                        Collect(part);
+                if (step.Change != null)
+                {
+                    keep.Add(step.Change.Record.AssetPath);
+                    if (step.Change.AssetBefore != null)
+                        keep.Add(step.Change.AssetBefore);
+                    if (step.Change.AssetAfter != null)
+                        keep.Add(step.Change.AssetAfter);
+                }
+                if (step.TileChange != null)
+                    keep.AddRange(step.TileChange.TileTexts());
+            }
+            foreach (var step in undoSteps)
+                Collect(step);
+            foreach (var step in redoSteps)
+                Collect(step);
+            return keep;
+        }
+
+        /// <summary>Deletes the unused made objects on a second click, as it cannot be taken back.</summary>
+        private Button DeleteMadeObjectsButton()
+        {
+            var armed = false;
+            Button delete = null;
+            delete = new Button(() =>
+            {
+                if (!armed)
+                {
+                    armed = true;
+                    delete.text = "Click again to delete " + madeObjects.Unused.Count + " folder(s)";
+                    delete.schedule.Execute(() =>
+                    {
+                        armed = false;
+                        delete.text = "Delete unused";
+                    }).StartingIn(4000);
+                    return;
+                }
+                var problems = new List<string>();
+                List<string> deleted;
+                try
+                {
+                    deleted = OmsiMadeObjects.DeleteUnused(madeObjects, problems);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    Debug.LogException(exception);
+                    SetStatus("The made objects could not be cleaned up: " + exception.Message);
+                    return;
+                }
+                madeObjects.Objects.RemoveAll(item => deleted.Contains(item.Name));
+                madeObjectsSection.Status = problems.Count == 0 ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
+                madeObjectsSection.Summary = "Deleted " + deleted.Count + " unused folder(s) under " + OmsiGeneratedObjectStore.Folder + "\\" +
+                                             Path.GetFileName(madeObjects.ProjectFolder) + "." +
+                                             (problems.Count > 0 ? " " + problems.Count + " could not be deleted." : string.Empty);
+                madeObjectsSection.Findings.Clear();
+                madeObjectsSection.Findings.AddRange(problems);
+                if (lastCheck != null)
+                    ShowCheckReport(lastCheck);
+                StartInstallationScan(true);
+                SetStatus("Deleted " + deleted.Count + " unused made object(s)" + (problems.Count > 0 ? "; " + problems[0] : string.Empty) + ".");
+            })
+            {
+                text = "Delete unused",
+                tooltip = "Deletes the folders of these objects from the OMSI installation. This cannot be undone."
+            };
+            delete.AddToClassList("map-control-button");
+            delete.AddToClassList("check-section-button");
+            delete.AddToClassList("inspector-edit-delete");
+            return delete;
+        }
+
+        private static string Megabytes(long bytes)
+        {
+            return (bytes / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB";
         }
 
         private OmsiCheckSection DlcSection()

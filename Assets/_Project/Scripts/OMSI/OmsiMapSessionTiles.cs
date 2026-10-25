@@ -24,6 +24,20 @@ namespace OmsiMapEditor.OMSI
         public int Y { get; }
         public bool IsApplied { get; internal set; } = true;
         internal List<OmsiObjectChange.FileState> Files { get; } = new List<OmsiObjectChange.FileState>();
+
+        /// <summary>The text of every tile file the change wrote, before and after, such as to see what undoing it brings back.</summary>
+        public IEnumerable<string> TileTexts()
+        {
+            foreach (var file in Files)
+            {
+                if (!file.RelativePath.EndsWith(".map", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (file.Before != null)
+                    yield return OmsiTextFile.Decode(file.Before);
+                if (file.After != null)
+                    yield return OmsiTextFile.Decode(file.After);
+            }
+        }
     }
 
     /// <summary>What deleting a tile did, or what stops it.</summary>

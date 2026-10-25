@@ -68,10 +68,10 @@ namespace OmsiMapEditor.OMSI
 
         internal double[] PositionAfter { get; set; }
 
-        /// <summary>The object file before and after a replacement.</summary>
-        internal string AssetBefore { get; set; }
+        /// <summary>The object file before and after a replacement; null for other changes.</summary>
+        public string AssetBefore { get; internal set; }
 
-        internal string AssetAfter { get; set; }
+        public string AssetAfter { get; internal set; }
 
         internal List<FileState> Files { get; } = new List<FileState>();
     }

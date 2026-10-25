@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -406,6 +407,44 @@ namespace OmsiMapEditor.Tests
             Assert.IsNull(OmsiGeneratedJunction.Parse(path, OmsiTextFile.Encode(piece.Sco, OmsiTextEncoding.Windows1252), each => profile));
             Assert.IsTrue(OmsiGeneratedJunction.IsMadeHere(@"Sceneryobjects\Mapforge\Test\x\x.sco"));
             Assert.IsFalse(OmsiGeneratedJunction.IsMadeHere(@"Sceneryobjects\Test\x.sco"));
+        }
+
+        [Test]
+        public void MadeObjectsNoMapNamesAreFoundAndOnlyThoseAreDeleted()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var piece = OmsiJunctionGenerator.StraightPiece(ProfilePath, profile, 12, "Test piece");
+            var paths = new[] { "In map", "In export", "In workspace", "Undo", "Unused" }
+                .Select(name => OmsiGeneratedObjectStore.Write(installation, "Test", name, piece)).ToArray();
+            // Another project's objects are never looked at.
+            OmsiGeneratedObjectStore.Write(installation, "Other", "Unused", piece);
+            // A map names the first in UTF-16 with forward slashes and another case; an export of it the second.
+            var map = Path.Combine(installation, "maps", "Town");
+            Directory.CreateDirectory(Path.Combine(map, "Chrono", "Works"));
+            File.WriteAllBytes(Path.Combine(map, "tile_0_0.map"),
+                Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes("[object]\r\n0\r\n" + paths[0].Replace('\\', '/').ToUpperInvariant() + "\r\n")).ToArray());
+            File.WriteAllText(Path.Combine(map, "Chrono", "Works", "tile_0_0.map"), "[object]\r\n0\r\n" + paths[1] + "\r\n");
+            File.WriteAllText(Path.Combine(map, "tile_1_0.map"), "[object]\r\n0\r\nSceneryobjects\\Test\\house.sco\r\n");
+            var workspace = Path.Combine(installation, "Projects", "Test.workspace");
+            Directory.CreateDirectory(workspace);
+            File.WriteAllText(Path.Combine(workspace, "tile_0_0.map"), "[object]\r\n0\r\n" + paths[2] + "\r\n");
+
+            var scan = OmsiMadeObjects.Find(installation, "Test", workspace, new[] { paths[3] });
+
+            Assert.AreEqual(5, scan.Objects.Count);
+            CollectionAssert.AreEqual(new[] { "Unused" }, scan.Unused.Select(item => item.Name));
+            Assert.Greater(scan.UnusedBytes, 0);
+            Assert.AreEqual(4, scan.ScannedFiles);
+            StringAssert.EndsWith(Path.Combine("Chrono", "Works", "tile_0_0.map"), scan.Objects.Single(item => item.Name == "In export").UsedBy);
+
+            var problems = new List<string>();
+            CollectionAssert.AreEqual(new[] { "Unused" }, OmsiMadeObjects.DeleteUnused(scan, problems));
+            CollectionAssert.IsEmpty(problems);
+            var left = Directory.GetDirectories(scan.ProjectFolder).Select(Path.GetFileName).OrderBy(name => name).ToArray();
+            CollectionAssert.AreEqual(new[] { "In export", "In map", "In workspace", "Undo" }, left);
+            Assert.IsTrue(Directory.Exists(Path.Combine(installation, "Sceneryobjects", "Mapforge", "Other", "Unused")));
+            // Without a folder for the project there is nothing to find.
+            CollectionAssert.IsEmpty(OmsiMadeObjects.Find(installation, "None", null, null).Objects);
         }
 
         private static double[] Along(OmsiJunctionArm arm, double along, double right)

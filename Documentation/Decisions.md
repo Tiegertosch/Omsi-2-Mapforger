@@ -367,3 +367,15 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Schneiden statt den nächsten Spline umzuformen: Im ersten Versuch wurde der Spline hinter einem gewachsenen Arm ganz neu geplant; in Grundorf war das ein gekrümmter Spline der Originalkarte von 150 m, der zu zwei Bögen von je 77 m geworden wäre. Geschnitten bleibt die Straße hinter dem Schnitt, wie sie ist.
 - 25 m Radius statt fester 5 m: Ein gedrehter Arm verschiebt seinen Punkt auch seitlich (10° bei 12 m Armlänge etwa 2 m), und eine gekrümmte Straße entfernt sich von einem längeren Arm; mit festen 5 m entstanden in Grundorf S-Kurven mit 4 bis 5 m Radius.
 - OMSI liest Text außerhalb von Abschnitten nicht; die Zeile „MapWorks arms:“ stört das Spiel also nicht und macht das Neu-Erzeugen verlustfrei.
+
+## ADR 036: Unbenutzte erzeugte Objekte aufräumen
+
+**Status:** Angenommen, 25. Oktober 2026, auf Wunsch des Nutzers (offener Punkt aus ADR 035). Vom Nutzer im Editor bestätigt.
+
+**Entscheidung:** Die Kartenprüfung (Tools) hat in einem Projekt das Thema „Made objects“. Es sucht im Hintergrund die Objektordner unter `Sceneryobjects\Mapforge\<Projekt>` der Installation (ADR 026), die nichts mehr nennt. Als benutzt gilt ein Ordner, solange eine Kacheldatei (`*.map`) irgendeiner Karte unter `maps` der Installation seinen Pfad enthält, also auch Exporte und Chrono-Varianten, oder eine Kacheldatei der Arbeitskopie des Projekts, oder etwas, das das offene Projekt zurückholen könnte: Objekte in Schritten der Rückgängig- und Wiederherstellen-Liste, auch die Dateien vor und nach einem Austausch und die Kacheln einer gelöschten Kachel, sowie das Objekt, das gerade platziert wird. Groß- und Kleinschreibung und Schrägstriche zählen nicht. Kann eine Kacheldatei nicht gelesen werden, gilt nichts als unbenutzt. Das Thema nennt die unbenutzten Ordner mit ihrer Größe; „Delete unused“ löscht sie nach einem zweiten Klick innerhalb von vier Sekunden, nur innerhalb des Projektordners. Das lässt sich nicht rückgängig machen.
+
+**Grund:**
+- Beim Drehen eines Arms bleibt die alte Kreuzung liegen, weil Rückgängig sie braucht (ADR 035); ohne Aufräumen sammeln sich Ordner an.
+- Exporte liegen als eigene Karten unter `maps` und nennen dieselben Pfade; alle Karten zu lesen schützt sie, auch wenn das Projekt die Objekte nicht mehr nutzt.
+- Projekte desselben Namens teilen sich einen Ordner; deren Arbeitskopien kennt der Editor nicht. Das Thema sagt das, und gelöscht wird erst nach Bestätigung.
+- In der Kartenprüfung statt als eigener Menüpunkt: Sie läuft ohnehin im Hintergrund, zeigt Befunde mit Knöpfen und braucht keine neue Oberfläche.
