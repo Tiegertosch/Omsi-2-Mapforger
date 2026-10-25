@@ -50,7 +50,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen
-- Kartenkacheln und Koordinatenverwaltung entwickeln
+- [x] Kartenkacheln und Koordinatenverwaltung: Kachelkante 300 m oder gemessen bei `[worldcoordinates]` (ADR 007, 019), Zeichnen relativ zur untersten Kachelecke, Objekte über Kachelgrenzen übernehmen (ADR 012), Kacheln hinzufügen und löschen (ADR 031)
 - [x] 3D-Viewport und navigierbare Weltansicht ergänzen: Gelände aus den Höhen je Kachel, perspektivische Kamera mit Drehen, Verschieben und Zoomen (ADR 013)
 - [x] In der 3D-Ansicht Objekte wählen, über das Gelände verschieben und an drei Ringen drehen: grün Heading, rot Pitch, blau Bank (ADR 014)
 - [x] Pitch und Bank von Objekten lesen, zeichnen, im Inspector bearbeiten und rückgängig machen; Objekte mit `[splinehelper]` bleiben ungekippt (ADR 014)
@@ -91,7 +91,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
     - [x] Mehrere Kreuzungen auf einer neuen Straße (ADR 033): an jeder gekreuzten Straße eine Kreuzung, der Reihe nach, am Ende auf einer Straße zusätzlich eine T-Kreuzung, ein Rückgängig-Schritt
     - Erzeugte Kreuzungen nach dem Verschieben eines Arms neu erzeugen
   - Gelände-Werkzeuge: Kanten an sehr steilen Stellen glätten, etwa zwischen den Ästen einer Kehre am Hang, die das 5-m-Raster nicht ohne Stufe abbilden kann (mit dem Nutzer vereinbart, 24. Oktober 2026)
-- Import-/Exportumfang schrittweise an den OMSI-Bestandsformaten ausrichten
+- [x] Import-/Exportumfang an den OMSI-Bestandsformaten ausrichten: verlustfreies Datensatzmodell, Unbekanntes bleibt als Freitext erhalten (ADR 008), Export als eigene Karte (ADR 009); einzige bekannte Lücke sind Splines vor Kachelversion 11 (unten)
 - [x] Validierungsberichte und Integritätsprüfungen ergänzen: Bericht unter **Tools** mit elf Themen (Import, Spline-Verbindungen, IDs und `[NextIDCode]`, Einstiegspunkte samt Index und Winkel, Anhängungen und verwaiste Wiederholungen, `[varparent]`-Ziele, fehlende Objekt- und Spline-Dateien, Anschlusspunkte von Kreuzungen, Fahrplan, Chrono-Auswahlen, DLC-Objekte), im Hintergrund berechnet, mit Sprung zur Kachel und „Copy report“
 - [x] Freigabeschritt für Player-Assets vor einer öffentlichen Auslieferung wieder einführen (siehe ADR 005): Freigabeliste `PlayerAssetReview.txt` mit SHA-256 je Player-Datei, normaler Build warnt, Release-Build bricht ab, Menübefehl „Record Reviewed Player Assets...“
 - [x] `[worldcoordinates]`-Karten wie Berlin-Spandau mit gemessener Kachelkante darstellen (siehe ADR 007)
