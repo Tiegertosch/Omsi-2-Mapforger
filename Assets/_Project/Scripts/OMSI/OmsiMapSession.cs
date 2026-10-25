@@ -68,6 +68,9 @@ namespace OmsiMapEditor.OMSI
 
         internal double[] PositionAfter { get; set; }
 
+        /// <summary>Attached objects a transfer took along into the target tile.</summary>
+        internal List<OmsiAttachedObjectRecord> MovedAttachedObjects { get; } = new List<OmsiAttachedObjectRecord>();
+
         /// <summary>The object file before and after a replacement; null for other changes.</summary>
         public string AssetBefore { get; internal set; }
 
@@ -159,8 +162,8 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Sets an object's position and heading and saves the tile into the workspace. Values equal to the stored
-        /// ones keep their original text. Returns false when nothing changed.
+        /// Sets an object's position and heading and saves the tile into the workspace; entry points on the object follow
+        /// it in global.cfg. Values equal to the stored ones keep their original text. Returns false when nothing changed.
         /// </summary>
         public bool UpdateObject(string tileFileName, int objectId, double x, double y, double z, double headingDegrees)
         {
@@ -193,6 +196,10 @@ namespace OmsiMapEditor.OMSI
             if (target == null)
                 throw new InvalidOperationException("Object " + objectId + " was not found in " + tileFileName + ".");
 
+            var oldX = target.X;
+            var oldY = target.Y;
+            var oldZ = target.Z;
+            var oldHeading = target.HeadingDegrees;
             var changed = false;
             if (target.X != x) { target.X = x; changed = true; }
             if (target.Y != y) { target.Y = y; changed = true; }
@@ -200,9 +207,14 @@ namespace OmsiMapEditor.OMSI
             if (target.HeadingDegrees != headingDegrees) { target.HeadingDegrees = headingDegrees; changed = true; }
             if (pitchDegrees.HasValue && target.PitchDegrees != pitchDegrees.Value) { target.PitchDegrees = pitchDegrees.Value; changed = true; }
             if (bankDegrees.HasValue && target.BankDegrees != bankDegrees.Value) { target.BankDegrees = bankDegrees.Value; changed = true; }
-            if (changed)
-                workspace.Save(relative, tile);
-            return changed;
+            if (!changed)
+                return false;
+            var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
+            if (config.Records.Exists(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase)) &&
+                OmsiTileEditing.FollowEntryPoints(tile, target, TileIndexOf(config, relative), config, oldX, oldY, oldZ, oldHeading) > 0)
+                workspace.Save(GlobalConfigFileName, config);
+            workspace.Save(relative, tile);
+            return true;
         }
 
         /// <summary>
@@ -329,14 +341,18 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Moves an object into another tile at a position in that tile, with its rules and the same ID. Entry point
-        /// indices of the source tile stay valid. Nothing changes while references tie the object to its tile; they
-        /// are returned instead.
+        /// Moves an object into another tile at a position in that tile, with its rules, the attached objects hanging on it
+        /// and the same IDs (ADR 012). What names them by tile follows: entry points get the new tile, index and position,
+        /// and chrono selections move into the chrono file of the new tile in each variant. Variable parents name IDs and
+        /// reach into neighbouring tiles, so a [varparent] that would end up further away keeps the object in its tile, as
+        /// do references that cannot follow, such as an attached object a chrono variant adds; they are returned instead.
         /// </summary>
         /// <param name="references">An index of the current files, shared by several transfers; null builds one.</param>
         public OmsiObjectChangeResult TransferObject(OmsiMapSummary summary, OmsiTileSummary tile, OmsiObjectRecord record,
             OmsiTileSummary target, double x, double y, OmsiReferenceIndex references = null)
         {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
             if (record == null)
@@ -359,8 +375,48 @@ namespace OmsiMapEditor.OMSI
             var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
             var view = FindObject(tileFile, record.Id, tile.FileName);
 
+            var ids = new HashSet<int>();
+            foreach (var member in OmsiTileEditing.Family(tileFile, view))
+                ids.Add(member is OmsiAttachedObjectView attached ? attached.Id : view.Id);
+            var chronoTiles = new List<string>();
+            foreach (var file in workspace.EnumerateFiles("Chrono", Path.GetFileName(tilePath), true))
+                chronoTiles.Add(file);
             references = references ?? BuildReferenceIndex();
-            var result = OmsiTileEditing.MoveObjectToTile(tileFile, view, TileIndexOf(config, tilePath), targetFile, x, y, config, references);
+            var blockers = new List<OmsiReference>();
+            foreach (var id in ids)
+                foreach (var reference in references.To(id))
+                {
+                    switch (reference.Kind)
+                    {
+                        case "attached object parent":
+                            // Attached objects in the tile move along; elsewhere they could not follow.
+                            if (!SamePath(reference.File, tilePath))
+                                blockers.Add(reference);
+                            break;
+                        case "variable parent":
+                            var holder = summary.Tiles.Find(candidate => SamePath(reference.File, OmsiRelativePath.Normalize(candidate.FileName)));
+                            if (holder == null || !Neighbours(holder, target))
+                                blockers.Add(new OmsiReference(id, reference.File, "variable parent out of reach"));
+                            break;
+                        case "chrono selection":
+                            if (!chronoTiles.Exists(file => SamePath(reference.File, file)))
+                                blockers.Add(reference);
+                            break;
+                    }
+                }
+            // A chrono variant may hang objects of its own on one that moves; they would stay behind in the old tile.
+            var chronoFiles = new List<KeyValuePair<string, OmsiRecordFile>>();
+            foreach (var file in chronoTiles)
+            {
+                var chrono = OmsiRecordFile.Parse(workspace.ReadAllBytes(file), OmsiTileRecordLayouts.Instance);
+                foreach (var attached in OmsiTileRecords.Of<OmsiAttachedObjectView>(chrono))
+                    if (ids.Contains(attached.ParentId))
+                        blockers.Add(new OmsiReference(attached.ParentId, file, "attached object of a chrono variant"));
+                chronoFiles.Add(new KeyValuePair<string, OmsiRecordFile>(file, chrono));
+            }
+
+            var result = OmsiTileEditing.MoveObjectToTile(tileFile, view, TileIndexOf(config, tilePath), targetFile, TileIndexOf(config, targetPath), x, y,
+                config, blockers, parent => TileOf(summary, parent) is OmsiTileSummary parentTile && Neighbours(parentTile, target));
             if (!result.Removed)
                 return new OmsiObjectChangeResult(null, result.Blockers);
 
@@ -374,11 +430,53 @@ namespace OmsiMapEditor.OMSI
             };
             AddFile(change, tilePath, tileBefore, tileFile.ToBytes());
             AddFile(change, targetPath, targetBefore, targetFile.ToBytes());
-            if (result.ShiftedEntryPointIndices > 0)
+            if (result.ShiftedEntryPointIndices > 0 || result.MovedEntryPoints > 0)
                 AddFile(change, GlobalConfigFileName, configBefore, config.ToBytes());
+            foreach (var pair in chronoFiles)
+            {
+                var targetChronoPath = Path.Combine(Path.GetDirectoryName(pair.Key) ?? string.Empty, Path.GetFileName(targetPath));
+                var targetChronoBefore = workspace.FileExists(targetChronoPath) ? workspace.ReadAllBytes(targetChronoPath) : null;
+                var targetChrono = targetChronoBefore != null
+                    ? OmsiRecordFile.Parse(targetChronoBefore, OmsiTileRecordLayouts.Instance)
+                    : NewChronoTile(pair.Value);
+                if (OmsiTileEditing.MoveChronoSelections(pair.Value, targetChrono, ids) == 0)
+                    continue;
+                AddFile(change, pair.Key, workspace.ReadAllBytes(pair.Key), pair.Value.ToBytes());
+                AddFile(change, targetChronoPath, targetChronoBefore, targetChrono.ToBytes());
+            }
             WriteFiles(change, false);
             MoveInSummary(change, true);
+            foreach (var attached in tile.AttachedObjects.FindAll(candidate => ids.Contains(candidate.Id)))
+            {
+                tile.AttachedObjects.Remove(attached);
+                target.AttachedObjects.Add(attached);
+                change.MovedAttachedObjects.Add(attached);
+            }
             return new OmsiObjectChangeResult(change, new OmsiReference[0]);
+        }
+
+        /// <summary>An empty chrono tile file like another: its encoding and version, without changes.</summary>
+        private static OmsiRecordFile NewChronoTile(OmsiRecordFile like)
+        {
+            var text = "File created with OMSI MapWorks on " + DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) +
+                       "\r\n\r\n[version]\r\n" + (like.Version > 0 ? like.Version : 14).ToString(System.Globalization.CultureInfo.InvariantCulture) + "\r\n";
+            return OmsiRecordFile.Parse(OmsiTextFile.Encode(text, like.Encoding), OmsiTileRecordLayouts.Instance);
+        }
+
+        /// <summary>True when two tiles are the same or touch, also at a corner.</summary>
+        private static bool Neighbours(OmsiTileSummary first, OmsiTileSummary second)
+        {
+            return Math.Abs(first.X - second.X) <= 1 && Math.Abs(first.Y - second.Y) <= 1;
+        }
+
+        /// <summary>The tile holding an element by ID: an object, attached object, spline or object along a spline; or null.</summary>
+        private static OmsiTileSummary TileOf(OmsiMapSummary summary, int id)
+        {
+            foreach (var candidate in summary.Tiles)
+                if (candidate.Objects.Exists(item => item.Id == id) || candidate.AttachedObjects.Exists(item => item.Id == id) ||
+                    candidate.Splines.Exists(spline => spline.Id == id) || candidate.SplineAttachments.Exists(item => item.Id == id))
+                    return candidate;
+            return null;
         }
 
         /// <summary>
@@ -468,13 +566,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Writes the after state, or the before state when undoing, after checking every file first.</summary>
         private void WriteFiles(OmsiObjectChange change, bool undo)
         {
-            var workspace = RequireWorkspace();
-            foreach (var file in change.Files)
-                if (!SameBytes(workspace.ReadAllBytes(file.RelativePath), undo ? file.After : file.Before))
-                    throw new InvalidOperationException(file.RelativePath + " was changed in the meantime; the step cannot be " +
-                                                        (undo ? "undone." : "applied."));
-            foreach (var file in change.Files)
-                workspace.Save(file.RelativePath, undo ? file.Before : file.After);
+            ApplyFiles(change.Files, undo);
         }
 
         private static void AddToSummary(OmsiMapSummary summary, OmsiObjectChange change)
@@ -499,6 +591,9 @@ namespace OmsiMapEditor.OMSI
         {
             var from = forward ? change.Tile : change.TargetTile;
             var to = forward ? change.TargetTile : change.Tile;
+            foreach (var attached in change.MovedAttachedObjects)
+                if (from.AttachedObjects.Remove(attached))
+                    to.AttachedObjects.Add(attached);
             if (from.Objects.Remove(change.Record))
                 from.ObjectCount--;
             var position = forward ? change.PositionAfter : change.PositionBefore;

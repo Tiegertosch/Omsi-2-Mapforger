@@ -825,6 +825,22 @@ namespace OmsiMapEditor.UI
                 mapCanvas != null && !mapCanvas.TurnSelection(turnDegrees))
                 Debug.LogWarning("-turnSelection needs a project and at least two selected objects.");
 
+            // -moveSelection <dx> <dy>: moves the selected objects by metres east and north and saves, as dragging does.
+            if (double.TryParse(Argument("-moveSelection", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveEast) &&
+                double.TryParse(Argument("-moveSelection", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveNorth) && selection.Count > 0)
+            {
+                var edits = new List<MapObjectEdit>();
+                foreach (var item in selection)
+                    edits.Add(new MapObjectEdit
+                    {
+                        Tile = item.Tile, Record = item.Record, LocalX = item.Record.LocalX + moveEast, LocalY = item.Record.LocalY + moveNorth,
+                        Height = item.Record.Height, HeadingDegrees = item.Record.HeadingDegrees, PitchDegrees = item.Record.PitchDegrees,
+                        BankDegrees = item.Record.BankDegrees
+                    });
+                CommitEdits(edits);
+                Debug.Log("Move selection: " + statusLabel?.text);
+            }
+
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
                 SetTextures(false);
 
@@ -3110,6 +3126,8 @@ namespace OmsiMapEditor.UI
                         var result = session.TransferObject(currentSummary, edit.Tile, edit.Record, target, targetX, targetY, references);
                         if (result.Succeeded)
                         {
+                            // The move took chrono selections and attached objects along; the next one reads them anew.
+                            references = null;
                             parts.Add(new ObjectEditStep { Change = result.Change });
                             transfers.Add("#" + edit.Record.Id + " into tile " + target.X + ", " + target.Y);
                             // A transfer keeps height and orientation; an edit from the inspector may change them too.

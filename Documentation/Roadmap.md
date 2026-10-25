@@ -114,7 +114,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Zeichenzeit großer Karten senken: Objekte je Kachel mit aufgelöstem Umriss und Grenzen zwischengespeichert, Kacheln außerhalb des Ausschnitts übersprungen, Objekte unter 12 Pixeln mit ihrer Hülle statt der Kontur; Berlin-Spandau bleibt in allen geprüften Ausschnitten unter 50 ms (vorher bis 94 ms)
 - [x] Mehrere Objekte gleichzeitig auswählen und verschieben: Strg+Klick, Strg+Rahmen, gemeinsames Ziehen und Löschen als ein Rückgängig-Schritt
 - [x] Objekte beim Verschieben über eine Kachelgrenze in die neue Kachel übernehmen, samt Regeln und mit derselben ID (ADR 012)
-- Objekte mit kachelgebundenen Verweisen mitsamt diesen Verweisen umziehen: Einstiegspunkte, Chrono-Auswahl, angehängte Objekte und Variablen-Eltern
+- [x] Objekte mit kachelgebundenen Verweisen mitsamt diesen Verweisen umziehen (ADR 012, Ergänzung): angehängte Objekte ziehen mit, Einstiegspunkte bekommen Kachel, Index und Position und folgen ihrem Objekt auch innerhalb der Kachel samt Richtung, Chrono-Auswahlen wandern in die Chrono-Datei der Zielkachel, `[varparent]` bleibt erlaubt, solange er höchstens eine Kachel weit reicht
 - [x] Mehrere Objekte gemeinsam drehen: Rotate-Werkzeug mit Griff in der Mitte der Auswahl (Draufsicht) oder grünem Ring um die Gruppe (3D), Positionen schwenken um die Mitte, Headings drehen mit, ein Rückgängig-Schritt
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
 - [x] Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen (24. Oktober 2026)

@@ -17,6 +17,12 @@ namespace OmsiMapEditor.OMSI
 
         public int ShiftedAttachmentSplineIndices { get; internal set; }
         public int ShiftedEntryPointIndices { get; internal set; }
+
+        /// <summary>Entry points that followed a moved object into its new tile.</summary>
+        public int MovedEntryPoints { get; internal set; }
+
+        /// <summary>Attached objects that moved along with their parent.</summary>
+        public int MovedAttachedObjects { get; internal set; }
     }
 
     /// <summary>
@@ -36,16 +42,22 @@ namespace OmsiMapEditor.OMSI
             "object", "attachObj", "splineAttachement", "splineAttachement_repeater"
         };
 
-        /// <summary>
-        /// References that tie an object to its tile: OMSI resolves them within the tile or by tile and index.
-        /// Timetables and bus stops name the ID alone, which a moved object keeps.
-        /// </summary>
-        private static readonly HashSet<string> TileBoundReferenceKinds = new HashSet<string>(StringComparer.Ordinal)
+        /// <summary>Chrono commands that change the element selected or added just before them.</summary>
+        private static readonly HashSet<string> ChronoCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "attached object parent", "variable parent", "chrono selection", "entry point"
+            "delete", "typ", "relabel", "rule", "kill_rule"
         };
 
         private const int EntryPointFieldCount = 12;
+
+        /// <summary>
+        /// An entry point lies at most about 1 m beside its object in real maps (TileRecordInventory); one further away is
+        /// stale and is put back on the object when it moves.
+        /// </summary>
+        private const double EntryPointReachMeters = 2.0;
+
+        /// <summary>An entry point whose angle differs more from its object's heading is stale and takes the heading.</summary>
+        private const double EntryPointTurnToleranceDegrees = 10.0;
 
         /// <summary>
         /// Appends a new [object] at the end of the tile, so no existing index changes. The ID comes from the
@@ -123,19 +135,44 @@ namespace OmsiMapEditor.OMSI
             return Detach(tile, element, tileIndex, globalConfig, new List<OmsiReference>(blockers ?? new OmsiReference[0]), null);
         }
 
+        /// <summary>The object and every attached object hanging on it, directly or through another, in file order.</summary>
+        public static List<OmsiTileRecordView> Family(OmsiRecordFile tile, OmsiObjectView item)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            var ids = new HashSet<int> { item.Id };
+            var family = new List<OmsiTileRecordView> { item };
+            // Attached objects stand after their parent in the same tile (TileRecordInventory).
+            for (var position = tile.Records.IndexOf(item.Record) + 1; position > 0 && position < tile.Records.Count; position++)
+                if (OmsiTileRecords.Create(tile, tile.Records[position]) is OmsiAttachedObjectView attached && ids.Contains(attached.ParentId))
+                {
+                    ids.Add(attached.Id);
+                    family.Add(attached);
+                }
+            return family;
+        }
+
         /// <summary>
-        /// Moves an [object] with its rules to the end of another tile and sets its position there. The ID stays, so
-        /// timetables and bus stops keep finding it. Nothing changes while references tie the object to its tile:
-        /// attached objects, variable parents, chrono selections and entry points; they are returned instead.
+        /// Moves an [object] with its rules, and the attached objects hanging on it, to the end of another tile in their
+        /// order and sets the object's position there; attached objects sit on it and need none. IDs stay, so timetables,
+        /// bus stops, chrono selections and variable parents keep finding them by ID. Entry points that name one of them by
+        /// index follow into the target tile and stay on the object (<see cref="FollowEntryPoints"/>). Nothing changes while
+        /// <paramref name="blockers"/> tie the object to its tile, or one of the moved records has a [varparent] whose
+        /// parent <paramref name="parentReachable"/> says would be out of reach, or a modifier of unverified layout; those
+        /// are returned instead.
         /// </summary>
         /// <param name="source">The tile that holds the object.</param>
         /// <param name="item">A view created from a record of <paramref name="source"/>.</param>
         /// <param name="sourceTileIndex">The source tile's position in global.cfg's [map] list.</param>
         /// <param name="target">The tile that receives the object.</param>
+        /// <param name="targetTileIndex">The target tile's position in global.cfg's [map] list.</param>
         /// <param name="x">Position in the target tile.</param>
         /// <param name="y">Position in the target tile.</param>
         public static OmsiRemovalResult MoveObjectToTile(OmsiRecordFile source, OmsiObjectView item, int sourceTileIndex,
-            OmsiRecordFile target, double x, double y, OmsiRecordFile globalConfig, OmsiReferenceIndex references)
+            OmsiRecordFile target, int targetTileIndex, double x, double y, OmsiRecordFile globalConfig, IEnumerable<OmsiReference> blockers,
+            Func<int, bool> parentReachable)
         {
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
@@ -147,43 +184,189 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentException("The target must be another tile.", nameof(target));
             if (globalConfig == null)
                 throw new ArgumentNullException(nameof(globalConfig));
-            if (references == null)
-                throw new ArgumentNullException(nameof(references));
             if (target.Version < 9)
                 throw new InvalidOperationException("Objects can only be moved into tiles of version 9 or later.");
 
-            var blockers = new List<OmsiReference>();
-            foreach (var reference in references.To(item.Id))
-                if (TileBoundReferenceKinds.Contains(reference.Kind))
-                    blockers.Add(reference);
-            var position = source.Records.IndexOf(item.Record);
-            for (var next = position + 1; position >= 0 && next < source.Records.Count && ModifierSections.Contains(source.Records[next].Name); next++)
+            var family = Family(source, item);
+            var result = new OmsiRemovalResult();
+            result.Blockers.AddRange(blockers ?? new OmsiReference[0]);
+            foreach (var member in family)
             {
-                var modifier = source.Records[next];
-                if (string.Equals(modifier.Name, "varparent", StringComparison.OrdinalIgnoreCase))
-                    blockers.Add(new OmsiReference(item.Id, "its tile", "variable parent of the object"));
-                else if (!modifier.HasKnownLayout || !modifier.IsComplete)
-                    blockers.Add(new OmsiReference(item.Id, "its tile", "[" + modifier.Name + "] without verified layout"));
+                TryGetId(member, out var memberId);
+                for (var next = source.Records.IndexOf(member.Record) + 1; next < source.Records.Count && ModifierSections.Contains(source.Records[next].Name); next++)
+                {
+                    var modifier = source.Records[next];
+                    if (string.Equals(modifier.Name, "varparent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!modifier.TryGetInt(0, out var parent) || parentReachable == null || !parentReachable(parent))
+                            result.Blockers.Add(new OmsiReference(memberId, "its tile", "variable parent of the object out of reach"));
+                    }
+                    else if (!modifier.HasKnownLayout || !modifier.IsComplete)
+                        result.Blockers.Add(new OmsiReference(memberId, "its tile", "[" + modifier.Name + "] without verified layout"));
+                }
+            }
+            if (result.Blockers.Count > 0)
+                return result;
+
+            // Entry points follow while the indices still describe both tiles unchanged: the moved records come after
+            // everything placed in the target, in their order.
+            var entryPoints = FindEntryPoints(globalConfig);
+            if (entryPoints != null)
+            {
+                var placedInTarget = 0;
+                foreach (var record in target.Records)
+                    if (PlacedObjectSections.Contains(record.Name))
+                        placedInTarget++;
+                for (var member = 0; member < family.Count; member++)
+                {
+                    var placed = PlacedIndexOf(source, source.Records.IndexOf(family[member].Record));
+                    for (var field = 1; field + EntryPointFieldCount <= entryPoints.Fields.Count; field += EntryPointFieldCount)
+                    {
+                        if (!entryPoints.TryGetInt(field + 10, out var entryTile) || entryTile != sourceTileIndex ||
+                            !entryPoints.TryGetInt(field, out var objectIndex) || objectIndex != placed)
+                            continue;
+                        entryPoints.SetField(field, OmsiNumberFormat.Format(placedInTarget + member));
+                        entryPoints.SetField(field + 10, OmsiNumberFormat.Format(targetTileIndex));
+                        // Its position is counted in the tile it names: from the object in the old tile to the object in the new one.
+                        FollowObject(entryPoints, field, item.X, item.Y, item.Z, item.HeadingDegrees, x, y, item.Z, item.HeadingDegrees);
+                        result.MovedEntryPoints++;
+                    }
+                }
             }
 
-            var moved = new List<OmsiRecord>();
-            var result = Detach(source, item, sourceTileIndex, globalConfig, blockers, moved);
-            if (!result.Removed)
-                return result;
+            // Taken out from the last, so the positions of those before stay; each takes its rules along.
+            var moved = new List<List<OmsiRecord>>();
+            for (var member = family.Count - 1; member >= 0; member--)
+            {
+                var records = new List<OmsiRecord>();
+                var detached = Detach(source, family[member], sourceTileIndex, globalConfig, new List<OmsiReference>(), records);
+                if (!detached.Removed)
+                    throw new InvalidOperationException("Element " + family[member].Record.Name + " could not be taken out of its tile.");
+                result.ShiftedEntryPointIndices += detached.ShiftedEntryPointIndices;
+                result.RemovedRecordCount += detached.RemovedRecordCount;
+                moved.Insert(0, records);
+            }
 
             // Copies with the target's line endings; the free text after a record, such as "Object Nr. 5", stays behind.
             var first = target.Records.Count;
-            foreach (var record in moved)
-            {
-                var fields = new List<string>();
-                foreach (var field in record.Fields)
-                    fields.Add(field.Text);
-                target.InsertRecord(target.Records.Count, target.CreateRecord(record.Name, fields));
-            }
+            foreach (var records in moved)
+                foreach (var record in records)
+                {
+                    var fields = new List<string>();
+                    foreach (var field in record.Fields)
+                        fields.Add(field.Text);
+                    target.InsertRecord(target.Records.Count, target.CreateRecord(record.Name, fields));
+                }
             var view = (OmsiObjectView)OmsiTileRecords.Create(target, target.Records[first]);
             view.X = x;
             view.Y = y;
+            result.MovedAttachedObjects = family.Count - 1;
+            result.Removed = true;
             return result;
+        }
+
+        /// <summary>
+        /// Keeps the entry points that name an object on it after it moved or turned within its tile, as OMSI starts the bus
+        /// at the entry point's own position and angle. Returns how many changed.
+        /// </summary>
+        /// <param name="item">The object with its new values, a view created from a record of <paramref name="tile"/>.</param>
+        /// <param name="tileIndex">The tile's position in global.cfg's [map] list.</param>
+        public static int FollowEntryPoints(OmsiRecordFile tile, OmsiObjectView item, int tileIndex, OmsiRecordFile globalConfig, double oldX, double oldY,
+            double oldZ, double oldHeadingDegrees)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            if (globalConfig == null)
+                throw new ArgumentNullException(nameof(globalConfig));
+            var entryPoints = FindEntryPoints(globalConfig);
+            if (entryPoints == null)
+                return 0;
+            var placed = PlacedIndexOf(tile, tile.Records.IndexOf(item.Record));
+            var followed = 0;
+            for (var field = 1; field + EntryPointFieldCount <= entryPoints.Fields.Count; field += EntryPointFieldCount)
+            {
+                if (!entryPoints.TryGetInt(field + 10, out var entryTile) || entryTile != tileIndex ||
+                    !entryPoints.TryGetInt(field, out var objectIndex) || objectIndex != placed)
+                    continue;
+                FollowObject(entryPoints, field, oldX, oldY, oldZ, oldHeadingDegrees, item.X, item.Y, item.Z, item.HeadingDegrees);
+                followed++;
+            }
+            return followed;
+        }
+
+        /// <summary>
+        /// Moves one entry point as its object moved: it keeps its place beside the object, turned with it, and its angle
+        /// relative to the object's heading; one stale by more than <see cref="EntryPointReachMeters"/> or
+        /// <see cref="EntryPointTurnToleranceDegrees"/> goes onto the object and takes its heading.
+        /// </summary>
+        private static void FollowObject(OmsiRecord entryPoints, int field, double oldX, double oldY, double oldZ, double oldHeading, double newX, double newY,
+            double newZ, double newHeading)
+        {
+            if (!entryPoints.TryGetDouble(field + 3, out var entryX) || !entryPoints.TryGetDouble(field + 4, out var entryZ) ||
+                !entryPoints.TryGetDouble(field + 5, out var entryY))
+                return;
+            var turn = (newHeading - oldHeading) * Math.PI / 180.0;
+            var offsetX = entryX - oldX;
+            var offsetY = entryY - oldY;
+            if (offsetX * offsetX + offsetY * offsetY > EntryPointReachMeters * EntryPointReachMeters)
+            {
+                offsetX = 0.0;
+                offsetY = 0.0;
+            }
+            // Headings turn clockwise from north, so the offset turns with them.
+            entryPoints.SetField(field + 3, OmsiNumberFormat.Format(newX + offsetX * Math.Cos(turn) + offsetY * Math.Sin(turn)));
+            entryPoints.SetField(field + 5, OmsiNumberFormat.Format(newY - offsetX * Math.Sin(turn) + offsetY * Math.Cos(turn)));
+            entryPoints.SetField(field + 4, OmsiNumberFormat.Format(entryZ + newZ - oldZ));
+
+            // The angle is a quaternion about the vertical axis, 2 atan2(y, w) the heading (TileRecordInventory).
+            if (!entryPoints.TryGetDouble(field + 6, out var qx) || !entryPoints.TryGetDouble(field + 7, out var qy) ||
+                !entryPoints.TryGetDouble(field + 8, out var qz) || !entryPoints.TryGetDouble(field + 9, out var qw) ||
+                Math.Abs(qx) > 1e-6 || Math.Abs(qz) > 1e-6)
+                return;
+            var angle = 2.0 * Math.Atan2(qy, qw) * 180.0 / Math.PI;
+            var relative = OmsiRoadPlanner.Normalize(angle - oldHeading);
+            var newAngle = Math.Abs(relative) > EntryPointTurnToleranceDegrees ? newHeading : newHeading + relative;
+            var half = newAngle * Math.PI / 360.0;
+            entryPoints.SetField(field + 7, OmsiNumberFormat.Format(Math.Sin(half)));
+            entryPoints.SetField(field + 9, OmsiNumberFormat.Format(Math.Cos(half)));
+        }
+
+        /// <summary>
+        /// Moves chrono selections of elements from one chrono tile file to another (TimetableChronoInventory): each
+        /// [selobject] naming one of the IDs with the commands after it, up to the next selection or new element, goes to
+        /// the end of <paramref name="to"/> in its order. Returns how many selections moved.
+        /// </summary>
+        public static int MoveChronoSelections(OmsiRecordFile from, OmsiRecordFile to, ICollection<int> ids)
+        {
+            if (from == null)
+                throw new ArgumentNullException(nameof(from));
+            if (to == null)
+                throw new ArgumentNullException(nameof(to));
+            if (ids == null)
+                throw new ArgumentNullException(nameof(ids));
+            var blocks = new List<OmsiRecord>();
+            var count = 0;
+            for (var position = 0; position < from.Records.Count; position++)
+            {
+                var record = from.Records[position];
+                if (!string.Equals(record.Name, "selobject", StringComparison.OrdinalIgnoreCase) || !record.TryGetInt(0, out var id) || !ids.Contains(id))
+                    continue;
+                count++;
+                blocks.Add(record);
+                while (position + 1 < from.Records.Count && ChronoCommands.Contains(from.Records[position + 1].Name))
+                    blocks.Add(from.Records[++position]);
+            }
+            foreach (var record in blocks)
+            {
+                from.RemoveRecord(record);
+                var fields = new List<string>();
+                foreach (var field in record.Fields)
+                    fields.Add(field.Text);
+                to.InsertRecord(to.Records.Count, to.CreateRecord(record.Name, fields));
+            }
+            return count;
         }
 
         /// <summary>

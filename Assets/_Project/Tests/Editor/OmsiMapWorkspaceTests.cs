@@ -363,7 +363,7 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
-        public void KeepsObjectsInTheirTileWhileTileBoundReferencesNameThem()
+        public void TakesEntryPointsAlongAndKeepsObjectsWhoseVariableParentWouldBeOutOfReach()
         {
             UseTwoTiles();
             File.WriteAllBytes(Path.Combine(original, "tile_0_0.map"), OmsiTextFile.Encode(string.Join("\r\n",
@@ -376,14 +376,115 @@ namespace OmsiMapEditor.Tests
             var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
             var summary = session.Read();
 
+            // The variable parent 99 lies nowhere, so it cannot be told to be within reach.
             var withVariableParent = session.TransferObject(summary, summary.Tiles[0], summary.Tiles[0].Objects[0], summary.Tiles[1], 1, 1);
-            var entryPoint = session.TransferObject(summary, summary.Tiles[0], summary.Tiles[0].Objects[1], summary.Tiles[1], 1, 1);
-            var busStop = session.TransferObject(summary, summary.Tiles[1], summary.Tiles[1].Objects[0], summary.Tiles[0], 2, 2);
+            Assert.AreEqual("variable parent of the object out of reach", withVariableParent.Blockers.Single().Kind);
 
-            Assert.AreEqual("variable parent of the object", withVariableParent.Blockers.Single().Kind);
-            Assert.AreEqual("entry point", entryPoint.Blockers.Single().Kind);
+            // Object 6 carries the entry point: it names tile 1 and the place after object 7 there. It lay far from the
+            // object, stale, so it goes onto the object.
+            var entryPoint = session.TransferObject(summary, summary.Tiles[0], summary.Tiles[0].Objects[1], summary.Tiles[1], 1, 1);
+            Assert.IsTrue(entryPoint.Succeeded);
+            var entries = EntryPoints(session.Workspace);
+            Assert.AreEqual("1", entries.GetField(1));
+            Assert.AreEqual("1", entries.GetField(11));
+            Assert.AreEqual(1.0, Number(entries.GetField(4)), 1e-9);
+            Assert.AreEqual(1.0, Number(entries.GetField(6)), 1e-9);
+
+            // A bus stop names its object by ID only; object 7 leaving tile 1 moves the entry point there up by one.
+            var busStop = session.TransferObject(summary, summary.Tiles[1], summary.Tiles[1].Objects[0], summary.Tiles[0], 2, 2);
             Assert.IsTrue(busStop.Succeeded);
-            CollectionAssert.AreEqual(new[] { "tile_0_0.map", "tile_1_0.map" }, session.ModifiedFiles());
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+
+            session.Undo(summary, busStop.Change);
+            session.Undo(summary, entryPoint.Change);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+        }
+
+        [Test]
+        public void TakesAttachedObjectsAndChronoSelectionsAlongIntoTheNewTile()
+        {
+            Write(original, "global.cfg", "[name]", "Testmap", "", "[NextIDCode]", "20", "",
+                "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "", "[map]", "2", "0", "tile_2_0.map", "");
+            // Object 5 carries attached object 8, which carries 9; object 6 takes its variables from 5.
+            Write(original, "tile_0_0.map", "[version]", "14", "",
+                "[object]", "0", "a.sco", "5", "290", "10", "0", "0", "0", "0", "0", "",
+                "[rule]", "0", "trafficdensity", "1.000", "0", "",
+                "[attachObj]", "0", "sign.sco", "8", "5", "0", "0", "0", "0", "0", "0", "",
+                "[attachObj]", "0", "light.sco", "9", "8", "0", "0", "0", "0", "0", "0", "",
+                "[object]", "0", "b.sco", "6", "10", "10", "0", "0", "0", "0", "0", "",
+                "[varparent]", "5", "");
+            Write(original, "tile_1_0.map", "[version]", "14", "", "[object]", "0", "c.sco", "7", "50", "60", "0", "0", "0", "0", "0", "");
+            Write(original, "tile_2_0.map", "[version]", "14", "");
+            // A chrono variant changes 5 and deletes 6 in tile 0.
+            var chrono = Path.Combine(original, "Chrono", "0100_Works");
+            Directory.CreateDirectory(chrono);
+            Write(chrono, "tile_0_0.map", "[version]", "14", "",
+                "[selobject]", "5", "", "[rule]", "0", "trafficdensity", "0.000", "0", "",
+                "[selobject]", "6", "", "[delete]", "");
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var item = summary.Tiles[0].Objects.Single(o => o.Id == 5);
+
+            var result = session.TransferObject(summary, summary.Tiles[0], item, summary.Tiles[1], 5, 10);
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Blockers));
+            CollectionAssert.AreEquivalent(new[] { 8, 9 }, summary.Tiles[1].AttachedObjects.Select(attached => attached.Id));
+            CollectionAssert.IsEmpty(summary.Tiles[0].AttachedObjects);
+            var reread = session.Read();
+            CollectionAssert.AreEqual(new[] { 7, 5 }, reread.Tiles[1].Objects.Select(o => o.Id));
+            CollectionAssert.AreEqual(new[] { 8, 9 }, reread.Tiles[1].AttachedObjects.Select(attached => attached.Id));
+            CollectionAssert.AreEqual(new[] { 6 }, reread.Tiles[0].Objects.Select(o => o.Id));
+            // The selection of 5 with its rule moved into the chrono file of tile 1, which the variant did not have.
+            var movedChrono = OmsiTextFile.Decode(session.Workspace.ReadAllBytes(@"Chrono\0100_Works\tile_1_0.map"));
+            StringAssert.Contains("[selobject]\r\n5\r\n", movedChrono);
+            StringAssert.Contains("0.000", movedChrono);
+            var leftChrono = OmsiTextFile.Decode(session.Workspace.ReadAllBytes(@"Chrono\0100_Works\tile_0_0.map"));
+            StringAssert.DoesNotContain("[selobject]\r\n5\r\n", leftChrono);
+            StringAssert.Contains("[delete]", leftChrono);
+
+            // On into tile 2, object 6 in tile 0 would take its variables from two tiles away.
+            var further = session.TransferObject(summary, summary.Tiles[1], item, summary.Tiles[2], 5, 10);
+            Assert.AreEqual("variable parent out of reach", further.Blockers.Single().Kind);
+
+            session.Undo(summary, result.Change);
+            CollectionAssert.AreEquivalent(new[] { 8, 9 }, summary.Tiles[0].AttachedObjects.Select(attached => attached.Id));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            session.Redo(summary, result.Change);
+            Assert.IsTrue(session.Workspace.FileExists(@"Chrono\0100_Works\tile_1_0.map"));
+        }
+
+        [Test]
+        public void EntryPointsStayOnTheirObjectWhenItMovesOrTurnsInItsTile()
+        {
+            UseMapWithEntryPoint();
+            // The entry point lies 0.5 m east of object 6 at 30, 40, facing north as the object does.
+            Write(original, "global.cfg", "[name]", "Testmap", "", "[NextIDCode]", "10", "",
+                "[entrypoints]", "1", "1", "6", "0", "30.5", "2", "40", "0", "0", "0", "1", "0", "Depot", "",
+                "[map]", "0", "0", "tile_0_0.map", "");
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects.Single(o => o.Id == 6);
+
+            // Turned a quarter clockwise and 10 m north: the entry point turns round the object, from east of it to south.
+            session.UpdateObject(tile, item, 30, 50, 1, 90);
+            var entries = EntryPoints(session.Workspace);
+            Assert.AreEqual(30.0, Number(entries.GetField(4)), 1e-9);
+            Assert.AreEqual(3.0, Number(entries.GetField(5)), 1e-9);
+            Assert.AreEqual(49.5, Number(entries.GetField(6)), 1e-9);
+            Assert.AreEqual(90.0, 2.0 * Math.Atan2(Number(entries.GetField(8)), Number(entries.GetField(10))) * 180.0 / Math.PI, 1e-3);
+
+            // Back as it was, and nothing is left changed.
+            session.UpdateObject(tile, item, 30, 40, 0, 0);
+            entries = EntryPoints(session.Workspace);
+            Assert.AreEqual(30.5, Number(entries.GetField(4)), 1e-9);
+            Assert.AreEqual(40.0, Number(entries.GetField(6)), 1e-9);
+            Assert.AreEqual(0.0, Number(entries.GetField(8)), 1e-9);
+        }
+
+        private static double Number(string text)
+        {
+            return double.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         /// <summary>Tile 0 as in <see cref="UseMapWithEntryPoint"/>; tile 1 to its right holds object 7.</summary>
