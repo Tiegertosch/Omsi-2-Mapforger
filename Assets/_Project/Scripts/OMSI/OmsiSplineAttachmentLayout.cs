@@ -111,6 +111,17 @@ namespace OmsiMapEditor.OMSI
             return chain;
         }
 
+        /// <summary>How far along its chain a spline begins, counted as a row anchored on it counts: from the chain's beginning.</summary>
+        public double ChainStartOf(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            var chain = ChainFrom(tile, spline);
+            return chain[chain.Count - 1].Begin;
+        }
+
         /// <summary>
         /// Where an object of a row lies at a distance along a chain, with the row's offset to the right, height and
         /// heading relative to the chain's direction.

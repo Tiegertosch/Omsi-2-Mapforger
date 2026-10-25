@@ -394,4 +394,6 @@ Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte ste
 **Grund:**
 - `[splineAttachement_repeater]` wird nicht geschrieben: In Berlin-Spandau passt die Nummer des ersten Objekts nur in 29 von 210 Fällen zum ersten Objekt der Kachel, der genannte Spline trägt es nur in 40 Fällen, und manche Wiederholungen stehen doppelt. Ein Datensatz je Kachel erreicht dasselbe Bild ohne unbelegte Felder.
 - Die Bibliothek wiederzuverwenden spart eine zweite Objektauswahl mit Reitern, Suche und Vorschaubildern.
-- Bekanntes Risiko: Weil der Startabstand ab dem Kettenanfang zählt, verrutschen in OMSI alle Reihen einer Kette, wenn vor ihrem Anfang eine Straße angebaut wird; das gilt auch für vorhandene Reihen der Originalkarten (Roadmap).
+- Weil der Startabstand ab dem Kettenanfang zählt, verrutschten in OMSI alle Reihen einer Kette, wenn vor ihrem Anfang eine Straße angebaut wurde, auch Reihen der Originalkarten.
+
+**Ergänzung vom 25. Oktober 2026:** Jede Spline-Änderung (Straße bauen, Spline löschen, teilen, verformen, und damit auch Kreuzungen einsetzen, Gelenke ziehen und Kreuzungen neu erzeugen) merkt sich vorher, wo der Spline jeder Reihe in seiner Kette beginnt, und rechnet es danach neu. Wo sich das geändert hat, ändert sich der Startabstand der Reihe um dieselbe Strecke; die Kacheldateien kommen in dieselbe Änderung, Rückgängig nimmt beides zurück. So bleiben die Objekte stehen, wo sie standen; ihr Abstand zum eigenen Spline bleibt gleich. Änderungen nur am oder hinter dem Spline einer Reihe verschieben sie wie bisher mit der Straße.

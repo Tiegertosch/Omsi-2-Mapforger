@@ -969,6 +969,64 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void RowsStayWhereTheyStandWhenARoadIsBuiltOnAtTheStartOfTheirChain()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A road east from 200 to 290 at y 100 with a lamp every 20 m along it.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 290, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var first = summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var plan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            session.AddAttachmentRow(summary, plan);
+            var lamps = Lamps(summary);
+            Assert.AreEqual(4, lamps.Count);
+
+            // A piece built on at the road's start makes its chain begin 50 m earlier; the lamps stay.
+            var start = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]), false);
+            var before = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 150, StartY = 100, StartHeight = 2, EndX = 200, EndY = 100, EndHeight = 2, EndJoinHeadingDegrees = 90,
+                HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, start);
+            AssertSamePlaces(lamps, Lamps(summary));
+            AssertSamePlaces(lamps, Lamps(session.Read()));
+
+            // Deleting the piece again and taking that back keeps them too.
+            var piece = summary.Tiles[0].Splines.Single(spline => spline.Id == before.SplineIds[0]);
+            var deletion = session.DeleteSpline(summary, summary.Tiles[0], piece);
+            Assert.IsTrue(deletion.Succeeded);
+            AssertSamePlaces(lamps, Lamps(summary));
+            session.Undo(summary, deletion.Change);
+            AssertSamePlaces(lamps, Lamps(summary));
+            session.Undo(summary, before);
+            AssertSamePlaces(lamps, Lamps(session.Read()));
+        }
+
+        private static List<OmsiPlacedAttachment> Lamps(OmsiMapSummary summary)
+        {
+            var layout = new OmsiSplineAttachmentLayout(summary);
+            var result = new List<OmsiPlacedAttachment>();
+            foreach (var tile in summary.Tiles)
+                foreach (var row in tile.SplineAttachments.Where(item => item.AssetPath == @"Sceneryobjects\lamp.sco"))
+                    result.AddRange(layout.Place(tile, row));
+            return result.OrderBy(item => item.WorldX).ToList();
+        }
+
+        private static void AssertSamePlaces(List<OmsiPlacedAttachment> expected, List<OmsiPlacedAttachment> actual)
+        {
+            Assert.AreEqual(expected.Count, actual.Count);
+            for (var index = 0; index < expected.Count; index++)
+            {
+                Assert.AreEqual(expected[index].WorldX, actual[index].WorldX, 0.01, "lamp " + index);
+                Assert.AreEqual(expected[index].WorldY, actual[index].WorldY, 0.01, "lamp " + index);
+            }
+        }
+
+        [Test]
         public void RoadsMeetingOtherRoadsAreFoundWhereTheyEndOnOrCrossThem()
         {
             // The map's road profile, now with a lane each way: an 8 m carriageway, a road for junctions.

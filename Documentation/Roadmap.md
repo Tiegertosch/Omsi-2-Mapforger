@@ -119,7 +119,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
 - [x] Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen (24. Oktober 2026)
 - [x] Reihen von Objekten entlang von Straßen anlegen und löschen (ADR 037): Werkzeug „Rows“ (T) mit Objekt-Bibliothek, Vorschau, ganze Straße oder von Klick zu Klick, beide Seiten, ein Datensatz je Kachel ohne Wiederholungen
-- Reihen beim Anbauen an den Kettenanfang mitführen: Startabstände der Reihen einer Kette um die Länge des neuen Stücks erhöhen, damit sie in OMSI nicht verrutschen
+- [x] Reihen beim Ändern ihrer Kette an Ort und Stelle halten (ADR 037, Ergänzung): Wächst oder schrumpft die Kette vor dem Spline einer Reihe, etwa durch eine angebaute Straße, ein gelöschtes Stück oder eine eingesetzte Kreuzung, ändert sich ihr Startabstand um dasselbe, im selben Rückgängig-Schritt; gilt auch für Reihen der Originalkarten
 - Vorhandene Reihen bearbeiten (Abstand, Versatz, Objekt) statt nur löschen und neu anlegen
 - Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
