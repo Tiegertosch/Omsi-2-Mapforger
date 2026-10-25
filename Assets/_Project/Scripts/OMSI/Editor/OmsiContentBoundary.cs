@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -131,7 +132,10 @@ namespace OmsiMapEditor.OMSI.Editor
             return string.Empty;
         }
 
-        /// <summary>Returns project assets that can enter a player through scenes, runtime data folders, or render settings.</summary>
+        /// <summary>
+        /// Returns project assets that can enter a player through scenes, runtime data folders, render settings, or the
+        /// splash screen and icons of the player settings.
+        /// </summary>
         public static IEnumerable<string> GetPlayerAssetPaths(IEnumerable<string> buildScenes)
         {
             var playerAssets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -157,6 +161,13 @@ namespace OmsiMapEditor.OMSI.Editor
                          "Assets/_Project/Settings/EditorRenderer.asset"
                      })
                 AddDependencies(settingsAsset, playerAssets);
+
+            foreach (var splashLogo in PlayerSettings.SplashScreen.logos)
+                AddDependencies(AssetDatabase.GetAssetPath(splashLogo.logo), playerAssets);
+            AddDependencies(AssetDatabase.GetAssetPath(PlayerSettings.SplashScreen.background), playerAssets);
+            AddDependencies(AssetDatabase.GetAssetPath(PlayerSettings.SplashScreen.backgroundPortrait), playerAssets);
+            foreach (var icon in PlayerSettings.GetIcons(NamedBuildTarget.Unknown, IconKind.Any))
+                AddDependencies(AssetDatabase.GetAssetPath(icon), playerAssets);
 
             return playerAssets;
         }

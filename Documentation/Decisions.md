@@ -42,6 +42,8 @@
 
 **Ergänzung vom 23. Oktober 2026:** Die Freigabe steht jetzt in einer Datei statt im Code: `Assets/_Project/Settings/PlayerAssetReview.txt` nennt jede Projektdatei, die in den Player gelangt, mit ihrer SHA-256 (Format von `sha256sum`; Code, Assemblydefinitionen und Paketdateien ausgenommen). Textdateien werden mit LF-Zeilenenden gerechnet, weil Git sie unter Windows je nach `core.autocrlf` mit CRLF auscheckt und die Liste sonst in jedem Klon anders ausfiele. Ein normaler Build meldet neue und geänderte Dateien nur als Warnung, damit die UI-Arbeit nicht stockt; `WindowsPlayerBuild.BuildRelease` (Menü **Build > Windows Player (Release)**) bricht dann ab. Nach einer Prüfung, dass keine der Dateien OMSI-Inhalt ist, auch nicht konvertiert, schreibt **Build > Record Reviewed Player Assets...** die Liste neu; der Befehl zeigt vorher, was neu oder geändert ist. Die Liste liegt außerhalb von `Resources` und gelangt nicht selbst in den Player. Die erste Liste mit 16 Dateien (Szene, Render- und App-Einstellungen, eigene Shader, UXML, USS, Theme, Inter mit Lizenz) wurde am 23. Oktober 2026 Datei für Datei geprüft.
 
+**Ergänzung vom 25. Oktober 2026:** Zu den Player-Dateien zählen auch Logos und Hintergründe des Startbilds sowie die Programm-Icons aus den Player-Einstellungen. Vorher kam das neue Startbild-Logo in den Player, ohne dass die Prüfung es sah.
+
 ## ADR 006: Unity Test Framework als direkte Abhängigkeit
 
 **Status:** Angenommen, 19. Oktober 2026.
