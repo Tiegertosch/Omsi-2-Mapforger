@@ -99,6 +99,14 @@ namespace OmsiMapEditor.UI
                 SaveGeo();
                 ShowGeo();
             };
+            satelliteWindow.PictureLoadRequested += (west, south, east, north) => LoadOwnPicture(west, south, east, north);
+            satelliteWindow.PictureSelected += id =>
+            {
+                selectedPictureId = id;
+                ShowOwnPictures();
+            };
+            satelliteWindow.PictureFitChanged += ChangePictureFit;
+            satelliteWindow.PictureRemoved += RemoveOwnPicture;
             satelliteWindow.OverlayChanged += (show, opacity) =>
             {
                 if (groundRenderer != null)
@@ -334,7 +342,7 @@ namespace OmsiMapEditor.UI
             var job = new OmsiAerialJob
             {
                 Geo = geo, TileSize = currentSummary.TileSizeMeters, Fetcher = tileFetcher, Decode = bytes => DecodeOnMainThread(bytes, cancel.Token),
-                MaxImageSize = ImageryPictureSize,
+                MaxImageSize = ImageryPictureSize, Font = OsmFont(),
                 Heights = heights
                     ? new OmsiGeoHeightOptions
                     {
@@ -514,6 +522,12 @@ namespace OmsiMapEditor.UI
 
         private void LayPicture(OmsiTileSummary tile, Texture2D texture, OmsiImageryMeta meta)
         {
+            // An own picture on the tile stays on top; the picture from the air waits in the project.
+            if (HasOwnPicture(tile))
+            {
+                Destroy(texture);
+                return;
+            }
             texture.Compress(false);
             texture.Apply(false, true);
             groundRenderer.SetImagery(tile.X, tile.Y, texture);
@@ -526,7 +540,30 @@ namespace OmsiMapEditor.UI
             foreach (var source in OmsiImagerySource.Imagery)
                 if (source.Name == name)
                     return source;
-            return null;
+            return name == OmsiImagerySource.OsmMap.Name ? OmsiImagerySource.OsmMap : null;
+        }
+
+        private OmsiTrueTypeFont osmFont;
+        private bool osmFontRead;
+
+        /// <summary>Inter's letters for the names on the drawn OpenStreetMap map, kept beside the interface's font.</summary>
+        private OmsiTrueTypeFont OsmFont()
+        {
+            if (osmFontRead)
+                return osmFont;
+            osmFontRead = true;
+            var asset = Resources.Load<TextAsset>("Fonts/Inter-Regular-Outlines");
+            try
+            {
+                osmFont = asset != null ? new OmsiTrueTypeFont(asset.bytes) : null;
+            }
+            catch (InvalidDataException exception)
+            {
+                Debug.LogWarning("The font for map names cannot be read: " + exception.Message);
+            }
+            if (osmFont == null)
+                Debug.LogWarning("The OpenStreetMap map is drawn without names: Fonts/Inter-Regular-Outlines is missing.");
+            return osmFont;
         }
 
         private static long MapTileKey(OmsiTileSummary tile)
@@ -666,11 +703,25 @@ namespace OmsiMapEditor.UI
                 else
                     OpenSatelliteWindow();
             }
+            ownPictures = new List<OmsiOwnPicture>();
+            ownPictureTiles.Clear();
             if (session?.Workspace == null || currentSummary == null)
                 return;
             foreach (var tile in currentSummary.Tiles)
                 if (tile.IsAvailable && session.Workspace.IsModified(OmsiMapSession.ImageryPath(tile)))
                     storedImagery.Enqueue(tile);
+            LoadOwnPictures();
+            int west = int.MaxValue, south = int.MaxValue, east = int.MinValue, north = int.MinValue;
+            foreach (var tile in currentSummary.Tiles)
+                if (tile.IsAvailable)
+                {
+                    west = Math.Min(west, tile.X);
+                    south = Math.Min(south, tile.Y);
+                    east = Math.Max(east, tile.X);
+                    north = Math.Max(north, tile.Y);
+                }
+            if (west <= east)
+                satelliteWindow?.SetPictureTiles(west, south, east, north);
         }
 
         /// <summary>Runs what the background work handed to the main thread, and lays stored pictures, within a few milliseconds.</summary>
@@ -679,6 +730,7 @@ namespace OmsiMapEditor.UI
             var started = Time.realtimeSinceStartup;
             while (Time.realtimeSinceStartup - started < 0.012f && aerialMainThread.TryDequeue(out var action))
                 action();
+            TickOwnPictures();
             while (Time.realtimeSinceStartup - started < 0.012f && storedImagery.Count > 0)
             {
                 var tile = storedImagery.Dequeue();
@@ -790,6 +842,35 @@ namespace OmsiMapEditor.UI
             }
             if (int.TryParse(Argument("-satelliteTile", 1), out var chosenX) && int.TryParse(Argument("-satelliteTile", 2), out var chosenY))
                 selectedTile = currentSummary.Tiles.Find(tile => tile.X == chosenX && tile.Y == chosenY) ?? selectedTile;
+            // -pictureLoad <file> [west south east north] lays an own picture; -pictureFit <turn> <east> <north> <size> lines it up.
+            var pictureFile = Argument("-pictureLoad", 1);
+            if (pictureFile != null)
+            {
+                if (int.TryParse(Argument("-pictureLoad", 2), out var pictureWest) && int.TryParse(Argument("-pictureLoad", 3), out var pictureSouth) &&
+                    int.TryParse(Argument("-pictureLoad", 4), out var pictureEast) && int.TryParse(Argument("-pictureLoad", 5), out var pictureNorth))
+                    LoadOwnPicture(pictureWest, pictureSouth, pictureEast, pictureNorth, pictureFile);
+                else
+                    LoadOwnPicture(0, 0, 0, 0, pictureFile);
+                if (double.TryParse(Argument("-pictureFit", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var turn) &&
+                    double.TryParse(Argument("-pictureFit", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var east) &&
+                    double.TryParse(Argument("-pictureFit", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var north) &&
+                    double.TryParse(Argument("-pictureFit", 4), NumberStyles.Float, CultureInfo.InvariantCulture, out var size))
+                {
+                    var fit = ownPictures.Find(item => item.Id == selectedPictureId)?.Clone();
+                    if (fit != null)
+                    {
+                        fit.Rotation = turn;
+                        fit.OffsetX = east;
+                        fit.OffsetY = north;
+                        fit.Scale = size;
+                        ChangePictureFit(fit);
+                    }
+                }
+                var cutWait = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - cutWait < 3f)
+                    yield return null;
+                LogSatellite();
+            }
             var load = Argument("-satelliteLoad", 1);
             if (load != null)
             {

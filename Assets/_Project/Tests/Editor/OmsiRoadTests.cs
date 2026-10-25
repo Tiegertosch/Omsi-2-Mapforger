@@ -1404,6 +1404,273 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void OwnPicturesAreStretchedOverTheirTilesAndCutIntoPieces()
+        {
+            // As openMapper's own.rs tests: the west tile's west edge is the picture's left, the east tile's east edge its right.
+            var picture = new OmsiOwnPicture { Id = "own_0_0", File = "own_0_0.png", West = 0, South = 0, East = 1, North = 0 };
+            void AssertUv(OmsiOwnPicture item, double x, double y, double u, double v, double tolerance = 1e-9)
+            {
+                Assert.IsTrue(item.Uv(300, x, y, out var gotU, out var gotV), x + ", " + y);
+                Assert.AreEqual(u, gotU, tolerance);
+                Assert.AreEqual(v, gotV, tolerance);
+            }
+            AssertUv(picture, 0, 300, 0, 0);
+            AssertUv(picture, 600, 0, 1, 1);
+            AssertUv(picture, 300, 150, 0.5, 0.5);
+            Assert.IsFalse(picture.Uv(300, 601, 10, out _, out _));
+
+            // Red on the left half, blue on the right: each tile gets its half.
+            var pixels = new byte[200 * 50 * 4];
+            for (var y = 0; y < 50; y++)
+                for (var x = 0; x < 200; x++)
+                {
+                    var index = (y * 200 + x) * 4;
+                    pixels[index] = (byte)(x < 100 ? 255 : 0);
+                    pixels[index + 2] = (byte)(x < 100 ? 0 : 255);
+                    pixels[index + 3] = 255;
+                }
+            var image = new OmsiImage(200, 50, 4, pixels);
+            var west = picture.Cut(image, 0, 0, 300, 64);
+            var east = picture.Cut(image, 1, 0, 300, 64);
+            CollectionAssert.AreEqual(new byte[] { 255, 0, 0, 255 }, west.Pixels.Skip((10 * 64 + 10) * 4).Take(4).ToArray());
+            CollectionAssert.AreEqual(new byte[] { 255, 0, 0, 255 }, west.Pixels.Skip((60 * 64 + 60) * 4).Take(4).ToArray());
+            CollectionAssert.AreEqual(new byte[] { 0, 0, 255, 255 }, east.Pixels.Skip((30 * 64 + 3) * 4).Take(4).ToArray());
+            Assert.AreEqual(256, picture.PieceSize(300, 200));
+            Assert.AreEqual(2048, picture.PieceSize(300, 4000));
+
+            // A quarter turn clockwise: the picture's top left corner goes to the north east, its top right to the south east.
+            var turned = new OmsiOwnPicture { Rotation = 90 };
+            AssertUv(turned, 299.999, 299.999, 0, 0, 1e-4);
+            AssertUv(turned, 299.999, 0.001, 1, 0, 1e-4);
+            // Mirrored: left and right swap, or top and bottom.
+            AssertUv(new OmsiOwnPicture { MirrorX = true }, 0, 300, 1, 0);
+            AssertUv(new OmsiOwnPicture { MirrorY = true }, 0, 300, 0, 1);
+            // Moved 30 m east: the tile's west 30 m are left bare.
+            var moved = new OmsiOwnPicture { OffsetX = 30 };
+            Assert.IsFalse(moved.Uv(300, 29, 150, out _, out _));
+            AssertUv(moved, 30, 150, 0, 0.5);
+            // Half the size round the same middle.
+            var half = new OmsiOwnPicture { Scale = 0.5 };
+            Assert.IsFalse(half.Uv(300, 74, 150, out _, out _));
+            AssertUv(half, 225, 225, 1, 0);
+            // A free turn keeps the middle where it is.
+            AssertUv(new OmsiOwnPicture { West = 2, South = 3, East = 4, North = 5, Rotation = 33 }, 3.5 * 300, 4.5 * 300, 0.5, 0.5);
+            // A quarter turn of a wide rectangle swaps the sides, so it still fills it.
+            var wide = new OmsiOwnPicture { East = 1, Rotation = 90 };
+            wide.Frame(300, out _, out _, out var width, out var height, out _);
+            Assert.AreEqual(300.0, width);
+            Assert.AreEqual(600.0, height);
+            Assert.IsTrue(wide.Uv(300, 1, 1, out _, out _) && wide.Uv(300, 599, 299, out _, out _));
+            // A transparent rim where a moved picture leaves the tile.
+            var grey = new byte[10 * 10 * 4];
+            for (var index = 0; index < grey.Length; index++)
+                grey[index] = 9;
+            for (var index = 3; index < grey.Length; index += 4)
+                grey[index] = 255;
+            var piece = new OmsiOwnPicture { OffsetX = 150 }.Cut(new OmsiImage(10, 10, 4, grey), 0, 0, 300, 32);
+            Assert.AreEqual(0, piece.Pixels[(16 * 32 + 2) * 4 + 3]);
+            CollectionAssert.AreEqual(new byte[] { 9, 9, 9, 255 }, piece.Pixels.Skip((16 * 32 + 30) * 4).Take(4).ToArray());
+        }
+
+        [Test]
+        public void OwnPicturesStayInTheProjectWithTheirFit()
+        {
+            var pictures = new List<OmsiOwnPicture>
+            {
+                new OmsiOwnPicture { Id = "own_0_0", File = "own_0_0.png", West = 0, South = -1, East = 1, North = 0, Rotation = -12.5, MirrorY = true, OffsetX = 3.25, Scale = 1.1 },
+                new OmsiOwnPicture { Id = "own_1_0", File = "own_1_0.jpg", West = 1, South = 0, East = 1, North = 0 }
+            };
+            var parsed = OmsiOwnPictures.Parse(OmsiOwnPictures.Write(pictures));
+            Assert.AreEqual(2, parsed.Count);
+            Assert.AreEqual("own_0_0.png", parsed[0].File);
+            Assert.AreEqual(-1, parsed[0].South);
+            Assert.AreEqual(-12.5, parsed[0].Rotation);
+            Assert.IsTrue(parsed[0].MirrorY);
+            Assert.IsFalse(parsed[0].MirrorX);
+            Assert.AreEqual(3.25, parsed[0].OffsetX);
+            Assert.AreEqual(1.1, parsed[0].Scale);
+            // The tile both cover shows the one added last.
+            Assert.AreEqual("own_1_0", OmsiOwnPictures.On(parsed, 1, 0).Id);
+            Assert.AreEqual("own_0_0", OmsiOwnPictures.On(parsed, 0, -1).Id);
+            Assert.IsNull(OmsiOwnPictures.On(parsed, 5, 5));
+            Assert.AreEqual("own_0_0_2", OmsiOwnPictures.NewId(parsed, 0, 0));
+
+            var session = OpenProject();
+            session.SaveOwnPictureFile("own_0_0.png", new byte[] { 1, 2 });
+            session.SaveOwnPictures(parsed);
+            Assert.AreEqual(2, session.ReadOwnPictures().Count);
+            CollectionAssert.AreEqual(new byte[] { 1, 2 }, session.ReadOwnPictureFile("own_0_0.png"));
+            session.DeleteOwnPictureFile("own_0_0.png");
+            Assert.IsNull(session.ReadOwnPictureFile("own_0_0.png"));
+            Assert.Throws<ArgumentException>(() => session.SaveOwnPictureFile("..\\tile_0_0.map", new byte[] { 1 }));
+        }
+
+        private const string OsmBody = "{\"elements\":[" +
+            "{\"type\":\"way\",\"tags\":{\"highway\":\"residential\",\"name\":\"Ленина улица\"},\"geometry\":[{\"lat\":0.0,\"lon\":0.0},{\"lat\":0.0,\"lon\":0.002}]}," +
+            "{\"type\":\"way\",\"tags\":{\"building\":\"yes\"},\"geometry\":[{\"lat\":0.0003,\"lon\":0.0003},{\"lat\":0.0003,\"lon\":0.0006},{\"lat\":0.0006,\"lon\":0.0006},{\"lat\":0.0006,\"lon\":0.0003},{\"lat\":0.0003,\"lon\":0.0003}]}," +
+            "{\"type\":\"way\",\"tags\":{\"natural\":\"water\"},\"geometry\":[{\"lat\":-0.0008,\"lon\":0.0},{\"lat\":-0.0008,\"lon\":0.0008},{\"lat\":-0.0004,\"lon\":0.0008},{\"lat\":-0.0004,\"lon\":0.0},{\"lat\":-0.0008,\"lon\":0.0}]}," +
+            "{\"type\":\"node\",\"lat\":0.0002,\"lon\":0.0012,\"tags\":{\"highway\":\"bus_stop\",\"name\":\"Центр\"}}]}";
+
+        /// <summary>The interface's font, as the player has it; the tests run from the project folder.</summary>
+        private static OmsiTrueTypeFont InterFont()
+        {
+            return new OmsiTrueTypeFont(File.ReadAllBytes(Path.Combine(Directory.GetCurrentDirectory(), "Assets", "_Project", "UI", "Resources", "Fonts", "Inter-Regular.ttf")));
+        }
+
+        private static OmsiRgbImage OsmPicture()
+        {
+            // As openMapper's tests: 0.002° of longitude is about 222 m, so 1 px is about 0.4 m at 600 px.
+            var data = OmsiOsmMap.Parse(OsmBody);
+            return OmsiOsmMap.Draw(data, 600, point => new OmsiMapPoint(point.Longitude / 0.002 * 600.0, 300.0 - point.Latitude / 0.002 * 600.0), 600.0 / 222.0,
+                InterFont(), CancellationToken.None);
+        }
+
+        [Test]
+        public void TheOsmMapIsDrawnWithItsRoadsHousesWaterAndStops()
+        {
+            var picture = OsmPicture();
+            uint At(int x, int y)
+            {
+                var index = (y * picture.Width + x) * 3;
+                return ((uint)picture.Rgb[index] << 16) | ((uint)picture.Rgb[index + 1] << 8) | picture.Rgb[index + 2];
+            }
+            // The land, a road (white), a house, a pond, a stop's blue sign.
+            Assert.AreEqual(0xf2efe9u, At(10, 100));
+            Assert.AreEqual(0xffffffu, At(100, 300));
+            Assert.AreEqual(0xd9d0c9u, At(135, 165));
+            Assert.AreEqual(0xaad3dfu, At(100, 450));
+            var blue = false;
+            for (var x = 350; x < 370; x++)
+                for (var y = 230; y < 250; y++)
+                    blue |= (At(x, y) & 0xff) > 150 && (At(x, y) >> 16) < 80;
+            Assert.IsTrue(blue, "no sign of the stop");
+        }
+
+        [Test]
+        public void TheStreetsNameIsWrittenInDarkInkOnTheRoad()
+        {
+            var picture = OsmPicture();
+            var dark = 0;
+            for (var x = 0; x < 600; x++)
+            {
+                var found = false;
+                for (var y = 270; y < 330 && !found; y++)
+                {
+                    var index = (y * 600 + x) * 3;
+                    found = picture.Rgb[index] < 160 && picture.Rgb[index + 1] < 160 && picture.Rgb[index + 2] < 160;
+                }
+                if (found)
+                    dark++;
+            }
+            Assert.Greater(dark, 10, dark + " dark columns");
+
+            // The letters: Inter has Latin and Cyrillic, a word is wider than its first letter, and an "o" has a hole.
+            var font = InterFont();
+            var word = font.TextOutline("Ленина", 20, out var wordWidth);
+            font.TextOutline("Л", 20, out var letterWidth);
+            Assert.Greater(word.Count, 5);
+            Assert.Greater(wordWidth, letterWidth * 4);
+            var o = font.TextOutline("o", 100, out _);
+            Assert.AreEqual(2, o.Count);
+            var placedO = o.Select(ring => (IList<OmsiMapPoint>)ring.Select(point => new OmsiMapPoint(point.X + 10, point.Y + 100)).ToList()).ToList();
+            var canvas = new OmsiCanvas(120, 120, 0xffffff);
+            canvas.Fill(placedO, 0x000000, false);
+            var all = placedO.SelectMany(ring => ring).ToList();
+            var middleX = (int)((all.Min(point => point.X) + all.Max(point => point.X)) / 2);
+            var middleY = (int)((all.Min(point => point.Y) + all.Max(point => point.Y)) / 2);
+            Assert.AreEqual(0x000000u, canvas.At((int)all.Min(point => point.X) + 3, middleY), "the ring of the o");
+            Assert.AreEqual(0xffffffu, canvas.At(middleX, middleY), "the hole of the o");
+        }
+
+        [Test]
+        public void TheCanvasFillsWithSoftEdgesAndDrawsLinesWithTheirEnds()
+        {
+            var canvas = new OmsiCanvas(40, 20, 0x000000);
+            // A square half a pixel off the grid: full inside, half at its edge.
+            canvas.Fill(new[] { new OmsiMapPoint(2.5, 2), new OmsiMapPoint(10.5, 2), new OmsiMapPoint(10.5, 10), new OmsiMapPoint(2.5, 10) }, 0xffffff);
+            Assert.AreEqual(0xffffffu, canvas.At(5, 5));
+            Assert.AreEqual(0x808080u, canvas.At(2, 5));
+            Assert.AreEqual(0x000000u, canvas.At(12, 5));
+            // Even-odd: a ring inside another is a hole.
+            var holed = new OmsiCanvas(20, 20, 0x000000);
+            holed.Fill(new IList<OmsiMapPoint>[]
+            {
+                new[] { new OmsiMapPoint(0, 0), new OmsiMapPoint(20, 0), new OmsiMapPoint(20, 20), new OmsiMapPoint(0, 20) },
+                new[] { new OmsiMapPoint(5, 5), new OmsiMapPoint(15, 5), new OmsiMapPoint(15, 15), new OmsiMapPoint(5, 15) }
+            }, 0xff0000, true);
+            Assert.AreEqual(0xff0000u, holed.At(2, 2));
+            Assert.AreEqual(0x000000u, holed.At(10, 10));
+            // A line 4 px wide: flat ends stop at the points, round ones reach 2 px further; a dash leaves gaps.
+            var lines = new OmsiCanvas(40, 20, 0x000000);
+            lines.Stroke(new[] { new OmsiMapPoint(10, 5), new OmsiMapPoint(30, 5) }, 4, 0xffffff, false);
+            lines.Stroke(new[] { new OmsiMapPoint(10, 14), new OmsiMapPoint(30, 14) }, 4, 0xffffff, true);
+            Assert.AreEqual(0xffffffu, lines.At(20, 5));
+            Assert.AreEqual(0x000000u, lines.At(8, 5));
+            Assert.AreEqual(0xffffffu, lines.At(9, 14));
+            Assert.AreEqual(0x000000u, lines.At(6, 14));
+            Assert.AreEqual(0x000000u, lines.At(20, 9));
+            var dashed = new OmsiCanvas(40, 10, 0x000000);
+            dashed.Stroke(new[] { new OmsiMapPoint(0, 5), new OmsiMapPoint(40, 5) }, 2, 0xffffff, false, false, new[] { 5.0, 5.0 });
+            Assert.AreEqual(0xffffffu, dashed.At(2, 5));
+            Assert.AreEqual(0x000000u, dashed.At(7, 5));
+            Assert.AreEqual(0xffffffu, dashed.At(12, 5));
+        }
+
+        [Test]
+        public void OverpassAnswersAreReadAndKeptAWeek()
+        {
+            var parsed = OmsiJson.Parse("{\"a\":[1,-2.5e1,true,null,\"x\\u00e4\\n\"],\"b\":{}}") as Dictionary<string, object>;
+            Assert.AreEqual(-25.0, ((List<object>)parsed["a"])[1]);
+            Assert.AreEqual("xä\n", ((List<object>)parsed["a"])[4]);
+            Assert.Throws<InvalidDataException>(() => OmsiJson.Parse("{\"a\":"));
+            var data = OmsiOsmMap.Parse(OsmBody);
+            Assert.AreEqual(4, data.Count);
+            Assert.AreEqual("Ленина улица", data[0].Tag("name"));
+            Assert.AreEqual(5, data[1].Way.Count);
+            Assert.AreEqual(0.0012, data[3].Node.Value.Longitude, 1e-12);
+            // Pieces of a multipolygon's outline become one ring.
+            var rings = OmsiOsmMap.Rings(new List<List<OmsiLatLon>>
+            {
+                new List<OmsiLatLon> { new OmsiLatLon(0, 0), new OmsiLatLon(0, 1), new OmsiLatLon(1, 1) },
+                new List<OmsiLatLon> { new OmsiLatLon(0, 0), new OmsiLatLon(1, 0), new OmsiLatLon(1, 1) }
+            });
+            Assert.AreEqual(1, rings.Count);
+            Assert.AreEqual(5, rings[0].Count);
+            StringAssert.Contains("way[\"highway\"](52.500000,13.400000,52.510000,13.420000);", OmsiOsmMap.Query(52.5, 13.4, 52.51, 13.42));
+
+            var cache = Path.Combine(Path.GetTempPath(), "mapforge-osm-" + Guid.NewGuid().ToString("N"), "Tiles");
+            var asked = 0;
+            var fetcher = new OmsiTileFetcher(cache, (url, cancel) =>
+            {
+                asked++;
+                StringAssert.StartsWith("https://overpass-api.de/api/interpreter?data=", url);
+                return new KeyValuePair<int, byte[]>(200, Encoding.UTF8.GetBytes(OsmBody));
+            });
+            try
+            {
+                Assert.AreEqual(OsmBody, fetcher.Overpass("[out:json];node(1,2,3,4);out;", CancellationToken.None));
+                Assert.AreEqual(OsmBody, fetcher.Overpass("[out:json];node(1,2,3,4);out;", CancellationToken.None));
+                Assert.AreEqual(1, asked);
+            }
+            finally
+            {
+                Directory.Delete(Path.GetDirectoryName(cache), true);
+            }
+
+            // A place on a map placed by hand and on a [worldcoordinates] map comes back as metres in its tile.
+            var placed = OmsiGeoreference.Placed(new OmsiGeoAnchor { TileX = 0, TileY = 0, Latitude = 52.5, Longitude = 13.4, RotationDegrees = 20 }, 300);
+            var where = placed.LatLon(2 * 300 + 120, -300 + 45);
+            var local = placed.Local(2, -1, where.Latitude, where.Longitude);
+            Assert.AreEqual(120.0, local.X, 1e-3);
+            Assert.AreEqual(45.0, local.Y, 1e-3);
+            var world = OmsiGeoreference.ForWorldCoordinates(371.9);
+            var spandau = world.LatLon(2402 * 371.9 + 200, 11279 * 371.9 + 300);
+            var back = world.Local(2402, 11279, spandau.Latitude, spandau.Longitude);
+            Assert.AreEqual(200.0, back.X, 0.01);
+            Assert.AreEqual(300.0, back.Y, 0.01);
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

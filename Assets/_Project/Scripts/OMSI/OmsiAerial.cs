@@ -46,13 +46,17 @@ namespace OmsiMapEditor.OMSI
     {
         public const string UserAgent = "OMSI-MapWorks/1.0 (+https://github.com/Tiegertosch/Omsi-2-Mapforger)";
 
-        private static readonly HttpClient Client = CreateClient();
+        private static readonly HttpClient Client = CreateClient(30);
+        private static readonly HttpClient SlowClient = CreateClient(150);
+        private static readonly object OverpassLock = new object();
+        private static readonly string[] OverpassServers = { "https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter" };
         private static readonly SemaphoreSlim Slots = new SemaphoreSlim(4);
         private static readonly object SearchLock = new object();
         private static DateTime lastSearch = DateTime.MinValue;
 
         private readonly string cacheRoot;
         private readonly Func<string, CancellationToken, KeyValuePair<int, byte[]>> get;
+        private readonly Func<string, CancellationToken, KeyValuePair<int, byte[]>> slowGet;
 
         /// <param name="cacheRoot">Where downloaded tiles are kept.</param>
         /// <param name="get">The HTTP GET of a URL as status and body; null for the network.</param>
@@ -60,6 +64,7 @@ namespace OmsiMapEditor.OMSI
         {
             this.cacheRoot = cacheRoot ?? throw new ArgumentNullException(nameof(cacheRoot));
             this.get = get ?? Download;
+            slowGet = get ?? DownloadSlowly;
         }
 
         /// <summary>Where tiles are kept unless said otherwise: the user's local application data.</summary>
@@ -131,6 +136,54 @@ namespace OmsiMapEditor.OMSI
             return ParsePlaces(Encoding.UTF8.GetString(answer.Value));
         }
 
+        /// <summary>
+        /// What OpenStreetMap has for an Overpass query, one request at a time: the main server first, then a mirror when
+        /// it is busy. A whole answer is kept a week beside the tiles; one cut short or empty is not kept.
+        /// </summary>
+        public string Overpass(string query, CancellationToken cancel)
+        {
+            lock (OverpassLock)
+            {
+                var folder = Path.Combine(Path.GetDirectoryName(cacheRoot) ?? cacheRoot, "osm");
+                var hash = 0xcbf29ce484222325UL;
+                foreach (var value in Encoding.UTF8.GetBytes(query))
+                    hash = unchecked((hash ^ value) * 0x100000001b3UL);
+                var path = Path.Combine(folder, hash.ToString("x16", CultureInfo.InvariantCulture) + ".json");
+                if (File.Exists(path) && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < TimeSpan.FromDays(7))
+                    return File.ReadAllText(path, Encoding.UTF8);
+                string problem = null;
+                foreach (var server in OverpassServers)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                    KeyValuePair<int, byte[]> answer;
+                    try
+                    {
+                        answer = slowGet(server + "?data=" + Uri.EscapeDataString(query), cancel);
+                    }
+                    catch (Exception exception) when (exception is HttpRequestException || exception is IOException || exception is TaskCanceledException && !cancel.IsCancellationRequested)
+                    {
+                        problem = "No connection to OpenStreetMap: are you online? (" + exception.Message + ")";
+                        continue;
+                    }
+                    if (answer.Key == 200)
+                    {
+                        var text = Encoding.UTF8.GetString(answer.Value);
+                        if (!text.Contains("\"remark\"") && text.Contains("\"elements\"") && !Regex.IsMatch(text, "\"elements\"\\s*:\\s*\\[\\s*\\]"))
+                        {
+                            Directory.CreateDirectory(folder);
+                            Keep(path, Encoding.UTF8.GetBytes(text));
+                        }
+                        return text;
+                    }
+                    if (answer.Key == 429 || answer.Key >= 502 && answer.Key <= 504)
+                        problem = "OpenStreetMap's servers are busy: try again in a minute.";
+                    else
+                        throw new IOException("Overpass: HTTP " + answer.Key + ".");
+                }
+                throw new IOException(problem ?? "OpenStreetMap did not answer.");
+            }
+        }
+
         /// <summary>Nominatim's answer: its places' display names, latitudes and longitudes.</summary>
         public static List<OmsiPlace> ParsePlaces(string json)
         {
@@ -185,6 +238,12 @@ namespace OmsiMapEditor.OMSI
             throw new IOException("No connection to the server: are you online? (" + last?.Message + ")", last);
         }
 
+        private static KeyValuePair<int, byte[]> DownloadSlowly(string url, CancellationToken cancel)
+        {
+            using (var response = SlowClient.GetAsync(url, cancel).GetAwaiter().GetResult())
+                return new KeyValuePair<int, byte[]>((int)response.StatusCode, response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult());
+        }
+
         private static KeyValuePair<int, byte[]> Download(string url, CancellationToken cancel)
         {
             Slots.Wait(cancel);
@@ -199,9 +258,9 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        private static HttpClient CreateClient()
+        private static HttpClient CreateClient(int seconds)
         {
-            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(seconds) };
             client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
             return client;
         }
@@ -583,6 +642,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The largest edge of a tile's picture, however fine the source.</summary>
         public int MaxImageSize { get; set; } = 4096;
 
+        /// <summary>The letters for the names on the drawn OpenStreetMap map; null for a map without names.</summary>
+        public OmsiTrueTypeFont Font { get; set; }
+
         /// <summary>Turns a picture's file (JPEG or PNG) into pixels; null where it cannot.</summary>
         public Func<byte[], OmsiRgbImage> Decode { get; set; }
 
@@ -610,7 +672,19 @@ namespace OmsiMapEditor.OMSI
             OmsiImagerySource source = null;
             var zoom = 0;
             var size = 0;
-            if (ImagerySources.Count > 0)
+            List<OmsiOsmElement> osm = null;
+            if (ImagerySources.Count == 1 && ImagerySources[0].Kind == OmsiImageryKind.OsmMap)
+            {
+                // One request for all the tiles, not one for each; if it does not answer, nothing more is asked.
+                source = ChosenSource = ImagerySources[0];
+                zoom = source.MaxZoom;
+                size = Math.Min(MaxImageSize, OmsiAerial.ImageSize(TileSize, OmsiGeoreference.MetresPerPixel(middle.Latitude, zoom)));
+                Status?.Invoke("Asking OpenStreetMap for the streets, houses and stops: this can take a minute for a large area; the answer is then kept for a week...");
+                var box = OmsiOsmMap.Box(Geo, Tiles, TileSize);
+                osm = OmsiOsmMap.Parse(Fetcher.Overpass(OmsiOsmMap.Query(box[0], box[1], box[2], box[3]), cancel));
+                Status?.Invoke(source.Name + ": " + osm.Count + " things from OpenStreetMap, " + size + " px a tile");
+            }
+            else if (ImagerySources.Count > 0)
             {
                 Status?.Invoke("Looking for the sharpest imagery here...");
                 var found = new List<KeyValuePair<OmsiImagerySource, double?>>();
@@ -662,7 +736,12 @@ namespace OmsiMapEditor.OMSI
                     {
                         if (attempt > 0)
                             Thread.Sleep(800 * attempt);
-                        if (source != null)
+                        if (osm != null)
+                        {
+                            var picture = OmsiOsmMap.Build(Geo, tile.X, tile.Y, TileSize, size, osm, Font, cancel);
+                            ImageReady?.Invoke(tile, picture, new OmsiImageryMeta { Source = source.Name, Zoom = zoom, Stamp = Geo.Stamp });
+                        }
+                        else if (source != null)
                         {
                             TileFor(source, zoom, size, tile, cancel);
                         }

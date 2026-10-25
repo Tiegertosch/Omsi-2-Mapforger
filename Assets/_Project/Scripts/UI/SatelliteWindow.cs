@@ -43,6 +43,19 @@ namespace OmsiMapEditor.UI
         private readonly Slider opacitySlider = new Slider(0f, 1f);
         private readonly Label opacityLabel = new Label();
 
+        private readonly IntegerField[] pictureTiles = { new IntegerField("x"), new IntegerField("y"), new IntegerField("x"), new IntegerField("y") };
+        private readonly VisualElement pictureList = new VisualElement();
+        private readonly VisualElement fitSection = new VisualElement();
+        private readonly Label fitTitle = new Label();
+        private readonly FloatField rotationValue = new FloatField("Turn (°)") { isDelayed = true };
+        private readonly Toggle mirrorXToggle = new Toggle { text = "Mirror left-right" };
+        private readonly Toggle mirrorYToggle = new Toggle { text = "Mirror top-bottom" };
+        private readonly FloatField offsetXValue = new FloatField("East (m)") { isDelayed = true };
+        private readonly FloatField offsetYValue = new FloatField("North (m)") { isDelayed = true };
+        private readonly FloatField scaleValue = new FloatField("Size") { isDelayed = true };
+        private readonly Label sizeLabel = new Label();
+        private OmsiOwnPicture fitShown;
+
         private bool placing;
         private bool busy;
         private bool placed;
@@ -135,14 +148,45 @@ namespace OmsiMapEditor.UI
             anchorLabel.AddToClassList("satellite-note");
             placeSection.Add(anchorLabel);
 
+            // The user's own pictures.
+            Section(left, "Own pictures");
+            var ownNote = new Label("A scan, a screenshot, an old plan: laid on tiles and lined up by eye. No place on the Earth needed.");
+            ownNote.AddToClassList("satellite-note");
+            left.Add(ownNote);
+            var tilesRow = new VisualElement();
+            tilesRow.AddToClassList("satellite-row");
+            var from = new Label("Tiles from");
+            from.AddToClassList("satellite-inline-label");
+            tilesRow.Add(from);
+            for (var index = 0; index < pictureTiles.Length; index++)
+            {
+                if (index == 2)
+                {
+                    var to = new Label("to");
+                    to.AddToClassList("satellite-inline-label");
+                    tilesRow.Add(to);
+                }
+                pictureTiles[index].AddToClassList("satellite-number");
+                pictureTiles[index].tooltip = index < 2 ? "The tile at the picture's south-west corner" : "The tile at the picture's north-east corner";
+                tilesRow.Add(pictureTiles[index]);
+            }
+            left.Add(tilesRow);
+            left.Add(Button("Load image file over these tiles...", () => PictureLoadRequested?.Invoke(pictureTiles[0].value, pictureTiles[1].value, pictureTiles[2].value,
+                pictureTiles[3].value), "A JPEG, PNG, BMP or TGA picture stretched over these tiles; the copy stays in the project", "layers"));
+            pictureList.AddToClassList("satellite-results");
+            left.Add(pictureList);
+
             // Pictures from the air and heights for the tiles.
             Section(right, "Imagery");
             var sourceRow = Row(right, "Source");
             sourceField.AddToClassList("new-map-dropdown");
-            sourceField.tooltip = "Where the pictures come from; none of them needs a key. The sharpest is chosen at the map's middle.";
+            sourceField.tooltip = "Where the pictures come from; none of them needs a key. The sharpest is chosen at the map's middle. " +
+                                  "\"OpenStreetMap map\" draws the map as openstreetmap.org shows it, with streets' names, houses and stops, to build over by eye.";
             var choices = new List<string> { SharpestChoice };
             foreach (var source in OmsiImagerySource.Imagery)
                 choices.Add(source.Name);
+            // The map as OpenStreetMap draws it, made from its data with streets' names, in place of a picture from the air.
+            choices.Add(OmsiImagerySource.OsmMap.Name);
             sourceField.choices = choices;
             sourceField.SetValueWithoutNotify(SharpestChoice);
             sourceField.RegisterValueChangedCallback(evt => SourceChanged?.Invoke(evt.newValue == SharpestChoice ? null : evt.newValue));
@@ -226,6 +270,61 @@ namespace OmsiMapEditor.UI
             var note = new Label("The pictures stay in the project and are not exported. Check a source's terms before you share pictures made from it.");
             note.AddToClassList("satellite-note");
             right.Add(note);
+
+            // Lining up the own picture chosen in the list.
+            right.Add(fitSection);
+            fitTitle.AddToClassList("inspector-section-heading");
+            fitSection.Add(fitTitle);
+            var turnRow = new VisualElement();
+            turnRow.AddToClassList("satellite-row");
+            turnRow.Add(Button("Turn left 90°", () => ChangeFit(fit => fit.Rotation = Wrap(fit.Rotation - 90.0)), "Turns the picture a quarter anticlockwise"));
+            turnRow.Add(Button("Turn right 90°", () => ChangeFit(fit => fit.Rotation = Wrap(fit.Rotation + 90.0)), "Turns the picture a quarter clockwise"));
+            rotationValue.AddToClassList("satellite-number");
+            rotationValue.tooltip = "Turned clockwise in degrees; drag the label or type a value";
+            rotationValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.Rotation = Wrap(evt.newValue)));
+            turnRow.Add(rotationValue);
+            fitSection.Add(turnRow);
+            var mirrorRow = new VisualElement();
+            mirrorRow.AddToClassList("satellite-row");
+            foreach (var toggle in new[] { mirrorXToggle, mirrorYToggle })
+            {
+                toggle.AddToClassList("picker-option-toggle");
+                toggle.AddToClassList("panel-toggle");
+                toggle.AddToClassList("satellite-mirror");
+                mirrorRow.Add(toggle);
+            }
+            mirrorXToggle.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.MirrorX = evt.newValue));
+            mirrorYToggle.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.MirrorY = evt.newValue));
+            fitSection.Add(mirrorRow);
+            var moveRow = new VisualElement();
+            moveRow.AddToClassList("satellite-row");
+            foreach (var field in new[] { offsetXValue, offsetYValue, scaleValue })
+            {
+                field.AddToClassList("satellite-number");
+                moveRow.Add(field);
+            }
+            offsetXValue.tooltip = "Moved east in metres; drag the label or type a value";
+            offsetYValue.tooltip = "Moved north in metres; drag the label or type a value";
+            scaleValue.tooltip = "Size against the tiles, 1 for stretched over them; drag the label or type a value";
+            offsetXValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.OffsetX = evt.newValue));
+            offsetYValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.OffsetY = evt.newValue));
+            scaleValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.Scale = Math.Max(0.05, Math.Min(20.0, evt.newValue))));
+            fitSection.Add(moveRow);
+            var fitButtons = new VisualElement();
+            fitButtons.AddToClassList("satellite-row");
+            sizeLabel.AddToClassList("satellite-note");
+            sizeLabel.AddToClassList("satellite-grow");
+            fitButtons.Add(sizeLabel);
+            fitButtons.Add(Button("Reset", () => ChangeFit(fit => fit.ResetFit()), "Stretched over its tiles again, unturned and unmirrored"));
+            var remove = Button("Remove", () =>
+            {
+                if (fitShown != null)
+                    PictureRemoved?.Invoke(fitShown.Id);
+            }, "Takes the picture off its tiles and out of the project");
+            remove.AddToClassList("inspector-edit-delete");
+            fitButtons.Add(remove);
+            fitSection.Add(fitButtons);
+            fitSection.style.display = DisplayStyle.None;
             UpdateButtons();
         }
 
@@ -247,6 +346,16 @@ namespace OmsiMapEditor.UI
         public event Action<bool, bool, bool> LoadRequested;
 
         public event Action CancelRequested;
+
+        /// <summary>A picture file is to be laid over the tiles from west, south to east, north.</summary>
+        public event Action<int, int, int, int> PictureLoadRequested;
+
+        public event Action<string> PictureSelected;
+
+        /// <summary>The chosen picture's fit changed: a copy with the new values.</summary>
+        public event Action<OmsiOwnPicture> PictureFitChanged;
+
+        public event Action<string> PictureRemoved;
 
         /// <summary>The ticks for terrain heights and for new tiles changed.</summary>
         public event Action<bool, bool> TicksChanged;
@@ -284,6 +393,62 @@ namespace OmsiMapEditor.UI
             sourceField.SetValueWithoutNotify(chosenSource ?? SharpestChoice);
             heightsToggle.SetValueWithoutNotify(settings.WithTerrain);
             autoToggle.SetValueWithoutNotify(settings.AutoNewTiles);
+        }
+
+        /// <summary>The rectangle of tiles a new picture goes over.</summary>
+        public void SetPictureTiles(int west, int south, int east, int north)
+        {
+            pictureTiles[0].SetValueWithoutNotify(west);
+            pictureTiles[1].SetValueWithoutNotify(south);
+            pictureTiles[2].SetValueWithoutNotify(east);
+            pictureTiles[3].SetValueWithoutNotify(north);
+        }
+
+        /// <summary>The own pictures, the chosen one with its fit; its picture's size, when known, for the size in metres.</summary>
+        public void ShowPictures(List<OmsiOwnPicture> pictures, OmsiOwnPicture chosen, double tileSize, OmsiImage image)
+        {
+            pictureList.Clear();
+            foreach (var picture in pictures)
+            {
+                var captured = picture.Id;
+                var count = (picture.East - picture.West + 1) * (picture.North - picture.South + 1);
+                var item = new Button(() => PictureSelected?.Invoke(captured))
+                {
+                    text = picture.File + " (" + count + " tile" + (count == 1 ? "" : "s") + " from " + picture.West + ", " + picture.South + ")"
+                };
+                item.AddToClassList("satellite-result");
+                item.EnableInClassList("satellite-result-chosen", chosen != null && chosen.Id == picture.Id);
+                pictureList.Add(item);
+            }
+            fitShown = chosen?.Clone();
+            fitSection.style.display = chosen != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (chosen == null)
+                return;
+            fitTitle.text = ("Line up " + chosen.File).ToUpperInvariant();
+            rotationValue.SetValueWithoutNotify((float)chosen.Rotation);
+            mirrorXToggle.SetValueWithoutNotify(chosen.MirrorX);
+            mirrorYToggle.SetValueWithoutNotify(chosen.MirrorY);
+            offsetXValue.SetValueWithoutNotify((float)chosen.OffsetX);
+            offsetYValue.SetValueWithoutNotify((float)chosen.OffsetY);
+            scaleValue.SetValueWithoutNotify((float)chosen.Scale);
+            chosen.Frame(tileSize, out _, out _, out var width, out var height, out _);
+            sizeLabel.text = width.ToString("0.0", CultureInfo.InvariantCulture) + " × " + height.ToString("0.0", CultureInfo.InvariantCulture) + " m" +
+                             (image != null ? ", " + (width / image.Width).ToString("0.00", CultureInfo.InvariantCulture) + " m a pixel" : string.Empty);
+        }
+
+        private void ChangeFit(Action<OmsiOwnPicture> change)
+        {
+            if (fitShown == null)
+                return;
+            var fit = fitShown.Clone();
+            change(fit);
+            PictureFitChanged?.Invoke(fit);
+        }
+
+        private static double Wrap(double degrees)
+        {
+            var wrapped = (degrees + 180.0) % 360.0;
+            return (wrapped < 0 ? wrapped + 360.0 : wrapped) - 180.0;
         }
 
         /// <summary>Where the anchor tile lies, or null while the map is not placed.</summary>

@@ -62,6 +62,13 @@ namespace OmsiMapEditor.OMSI
             column = tileX + localX / EdgeMeters(row);
         }
 
+        /// <summary>A fractional grid column and row as a position local to a tile, the inverse of <see cref="ToGrid"/>.</summary>
+        public static void FromGrid(int tileX, int tileY, double column, double row, out double localX, out double localY)
+        {
+            localY = (row - tileY) * EdgeMeters(0.5 * (tileY + row));
+            localX = (column - tileX) * EdgeMeters(row);
+        }
+
         /// <summary>The distance in metres between two tile-local positions of a world-coordinate map.</summary>
         public static double DistanceMeters(int firstTileX, int firstTileY, double firstX, double firstY, int secondTileX, int secondTileY,
             double secondX, double secondY)

@@ -125,6 +125,19 @@ namespace OmsiMapEditor.OMSI
             return new OmsiMapPoint(anchorX + east * Math.Cos(radians) - north * Math.Sin(radians), anchorY + east * Math.Sin(radians) + north * Math.Cos(radians));
         }
 
+        /// <summary>A latitude and longitude in metres east and north of a tile's south-west corner, for either kind of map.</summary>
+        public OmsiMapPoint Local(int tileX, int tileY, double lat, double lon)
+        {
+            if (!world)
+            {
+                var point = World(lat, lon);
+                return new OmsiMapPoint(point.X - tileX * tileSize, point.Y - tileY * tileSize);
+            }
+            var mercator = MercatorOf(lat, lon);
+            OmsiWorldTiles.FromGrid(tileX, tileY, mercator.X * 65536.0 - 32768.0, 32768.0 - mercator.Y * 65536.0, out var localX, out var localY);
+            return new OmsiMapPoint(localX, localY);
+        }
+
         /// <summary>Text that changes when the placement does: imagery made for another placement is out of date.</summary>
         public string Stamp =>
             world ? "world " + tileSize.ToString("R", CultureInfo.InvariantCulture)
@@ -296,7 +309,10 @@ namespace OmsiMapEditor.OMSI
         Wms,
 
         /// <summary>Heights as Terrarium PNGs: R · 256 + G + B / 256 − 32768 m.</summary>
-        Terrarium
+        Terrarium,
+
+        /// <summary>The map drawn from OpenStreetMap's data (<see cref="OmsiOsmMap"/>), not fetched as tiles.</summary>
+        OsmMap
     }
 
     /// <summary>
@@ -386,6 +402,13 @@ namespace OmsiMapEditor.OMSI
             Name = TerrainName, Url = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png", Kind = OmsiImageryKind.Terrarium, MaxZoom = 15,
             Attribution = "Terrain: Mapzen Terrain Tiles on AWS Open Data (SRTM, USGS 3DEP, GMTED2010, ETOPO1, Copernicus EU-DEM and others)",
             Terms = "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"
+        };
+
+        /// <summary>The map as OpenStreetMap draws it, drawn here from its data at zoom 19 detail.</summary>
+        public static OmsiImagerySource OsmMap { get; } = new OmsiImagerySource
+        {
+            Name = OmsiOsmMap.SourceName, Url = string.Empty, Kind = OmsiImageryKind.OsmMap, MaxZoom = 19, Attribution = OmsiOsmMap.Attribution,
+            Terms = "https://www.openstreetmap.org/copyright"
         };
 
         /// <summary>The request for one tile.</summary>

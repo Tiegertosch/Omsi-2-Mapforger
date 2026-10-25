@@ -389,10 +389,17 @@
 .satellite-results { margin-bottom: var(--mf-space-1); }
 .satellite-result { height: 22px; margin: 1px 0; padding: 0 6px; -unity-text-align: middle-left; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .satellite-result:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
-.world-map { height: 260px; flex-shrink: 0; margin: var(--mf-space-1) 0 2px; background-color: var(--mf-color-field); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); --world-map-outline: var(--mf-color-text-primary); --world-map-anchor: var(--mf-color-accent); }
+.world-map { height: 230px; flex-shrink: 0; margin: var(--mf-space-1) 0 2px; background-color: var(--mf-color-field); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); --world-map-outline: var(--mf-color-text-primary); --world-map-anchor: var(--mf-color-accent); }
 .satellite-attribution { margin-bottom: var(--mf-space-1); font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
 .satellite-note { margin: 2px 0 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .satellite-label { width: 120px; min-width: 120px; }
 .satellite-progress { flex-grow: 1; flex-shrink: 1; margin-right: 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); white-space: normal; }
 .satellite-grow { flex-grow: 1; flex-shrink: 1; }
+.satellite-inline-label { margin: 0 6px 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
+.satellite-number { flex-grow: 1; flex-shrink: 1; min-width: 0; margin: 0 6px 0 0; }
+.satellite-number > Label { min-width: 0; width: auto; margin: 0 4px 0 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
+.satellite-number .unity-base-text-field__input { height: 26px; margin: 0; padding: 0 6px; -unity-text-align: middle-left; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.satellite-number .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
+.satellite-mirror { margin-right: var(--mf-space-3); }
+.satellite-result-chosen, .satellite-result-chosen:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
 .imagery-attribution { position: absolute; right: 310px; bottom: var(--mf-space-1); padding: 2px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }

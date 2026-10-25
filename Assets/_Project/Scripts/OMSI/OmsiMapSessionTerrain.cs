@@ -294,6 +294,47 @@ namespace OmsiMapEditor.OMSI
             return Workspace.ReadAllBytes(path);
         }
 
+        /// <summary>The project's own pictures (Mapforge\Pictures\pictures.txt), the last added last.</summary>
+        public List<OmsiOwnPicture> ReadOwnPictures()
+        {
+            var workspace = Workspace;
+            return workspace != null && workspace.IsModified(OmsiOwnPictures.ListPath)
+                ? OmsiOwnPictures.Parse(System.Text.Encoding.UTF8.GetString(workspace.ReadAllBytes(OmsiOwnPictures.ListPath)))
+                : new List<OmsiOwnPicture>();
+        }
+
+        public void SaveOwnPictures(IEnumerable<OmsiOwnPicture> pictures)
+        {
+            if (pictures == null)
+                throw new ArgumentNullException(nameof(pictures));
+            RequireWorkspace().Save(OmsiOwnPictures.ListPath, System.Text.Encoding.UTF8.GetBytes(OmsiOwnPictures.Write(pictures)));
+        }
+
+        /// <summary>Keeps the copy of a picture file under Mapforge\Pictures.</summary>
+        public void SaveOwnPictureFile(string fileName, byte[] bytes)
+        {
+            if (string.IsNullOrEmpty(fileName) || fileName.IndexOfAny(new[] { '\\', '/', ' ' }) >= 0)
+                throw new ArgumentException("A picture file name has no folders and no spaces.", nameof(fileName));
+            if (bytes == null)
+                throw new ArgumentNullException(nameof(bytes));
+            RequireWorkspace().Save(OmsiOwnPictures.Folder + "\\" + fileName, bytes);
+        }
+
+        /// <summary>A picture file's copy, or null when the project has none by that name.</summary>
+        public byte[] ReadOwnPictureFile(string fileName)
+        {
+            var path = OmsiOwnPictures.Folder + "\\" + fileName;
+            return Workspace != null && Workspace.IsModified(path) ? Workspace.ReadAllBytes(path) : null;
+        }
+
+        public void DeleteOwnPictureFile(string fileName)
+        {
+            var path = OmsiOwnPictures.Folder + "\\" + fileName;
+            var workspace = RequireWorkspace();
+            if (workspace.IsModified(path))
+                workspace.Revert(path);
+        }
+
         /// <summary>Whether an object keeps its height as written rather than above the ground, as junctions do.</summary>
         private static bool HasAbsoluteHeight(string installation, string assetPath)
         {
