@@ -423,6 +423,8 @@ Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte ste
 
 **Offen:** Kacheln löschen führt Kettenabstände und Reihen benachbarter Kacheln noch nicht nach. Reihen, die mit früheren Versionen über eine Kachelgrenze gelegt wurden, bleiben auf den falschen Wert gerechnet. „Store offsets“ hält sie dort, wo openOMSI sie zeigt; solche Reihen löscht man am besten und legt sie neu.
 
+**Ergänzung vom 25. Oktober 2026 (Kacheln löschen, vom Nutzer bestätigt):** Läuft eine Kette durch eine gelöschte Kachel, beginnt oder endet sie danach an deren Rand. Das Löschen führt deshalb wie jede Spline-Änderung die Kettenabstände der Splines in den Nachbarkacheln nach (`KeepChains`) und verschiebt den Startabstand der Reihen an ihnen um genauso viel, damit ihre Objekte stehen bleiben; alles gehört zum selben Rückgängig-Schritt (`KeepChainsAfterDeletion`).
+
 ## ADR 039: Angehängte Objekte beim Platzieren einrasten
 
 **Status:** Angenommen, 25. Oktober 2026; Bedienung nach Wahl des Nutzers („Beim Platzieren einrasten“), vom Nutzer im Editor und in openOMSI bestätigt.

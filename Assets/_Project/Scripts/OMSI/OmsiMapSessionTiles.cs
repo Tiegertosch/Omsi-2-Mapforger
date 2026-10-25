@@ -97,7 +97,8 @@ namespace OmsiMapEditor.OMSI
         /// elements of other tiles, timetables or signal routes naming its elements, or chrono variants changing it, as
         /// these would break. Splines of other tiles joined to its splines get an open end. Tile indices after it move down
         /// by one wherever they are written: entry points, repeated rows along splines, timetables and signal routes, also
-        /// those of chrono variants. Its files stay where they are, unlisted, as OMSI ignores them.
+        /// those of chrono variants. Chains that ran through it get their new offsets beside it, and the rows along them
+        /// stay where they stood. Its files stay where they are, unlisted, as OMSI ignores them.
         /// </summary>
         public OmsiTileDeletionResult DeleteTile(OmsiMapSummary summary, OmsiTileSummary tile)
         {
@@ -202,9 +203,31 @@ namespace OmsiMapEditor.OMSI
 
             if (blockers.Count > 0)
                 return new OmsiTileDeletionResult(null, blockers);
+            // Where every chain begins and every row counts from, before the tile goes.
+            var chains = Chains(summary);
             files.Collect(change.Files);
             ApplyFiles(change.Files, false);
+            KeepChainsAfterDeletion(change, chains);
             return new OmsiTileDeletionResult(change, new string[0]);
+        }
+
+        /// <summary>
+        /// A chain that ran through the deleted tile now begins, or ends, at its edge: the splines of the tiles beside it
+        /// get their new chain offsets, and the rows along them move their start by as much, so their objects stay where
+        /// they stood (ADR 038). The files join the deletion's step.
+        /// </summary>
+        private void KeepChainsAfterDeletion(OmsiTileChange change, ChainState before)
+        {
+            var kept = new OmsiSplineChange(OmsiSplineChangeKind.ChainOffsets);
+            KeepChains(Read(), kept, before);
+            foreach (var file in kept.Files)
+            {
+                var state = change.Files.Find(item => string.Equals(item.RelativePath, file.RelativePath, StringComparison.OrdinalIgnoreCase));
+                if (state != null)
+                    state.After = file.After;
+                else
+                    change.Files.Add(file);
+            }
         }
 
         /// <summary>Takes back an added or deleted tile, or does it again; fails without writing when a file changed since.</summary>

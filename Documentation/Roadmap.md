@@ -122,7 +122,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Reihen beim Ändern ihrer Kette an Ort und Stelle halten (ADR 037, Ergänzung): Wächst oder schrumpft die Kette vor dem Spline einer Reihe, etwa durch eine angebaute Straße, ein gelöschtes Stück oder eine eingesetzte Kreuzung, ändert sich ihr Startabstand um dasselbe, im selben Rückgängig-Schritt; gilt auch für Reihen der Originalkarten
 - [x] Vorhandene Reihen bearbeiten (ADR 037, zweite Ergänzung): Ein Klick wählt die ganze Reihe samt ihren Teilen auf anderen Kacheln, die Felder zeigen ihre Werte (Abstand, Abstand von der Mitte, Höhe, Drehung), Enter ändert sie, ein Objekt aus der Bibliothek ersetzt ihre Objekte, R dreht sie; die Reihe wird über dieselbe Strecke neu geplant, ihre Datensätze behalten ihre IDs; Reihen mit Wiederholungen bekommen die Werte in jedem Datensatz
 - [x] Kettenabstände pflegen und Reihen wie openOMSI auslegen (ADR 038): Feld 17 der Splines nach jeder Spline-Änderung, Reihen ab dem gespeicherten Kettenabstand und nur in der eigenen Kachel, Thema „Chain offsets“ der Kartenprüfung mit Reparatur
-- Kacheln löschen: Kettenabstände und Reihen benachbarter Kacheln nachführen
+- [x] Kacheln löschen: Kettenabstände und Reihen benachbarter Kacheln nachführen (ADR 038, Ergänzung)
 - [x] Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen (ADR 039): beim Platzieren an freien Punkten einrasten, im Inspector auflisten und abnehmen, Löschen nimmt sie mit
 - Angehängte Objekte an Reihen entlang von Straßen anlegen
 - Gelände-Werkzeuge wie openMapper (ADR 040, Entscheidung des Nutzers):

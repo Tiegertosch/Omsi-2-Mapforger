@@ -2249,6 +2249,48 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void DeletingATileGivesTheChainsBesideItTheirNewOffsetsAndKeepsTheirRowsWhereTheyStand()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 420, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var first = summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var plan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(plan.Problem);
+            session.AddAttachmentRow(summary, plan);
+            summary = session.Read();
+            // The lamps of tile 1, 0, which stays.
+            var layout = new OmsiSplineAttachmentLayout(summary);
+            var tile1 = summary.Tiles.Single(tile => tile.X == 1);
+            var lampsOfTile1 = tile1.SplineAttachments.Where(row => row.AssetPath == @"Sceneryobjects\lamp.sco").SelectMany(row => layout.Place(tile1, row))
+                .OrderBy(item => item.WorldX).ToList();
+            Assert.Greater(lampsOfTile1.Count, 0);
+            var firstOfTile1 = tile1.Splines.First(spline => road.SplineIds.Contains(spline.Id));
+            Assert.Greater(firstOfTile1.ChainOffset.Value, 90.0);
+            var tileBefore = session.Workspace.ReadAllBytes("tile_1_0.map");
+
+            var result = session.DeleteTile(summary, summary.Tiles.Single(tile => tile.X == 0));
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Blockers));
+            var read = session.Read();
+            Assert.AreEqual(1, read.Tiles.Count);
+            // The chain begins at the edge now, every offset counted from there; the lamps stand where they stood.
+            var kept = read.Tiles[0].Splines.Where(spline => road.SplineIds.Contains(spline.Id)).ToList();
+            Assert.AreEqual(0.0, kept.Single(spline => spline.Id == firstOfTile1.Id).ChainOffset.Value, 1e-3);
+            Assert.AreEqual(0, OmsiMapSession.StaleChainOffsets(read).Count);
+            AssertSamePlaces(lampsOfTile1, Lamps(read));
+
+            // One step: taking it back brings the offsets and rows back too.
+            session.ApplyTileChange(result.Change, true);
+            CollectionAssert.AreEqual(tileBefore, session.Workspace.ReadAllBytes("tile_1_0.map"));
+            Assert.AreEqual(2, session.Read().Tiles.Count);
+        }
+
+        [Test]
         public void ARowOnlyLaysObjectsAlongItsOwnTileAndNotBeforeItsOwnSpline()
         {
             var session = OpenProject();
