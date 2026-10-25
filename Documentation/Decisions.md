@@ -406,7 +406,7 @@ Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte ste
 
 ## ADR 038: openOMSI als Ziel; Kettenabstände pflegen und Reihen wie openOMSI auslegen
 
-**Status:** Angenommen, 25. Oktober 2026, nach Spieltests des Nutzers in openOMSI und OMSI 2. Ziel ist laut Nutzer die Verträglichkeit mit openOMSI (Omsi-Hub); in OMSI 2 sind etwa erzeugte Kreuzungen unsichtbar, das ist hingenommen.
+**Status:** Angenommen, 25. Oktober 2026, nach Spieltests des Nutzers in openOMSI und OMSI 2; vom Nutzer in openOMSI bestätigt. Ziel ist laut Nutzer die Verträglichkeit mit openOMSI (Omsi-Hub); in OMSI 2 sind etwa erzeugte Kreuzungen unsichtbar, das ist hingenommen.
 
 **Entscheidung:** Wo die Kartendaten eine Formatfrage offen lassen, gilt openOMSIs Auslegung (Quelltext unter github.com/openOMSI-org/openOMSI; seine Kommentare halten Abgleiche mit Omsi.exe fest).
 
