@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
@@ -8,9 +9,11 @@ namespace OmsiMapEditor.UI
     /// The options of the row tool, shown beside the object library in place of its placing options: the object chosen
     /// in the library, the distance between objects, how far from the road's centre, height, heading, both sides and
     /// whether a row runs along the whole road. The shell plans and lays the rows; the options only hold the settings.
+    /// While a row of the map is selected, the fields show its values instead and the laying values wait.
     /// </summary>
     internal sealed class RowToolOptions : VisualElement
     {
+        private readonly Label title;
         private readonly Label objectLabel;
         private readonly TextField intervalField;
         private readonly TextField offsetField;
@@ -20,11 +23,14 @@ namespace OmsiMapEditor.UI
         private readonly Toggle wholeRoadToggle;
         private readonly Label planLabel;
 
+        /// <summary>The laying values of the fields while a selected row's values are shown; null otherwise.</summary>
+        private string[] laying;
+
         public RowToolOptions()
         {
             AddToClassList("tool-panel");
             AddToClassList("picker-options");
-            var title = new Label("Rows along roads");
+            title = new Label("Rows along roads");
             title.AddToClassList("picker-options-title");
             Add(title);
 
@@ -56,13 +62,20 @@ namespace OmsiMapEditor.UI
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
             Add(planLabel);
-            var hint = new Label("Point at a road: the row lies on the side of the pointer. Click to lay it; R turns the objects by 15°, Shift+R back. Click an object of a row to select the row; Del deletes it. Esc ends the tool.");
+            var hint = new Label("Point at a road: the row lies on the side of the pointer. Click to lay it; R turns the objects by 15°, Shift+R back. " +
+                                 "Click an object of a row to select the row: change its values and press Enter, or choose another object in the library; Del deletes it. Esc ends the tool.");
             hint.AddToClassList("panel-info");
             Add(hint);
         }
 
         /// <summary>A setting changed; the shell plans the row again.</summary>
         public event Action SettingsChanged;
+
+        /// <summary>Enter was pressed in a field or a field lost focus; the shell changes a selected row to the values.</summary>
+        public event Action Committed;
+
+        /// <summary>True while the fields show the values of a selected row.</summary>
+        public bool IsEditing => laying != null;
 
         public double Interval => Number(intervalField, 0.0) ?? 25.0;
 
@@ -89,6 +102,33 @@ namespace OmsiMapEditor.UI
                 intervalField.value = interval;
             if (!string.IsNullOrWhiteSpace(heading))
                 headingField.value = heading;
+        }
+
+        /// <summary>Shows the values of a selected row; the laying values come back with <see cref="EndEditing"/>.</summary>
+        public void BeginEditing(double interval, double offset, double height, double heading)
+        {
+            laying = laying ?? new[] { intervalField.value, offsetField.value, heightField.value, headingField.value };
+            title.text = "Selected row";
+            intervalField.SetValueWithoutNotify(Format(interval));
+            offsetField.SetValueWithoutNotify(Format(offset));
+            heightField.SetValueWithoutNotify(Format(height));
+            headingField.SetValueWithoutNotify(Format(heading));
+            bothSidesToggle.SetEnabled(false);
+            wholeRoadToggle.SetEnabled(false);
+        }
+
+        public void EndEditing()
+        {
+            if (laying == null)
+                return;
+            intervalField.SetValueWithoutNotify(laying[0]);
+            offsetField.SetValueWithoutNotify(laying[1]);
+            heightField.SetValueWithoutNotify(laying[2]);
+            headingField.SetValueWithoutNotify(laying[3]);
+            laying = null;
+            title.text = "Rows along roads";
+            bothSidesToggle.SetEnabled(true);
+            wholeRoadToggle.SetEnabled(true);
         }
 
         public void ShowObject(string assetPath)
@@ -120,9 +160,20 @@ namespace OmsiMapEditor.UI
             var field = new TextField { value = value, tooltip = tooltip };
             field.AddToClassList("picker-field");
             field.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    Committed?.Invoke();
+            }, TrickleDown.TrickleDown);
+            field.RegisterCallback<FocusOutEvent>(_ => Committed?.Invoke());
             row.tooltip = tooltip;
             row.Add(field);
             return field;
+        }
+
+        private static string Format(double value)
+        {
+            return value.ToString("0.###", CultureInfo.InvariantCulture);
         }
 
         private static double? Number(TextField field, double minimum)

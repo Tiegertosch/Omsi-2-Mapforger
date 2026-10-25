@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -966,6 +967,286 @@ namespace OmsiMapEditor.Tests
             // Between two points along the road: from 30 m to 75 m, every 20 m.
             var part = OmsiAttachmentRows.Plan(summary, layout, summary.Tiles[0], start, request, 75, 30);
             Assert.AreEqual(new[] { 230.0, 250.0, 270.0 }, part.Objects.Select(item => Math.Round(item.WorldX, 6)).ToArray());
+        }
+
+        [Test]
+        public void SplinesBuiltAcrossATileBorderStoreHowFarAlongTheirChainTheyBegin()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 420, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+
+            // Read again from the files: each spline's last number is the length of the road before it, also past the border.
+            var reread = session.Read();
+            var splines = road.SplineIds.Select(id => reread.Tiles.SelectMany(tile => tile.Splines).Single(spline => spline.Id == id)).ToList();
+            Assert.Greater(splines.Count, 1);
+            Assert.IsTrue(reread.Tiles[1].Splines.Any(spline => road.SplineIds.Contains(spline.Id)), "the road reaches tile 1");
+            var before = 0.0;
+            foreach (var spline in splines)
+            {
+                Assert.AreEqual(before, spline.ChainOffset.Value, 1e-3, "spline " + spline.Id);
+                before += spline.LengthMeters;
+            }
+
+            // A piece built on at the start moves every offset on by its length; taking it back moves them back.
+            var start = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]), false);
+            var piece = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 150, StartY = 100, StartHeight = 2, EndX = 200, EndY = 100, EndHeight = 2, EndJoinHeadingDegrees = 90, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, start);
+            var built = session.Read().Tiles.SelectMany(tile => tile.Splines).ToList();
+            Assert.AreEqual(50.0, built.Single(spline => spline.Id == road.SplineIds[0]).ChainOffset.Value, 1e-3);
+            session.Undo(summary, piece);
+            Assert.AreEqual(0.0, session.Read().Tiles.SelectMany(tile => tile.Splines).Single(spline => spline.Id == road.SplineIds[0]).ChainOffset.Value, 1e-3);
+        }
+
+        [Test]
+        public void StoringChainOffsetsWrittenAs0KeepsTheRowsAlongThemWhereTheyStand()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 420, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            // As earlier versions of the editor wrote them: every chain offset 0.
+            foreach (var name in new[] { "tile_0_0.map", "tile_1_0.map" })
+            {
+                var file = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes(name), OmsiTileRecordLayouts.Instance);
+                foreach (var view in OmsiTileRecords.Of<OmsiSplineView>(file))
+                    view.ChainOffset = 0;
+                session.Workspace.Save(name, file);
+            }
+            summary = session.Read();
+            var stale = OmsiMapSession.StaleChainOffsets(summary);
+            Assert.AreEqual(road.SplineIds.Count - 1, stale.Count);
+            var first = summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var plan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(plan.Problem);
+            session.AddAttachmentRow(summary, plan);
+            var lamps = Lamps(summary);
+            Assert.AreEqual(11, lamps.Count);
+            var before = new[] { session.Workspace.ReadAllBytes("tile_0_0.map"), session.Workspace.ReadAllBytes("tile_1_0.map") };
+
+            var change = session.StoreChainOffsets(summary);
+
+            Assert.IsNotNull(change);
+            Assert.AreEqual(0, OmsiMapSession.StaleChainOffsets(session.Read()).Count);
+            AssertSamePlaces(lamps, Lamps(session.Read()));
+            Assert.IsNull(session.StoreChainOffsets(summary));
+            session.Undo(summary, change);
+            CollectionAssert.AreEqual(before[0], session.Workspace.ReadAllBytes("tile_0_0.map"));
+            CollectionAssert.AreEqual(before[1], session.Workspace.ReadAllBytes("tile_1_0.map"));
+        }
+
+        [Test]
+        public void ARowOnlyLaysObjectsAlongItsOwnTileAndNotBeforeItsOwnSpline()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 420, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var layout = new OmsiSplineAttachmentLayout(summary);
+            var tile0 = summary.Tiles[0];
+            var first = tile0.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+
+            // Every 20 m from 10 m on along the first spline: the objects stop where the road's last spline of tile 0 ends,
+            // which may reach a little past x 300.
+            var record = new OmsiSplineAttachmentRecord
+            {
+                AssetPath = @"Sceneryobjects\lamp.sco", SplineIndex = tile0.Splines.IndexOf(first), LateralOffset = 6, StartDistance = 10, Interval = 20, Range = 200
+            };
+            var inTile0 = tile0.Splines.Where(spline => road.SplineIds.Contains(spline.Id)).Sum(spline => spline.LengthMeters);
+            Assert.Less(inTile0, 220.0);
+            var placed = layout.Place(tile0, record);
+            Assert.AreEqual(Enumerable.Range(0, 11).Select(number => 10.0 + 20 * number).Where(along => along <= inTile0).Select(along => 200.0 + along).ToArray(),
+                placed.Select(item => Math.Round(item.WorldX, 6)).ToArray());
+
+            // A spline in tile 1 counts from its stored offset; a start before that offset is not drawn at all.
+            var tile1 = summary.Tiles[1];
+            var later = tile1.Splines.First(spline => road.SplineIds.Contains(spline.Id));
+            var offset = later.ChainOffset.Value;
+            Assert.Greater(offset, 90.0);
+            var onLater = new OmsiSplineAttachmentRecord
+            {
+                AssetPath = @"Sceneryobjects\lamp.sco", SplineIndex = tile1.Splines.IndexOf(later), LateralOffset = 6, StartDistance = offset + 5, Interval = 0
+            };
+            Assert.AreEqual(1, layout.Place(tile1, onLater).Count);
+            Assert.AreEqual(200.0 + offset + 5, layout.Place(tile1, onLater)[0].WorldX, 1e-6);
+            onLater.StartDistance = 5;
+            Assert.AreEqual(0, layout.Place(tile1, onLater).Count);
+
+            // Laid by the tool, the row has a record in each tile, and each gives its tile's lamps.
+            var plan = OmsiAttachmentRows.Plan(summary, layout, tile0, first, new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(plan.Problem);
+            Assert.AreEqual(2, plan.Parts.Count);
+            Assert.AreSame(tile1, plan.Parts[1].Tile);
+            // Its start is its first lamp's distance along the road, as the stored offsets count it.
+            Assert.AreEqual(plan.Objects[plan.Parts[0].Count].WorldX - 200.0, plan.Parts[1].StartDistance, 1e-6);
+            session.AddAttachmentRow(summary, plan);
+            Assert.AreEqual(11, Lamps(session.Read()).Count);
+        }
+
+        [Test]
+        public void ARowLaidInPartsPerTileIsChangedAsOneKeepingItsRecords()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var start = BuildRoadAcrossTiles(session, summary);
+            var laid = session.AddAttachmentRow(summary, OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], start,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 }));
+            var tilesLaid = new[] { session.Workspace.ReadAllBytes("tile_0_0.map"), session.Workspace.ReadAllBytes("tile_1_0.map") };
+            var ids = laid.Added.Select(item => item.Value.Id).ToArray();
+
+            // Picked at its part in tile 1, the row is both records, seen along the road from its east end: lamps 10 m
+            // to 210 m along it, 6 m to the left of west.
+            var row = OmsiAttachmentRows.RowOf(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[1], laid.Added[1].Value);
+            Assert.AreEqual(2, row.Records.Count);
+            Assert.AreEqual(11, row.ObjectCount);
+            Assert.AreEqual(-6.0, row.Request.LateralOffset, 1e-9);
+            Assert.AreEqual(10.0, row.From, 1e-6);
+            Assert.AreEqual(210.0, row.To, 1e-6);
+            Assert.IsFalse(row.Continues);
+
+            // Every 25 m and 8 m from the centre: nine lamps from the same first one on, in the same two records.
+            var result = session.ChangeAttachmentRow(summary, row, new OmsiAttachmentRowRequest
+            {
+                AssetPath = row.Request.AssetPath, LateralOffset = -8, Height = row.Request.Height, HeadingDegrees = row.Request.HeadingDegrees, Interval = 25
+            });
+            Assert.IsTrue(result.Succeeded, result.Problem);
+            CollectionAssert.AreEquivalent(ids, result.Change.Added.Select(item => item.Value.Id).ToArray());
+            var lamps = Lamps(session.Read());
+            Assert.AreEqual(Enumerable.Range(0, 9).Select(number => 210.0 + 25 * number).ToArray(), lamps.Select(item => Math.Round(item.WorldX, 6)).ToArray());
+            Assert.IsTrue(lamps.All(item => Math.Abs(item.WorldY - 92.0) < 1e-6));
+            Assert.AreEqual(9, Lamps(summary).Count);
+
+            // Taken back, the tiles are as laid; done again, the nine lamps return.
+            session.Undo(summary, result.Change);
+            CollectionAssert.AreEqual(tilesLaid[0], session.Workspace.ReadAllBytes("tile_0_0.map"));
+            CollectionAssert.AreEqual(tilesLaid[1], session.Workspace.ReadAllBytes("tile_1_0.map"));
+            Assert.AreEqual(11, Lamps(summary).Count);
+            session.Redo(summary, result.Change);
+            Assert.AreEqual(9, Lamps(summary).Count);
+
+            // Another object stands where the lamps stood.
+            var changed = OmsiAttachmentRows.RowOf(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0],
+                summary.Tiles[0].SplineAttachments.Single(item => item.AssetPath == @"Sceneryobjects\lamp.sco"));
+            Assert.AreEqual(2, changed.Records.Count);
+            var swap = session.ChangeAttachmentRow(summary, changed, new OmsiAttachmentRowRequest
+            {
+                AssetPath = @"Sceneryobjects\bench.sco", LateralOffset = changed.Request.LateralOffset, Height = changed.Request.Height,
+                HeadingDegrees = changed.Request.HeadingDegrees, Interval = changed.Request.Interval
+            });
+            Assert.IsTrue(swap.Succeeded, swap.Problem);
+            var reread = session.Read();
+            var layout = new OmsiSplineAttachmentLayout(reread);
+            var benches = reread.Tiles.SelectMany(tile => tile.SplineAttachments.Where(item => item.AssetPath == @"Sceneryobjects\bench.sco")
+                .SelectMany(item => layout.Place(tile, item))).OrderBy(item => item.WorldX).ToList();
+            AssertSamePlaces(lamps, benches);
+            Assert.AreEqual(0, Lamps(reread).Count);
+        }
+
+        [Test]
+        public void ARowShortenedToOneObjectLeavesTheTileItNoLongerReaches()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var start = BuildRoadAcrossTiles(session, summary);
+            // Lamps at 280, 300 and 320: one in tile 0, two in tile 1.
+            var laid = session.AddAttachmentRow(summary, OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], start,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 }, 80, 120));
+            Assert.AreEqual(2, laid.Added.Count);
+            var row = OmsiAttachmentRows.RowOf(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], laid.Added[0].Value);
+            var request = new OmsiAttachmentRowRequest
+            {
+                AssetPath = row.Request.AssetPath, LateralOffset = row.Request.LateralOffset, Height = row.Request.Height, HeadingDegrees = row.Request.HeadingDegrees
+            };
+
+            // Every 40 m: lamps at 280 and 320, still one per tile.
+            request.Interval = 40;
+            var wider = session.ChangeAttachmentRow(summary, row, request);
+            Assert.IsTrue(wider.Succeeded, wider.Problem);
+            Assert.AreEqual(new[] { 280.0, 320.0 }, Lamps(session.Read()).Select(item => Math.Round(item.WorldX, 6)).ToArray());
+
+            // A single lamp: the record in tile 1 goes, the one in tile 0 keeps its ID.
+            var single = OmsiAttachmentRows.RowOf(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0],
+                summary.Tiles[0].SplineAttachments.Single(item => item.AssetPath == @"Sceneryobjects\lamp.sco"));
+            request.Interval = 0;
+            var one = session.ChangeAttachmentRow(summary, single, request);
+            Assert.IsTrue(one.Succeeded, one.Problem);
+            Assert.AreEqual(new[] { 280.0 }, Lamps(session.Read()).Select(item => Math.Round(item.WorldX, 6)).ToArray());
+            Assert.AreEqual(0, summary.Tiles[1].SplineAttachments.Count(item => item.AssetPath == @"Sceneryobjects\lamp.sco"));
+            Assert.AreEqual(laid.Added[0].Value.Id, summary.Tiles[0].SplineAttachments.Single(item => item.AssetPath == @"Sceneryobjects\lamp.sco").Id);
+            session.Undo(summary, one.Change);
+            Assert.AreEqual(2, Lamps(summary).Count);
+        }
+
+        [Test]
+        public void ARowContinuedOnAnotherTileGetsTheNewValuesInEveryContinuation()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var start = BuildRoadAcrossTiles(session, summary);
+            var laid = session.AddAttachmentRow(summary, OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], start,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 }, 10, 50));
+            var master = laid.Added.Single().Value;
+            // A continuation on tile 1 with the master's values, as the OMSI editor writes them.
+            var tile = Encoding.Unicode.GetString(session.Workspace.ReadAllBytes("tile_1_0.map"));
+            tile += string.Join("\r\n", "[splineAttachement_repeater]", "0", "0", "3", @"Sceneryobjects\lamp.sco", master.Id.ToString(CultureInfo.InvariantCulture), "0",
+                "6", "0", master.StartDistance.ToString(CultureInfo.InvariantCulture), "0", "0", "0", "20", master.Range.ToString(CultureInfo.InvariantCulture), "0", "0", "") + "\r\n";
+            session.Workspace.Save("tile_1_0.map", Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes(tile.TrimStart('﻿'))).ToArray());
+            summary = session.Read();
+            var before = session.Workspace.ReadAllBytes("tile_1_0.map");
+            var record = summary.Tiles[0].SplineAttachments.Single(item => item.Id == master.Id);
+
+            var row = OmsiAttachmentRows.RowOf(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], record);
+            Assert.IsTrue(row.Continues);
+            Assert.AreEqual(1, row.Records.Count);
+            var result = session.ChangeAttachmentRow(summary, row, new OmsiAttachmentRowRequest
+            {
+                AssetPath = @"Sceneryobjects\bench.sco", LateralOffset = 8, Height = 0.5, HeadingDegrees = 90, Interval = 20
+            });
+            Assert.IsTrue(result.Succeeded, result.Problem);
+
+            var reread = session.Read();
+            var rows = reread.Tiles.SelectMany(item => item.SplineAttachments).Where(item => item.Id == master.Id).ToList();
+            Assert.AreEqual(2, rows.Count);
+            Assert.AreEqual(1, rows.Count(item => item.IsRepeater));
+            foreach (var item in rows)
+            {
+                Assert.AreEqual(@"Sceneryobjects\bench.sco", item.AssetPath);
+                Assert.AreEqual(8.0, item.LateralOffset, 1e-9);
+                Assert.AreEqual(0.5, item.Height, 1e-9);
+                Assert.AreEqual(90.0, item.HeadingDegrees, 1e-9);
+                Assert.AreEqual(master.StartDistance, item.StartDistance, 1e-6);
+            }
+            session.Undo(summary, result.Change);
+            CollectionAssert.AreEqual(before, session.Workspace.ReadAllBytes("tile_1_0.map"));
+        }
+
+        /// <summary>
+        /// A road east at y 100 from 200 to 290 in tile 0, then one built from 420 back west ending on it, so the chain runs
+        /// against it in tile 1; returns the first spline.
+        /// </summary>
+        private static OmsiSplineRecord BuildRoadAcrossTiles(OmsiMapSession session, OmsiMapSummary summary)
+        {
+            var first = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 290, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var firstEnd = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == first.SplineIds.Last()), true);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 420, StartY = 100, StartHeight = 2, StartHeadingDegrees = 270, EndX = 290, EndY = 100, EndHeight = 2,
+                EndJoinHeadingDegrees = 270, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, firstEnd);
+            return summary.Tiles[0].Splines.Single(spline => spline.Id == first.SplineIds[0]);
         }
 
         [Test]

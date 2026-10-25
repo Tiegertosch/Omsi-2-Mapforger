@@ -130,14 +130,16 @@ namespace OmsiMapEditor.UI
         private bool bendingSpline;
 
         // The row tool (ADR 037): its options beside the object library, the object it lays, how the map's rows lie, the
-        // rows laid out for picking, the road a first click started a row on and the row selected for deleting.
+        // rows laid out for picking, the road a first click started a row on, the row selected for changing or deleting
+        // and the row last under the pointer.
         private RowToolOptions rowOptions;
         private string rowAsset;
         private OmsiSplineAttachmentLayout rowLayout;
         private List<KeyValuePair<KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>, List<OmsiPlacedAttachment>>> rowObjects;
         private OmsiSplinePoint rowStart;
         private double rowStartAlong;
-        private KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>? selectedRow;
+        private OmsiAttachmentRow selectedRow;
+        private OmsiAttachmentRow hoveredRow;
 
         // Where a row was just laid; no new row is shown there until the pointer moves, so a second click cannot lay it twice.
         private OmsiMapPoint? rowLaidAt;
@@ -198,6 +200,8 @@ namespace OmsiMapEditor.UI
         // The objects made for the project as the last check found them, and the topic showing them.
         private OmsiMadeObjectScan madeObjects;
         private OmsiCheckSection madeObjectsSection;
+        private List<OmsiChainOffsetFinding> staleChainOffsets;
+        private OmsiCheckSection chainOffsetsSection;
         private VisualElement newMapDialog;
         private NewMapDialog newMapForm;
         private Label exportTargetLabel;
@@ -318,6 +322,11 @@ namespace OmsiMapEditor.UI
                 {
                     if (activeTool == EditorTool.Rows)
                         UpdateRowPreview();
+                };
+                rowOptions.Committed += () =>
+                {
+                    if (activeTool == EditorTool.Rows && selectedRow != null)
+                        ChangeSelectedRow(null);
                 };
                 objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
                 objectsPanel.PreviewRequested += path => objectRenderer?.RequestPreview(path);
@@ -1023,6 +1032,24 @@ namespace OmsiMapEditor.UI
                 if (Array.IndexOf(args, "-rowsLay") >= 0)
                     ClickRow(rowsAt.X, rowsAt.Y);
                 Debug.Log("Rows: " + statusLabel?.text);
+                // -rowsChange <every> [<object>]: selects the row just laid and changes its distance between objects, and its object.
+                var rowsChange = Argument("-rowsChange", 1);
+                if (rowsChange != null && rowLaidAt.HasValue)
+                {
+                    KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>? laid = null;
+                    foreach (var tile in currentSummary.Tiles)
+                        foreach (var row in tile.SplineAttachments)
+                            if (!row.IsRepeater && (!laid.HasValue || row.Id > laid.Value.Value.Id))
+                                laid = new KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>(tile, row);
+                    rowLaidAt = null;
+                    if (laid.HasValue)
+                    {
+                        SelectRow(laid.Value);
+                        rowOptions.Apply(false, rowsChange, null);
+                        ChangeSelectedRow(Argument("-rowsChange", 2) is string swap && !swap.StartsWith("-", StringComparison.Ordinal) ? swap : null);
+                    }
+                    Debug.Log("Rows changed: " + statusLabel?.text);
+                }
             }
 
             // -turnArm <object ID> <arm from 1> <heading in the object>: drags that arm handle of a junction made here.
@@ -3327,7 +3354,7 @@ namespace OmsiMapEditor.UI
             rowLayout = null;
             rowObjects = null;
             rowStart = null;
-            selectedRow = null;
+            DeselectRow();
             rowOptions.ShowObject(rowAsset);
             rowOptions.ShowPlan(rowAsset == null ? "Choose the object for the row in the library." : "Point at a road.", false);
             SetStatus("Rows: choose an object in the library, point at a road and click; the row lies on the side of the pointer. " +
@@ -3345,11 +3372,17 @@ namespace OmsiMapEditor.UI
             rowLayout = null;
             rowObjects = null;
             rowStart = null;
-            selectedRow = null;
+            DeselectRow();
         }
 
         private void ChooseRowObject(string assetPath)
         {
+            // With a row selected, the chosen object takes the place of its objects.
+            if (selectedRow != null)
+            {
+                ChangeSelectedRow(assetPath);
+                return;
+            }
             rowAsset = assetPath;
             rowOptions?.ShowObject(assetPath);
             UpdateRowPreview();
@@ -3370,10 +3403,25 @@ namespace OmsiMapEditor.UI
                 rowOptions.ShowPlan("Laid. Move the pointer to lay another row.", false);
                 return;
             }
-            if (selectedRow.HasValue)
+            if (selectedRow != null)
             {
-                ShowRowMarks(Placed(selectedRow.Value), true);
-                rowOptions.ShowPlan("Row of " + Path.GetFileNameWithoutExtension(selectedRow.Value.Value.AssetPath) + " selected: Del deletes it, Esc keeps it.", false);
+                // The row as it would be with the values in the fields, until Enter changes it.
+                var request = EditRequest(null);
+                var name = Path.GetFileNameWithoutExtension(selectedRow.Request.AssetPath);
+                if (OmsiAttachmentRows.Same(request, selectedRow.Request))
+                {
+                    ShowRowMarks(Placed(selectedRow), true);
+                    rowOptions.ShowPlan("Row of " + name + " with " + selectedRow.ObjectCount + " object(s) in " + selectedRow.Records.Count + " record(s)" +
+                                        (selectedRow.Continues ? ", continued on other tiles" : string.Empty) +
+                                        ": change its values and press Enter, or choose another object; Del deletes it, Esc lets it go.", false);
+                    return;
+                }
+                rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
+                var plan = OmsiAttachmentRows.Replan(currentSummary, rowLayout, selectedRow, request);
+                ShowRowMarks(plan.Objects, plan.Problem == null);
+                if (plan.Problem == null)
+                    objectRenderer?.SetRowPreview(request.AssetPath, plan.Objects);
+                rowOptions.ShowPlan(plan.Problem ?? plan.Objects.Count + " object(s) instead of " + selectedRow.ObjectCount + "; Enter changes the row.", plan.Problem != null);
                 return;
             }
             if (!roadPointer.HasValue)
@@ -3382,7 +3430,9 @@ namespace OmsiMapEditor.UI
             var hovered = rowStart == null ? RowAt(pointer) : null;
             if (hovered.HasValue)
             {
-                var objects = Placed(hovered.Value);
+                if (hoveredRow == null || !hoveredRow.Records.Exists(item => ReferenceEquals(item.Value, hovered.Value.Value)))
+                    hoveredRow = RowOf(hovered.Value);
+                var objects = hoveredRow != null ? Placed(hoveredRow) : Placed(hovered.Value);
                 ShowRowMarks(objects, true);
                 rowOptions.ShowPlan("Row of " + Path.GetFileNameWithoutExtension(hovered.Value.Value.AssetPath) + " with " + objects.Count +
                                     " object(s); click selects it.", false);
@@ -3437,7 +3487,6 @@ namespace OmsiMapEditor.UI
             OmsiMapGeometry.GetLocalFrameAt(at.Spline, at.Distance, out var local, out var radians);
             var point = OmsiMapGeometry.TileLocalToWorld(at.Tile.X, at.Tile.Y, local.X, local.Y, size);
             var right = (pointer.X - point.X) * Math.Cos(radians) - (pointer.Y - point.Y) * Math.Sin(radians) >= 0.0;
-            var profile = RoadProfiles().Get(at.Spline.AssetPath);
 
             double? from = null, to = null;
             if (!rowOptions.WholeRoad)
@@ -3450,9 +3499,7 @@ namespace OmsiMapEditor.UI
             var plans = new List<OmsiAttachmentRowPlan>();
             foreach (var onRight in rowOptions.BothSides ? new[] { true, false } : new[] { right })
             {
-                // Without a distance typed, 0.5 m inside the edge of the road's profile, on the pavement.
-                var edge = profile == null ? 5.0 : Math.Max(0.5, (onRight ? profile.RightEdge : -profile.LeftEdge) - 0.5);
-                var distance = rowOptions.Offset ?? edge;
+                var distance = rowOptions.Offset ?? EdgeOffset(at.Spline, onRight);
                 var request = new OmsiAttachmentRowRequest
                 {
                     AssetPath = rowAsset, LateralOffset = onRight ? distance : -distance, Height = rowOptions.Height,
@@ -3475,13 +3522,22 @@ namespace OmsiMapEditor.UI
                 var hovered = RowAt(pointer);
                 if (hovered.HasValue)
                 {
-                    selectedRow = hovered;
+                    SelectRow(hovered.Value);
                     UpdateRowPreview();
-                    SetStatus("Selected the row of " + hovered.Value.Value.AssetPath + " (#" + hovered.Value.Value.Id + "); Del deletes it.");
+                    if (selectedRow != null)
+                        SetStatus("Selected the row of " + hovered.Value.Value.AssetPath + " (#" + hovered.Value.Value.Id + "): change its values and press Enter, " +
+                                  "or choose another object in the library; Del deletes it.");
                     return;
                 }
             }
-            selectedRow = null;
+            // A click beside the selected row only lets it go.
+            if (selectedRow != null)
+            {
+                DeselectRow();
+                UpdateRowPreview();
+                SetStatus("Rows: point at a road and click to lay a row; Esc leaves the tool.");
+                return;
+            }
             if (rowAsset == null)
             {
                 SetStatus("Choose the object for the row in the library first.");
@@ -3545,41 +3601,165 @@ namespace OmsiMapEditor.UI
             SetStatus("Laid " + objects + " " + name + " along the road" + (plans.Count > 1 ? " on both sides" : string.Empty) + ". Ctrl+Z takes it back.");
         }
 
+        /// <summary>Deletes the selected row, all its records in one step.</summary>
         private void DeleteSelectedRow()
         {
-            if (!selectedRow.HasValue || !CanEdit)
+            if (selectedRow == null || !CanEdit)
                 return;
-            var row = selectedRow.Value;
-            OmsiAttachmentDeletionResult result;
+            var row = selectedRow;
+            var changes = new List<OmsiAttachmentChange>();
+            string failure = null;
             try
             {
-                result = session.DeleteAttachmentRow(currentSummary, row.Key, row.Value);
+                foreach (var record in row.Records)
+                {
+                    var result = session.DeleteAttachmentRow(currentSummary, record.Key, record.Value);
+                    if (!result.Succeeded)
+                    {
+                        failure = "The row stays: " + DescribeReferences(result.Blockers) + " still name it.";
+                        break;
+                    }
+                    changes.Add(result.Change);
+                }
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
             {
                 Debug.LogException(exception);
-                SetStatus("The row could not be deleted: " + exception.Message);
+                failure = "The row could not be deleted: " + exception.Message;
+            }
+            if (failure != null)
+            {
+                for (var index = changes.Count - 1; index >= 0; index--)
+                    session.Undo(currentSummary, changes[index]);
+                SetStatus(failure);
+                return;
+            }
+            DeselectRow();
+            rowLayout = null;
+            rowObjects = null;
+            var parts = changes.ConvertAll(change => new ObjectEditStep { AttachmentChange = change });
+            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = "the deletion of the row of " + Path.GetFileNameWithoutExtension(row.Request.AssetPath) });
+            RefreshAfterChange(null);
+            UpdateRowPreview();
+            SetStatus("Deleted the row of " + row.Request.AssetPath + ". Ctrl+Z takes it back.");
+        }
+
+        /// <summary>Selects the row a record belongs to and shows its values in the options.</summary>
+        private void SelectRow(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> record)
+        {
+            selectedRow = RowOf(record);
+            if (selectedRow == null)
+            {
+                DeselectRow();
+                SetStatus("The row of " + record.Value.AssetPath + " (#" + record.Value.Id + ") has no objects along its road.");
+                return;
+            }
+            // Values as when laying: the distance from the centre, the heading as on the right of the road.
+            var request = selectedRow.Request;
+            var left = request.LateralOffset < 0.0;
+            rowOptions.BeginEditing(request.Interval, Math.Abs(request.LateralOffset), request.Height,
+                ((request.HeadingDegrees - (left ? 180.0 : 0.0)) % 360.0 + 360.0) % 360.0);
+            rowOptions.ShowObject(request.AssetPath);
+        }
+
+        private void DeselectRow()
+        {
+            selectedRow = null;
+            rowOptions?.EndEditing();
+            rowOptions?.ShowObject(rowAsset);
+        }
+
+        /// <summary>The values in the options for the selected row, on its side of the road, with another object or its own.</summary>
+        private OmsiAttachmentRowRequest EditRequest(string assetPath)
+        {
+            var row = selectedRow;
+            var left = row.Request.LateralOffset < 0.0;
+            var distance = rowOptions.Offset ?? EdgeOffset(row.Spline, !left);
+            return new OmsiAttachmentRowRequest
+            {
+                AssetPath = assetPath ?? row.Request.AssetPath, LateralOffset = left ? -distance : distance, Height = rowOptions.Height,
+                HeadingDegrees = ((rowOptions.HeadingDegrees + (left ? 180.0 : 0.0)) % 360.0 + 360.0) % 360.0, Interval = rowOptions.Interval
+            };
+        }
+
+        /// <summary>Changes the selected row to the values in the options, as one step; it stays selected.</summary>
+        private void ChangeSelectedRow(string assetPath)
+        {
+            if (selectedRow == null || !CanEdit)
+                return;
+            var request = EditRequest(assetPath);
+            if (OmsiAttachmentRows.Same(request, selectedRow.Request))
+            {
+                UpdateRowPreview();
+                return;
+            }
+            OmsiAttachmentEditResult result;
+            try
+            {
+                result = session.ChangeAttachmentRow(currentSummary, selectedRow, request);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The row could not be changed: " + exception.Message);
                 return;
             }
             if (!result.Succeeded)
             {
-                SetStatus("The row stays: " + DescribeReferences(result.Blockers) + " still name it.");
+                SetStatus(result.Problem != null ? "The row stays as it was: " + result.Problem : "The row stays: " + DescribeReferences(result.Blockers) + " still name it.");
+                UpdateRowPreview();
                 return;
             }
-            selectedRow = null;
+            var id = selectedRow.Records[0].Value.Id;
             rowLayout = null;
             rowObjects = null;
             PushHistory(new ObjectEditStep { AttachmentChange = result.Change });
             RefreshAfterChange(null);
+            var kept = result.Change.Added.Find(item => !item.Value.IsRepeater && item.Value.Id == id);
+            if (kept.Value == null)
+                kept = result.Change.Added.Find(item => !item.Value.IsRepeater);
+            SelectRow(kept);
             UpdateRowPreview();
-            SetStatus("Deleted the row of " + row.Value.AssetPath + ". Ctrl+Z takes it back.");
+            SetStatus("Changed the row of " + Path.GetFileNameWithoutExtension(request.AssetPath) + (selectedRow != null ? ": " + selectedRow.ObjectCount + " object(s)" : string.Empty) +
+                      ". Ctrl+Z takes it back.");
         }
 
-        /// <summary>Where the objects of a row of the map stand.</summary>
+        /// <summary>The row a record belongs to, with its parts on other tiles, or null when it has no objects along its road.</summary>
+        private OmsiAttachmentRow RowOf(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> record)
+        {
+            rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
+            try
+            {
+                return OmsiAttachmentRows.RowOf(currentSummary, rowLayout, record.Key, record.Value);
+            }
+            catch (InvalidOperationException exception)
+            {
+                Debug.LogWarning(exception.Message);
+                return null;
+            }
+        }
+
+        /// <summary>Without a distance typed, a row stands 0.5 m inside the edge of the road's profile, on the pavement.</summary>
+        private double EdgeOffset(OmsiSplineRecord spline, bool onRight)
+        {
+            var profile = RoadProfiles().Get(spline.AssetPath);
+            return profile == null ? 5.0 : Math.Max(0.5, (onRight ? profile.RightEdge : -profile.LeftEdge) - 0.5);
+        }
+
+        /// <summary>Where the objects of a record of the map stand.</summary>
         private List<OmsiPlacedAttachment> Placed(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row)
         {
             rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
             return rowLayout.Place(row.Key, row.Value);
+        }
+
+        /// <summary>Where the objects of a row of the map stand, in all its records.</summary>
+        private List<OmsiPlacedAttachment> Placed(OmsiAttachmentRow row)
+        {
+            var objects = new List<OmsiPlacedAttachment>();
+            foreach (var record in row.Records)
+                objects.AddRange(Placed(record));
+            return objects;
         }
 
         /// <summary>The row of the map with an object under the pointer, or null; the rows are laid out once while the tool lasts.</summary>
@@ -3587,6 +3767,7 @@ namespace OmsiMapEditor.UI
         {
             if (rowObjects == null)
             {
+                hoveredRow = null;
                 rowObjects = new List<KeyValuePair<KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>, List<OmsiPlacedAttachment>>>();
                 foreach (var tile in currentSummary.Tiles)
                     foreach (var row in tile.SplineAttachments)
@@ -3693,7 +3874,7 @@ namespace OmsiMapEditor.UI
                     if (rowStart != null || selectedRow != null)
                     {
                         rowStart = null;
-                        selectedRow = null;
+                        DeselectRow();
                         UpdateRowPreview();
                         SetStatus("Rows: point at a road and click to lay a row; Esc leaves the tool.");
                     }
@@ -3710,6 +3891,8 @@ namespace OmsiMapEditor.UI
                 {
                     rowOptions.TurnBy(evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep);
                     SetStatus("Rows: objects turned to " + rowOptions.HeadingDegrees.ToString("0.#", CultureInfo.InvariantCulture) + "° against the road.");
+                    if (selectedRow != null)
+                        ChangeSelectedRow(null);
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.T && mapCanvas != null && !mapCanvas.IsPlacing)
@@ -3855,7 +4038,7 @@ namespace OmsiMapEditor.UI
                     session.Redo(currentSummary, step.AttachmentChange);
                 rowLayout = null;
                 rowObjects = null;
-                selectedRow = null;
+                DeselectRow();
                 return;
             }
 
@@ -3966,7 +4149,8 @@ namespace OmsiMapEditor.UI
             if (step.TileChange != null)
                 return (step.TileChange.Added ? "the new tile " : "the deletion of tile ") + step.TileChange.X + ", " + step.TileChange.Y;
             if (step.AttachmentChange != null)
-                return step.AttachmentChange.Added.Count > 0 ? "the new row of objects" : "the deletion of a row of objects";
+                return step.AttachmentChange.Added.Count > 0 && step.AttachmentChange.Removed.Count > 0 ? "the change of a row of objects" :
+                    step.AttachmentChange.Added.Count > 0 ? "the new row of objects" : "the deletion of a row of objects";
             if (step.Group != null)
             {
                 var ids = new HashSet<int>();
@@ -4804,12 +4988,14 @@ namespace OmsiMapEditor.UI
             SetStatus("Checking the map...");
             // The objects made for the project are looked for alongside, reading every map of the installation.
             OmsiMadeObjectScan made = null;
+            List<OmsiChainOffsetFinding> stale = null;
             var keep = CanEdit ? MadeObjectsStillNeeded() : null;
             var projectName = currentProjectName;
             var workspaceFolder = session.Workspace?.WorkspacePath;
             var task = Task.Run(() =>
             {
                 var result = OmsiMapCheck.Run(summary, source, installationRoot, configName);
+                stale = OmsiMapSession.StaleChainOffsets(summary);
                 if (keep != null)
                     made = OmsiMadeObjects.Find(installationRoot, projectName, workspaceFolder, keep);
                 return result;
@@ -4840,6 +5026,9 @@ namespace OmsiMapEditor.UI
                 madeObjectsSection = made == null ? null : MadeObjectsSection(made);
                 if (madeObjectsSection != null)
                     report.Sections.Add(madeObjectsSection);
+                staleChainOffsets = stale;
+                chainOffsetsSection = ChainOffsetsSection(stale);
+                report.Sections.Add(chainOffsetsSection);
                 lastCheck = report;
                 ShowCheckReport(report);
             }).Every(100);
@@ -4884,6 +5073,8 @@ namespace OmsiMapEditor.UI
                 }
                 if (ReferenceEquals(section, madeObjectsSection) && madeObjects != null && madeObjects.Unused.Count > 0)
                     header.Add(DeleteMadeObjectsButton());
+                if (ReferenceEquals(section, chainOffsetsSection) && staleChainOffsets != null && staleChainOffsets.Count > 0 && CanEdit && chronoDate == null)
+                    header.Add(StoreChainOffsetsButton());
                 box.Add(header);
                 var summaryLabel = new Label(section.Summary);
                 summaryLabel.AddToClassList("check-section-summary");
@@ -4941,6 +5132,69 @@ namespace OmsiMapEditor.UI
                     section.Findings.Add(item.Name + " (" + Megabytes(item.Bytes) + ")");
             }
             return section;
+        }
+
+        /// <summary>
+        /// The topic of the splines whose stored chain offset is not where their chain puts them. openOMSI counts the rows
+        /// along a spline from that value and runs its textures on from it; earlier versions of this editor wrote 0.
+        /// </summary>
+        private static OmsiCheckSection ChainOffsetsSection(List<OmsiChainOffsetFinding> stale)
+        {
+            var section = new OmsiCheckSection("Chain offsets") { Status = OmsiCheckStatus.Passed };
+            if (stale.Count == 0)
+            {
+                section.Summary = "Every spline stores how far along its chain it begins.";
+                return section;
+            }
+            section.Status = OmsiCheckStatus.Note;
+            section.Summary = stale.Count + " spline(s) store a chain offset that is not where their chain puts them, such as roads built with earlier versions " +
+                              "of this editor, which wrote 0. openOMSI counts the rows along a spline from that value and runs its textures on from it. " +
+                              "Store offsets writes the right values and moves the rows along those splines with them, so they stay where they stand.";
+            foreach (var item in stale)
+                section.Findings.Add("Spline #" + item.Spline.Id + " in tile " + item.Tile.X + ", " + item.Tile.Y + ": stores " +
+                                     item.Spline.ChainOffset.GetValueOrDefault().ToString("0.##", CultureInfo.InvariantCulture) + " m, its chain begins " +
+                                     item.ChainStart.ToString("0.##", CultureInfo.InvariantCulture) + " m before it");
+            return section;
+        }
+
+        /// <summary>Stores the right chain offsets as one step that Ctrl+Z takes back.</summary>
+        private Button StoreChainOffsetsButton()
+        {
+            var store = new Button(() =>
+            {
+                OmsiSplineChange change;
+                try
+                {
+                    change = session.StoreChainOffsets(currentSummary);
+                }
+                catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+                {
+                    Debug.LogException(exception);
+                    SetStatus("The chain offsets could not be stored: " + exception.Message);
+                    return;
+                }
+                var count = staleChainOffsets.Count;
+                if (change != null)
+                {
+                    PushHistory(new ObjectEditStep { SplineChange = change, Description = "storing " + count + " chain offset(s)" });
+                    RefreshSplineViews(change);
+                }
+                staleChainOffsets = OmsiMapSession.StaleChainOffsets(currentSummary);
+                chainOffsetsSection.Status = staleChainOffsets.Count == 0 ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
+                chainOffsetsSection.Summary = "Stored the chain offsets of " + count + " spline(s) and moved the rows along them with them." +
+                                              (staleChainOffsets.Count > 0 ? " " + staleChainOffsets.Count + " still differ." : string.Empty);
+                chainOffsetsSection.Findings.Clear();
+                if (lastCheck != null)
+                    ShowCheckReport(lastCheck);
+                SetStatus("Stored the chain offsets of " + count + " spline(s). Ctrl+Z takes it back.");
+            })
+            {
+                text = "Store offsets",
+                tooltip = "Writes into each listed spline how far along its chain it begins, and moves the rows along it so they stay where they stand"
+            };
+            store.AddToClassList("map-control-button");
+            store.AddToClassList("check-section-button");
+            return store;
         }
 
         /// <summary>The objects made here that the open project could still bring back: by undo or redo, or while placing one.</summary>

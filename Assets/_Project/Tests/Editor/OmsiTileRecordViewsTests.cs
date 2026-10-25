@@ -70,7 +70,7 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(50.0, road.LengthMeters, 1e-12);
             Assert.AreEqual(0.5, road.CantStart, 1e-12);
             Assert.AreEqual(0.0, road.SkewStart.Value, 1e-12);
-            Assert.AreEqual(50.0, road.AlignmentLength, 1e-12);
+            Assert.AreEqual(50.0, road.ChainOffset, 1e-12);
             Assert.IsTrue(road.IsMirrored);
             // A [spline] derives its height change from the gradients: 50 m * (1 % - 1 %) / 2.
             Assert.AreEqual(0.0, road.HeightDifference, 1e-12);
@@ -94,7 +94,7 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(0.2, spline.CantStart, 1e-12);
             Assert.AreEqual(0.3, spline.CantEnd, 1e-12);
             Assert.IsNull(spline.SkewStart);
-            Assert.AreEqual(10.0, spline.AlignmentLength, 1e-12);
+            Assert.AreEqual(10.0, spline.ChainOffset, 1e-12);
         }
 
         [Test]

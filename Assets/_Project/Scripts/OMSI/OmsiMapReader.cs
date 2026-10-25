@@ -356,6 +356,10 @@ namespace OmsiMapEditor.OMSI
                 IsSplineH = isSplineH,
                 IsMirrored = section.FieldCount > 0 && values[section.FieldCount - 1] == "mirror"
             };
+            // The chain offset is the last number: field 15 in versions 11 and 12, 17 from 14 on, one later in [spline_h].
+            var last = record.IsMirrored ? section.FieldCount - 2 : section.FieldCount - 1;
+            if (last >= (isSplineH ? 16 : 15) && TryDouble(values, last, out var chainOffset))
+                record.ChainOffset = chainOffset;
             return true;
         }
 

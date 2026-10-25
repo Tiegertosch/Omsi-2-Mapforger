@@ -38,8 +38,157 @@ namespace OmsiMapEditor.OMSI
         public bool Succeeded => Change != null;
     }
 
+    /// <summary>What changing a row did, or why it stayed as it was: references to records it would remove, or a problem of the plan.</summary>
+    public sealed class OmsiAttachmentEditResult
+    {
+        internal OmsiAttachmentEditResult(OmsiAttachmentChange change, IReadOnlyList<OmsiReference> blockers, string problem)
+        {
+            Change = change;
+            Blockers = blockers;
+            Problem = problem;
+        }
+
+        public OmsiAttachmentChange Change { get; }
+        public IReadOnlyList<OmsiReference> Blockers { get; }
+        public string Problem { get; }
+        public bool Succeeded => Change != null;
+    }
+
     public sealed partial class OmsiMapSession
     {
+        /// <summary>
+        /// Changes a row of the map (<see cref="OmsiAttachmentRows.RowOf"/>) to new values: plans it again over the same
+        /// stretch of road and writes the parts into its records tile by tile in order, keeping their IDs; further parts go
+        /// to the end of their tile with a new ID, records left over are removed unless something names them. A row
+        /// continued by [splineAttachement_repeater] gets the values in its record and every continuation instead.
+        /// </summary>
+        public OmsiAttachmentEditResult ChangeAttachmentRow(OmsiMapSummary summary, OmsiAttachmentRow row, OmsiAttachmentRowRequest request)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (row == null)
+                throw new ArgumentNullException(nameof(row));
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+            if (string.IsNullOrWhiteSpace(request.AssetPath))
+                throw new ArgumentException("An object file path is required.", nameof(request));
+
+            var workspace = RequireWorkspace();
+            var change = new OmsiAttachmentChange();
+            var files = new Dictionary<string, KeyValuePair<byte[], OmsiRecordFile>>(StringComparer.OrdinalIgnoreCase);
+            var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+            var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
+            var configChanged = false;
+            var allocated = false;
+
+            if (row.Continues)
+            {
+                var id = row.Records[0].Value.Id;
+                foreach (var tile in summary.Tiles)
+                    foreach (var record in tile.SplineAttachments)
+                    {
+                        if (record.Id != id)
+                            continue;
+                        var changed = OmsiAttachmentRows.Changed(record, request);
+                        Write(FindAttachment(Open(files, workspace, tile), tile, record), changed);
+                        change.Removed.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>(tile, record));
+                        change.Added.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>(tile, changed));
+                    }
+            }
+            else
+            {
+                var plan = OmsiAttachmentRows.Replan(summary, new OmsiSplineAttachmentLayout(summary), row, request);
+                if (plan.Problem != null)
+                    return new OmsiAttachmentEditResult(null, new OmsiReference[0], plan.Problem);
+                if (plan.Parts.Count == 0)
+                    return new OmsiAttachmentEditResult(null, new OmsiReference[0], "The row would have no objects.");
+                var left = new List<KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>>(row.Records);
+                foreach (var part in plan.Parts)
+                {
+                    var record = OmsiAttachmentRows.Record(part, request);
+                    var file = Open(files, workspace, part.Tile);
+                    var index = left.FindIndex(item => ReferenceEquals(item.Key, part.Tile));
+                    if (index >= 0)
+                    {
+                        record.Id = left[index].Value.Id;
+                        Write(FindAttachment(file, part.Tile, left[index].Value), record);
+                        change.Removed.Add(left[index]);
+                        left.RemoveAt(index);
+                    }
+                    else
+                    {
+                        ids = ids ?? OmsiIdAllocator.ForMap(workspace, GlobalConfigFileName);
+                        record.Id = OmsiTileEditing.AppendSplineAttachment(file, ids, record).Id;
+                        allocated = true;
+                    }
+                    change.Added.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>(part.Tile, record));
+                }
+                OmsiReferenceIndex references = null;
+                foreach (var old in left)
+                {
+                    references = references ?? BuildReferenceIndex();
+                    var file = Open(files, workspace, old.Key);
+                    var result = OmsiTileEditing.Remove(file, FindAttachment(file, old.Key, old.Value), TileIndexOf(config, OmsiRelativePath.Normalize(old.Key.FileName)),
+                        config, references);
+                    if (!result.Removed)
+                        return new OmsiAttachmentEditResult(null, result.Blockers, null);
+                    configChanged |= result.ShiftedEntryPointIndices > 0;
+                    change.Removed.Add(old);
+                }
+                if (allocated)
+                {
+                    ids.ApplyTo(config);
+                    configChanged = true;
+                }
+            }
+
+            foreach (var pair in files)
+                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = pair.Key, Before = pair.Value.Key, After = pair.Value.Value.ToBytes() });
+            if (configChanged)
+                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });
+            ApplyFiles(change.Files, false);
+            ApplyRows(summary, change, true);
+            foreach (var pair in change.Added)
+                summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, pair.Value.Id);
+            if (allocated)
+                summary.NextIdCode = ids.NextFreeId;
+            return new OmsiAttachmentEditResult(change, new OmsiReference[0], null);
+        }
+
+        /// <summary>A tile's file read from the workspace once per change, with its bytes before.</summary>
+        private static OmsiRecordFile Open(Dictionary<string, KeyValuePair<byte[], OmsiRecordFile>> files, OmsiMapWorkspace workspace, OmsiTileSummary tile)
+        {
+            var path = OmsiRelativePath.Normalize(tile.FileName);
+            if (!files.TryGetValue(path, out var file))
+            {
+                var bytes = workspace.ReadAllBytes(path);
+                file = new KeyValuePair<byte[], OmsiRecordFile>(bytes, OmsiRecordFile.Parse(bytes, OmsiTileRecordLayouts.Instance));
+                files[path] = file;
+            }
+            return file.Value;
+        }
+
+        private static OmsiSplineAttachmentView FindAttachment(OmsiRecordFile file, OmsiTileSummary tile, OmsiSplineAttachmentRecord record)
+        {
+            foreach (var view in OmsiTileRecords.Of<OmsiSplineAttachmentView>(file))
+                if (view.IsRepeater == record.IsRepeater && view.Id == record.Id)
+                    return view;
+            throw new InvalidOperationException("Row " + record.Id + " was not found in " + tile.FileName + ".");
+        }
+
+        /// <summary>Writes a row's values into its record; the detail level, pitch, bank, tilt and texts stay.</summary>
+        private static void Write(OmsiSplineAttachmentView view, OmsiSplineAttachmentRecord record)
+        {
+            view.AssetPath = record.AssetPath;
+            view.SplineIndex = record.SplineIndex;
+            view.LateralOffset = record.LateralOffset;
+            view.Height = record.Height;
+            view.StartDistance = record.StartDistance;
+            view.HeadingDegrees = record.HeadingDegrees;
+            view.Interval = record.Interval;
+            view.Range = record.Range;
+        }
+
         /// <summary>
         /// Writes a planned row (<see cref="OmsiAttachmentRows.Plan"/>): one [splineAttachement] per part at the end of its
         /// tile with a new map-wide ID, and [NextIDCode] raised in global.cfg.

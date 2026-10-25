@@ -120,12 +120,14 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen (24. Oktober 2026)
 - [x] Reihen von Objekten entlang von Straßen anlegen und löschen (ADR 037): Werkzeug „Rows“ (T) mit Objekt-Bibliothek, Vorschau, ganze Straße oder von Klick zu Klick, beide Seiten, ein Datensatz je Kachel ohne Wiederholungen
 - [x] Reihen beim Ändern ihrer Kette an Ort und Stelle halten (ADR 037, Ergänzung): Wächst oder schrumpft die Kette vor dem Spline einer Reihe, etwa durch eine angebaute Straße, ein gelöschtes Stück oder eine eingesetzte Kreuzung, ändert sich ihr Startabstand um dasselbe, im selben Rückgängig-Schritt; gilt auch für Reihen der Originalkarten
-- Vorhandene Reihen bearbeiten (Abstand, Versatz, Objekt) statt nur löschen und neu anlegen
+- [x] Vorhandene Reihen bearbeiten (ADR 037, zweite Ergänzung): Ein Klick wählt die ganze Reihe samt ihren Teilen auf anderen Kacheln, die Felder zeigen ihre Werte (Abstand, Abstand von der Mitte, Höhe, Drehung), Enter ändert sie, ein Objekt aus der Bibliothek ersetzt ihre Objekte, R dreht sie; die Reihe wird über dieselbe Strecke neu geplant, ihre Datensätze behalten ihre IDs; Reihen mit Wiederholungen bekommen die Werte in jedem Datensatz
+- [x] Kettenabstände pflegen und Reihen wie openOMSI auslegen (ADR 038): Feld 17 der Splines nach jeder Spline-Änderung, Reihen ab dem gespeicherten Kettenabstand und nur in der eigenen Kachel, Thema „Chain offsets“ der Kartenprüfung mit Reparatur
+- Kacheln löschen: Kettenabstände und Reihen benachbarter Kacheln nachführen
 - Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht
 - [x] Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern: Bereich „Chrono“ im Projekt-Panel mit Datum, Variantenliste und „Base map“, Überlagerung im Hintergrund, Linienwege aus dem Fahrplan des Datums, Ansicht schreibgeschützt (ADR 020)
 - Chrono-Varianten bearbeiten: Änderungen einer Variante zuordnen statt der Kachel
-- [x] Angehängte Objekte (`[attachObj]`, auch mehrstufig) und Spline-Anhängungen zeichnen; der Startabstand zählt ab dem Kettenanfang
+- [x] Angehängte Objekte (`[attachObj]`, auch mehrstufig) und Spline-Anhängungen zeichnen; der Startabstand zählt ab dem gespeicherten Kettenabstand des Splines (ADR 038)
 - [x] Rückseiten wie OMSI weglassen, Glas überblenden, `[matl_transmap]` als Deckkraft auswerten, Bäume in 3D als gekreuzte Flächen
 - [x] Transparenzkarten am 70er-Wartehäuschen im Player prüfen (22. Oktober 2026: Seitenscheiben halbdurchsichtig)

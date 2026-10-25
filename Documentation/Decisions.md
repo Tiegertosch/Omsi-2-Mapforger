@@ -397,3 +397,28 @@ Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte ste
 - Weil der Startabstand ab dem Kettenanfang zählt, verrutschten in OMSI alle Reihen einer Kette, wenn vor ihrem Anfang eine Straße angebaut wurde, auch Reihen der Originalkarten.
 
 **Ergänzung vom 25. Oktober 2026:** Jede Spline-Änderung (Straße bauen, Spline löschen, teilen, verformen, und damit auch Kreuzungen einsetzen, Gelenke ziehen und Kreuzungen neu erzeugen) merkt sich vorher, wo der Spline jeder Reihe in seiner Kette beginnt, und rechnet es danach neu. Wo sich das geändert hat, ändert sich der Startabstand der Reihe um dieselbe Strecke; die Kacheldateien kommen in dieselbe Änderung, Rückgängig nimmt beides zurück. So bleiben die Objekte stehen, wo sie standen; ihr Abstand zum eigenen Spline bleibt gleich. Änderungen nur am oder hinter dem Spline einer Reihe verschieben sie wie bisher mit der Straße.
+
+**Dritte Ergänzung vom 25. Oktober 2026:** Reihen werden nach ADR 038 ausgelegt und geplant: ein Datensatz für die Splines einer Kachel in einer Laufrichtung, Startabstand ab dem gespeicherten Kettenabstand des Ankers. Das Mitführen beim Anbauen rechnet mit dem gespeicherten Kettenabstand statt mit der Kette.
+
+**Zweite Ergänzung vom 25. Oktober 2026 (Reihen bearbeiten):** Ein Klick auf ein Objekt wählt die ganze Reihe: den Datensatz und die Datensätze desselben Objekts mit gleichem Abstand, gleicher Höhe, gleichem Versatz und gleicher Drehung entlang derselben Kette, die ihn im selben Abstand fortsetzen, so wie das Werkzeug eine Reihe je Kachel aufteilt (`OmsiAttachmentRows.RowOf`). Die Felder zeigen dann ihre Werte wie beim Legen (Abstand von der Mitte ohne Vorzeichen, Drehung wie auf der rechten Seite); während des Tippens zeigt die Karte die geänderte Reihe, Enter oder das Verlassen des Feldes ändert sie, ein Objekt aus der Bibliothek ersetzt ihre Objekte, R dreht sie um 15°. Esc gibt die Reihe frei, die Felder zeigen wieder die Werte zum Legen. Geändert wird über dieselbe Strecke: vom ersten Objekt an so viele, wie bis zum letzten passen. Die neu geplanten Teile kommen der Reihe nach in die vorhandenen Datensätze ihrer Kachel und behalten deren IDs, Detailstufe, Neigung und Texte; weitere Teile kommen ans Kachelende, übrige Datensätze werden gelöscht, außer Verweise nennen sie. Eine Reihe mit `[splineAttachement_repeater]` wird nicht neu geplant, weil deren Bedeutung ungeklärt ist: Hauptdatensatz und alle Wiederholungen mit derselben ID bekommen dieselben neuen Werte, Start und Reichweite bleiben (die Wiederholungen wiederholen laut Inventar die Werte des Hauptdatensatzes). Werte gelten als unverändert, solange sie auf die angezeigten drei Nachkommastellen gleich sind, damit bloßes Verlassen eines Feldes keine Originalreihe rundet. Entf löscht alle Datensätze der Reihe in einem Schritt.
+
+**Grund:** Eine Reihe über mehrere Kacheln ist für den Nutzer eine Reihe; sie Kachel für Kachel zu bearbeiten, ließe an jeder Grenze einen falschen Abstand. Neu zu planen statt Werte einzeln zu ändern hält jedes Objekt in der Kachel seines Datensatzes und prüft das Ergebnis wieder mit der Zeichenlogik.
+
+## ADR 038: openOMSI als Ziel; Kettenabstände pflegen und Reihen wie openOMSI auslegen
+
+**Status:** Angenommen, 25. Oktober 2026, nach Spieltests des Nutzers in openOMSI und OMSI 2. Ziel ist laut Nutzer die Verträglichkeit mit openOMSI (Omsi-Hub); in OMSI 2 sind etwa erzeugte Kreuzungen unsichtbar, das ist hingenommen.
+
+**Entscheidung:** Wo die Kartendaten eine Formatfrage offen lassen, gilt openOMSIs Auslegung (Quelltext unter github.com/openOMSI-org/openOMSI; seine Kommentare halten Abgleiche mit Omsi.exe fest).
+
+- Die letzte Zahl eines `[spline]` (Feld 17, ab Version 11) ist der Kettenabstand: die Länge der Kette vor dem Spline (TileRecordInventory). Nach jeder Spline-Änderung bekommen neue Splines und Splines, deren Kette jetzt anders vor ihnen beginnt, diesen Wert, im selben Rückgängig-Schritt (`KeepChains`). Werte von Ketten, die die Änderung nicht berührt, bleiben, auch veraltete der Originalkarten.
+- `OmsiSplineAttachmentLayout.Place` legt eine Reihe wie openOMSI aus: ab dem gespeicherten Kettenabstand des eigenen Splines, nur auf den Splines der eigenen Kachel, Wiederholungen ebenso; Datensätze, die vor ihrem Spline beginnen, zeichnet es nicht.
+- Das Werkzeug „Rows“ teilt eine Reihe in Datensätze je zusammenhängendem Stück der Kette in einer Kachel und einer Laufrichtung; läuft die Straße gegen die Splines, beginnt der Datensatz beim letzten Objekt und legt die anderen zurück, mit umgekehrtem Versatz und um 180° gedreht.
+- Rückt der gespeicherte Kettenabstand eines Ankers, rückt der Startabstand seiner Reihen um dasselbe, so bleiben die Objekte stehen.
+- Das Thema „Chain offsets“ der Kartenprüfung listet Splines, deren gespeicherter Wert mehr als 1 cm von ihrer Kette abweicht; „Store offsets“ schreibt die richtigen Werte und verschiebt die Reihen auf diesen Splines mit, als ein Rückgängig-Schritt (`StoreChainOffsets`).
+
+**Grund:**
+- Der Nutzer spielt und testet in openOMSI.
+- Unser Straßenwerkzeug schrieb 0 als Kettenabstand. Eine Reihe in der zweiten Kachel einer Straße war deshalb in openOMSI unsichtbar, und die Texturen liefen nicht über die Gelenke.
+- Die Abgleiche in Grundorf, Stadtückheim und Berlin-Spandau bestätigen die Bedeutung des Felds.
+
+**Offen:** Kacheln löschen führt Kettenabstände und Reihen benachbarter Kacheln noch nicht nach. Reihen, die mit früheren Versionen über eine Kachelgrenze gelegt wurden, bleiben auf den falschen Wert gerechnet. „Store offsets“ hält sie dort, wo openOMSI sie zeigt; solche Reihen löscht man am besten und legt sie neu.

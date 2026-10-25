@@ -88,7 +88,20 @@ namespace OmsiMapEditor.OMSI
         Geometry,
 
         /// <summary>A spline was split in two at a point along it.</summary>
-        Split
+        Split,
+
+        /// <summary>Stored chain offsets were set to where the splines' chains put them.</summary>
+        ChainOffsets
+    }
+
+    /// <summary>A spline whose stored chain offset is not where its chain puts it.</summary>
+    public sealed class OmsiChainOffsetFinding
+    {
+        public OmsiTileSummary Tile { get; internal set; }
+        public OmsiSplineRecord Spline { get; internal set; }
+
+        /// <summary>The length of the chain before the spline.</summary>
+        public double ChainStart { get; internal set; }
     }
 
     /// <summary>
@@ -211,7 +224,7 @@ namespace OmsiMapEditor.OMSI
                     OmsiNumberFormat.Format(piece.LengthMeters), OmsiNumberFormat.Format(piece.RadiusMeters),
                     OmsiNumberFormat.Format(piece.GradientStartPercent), OmsiNumberFormat.Format(piece.GradientEndPercent), "0", "0"
                 };
-                // Version 14 adds the skew at start and end before the alignment length.
+                // Version 14 adds the skew at start and end before the chain offset, which the chain pass writes afterwards.
                 if (tileFile.Version < 0 || tileFile.Version >= 14)
                     fields.AddRange(new[] { "0", "0" });
                 fields.Add("0");
@@ -230,10 +243,10 @@ namespace OmsiMapEditor.OMSI
             change.SplineIds.AddRange(pieceIds);
             change.Tiles.AddRange(tiles);
             files.Collect(change.Files);
-            var rows = RowAnchors(summary);
+            var chains = Chains(summary);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
-            KeepRowsInPlace(summary, change, rows);
+            KeepChains(summary, change, chains);
             ReshapeTerrain(summary, change);
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, pieceIds[pieceIds.Count - 1]);
             summary.NextIdCode = ids.NextFreeId;
@@ -309,10 +322,10 @@ namespace OmsiMapEditor.OMSI
             // The terrain around the deleted spline returns to what the other roads leave of the original.
             var shaped = ShapesTerrain(spline);
             files.Collect(change.Files);
-            var rows = RowAnchors(summary);
+            var chains = Chains(summary);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
-            KeepRowsInPlace(summary, change, rows);
+            KeepChains(summary, change, chains);
             if (shaped)
                 ReshapeTerrain(summary, change);
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
@@ -457,10 +470,10 @@ namespace OmsiMapEditor.OMSI
 
             var shaped = ShapesTerrain(spline);
             files.Collect(change.Files);
-            var rows = RowAnchors(summary);
+            var chains = Chains(summary);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
-            KeepRowsInPlace(summary, change, rows);
+            KeepChains(summary, change, chains);
             if (shaped)
                 ReshapeTerrain(summary, change);
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, newId);
@@ -542,10 +555,10 @@ namespace OmsiMapEditor.OMSI
             if (change.SplineIds.Count == 0)
                 return null;
             files.Collect(change.Files);
-            var rows = RowAnchors(summary);
+            var chains = Chains(summary);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
-            KeepRowsInPlace(summary, change, rows);
+            KeepChains(summary, change, chains);
             ReshapeTerrain(summary, change);
             return change;
         }
@@ -663,10 +676,10 @@ namespace OmsiMapEditor.OMSI
             if (change.SplineIds.Count == 0)
                 return null;
             files.Collect(change.Files);
-            var rows = RowAnchors(summary);
+            var chains = Chains(summary);
             WriteFiles(change.Files, false);
             RefreshSplines(summary, change);
-            KeepRowsInPlace(summary, change, rows);
+            KeepChains(summary, change, chains);
             ReshapeTerrain(summary, change);
             return change;
         }
@@ -961,55 +974,132 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// For every row along splines, how far along its chain its spline begins, by row ID. A row's start distance
-        /// counts from the beginning of the chain (TileRecordInventory), so this tells how a change before it moves it.
+        /// The splines whose stored chain offset differs by more than a centimetre from the length of the chain before them,
+        /// such as roads built by earlier versions of this editor, which wrote 0. openOMSI counts rows along them and runs
+        /// their textures from the stored value.
         /// </summary>
-        private static Dictionary<int, double> RowAnchors(OmsiMapSummary summary)
+        public static List<OmsiChainOffsetFinding> StaleChainOffsets(OmsiMapSummary summary)
         {
-            var result = new Dictionary<int, double>();
             if (summary == null)
-                return result;
-            OmsiSplineAttachmentLayout layout = null;
+                throw new ArgumentNullException(nameof(summary));
+            var result = new List<OmsiChainOffsetFinding>();
+            var layout = new OmsiSplineAttachmentLayout(summary);
             foreach (var tile in summary.Tiles)
-                foreach (var row in tile.SplineAttachments)
+                foreach (var spline in tile.Splines)
                 {
-                    if (row.IsRepeater || row.SplineIndex < 0 || row.SplineIndex >= tile.Splines.Count)
+                    if (!spline.ChainOffset.HasValue)
                         continue;
-                    layout = layout ?? new OmsiSplineAttachmentLayout(summary);
-                    result[row.Id] = layout.ChainStartOf(tile, tile.Splines[row.SplineIndex]);
+                    var start = layout.ChainStartOf(tile, spline);
+                    if (Math.Abs(spline.ChainOffset.Value - start) > 0.01)
+                        result.Add(new OmsiChainOffsetFinding { Tile = tile, Spline = spline, ChainStart = start });
                 }
             return result;
         }
 
         /// <summary>
-        /// Keeps the rows along splines where they stand after a change of splines: where the chain before a row's spline
-        /// grew or shrank, such as a road built on at its start, a piece deleted or a junction cutting it, the row's start
-        /// distance changes by as much, as part of the same change, so OMSI lays its objects where they were.
+        /// Stores in every spline the length of the chain before it where the stored value differs, and moves the rows
+        /// along those splines by as much, so openOMSI lays their objects where it laid them before. Null when every
+        /// stored value is right.
         /// </summary>
-        private void KeepRowsInPlace(OmsiMapSummary summary, OmsiSplineChange change, Dictionary<int, double> before)
+        public OmsiSplineChange StoreChainOffsets(OmsiMapSummary summary)
         {
-            if (summary == null || before.Count == 0)
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            var before = Chains(summary);
+            // Unlike after an edit, every spline counts, not only those whose chain changed.
+            before.Splines.Clear();
+            var change = new OmsiSplineChange(OmsiSplineChangeKind.ChainOffsets);
+            KeepChains(summary, change, before);
+            return change.Files.Count > 0 ? change : null;
+        }
+
+        /// <summary>What a change of splines is compared with afterwards: where each spline begins along its chain, and where each row counts from.</summary>
+        private sealed class ChainState
+        {
+            public readonly Dictionary<int, double> Splines = new Dictionary<int, double>();
+            public readonly Dictionary<string, double> Rows = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>A row record by its tile, ID, kind and the spline it names, which stay while spline indices shift.</summary>
+        private static string RowKey(OmsiTileSummary tile, OmsiSplineAttachmentRecord row)
+        {
+            return OmsiRelativePath.Normalize(tile.FileName) + "|" + row.Id + "|" + (row.IsRepeater ? "r" : "m") + "|" + tile.Splines[row.SplineIndex].Id;
+        }
+
+        private static ChainState Chains(OmsiMapSummary summary)
+        {
+            var state = new ChainState();
+            if (summary == null)
+                return state;
+            var layout = new OmsiSplineAttachmentLayout(summary);
+            foreach (var tile in summary.Tiles)
+            {
+                foreach (var spline in tile.Splines)
+                    state.Splines[spline.Id] = layout.ChainStartOf(tile, spline);
+                foreach (var row in tile.SplineAttachments)
+                    if (row.SplineIndex >= 0 && row.SplineIndex < tile.Splines.Count)
+                        state.Rows[RowKey(tile, row)] = layout.ChainOffsetOf(tile, tile.Splines[row.SplineIndex]);
+            }
+            return state;
+        }
+
+        /// <summary>
+        /// Keeps chains and rows right after a change of splines. Every new spline, and every spline whose chain now begins
+        /// elsewhere before it, gets its distance from the chain's beginning as its stored chain offset, as OMSI's editor
+        /// writes it; offsets of chains the change left alone stay as they are. Rows count their start from their spline's
+        /// stored offset, so where that moved, such as for a road built on at its start, a piece deleted or a junction
+        /// cutting it, the row's start distance moves by as much and its objects stay where they stood. All of it joins
+        /// the same change.
+        /// </summary>
+        private void KeepChains(OmsiMapSummary summary, OmsiSplineChange change, ChainState before)
+        {
+            if (summary == null)
                 return;
-            var after = RowAnchors(summary);
+            var layout = new OmsiSplineAttachmentLayout(summary);
             var workspace = RequireWorkspace();
             var edited = new Dictionary<string, OmsiRecordFile>(StringComparer.OrdinalIgnoreCase);
             var tiles = new List<OmsiTileSummary>();
+            OmsiRecordFile Edit(OmsiTileSummary tile)
+            {
+                var path = OmsiRelativePath.Normalize(tile.FileName);
+                if (!edited.TryGetValue(path, out var file))
+                {
+                    file = OmsiRecordFile.Parse(workspace.ReadAllBytes(path), OmsiTileRecordLayouts.Instance);
+                    edited[path] = file;
+                    tiles.Add(tile);
+                }
+                return file;
+            }
+
+            var written = new Dictionary<OmsiSplineRecord, double>();
+            foreach (var tile in summary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (!spline.ChainOffset.HasValue)
+                        continue;
+                    var now = layout.ChainStartOf(tile, spline);
+                    if (before.Splines.TryGetValue(spline.Id, out var was) && Math.Abs(was - now) < 1e-4 || Math.Abs(spline.ChainOffset.Value - now) < 1e-4)
+                        continue;
+                    foreach (var view in OmsiTileRecords.Of<OmsiSplineView>(Edit(tile)))
+                        if (view.Id == spline.Id)
+                            view.ChainOffset = now;
+                    written[spline] = now;
+                }
+
             foreach (var tile in summary.Tiles)
                 foreach (var row in tile.SplineAttachments)
                 {
-                    if (row.IsRepeater || !before.TryGetValue(row.Id, out var was) || !after.TryGetValue(row.Id, out var now) || Math.Abs(now - was) < 1e-4)
+                    if (row.SplineIndex < 0 || row.SplineIndex >= tile.Splines.Count || !before.Rows.TryGetValue(RowKey(tile, row), out var was))
                         continue;
-                    var path = OmsiRelativePath.Normalize(tile.FileName);
-                    if (!edited.TryGetValue(path, out var file))
-                    {
-                        file = OmsiRecordFile.Parse(workspace.ReadAllBytes(path), OmsiTileRecordLayouts.Instance);
-                        edited[path] = file;
-                        tiles.Add(tile);
-                    }
-                    foreach (var view in OmsiTileRecords.Of<OmsiSplineAttachmentView>(file))
-                        if (!view.IsRepeater && view.Id == row.Id)
+                    var anchor = tile.Splines[row.SplineIndex];
+                    var now = written.TryGetValue(anchor, out var offset) ? offset : layout.ChainOffsetOf(tile, anchor);
+                    if (Math.Abs(now - was) < 1e-4)
+                        continue;
+                    foreach (var view in OmsiTileRecords.Of<OmsiSplineAttachmentView>(Edit(tile)))
+                        if (view.Id == row.Id && view.IsRepeater == row.IsRepeater && view.SplineIndex == row.SplineIndex)
                             view.StartDistance += now - was;
                 }
+
             if (edited.Count == 0)
                 return;
             foreach (var pair in edited)

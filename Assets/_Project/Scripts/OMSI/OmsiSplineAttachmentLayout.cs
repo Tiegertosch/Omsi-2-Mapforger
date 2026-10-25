@@ -14,6 +14,11 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The spline's direction there plus the attachment's own heading, clockwise from north.</summary>
         public double HeadingDegrees;
+
+        /// <summary>The spline the object stands on, and how far from that spline's start.</summary>
+        public OmsiSplineRecord Spline;
+
+        public double AlongSpline;
     }
 
     /// <summary>One spline of a chain as a row counts it: where it begins along the chain and whether the chain runs against it.</summary>
@@ -30,11 +35,14 @@ namespace OmsiMapEditor.OMSI
     }
 
     /// <summary>
-    /// Places the objects of [splineAttachement] rows. Object j lies at the start distance plus j times the interval
-    /// along the spline chain, while j times the interval does not exceed the range. The chain follows each spline's
-    /// next neighbour by ID across the whole map, also where a neighbour is joined at its end and runs the other way, so
-    /// a row is complete from its main record alone; [splineAttachement_repeater] records are not needed. Where a link
-    /// is recorded on one side only, the chain continues to the spline that names this one and meets its end.
+    /// Places the objects of [splineAttachement] rows as openOMSI does, following Omsi.exe (`crates/omsi-world/src/map_index.rs`,
+    /// `tile_row_objects`): object j lies at the start distance plus j times the interval along the chain, counted from
+    /// where the chain begins by the record's spline's stored chain offset (<see cref="OmsiSplineRecord.ChainOffset"/>),
+    /// while j times the interval does not exceed the range. A record lays objects on its own spline and the splines after
+    /// it in its direction only while they lie in its tile; where the chain enters another tile, a record there carries
+    /// the row on, as [splineAttachement_repeater] does. A record whose first object would lie before its own spline is not
+    /// drawn. The chain follows each spline's neighbours by ID, also where a neighbour is joined at its end and runs the
+    /// other way; where a link is recorded on one side only, it continues to the spline that names this one and meets it.
     /// </summary>
     public sealed class OmsiSplineAttachmentLayout
     {
@@ -73,27 +81,92 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        /// <summary>The objects of a row; empty for repeaters, a missing spline or a broken record.</summary>
+        /// <summary>A single object standing this far past the end of its chain still stands at the end, as editors' sums of lengths drift.</summary>
+        private const double ChainEndTolerance = 1.0;
+
+        /// <summary>
+        /// The objects of a row record or of a continuation on another tile; empty for a missing spline or a record OMSI
+        /// does not draw.
+        /// </summary>
         public List<OmsiPlacedAttachment> Place(OmsiTileSummary tile, OmsiSplineAttachmentRecord record)
         {
             var result = new List<OmsiPlacedAttachment>();
-            if (tile == null || record == null || record.IsRepeater || record.SplineIndex < 0 || record.SplineIndex >= tile.Splines.Count)
+            if (tile == null || record == null || record.SplineIndex < 0 || record.SplineIndex >= tile.Splines.Count)
+                return result;
+            var anchor = tile.Splines[record.SplineIndex];
+            // Omsi.exe leaves out a record whose first object lies before its own spline, judged by the chain as the tile
+            // reads it; continuations are drawn as they are.
+            if (!record.IsRepeater && record.StartDistance - TileChainOffset(tile, anchor) < -1e-6)
                 return result;
 
-            var chain = ChainFrom(tile, tile.Splines[record.SplineIndex]);
-
+            var first = record.StartDistance - ChainOffsetOf(tile, anchor);
+            var chain = new List<OmsiChainSegment> { new OmsiChainSegment { Tile = tile, Spline = anchor, Reversed = false } };
             var single = !(record.Interval > 0.0);
-            var last = single ? record.StartDistance : record.StartDistance + Math.Floor(Math.Max(0.0, record.Range) / record.Interval) * record.Interval;
             for (var number = 0; number < MaximumObjectsPerRow; number++)
             {
-                var distance = record.StartDistance + (single ? 0.0 : number * record.Interval);
-                if (distance > last + 1e-9 || !ExtendTo(chain, distance))
+                if (!single && number * record.Interval > Math.Max(0.0, record.Range) + 1e-6)
                     break;
-                result.Add(PlaceAt(chain, distance, record));
+                var distance = first + (single ? 0.0 : number * record.Interval);
+                if (!ExtendInTile(chain, distance))
+                {
+                    // Only a single object stands at the very end from a little past it.
+                    var end = chain[chain.Count - 1];
+                    if (!single || distance > end.End + ChainEndTolerance || Neighbour(end, true, chain) != null)
+                        break;
+                    distance = end.End;
+                }
+                if (distance >= -1e-6)
+                    result.Add(PlaceAt(chain, Math.Max(0.0, distance), record));
                 if (single)
                     break;
             }
             return result;
+        }
+
+        /// <summary>
+        /// Where along its chain a spline begins as rows anchored on it count: the stored chain offset, or for records
+        /// without one the length of the chain before it.
+        /// </summary>
+        public double ChainOffsetOf(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            return spline.ChainOffset ?? ChainStartOf(tile, spline);
+        }
+
+        /// <summary>
+        /// The length of the splines before a spline in its tile, following the previous IDs within the tile, as Omsi.exe
+        /// judges whether a row starts before its spline.
+        /// </summary>
+        public static double TileChainOffset(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            var total = 0.0;
+            var seen = new HashSet<int> { spline.Id };
+            var current = spline;
+            while (current.PreviousId != 0 && seen.Count < MaximumSplinesPerChain)
+            {
+                var previous = tile.Splines.Find(item => item.Id == current.PreviousId);
+                if (previous == null || !seen.Add(previous.Id))
+                    break;
+                total += Math.Max(0.0, previous.LengthMeters);
+                current = previous;
+            }
+            return total;
+        }
+
+        /// <summary>Follows the chain within the first segment's tile until it reaches the distance; false where it leaves the tile or ends before.</summary>
+        private bool ExtendInTile(List<OmsiChainSegment> chain, double distance)
+        {
+            while (chain[chain.Count - 1].End < distance - 1e-6)
+            {
+                if (chain.Count >= MaximumSplinesPerChain)
+                    return false;
+                var current = chain[chain.Count - 1];
+                var following = Neighbour(current, true, chain);
+                if (following == null || !ReferenceEquals(following.Tile, chain[0].Tile))
+                    return false;
+                following.Begin = current.End;
+                chain.Add(following);
+            }
+            return true;
         }
 
         /// <summary>
@@ -225,7 +298,9 @@ namespace OmsiMapEditor.OMSI
                 WorldX = segment.Tile.X * tileSize + position.X + Math.Cos(heading) * offset,
                 WorldY = segment.Tile.Y * tileSize + position.Y - Math.Sin(heading) * offset,
                 Height = height + record.Height,
-                HeadingDegrees = ((heading * 180.0 / Math.PI + record.HeadingDegrees) % 360.0 + 360.0) % 360.0
+                HeadingDegrees = ((heading * 180.0 / Math.PI + record.HeadingDegrees) % 360.0 + 360.0) % 360.0,
+                Spline = spline,
+                AlongSpline = onSpline
             };
         }
 

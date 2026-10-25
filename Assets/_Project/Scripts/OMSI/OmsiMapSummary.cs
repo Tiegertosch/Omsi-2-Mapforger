@@ -187,12 +187,19 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// True when the record comes from a [spline_h] section. It shares the leading fields of [spline] and inserts
-        /// the height difference between start and end as field 13; cant, skew and alignment move back by one.
+        /// the height difference between start and end as field 13; cant, skew and chain offset move back by one.
         /// </summary>
         public bool IsSplineH { get; internal set; }
 
         /// <summary>True when the record ends with "mirror": the cross-section is turned over.</summary>
         public bool IsMirrored { get; internal set; }
+
+        /// <summary>
+        /// The record's last number (tile version 11 on): how far along its chain the spline begins, as OMSI's editor
+        /// writes it. Rows along the spline count their start distance from it, and the textures run on across the chain's
+        /// joints with it (openOMSI, `crates/omsi-world/src/map_index.rs`); null when the record has none.
+        /// </summary>
+        public double? ChainOffset { get; internal set; }
 
         /// <summary>
         /// True when [spline_terrain_align] or [spline_terrain_align_2] follows the spline: the terrain was fitted to it, as

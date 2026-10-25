@@ -65,14 +65,16 @@ Das Elternobjekt steht in allen 1.469 Fällen weiter oben in derselben Kachel. E
 | 3 | Index des Splines in der Spline-Reihenfolge dieser Kachel; `[spline]` und `[spline_h]` zählen gemeinsam |
 | 4 | seitlicher Versatz |
 | 5 | Höhe |
-| 6 | Startabstand entlang des Splines |
+| 6 | Startabstand entlang der Kette, gezählt ab dem Kettenabstand des eigenen Splines (Feld 17 dort) |
 | 7, 8, 9 | Heading, Pitch, Bank |
 | 10 | Abstand zwischen Wiederholungen |
 | 11 | Reichweite |
 | 12 | Kippflag |
 | 13 … | Anzahl der Texte und die Texte |
 
-Der Spline-Index liegt in allen 871 Fällen innerhalb der Spline-Anzahl der Kachel. Haltestellen in Fahrplänen können solche Objekte sein. Ihr seitlicher Versatz stimmt mit dem Fahrplanwert überein (siehe [TimetableChronoInventory.md](TimetableChronoInventory.md)).
+Der Spline-Index liegt in allen 871 Fällen innerhalb der Spline-Anzahl der Kachel.
+
+**Auslegung (openOMSI, nach eigenen Angaben an Omsi.exe auf Berlin-Spandau geprüft, `tile_row_objects` in `crates/omsi-world/src/map_index.rs`):** Objekt j liegt beim Startabstand plus j-mal Abstand, solange j-mal Abstand die Reichweite nicht übersteigt, gemessen ab dem Kettenabstand des eigenen Splines in dessen Richtung. Ein Datensatz legt Objekte nur auf seinem Spline und den folgenden Splines **derselben Kachel**; wo die Kette in eine andere Kachel läuft, führt dort ein eigener Datensatz oder eine Wiederholung die Reihe fort. Ein Datensatz, dessen erstes Objekt vor seinem eigenen Spline läge (Startabstand kleiner als die Länge der Splines davor in der Kachel), wird nicht gezeichnet. Ein Spieltest des Nutzers in openOMSI am 25. Oktober 2026 bestätigte das: Eine Reihe, deren Startabstand über die Kachelgrenze gezählt war, während der Spline 0 als Kettenabstand speicherte, fehlte; dieselben Laternen mit Startabstand ab dem Spline erschienen; eine Reihe, die vorwärts in die nächste Kachel reichen sollte, fehlte dort. Haltestellen in Fahrplänen können solche Objekte sein. Ihr seitlicher Versatz stimmt mit dem Fahrplanwert überein (siehe [TimetableChronoInventory.md](TimetableChronoInventory.md)).
 
 ### `[splineAttachement_repeater]`
 
@@ -106,14 +108,16 @@ Eine Wiederholung führt eine Anhängung über Kachelgrenzen fort.
 | 11, 12 | Steigung am Anfang und am Ende in Prozent | |
 | 13, 14 | Querneigung am Anfang und am Ende | 5 |
 | 15, 16 | Querverschiebung (Skew) am Anfang und am Ende | 14 |
-| 17 | Ausrundungslänge | |
+| 17 | Kettenabstand: Länge der Kette vor dem Spline, zugleich Texturversatz | 11 |
 | 18 | optional `mirror` | 7 |
 
 In Version 14 hat ein Spline 18 Felder oder 19 mit `mirror`. In den Versionen 11 und 12 sind es 16 Felder, weil die Querverschiebung fehlt.
 
+**Kettenabstand (letzte Zahl):** Bisher hier als Ausrundungslänge geführt. openOMSI liest darin, wie weit der Spline vom Anfang seiner Kette entfernt beginnt; Reihen zählen ihren Startabstand ab diesem Wert, und die Texturen laufen damit über die Gelenke weiter (`crates/omsi-map/src/tile.rs`, `tex_offset`). Abgleich mit der Länge der Kette vor dem Spline, gerechnet über Nachbar-IDs (25. Oktober 2026): Grundorf 36 von 36 verbundenen Splines (15 davon mit Kette über eine Kachelgrenze), Stadtückheim 17 von 17, Berlin-Spandau 2.406 von 2.486 (660 von 693 über Kachelgrenzen); die übrigen 80 sind vermutlich veraltet. Frühere Versionen dieses Editors schrieben 0.
+
 ### `[spline_h]`
 
-`[spline_h]` hat ein zusätzliches Feld an Position 13: den **Höhenunterschied** zwischen Anfang und Ende in Metern. Querneigung, Querverschiebung, Ausrundungslänge und `mirror` rücken um eins nach hinten. Ein `[spline_h]` hat also 19 Felder, mit `mirror` 20. Das „h“ steht vermutlich für diese Höhenangabe.
+`[spline_h]` hat ein zusätzliches Feld an Position 13: den **Höhenunterschied** zwischen Anfang und Ende in Metern. Querneigung, Querverschiebung, Kettenabstand und `mirror` rücken um eins nach hinten. Ein `[spline_h]` hat also 19 Felder, mit `mirror` 20. Das „h“ steht vermutlich für diese Höhenangabe.
 
 **Beleg:** Bei normalen Splines ergibt sich die Endhöhe aus der linear verlaufenden Steigung. Sie ist die Anfangshöhe plus Länge mal Mittelwert der beiden Steigungen. Bei `[spline_h]` ist sie die Anfangshöhe plus Feld 13. Mit diesen beiden Regeln ist die Höhe an jeder Verbindung stetig. Mit der Steigungsregel allein passten bei `[spline_h]` nur 100 von 270 Verbindungen.
 

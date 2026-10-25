@@ -168,7 +168,7 @@ namespace OmsiMapEditor.OMSI
     {
         private readonly int cantIndex;
         private readonly int? skewIndex;
-        private readonly int alignmentIndex;
+        private readonly int chainOffsetIndex;
 
         internal OmsiSplineView(OmsiRecord record, int version) : base(record)
         {
@@ -178,11 +178,11 @@ namespace OmsiMapEditor.OMSI
             if (version >= 14)
             {
                 skewIndex = 15 + shift;
-                alignmentIndex = 17 + shift;
+                chainOffsetIndex = 17 + shift;
             }
             else
             {
-                alignmentIndex = 15;
+                chainOffsetIndex = 15;
             }
         }
 
@@ -242,21 +242,24 @@ namespace OmsiMapEditor.OMSI
             return skewIndex.Value;
         }
 
-        public double AlignmentLength { get => GetDouble(alignmentIndex); set => SetDouble(alignmentIndex, value); }
+        /// <summary>
+        /// How far along its chain the spline begins, the record's last number (see <see cref="OmsiSplineRecord.ChainOffset"/>).
+        /// </summary>
+        public double ChainOffset { get => GetDouble(chainOffsetIndex); set => SetDouble(chainOffsetIndex, value); }
 
         /// <summary>True when the optional mirror line follows; every path then lies at the negated offset.</summary>
         public bool IsMirrored
         {
-            get => Record.Fields.Count > alignmentIndex + 1 &&
-                   string.Equals(Record.GetField(alignmentIndex + 1), "mirror", StringComparison.Ordinal);
+            get => Record.Fields.Count > chainOffsetIndex + 1 &&
+                   string.Equals(Record.GetField(chainOffsetIndex + 1), "mirror", StringComparison.Ordinal);
             set
             {
                 if (value == IsMirrored)
                     return;
                 if (value)
-                    Record.InsertField(alignmentIndex + 1, "mirror");
+                    Record.InsertField(chainOffsetIndex + 1, "mirror");
                 else
-                    Record.RemoveField(alignmentIndex + 1);
+                    Record.RemoveField(chainOffsetIndex + 1);
             }
         }
 
