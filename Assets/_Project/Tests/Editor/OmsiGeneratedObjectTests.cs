@@ -375,6 +375,39 @@ namespace OmsiMapEditor.Tests
                     Assert.Greater(mesh.Normals[index][1], 0.99f);
         }
 
+        [Test]
+        public void AMadeJunctionReadsBackWithItsArmsAndWhichAreMainAndTurnedOver()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            // A road north with a street crossing it: arriving from the west, leaving to the east.
+            var arms = OmsiRoadJunctions.Arms(ProfilePath, profile, ProfilePath, profile, new[] { 270.0 }, new[] { 90.0 });
+            var made = OmsiJunctionGenerator.Junction(arms, null, "Crossroads");
+            const string path = @"Sceneryobjects\Mapforge\Test\Crossroads_3\Crossroads_3.sco";
+
+            var junction = OmsiGeneratedJunction.Parse(path, OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252), each => profile);
+
+            Assert.IsTrue(junction.SidesKnown);
+            Assert.AreEqual("Crossroads", junction.Name);
+            CollectionAssert.AreEqual(new[] { 0.0, 90.0, 180.0, 270.0 }, junction.Arms.Select(arm => arm.HeadingDegrees));
+            CollectionAssert.AreEqual(new[] { true, false, true, false }, junction.Arms.Select(arm => arm.Main));
+            CollectionAssert.AreEqual(new[] { false, false, true, true }, junction.Arms.Select(arm => arm.Mirrored));
+            Assert.AreSame(profile, junction.Arms[1].Profile);
+            Assert.AreEqual(ProfilePath, junction.Arms[1].ProfilePath);
+
+            // Made before the arms line: the arms ahead and back are main, and none is known to be turned over.
+            var older = System.Text.RegularExpressions.Regex.Replace(made.Sco, "MapWorks arms:[^\r\n]*\r\n", string.Empty);
+            var guessed = OmsiGeneratedJunction.Parse(path, OmsiTextFile.Encode(older, OmsiTextEncoding.Windows1252), each => profile);
+            Assert.IsFalse(guessed.SidesKnown);
+            CollectionAssert.AreEqual(new[] { true, false, true, false }, guessed.Arms.Select(arm => arm.Main));
+            Assert.IsFalse(guessed.Arms.Any(arm => arm.Mirrored));
+
+            // A straight piece is no junction, and only files under Sceneryobjects\Mapforge count as made here.
+            var piece = OmsiJunctionGenerator.StraightPiece(ProfilePath, profile, 12, "Test piece");
+            Assert.IsNull(OmsiGeneratedJunction.Parse(path, OmsiTextFile.Encode(piece.Sco, OmsiTextEncoding.Windows1252), each => profile));
+            Assert.IsTrue(OmsiGeneratedJunction.IsMadeHere(@"Sceneryobjects\Mapforge\Test\x\x.sco"));
+            Assert.IsFalse(OmsiGeneratedJunction.IsMadeHere(@"Sceneryobjects\Test\x.sco"));
+        }
+
         private static double[] Along(OmsiJunctionArm arm, double along, double right)
         {
             var radians = arm.HeadingDegrees * Math.PI / 180.0;

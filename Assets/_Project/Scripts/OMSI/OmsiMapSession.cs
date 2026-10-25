@@ -10,11 +10,14 @@ namespace OmsiMapEditor.OMSI
         Deletion,
 
         /// <summary>The object moved into another tile, keeping its ID.</summary>
-        Transfer
+        Transfer,
+
+        /// <summary>The object got another object file, keeping its ID and place, such as a junction made again.</summary>
+        Replacement
     }
 
     /// <summary>
-    /// A placed, deleted or transferred object. It keeps the bytes of every file it changed, before and after, so undo
+    /// A placed, deleted, transferred or replaced object. It keeps the bytes of every file it changed, before and after, so undo
     /// and redo restore exactly what the change wrote, including rules and variables that went with the object.
     /// </summary>
     public sealed class OmsiObjectChange
@@ -48,7 +51,9 @@ namespace OmsiMapEditor.OMSI
         public bool IsApplied { get; internal set; } = true;
 
         /// <summary>True when the object exists in the summary in the current state of the change.</summary>
-        public bool ObjectExists => Kind == OmsiObjectChangeKind.Deletion ? !IsApplied : Kind == OmsiObjectChangeKind.Transfer || IsApplied;
+        public bool ObjectExists => Kind == OmsiObjectChangeKind.Deletion
+            ? !IsApplied
+            : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || IsApplied;
 
         /// <summary>The tile that holds the object in the current state of the change.</summary>
         public OmsiTileSummary CurrentTile => Kind == OmsiObjectChangeKind.Transfer && IsApplied ? TargetTile : Tile;
@@ -62,6 +67,11 @@ namespace OmsiMapEditor.OMSI
         internal double[] PositionBefore { get; set; }
 
         internal double[] PositionAfter { get; set; }
+
+        /// <summary>The object file before and after a replacement.</summary>
+        internal string AssetBefore { get; set; }
+
+        internal string AssetAfter { get; set; }
 
         internal List<FileState> Files { get; } = new List<FileState>();
     }
@@ -371,6 +381,38 @@ namespace OmsiMapEditor.OMSI
             return new OmsiObjectChangeResult(change, new OmsiReference[0]);
         }
 
+        /// <summary>
+        /// Gives a placed object another object file and keeps everything else: its ID, place, orientation and the rules
+        /// that follow it. Used to put a junction made again in place of the one it replaces.
+        /// </summary>
+        public OmsiObjectChange ReplaceObject(OmsiMapSummary summary, OmsiTileSummary tile, OmsiObjectRecord record, string assetPath)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+            if (string.IsNullOrWhiteSpace(assetPath))
+                throw new ArgumentException("An object file is required.", nameof(assetPath));
+
+            var workspace = RequireWorkspace();
+            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var tileBefore = workspace.ReadAllBytes(tilePath);
+            var tileFile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
+            var view = FindObject(tileFile, record.Id, tile.FileName);
+            view.AssetPath = assetPath;
+
+            var listIndex = tile.Objects.IndexOf(record);
+            var change = new OmsiObjectChange(OmsiObjectChangeKind.Replacement, tile, record, listIndex < 0 ? tile.Objects.Count : listIndex)
+            {
+                AssetBefore = record.AssetPath,
+                AssetAfter = view.AssetPath
+            };
+            AddFile(change, tilePath, tileBefore, tileFile.ToBytes());
+            WriteFiles(change, false);
+            record.AssetPath = change.AssetAfter;
+            return change;
+        }
+
         /// <summary>Every reference to an ID in the current files; build it once for a group of deletions or transfers.</summary>
         public OmsiReferenceIndex BuildReferenceIndex()
         {
@@ -378,7 +420,7 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Takes back a placement or deletion: writes the files as they were before and updates the summary. Fails
+        /// Takes back a placement, deletion, transfer or replacement: writes the files as they were before and updates the summary. Fails
         /// without writing anything when a file was changed since, so later edits are never overwritten.
         /// </summary>
         public void Undo(OmsiMapSummary summary, OmsiObjectChange change)
@@ -392,12 +434,14 @@ namespace OmsiMapEditor.OMSI
                 RemoveFromSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Deletion)
                 AddToSummary(summary, change);
+            else if (change.Kind == OmsiObjectChangeKind.Replacement)
+                change.Record.AssetPath = change.AssetBefore;
             else
                 MoveInSummary(change, false);
             change.IsApplied = false;
         }
 
-        /// <summary>Applies an undone placement or deletion again.</summary>
+        /// <summary>Applies an undone change again.</summary>
         public void Redo(OmsiMapSummary summary, OmsiObjectChange change)
         {
             if (change == null)
@@ -409,6 +453,8 @@ namespace OmsiMapEditor.OMSI
                 AddToSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Deletion)
                 RemoveFromSummary(summary, change);
+            else if (change.Kind == OmsiObjectChangeKind.Replacement)
+                change.Record.AssetPath = change.AssetAfter;
             else
                 MoveInSummary(change, true);
             change.IsApplied = true;

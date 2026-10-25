@@ -149,8 +149,14 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(tile));
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
+            return Place(Helpers(item.AssetPath), tile, item, tileSizeMeters, localX, localY, objectHeight, headingDegrees, pitchDegrees, bankDegrees);
+        }
+
+        /// <summary>Connection points from [splinehelper] points, for an object at a place and orientation.</summary>
+        internal static List<OmsiJunctionPort> Place(IReadOnlyList<OmsiSplineHelper> list, OmsiTileSummary tile, OmsiObjectRecord item, double tileSizeMeters,
+            double localX, double localY, double objectHeight, double headingDegrees, double pitchDegrees, double bankDegrees)
+        {
             var result = new List<OmsiJunctionPort>();
-            var list = Helpers(item.AssetPath);
             if (list.Count == 0)
                 return result;
             var origin = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, localX, localY, tileSizeMeters);

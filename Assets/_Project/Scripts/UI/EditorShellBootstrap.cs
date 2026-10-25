@@ -126,6 +126,13 @@ namespace OmsiMapEditor.UI
         // True while the middle handle of the dragged spline bends it, rather than one of its ends moving.
         private bool bendingSpline;
 
+        // The junction made here whose arm is being turned at its handle, and that arm; null and -1 otherwise.
+        private OmsiJunctionRebuild armRebuild;
+        private int draggedArm = -1;
+
+        // Junctions made here as read from their files, by installation and object file; null for other objects.
+        private readonly Dictionary<string, OmsiGeneratedJunction> madeJunctions = new Dictionary<string, OmsiGeneratedJunction>(StringComparer.OrdinalIgnoreCase);
+
         // A spline clicked in the map; it is shown in the inspector and can be deleted.
         private OmsiTileSummary selectedSplineTile;
         private OmsiSplineRecord selectedSpline;
@@ -361,6 +368,15 @@ namespace OmsiMapEditor.UI
                     draggedSplineEnd = null;
                     mapCanvas.ClearRoadPreview();
                     SetStatus((bendingSpline ? "Bending the spline" : "Moving the spline end") + " cancelled.");
+                };
+                mapCanvas.ArmDragStarted += StartArmTurn;
+                mapCanvas.ArmDragged += (x, y, alt) => PreviewArmTurn(x, y, false, alt);
+                mapCanvas.ArmDropped += (x, y, alt) => PreviewArmTurn(x, y, true, alt);
+                mapCanvas.ArmDragCancelled += () =>
+                {
+                    armRebuild = null;
+                    mapCanvas.ClearRoadPreview();
+                    SetStatus("Turning the arm cancelled.");
                 };
                 mapCanvas.PointerInfoChanged += text =>
                 {
@@ -908,6 +924,28 @@ namespace OmsiMapEditor.UI
                     draggedSplineEnd = new OmsiSplineEnd(moveTile, selectedSpline, Argument("-moveSplineEnd", 2) == "end");
                     var target = OmsiMapGeometry.TileLocalToWorld(moveTileX, moveTileY, moveX, moveY, currentSummary.TileSizeMeters);
                     PreviewSplineEnd(target.X, target.Y, Array.IndexOf(args, "-moveCommit") >= 0, Array.IndexOf(args, "-moveAlt") >= 0);
+                }
+            }
+
+            // -turnArm <object ID> <arm from 1> <heading in the object>: drags that arm handle of a junction made here.
+            if (int.TryParse(Argument("-turnArm", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var armObjectId) &&
+                int.TryParse(Argument("-turnArm", 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out var armNumber) &&
+                double.TryParse(Argument("-turnArm", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var armHeading))
+            {
+                var armTile = currentSummary.Tiles.Find(tile => tile.Objects.Exists(item => item.Id == armObjectId));
+                var armObject = armTile?.Objects.Find(item => item.Id == armObjectId);
+                if (armObject != null)
+                {
+                    // Wait for the ground, so the roads are rebuilt into a loaded map as when dragging.
+                    var groundStarted = Time.realtimeSinceStartup;
+                    while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundStarted < 300f)
+                        yield return null;
+                    RefreshAfterChange(new[] { new MapSelectionItem { Tile = armTile, Record = armObject } });
+                    StartArmTurn(armNumber - 1);
+                    var centre = OmsiMapGeometry.TileLocalToWorld(armTile.X, armTile.Y, armObject.LocalX, armObject.LocalY, currentSummary.TileSizeMeters);
+                    var radians = (armObject.HeadingDegrees + armHeading) * Math.PI / 180.0;
+                    PreviewArmTurn(centre.X + Math.Sin(radians) * 20.0, centre.Y + Math.Cos(radians) * 20.0, Array.IndexOf(args, "-turnCommit") >= 0, true);
+                    Debug.Log("Turn arm: " + statusLabel?.text);
                 }
             }
 
@@ -1540,6 +1578,180 @@ namespace OmsiMapEditor.UI
             var splits = move.Splines.FindAll(geometry => geometry.SplitOff);
             SetStatus((bendingSpline ? "Bent spline #" : "Moved spline #") + id + (moved.Count > 0 ? " and #" + string.Join(", #", moved) : string.Empty) +
                       (splits.Count > 0 ? "; split #" + string.Join(", #", splits.ConvertAll(split => split.Spline.Id)) + " into two arcs to stay free of kinks" : string.Empty) +
+                      (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + ". Ctrl+Z takes it back.");
+        }
+
+        /// <summary>The junction an object file holds when the editor made it, read once; null for any other object.</summary>
+        private OmsiGeneratedJunction MadeJunction(string assetPath)
+        {
+            if (currentSummary == null || !OmsiGeneratedJunction.IsMadeHere(assetPath))
+                return null;
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            var key = root + "|" + assetPath;
+            if (!madeJunctions.TryGetValue(key, out var junction))
+            {
+                // Made objects are never overwritten (ADR 026), so what was read stays true.
+                junction = OmsiGeneratedJunction.Read(root, assetPath, RoadProfiles().Get);
+                madeJunctions[key] = junction;
+            }
+            return junction;
+        }
+
+        /// <summary>
+        /// Shows a handle on each arm of the one selected object when the editor made it as a junction, a little inside the
+        /// connection point so the point's diamond stays visible; dragging one turns that arm.
+        /// </summary>
+        private void UpdateArmHandles()
+        {
+            if (mapCanvas == null)
+                return;
+            var item = selection.Count == 1 ? selection[0] : null;
+            if (!CanEdit || item?.Tile == null || MadeJunction(item.Record.AssetPath) == null)
+            {
+                mapCanvas.SetArmHandles(null);
+                return;
+            }
+            var size = currentSummary.TileSizeMeters;
+            var centre = OmsiMapGeometry.TileLocalToWorld(item.Tile.X, item.Tile.Y, item.Record.LocalX, item.Record.LocalY, size);
+            var handles = new List<OmsiMapPoint>();
+            foreach (var port in Junctions().Ports(item.Tile, item.Record, size))
+            {
+                var length = Math.Sqrt((port.Position.X - centre.X) * (port.Position.X - centre.X) + (port.Position.Y - centre.Y) * (port.Position.Y - centre.Y));
+                var inset = Math.Min(3.0, length / 3.0);
+                var radians = port.OutwardHeadingDegrees * Math.PI / 180.0;
+                handles.Add(new OmsiMapPoint(port.Position.X - Math.Sin(radians) * inset, port.Position.Y - Math.Cos(radians) * inset));
+            }
+            mapCanvas.SetArmHandles(handles);
+        }
+
+        /// <summary>An arm handle of the selected junction was grabbed: finds what is joined to each of its points.</summary>
+        private void StartArmTurn(int arm)
+        {
+            armRebuild = null;
+            draggedArm = arm;
+            var item = selection.Count == 1 ? selection[0] : null;
+            var made = item == null ? null : MadeJunction(item.Record.AssetPath);
+            if (made == null || item.Tile == null)
+                return;
+            armRebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, item.Tile, item.Record);
+            if (armRebuild == null)
+                SetStatus("Junction #" + item.Record.Id + " cannot be made again: its connection points do not match its file.");
+        }
+
+        /// <summary>
+        /// While an arm handle is dragged: turns the arm towards the pointer in steps of 5 degrees, or freely with Alt, and
+        /// shows the arms and the roads led to their points; on release makes the junction again under
+        /// Sceneryobjects\Mapforge, puts it in place of the old one and leads the roads to it, as one undo step, unless the
+        /// plan has errors.
+        /// </summary>
+        private void PreviewArmTurn(double x, double y, bool commit, bool alt)
+        {
+            if (armRebuild == null || currentSummary == null || mapCanvas == null)
+                return;
+            var rebuild = armRebuild;
+            var junction = rebuild.Junction;
+            var size = currentSummary.TileSizeMeters;
+            var centre = OmsiMapGeometry.TileLocalToWorld(rebuild.Tile.X, rebuild.Tile.Y, junction.LocalX, junction.LocalY, size);
+            var heading = OmsiRoadPlanner.ChordHeading(centre.X, centre.Y, x, y) - junction.HeadingDegrees;
+            if (!alt)
+                heading = Math.Round(heading / 5.0) * 5.0;
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            var plain = File.Exists(Path.Combine(root, PlainAsphalt)) ? PlainAsphalt : null;
+            var turn = rebuild.PlanTurn(draggedArm, heading, plain);
+            var unchanged = Math.Abs(OmsiRoadPlanner.Normalize(turn.HeadingDegrees - rebuild.Made.Arms[draggedArm].HeadingDegrees)) < 0.01;
+            var degrees = turn.HeadingDegrees.ToString("0.#", CultureInfo.InvariantCulture) + "\u00b0";
+            var issues = new List<OmsiRoadIssue>();
+            foreach (var lead in turn.Leads)
+                issues.AddRange(lead.Piece.Issues);
+            if (!commit)
+            {
+                // The arms from the centre to their points, and the pieces leading the roads to them.
+                var pieces = new List<OmsiMapPoint[]>();
+                foreach (var port in turn.Ports)
+                    pieces.Add(new[] { centre, port.Position });
+                foreach (var lead in turn.Leads)
+                    foreach (var piece in lead.Piece.Pieces)
+                    {
+                        var count = Math.Max(2, (int)Math.Ceiling(piece.LengthMeters / 2.0));
+                        var points = new OmsiMapPoint[count + 1];
+                        for (var step = 0; step <= count; step++)
+                        {
+                            piece.PointAt(piece.LengthMeters * step / count, out var pointX, out var pointY, out _);
+                            points[step] = new OmsiMapPoint(pointX, pointY);
+                        }
+                        pieces.Add(points);
+                    }
+                mapCanvas.SetRoadPreview(pieces, !turn.HasErrors, issues, null, null);
+                var text = "Turning arm " + (draggedArm + 1) + " of junction #" + junction.Id + " to " + degrees + (alt ? string.Empty : "; Alt turns it freely");
+                var furthest = 0.0;
+                foreach (var lead in turn.Leads)
+                    furthest = Math.Max(furthest, lead.CutMeters);
+                if (turn.Leads.Count > 0)
+                    text += "; the roads are laid anew up to " + furthest.ToString("0", CultureInfo.InvariantCulture) + " m out";
+                if (turn.Problem != null)
+                    text += "; " + turn.Problem;
+                foreach (var issue in issues)
+                    text += "; " + issue.Message;
+                SetStatus(text);
+                return;
+            }
+
+            armRebuild = null;
+            mapCanvas.ClearRoadPreview();
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("turn junction arms"));
+                return;
+            }
+            if (unchanged)
+            {
+                SetStatus("Arm " + (draggedArm + 1) + " of junction #" + junction.Id + " stays as it is.");
+                return;
+            }
+            if (turn.HasErrors)
+            {
+                SetStatus("Junction #" + junction.Id + " stays: " + (turn.Problem ?? issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message));
+                return;
+            }
+            string assetPath;
+            try
+            {
+                var made = OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + rebuild.Made.Name);
+                assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, rebuild.Made.Name, made);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The junction could not be made again: " + exception.Message);
+                return;
+            }
+            OmsiJunctionInsertionResult result;
+            try
+            {
+                result = session.RebuildJunction(currentSummary, rebuild, turn, assetPath);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                RefreshAfterChange(null);
+                SetStatus("Junction #" + junction.Id + " could not be made again: " + exception.Message);
+                return;
+            }
+            if (!result.Succeeded)
+            {
+                RefreshAfterChange(null);
+                SetStatus("Junction #" + junction.Id + " stays: " + DescribeReferences(result.Blockers) + " still need the roads at it as they are.");
+                return;
+            }
+            var steps = new List<object>(result.Steps);
+            foreach (var step in steps)
+                if (step is OmsiSplineChange change)
+                    RefreshSplineViews(change);
+            roadPorts = null;
+            PushSteps(steps, "turning arm " + (draggedArm + 1) + " of junction #" + junction.Id);
+            var warnings = issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
+            SetStatus("Turned arm " + (draggedArm + 1) + " of junction #" + junction.Id + " to " + degrees + " and made it again as " +
+                      Path.GetFileNameWithoutExtension(assetPath) + "; the roads joined to it are led to its points" +
                       (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + ". Ctrl+Z takes it back.");
         }
 
@@ -2833,6 +3045,7 @@ namespace OmsiMapEditor.UI
                     : selection.Count + " objects selected";
             UpdateToolbar();
             RenderInspector();
+            UpdateArmHandles();
         }
 
         private string DescribeSelection()
@@ -3322,6 +3535,8 @@ namespace OmsiMapEditor.UI
                     return "the placement of object #" + step.Change.Record.Id;
                 case OmsiObjectChangeKind.Deletion:
                     return "the deletion of object #" + step.Change.Record.Id;
+                case OmsiObjectChangeKind.Replacement:
+                    return "the new shape of object #" + step.Change.Record.Id;
                 default:
                     return "the move of object #" + step.Change.Record.Id + " into tile " + step.Change.TargetTile.X + ", " + step.Change.TargetTile.Y;
             }

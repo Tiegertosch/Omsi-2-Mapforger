@@ -891,7 +891,8 @@ namespace OmsiMapEditor.OMSI
                     ShapeCatalogs();
                     if (shapeJunctions.Helpers(item.AssetPath).Count == 0)
                         continue;
-                    text.Append(item.Id).Append(' ').Append(tile.X).Append(' ').Append(tile.Y).Append(' ')
+                    // The file as well: a junction made again changes its shape in place.
+                    text.Append(item.Id).Append(' ').Append(item.AssetPath).Append(' ').Append(tile.X).Append(' ').Append(tile.Y).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.LocalX)).Append(' ').Append(OmsiNumberFormat.Format(item.LocalY)).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.Height)).Append(' ').Append(OmsiNumberFormat.Format(item.HeadingDegrees)).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.PitchDegrees)).Append(' ').Append(OmsiNumberFormat.Format(item.BankDegrees)).Append(';');

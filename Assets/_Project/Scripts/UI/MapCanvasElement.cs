@@ -189,7 +189,7 @@ namespace OmsiMapEditor.UI
 
         private readonly Dictionary<string, Footprint> footprints = new Dictionary<string, Footprint>(StringComparer.OrdinalIgnoreCase);
 
-        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan, Turn, SplineEnd }
+        private enum DragMode { None, Pan, MovePending, Move, Rotate, Box, Orbit, OrbitPan, Turn, SplineEnd, JunctionArm }
 
         private sealed class SplinePath
         {
@@ -250,6 +250,9 @@ namespace OmsiMapEditor.UI
         private readonly List<JunctionMarker> junctionMarkers = new List<JunctionMarker>();
         private Vector2? roadStart;
         private OmsiSplineRecord selectedSpline;
+
+        /// <summary>World positions of the arm handles of the selected junction, or none.</summary>
+        private readonly List<OmsiMapPoint> armHandles = new List<OmsiMapPoint>();
 
         /// <summary>Free spline ends are drawn while building roads from this scale on.</summary>
         private const float FreeEndMetersPerPixel = 2f;
@@ -459,6 +462,18 @@ namespace OmsiMapEditor.UI
 
         /// <summary>Dragging a spline handle was cancelled; nothing changes.</summary>
         public event Action SplineEndDragCancelled;
+
+        /// <summary>An arm handle of the selected junction is being dragged, by the arm's place among its handles.</summary>
+        public event Action<int> ArmDragStarted;
+
+        /// <summary>The dragged arm handle is at a world position; true while Alt is held.</summary>
+        public event Action<double, double, bool> ArmDragged;
+
+        /// <summary>The dragged arm handle was let go at a world position; true while Alt is held.</summary>
+        public event Action<double, double, bool> ArmDropped;
+
+        /// <summary>Dragging an arm handle was cancelled; nothing changes.</summary>
+        public event Action ArmDragCancelled;
 
         /// <summary>The selection was moved, or its object rotated, by dragging and the pointer was released.</summary>
         public event Action<List<MapObjectEdit>> ObjectsEdited;
@@ -763,6 +778,18 @@ namespace OmsiMapEditor.UI
             junctionMarkers.Clear();
             if (markers != null)
                 junctionMarkers.AddRange(markers);
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// Shows a round handle on each arm of a junction the editor made, at world positions; dragging one turns that
+        /// arm. Null or empty hides them.
+        /// </summary>
+        public void SetArmHandles(IEnumerable<OmsiMapPoint> points)
+        {
+            armHandles.Clear();
+            if (points != null)
+                armHandles.AddRange(points);
             MarkDirtyRepaint();
         }
 
@@ -1197,6 +1224,7 @@ namespace OmsiMapEditor.UI
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
             DrawJunctionMarkers(painter, visible);
+            DrawArmHandles(painter);
             DrawTileAdders(painter);
             var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
@@ -1483,6 +1511,36 @@ namespace OmsiMapEditor.UI
             if (Vector2.Distance(screen, MapToScreen(WorldToMap(middle))) <= HandleRadius + 3f)
                 return SplineHandleKind.Curve;
             return null;
+        }
+
+        private bool ArmHandlesShown => armHandles.Count > 0 && AllowEditing && !roadMode && placementAsset == null && !ThreeDimensional;
+
+        /// <summary>Round handles on the arms of the selected junction made here; hidden while one is dragged, as the preview shows the arms.</summary>
+        private void DrawArmHandles(Painter2D painter)
+        {
+            if (!ArmHandlesShown || dragMode == DragMode.JunctionArm || IsDraggingObject())
+                return;
+            foreach (var point in armHandles)
+            {
+                painter.fillColor = handleFillColor;
+                painter.strokeColor = selectedObjectColor;
+                painter.lineWidth = 2f;
+                painter.BeginPath();
+                AddCircle(painter, MapToScreen(WorldToMap(point)), HandleRadius);
+                painter.Fill();
+                painter.Stroke();
+            }
+        }
+
+        /// <summary>The arm handle under a screen position, by its place, or -1.</summary>
+        private int ArmHandleAt(Vector2 screen)
+        {
+            if (!ArmHandlesShown)
+                return -1;
+            for (var index = 0; index < armHandles.Count; index++)
+                if (Vector2.Distance(screen, MapToScreen(WorldToMap(armHandles[index]))) <= HandleRadius + 3f)
+                    return index;
+            return -1;
         }
 
         /// <summary>
@@ -2193,6 +2251,15 @@ namespace OmsiMapEditor.UI
 
             if (ClickAdder(position))
             {
+                evt.StopPropagation();
+                return;
+            }
+
+            var armHandle = ArmHandleAt(position);
+            if (armHandle >= 0)
+            {
+                BeginDrag(DragMode.JunctionArm, evt.pointerId, position);
+                ArmDragStarted?.Invoke(armHandle);
                 evt.StopPropagation();
                 return;
             }
@@ -3101,6 +3168,10 @@ namespace OmsiMapEditor.UI
                     var dragged = ScreenToMap(position);
                     SplineEndDragged?.Invoke(dragged.x + originX, dragged.y + originY, evt.altKey);
                     break;
+                case DragMode.JunctionArm:
+                    var turned = ScreenToMap(position);
+                    ArmDragged?.Invoke(turned.x + originX, turned.y + originY, evt.altKey);
+                    break;
                 case DragMode.Pan:
                     var delta = position - dragLastPointer;
                     center += new Vector2(-delta.x, delta.y) * metersPerPixel;
@@ -3179,6 +3250,15 @@ namespace OmsiMapEditor.UI
                 var dropped = ScreenToMap((Vector2)evt.localPosition);
                 EndDrag();
                 SplineEndDropped?.Invoke(dropped.x + originX, dropped.y + originY, evt.altKey);
+                MarkDirtyRepaint();
+                evt.StopPropagation();
+                return;
+            }
+            if (finished == DragMode.JunctionArm)
+            {
+                var released = ScreenToMap((Vector2)evt.localPosition);
+                EndDrag();
+                ArmDropped?.Invoke(released.x + originX, released.y + originY, evt.altKey);
                 MarkDirtyRepaint();
                 evt.StopPropagation();
                 return;
@@ -3264,9 +3344,12 @@ namespace OmsiMapEditor.UI
             if (dragMode == DragMode.None)
                 return;
             var splineEnd = dragMode == DragMode.SplineEnd;
+            var arm = dragMode == DragMode.JunctionArm;
             EndDrag();
             if (splineEnd)
                 SplineEndDragCancelled?.Invoke();
+            if (arm)
+                ArmDragCancelled?.Invoke();
             MarkDirtyRepaint();
         }
 

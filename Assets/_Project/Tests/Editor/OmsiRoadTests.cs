@@ -628,7 +628,7 @@ namespace OmsiMapEditor.Tests
             // Placed here: its ID lies above those of the original map. Its point is at 100, 260, where the road ends.
             var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 270, Height = 2 };
             summary.Tiles[0].Objects.Add(junction);
-            Assert.AreEqual(string.Empty, session.JunctionTerrainState(summary).Replace("500 0 0 100 270 2 0 0 0;", string.Empty));
+            Assert.AreEqual(string.Empty, session.JunctionTerrainState(summary).Replace(@"500 Sceneryobjects\Test\square.sco 0 0 100 270 2 0 0 0;", string.Empty));
             var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
             {
                 StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
@@ -807,6 +807,91 @@ namespace OmsiMapEditor.Tests
                     session.Undo(summary, (OmsiObjectChange)step);
             }
             CollectionAssert.AreEqual(tileBytes, session.Workspace.ReadAllBytes("tile_0_0.map"));
+        }
+
+        [Test]
+        public void TurningAnArmOfAMadeJunctionMakesItAgainAndLeadsEveryJoinedRoadToItsPoint()
+        {
+            // The map's road profile with a lane each way, so junctions can be made of it.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            File.WriteAllText(Path.Combine(installation, "Splines", "road.sli"),
+                "[texture]\r\nroad.bmp\r\n\r\n[profile]\r\n0\r\n\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n" +
+                "[path]\r\n0\r\n-2\r\n0.15\r\n3.5\r\n1\r\n[path]\r\n0\r\n2\r\n0.15\r\n3.5\r\n0\r\n");
+            var profiles = new OmsiSplineProfileCatalog(installation);
+            var road = profiles.Get(@"Splines\road.sli");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var built = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 180, StartHeight = 2, EndX = 100, EndY = 280, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            // A T junction made of the road with its side arm east, inserted into the road at 230 ...
+            var tee = OmsiJunctionGenerator.Junction(OmsiRoadJunctions.Arms(@"Splines\road.sli", road, @"Splines\road.sli", road, new double[0], new[] { 90.0 }),
+                null, "Tee");
+            var teePath = OmsiGeneratedObjectStore.Write(installation, "Roads", "Tee", tee);
+            var catalog = new OmsiJunctionCatalog(installation);
+            var spline = tile.Splines.Single(candidate => candidate.Id == built.SplineIds[1]);
+            var insertion = session.InsertJunction(summary, OmsiJunctionInsertion.Plan(summary, catalog, teePath, tile, spline, 25.0, 110, 230,
+                OmsiRoadJunctions.MainPair(catalog.Helpers(teePath))));
+            Assert.IsTrue(insertion.Succeeded);
+            var junction = insertion.Junction;
+            // ... and a street leaving its east point.
+            var east = catalog.Ports(tile, junction, 300).Single(port => Math.Abs(OmsiRoadPlanner.Normalize(port.OutwardHeadingDegrees - 90.0)) < 1e-6);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = east.Position.X, StartY = east.Position.Y, StartHeadingDegrees = east.OutwardHeadingDegrees, StartHeight = east.Height,
+                EndX = east.Position.X + 40, EndY = east.Position.Y, EndHeight = east.Height, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var tileBytes = session.Workspace.ReadAllBytes("tile_0_0.map");
+
+            var made = OmsiGeneratedJunction.Read(installation, teePath, profiles.Get);
+            Assert.IsNotNull(made);
+            Assert.IsTrue(made.SidesKnown);
+            var rebuild = OmsiJunctionRebuild.Prepare(summary, catalog, made, tile, junction);
+            for (var index = 0; index < made.Arms.Count; index++)
+                Assert.IsNotNull(rebuild.JoinedAt(index), "no road at point " + (index + 1));
+            var side = made.Arms.FindIndex(arm => !arm.Main);
+            // The side arm stays 30° clear of the road's arms, between them.
+            Assert.AreEqual(30.0, rebuild.PlanTurn(side, 10, null).HeadingDegrees, 1e-9);
+            Assert.AreEqual(150.0, rebuild.PlanTurn(side, 200, null).HeadingDegrees, 1e-9);
+
+            var turn = rebuild.PlanTurn(side, 60, null);
+            Assert.IsFalse(turn.HasErrors, turn.Problem ?? string.Join("; ", turn.Leads.SelectMany(lead => lead.Piece.Issues).Select(issue => issue.Message)));
+            // Nearer the street, the corner ahead needs more room: that arm grows past the 5 m piece leading to it, so its road
+            // is cut 5 m beyond the new point, at the joint 0.7 m further on, and runs on from there as before.
+            var ahead = made.Arms.FindIndex(arm => arm.Main && Math.Abs(arm.HeadingDegrees) < 1e-6);
+            var aheadLead = turn.Leads.Single(lead => lead.Arm == ahead);
+            Assert.Greater(aheadLead.Port.Position.Y, 242.0);
+            Assert.AreEqual(255.0, aheadLead.Cut.Y, 1e-6);
+            Assert.GreaterOrEqual(aheadLead.Cut.Y - aheadLead.Port.Position.Y, OmsiJunctionInsertion.ConnectorMeters);
+            var beyond = tile.Splines.Single(candidate => Math.Abs(new OmsiSplineEnd(tile, candidate, false).Position(300).Y - 255.0) < 1e-6);
+            var beyondLength = beyond.LengthMeters;
+            var again = OmsiGeneratedObjectStore.Write(installation, "Roads", made.Name, OmsiJunctionGenerator.Junction(turn.Arms, null, "Tee"));
+            var result = session.RebuildJunction(summary, rebuild, turn, again);
+            Assert.IsTrue(result.Succeeded);
+            StringAssert.EndsWith(@"Tee_2\Tee_2.sco", again);
+            Assert.AreEqual(again, junction.AssetPath);
+            // Every road meets its point again, the street at its new heading.
+            var checks = OmsiJunctionCatalog.Check(summary, catalog.Ports(tile, junction, 300));
+            foreach (var check in checks)
+                Assert.AreEqual(OmsiJunctionPortState.Connected, check.State, check.Message);
+            Assert.IsTrue(checks.Any(check => Math.Abs(OmsiRoadPlanner.Normalize(check.Port.OutwardHeadingDegrees - 60.0)) < 1e-6));
+            Assert.AreEqual(beyondLength, tile.Splines.Single(candidate => candidate.Id == beyond.Id).LengthMeters, 1e-9);
+
+            // Taking every step back, the last first, leaves the junction and the roads as they were.
+            foreach (var step in result.Steps.Reverse())
+            {
+                if (step is OmsiSplineChange change)
+                    session.Undo(summary, change);
+                else
+                    session.Undo(summary, (OmsiObjectChange)step);
+            }
+            Assert.AreEqual(teePath, junction.AssetPath);
+            CollectionAssert.AreEqual(tileBytes, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            // Redoing the replacement names the junction made again.
+            session.Redo(summary, (OmsiObjectChange)result.Steps[0]);
+            Assert.AreEqual(again, junction.AssetPath);
         }
 
         [Test]

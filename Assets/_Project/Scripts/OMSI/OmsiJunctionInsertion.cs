@@ -248,6 +248,32 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The road is cut this far beyond each connection point; the gap is closed by a short new piece.</summary>
         public const double ConnectorMeters = 5.0;
 
+        /// <summary>
+        /// The short piece from a road end at a cut to a connection point, with two arcs so it meets the point's position,
+        /// heading and height. It runs the way the road does: on from a road ending at the cut, or from the point into a road
+        /// starting there, so profiles that differ left and right stay the right way round.
+        /// </summary>
+        /// <param name="outwardHeadingDegrees">The heading leaving the road end outwards, towards the point.</param>
+        /// <param name="roadEndsThere">True when the road's spline ends at the cut, false when it starts there.</param>
+        public static OmsiRoadPlan PieceToPort(OmsiMapPoint roadEnd, double outwardHeadingDegrees, double height, bool roadEndsThere, OmsiJunctionPort port)
+        {
+            if (port == null)
+                throw new ArgumentNullException(nameof(port));
+            return roadEndsThere
+                ? OmsiRoadPlanner.Plan(new OmsiRoadRequest
+                {
+                    StartX = roadEnd.X, StartY = roadEnd.Y, StartHeadingDegrees = outwardHeadingDegrees, StartHeight = height,
+                    EndX = port.Position.X, EndY = port.Position.Y, EndHeight = port.Height, EndJoinHeadingDegrees = port.OutwardHeadingDegrees + 180.0,
+                    HeightMode = OmsiRoadHeightMode.Manual
+                }, null)
+                : OmsiRoadPlanner.Plan(new OmsiRoadRequest
+                {
+                    StartX = port.Position.X, StartY = port.Position.Y, StartHeadingDegrees = port.OutwardHeadingDegrees, StartHeight = port.Height,
+                    EndX = roadEnd.X, EndY = roadEnd.Y, EndHeight = height, EndJoinHeadingDegrees = outwardHeadingDegrees + 180.0,
+                    HeightMode = OmsiRoadHeightMode.Manual
+                }, null);
+        }
+
         /// <summary>Opposite connection points face away from each other within this many degrees.</summary>
         private const double OppositeToleranceDegrees = 15.0;
 

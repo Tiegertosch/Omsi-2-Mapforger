@@ -220,7 +220,19 @@ namespace OmsiMapEditor.OMSI
             generated.Textures.AddRange(layout.Textures.Values);
 
             var sco = new StringBuilder();
-            sco.Append("Made by OMSI MapWorks: a junction of ").Append(layout.Arms.Count).Append(" arms.\r\n\r\n");
+            sco.Append("Made by OMSI MapWorks: a junction of ").Append(layout.Arms.Count).Append(" arms.\r\n");
+            // What the [splinehelper] sections cannot say, in their order, so the junction can be made again (OmsiGeneratedJunction).
+            sco.Append(OmsiGeneratedJunction.ArmsPrefix);
+            for (var index = 0; index < layout.Arms.Count; index++)
+            {
+                var arm = layout.Arms[index];
+                sco.Append(index == 0 ? " " : "; ").Append(OmsiXWriter.Number(arm.HeadingDegrees));
+                if (arm.Main)
+                    sco.Append(" main");
+                if (arm.Mirrored)
+                    sco.Append(" mirrored");
+            }
+            sco.Append("\r\n\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");
             Section(sco, "rendertype", "surface");
