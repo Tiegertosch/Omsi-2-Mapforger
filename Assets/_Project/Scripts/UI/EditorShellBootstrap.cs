@@ -1102,6 +1102,16 @@ namespace OmsiMapEditor.UI
                 }
             }
 
+            // -levelGround: levels the ground under the objects chosen with -select, once the ground is drawn.
+            if (Array.IndexOf(args, "-levelGround") >= 0)
+            {
+                var levelWait = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - levelWait < 300f)
+                    yield return null;
+                LevelSelectedGround();
+                Debug.Log("Level ground: " + statusLabel?.text);
+            }
+
             // -terrain <raise|lower|smooth|flatten|roughen> <tile x> <tile y> <x> <y> [-terrainRadius m] [-terrainStrength s] [-terrainSeconds s]:
             // holds the brush there for some seconds; -terrain ramp <tile x> <tile y> <x1> <y1> <x2> <y2> lays a ramp.
             var terrainMode = Argument("-terrain", 1);
@@ -3626,6 +3636,34 @@ namespace OmsiMapEditor.UI
             var length = Math.Sqrt((x - start.X) * (x - start.X) + (y - start.Y) * (y - start.Y));
             SetStatus("Laid a ramp of " + gradient.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " % over " +
                       length.ToString("0", CultureInfo.InvariantCulture) + " m. Ctrl+Z takes it back.");
+        }
+
+        /// <summary>Levels the ground under the selected objects (ADR 040, stage 2), as one step.</summary>
+        private void LevelSelectedGround()
+        {
+            if (!CanEdit || currentSummary == null || selection.Count == 0)
+                return;
+            OmsiTerrainChange change;
+            int levelled;
+            try
+            {
+                change = session.LevelGroundUnder(currentSummary,
+                    selection.ConvertAll(item => new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(TileHolding(item) ?? item.Tile, item.Record)), out levelled);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The ground could not be levelled: " + exception.Message);
+                return;
+            }
+            if (change == null)
+            {
+                SetStatus(levelled == 0 ? "Nothing to level: trees and objects without an outline keep their ground." : "The ground there is level already.");
+                return;
+            }
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "levelling the ground under " + levelled + " object(s)" });
+            RefreshGround(change.Tiles);
+            SetStatus("Levelled the ground under " + levelled + " object(s). Ctrl+Z takes it back.");
         }
 
         /// <summary>Draws the ground and the objects standing on it again where the terrain changed.</summary>
@@ -6216,6 +6254,14 @@ namespace OmsiMapEditor.UI
             var canEdit = CanEdit;
             if (canEdit)
             {
+                var level = new Button(LevelSelectedGround)
+                {
+                    text = "Level ground under them",
+                    tooltip = "Makes the ground under each object's outline level with its foot, easing into the ground around over 3 m; trees are left out"
+                };
+                level.AddToClassList("map-control-button");
+                level.AddToClassList("inspector-edit-apply");
+                editor.Add(level);
                 var delete = new Button(DeleteSelectedObjects) { text = "Delete " + selection.Count + " objects" };
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
@@ -6325,6 +6371,14 @@ namespace OmsiMapEditor.UI
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
+                var level = new Button(LevelSelectedGround)
+                {
+                    text = "Level ground",
+                    tooltip = "Makes the ground under the object's outline level with its foot, easing into the ground around over 3 m, as for a house on a slope"
+                };
+                level.AddToClassList("map-control-button");
+                level.AddToClassList("inspector-edit-apply");
+                editor.Add(level);
                 var delete = new Button(DeleteSelectedObjects) { text = "Delete object" };
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");

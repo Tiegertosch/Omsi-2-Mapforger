@@ -461,4 +461,6 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - Ohne eigene Grundlage hätte der nächste Straßenbau alles überschrieben, was man modelliert hat, weil die Anpassung vom Original ausgeht.
 - Gemeinsame Kachelkanten verhindern Stufen an Kachelgrenzen.
 
-**Offen:** Gelände unter Objekten einebnen, Höhenkarte und See/Fluss (Roadmap, Etappen 2 bis 4).
+**Ergänzung vom 25. Oktober 2026 (Etappe 2):** „Level ground“ im Inspector eines gewählten Objekts oder einer Auswahl ebnet wie openMappers `level_ground`: Innerhalb des Rechtecks um den Grundriss (`OmsiObjectOutline`, im Objektrahmen und mit seiner Drehung) liegt das Gelände auf der Höhe des Fußes, darüber hinaus geht es über 3 m weich (Smoothstep) ins Gelände über. Der Fuß ist das Gelände unter der Objektmitte, bei Objekten mit absoluter Höhe (`[absheight]`, Kreuzungen) ihre eigene Höhe. Bäume und Objekte ohne Grundriss bleiben aus. Alle gewählten Objekte zusammen sind ein Rückgängig-Schritt über dieselbe Grundlage wie die Pinsel (`OmsiMapSession.LevelGroundUnder`, `OmsiTerrainBrush.Level`).
+
+**Offen:** Höhenkarte und See/Fluss (Roadmap, Etappen 3 und 4).

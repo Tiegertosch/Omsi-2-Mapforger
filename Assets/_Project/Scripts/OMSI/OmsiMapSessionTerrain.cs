@@ -137,6 +137,70 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// The ground under each object made level with its foot, as openMapper's "Level ground" does: its outline and 3 m
+        /// around it ease into the ground about, at the ground's height under its middle, or at its own height when that
+        /// is absolute. Trees and objects without an outline are left out. One step, or null when nothing changed;
+        /// <paramref name="levelled"/> says for how many objects.
+        /// </summary>
+        public OmsiTerrainChange LevelGroundUnder(OmsiMapSummary summary, IEnumerable<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>> objects, out int levelled)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (objects == null)
+                throw new ArgumentNullException(nameof(objects));
+            levelled = 0;
+            ShapeCatalogs();
+            var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(GlobalConfigPath)));
+            var stroke = BeginTerrainStroke(summary);
+            var size = summary.TileSizeMeters;
+            foreach (var pair in objects)
+            {
+                var item = pair.Value;
+                var outline = shapeOutlines.Get(item.AssetPath);
+                if (outline.Source == OmsiOutlineSource.Tree || outline.Points.Length == 0)
+                    continue;
+                var min = new OmsiMapPoint(double.MaxValue, double.MaxValue);
+                var max = new OmsiMapPoint(double.MinValue, double.MinValue);
+                foreach (var point in outline.Points)
+                {
+                    min = new OmsiMapPoint(Math.Min(min.X, point.X), Math.Min(min.Y, point.Y));
+                    max = new OmsiMapPoint(Math.Max(max.X, point.X), Math.Max(max.Y, point.Y));
+                }
+                var x = pair.Key.X * size + item.LocalX;
+                var y = pair.Key.Y * size + item.LocalY;
+                var ground = stroke.HeightAt(x, y);
+                if (!ground.HasValue)
+                    continue;
+                var height = HasAbsoluteHeight(installation, item.AssetPath) ? item.Height : ground.Value;
+                var reach = Math.Sqrt((max.X - min.X) * (max.X - min.X) + (max.Y - min.Y) * (max.Y - min.Y)) +
+                            Math.Sqrt((min.X + max.X) * (min.X + max.X) + (min.Y + max.Y) * (min.Y + max.Y)) + 4.0;
+                var before = Snapshot(stroke.Shown, x, y, reach);
+                OmsiTerrainBrush.Level(stroke.Shown, x, y, item.HeadingDegrees, min, max, height);
+                Follow(stroke, before);
+                levelled++;
+            }
+            return EndTerrainStroke(summary, stroke);
+        }
+
+        /// <summary>Whether an object keeps its height as written rather than above the ground, as junctions do.</summary>
+        private static bool HasAbsoluteHeight(string installation, string assetPath)
+        {
+            try
+            {
+                var path = OmsiRelativePath.Resolve(installation, assetPath);
+                if (!System.IO.File.Exists(path))
+                    return false;
+                var sceneryObject = OmsiSceneryObject.Parse(System.IO.File.ReadAllBytes(path));
+                return sceneryObject.HasAbsoluteHeight || sceneryObject.HasSplineHelper;
+            }
+            catch (Exception exception) when (exception is System.IO.IOException || exception is System.IO.InvalidDataException ||
+                                              exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Keeps the stroke as one step: the shaped ground of the touched tiles is saved, and the ground they show is fitted
         /// to the roads again from it, with their neighbours. Null when nothing changed.
         /// </summary>

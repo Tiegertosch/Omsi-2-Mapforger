@@ -1070,6 +1070,44 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TheGroundUnderAnObjectIsLevelledWithItsFootAndEasesIntoTheGroundAround()
+        {
+            // A house 10 m wide and 6 m deep, a junction plate with its height absolute, and a tree, in the installation.
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            var objects = Path.Combine(installation, "Sceneryobjects");
+            Directory.CreateDirectory(objects);
+            File.WriteAllText(Path.Combine(objects, "house.sco"), "[boundingbox]\r\n10\r\n6\r\n5\r\n0\r\n0\r\n2.5\r\n");
+            File.WriteAllText(Path.Combine(objects, "plate.sco"), "[absheight]\r\n\r\n[boundingbox]\r\n8\r\n8\r\n1\r\n0\r\n0\r\n0.5\r\n");
+            File.WriteAllText(Path.Combine(objects, "tree.sco"), "[tree]\r\ntree.bmp\r\n8\r\n12\r\n0.5\r\n0.7\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var house = session.PlaceObject(summary, tile, @"Sceneryobjects\house.sco", 60, 250, 0, 0).Record;
+            var turned = session.PlaceObject(summary, tile, @"Sceneryobjects\house.sco", 160, 250, 0, 90).Record;
+            var plate = session.PlaceObject(summary, tile, @"Sceneryobjects\plate.sco", 250, 250, 20, 0).Record;
+            var tree = session.PlaceObject(summary, tile, @"Sceneryobjects\tree.sco", 250, 200, 0, 0).Record;
+
+            var change = session.LevelGroundUnder(summary, new[] { house, turned, plate, tree }.Select(item => new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(tile, item)),
+                out var levelled);
+
+            Assert.AreEqual(3, levelled);
+            var terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            // The house on the 5 % slope: 3 m under its middle, its whole outline at 3 m, 5 m past its side as it was.
+            Assert.AreEqual(3.0, terrain[11, 50], 1e-4);
+            Assert.AreEqual(3.0, terrain[13, 50], 1e-4);
+            Assert.AreEqual(0.05 * 70, terrain[14, 50], 1e-4);
+            // Turned a quarter, its 10 m run north and south: 5 m north of its middle is inside, 5 m east is 2 m out.
+            Assert.AreEqual(8.0, terrain[32, 51], 1e-4);
+            Assert.Greater(terrain[33, 50], 8.0 + 1e-3);
+            Assert.Less(terrain[33, 50], 0.05 * 165 - 1e-3);
+            // The plate keeps its absolute height of 20 m; the tree's ground is left alone.
+            Assert.AreEqual(20.0, terrain[50, 50], 1e-4);
+            Assert.AreEqual(0.05 * 250, terrain[50, 40], 1e-4);
+            session.Undo(summary, change);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

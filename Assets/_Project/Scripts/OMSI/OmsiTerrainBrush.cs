@@ -264,6 +264,50 @@ namespace OmsiMapEditor.OMSI
             return length > 1e-6 ? (bHeight - aHeight) / length * 100.0 : 0.0;
         }
 
+        /// <summary>The ground eases from a levelled outline back into the ground around over this distance.</summary>
+        private const double LevelMarginMeters = 3.0;
+
+        /// <summary>
+        /// The ground under an outline made level (openMapper, `level_ground`): within the rectangle from
+        /// <paramref name="min"/> to <paramref name="max"/> in the frame of something standing at (x, y) turned by the
+        /// heading (x right, y forward), the ground lies at the height; over the next 3 m it eases back into the ground.
+        /// </summary>
+        public static void Level(OmsiTerrainGrid grid, double x, double y, double headingDegrees, OmsiMapPoint min, OmsiMapPoint max, double height)
+        {
+            if (grid == null)
+                throw new ArgumentNullException(nameof(grid));
+            var heading = headingDegrees * Math.PI / 180.0;
+            var sin = Math.Sin(heading);
+            var cos = Math.Cos(heading);
+            var reach = Math.Sqrt((max.X - min.X) * (max.X - min.X) + (max.Y - min.Y) * (max.Y - min.Y)) / 2.0 + LevelMarginMeters +
+                        Math.Sqrt((min.X + max.X) * (min.X + max.X) + (min.Y + max.Y) * (min.Y + max.Y)) / 2.0;
+            var cell = grid.CellMeters;
+            var changes = new List<KeyValuePair<KeyValuePair<long, long>, float>>();
+            for (var gy = (long)Math.Floor((y - reach) / cell); gy <= (long)Math.Ceiling((y + reach) / cell); gy++)
+                for (var gx = (long)Math.Floor((x - reach) / cell); gx <= (long)Math.Ceiling((x + reach) / cell); gx++)
+                {
+                    // Into the frame of the object: forward is the heading, clockwise from north; right is a quarter turn on.
+                    var dx = gx * cell - x;
+                    var dy = gy * cell - y;
+                    var right = dx * cos - dy * sin;
+                    var forward = dx * sin + dy * cos;
+                    var outsideX = Math.Max(0.0, Math.Max(min.X - right, right - max.X));
+                    var outsideY = Math.Max(0.0, Math.Max(min.Y - forward, forward - max.Y));
+                    var outside = Math.Sqrt(outsideX * outsideX + outsideY * outsideY);
+                    if (outside >= LevelMarginMeters)
+                        continue;
+                    var current = grid.Get(gx, gy);
+                    if (!current.HasValue)
+                        continue;
+                    var t = outside / LevelMarginMeters;
+                    var weight = 1.0 - t * t * (3.0 - 2.0 * t);
+                    changes.Add(new KeyValuePair<KeyValuePair<long, long>, float>(new KeyValuePair<long, long>(gx, gy),
+                        (float)(current.Value + (height - current.Value) * weight)));
+                }
+            foreach (var change in changes)
+                grid.Set(change.Key.Key, change.Key.Value, change.Value);
+        }
+
         /// <summary>Rolls of natural ground at a place: smooth value noise about 40 m and 12 m across, between −1 and 1.</summary>
         public static double Rolls(double x, double y)
         {

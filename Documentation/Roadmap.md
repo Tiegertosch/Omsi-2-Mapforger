@@ -127,7 +127,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - Angehängte Objekte an Reihen entlang von Straßen anlegen
 - Gelände-Werkzeuge wie openMapper (ADR 040, Entscheidung des Nutzers):
   - [x] Etappe 1: Werkzeug „Terrain“ (G) mit den Pinseln Raise, Lower, Smooth, Flatten (Starthöhe oder eingetippte Höhe) und Roughen, Radius 3–150 m und Stärke 0,05–1, Rampe zwischen zwei Klicks; Kachelränder gemeinsam, Gelände nie über einer Straße daneben; Grundlage je Kachel unter `Mapforge\Terrain`, auf die gebaute Straßen angepasst werden; ein Rückgängig-Schritt je Pinselstrich
-  - Etappe 2: Gelände unter einem Objekt einebnen („Level ground“)
+  - [x] Etappe 2: Gelände unter einem Objekt einebnen („Level ground“ im Inspector, auch für eine Auswahl): Grundriss auf Höhe des Fußes, 3 m weicher Übergang, Bäume ausgelassen
   - Etappe 3: Höhenkarte als 16-Bit-PNG exportieren und importieren
   - Etappe 4: See und Fluss (Grund ausheben, `[water]` setzen)
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
