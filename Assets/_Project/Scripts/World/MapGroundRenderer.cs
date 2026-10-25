@@ -160,6 +160,9 @@ namespace OmsiMapEditor.World
         // one opacity for all. The pictures outlive a new load of the same map; their surfaces follow the ground.
         private readonly Dictionary<long, Texture2D> imageryTextures = new Dictionary<long, Texture2D>();
         private readonly Dictionary<long, MeshRenderer> imagerySurfaces = new Dictionary<long, MeshRenderer>();
+
+        // Full pictures of tiles near the view while zoomed in, shown in place of their smaller copy.
+        private readonly Dictionary<long, Texture2D> sharpTextures = new Dictionary<long, Texture2D>();
         private Transform imageryRoot;
         private float imageryOpacity = 1f;
         private bool imageryVisible = true;
@@ -1270,6 +1273,7 @@ namespace OmsiMapEditor.World
         {
             var key = TileKey(tileX, tileY);
             RemoveImagerySurface(key);
+            DropSharp(key);
             if (imageryTextures.TryGetValue(key, out var old) && old != picture)
                 Destroy(old);
             imageryTextures.Remove(key);
@@ -1288,6 +1292,58 @@ namespace OmsiMapEditor.World
             foreach (var texture in imageryTextures.Values)
                 Destroy(texture);
             imageryTextures.Clear();
+            foreach (var key in new List<long>(sharpTextures.Keys))
+                DropSharp(key);
+        }
+
+        /// <summary>
+        /// Shows a tile's full picture in place of its smaller copy, while it is near the view; null goes back to the copy.
+        /// The renderer takes the texture over.
+        /// </summary>
+        public void SetSharpImagery(int tileX, int tileY, Texture2D picture)
+        {
+            var key = TileKey(tileX, tileY);
+            DropSharp(key);
+            if (picture == null || !imageryTextures.ContainsKey(key))
+            {
+                if (picture != null)
+                    Destroy(picture);
+                ShowImageryTexture(key);
+                return;
+            }
+            sharpTextures[key] = picture;
+            ShowImageryTexture(key);
+        }
+
+        /// <summary>Whether a tile shows its full picture now.</summary>
+        public bool HasSharpImagery(int tileX, int tileY)
+        {
+            return sharpTextures.ContainsKey(TileKey(tileX, tileY));
+        }
+
+        /// <summary>The tiles that show their full picture now, as x and y.</summary>
+        public List<KeyValuePair<int, int>> SharpTiles()
+        {
+            var tiles = new List<KeyValuePair<int, int>>();
+            foreach (var key in sharpTextures.Keys)
+                tiles.Add(new KeyValuePair<int, int>((int)(key >> 32), (int)(key & 0xffffffffL)));
+            return tiles;
+        }
+
+        private void DropSharp(long key)
+        {
+            if (!sharpTextures.TryGetValue(key, out var sharp))
+                return;
+            sharpTextures.Remove(key);
+            Destroy(sharp);
+            ShowImageryTexture(key);
+        }
+
+        private void ShowImageryTexture(long key)
+        {
+            if (!imagerySurfaces.TryGetValue(key, out var surface) || surface == null)
+                return;
+            surface.sharedMaterial.SetTexture("_MainTex", sharpTextures.TryGetValue(key, out var sharp) ? sharp : imageryTextures.TryGetValue(key, out var picture) ? picture : null);
         }
 
         /// <summary>How opaque the pictures from the air lie on the ground, 0 to 1.</summary>
@@ -1328,7 +1384,7 @@ namespace OmsiMapEditor.World
                 imageryRoot.gameObject.SetActive(imageryVisible);
             }
             var overlay = new Material(splineShader) { renderQueue = ImageryQueue, name = "Imagery " + state.X + ", " + state.Y };
-            overlay.SetTexture("_MainTex", picture);
+            overlay.SetTexture("_MainTex", sharpTextures.TryGetValue(state.Key, out var sharp) ? sharp : picture);
             overlay.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
             overlay.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
             overlay.SetFloat("_DepthWrite", 0f);

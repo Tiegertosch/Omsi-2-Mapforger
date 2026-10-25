@@ -232,6 +232,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A tile added to the map gets its pictures (and heights, with <see cref="WithTerrain"/>) by itself.</summary>
         public bool AutoNewTiles { get; set; }
 
+        /// <summary>The edge of a tile's picture: 0 for every pixel of the source up to 4096, or 1024, 2048 or 4096.</summary>
+        public int PictureSize { get; set; }
+
         public static OmsiGeoSettings Parse(string text)
         {
             var settings = new OmsiGeoSettings();
@@ -266,6 +269,8 @@ namespace OmsiMapEditor.OMSI
                 settings.Source = source;
             settings.WithTerrain = values.TryGetValue("terrain", out var terrain) && terrain == "1";
             settings.AutoNewTiles = values.TryGetValue("autonew", out var autoNew) && autoNew == "1";
+            var size = (int)Number("picture", 0);
+            settings.PictureSize = size == 1024 || size == 2048 || size == 4096 ? size : 0;
             return settings;
         }
 
@@ -293,8 +298,85 @@ namespace OmsiMapEditor.OMSI
             Line("show", ShowImagery ? 1 : 0);
             Line("terrain", WithTerrain ? 1 : 0);
             Line("autonew", AutoNewTiles ? 1 : 0);
+            Line("picture", PictureSize);
             if (!string.IsNullOrEmpty(Source))
                 text.Append("source ").Append(Source).Append('\n');
+            return text.ToString();
+        }
+    }
+
+    /// <summary>
+    /// The user's keys for sources that need one and the user's own tile servers, kept only on this computer (never in a
+    /// project, so a key is not shared with it), one tab-separated line each: "key", name, key; "source", name, kind
+    /// (xyz or wms), finest zoom, URL, attribution.
+    /// </summary>
+    public sealed class OmsiImageryPreferences
+    {
+        public Dictionary<string, string> Keys { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+        public List<OmsiImagerySource> Sources { get; } = new List<OmsiImagerySource>();
+
+        /// <summary>Where they are kept unless said otherwise: the user's local application data.</summary>
+        public static string DefaultPath =>
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OMSI MapWorks", "imagery-sources.txt");
+
+        /// <summary>The key entered for a source, or null.</summary>
+        public string Key(string sourceName)
+        {
+            return sourceName != null && Keys.TryGetValue(sourceName, out var key) && !string.IsNullOrWhiteSpace(key) ? key.Trim() : null;
+        }
+
+        /// <summary>Whether a source can be asked: it has its key if it needs one.</summary>
+        public bool Usable(OmsiImagerySource source)
+        {
+            return source != null && (!source.NeedsKey || Key(source.Name) != null);
+        }
+
+        /// <summary>The editor's sources, then the user's own that do not share a name with one of them.</summary>
+        public List<OmsiImagerySource> All()
+        {
+            var all = new List<OmsiImagerySource>(OmsiImagerySource.Imagery);
+            foreach (var source in Sources)
+                if (!all.Exists(item => item.Name == source.Name))
+                    all.Add(source);
+            return all;
+        }
+
+        public static OmsiImageryPreferences Parse(string text)
+        {
+            var preferences = new OmsiImageryPreferences();
+            foreach (var line in (text ?? string.Empty).Split('\n'))
+            {
+                var parts = line.TrimEnd('\r').Split('\t');
+                if (parts.Length == 3 && parts[0] == "key" && parts[1].Length > 0)
+                    preferences.Keys[parts[1]] = parts[2];
+                else if (parts.Length == 6 && parts[0] == "source" && int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var zoom))
+                {
+                    try
+                    {
+                        preferences.Sources.Add(OmsiImagerySource.Own(parts[1], parts[4], parts[5], zoom, parts[2] == "wms"));
+                    }
+                    catch (ArgumentException)
+                    {
+                        // A broken line is left out; the others stay.
+                    }
+                }
+            }
+            return preferences;
+        }
+
+        public override string ToString()
+        {
+            var text = new StringBuilder();
+            string Clean(string value)
+            {
+                return (value ?? string.Empty).Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ');
+            }
+            foreach (var pair in Keys)
+                if (!string.IsNullOrWhiteSpace(pair.Value))
+                    text.Append("key\t").Append(Clean(pair.Key)).Append('\t').Append(Clean(pair.Value.Trim())).Append('\n');
+            foreach (var source in Sources)
+                text.Append("source\t").Append(Clean(source.Name)).Append('\t').Append(source.Kind == OmsiImageryKind.Wms ? "wms" : "xyz").Append('\t')
+                    .Append(source.MaxZoom.ToString(CultureInfo.InvariantCulture)).Append('\t').Append(Clean(source.Url)).Append('\t').Append(Clean(source.Attribution)).Append('\n');
             return text.ToString();
         }
     }
@@ -346,6 +428,30 @@ namespace OmsiMapEditor.OMSI
         /// <summary>An official orthophoto, preferred where it has the place.</summary>
         public bool IsOrthophoto { get; private set; }
 
+        /// <summary>Works only with the user's own key, filled in for {key}.</summary>
+        public bool NeedsKey { get; private set; }
+
+        /// <summary>Added by the user, not part of the editor.</summary>
+        public bool IsOwn { get; private set; }
+
+        /// <summary>A tile server of the user's: XYZ or WMTS tiles at {z}/{x}/{y}, or a WMS asked by {bbox}.</summary>
+        public static OmsiImagerySource Own(string name, string url, string attribution, int maxZoom, bool wms)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(url))
+                throw new ArgumentException("A tile server needs a name and a URL.");
+            return new OmsiImagerySource
+            {
+                Name = name.Trim(), Url = url.Trim(), Attribution = string.IsNullOrWhiteSpace(attribution) ? name.Trim() : attribution.Trim(), Terms = string.Empty,
+                MaxZoom = Math.Max(1, Math.Min(22, maxZoom)), Kind = wms ? OmsiImageryKind.Wms : OmsiImageryKind.Imagery, TilePixels = wms ? 512 : 256, IsOwn = true,
+                NeedsKey = url.Contains("{key}")
+            };
+        }
+
+        private static OmsiImagerySource Keyed(string name, string url, string attribution, int maxZoom, string link, int pixels)
+        {
+            return new OmsiImagerySource { Name = name, Url = url, Attribution = attribution, Terms = link, MaxZoom = maxZoom, NeedsKey = true, TilePixels = pixels };
+        }
+
         public const string EsriName = "Esri World Imagery";
         public const string TerrainName = "AWS Terrain Tiles";
 
@@ -372,6 +478,10 @@ namespace OmsiMapEditor.OMSI
                 Attribution = "Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community", Terms = "https://www.esri.com/en-us/legal/terms/full-master-agreement",
                 MaxZoom = 21
             },
+            Keyed("Mapbox Satellite", "https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token={key}", "© Mapbox © OpenStreetMap contributors © Maxar", 21,
+                "https://account.mapbox.com/access-tokens/", 512),
+            Keyed("MapTiler Satellite", "https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key={key}", "© MapTiler © OpenStreetMap contributors", 20,
+                "https://cloud.maptiler.com/account/keys/", 256),
             Ortho("Berlin TrueDOP 2024", Wms("https://gdi.berlin.de/services/wms/truedop_2024", "truedop_2024"), "© Geoportal Berlin, TrueDOP 2024, dl-de/zero-2.0",
                 "https://www.govdata.de/dl-de/zero-2-0", new[] { 13.08, 52.33, 13.77, 52.68 }, 0.2, true),
             Ortho("Brandenburg DOP20", Wms("https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms", "bebb_dop20c"), "© GeoBasis-DE/LGB, dl-de/by-2-0",
@@ -411,8 +521,8 @@ namespace OmsiMapEditor.OMSI
             Terms = "https://www.openstreetmap.org/copyright"
         };
 
-        /// <summary>The request for one tile.</summary>
-        public string TileUrl(int zoom, int x, int y)
+        /// <summary>The request for one tile, with the user's key where the source takes one.</summary>
+        public string TileUrl(int zoom, int x, int y, string key = null)
         {
             const double r = 20037508.342789244;
             var step = 2.0 * r / (1L << zoom);
@@ -420,7 +530,8 @@ namespace OmsiMapEditor.OMSI
                 (-r + (x + 1.0) * step).ToString("0.000", CultureInfo.InvariantCulture), (r - y * step).ToString("0.000", CultureInfo.InvariantCulture));
             var pixels = TilePixels.ToString(CultureInfo.InvariantCulture);
             return Url.Replace("{z}", zoom.ToString(CultureInfo.InvariantCulture)).Replace("{x}", x.ToString(CultureInfo.InvariantCulture))
-                .Replace("{y}", y.ToString(CultureInfo.InvariantCulture)).Replace("{bbox}", box).Replace("{width}", pixels).Replace("{height}", pixels);
+                .Replace("{y}", y.ToString(CultureInfo.InvariantCulture)).Replace("{bbox}", box).Replace("{width}", pixels).Replace("{height}", pixels)
+                .Replace("{key}", Uri.EscapeDataString(key ?? string.Empty));
         }
 
         /// <summary>Whether the source may have imagery at a place.</summary>
@@ -459,7 +570,8 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// Sources in the order to prefer them at a place, given each one's detail there in metres a pixel (null when not
-        /// known): the finest first, a centimetre either way counting the same, then official orthophotos, then Esri.
+        /// known): the finest first, a centimetre either way counting the same, then official orthophotos, Mapbox, MapTiler,
+        /// Esri and the user's own servers.
         /// </summary>
         public static List<KeyValuePair<OmsiImagerySource, double?>> Rank(IEnumerable<KeyValuePair<OmsiImagerySource, double?>> found)
         {
@@ -470,7 +582,8 @@ namespace OmsiMapEditor.OMSI
             }
             int Preference(OmsiImagerySource source)
             {
-                return source.IsOrthophoto ? 0 : source.Name == EsriName ? 4 : 5;
+                return source.IsOrthophoto ? 0 : source.Name.StartsWith("Mapbox", StringComparison.Ordinal) ? 2 :
+                    source.Name.StartsWith("MapTiler", StringComparison.Ordinal) ? 3 : source.Name == EsriName ? 4 : 5;
             }
             list.Sort((a, b) =>
             {

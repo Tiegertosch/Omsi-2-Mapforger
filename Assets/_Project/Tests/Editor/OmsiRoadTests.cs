@@ -1291,15 +1291,15 @@ namespace OmsiMapEditor.Tests
             {
                 asked.Add(url);
                 // Zoom 18 has nothing; zoom 17 has a picture.
-                return url.Contains("/tile/18/") ? new KeyValuePair<int, byte[]>(404, new byte[0]) : new KeyValuePair<int, byte[]>(200, new byte[] { 1, 2, 3 });
+                return url.Contains("/tile/18/") ? new KeyValuePair<int, byte[]>(404, new byte[0]) : new KeyValuePair<int, byte[]>(200, Jpeg);
             });
             var esri = OmsiImagerySource.Imagery.Single(source => source.Name == OmsiImagerySource.EsriName);
             try
             {
                 Assert.IsNull(fetcher.Tile(esri, 18, 1, 2, CancellationToken.None));
                 Assert.IsNull(fetcher.Tile(esri, 18, 1, 2, CancellationToken.None));
-                CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, fetcher.Tile(esri, 17, 0, 1, CancellationToken.None));
-                CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, fetcher.Tile(esri, 17, 0, 1, CancellationToken.None));
+                CollectionAssert.AreEqual(Jpeg, fetcher.Tile(esri, 17, 0, 1, CancellationToken.None));
+                CollectionAssert.AreEqual(Jpeg, fetcher.Tile(esri, 17, 0, 1, CancellationToken.None));
                 Assert.AreEqual(2, asked.Count);
             }
             finally
@@ -1668,6 +1668,180 @@ namespace OmsiMapEditor.Tests
             var back = world.Local(2402, 11279, spandau.Latitude, spandau.Longitude);
             Assert.AreEqual(200.0, back.X, 0.01);
             Assert.AreEqual(300.0, back.Y, 0.01);
+        }
+
+        [Test]
+        public void SourcesWithAKeyAndOwnServersAreAskedWithTheKeyOnlyThisComputerKeeps()
+        {
+            var mapbox = OmsiImagerySource.Imagery.Single(source => source.Name == "Mapbox Satellite");
+            Assert.IsTrue(mapbox.NeedsKey);
+            Assert.AreEqual("https://api.mapbox.com/v4/mapbox.satellite/17/5/6@2x.jpg90?access_token=pk.a%2Bb", mapbox.TileUrl(17, 5, 6, "pk.a+b"));
+            var preferences = new OmsiImageryPreferences();
+            Assert.IsFalse(preferences.Usable(mapbox));
+            preferences.Keys["Mapbox Satellite"] = " pk.secret ";
+            Assert.IsTrue(preferences.Usable(mapbox));
+            Assert.AreEqual("pk.secret", preferences.Key("Mapbox Satellite"));
+            preferences.Sources.Add(OmsiImagerySource.Own("City WMS", "https://example.org/wms?BBOX={bbox}&WIDTH={width}&HEIGHT={height}", "© City", 19, true));
+            preferences.Sources.Add(OmsiImagerySource.Own("Esri World Imagery", "https://example.org/{z}/{x}/{y}.png", "", 18, false));
+            var parsed = OmsiImageryPreferences.Parse(preferences.ToString());
+            Assert.AreEqual("pk.secret", parsed.Key("Mapbox Satellite"));
+            Assert.AreEqual(2, parsed.Sources.Count);
+            Assert.AreEqual(OmsiImageryKind.Wms, parsed.Sources[0].Kind);
+            Assert.AreEqual(512, parsed.Sources[0].TilePixels);
+            Assert.AreEqual(19, parsed.Sources[0].MaxZoom);
+            Assert.IsTrue(parsed.Sources[0].IsOwn);
+            // An own source named as one of the editor's does not hide it.
+            Assert.AreEqual(OmsiImagerySource.Imagery.Count + 1, parsed.All().Count);
+            // Mapbox before MapTiler before Esri at the same detail.
+            var maptiler = OmsiImagerySource.Imagery.Single(source => source.Name == "MapTiler Satellite");
+            var esri = OmsiImagerySource.Imagery.Single(source => source.Name == OmsiImagerySource.EsriName);
+            var ranked = OmsiImagerySource.Rank(new[]
+            {
+                new KeyValuePair<OmsiImagerySource, double?>(esri, 0.3), new KeyValuePair<OmsiImagerySource, double?>(maptiler, 0.3),
+                new KeyValuePair<OmsiImagerySource, double?>(mapbox, 0.3), new KeyValuePair<OmsiImagerySource, double?>(parsed.Sources[0], 0.3)
+            });
+            Assert.AreEqual(new[] { "Mapbox Satellite", "MapTiler Satellite", OmsiImagerySource.EsriName, "City WMS" }, ranked.Select(pair => pair.Key.Name).ToArray());
+
+            var cache = Path.Combine(Path.GetTempPath(), "mapforge-keys-" + Guid.NewGuid().ToString("N"));
+            var asked = new List<string>();
+            var fetcher = new OmsiTileFetcher(cache, (url, cancel) =>
+            {
+                asked.Add(url);
+                return new KeyValuePair<int, byte[]>(403, new byte[0]);
+            });
+            try
+            {
+                // Without a key nothing is asked; a refused key is said without the key.
+                var none = Assert.Throws<IOException>(() => fetcher.Tile(mapbox, 17, 5, 6, CancellationToken.None));
+                StringAssert.Contains("no key", none.Message);
+                Assert.AreEqual(0, asked.Count);
+                fetcher.Keys = name => parsed.Key(name);
+                var refused = Assert.Throws<IOException>(() => fetcher.Tile(mapbox, 17, 5, 6, CancellationToken.None));
+                StringAssert.Contains("refused the key", refused.Message);
+                StringAssert.DoesNotContain("secret", refused.Message);
+                StringAssert.Contains("access_token=pk.secret", asked[0]);
+            }
+            finally
+            {
+                if (Directory.Exists(cache))
+                    Directory.Delete(cache, true);
+            }
+
+            // A picture made smaller keeps the mean of the pixels each new one covers.
+            var big = new OmsiRgbImage(4, 2, new byte[] { 0, 0, 0, 100, 100, 100, 10, 10, 10, 20, 20, 20, 0, 0, 0, 100, 100, 100, 30, 30, 30, 40, 40, 40 });
+            var small = big.Reduced(2);
+            Assert.AreEqual(2, small.Width);
+            Assert.AreEqual(1, small.Height);
+            Assert.AreEqual(50, small.Rgb[0]);
+            Assert.AreEqual(25, small.Rgb[3]);
+            Assert.AreSame(small, small.Reduced(4));
+            var settings = OmsiGeoSettings.Parse(new OmsiGeoSettings { PictureSize = 2048 }.ToString());
+            Assert.AreEqual(2048, settings.PictureSize);
+            Assert.AreEqual(0, OmsiGeoSettings.Parse("picture 1000\n").PictureSize);
+        }
+
+        [Test]
+        public void TilesBesideLoadedHeightsBendToMeetThem()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var east = summary.Tiles.Single(tile => tile.X == 1 && tile.Y == 0);
+            var west = summary.Tiles.Single(tile => tile.X == 0 && tile.Y == 0);
+            var before = OmsiTerrain.Parse(session.Source.ReadAllBytes("tile_1_0.map.terrain"));
+            var heights = new float[OmsiTerrain.Resolution * OmsiTerrain.Resolution];
+            for (var index = 0; index < heights.Length; index++)
+                heights[index] = 10f;
+            var edges = new List<OmsiTerrainEdge>();
+            var change = session.ImportTerrainHeights(summary, new[] { new KeyValuePair<OmsiTileSummary, float[]>(west, heights) }, edges);
+            Assert.IsNotNull(change);
+            var stepped = edges.Single();
+            Assert.AreEqual(1, stepped.TileX);
+            Assert.AreEqual(1, stepped.DirectionX);
+            Assert.AreEqual(before[0, 30], stepped.Before[30], 1e-4);
+            // The shared edge already has the loaded heights; one sample inside the step is still there.
+            var laid = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain"));
+            Assert.AreEqual(10.0, laid[0, 30], 1e-4);
+            Assert.AreEqual(before[1, 30], laid[1, 30], 1e-4);
+
+            var fit = session.FitTerrainEdges(session.Read(), edges);
+            Assert.IsNotNull(fit);
+            var bent = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain"));
+            var delta = 10f - before[0, 30];
+            var t = 1f / 12f;
+            Assert.AreEqual(before[1, 30] + delta * (1f - t * t * (3f - 2f * t)), bent[1, 30], 1e-3);
+            Assert.AreEqual(10.0, bent[0, 30], 1e-4);
+            // Past the reach the tile is as it was.
+            Assert.AreEqual(before[12, 30], bent[12, 30], 1e-4);
+            Assert.AreEqual(before[40, 30], bent[40, 30], 1e-4);
+            // With the heights taken back, the edge is as it was and there is nothing to fit.
+            session.Undo(session.Read(), fit);
+            session.Undo(session.Read(), change);
+            Assert.IsNull(session.FitTerrainEdges(session.Read(), edges));
+        }
+
+        /// <summary>The start of a JPEG file, enough for the fetcher to take it as a picture.</summary>
+        private static readonly byte[] Jpeg = { 0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5, 6 };
+
+        [Test]
+        public void APageInPlaceOfAPictureIsNotKeptAndTheSharpestPassesItsSourceOver()
+        {
+            var cache = Path.Combine(Path.GetTempPath(), "mapforge-nopicture-" + Guid.NewGuid().ToString("N"));
+            var page = Encoding.UTF8.GetBytes("<html><head><title>\nWartungsarbeiten\n</title></head></html>");
+            var jpeg = Jpeg;
+            var maintenance = true;
+            var asked = 0;
+            var fetcher = new OmsiTileFetcher(cache, (url, cancel) =>
+            {
+                asked++;
+                return new KeyValuePair<int, byte[]>(200, maintenance ? page : jpeg);
+            });
+            var lower = OmsiImagerySource.Imagery.Single(source => source.Name == "Niedersachsen DOP20");
+            try
+            {
+                var refused = Assert.Throws<IOException>(() => fetcher.Tile(lower, 18, 1, 2, CancellationToken.None));
+                StringAssert.Contains("the server sent no picture (Wartungsarbeiten)", refused.Message);
+                // Not kept: once the service is back, the tile comes.
+                maintenance = false;
+                CollectionAssert.AreEqual(jpeg, fetcher.Tile(lower, 18, 1, 2, CancellationToken.None));
+                Assert.AreEqual(2, asked);
+                // A page an older version kept is thrown away and asked for again.
+                var kept = Path.Combine(cache, lower.Slug, "18", "1", "3.tile");
+                Directory.CreateDirectory(Path.GetDirectoryName(kept));
+                File.WriteAllBytes(kept, page);
+                CollectionAssert.AreEqual(jpeg, fetcher.Tile(lower, 18, 1, 3, CancellationToken.None));
+                CollectionAssert.AreEqual(jpeg, File.ReadAllBytes(kept));
+            }
+            finally
+            {
+                Directory.Delete(cache, true);
+            }
+            Assert.IsTrue(OmsiTileFetcher.IsPicture(OmsiPng.EncodeGrey16(2, 2, new ushort[4])));
+            Assert.IsFalse(OmsiTileFetcher.IsPicture(page));
+
+            // Looking for the sharpest in Hanover, the service under maintenance is passed over and Esri is taken.
+            var session = OpenProject();
+            var job = new OmsiAerialJob
+            {
+                Geo = OmsiGeoreference.Placed(new OmsiGeoAnchor { Latitude = 52.3745, Longitude = 9.7386 }, 300), TileSize = 300, MaxImageSize = 512,
+                Fetcher = new OmsiTileFetcher(cache, (url, cancel) => new KeyValuePair<int, byte[]>(200, url.Contains("lgln") ? page : Jpeg)),
+                Decode = bytes => new OmsiRgbImage(1, 1, new byte[] { 90, 90, 90 })
+            };
+            job.Tiles.Add(session.Read().Tiles[0]);
+            job.ImagerySources.Add(lower);
+            job.ImagerySources.Add(OmsiImagerySource.Imagery.Single(source => source.Name == OmsiImagerySource.EsriName));
+            var pictures = 0;
+            job.ImageReady = (tile, picture, meta) => pictures++;
+            try
+            {
+                job.Run(CancellationToken.None);
+            }
+            finally
+            {
+                Directory.Delete(cache, true);
+            }
+            Assert.AreEqual(OmsiImagerySource.EsriName, job.ChosenSource.Name);
+            StringAssert.Contains("Wartungsarbeiten", job.PassedOver.Single());
+            Assert.AreEqual(1, pictures);
         }
 
         [Test]

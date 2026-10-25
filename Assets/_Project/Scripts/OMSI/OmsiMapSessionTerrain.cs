@@ -7,6 +7,49 @@ namespace OmsiMapEditor.OMSI
     /// The ground shaped by hand: the shaped ground of every tile it touched before and after, so the step can be taken
     /// back and done again; the ground fitted to roads follows from it.
     /// </summary>
+    /// <summary>
+    /// An edge between tiles with loaded heights and a tile without: the tile beside, which way it lies from the loaded one,
+    /// and the edge's 61 heights before the heights were laid.
+    /// </summary>
+    public sealed class OmsiTerrainEdge
+    {
+        public int TileX { get; set; }
+        public int TileY { get; set; }
+
+        /// <summary>Where the tile lies from the loaded one: (1, 0) east, (0, 1) north.</summary>
+        public int DirectionX { get; set; }
+        public int DirectionY { get; set; }
+
+        public float[] Before { get; set; }
+
+        /// <summary>The map-wide sample of the edge's sample <paramref name="index"/>, <paramref name="depth"/> samples into the tile.</summary>
+        public void Sample(int index, int depth, out long gx, out long gy)
+        {
+            const int cells = OmsiTerrain.Resolution - 1;
+            long originX = (long)TileX * cells, originY = (long)TileY * cells;
+            if (DirectionX == 1)
+            {
+                gx = originX + depth;
+                gy = originY + index;
+            }
+            else if (DirectionX == -1)
+            {
+                gx = originX + cells - depth;
+                gy = originY + index;
+            }
+            else if (DirectionY == 1)
+            {
+                gx = originX + index;
+                gy = originY + depth;
+            }
+            else
+            {
+                gx = originX + index;
+                gy = originY + cells - depth;
+            }
+        }
+    }
+
     public sealed class OmsiTerrainChange
     {
         internal OmsiTerrainChange()
@@ -227,7 +270,12 @@ namespace OmsiMapEditor.OMSI
         /// Terrain heights from the world laid on tiles, 61 × 61 each from the south, taking the place of the ground shaped
         /// by hand; roads fitted to the terrain are fitted in again. One step, or null when nothing changed.
         /// </summary>
-        public OmsiTerrainChange ImportTerrainHeights(OmsiMapSummary summary, IEnumerable<KeyValuePair<OmsiTileSummary, float[]>> heights)
+        /// <param name="steppedEdges">
+        /// Filled with the edges the heights share with tiles that got none, with their heights before: the ground steps one
+        /// sample inside those tiles until <see cref="FitTerrainEdges"/> bends them.
+        /// </param>
+        public OmsiTerrainChange ImportTerrainHeights(OmsiMapSummary summary, IEnumerable<KeyValuePair<OmsiTileSummary, float[]>> heights,
+            List<OmsiTerrainEdge> steppedEdges = null)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -235,14 +283,83 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(heights));
             const int cells = OmsiTerrain.Resolution - 1;
             var stroke = BeginTerrainStroke(summary);
+            var laid = new List<KeyValuePair<OmsiTileSummary, float[]>>();
             foreach (var pair in heights)
+                if (pair.Value != null && pair.Value.Length == OmsiTerrain.Resolution * OmsiTerrain.Resolution)
+                    laid.Add(pair);
+            if (steppedEdges != null)
             {
-                if (pair.Value == null || pair.Value.Length != OmsiTerrain.Resolution * OmsiTerrain.Resolution)
-                    continue;
+                var loaded = new HashSet<long>();
+                foreach (var pair in laid)
+                    loaded.Add(((long)pair.Key.X << 32) | (uint)pair.Key.Y);
+                foreach (var pair in laid)
+                    foreach (var direction in new[] { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 } })
+                    {
+                        int x = pair.Key.X + direction[0], y = pair.Key.Y + direction[1];
+                        var neighbour = summary.Tiles.Find(tile => tile.X == x && tile.Y == y && tile.IsAvailable && tile.HasTerrain);
+                        if (neighbour == null || loaded.Contains(((long)x << 32) | (uint)y))
+                            continue;
+                        var edge = new OmsiTerrainEdge { TileX = x, TileY = y, DirectionX = direction[0], DirectionY = direction[1], Before = new float[OmsiTerrain.Resolution] };
+                        for (var index = 0; index < OmsiTerrain.Resolution; index++)
+                        {
+                            edge.Sample(index, 0, out var gx, out var gy);
+                            edge.Before[index] = stroke.Shaped.Get(gx, gy) ?? 0f;
+                        }
+                        steppedEdges.Add(edge);
+                    }
+            }
+            foreach (var pair in laid)
                 for (var row = 0; row < OmsiTerrain.Resolution; row++)
                     for (var column = 0; column < OmsiTerrain.Resolution; column++)
                         stroke.Shaped.Set((long)pair.Key.X * cells + column, (long)pair.Key.Y * cells + row, pair.Value[row * OmsiTerrain.Resolution + column]);
-            }
+            // An edge that moved by less than 5 cm does not step: tiles loaded before meet the new ones.
+            steppedEdges?.RemoveAll(edge =>
+            {
+                for (var index = 0; index < OmsiTerrain.Resolution; index++)
+                {
+                    edge.Sample(index, 0, out var gx, out var gy);
+                    if (Math.Abs((stroke.Shaped.Get(gx, gy) ?? edge.Before[index]) - edge.Before[index]) >= 0.05f)
+                        return false;
+                }
+                return true;
+            });
+            return EndTerrainStroke(summary, stroke);
+        }
+
+        /// <summary>
+        /// Bends tiles beside loaded heights to meet them, as openMapper's fit_edge: each sample of the shared edge moved by
+        /// as much as the edge moved, fading out smoothly over some samples into the tile (12: 60 m on a 300 m tile). One
+        /// step, or null when nothing changed.
+        /// </summary>
+        public OmsiTerrainChange FitTerrainEdges(OmsiMapSummary summary, IEnumerable<OmsiTerrainEdge> edges, int reach = 12)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (edges == null)
+                throw new ArgumentNullException(nameof(edges));
+            reach = Math.Max(1, Math.Min(OmsiTerrain.Resolution - 1, reach));
+            var stroke = BeginTerrainStroke(summary);
+            foreach (var edge in edges)
+                for (var index = 0; index < OmsiTerrain.Resolution; index++)
+                {
+                    edge.Sample(index, 0, out var edgeX, out var edgeY);
+                    var now = stroke.Shaped.Get(edgeX, edgeY);
+                    if (!now.HasValue)
+                        continue;
+                    var delta = now.Value - edge.Before[index];
+                    if (Math.Abs(delta) < 1e-4f)
+                        continue;
+                    for (var depth = 1; depth < reach; depth++)
+                    {
+                        var t = depth / (float)reach;
+                        // Smooth: no kink where the fade ends.
+                        var weight = 1f - t * t * (3f - 2f * t);
+                        edge.Sample(index, depth, out var gx, out var gy);
+                        var height = stroke.Shaped.Get(gx, gy);
+                        if (height.HasValue)
+                            stroke.Shaped.Set(gx, gy, height.Value + delta * weight);
+                    }
+                }
             return EndTerrainStroke(summary, stroke);
         }
 
@@ -268,8 +385,18 @@ namespace OmsiMapEditor.OMSI
             return OmsiMapExporter.ProjectDataFolder + "\\Imagery\\" + System.IO.Path.GetFileName(OmsiRelativePath.Normalize(tile.FileName)) + ".jpg";
         }
 
-        /// <summary>Keeps a tile's imagery (a JPEG) and what it was made from.</summary>
-        public void SaveImagery(OmsiTileSummary tile, byte[] jpeg, OmsiImageryMeta meta)
+        /// <summary>Where a tile's smaller copy for the view is kept, when its picture is larger than the view shows.</summary>
+        public static string ImageryViewPath(OmsiTileSummary tile)
+        {
+            var path = ImageryPath(tile);
+            return path.Substring(0, path.Length - 4) + ".view.jpg";
+        }
+
+        /// <summary>
+        /// Keeps a tile's imagery (a JPEG), what it was made from, and a smaller copy for the view when the picture is
+        /// larger (null when it is not: an older copy goes).
+        /// </summary>
+        public void SaveImagery(OmsiTileSummary tile, byte[] jpeg, OmsiImageryMeta meta, byte[] viewJpeg = null)
         {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
@@ -278,6 +405,18 @@ namespace OmsiMapEditor.OMSI
             var workspace = RequireWorkspace();
             workspace.Save(ImageryPath(tile), jpeg);
             workspace.Save(ImageryPath(tile) + ".txt", System.Text.Encoding.UTF8.GetBytes(meta?.ToString() ?? string.Empty));
+            if (viewJpeg != null)
+                workspace.Save(ImageryViewPath(tile), viewJpeg);
+            else if (workspace.IsModified(ImageryViewPath(tile)))
+                workspace.Revert(ImageryViewPath(tile));
+        }
+
+        /// <summary>A tile's picture for the view: its smaller copy when it has one, else the picture; null when it has none.</summary>
+        public byte[] ReadImageryForView(OmsiTileSummary tile, out OmsiImageryMeta meta, out bool sharper)
+        {
+            var full = ReadImagery(tile, out meta);
+            sharper = full != null && Workspace.IsModified(ImageryViewPath(tile));
+            return sharper ? Workspace.ReadAllBytes(ImageryViewPath(tile)) : full;
         }
 
         /// <summary>A tile's imagery (a JPEG), or null when it has none.</summary>

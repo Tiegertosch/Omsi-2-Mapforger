@@ -55,6 +55,21 @@ namespace OmsiMapEditor.UI
         private readonly FloatField scaleValue = new FloatField("Size") { isDelayed = true };
         private readonly Label sizeLabel = new Label();
         private OmsiOwnPicture fitShown;
+        private readonly DropdownField pictureSizeField = new DropdownField();
+        private readonly VisualElement edgesRow = new VisualElement();
+        private readonly Label edgesLabel = new Label();
+        private readonly VisualElement keyRows = new VisualElement();
+        private readonly VisualElement ownSourceRows = new VisualElement();
+        private readonly TextField ownNameField = new TextField();
+        private readonly TextField ownUrlField = new TextField();
+        private readonly TextField ownAttributionField = new TextField();
+        private readonly IntegerField ownZoomField = new IntegerField("Finest zoom") { value = 19 };
+        private readonly Toggle ownWmsToggle = new Toggle { text = "WMS: each tile asked by its {bbox}" };
+        private readonly Label ownProblem = new Label();
+
+        /// <summary>The choices of "Picture of a tile" and the edges they stand for; 0 for every pixel of the source.</summary>
+        private static readonly string[] PictureSizeNames = { "Every pixel (up to 4096)", "1024 × 1024", "2048 × 2048", "4096 × 4096" };
+        private static readonly int[] PictureSizes = { 0, 1024, 2048, 4096 };
 
         private bool placing;
         private bool busy;
@@ -182,15 +197,17 @@ namespace OmsiMapEditor.UI
             sourceField.AddToClassList("new-map-dropdown");
             sourceField.tooltip = "Where the pictures come from; none of them needs a key. The sharpest is chosen at the map's middle. " +
                                   "\"OpenStreetMap map\" draws the map as openstreetmap.org shows it, with streets' names, houses and stops, to build over by eye.";
-            var choices = new List<string> { SharpestChoice };
-            foreach (var source in OmsiImagerySource.Imagery)
-                choices.Add(source.Name);
-            // The map as OpenStreetMap draws it, made from its data with streets' names, in place of a picture from the air.
-            choices.Add(OmsiImagerySource.OsmMap.Name);
-            sourceField.choices = choices;
+            SetSources(OmsiImagerySource.Imagery);
             sourceField.SetValueWithoutNotify(SharpestChoice);
             sourceField.RegisterValueChangedCallback(evt => SourceChanged?.Invoke(evt.newValue == SharpestChoice ? null : evt.newValue));
             sourceRow.Add(sourceField);
+            var sizeRow = Row(right, "Picture of a tile");
+            pictureSizeField.AddToClassList("new-map-dropdown");
+            pictureSizeField.choices = new List<string>(PictureSizeNames);
+            pictureSizeField.SetValueWithoutNotify(PictureSizeNames[0]);
+            pictureSizeField.tooltip = "How many pixels each tile's picture keeps. The map shows 1024 a tile and the full picture of the tiles in view when you zoom in.";
+            pictureSizeField.RegisterValueChangedCallback(evt => PictureSizeChanged?.Invoke(PictureSizes[Math.Max(0, Array.IndexOf(PictureSizeNames, evt.newValue))]));
+            sizeRow.Add(pictureSizeField);
             detailLabel.AddToClassList("satellite-note");
             right.Add(detailLabel);
             heightsToggle.text = "Also load terrain heights";
@@ -223,6 +240,16 @@ namespace OmsiMapEditor.UI
             cancelButton = Button("Cancel", () => CancelRequested?.Invoke(), "Stops loading; tiles done so far stay");
             progressRow.Add(cancelButton);
             right.Add(progressRow);
+            edgesRow.AddToClassList("satellite-row");
+            edgesRow.AddToClassList("satellite-wrap");
+            edgesLabel.AddToClassList("satellite-note");
+            edgesLabel.AddToClassList("satellite-warning");
+            edgesLabel.AddToClassList("satellite-grow");
+            edgesRow.Add(edgesLabel);
+            edgesRow.Add(Button("Fit their edges", () => EdgesFitRequested?.Invoke(), "Their edge takes the loaded heights, fading out 60 m into the tile; Ctrl+Z takes it back"));
+            edgesRow.Add(Button("Leave them", () => EdgesLeft?.Invoke(), "Keeps the step at their edge"));
+            edgesRow.style.display = DisplayStyle.None;
+            right.Add(edgesRow);
 
             Section(right, "Terrain heights");
             relativeToggle.text = "Relative: the middle tile's mean height is 0 m";
@@ -325,6 +352,44 @@ namespace OmsiMapEditor.UI
             fitButtons.Add(remove);
             fitSection.Add(fitButtons);
             fitSection.style.display = DisplayStyle.None;
+
+            // Sources with the user's own key, and the user's own tile servers; both stay on this computer.
+            var keys = new Foldout { text = "Keys for more sources (optional)", value = false };
+            keys.AddToClassList("satellite-foldout");
+            var keysNote = new Label("Everything works without a key. With your own free key these may be sharper in some places; the key stays on this computer.");
+            keysNote.AddToClassList("satellite-note");
+            keys.Add(keysNote);
+            keys.Add(keyRows);
+            right.Add(keys);
+            var own = new Foldout { text = "Your own tile server", value = false };
+            own.AddToClassList("satellite-foldout");
+            Field(Row(own, "Name"), ownNameField, "How the server is called in the source list");
+            Field(Row(own, "URL"), ownUrlField, "{z} {x} {y} are filled in; a WMS gets {bbox} (EPSG:3857) and {width} {height}; {key} is your key");
+            Field(Row(own, "Attribution"), ownAttributionField, "Shown under the map while its pictures show");
+            foreach (var field in new[] { ownNameField, ownUrlField, ownAttributionField })
+                field.AddToClassList("satellite-wide-field");
+            var zoomRow = new VisualElement();
+            zoomRow.AddToClassList("satellite-row");
+            ownZoomField.AddToClassList("satellite-number");
+            ownZoomField.tooltip = "The finest zoom the server has";
+            zoomRow.Add(ownZoomField);
+            ownWmsToggle.AddToClassList("picker-option-toggle");
+            ownWmsToggle.AddToClassList("panel-toggle");
+            zoomRow.Add(ownWmsToggle);
+            own.Add(zoomRow);
+            var serverNote = new Label("{z} {x} {y} are filled in; a WMS gets {bbox} (EPSG:3857) and {width} {height}; {key} is your key.");
+            serverNote.AddToClassList("satellite-note");
+            own.Add(serverNote);
+            ownProblem.AddToClassList("satellite-note");
+            ownProblem.AddToClassList("export-problem");
+            own.Add(ownProblem);
+            own.Add(Button("Add", () =>
+            {
+                ownProblem.text = string.Empty;
+                OwnSourceAdded?.Invoke(ownNameField.value, ownUrlField.value, ownAttributionField.value, ownZoomField.value, ownWmsToggle.value);
+            }, "Adds the server to the source list", "plus"));
+            own.Add(ownSourceRows);
+            right.Add(own);
             UpdateButtons();
         }
 
@@ -346,6 +411,20 @@ namespace OmsiMapEditor.UI
         public event Action<bool, bool, bool> LoadRequested;
 
         public event Action CancelRequested;
+
+        /// <summary>"Picture of a tile" changed: the edge in pixels, 0 for every pixel of the source.</summary>
+        public event Action<int> PictureSizeChanged;
+
+        public event Action EdgesFitRequested;
+        public event Action EdgesLeft;
+
+        /// <summary>A key was typed for a source, by the source's name; empty to take it away.</summary>
+        public event Action<string, string> KeyChanged;
+
+        /// <summary>An own tile server: name, URL, attribution, finest zoom, WMS.</summary>
+        public event Action<string, string, string, int, bool> OwnSourceAdded;
+
+        public event Action<string> OwnSourceRemoved;
 
         /// <summary>A picture file is to be laid over the tiles from west, south to east, north.</summary>
         public event Action<int, int, int, int> PictureLoadRequested;
@@ -390,9 +469,81 @@ namespace OmsiMapEditor.UI
             showToggle.SetValueWithoutNotify(settings.ShowImagery);
             opacitySlider.SetValueWithoutNotify((float)settings.ImageryOpacity);
             ShowOpacity((float)settings.ImageryOpacity);
-            sourceField.SetValueWithoutNotify(chosenSource ?? SharpestChoice);
+            sourceField.SetValueWithoutNotify(chosenSource != null && sourceField.choices.Contains(chosenSource) ? chosenSource : SharpestChoice);
+            pictureSizeField.SetValueWithoutNotify(PictureSizeNames[Math.Max(0, Array.IndexOf(PictureSizes, settings.PictureSize))]);
             heightsToggle.SetValueWithoutNotify(settings.WithTerrain);
             autoToggle.SetValueWithoutNotify(settings.AutoNewTiles);
+        }
+
+        /// <summary>The sources to choose from: the sharpest, these, and the drawn OpenStreetMap map.</summary>
+        public void SetSources(IEnumerable<OmsiImagerySource> sources)
+        {
+            var choices = new List<string> { SharpestChoice };
+            foreach (var source in sources)
+                choices.Add(source.Name);
+            // The map as OpenStreetMap draws it, made from its data with streets' names, in place of a picture from the air.
+            choices.Add(OmsiImagerySource.OsmMap.Name);
+            sourceField.choices = choices;
+            if (!choices.Contains(sourceField.value))
+                sourceField.SetValueWithoutNotify(SharpestChoice);
+        }
+
+        /// <summary>The sources that need a key with the key entered for each (shown hidden), and the user's own servers.</summary>
+        public void ShowKeys(IEnumerable<OmsiImagerySource> sources, Func<string, string> key)
+        {
+            keyRows.Clear();
+            ownSourceRows.Clear();
+            foreach (var source in sources)
+            {
+                if (source.NeedsKey)
+                {
+                    var name = source.Name;
+                    var row = Row(keyRows, name);
+                    var field = new TextField { isPasswordField = true, value = key(name) ?? string.Empty };
+                    field.textEdition.placeholder = "key";
+                    Field(row, field, "Your key for " + name + "; it stays on this computer");
+                    field.AddToClassList("satellite-wide-field");
+                    field.RegisterCallback<FocusOutEvent>(_ => KeyChanged?.Invoke(name, field.value));
+                    if (!string.IsNullOrEmpty(source.Terms))
+                    {
+                        var link = source.Terms;
+                        row.Add(Button("Get a key", () => Application.OpenURL(link), "Opens " + link + " in your browser"));
+                    }
+                }
+                if (source.IsOwn)
+                {
+                    var name = source.Name;
+                    var row = new VisualElement();
+                    row.AddToClassList("satellite-row");
+                    var label = new Label(name + (source.Kind == OmsiImageryKind.Wms ? " (WMS)" : string.Empty) + ", zoom " + source.MaxZoom);
+                    label.AddToClassList("satellite-note");
+                    label.AddToClassList("satellite-grow");
+                    row.Add(label);
+                    var remove = Button("Remove", () => OwnSourceRemoved?.Invoke(name), "Takes the server out of the source list");
+                    remove.AddToClassList("inspector-edit-delete");
+                    row.Add(remove);
+                    ownSourceRows.Add(row);
+                }
+            }
+        }
+
+        /// <summary>Why an own tile server could not be added; null when it was.</summary>
+        public void ShowOwnSourceProblem(string problem)
+        {
+            ownProblem.text = problem ?? string.Empty;
+            if (problem == null)
+            {
+                ownNameField.SetValueWithoutNotify(string.Empty);
+                ownUrlField.SetValueWithoutNotify(string.Empty);
+                ownAttributionField.SetValueWithoutNotify(string.Empty);
+            }
+        }
+
+        /// <summary>How many tiles beside loaded heights step at their edge; 0 hides the question.</summary>
+        public void ShowSteppedEdges(int tiles)
+        {
+            edgesRow.style.display = tiles > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            edgesLabel.text = tiles + " tile(s) beside the loaded heights were not loaded: the ground steps at their edge.";
         }
 
         /// <summary>The rectangle of tiles a new picture goes over.</summary>

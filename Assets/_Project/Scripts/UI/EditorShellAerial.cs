@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
@@ -19,8 +20,14 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        /// <summary>The edge of a tile's picture at most: 0.3 m a pixel on a 300 m tile, as much as the ground can show.</summary>
+        /// <summary>
+        /// The edge of the pictures the ground shows of every tile: 0.3 m a pixel on a 300 m tile. Larger pictures keep a
+        /// copy of this size, and their full picture is shown only for the tiles near the view when zoomed in.
+        /// </summary>
         private const int ImageryPictureSize = 1024;
+
+        /// <summary>Tiles shown with their full picture at most, the nearest to the middle of the view.</summary>
+        private const int SharpTileLimit = 9;
 
         private readonly OmsiTileFetcher tileFetcher = new OmsiTileFetcher(OmsiTileFetcher.DefaultCacheRoot);
         private readonly ConcurrentQueue<Action> aerialMainThread = new ConcurrentQueue<Action>();
@@ -33,6 +40,9 @@ namespace OmsiMapEditor.UI
         private Task aerialTask;
         private int aerialGeneration;
         private bool? satelliteTileChosen;
+        private OmsiImageryPreferences imageryPreferences = new OmsiImageryPreferences();
+        private List<OmsiTerrainEdge> steppedEdges = new List<OmsiTerrainEdge>();
+        private float sharpCheckedAt;
         private string aerialMapKey;
 
         // Tiles added while "New tiles get pictures by themselves" is ticked, by position, waiting for the load running now.
@@ -40,6 +50,8 @@ namespace OmsiMapEditor.UI
 
         private void InitializeSatellite(VisualElement root, VisualElement viewMenu)
         {
+            ReadImageryPreferences();
+            tileFetcher.Keys = name => imageryPreferences.Key(name);
             satelliteWindow = new SatelliteWindow();
             satelliteWindow.style.display = DisplayStyle.None;
             workspaceElement?.Add(satelliteWindow);
@@ -99,6 +111,64 @@ namespace OmsiMapEditor.UI
                 SaveGeo();
                 ShowGeo();
             };
+            satelliteWindow.PictureSizeChanged += size =>
+            {
+                if (geoSettings == null)
+                    return;
+                geoSettings.PictureSize = size;
+                SaveGeo();
+            };
+            satelliteWindow.EdgesFitRequested += FitSteppedEdges;
+            satelliteWindow.EdgesLeft += () =>
+            {
+                steppedEdges.Clear();
+                satelliteWindow.ShowSteppedEdges(0);
+            };
+            satelliteWindow.KeyChanged += (name, key) =>
+            {
+                if ((imageryPreferences.Key(name) ?? string.Empty) == (key ?? string.Empty).Trim())
+                    return;
+                if (string.IsNullOrWhiteSpace(key))
+                    imageryPreferences.Keys.Remove(name);
+                else
+                    imageryPreferences.Keys[name] = key.Trim();
+                SaveImageryPreferences();
+                SetStatus(string.IsNullOrWhiteSpace(key) ? "The key for " + name + " is taken away." : "The key for " + name + " is kept on this computer.");
+            };
+            satelliteWindow.OwnSourceAdded += (name, url, attribution, zoom, wms) =>
+            {
+                OmsiImagerySource source;
+                try
+                {
+                    source = OmsiImagerySource.Own(name, url, attribution, zoom, wms);
+                }
+                catch (ArgumentException exception)
+                {
+                    satelliteWindow.ShowOwnSourceProblem(exception.Message);
+                    return;
+                }
+                if (imageryPreferences.All().Exists(item => item.Name == source.Name) || source.Name == OmsiImagerySource.OsmMap.Name)
+                {
+                    satelliteWindow.ShowOwnSourceProblem("A source of that name is there already.");
+                    return;
+                }
+                if (!wms && !(url.Contains("{z}") && url.Contains("{x}") && url.Contains("{y}")) || wms && !url.Contains("{bbox}"))
+                {
+                    satelliteWindow.ShowOwnSourceProblem(wms ? "A WMS URL needs {bbox}." : "A tile URL needs {z}, {x} and {y}.");
+                    return;
+                }
+                imageryPreferences.Sources.Add(source);
+                SaveImageryPreferences();
+                satelliteWindow.ShowOwnSourceProblem(null);
+                ShowImagerySources();
+            };
+            satelliteWindow.OwnSourceRemoved += name =>
+            {
+                imageryPreferences.Sources.RemoveAll(source => source.Name == name);
+                imageryPreferences.Keys.Remove(name);
+                SaveImageryPreferences();
+                ShowImagerySources();
+            };
             satelliteWindow.PictureLoadRequested += (west, south, east, north) => LoadOwnPicture(west, south, east, north);
             satelliteWindow.PictureSelected += id =>
             {
@@ -151,6 +221,7 @@ namespace OmsiMapEditor.UI
             }
             geoSettings = geoSettings ?? session.ReadGeoSettings();
             satelliteWindow.style.display = DisplayStyle.Flex;
+            ShowImagerySources();
             satelliteWindow.WorldMap.SetSource(tileFetcher, OmsiImagerySource.Imagery[0]);
             satelliteWindow.ShowAttribution(OmsiImagerySource.Imagery[0].Attribution + "  ·  Search © OpenStreetMap contributors");
             ShowGeo();
@@ -342,7 +413,7 @@ namespace OmsiMapEditor.UI
             var job = new OmsiAerialJob
             {
                 Geo = geo, TileSize = currentSummary.TileSizeMeters, Fetcher = tileFetcher, Decode = bytes => DecodeOnMainThread(bytes, cancel.Token),
-                MaxImageSize = ImageryPictureSize, Font = OsmFont(),
+                MaxImageSize = 4096, PictureSize = geoSettings.PictureSize, Font = OsmFont(),
                 Heights = heights
                     ? new OmsiGeoHeightOptions
                     {
@@ -358,7 +429,9 @@ namespace OmsiMapEditor.UI
                 if (chosen != null)
                     job.ImagerySources.Add(chosen);
                 else
-                    job.ImagerySources.AddRange(OmsiImagerySource.Imagery);
+                    foreach (var source in imageryPreferences.All())
+                        if (imageryPreferences.Usable(source))
+                            job.ImagerySources.Add(source);
             }
 
             var generation = ++aerialGeneration;
@@ -376,13 +449,18 @@ namespace OmsiMapEditor.UI
                     satelliteWindow?.ShowDetail(text);
                 SetStatus("Satellite: " + text);
             });
-            job.ImageReady = (tile, picture, meta) => aerialMainThread.Enqueue(() =>
+            job.ImageReady = (tile, picture, meta) =>
             {
-                if (generation != aerialGeneration)
-                    return;
-                if (ShowPicture(tile, picture, meta, true))
-                    pictured++;
-            });
+                // Made smaller and written as JPEG here, off the main thread.
+                var prepared = PreparePicture(picture);
+                aerialMainThread.Enqueue(() =>
+                {
+                    if (generation != aerialGeneration)
+                        return;
+                    if (ShowPicture(tile, prepared, meta))
+                        pictured++;
+                });
+            };
             job.HeightsReady = (tile, values) =>
             {
                 lock (laid)
@@ -455,13 +533,19 @@ namespace OmsiMapEditor.UI
             {
                 try
                 {
-                    var change = session.ImportTerrainHeights(currentSummary, heights);
+                    var stepped = new List<OmsiTerrainEdge>();
+                    var change = session.ImportTerrainHeights(currentSummary, heights, stepped);
                     if (change != null)
                     {
                         PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the terrain heights from the world" });
                         RefreshGround(change.Tiles);
                         report.Add("heights on " + change.Tiles.Count + " tile(s), Ctrl+Z takes them back");
                     }
+                    steppedEdges = stepped;
+                    var steppedTiles = new HashSet<long>();
+                    foreach (var edge in stepped)
+                        steppedTiles.Add(((long)edge.TileX << 32) | (uint)edge.TileY);
+                    satelliteWindow?.ShowSteppedEdges(steppedTiles.Count);
                     if (job.Base.HasValue && geoSettings != null && geoSettings.Heights.Relative)
                     {
                         geoSettings.Heights.Base = job.Base;
@@ -475,6 +559,8 @@ namespace OmsiMapEditor.UI
                     report.Add("the heights could not be laid on the map: " + exception.Message);
                 }
             }
+            if (job.PassedOver.Count > 0)
+                report.Add("passed over: " + string.Join(" ", job.PassedOver));
             if (failed.Count > 0)
             {
                 Debug.LogWarning("Satellite problems:\n" + string.Join("\n", failed));
@@ -485,39 +571,238 @@ namespace OmsiMapEditor.UI
             SetStatus("Satellite: " + text);
         }
 
-        /// <summary>
-        /// A picture of a tile: kept in the project as a JPEG when it is new, then laid over the ground. Its rows run from
-        /// the north edge; the texture's from the south, as the ground's UVs.
-        /// </summary>
-        private bool ShowPicture(OmsiTileSummary tile, OmsiRgbImage picture, OmsiImageryMeta meta, bool keep)
+        /// <summary>A tile's picture made ready off the main thread: its copy for the view, and both as JPEG where Unity allows it.</summary>
+        private sealed class PreparedPicture
         {
-            if (groundRenderer == null || picture == null)
-                return false;
-            var size = picture.Width;
+            public byte[] ViewRows;
+            public int ViewWidth;
+            public int ViewHeight;
+            public byte[] FullJpeg;
+            public byte[] ViewJpeg;
+            public bool Larger;
+
+            // The full picture's rows, kept only when it has to be written as JPEG on the main thread.
+            public byte[] FullRows;
+            public int FullWidth;
+            public int FullHeight;
+        }
+
+        /// <summary>
+        /// Rows from the south, as the texture and the ground's UVs have them; the picture's rows run from the north edge.
+        /// </summary>
+        private static byte[] BottomUp(OmsiRgbImage picture)
+        {
             var rows = new byte[picture.Rgb.Length];
-            var stride = size * 3;
+            var stride = picture.Width * 3;
             for (var row = 0; row < picture.Height; row++)
                 Array.Copy(picture.Rgb, row * stride, rows, (picture.Height - 1 - row) * stride, stride);
-            var texture = new Texture2D(size, picture.Height, TextureFormat.RGB24, true)
+            return rows;
+        }
+
+        private static PreparedPicture PreparePicture(OmsiRgbImage picture)
+        {
+            if (picture == null)
+                return null;
+            var view = picture.Reduced(ImageryPictureSize);
+            var prepared = new PreparedPicture { ViewRows = BottomUp(view), ViewWidth = view.Width, ViewHeight = view.Height, Larger = view != picture };
+            var fullRows = prepared.Larger ? BottomUp(picture) : prepared.ViewRows;
+            try
+            {
+                prepared.FullJpeg = ImageConversion.EncodeArrayToJPG(fullRows, GraphicsFormat.R8G8B8_SRGB, (uint)picture.Width, (uint)picture.Height, 0, 90);
+                if (prepared.Larger)
+                    prepared.ViewJpeg = ImageConversion.EncodeArrayToJPG(prepared.ViewRows, GraphicsFormat.R8G8B8_SRGB, (uint)view.Width, (uint)view.Height, 0, 90);
+            }
+            catch (UnityException)
+            {
+                // Written on the main thread instead.
+                prepared.FullJpeg = prepared.ViewJpeg = null;
+                prepared.FullRows = fullRows;
+                prepared.FullWidth = picture.Width;
+                prepared.FullHeight = picture.Height;
+            }
+            return prepared;
+        }
+
+        private static byte[] EncodeJpeg(byte[] rows, int width, int height)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+            try
+            {
+                texture.SetPixelData(rows, 0);
+                texture.Apply(false, false);
+                return texture.EncodeToJPG(90);
+            }
+            finally
+            {
+                Destroy(texture);
+            }
+        }
+
+        /// <summary>A new picture of a tile: kept in the project (with a smaller copy when it is large), then laid over the ground.</summary>
+        private bool ShowPicture(OmsiTileSummary tile, PreparedPicture prepared, OmsiImageryMeta meta)
+        {
+            if (groundRenderer == null || prepared == null)
+                return false;
+            try
+            {
+                if (prepared.FullJpeg == null)
+                {
+                    prepared.FullJpeg = EncodeJpeg(prepared.FullRows, prepared.FullWidth, prepared.FullHeight);
+                    if (prepared.Larger)
+                        prepared.ViewJpeg = EncodeJpeg(prepared.ViewRows, prepared.ViewWidth, prepared.ViewHeight);
+                }
+                session.SaveImagery(tile, prepared.FullJpeg, meta, prepared.Larger ? prepared.ViewJpeg : null);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The picture of tile " + tile.X + ", " + tile.Y + " could not be kept: " + exception.Message);
+            }
+            var texture = new Texture2D(prepared.ViewWidth, prepared.ViewHeight, TextureFormat.RGB24, true)
             {
                 wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = "Imagery " + tile.X + ", " + tile.Y
             };
-            texture.SetPixelData(rows, 0);
+            texture.SetPixelData(prepared.ViewRows, 0);
             texture.Apply(true, false);
-            if (keep)
-            {
-                try
-                {
-                    session.SaveImagery(tile, texture.EncodeToJPG(90), meta);
-                }
-                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException)
-                {
-                    Debug.LogException(exception);
-                    SetStatus("The picture of tile " + tile.X + ", " + tile.Y + " could not be kept: " + exception.Message);
-                }
-            }
             LayPicture(tile, texture, meta);
             return true;
+        }
+
+        /// <summary>The terrain of the tiles beside the loaded heights bent to meet them, as one step.</summary>
+        private void FitSteppedEdges()
+        {
+            if (steppedEdges.Count == 0 || currentSummary == null)
+                return;
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("fit tile edges"));
+                return;
+            }
+            OmsiTerrainChange change;
+            try
+            {
+                change = session.FitTerrainEdges(currentSummary, steppedEdges);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The tile edges could not be fitted: " + exception.Message);
+                return;
+            }
+            steppedEdges = new List<OmsiTerrainEdge>();
+            satelliteWindow?.ShowSteppedEdges(0);
+            if (change == null)
+            {
+                SetStatus("The tile edges meet already.");
+                return;
+            }
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the fitted tile edges" });
+            RefreshGround(change.Tiles);
+            SetStatus("Fitted the edges of " + change.Tiles.Count + " tile(s) to the loaded heights. Ctrl+Z takes it back.");
+        }
+
+        private void ReadImageryPreferences()
+        {
+            try
+            {
+                var path = OmsiImageryPreferences.DefaultPath;
+                imageryPreferences = File.Exists(path) ? OmsiImageryPreferences.Parse(File.ReadAllText(path)) : new OmsiImageryPreferences();
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                Debug.LogWarning("The imagery keys and servers could not be read: " + exception.Message);
+                imageryPreferences = new OmsiImageryPreferences();
+            }
+        }
+
+        private void SaveImageryPreferences()
+        {
+            try
+            {
+                var path = OmsiImageryPreferences.DefaultPath;
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, imageryPreferences.ToString());
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The imagery keys and servers could not be saved: " + exception.Message);
+            }
+        }
+
+        /// <summary>The sources in the window's list, with the keys and the own servers.</summary>
+        private void ShowImagerySources()
+        {
+            if (satelliteWindow == null)
+                return;
+            var all = imageryPreferences.All();
+            satelliteWindow.SetSources(all);
+            satelliteWindow.ShowKeys(all, name => imageryPreferences.Key(name));
+        }
+
+        /// <summary>
+        /// Zoomed in closer than a tile's copy shows, the tiles near the middle of the view get their full picture, one each
+        /// call, at most a few; tiles that left the view go back to their copy. Called a few times a second.
+        /// </summary>
+        private void TickSharpImagery()
+        {
+            if (groundRenderer == null || mapCanvas == null || currentSummary == null || session?.Workspace == null || !mapCanvas.HasView)
+                return;
+            if (Time.realtimeSinceStartup - sharpCheckedAt < 0.4f)
+                return;
+            sharpCheckedAt = Time.realtimeSinceStartup;
+            var tileSize = currentSummary.TileSizeMeters;
+            double centreX, centreY, metresPerPixel, reach;
+            if (mapCanvas.ThreeDimensional)
+            {
+                centreX = mapCanvas.OrbitTarget.x + mapCanvas.OriginX;
+                centreY = mapCanvas.OrbitTarget.y + mapCanvas.OriginY;
+                // About what a screen pixel covers at the target, for the camera's field of view.
+                metresPerPixel = mapCanvas.OrbitDistance * 0.0013;
+                reach = mapCanvas.OrbitDistance * 1.2;
+            }
+            else
+            {
+                centreX = mapCanvas.Center.x + mapCanvas.OriginX;
+                centreY = mapCanvas.Center.y + mapCanvas.OriginY;
+                metresPerPixel = mapCanvas.MetersPerPixel;
+                var bounds = mapCanvas.worldBound;
+                reach = 0.5 * Math.Sqrt(bounds.width * bounds.width + bounds.height * bounds.height) * metresPerPixel;
+            }
+            var wanted = new List<KeyValuePair<double, OmsiTileSummary>>();
+            if (groundRenderer.ImageryVisible && metresPerPixel < tileSize / ImageryPictureSize * 0.9)
+                foreach (var tile in currentSummary.Tiles)
+                {
+                    if (!tile.IsAvailable || HasOwnPicture(tile) || !session.Workspace.IsModified(OmsiMapSession.ImageryViewPath(tile)))
+                        continue;
+                    var dx = (tile.X + 0.5) * tileSize - centreX;
+                    var dy = (tile.Y + 0.5) * tileSize - centreY;
+                    var distance = Math.Sqrt(dx * dx + dy * dy);
+                    if (distance < reach + tileSize * 0.75)
+                        wanted.Add(new KeyValuePair<double, OmsiTileSummary>(distance, tile));
+                }
+            wanted.Sort((a, b) => a.Key.CompareTo(b.Key));
+            if (wanted.Count > SharpTileLimit)
+                wanted.RemoveRange(SharpTileLimit, wanted.Count - SharpTileLimit);
+            foreach (var sharp in groundRenderer.SharpTiles())
+                if (!wanted.Exists(pair => pair.Value.X == sharp.Key && pair.Value.Y == sharp.Value))
+                    groundRenderer.SetSharpImagery(sharp.Key, sharp.Value, null);
+            var next = wanted.Find(pair => !groundRenderer.HasSharpImagery(pair.Value.X, pair.Value.Y)).Value;
+            if (next == null)
+                return;
+            var bytes = session.ReadImagery(next, out _);
+            var texture = new Texture2D(2, 2, TextureFormat.RGB24, true)
+            {
+                wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = "Sharp imagery " + next.X + ", " + next.Y
+            };
+            if (bytes == null || !texture.LoadImage(bytes, false))
+            {
+                Destroy(texture);
+                return;
+            }
+            texture.Compress(false);
+            texture.Apply(false, true);
+            groundRenderer.SetSharpImagery(next.X, next.Y, texture);
         }
 
         private void LayPicture(OmsiTileSummary tile, Texture2D texture, OmsiImageryMeta meta)
@@ -535,9 +820,9 @@ namespace OmsiMapEditor.UI
             UpdateImageryAttribution();
         }
 
-        private static OmsiImagerySource FindImagerySource(string name)
+        private OmsiImagerySource FindImagerySource(string name)
         {
-            foreach (var source in OmsiImagerySource.Imagery)
+            foreach (var source in imageryPreferences.All())
                 if (source.Name == name)
                     return source;
             return name == OmsiImagerySource.OsmMap.Name ? OmsiImagerySource.OsmMap : null;
@@ -682,6 +967,8 @@ namespace OmsiMapEditor.UI
             }
             aerialMapKey = mapKey;
             autoTiles.Clear();
+            steppedEdges = new List<OmsiTerrainEdge>();
+            satelliteWindow?.ShowSteppedEdges(0);
             aerialGeneration++;
             aerialCancel?.Cancel();
             aerialCancel = null;
@@ -731,12 +1018,13 @@ namespace OmsiMapEditor.UI
             while (Time.realtimeSinceStartup - started < 0.012f && aerialMainThread.TryDequeue(out var action))
                 action();
             TickOwnPictures();
+            TickSharpImagery();
             while (Time.realtimeSinceStartup - started < 0.012f && storedImagery.Count > 0)
             {
                 var tile = storedImagery.Dequeue();
                 if (session == null)
                     break;
-                var bytes = session.ReadImagery(tile, out var meta);
+                var bytes = session.ReadImageryForView(tile, out var meta, out _);
                 if (bytes == null)
                     continue;
                 var texture = new Texture2D(2, 2, TextureFormat.RGB24, true)
@@ -780,7 +1068,8 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// -satellite opens the window; -satelliteSearch &lt;text&gt; finds a place; -satellitePlace &lt;latitude&gt; &lt;longitude&gt;
         /// [rotation] lays the map's middle there; -satelliteSource &lt;name&gt; chooses a source; -satelliteTile &lt;x&gt; &lt;y&gt; selects
-        /// a tile; -satelliteLoad all|tile|heights [-satelliteHeights] loads and waits for the end; -satelliteOpacity &lt;0..1&gt;.
+        /// a tile; -satelliteLoad all|tile|heights [-satelliteHeights] loads and waits for the end; -satelliteFitEdges fits the
+        /// edges beside loaded heights; -satelliteSize 0|1024|2048|4096 sets the picture size; -satelliteOpacity &lt;0..1&gt;.
         /// Statuses go to the log as "Satellite:".
         /// </summary>
         private IEnumerator RunSatelliteArguments(string[] args)
@@ -822,6 +1111,11 @@ namespace OmsiMapEditor.UI
                 PlaceMapAt(OmsiGeoreference.MercatorOf(latitude, longitude));
                 OpenSatelliteWindow();
                 LogSatellite();
+            }
+            if (int.TryParse(Argument("-satelliteSize", 1), out var pictureSize) && geoSettings != null)
+            {
+                geoSettings.PictureSize = pictureSize;
+                SaveGeo();
             }
             var source = Argument("-satelliteSource", 1);
             if (source != null && geoSettings != null)
@@ -882,7 +1176,20 @@ namespace OmsiMapEditor.UI
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
                 LogSatellite();
+                if (steppedEdges.Count > 0)
+                    Debug.Log("Satellite: " + steppedEdges.Count + " stepped edge(s) beside the loaded heights.");
             }
+            // -satelliteFitEdges bends the tiles beside loaded heights to meet them.
+            if (Array.IndexOf(args, "-satelliteFitEdges") >= 0)
+            {
+                FitSteppedEdges();
+                LogSatellite();
+            }
+            // Zoomed in, the full pictures of the tiles in view come a few times a second.
+            var sharpWait = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - sharpWait < 5f)
+                yield return null;
+            Debug.Log("Satellite: " + groundRenderer.SharpTiles().Count + " tile(s) with their full picture.");
         }
     }
 }

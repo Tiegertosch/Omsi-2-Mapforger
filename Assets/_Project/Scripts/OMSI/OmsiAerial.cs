@@ -27,6 +27,40 @@ namespace OmsiMapEditor.OMSI
         public int Width { get; }
         public int Height { get; }
         public byte[] Rgb { get; }
+
+        /// <summary>The picture at most some pixels a side, each new pixel the mean of the old ones it covers; itself when it is small enough.</summary>
+        public OmsiRgbImage Reduced(int maximum)
+        {
+            if (Width <= maximum && Height <= maximum)
+                return this;
+            var scale = Math.Max(Width, Height) / (double)maximum;
+            var width = Math.Max(1, (int)Math.Round(Width / scale));
+            var height = Math.Max(1, (int)Math.Round(Height / scale));
+            var rgb = new byte[width * height * 3];
+            Parallel.For(0, height, y =>
+            {
+                int top = (int)(y * (double)Height / height), bottom = Math.Max(top + 1, (int)((y + 1) * (double)Height / height));
+                for (var x = 0; x < width; x++)
+                {
+                    int left = (int)(x * (double)Width / width), right = Math.Max(left + 1, (int)((x + 1) * (double)Width / width));
+                    int red = 0, green = 0, blue = 0, count = 0;
+                    for (var sy = top; sy < bottom; sy++)
+                        for (var sx = left; sx < right; sx++)
+                        {
+                            var index = (sy * Width + sx) * 3;
+                            red += Rgb[index];
+                            green += Rgb[index + 1];
+                            blue += Rgb[index + 2];
+                            count++;
+                        }
+                    var target = (y * width + x) * 3;
+                    rgb[target] = (byte)((red + count / 2) / count);
+                    rgb[target + 1] = (byte)((green + count / 2) / count);
+                    rgb[target + 2] = (byte)((blue + count / 2) / count);
+                }
+            });
+            return new OmsiRgbImage(width, height, rgb);
+        }
     }
 
     /// <summary>A place found by name.</summary>
@@ -58,6 +92,9 @@ namespace OmsiMapEditor.OMSI
         private readonly Func<string, CancellationToken, KeyValuePair<int, byte[]>> get;
         private readonly Func<string, CancellationToken, KeyValuePair<int, byte[]>> slowGet;
 
+        /// <summary>The user's key for a source by its name, or null; a key never shows in a message.</summary>
+        public Func<string, string> Keys { get; set; }
+
         /// <param name="cacheRoot">Where downloaded tiles are kept.</param>
         /// <param name="get">The HTTP GET of a URL as status and body; null for the network.</param>
         public OmsiTileFetcher(string cacheRoot, Func<string, CancellationToken, KeyValuePair<int, byte[]>> get = null)
@@ -80,13 +117,25 @@ namespace OmsiMapEditor.OMSI
             var data = Path.Combine(folder, y.ToString(CultureInfo.InvariantCulture) + ".tile");
             var none = Path.Combine(folder, y.ToString(CultureInfo.InvariantCulture) + ".none");
             if (File.Exists(data))
-                return File.ReadAllBytes(data);
+            {
+                var kept = File.ReadAllBytes(data);
+                // A page a server sent in place of a picture, kept by an older version, is asked for again.
+                if (IsPicture(kept))
+                    return kept;
+                File.Delete(data);
+            }
             if (File.Exists(none))
                 return null;
-            var answer = GetWithRetries(source.TileUrl(zoom, x, y), cancel);
+            var key = source.NeedsKey ? Keys?.Invoke(source.Name) : null;
+            if (source.NeedsKey && string.IsNullOrEmpty(key))
+                throw new IOException(source.Name + ": no key entered.");
+            var answer = GetWithRetries(source.TileUrl(zoom, x, y, key), cancel);
             Directory.CreateDirectory(folder);
             switch (answer.Key)
             {
+                case 200 when answer.Value.Length > 0 && !IsPicture(answer.Value):
+                    // A maintenance page or a WMS error with "200 OK": not kept, so it is asked for again later.
+                    throw new IOException(source.Name + ": the server sent no picture" + Said(answer.Value) + ".");
                 case 200 when answer.Value.Length > 0 && !(source.Kind != OmsiImageryKind.Terrarium && IsPlaceholder(answer.Value)):
                     Keep(data, answer.Value);
                     return answer.Value;
@@ -95,6 +144,9 @@ namespace OmsiMapEditor.OMSI
                 case 404:
                     Keep(none, new byte[0]);
                     return null;
+                case 401:
+                case 403:
+                    throw new IOException(source.Name + ": the server refused the key (HTTP " + answer.Key + ").");
                 case 429:
                     throw new IOException(source.Name + ": too many requests, try again later.");
                 default:
@@ -202,6 +254,26 @@ namespace OmsiMapEditor.OMSI
                 });
             }
             return places;
+        }
+
+        /// <summary>Whether a file is a picture the editor reads: JPEG or PNG.</summary>
+        public static bool IsPicture(byte[] bytes)
+        {
+            return bytes != null && bytes.Length > 8 &&
+                   (bytes[0] == 0xFF && bytes[1] == 0xD8 || bytes[0] == 0x89 && bytes[1] == (byte)'P' && bytes[2] == (byte)'N' && bytes[3] == (byte)'G');
+        }
+
+        /// <summary>What a server's page or error says, in a few words: its title, or a WMS ServiceException's text.</summary>
+        private static string Said(byte[] bytes)
+        {
+            var text = Encoding.UTF8.GetString(bytes, 0, Math.Min(bytes.Length, 4096));
+            var said = Regex.Match(text, @"<title>\s*([^<]*?)\s*</title>", RegexOptions.IgnoreCase);
+            if (!said.Success)
+                said = Regex.Match(text, @"<ServiceException[^>]*>\s*([^<]*?)\s*</ServiceException>", RegexOptions.IgnoreCase);
+            if (!said.Success)
+                return string.Empty;
+            var words = said.Groups[1].Value.Trim();
+            return words.Length == 0 ? string.Empty : " (" + (words.Length > 120 ? words.Substring(0, 120) + "..." : words) + ")";
         }
 
         /// <summary>Esri's "no imagery here" picture, byte for byte the same everywhere.</summary>
@@ -642,6 +714,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The largest edge of a tile's picture, however fine the source.</summary>
         public int MaxImageSize { get; set; } = 4096;
 
+        /// <summary>The edge of every tile's picture; 0 for as many pixels as the source has, up to <see cref="MaxImageSize"/>.</summary>
+        public int PictureSize { get; set; }
+
         /// <summary>The letters for the names on the drawn OpenStreetMap map; null for a map without names.</summary>
         public OmsiTrueTypeFont Font { get; set; }
 
@@ -658,6 +733,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The source and zoom chosen, and its detail in metres a pixel.</summary>
         public OmsiImagerySource ChosenSource { get; private set; }
+
+        /// <summary>Why sources were passed over in looking for the sharpest: those that did not answer properly.</summary>
+        public List<string> PassedOver { get; } = new List<string>();
 
         /// <summary>The height relative heights take off: the options' own, or the middle tile's mean height measured.</summary>
         public double? Base { get; private set; }
@@ -678,7 +756,7 @@ namespace OmsiMapEditor.OMSI
                 // One request for all the tiles, not one for each; if it does not answer, nothing more is asked.
                 source = ChosenSource = ImagerySources[0];
                 zoom = source.MaxZoom;
-                size = Math.Min(MaxImageSize, OmsiAerial.ImageSize(TileSize, OmsiGeoreference.MetresPerPixel(middle.Latitude, zoom)));
+                size = PictureSize > 0 ? PictureSize : Math.Min(MaxImageSize, OmsiAerial.ImageSize(TileSize, OmsiGeoreference.MetresPerPixel(middle.Latitude, zoom)));
                 Status?.Invoke("Asking OpenStreetMap for the streets, houses and stops: this can take a minute for a large area; the answer is then kept for a week...");
                 var box = OmsiOsmMap.Box(Geo, Tiles, TileSize);
                 osm = OmsiOsmMap.Parse(Fetcher.Overpass(OmsiOsmMap.Query(box[0], box[1], box[2], box[3]), cancel));
@@ -689,9 +767,20 @@ namespace OmsiMapEditor.OMSI
                 Status?.Invoke("Looking for the sharpest imagery here...");
                 var found = new List<KeyValuePair<OmsiImagerySource, double?>>();
                 var zooms = new Dictionary<OmsiImagerySource, int>();
+                var silent = new List<string>();
                 foreach (var candidate in ImagerySources)
                 {
-                    var finest = Fetcher.FinestZoom(candidate, middle.Latitude, middle.Longitude, cancel);
+                    int? finest;
+                    try
+                    {
+                        finest = Fetcher.FinestZoom(candidate, middle.Latitude, middle.Longitude, cancel);
+                    }
+                    catch (IOException exception) when (ImagerySources.Count > 1)
+                    {
+                        // A source that does not answer properly is passed over; the others may.
+                        silent.Add(exception.Message);
+                        continue;
+                    }
                     if (!finest.HasValue)
                         continue;
                     zooms[candidate] = finest.Value;
@@ -699,13 +788,14 @@ namespace OmsiMapEditor.OMSI
                 }
                 var ranked = OmsiImagerySource.Rank(found);
                 if (ranked.Count == 0)
-                    throw new InvalidOperationException("No source has imagery here.");
+                    throw new InvalidOperationException("No source has imagery here." + (silent.Count > 0 ? " " + string.Join(" ", silent) : string.Empty));
+                PassedOver.AddRange(silent);
                 source = ranked[0].Key;
                 zoom = zooms[source];
-                size = Math.Min(MaxImageSize, OmsiAerial.ImageSize(TileSize, source.MetresPerPixel(middle.Latitude, zoom)));
+                size = PictureSize > 0 ? PictureSize : Math.Min(MaxImageSize, OmsiAerial.ImageSize(TileSize, source.MetresPerPixel(middle.Latitude, zoom)));
                 ChosenSource = source;
                 Status?.Invoke(source.Name + ", zoom " + zoom + ", " + source.MetresPerPixel(middle.Latitude, zoom).ToString("0.00", CultureInfo.InvariantCulture) +
-                               " m a pixel, " + size + " px a tile");
+                               " m a pixel, " + size + " px a tile" + (silent.Count > 0 ? "; passed over: " + string.Join(" ", silent) : string.Empty));
             }
 
             var heightZoom = 0;
