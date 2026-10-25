@@ -425,7 +425,7 @@ Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte ste
 
 ## ADR 039: Angehängte Objekte beim Platzieren einrasten
 
-**Status:** Angenommen, 25. Oktober 2026; Bedienung nach Wahl des Nutzers („Beim Platzieren einrasten“), vom Nutzer im Editor bestätigt.
+**Status:** Angenommen, 25. Oktober 2026; Bedienung nach Wahl des Nutzers („Beim Platzieren einrasten“), vom Nutzer im Editor und in openOMSI bestätigt.
 
 **Entscheidung:** Ein Objekt aus der Bibliothek wird platziert wie bisher. Kommt die Vorschau einem freien Anhängepunkt (`[new_attachment]`) eines Objekts oder angehängten Objekts der Karte nahe (16 Pixel, mindestens 1 m, von oben gesehen), rastet sie dort ein und steht in der Lage des Punkts; R dreht sie am Punkt, Alt platziert frei. Ein Klick schreibt ein `[attachObj]` ans Ende der Kachel des Elternobjekts, also hinter das Elternobjekt (TileRecordInventory), mit neuer ID, Instanz 0, Punktindex und der Drehung gegen den Punkt (`OmsiTileEditing.AppendAttachedObject`, `OmsiMapSession.AttachObject`). Frei ist ein Punkt, an dem noch kein angehängtes Objekt hängt. Kreuzungen rasten weiter an Straßen ein, nicht an Punkten.
 
