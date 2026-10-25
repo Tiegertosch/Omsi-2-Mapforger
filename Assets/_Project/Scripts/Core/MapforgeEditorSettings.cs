@@ -21,7 +21,7 @@ namespace OmsiMapEditor.Core
         [Serializable]
         public sealed class ApplicationSettings
         {
-            public string displayName = "OMSI Map Editor";
+            public string displayName = "OMSI MapWorks";
             public int defaultWindowWidth = 1600;
             public int defaultWindowHeight = 900;
             public int minimumWindowWidth = 1100;

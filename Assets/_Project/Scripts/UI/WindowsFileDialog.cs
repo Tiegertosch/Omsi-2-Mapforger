@@ -8,7 +8,7 @@ namespace OmsiMapEditor.UI
     internal static class WindowsFileDialog
     {
         public const string GlobalConfigFilter = "OMSI map configuration (global.cfg)\0global.cfg\0All files\0*.*\0";
-        public const string ProjectFilter = "Mapforge project (*.omproj)\0*.omproj\0";
+        public const string ProjectFilter = "MapWorks project (*.omproj)\0*.omproj\0";
         public const string ProjectExtension = "omproj";
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN

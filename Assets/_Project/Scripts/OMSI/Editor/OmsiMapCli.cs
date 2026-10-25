@@ -9,7 +9,7 @@ namespace OmsiMapEditor.OMSI.Editor
     /// <summary>Unity batch-mode entry point for inspecting an existing map without changing it.</summary>
     public static class OmsiMapCli
     {
-        [MenuItem("OMSI Map Editor/Import/Log Map Summary (CLI)")]
+        [MenuItem("OMSI MapWorks/Import/Log Map Summary (CLI)")]
         public static void InspectFromEnvironment()
         {
             var configPath = Environment.GetEnvironmentVariable("OMSI_MAP_CONFIG");
@@ -39,7 +39,7 @@ namespace OmsiMapEditor.OMSI.Editor
             EditorApplication.Exit(report.Passed ? 0 : 1);
         }
 
-        [MenuItem("OMSI Map Editor/Import/Verify Lossless Round Trip...")]
+        [MenuItem("OMSI MapWorks/Import/Verify Lossless Round Trip...")]
         private static void VerifyRoundTripFromMenu()
         {
             var folder = EditorUtility.OpenFolderPanel("Select an OMSI map folder", string.Empty, string.Empty);

@@ -551,7 +551,7 @@ namespace OmsiMapEditor.OMSI
         private OmsiMapWorkspace RequireWorkspace()
         {
             if (Workspace == null)
-                throw new InvalidOperationException("Save a Mapforge project before editing; the map is open read-only.");
+                throw new InvalidOperationException("Save a MapWorks project before editing; the map is open read-only.");
             return Workspace;
         }
 

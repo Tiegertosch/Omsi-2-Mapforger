@@ -205,7 +205,7 @@ namespace OmsiMapEditor.OMSI.Editor
             var lines = new List<string>
             {
                 "# Player files reviewed for OMSI content (ADR 005): SHA-256 and project path.",
-                "# Recorded with OMSI Map Editor > Build > Record Reviewed Player Assets after checking the files; do not edit by hand."
+                "# Recorded with OMSI MapWorks > Build > Record Reviewed Player Assets after checking the files; do not edit by hand."
             };
             lines.AddRange(current.Select(pair => pair.Value + "  " + pair.Key));
             File.WriteAllText(ReviewListPath, string.Join("\n", lines) + "\n", new System.Text.UTF8Encoding(false));

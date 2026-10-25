@@ -29,7 +29,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(meshes));
             var text = new StringBuilder();
             text.Append("xof 0302txt 0032\n\n");
-            text.Append("// Written by OMSI Map Editor (Mapforge).\n\n");
+            text.Append("// Written by OMSI MapWorks.\n\n");
             text.Append("Mesh MapforgeMesh {\n");
 
             var vertices = 0;
@@ -186,7 +186,7 @@ namespace OmsiMapEditor.OMSI
             generated.Model = OmsiXWriter.Write(meshes);
 
             var sco = new StringBuilder();
-            sco.Append("Made by OMSI Map Editor (Mapforge): a straight test piece in the profile ").Append(profilePath.Trim()).Append(".\r\n\r\n");
+            sco.Append("Made by OMSI MapWorks: a straight test piece in the profile ").Append(profilePath.Trim()).Append(".\r\n\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");
             Section(sco, "rendertype", "surface");
@@ -220,7 +220,7 @@ namespace OmsiMapEditor.OMSI
             generated.Textures.AddRange(layout.Textures.Values);
 
             var sco = new StringBuilder();
-            sco.Append("Made by OMSI Map Editor (Mapforge): a junction of ").Append(layout.Arms.Count).Append(" arms.\r\n\r\n");
+            sco.Append("Made by OMSI MapWorks: a junction of ").Append(layout.Arms.Count).Append(" arms.\r\n\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");
             Section(sco, "rendertype", "surface");

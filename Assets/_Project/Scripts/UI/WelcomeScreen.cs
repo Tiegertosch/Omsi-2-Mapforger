@@ -16,7 +16,7 @@ namespace OmsiMapEditor.UI
         {
             AddToClassList("welcome");
 
-            var title = new Label("OMSI Map Editor");
+            var title = new Label("OMSI MapWorks");
             title.AddToClassList("welcome-title");
             Add(title);
             var tagline = new Label("Build worlds. Shape roads. Drive your vision.");
@@ -25,7 +25,7 @@ namespace OmsiMapEditor.UI
 
             var cards = new VisualElement();
             cards.AddToClassList("welcome-cards");
-            cards.Add(Card("folder", "Open project", "Continue editing a Mapforge project (.omproj).",
+            cards.Add(Card("folder", "Open project", "Continue editing a MapWorks project (.omproj).",
                 () => OpenProjectRequested?.Invoke(), null));
             cards.Add(Card("map", "Open OMSI map", "Look at a map of your OMSI installation. Save it as a project to edit it.",
                 () => OpenMapRequested?.Invoke(), null));

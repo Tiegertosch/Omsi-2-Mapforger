@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "application": {
-    "displayName": "OMSI Map Editor",
+    "displayName": "OMSI MapWorks",
     "defaultWindowWidth": 1600,
     "defaultWindowHeight": 900,
     "minimumWindowWidth": 1100,

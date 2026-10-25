@@ -982,7 +982,7 @@ namespace OmsiMapEditor.UI
 
         private void OpenProject()
         {
-            var projectPath = WindowsFileDialog.OpenFile("Open a Mapforge project", WindowsFileDialog.ProjectFilter);
+            var projectPath = WindowsFileDialog.OpenFile("Open a MapWorks project", WindowsFileDialog.ProjectFilter);
             if (!string.IsNullOrEmpty(projectPath))
                 OpenProjectFile(projectPath);
         }
@@ -995,9 +995,9 @@ namespace OmsiMapEditor.UI
                 var fullProjectPath = Path.GetFullPath(projectPath);
                 var project = JsonUtility.FromJson<MapforgeProject>(File.ReadAllText(fullProjectPath));
                 if (project == null)
-                    throw new InvalidDataException("The selected file does not contain a Mapforge project.");
+                    throw new InvalidDataException("The selected file does not contain a MapWorks project.");
                 if (project.formatVersion != MapforgeProject.CurrentFormatVersion)
-                    throw new InvalidDataException("This Mapforge project uses an unsupported format version: " + project.formatVersion + ".");
+                    throw new InvalidDataException("This MapWorks project uses an unsupported format version: " + project.formatVersion + ".");
                 if (string.IsNullOrWhiteSpace(project.globalConfigPath))
                     throw new InvalidDataException("The project does not contain an OMSI global.cfg path.");
 
@@ -1060,7 +1060,7 @@ namespace OmsiMapEditor.UI
                 var suggestedName = string.IsNullOrWhiteSpace(currentProjectName)
                     ? (string.IsNullOrWhiteSpace(currentSummary.Name) ? "OMSI Map" : currentSummary.Name)
                     : currentProjectName;
-                var projectPath = WindowsFileDialog.SaveFile("Save Mapforge project", WindowsFileDialog.ProjectFilter,
+                var projectPath = WindowsFileDialog.SaveFile("Save MapWorks project", WindowsFileDialog.ProjectFilter,
                     WindowsFileDialog.ProjectExtension, SanitizeFileName(suggestedName) + "." + WindowsFileDialog.ProjectExtension);
                 if (string.IsNullOrEmpty(projectPath))
                     return;
@@ -1187,7 +1187,7 @@ namespace OmsiMapEditor.UI
             return chronoDate != null
                 ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
                   " with its chrono variants and is read-only. Choose Base map in the project browser to " + action + "."
-                : "The map is read-only. Save a Mapforge project (File > Save map project as...) to " + action + ".";
+                : "The map is read-only. Save a MapWorks project (File > Save map project as...) to " + action + ".";
         }
 
         /// <summary>
@@ -3786,7 +3786,7 @@ namespace OmsiMapEditor.UI
             }
             if (!session.CanEdit)
             {
-                SetStatus("Exports are built from a project workspace. Save a Mapforge project first.");
+                SetStatus("Exports are built from a project workspace. Save a MapWorks project first.");
                 return;
             }
             if (exportDialog == null || exportFolderField == null || exportNameField == null)
@@ -3794,7 +3794,7 @@ namespace OmsiMapEditor.UI
 
             var displayName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
             exportFolderField.SetValueWithoutNotify(Path.GetFileName(OmsiMapExporter.SuggestTargetFolder(session.Workspace)));
-            exportNameField.SetValueWithoutNotify(displayName + " (Mapforge)");
+            exportNameField.SetValueWithoutNotify(displayName + " (MapWorks)");
             UpdateExportTarget();
             exportDialog.style.display = DisplayStyle.Flex;
             if (chronoDate != null)
@@ -3906,7 +3906,7 @@ namespace OmsiMapEditor.UI
                 problem = reason;
             var editedCount = session.ModifiedFiles().Count;
             exportTargetLabel.text = problem ??
-                                     (Directory.Exists(target) ? "Replaces the earlier Mapforge export in:\n" : "Creates the map folder:\n") +
+                                     (Directory.Exists(target) ? "Replaces the earlier MapWorks export in:\n" : "Creates the map folder:\n") +
                                      target + "\nEdited files included: " + editedCount;
             exportTargetLabel.EnableInClassList("export-problem", problem != null);
             exportConfirmButton?.SetEnabled(problem == null);
@@ -4739,7 +4739,7 @@ namespace OmsiMapEditor.UI
             var hint = new Label(canEdit
                 ? "Drag one of them on the map to move all; with Rotate (E) the handle in their middle turns them together. " +
                   "Ctrl+click adds or removes an object, Esc clears the selection."
-                : "Read-only. Save a Mapforge project (File > Save map project as...) to edit this map.");
+                : "Read-only. Save a MapWorks project (File > Save map project as...) to edit this map.");
             hint.AddToClassList("muted");
             hint.AddToClassList("inspector-edit-hint");
             editor.Add(hint);
@@ -4792,7 +4792,7 @@ namespace OmsiMapEditor.UI
             {
                 foreach (var field in new[] { xField, yField, zField, headingField, pitchField, bankField })
                     field.SetEnabled(false);
-                var hint = new Label("Read-only. Save a Mapforge project (File > Save map project as...) to edit this map.");
+                var hint = new Label("Read-only. Save a MapWorks project (File > Save map project as...) to edit this map.");
                 hint.AddToClassList("muted");
                 hint.AddToClassList("inspector-edit-hint");
                 editor.Add(hint);

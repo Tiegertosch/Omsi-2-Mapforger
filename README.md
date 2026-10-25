@@ -1,8 +1,8 @@
-# OMSI Map Editor
+# OMSI MapWorks
 
 **A Windows desktop editor for exploring, checking and editing OMSI 2 maps.**
 
-OMSI Mapforge is the open-source project behind OMSI Map Editor. It reads maps and game assets from your local OMSI 2 installation. Inspect a map from above or in 3D, build roads and junctions, arrange scenery, and export your work as a separate map for OMSI. The project is under active development.
+OMSI MapWorks is developed under the working name Mapforge. It reads maps and game assets from your local OMSI 2 installation. Inspect a map from above or in 3D, build roads and junctions, arrange scenery, and export your work as a separate map for OMSI. The project is under active development.
 
 Mapforge keeps edits in a project workspace and leaves the source map untouched. Its file model preserves map data it does not yet understand, so existing records can travel through an edit and export without being rewritten.
 
@@ -72,4 +72,4 @@ Run the EditMode suite from Unity's **Window > General > Test Runner**. Detailed
 
 ## License
 
-OMSI Mapforge is licensed under the [GNU Affero General Public License v3.0](LICENSE). Third-party components and attributions are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). OMSI and its content are not part of this project.
+OMSI MapWorks is licensed under the [GNU Affero General Public License v3.0](LICENSE). Third-party components and attributions are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). OMSI and its content are not part of this project.

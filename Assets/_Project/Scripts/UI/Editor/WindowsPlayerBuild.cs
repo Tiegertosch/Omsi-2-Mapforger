@@ -17,23 +17,23 @@ namespace OmsiMapEditor.Editor
     public static class WindowsPlayerBuild
     {
         private const string StartupScenePath = "Assets/_Project/Scenes/EditorStartup.unity";
-        private const string OutputPath = "Builds/Windows/OMSIMapEditor.exe";
+        private const string OutputPath = "Builds/Windows/OMSIMapWorks.exe";
 
-        [MenuItem("OMSI Map Editor/Build/Windows Player")]
+        [MenuItem("OMSI MapWorks/Build/Windows Player")]
         public static void Build()
         {
             Build(false);
         }
 
         /// <summary>A player to hand out: every player file must be reviewed in its current form.</summary>
-        [MenuItem("OMSI Map Editor/Build/Windows Player (Release)")]
+        [MenuItem("OMSI MapWorks/Build/Windows Player (Release)")]
         public static void BuildRelease()
         {
             Build(true);
         }
 
         /// <summary>Records the player files as reviewed, after a person checked that none of them is OMSI content.</summary>
-        [MenuItem("OMSI Map Editor/Build/Record Reviewed Player Assets...")]
+        [MenuItem("OMSI MapWorks/Build/Record Reviewed Player Assets...")]
         public static void RecordReviewedPlayerAssets()
         {
             var paths = OmsiContentBoundary.GetPlayerAssetPaths(EnabledScenes()).ToList();
@@ -86,7 +86,7 @@ namespace OmsiMapEditor.Editor
             if (!review.IsClean)
             {
                 var message = (review.NewFiles.Count + review.ChangedFiles.Count) + " player file(s) were not reviewed for OMSI content in their current form; " +
-                              "check them and choose OMSI Map Editor > Build > Record Reviewed Player Assets:\n" + review;
+                              "check them and choose OMSI MapWorks > Build > Record Reviewed Player Assets:\n" + review;
                 if (release)
                     throw new InvalidOperationException("Release build blocked: " + message);
                 Debug.LogWarning(message);

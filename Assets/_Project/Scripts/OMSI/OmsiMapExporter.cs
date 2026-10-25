@@ -25,13 +25,13 @@ namespace OmsiMapEditor.OMSI
 
         private const string TemporarySuffix = ".mapforge-export-tmp";
 
-        /// <summary>Suggests a sibling folder of the original map, for example "Grundorf (Mapforge)".</summary>
+        /// <summary>Suggests a sibling folder of the original map, for example "Grundorf (MapWorks)".</summary>
         public static string SuggestTargetFolder(OmsiMapWorkspace workspace)
         {
             if (workspace == null)
                 throw new ArgumentNullException(nameof(workspace));
             var parent = Path.GetDirectoryName(workspace.RootPath);
-            return Path.Combine(parent, Path.GetFileName(workspace.RootPath) + " (Mapforge)");
+            return Path.Combine(parent, Path.GetFileName(workspace.RootPath) + " (MapWorks)");
         }
 
         /// <summary>True when the folder does not exist yet or holds an earlier Mapforge export.</summary>
@@ -44,7 +44,7 @@ namespace OmsiMapEditor.OMSI
             else if (OmsiRelativePath.IsSameOrInside(target, workspace.WorkspacePath) || OmsiRelativePath.IsSameOrInside(workspace.WorkspacePath, target))
                 reason = "The export folder must be separate from the project workspace.";
             else if (Directory.Exists(target) && !File.Exists(Path.Combine(target, MarkerFileName)))
-                reason = "The folder already exists and was not created by a Mapforge export: " + target;
+                reason = "The folder already exists and was not created by a MapWorks export: " + target;
             return reason == null;
         }
 
@@ -76,7 +76,7 @@ namespace OmsiMapEditor.OMSI
 
                 SetFriendlyName(Path.Combine(temporary, "global.cfg"), friendlyName.Trim());
                 File.WriteAllText(Path.Combine(temporary, MarkerFileName),
-                    "Exported by OMSI Mapforge on " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine +
+                    "Exported by OMSI MapWorks on " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine +
                     "Original map: " + workspace.RootPath + Environment.NewLine +
                     "Edited files: " + report.EditedFiles.Count + Environment.NewLine);
 

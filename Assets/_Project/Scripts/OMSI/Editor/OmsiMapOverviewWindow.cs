@@ -18,7 +18,7 @@ namespace OmsiMapEditor.OMSI.Editor
         private OmsiSplineContinuityReport continuity;
         private Vector2 mapScroll;
 
-        [MenuItem("OMSI Map Editor/Import/Read OMSI Map...")]
+        [MenuItem("OMSI MapWorks/Import/Read OMSI Map...")]
         private static void OpenWindow()
         {
             var window = GetWindow<OmsiMapOverviewWindow>();

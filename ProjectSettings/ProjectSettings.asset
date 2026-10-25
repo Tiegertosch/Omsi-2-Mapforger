@@ -12,8 +12,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: OMSI Map Editor
-  productName: OMSI Map Editor
+  companyName: OMSI MapWorks
+  productName: OMSI MapWorks
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.09019608, g: 0.10980392, b: 0.13725491, a: 1}

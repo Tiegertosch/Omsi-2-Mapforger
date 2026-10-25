@@ -35,6 +35,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Etappe 4: Schrift Inter, Icons für Ansichtsknöpfe und Panels, Umschalter für Texturen und 3D
 - [x] Startbildschirm: Projekt öffnen, Karte öffnen, zuletzt geöffnete Projekte und Karten
 - [x] Startbild beim Programmstart mit dem Logo des Nutzers (`Assets/_Project/UI/Branding/Logo.png`) statt des Unity-Logos, auf der Hintergrundfarbe `--mf-color-bg`
+- [x] Produktname „OMSI MapWorks“ statt des Platzhalters „OMSI Map Editor“ (ADR 034); Einstellungen werden beim ersten Start übernommen
 - [x] Neue Karte anlegen: Kartenordner mit Hilfsdateien aus einer Basiskarte als Vorlage, eine leere Kachel mit flachem Gelände, dazu ein Projekt (ADR 017); auf dem Startbildschirm und unter **File > New map...**
 - [x] Neue Karte im Spiel prüfen: Ohne Einstiegspunkt stürzt OMSI beim Laden ab; neue Karten bekommen den Einstiegspunkt „Start“ auf einem `entrypoint_bus.sco`
 - [x] Objekte-Bibliothek: DLC-Objekte nach Steams Dateilisten ausblenden oder kennzeichnen, User-Content bleibt sichtbar; Kartenprüfung nennt DLC-Objekte (ADR 016)

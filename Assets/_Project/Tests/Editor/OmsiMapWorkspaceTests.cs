@@ -79,14 +79,14 @@ namespace OmsiMapEditor.Tests
             workspace.Save("tile_0_0.map", tile);
             var target = OmsiMapExporter.SuggestTargetFolder(workspace);
 
-            var report = OmsiMapExporter.Export(workspace, target, "Test Map (Mapforge)");
+            var report = OmsiMapExporter.Export(workspace, target, "Test Map (MapWorks)");
 
-            Assert.AreEqual(Path.Combine(mapsFolder, "Testmap (Mapforge)"), target);
+            Assert.AreEqual(Path.Combine(mapsFolder, "Testmap (MapWorks)"), target);
             Assert.AreEqual(3, report.CopiedFileCount);
             CollectionAssert.AreEqual(new[] { "tile_0_0.map" }, report.EditedFiles);
             CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(target, "texture", "gras.bmp")));
             var exported = OmsiMapReader.Read(Path.Combine(target, "global.cfg"));
-            Assert.AreEqual("Test Map (Mapforge)", exported.FriendlyName);
+            Assert.AreEqual("Test Map (MapWorks)", exported.FriendlyName);
             Assert.AreEqual("Testmap", exported.Name);
             Assert.AreEqual(90.0, exported.Tiles[0].Objects[0].HeadingDegrees, 1e-12);
             Assert.AreEqual("Test Map", OmsiMapReader.Read(Path.Combine(original, "global.cfg")).FriendlyName);
@@ -111,7 +111,7 @@ namespace OmsiMapEditor.Tests
             var foreign = Path.Combine(mapsFolder, "Other map");
             Directory.CreateDirectory(foreign);
             Assert.IsFalse(OmsiMapExporter.CanWriteTo(workspace, foreign, out var reason));
-            StringAssert.Contains("not created by a Mapforge export", reason);
+            StringAssert.Contains("not created by a MapWorks export", reason);
             Assert.Throws<InvalidOperationException>(() => OmsiMapExporter.Export(workspace, foreign, "X"));
             Assert.Throws<InvalidOperationException>(() => OmsiMapExporter.Export(workspace, original, "X"));
             Assert.Throws<InvalidOperationException>(() => OmsiMapExporter.Export(workspace, Path.Combine(original, "copy"), "X"));

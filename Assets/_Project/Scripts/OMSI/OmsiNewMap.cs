@@ -44,7 +44,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Records of global.cfg that belong to the template's places and are left out.</summary>
         private static readonly string[] DroppedRecords = { "map", "entrypoints", "backgroundimage", "worldcoordinates" };
 
-        private const string DefaultDescription = "A new map, created with OMSI Map Editor.";
+        private const string DefaultDescription = "A new map, created with OMSI MapWorks.";
 
         /// <summary>Hour and density of a day as in Grundorf, for templates without a curve of their own.</summary>
         private static readonly double[,] StandardCarCurve =
@@ -158,7 +158,7 @@ namespace OmsiMapEditor.OMSI
                     File.WriteAllBytes(Path.Combine(temporary, file + ".terrain"), CreateFlatTerrain(options.GroundHeight));
                 }
                 File.WriteAllBytes(Path.Combine(temporary, "signalroutes.cfg"), OmsiTextFile.Encode(
-                    "-----------------------\r\nSignal Routes File\r\n-----------------------\r\n\r\nCreated with OMSI Map Editor\r\nDate: " +
+                    "-----------------------\r\nSignal Routes File\r\n-----------------------\r\n\r\nCreated with OMSI MapWorks\r\nDate: " +
                     createdAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) + "\r\n\r\n", OmsiTextEncoding.Windows1252));
 
                 Directory.Move(temporary, target);
@@ -190,7 +190,7 @@ namespace OmsiMapEditor.OMSI
         {
             var config = template;
             config.Preamble.Clear();
-            config.Preamble.Add(new OmsiLine("File created with OMSI Map Editor on " + createdAt.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture),
+            config.Preamble.Add(new OmsiLine("File created with OMSI MapWorks on " + createdAt.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture),
                 config.DefaultLineEnding));
             config.Preamble.Add(new OmsiLine(string.Empty, config.DefaultLineEnding));
             foreach (var dropped in DroppedRecords)
@@ -435,7 +435,7 @@ namespace OmsiMapEditor.OMSI
         private static StringBuilder TileHeader(DateTime createdAt)
         {
             var text = new StringBuilder();
-            text.Append("File created with OMSI Map Editor on ").Append(createdAt.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture)).Append("\r\n\r\n");
+            text.Append("File created with OMSI MapWorks on ").Append(createdAt.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture)).Append("\r\n\r\n");
             text.Append("[version]\r\n").Append(TileVersion.ToString(CultureInfo.InvariantCulture)).Append("\r\n\r\n");
             text.Append("[terrain]\r\n\r\n\r\n");
             text.Append("[variable_terrainlightmap]\r\n\r\n");

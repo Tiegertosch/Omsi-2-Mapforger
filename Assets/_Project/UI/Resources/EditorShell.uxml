@@ -2,7 +2,7 @@
     <ui:Style src="EditorShell.uss" />
     <ui:VisualElement name="app-root" class="app-root">
         <ui:VisualElement name="toolbar" class="menu-bar">
-            <ui:Label text="OMSI Map Editor" class="brand" />
+            <ui:Label text="OMSI MapWorks" class="brand" />
             <ui:VisualElement class="menu-container">
                 <ui:Button name="file-menu-button" text="File" class="toolbar-menu-button" />
                 <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" />
@@ -49,7 +49,7 @@
         </ui:VisualElement>
         <ui:VisualElement name="file-menu" class="menu-popup file-menu">
             <ui:Button name="new-map-menu-item" text="New map..." class="menu-popup-item" />
-            <ui:Button name="open-project-menu-item" text="Open Mapforge project..." class="menu-popup-item" />
+            <ui:Button name="open-project-menu-item" text="Open MapWorks project..." class="menu-popup-item" />
             <ui:Button name="save-project-menu-item" text="Save map project as..." class="menu-popup-item" />
             <ui:Button name="export-menu-item" text="Export to OMSI..." class="menu-popup-item" />
             <ui:Label class="menu-divider" />
@@ -82,7 +82,7 @@
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="help-menu" class="menu-popup help-menu">
-            <ui:Label text="OMSI Map Editor" class="popup-title" />
+            <ui:Label text="OMSI MapWorks" class="popup-title" />
             <ui:Label name="map-hint" class="popup-description help-controls" style="display: none;" />
             <ui:Label text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
             <ui:Label text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />

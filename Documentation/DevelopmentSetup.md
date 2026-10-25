@@ -127,7 +127,7 @@ UNITY="/d/Unity Hub/Unity 6.6/6000.6.6f1/Editor/Unity.exe"
 # EditMode-Tests; das Ergebnis steht in der XML-Datei
 "$UNITY" -batchmode -nographics -projectPath "$PWD" -runTests -testPlatform EditMode -testResults /tmp/editmode.xml -logFile /tmp/editmode.log
 
-# Windows-Player nach Builds/Windows/OMSIMapEditor.exe, inklusive Prüfung der Inhaltsgrenze
+# Windows-Player nach Builds/Windows/OMSIMapWorks.exe, inklusive Prüfung der Inhaltsgrenze
 "$UNITY" -batchmode -nographics -quit -projectPath "$PWD" -executeMethod OmsiMapEditor.Editor.WindowsPlayerBuild.Build -logFile /tmp/build.log
 
 # Release-Player: bricht ab, wenn eine Player-Datei nicht in ihrer jetzigen Form freigegeben ist (ADR 005)
@@ -146,12 +146,12 @@ OMSI_MAP_CONFIG="D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cf
 **Player ohne Klicken prüfen:** Der gebaute Player öffnet mit `-openMap pfad\global.cfg` oder `-openProject pfad.omproj` direkt eine Karte. `-view kachelX kachelY x y meterProPixel` setzt den Ausschnitt, `-orbit Richtung Neigung Abstand` zeigt ihn in 3D, `-select objektID` wählt ein Objekt (mit `-openProject` erscheinen in 3D Auswahlquader und Drehring), `-tool drag|move|rotate` wählt das Werkzeug (Achsenpfeile nur mit `move`, Ringe und Drehgriff nur mit `rotate`), `-objects` öffnet die Objekte-Bibliothek, `-fold project|inspector|both` klappt Panels ein, `-place Sceneryobjects\...\objekt.sco` startet das Platzieren mit der Vorschau in der Bildmitte, `-addTile x y` und `-deleteTile x y` fügen eine Kachel hinzu oder löschen sie (nur mit Projekt), `-hoverTileAdder x y` zeigt das Plus eines freien Platzes wie unter dem Mauszeiger, `-screenshot datei.png` speichert ein Bildschirmfoto, sobald Boden, Objekte und Umrisse geladen sind, ohne Karte den Startbildschirm, und `-quit` beendet den Player danach:
 
 ```bash
-./Builds/Windows/OMSIMapEditor.exe -screen-width 1600 -screen-height 900 -screen-fullscreen 0 \
+./Builds/Windows/OMSIMapWorks.exe -screen-width 1600 -screen-height 900 -screen-fullscreen 0 \
   -openMap "D:/SteamLibrary/steamapps/common/OMSI 2/maps/Grundorf/global.cfg" -view 0 -1 150 150 0.25 \
   -screenshot "C:/temp/grundorf.png" -quit -logFile "C:/temp/player.log"
 ```
 
-**Player-Log:** Der gebaute Player schreibt nach `%USERPROFILE%\AppData\LocalLow\OMSI Map Editor\OMSI Map Editor\Player.log`. Die Kartenansicht meldet dort Neuzeichnungen über 50 ms.
+**Player-Log:** Der gebaute Player schreibt nach `%USERPROFILE%\AppData\LocalLow\OMSI MapWorks\OMSI MapWorks\Player.log`. Die Kartenansicht meldet dort Neuzeichnungen über 50 ms.
 
 ## Naechste Schritte
 

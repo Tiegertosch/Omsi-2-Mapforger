@@ -50,7 +50,7 @@ UI und Fachmodule dürfen von Core abhängen. Die UI nutzt zusätzlich `Editor.O
 
 `Assets/_Project/Settings/Resources/editor-settings.json` enthält die versionsfähigen Startwerte für Anwendungsname, Desktopfenster und UI-Skalierung. Der Datenvertrag ist `MapforgeEditorSettings` in `Editor.Core` und prüft die Werte beim Laden.
 
-- Das Editor-Setup überträgt Anwendungsname, Standardfenstergröße und `startMaximized` in die Player Settings. Nach Änderungen an der Datei **OMSI Map Editor > Setup > Apply Editor Settings** ausführen.
+- Das Editor-Setup überträgt Anwendungsname, Standardfenstergröße und `startMaximized` in die Player Settings. Nach Änderungen an der Datei **OMSI MapWorks > Setup > Apply Editor Settings** ausführen.
 - Der Player lädt die Datei über `Resources` und setzt `interface.scale` als Skalierung des UI Toolkit-Panels. Ungültige Werte werden gemeldet; dann gelten die eingebauten Standardwerte.
 - `minimumWindowWidth`/`minimumWindowHeight` werden geprüft, aber noch nicht erzwungen, weil Unity dafür keine Player-API bietet. `interface.defaultLocale` ist für eine spätere Lokalisierung reserviert.
 

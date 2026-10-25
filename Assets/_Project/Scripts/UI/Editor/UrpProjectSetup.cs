@@ -23,7 +23,7 @@ namespace OmsiMapEditor.Editor
             EditorApplication.delayCall += ConfigurePipeline;
         }
 
-        [MenuItem("OMSI Map Editor/Setup/Configure URP")]
+        [MenuItem("OMSI MapWorks/Setup/Configure URP")]
         public static void ConfigurePipeline()
         {
             if (SessionState.GetBool(SetupKey, false))
@@ -86,11 +86,11 @@ namespace OmsiMapEditor.Editor
             QualitySettings.renderPipeline = pipeline;
             ApplyPlayerSettings();
             SessionState.SetBool(SetupKey, true);
-            Debug.Log("OMSI Map Editor URP pipeline is configured.");
+            Debug.Log("OMSI MapWorks URP pipeline is configured.");
         }
 
         /// <summary>Copies the application values from editor-settings.json into the Unity player settings.</summary>
-        [MenuItem("OMSI Map Editor/Setup/Apply Editor Settings")]
+        [MenuItem("OMSI MapWorks/Setup/Apply Editor Settings")]
         public static void ApplyPlayerSettings()
         {
             MapforgeEditorSettings settings;

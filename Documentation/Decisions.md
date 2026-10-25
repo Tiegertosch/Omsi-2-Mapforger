@@ -343,3 +343,14 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 **Grund:**
 - Lange Straßen über mehrere Querstraßen in einem Zug zu ziehen ist der übliche Fall; bisher entstand nur an der ersten eine Kreuzung, die übrigen wurden ohne Verbindung überbaut.
 - Neu planen nach jeder Kreuzung statt alle Schnittpunkte der ersten Planung zu nutzen: Jede Kreuzung verschiebt den Weg um ihre Arme, und die Straße verlässt sie in Richtung ihres vorderen Arms; die übrigen Schnittpunkte liegen danach woanders.
+
+## ADR 034: Produktname OMSI MapWorks
+
+**Status:** Angenommen, 25. Oktober 2026, Entscheidung des Nutzers.
+
+**Entscheidung:** Das fertige Programm heißt **OMSI MapWorks**. „OMSI Map Editor“ war ein Platzhalter, „Mapforge“ ist der Entwicklungsname. Umbenannt wird alles Sichtbare: Fenstertitel sowie Firmen- und Produktname in den Player-Einstellungen, Startbildschirm, Kopfzeile, Hilfedialog, `editor-settings.json`, Meldungen („MapWorks project“), Kommentare in neuen Karten und erzeugten Modellen, der vorgeschlagene Exportname „Karte (MapWorks)“, das Unity-Menü **OMSI MapWorks** und die Exe `Builds/Windows/OMSIMapWorks.exe`. Das Startbild zeigt das Logo des Nutzers statt des Unity-Logos. Technische Namen behalten „Mapforge“: `Sceneryobjects\Mapforge\<Projekt>` samt `[groups]` und Anzeigenamen erzeugter Kreuzungen, die Markierungsdatei `mapforge-export.txt`, die Endung `.omproj`, Schlüssel der PlayerPrefs, Namespaces `OmsiMapEditor.*` und der Repository-Name. Weil Unity PlayerPrefs unter Firmen- und Produktnamen ablegt, kopiert `PreferencesMigration` beim ersten Start den Registry-Schlüssel von „OMSI Map Editor“ einmal herüber (zuletzt geöffnet, Favoriten, DLC-Markierungen); das Zwischenlager der Vorschaubilder unter `persistentDataPath` wird neu gerendert.
+
+**Grund:**
+- Bestehende Karten nennen erzeugte Kreuzungen über ihren Pfad unter `Sceneryobjects\Mapforge`, frühere Exporte werden an `mapforge-export.txt` erkannt; ein Umbenennen würde beides brechen oder Ordner doppeln (Entscheidung des Nutzers).
+- Die Vorschaubilder sind ein reiner Cache; die Einstellungen dagegen hat der Nutzer von Hand gepflegt.
+- `CorporateDesign.md` schlägt „OMSI MapForge“ als vorläufige Wortmarke vor; dieser ADR legt den Namen fest.

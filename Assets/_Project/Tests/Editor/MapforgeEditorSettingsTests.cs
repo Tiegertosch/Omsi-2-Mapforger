@@ -17,7 +17,7 @@ namespace OmsiMapEditor.Tests
 
             Assert.IsNotNull(settings);
             Assert.DoesNotThrow(settings.Validate);
-            Assert.AreEqual("OMSI Map Editor", settings.application.displayName);
+            Assert.AreEqual("OMSI MapWorks", settings.application.displayName);
         }
 
         [Test]

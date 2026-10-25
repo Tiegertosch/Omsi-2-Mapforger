@@ -75,7 +75,7 @@ namespace OmsiMapEditor.Tests
             var summary = OmsiMapReader.Read(report.GlobalConfigPath);
             Assert.AreEqual("Neustadt", summary.Name);
             Assert.AreEqual("Neustadt (Test)", summary.FriendlyName);
-            Assert.AreEqual("A new map, created with OMSI Map Editor.", summary.Description);
+            Assert.AreEqual("A new map, created with OMSI MapWorks.", summary.Description);
             Assert.AreEqual(2, summary.NextIdCode);
             Assert.IsFalse(summary.UsesWorldCoordinates);
             Assert.AreEqual(300.0, summary.TileSizeMeters);
@@ -95,7 +95,7 @@ namespace OmsiMapEditor.Tests
 
             var config = OmsiRecordFile.Load(report.GlobalConfigPath, OmsiGlobalConfigLayouts.Instance);
             Assert.AreEqual(OmsiTextEncoding.Utf16LittleEndian, config.Encoding);
-            Assert.AreEqual("File created with OMSI Map Editor on 23.10.2026 18:30:00", config.Preamble[0].Text);
+            Assert.AreEqual("File created with OMSI MapWorks on 23.10.2026 18:30:00", config.Preamble[0].Text);
             var names = config.Records.Select(record => record.Name).ToList();
             // The template's entry point is replaced by one on the new tile's object.
             var entryPoints = config.Records.Single(record => record.Name == "entrypoints");
