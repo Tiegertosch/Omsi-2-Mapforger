@@ -440,7 +440,7 @@ Der Inspector des gewählten Objekts listet unter „Attached objects“ alles, 
 
 ## ADR 040: Gelände-Werkzeuge wie openMapper, mit einer Grundlage für die Straßenanpassung
 
-**Status:** Angenommen, 25. Oktober 2026; Vorbild und Etappen nach Wahl des Nutzers (openMapper übernehmen, damit es sicher zu openOMSI passt; zuerst Pinsel und Rampe).
+**Status:** Angenommen, 25. Oktober 2026; Vorbild und Etappen nach Wahl des Nutzers (openMapper übernehmen, damit es sicher zu openOMSI passt; zuerst Pinsel und Rampe). Etappe 1 vom Nutzer in openOMSI bestätigt, auch über Kachelkanten.
 
 **Entscheidung:** Das Werkzeug „Terrain“ (G) arbeitet wie openMappers Terrain-Werkzeug (`src/editor.rs`, siehe THIRD_PARTY_NOTICES):
 
