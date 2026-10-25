@@ -16,6 +16,19 @@ namespace OmsiMapEditor.OMSI
         public double HeadingDegrees;
     }
 
+    /// <summary>One spline of a chain as a row counts it: where it begins along the chain and whether the chain runs against it.</summary>
+    public sealed class OmsiChainSegment
+    {
+        public OmsiTileSummary Tile { get; internal set; }
+        public OmsiSplineRecord Spline { get; internal set; }
+
+        /// <summary>True when the chain runs from the spline's end to its start.</summary>
+        public bool Reversed { get; internal set; }
+
+        public double Begin { get; internal set; }
+        public double End => Begin + Spline.LengthMeters;
+    }
+
     /// <summary>
     /// Places the objects of [splineAttachement] rows. Object j lies at the start distance plus j times the interval
     /// along the spline chain, while j times the interval does not exceed the range. The chain follows each spline's
@@ -67,17 +80,7 @@ namespace OmsiMapEditor.OMSI
             if (tile == null || record == null || record.IsRepeater || record.SplineIndex < 0 || record.SplineIndex >= tile.Splines.Count)
                 return result;
 
-            // The start distance counts from the beginning of the chain, which may lie before the record's spline.
-            var chain = new List<Segment> { new Segment { Tile = tile, Spline = tile.Splines[record.SplineIndex], Reversed = false } };
-            while (chain.Count < MaximumSplinesPerChain)
-            {
-                var before = Neighbour(chain[0], false, chain);
-                if (before == null)
-                    break;
-                chain.Insert(0, before);
-            }
-            for (var index = 1; index < chain.Count; index++)
-                chain[index].Begin = chain[index - 1].End;
+            var chain = ChainFrom(tile, tile.Splines[record.SplineIndex]);
 
             var single = !(record.Interval > 0.0);
             var last = single ? record.StartDistance : record.StartDistance + Math.Floor(Math.Max(0.0, record.Range) / record.Interval) * record.Interval;
@@ -93,20 +96,51 @@ namespace OmsiMapEditor.OMSI
             return result;
         }
 
-        private sealed class Segment
+        /// <summary>
+        /// The whole chain through a spline, as a row anchored on it counts it: in the spline's direction, from the
+        /// beginning of the chain, which may lie before it, to the end, where no neighbour follows.
+        /// </summary>
+        public List<OmsiChainSegment> Chain(OmsiTileSummary tile, OmsiSplineRecord spline)
         {
-            public OmsiTileSummary Tile;
-            public OmsiSplineRecord Spline;
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (spline == null)
+                throw new ArgumentNullException(nameof(spline));
+            var chain = ChainFrom(tile, spline);
+            ExtendTo(chain, double.MaxValue);
+            return chain;
+        }
 
-            /// <summary>True when the chain runs from the spline's end to its start.</summary>
-            public bool Reversed;
+        /// <summary>
+        /// Where an object of a row lies at a distance along a chain, with the row's offset to the right, height and
+        /// heading relative to the chain's direction.
+        /// </summary>
+        public OmsiPlacedAttachment PointAt(List<OmsiChainSegment> chain, double distance, double lateralOffset, double height, double headingDegrees)
+        {
+            if (chain == null || chain.Count == 0)
+                throw new ArgumentException("A chain is required.", nameof(chain));
+            return PlaceAt(chain, distance, new OmsiSplineAttachmentRecord { LateralOffset = lateralOffset, Height = height, HeadingDegrees = headingDegrees });
+        }
 
-            public double Begin;
-            public double End => Begin + Spline.LengthMeters;
+        /// <summary>The chain from its beginning, which may lie before the spline, up to the spline's end.</summary>
+        private List<OmsiChainSegment> ChainFrom(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            // The start distance counts from the beginning of the chain, which may lie before the record's spline.
+            var chain = new List<OmsiChainSegment> { new OmsiChainSegment { Tile = tile, Spline = spline, Reversed = false } };
+            while (chain.Count < MaximumSplinesPerChain)
+            {
+                var before = Neighbour(chain[0], false, chain);
+                if (before == null)
+                    break;
+                chain.Insert(0, before);
+            }
+            for (var index = 1; index < chain.Count; index++)
+                chain[index].Begin = chain[index - 1].End;
+            return chain;
         }
 
         /// <summary>Follows neighbours until the chain reaches the distance; false where the chain ends before it.</summary>
-        private bool ExtendTo(List<Segment> chain, double distance)
+        private bool ExtendTo(List<OmsiChainSegment> chain, double distance)
         {
             while (chain[chain.Count - 1].End < distance - 1e-9)
             {
@@ -127,7 +161,7 @@ namespace OmsiMapEditor.OMSI
         /// the neighbour it names, or a spline naming it, whose end meets there. Splines already in the chain are skipped,
         /// so loops end.
         /// </summary>
-        private Segment Neighbour(Segment current, bool forward, List<Segment> chain)
+        private OmsiChainSegment Neighbour(OmsiChainSegment current, bool forward, List<OmsiChainSegment> chain)
         {
             var atEnd = forward != current.Reversed;
             var meeting = WorldPoint(current.Tile, current.Spline, atEnd ? current.Spline.LengthMeters : 0.0);
@@ -146,14 +180,14 @@ namespace OmsiMapEditor.OMSI
                 var endMeets = Distance(meeting, WorldPoint(next.Key, next.Value, next.Value.LengthMeters)) <= JoinTolerance;
                 // Going forward the chain enters the neighbour where they meet; going back it leaves it there.
                 if (forward && (startMeets || endMeets))
-                    return new Segment { Tile = next.Key, Spline = next.Value, Reversed = !startMeets };
+                    return new OmsiChainSegment { Tile = next.Key, Spline = next.Value, Reversed = !startMeets };
                 if (!forward && (endMeets || startMeets))
-                    return new Segment { Tile = next.Key, Spline = next.Value, Reversed = !endMeets };
+                    return new OmsiChainSegment { Tile = next.Key, Spline = next.Value, Reversed = !endMeets };
             }
             return null;
         }
 
-        private OmsiPlacedAttachment PlaceAt(List<Segment> chain, double distance, OmsiSplineAttachmentRecord record)
+        private OmsiPlacedAttachment PlaceAt(List<OmsiChainSegment> chain, double distance, OmsiSplineAttachmentRecord record)
         {
             var segment = chain[chain.Count - 1];
             foreach (var candidate in chain)

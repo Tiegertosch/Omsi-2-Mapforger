@@ -382,3 +382,16 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Exporte liegen als eigene Karten unter `maps` und nennen dieselben Pfade; alle Karten zu lesen schützt sie, auch wenn das Projekt die Objekte nicht mehr nutzt.
 - Projekte desselben Namens teilen sich einen Ordner; deren Arbeitskopien kennt der Editor nicht. Das Thema sagt das, und gelöscht wird erst nach Bestätigung.
 - In der Kartenprüfung statt als eigener Menüpunkt: Sie läuft ohnehin im Hintergrund, zeigt Befunde mit Knöpfen und braucht keine neue Oberfläche.
+
+## ADR 037: Reihen von Objekten entlang von Straßen anlegen
+
+**Status:** Angenommen, 25. Oktober 2026; eigenes Werkzeug und Reichweite bis zur nächsten Kreuzung nach Wahl des Nutzers. Vom Nutzer im Editor bestätigt; im Spiel noch ungeprüft.
+
+**Entscheidung:** Das Werkzeug „Rows“ (T) legt `[splineAttachement]`-Reihen an, etwa Laternen oder Pfosten. Es zeigt die Objekt-Bibliothek mit eigener Optionsspalte: Abstand zwischen den Objekten (25 m), Abstand von der Mitte (leer: 0,5 m innerhalb des Profilrands), Höhe, Drehung gegen die Fahrtrichtung, beide Seiten, ganze Straße. Zeigt der Zeiger auf eine Straße, zeigt die Karte, wo die Objekte stehen würden, auf der Seite des Zeigers; ein Klick legt die Reihe, mit „Whole road“ entlang der ganzen Kette verbundener Splines von Kreuzung oder freiem Ende zu Kreuzung oder freiem Ende, gleichmäßig verteilt mit gleichen Rändern, sonst zwischen zwei Klicks. Auf der linken Seite steht jedes Objekt um 180° gedreht, so zeigen beide Reihen zur Straße. Die Vorschau zeigt die Objekte selbst als Modelle; R dreht sie vorher um 15°, Shift+R zurück; nach dem Legen erscheint erst wieder eine Vorschau, wenn sich der Zeiger bewegt, damit ein zweiter Klick die Reihe nicht doppelt legt (Wünsche des Nutzers nach dem ersten Test). Ein Klick auf ein Objekt einer vorhandenen Reihe wählt die Reihe, Entf löscht sie; Verweise wie Haltestellen im Fahrplan verhindern das. Alles ist rückgängig zu machen (`OmsiAttachmentChange`, Dateistände).
+
+Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte stehen, verankert an einem Spline dieser Kachel. Der Startabstand zählt wie in OMSI ab dem Anfang der ganzen Kette des Ankersplines; läuft die Kette gegen den Ankerspline, zählt der Datensatz vom anderen Ende, mit umgekehrtem Versatz und um 180° gedrehten Objekten. Jeder geplante Datensatz wird vor dem Schreiben mit der Zeichenlogik (`OmsiSplineAttachmentLayout`) nachgerechnet und muss genau die geplanten Positionen ergeben.
+
+**Grund:**
+- `[splineAttachement_repeater]` wird nicht geschrieben: In Berlin-Spandau passt die Nummer des ersten Objekts nur in 29 von 210 Fällen zum ersten Objekt der Kachel, der genannte Spline trägt es nur in 40 Fällen, und manche Wiederholungen stehen doppelt. Ein Datensatz je Kachel erreicht dasselbe Bild ohne unbelegte Felder.
+- Die Bibliothek wiederzuverwenden spart eine zweite Objektauswahl mit Reitern, Suche und Vorschaubildern.
+- Bekanntes Risiko: Weil der Startabstand ab dem Kettenanfang zählt, verrutschen in OMSI alle Reihen einer Kette, wenn vor ihrem Anfang eine Straße angebaut wird; das gilt auch für vorhandene Reihen der Originalkarten (Roadmap).

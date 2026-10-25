@@ -8,7 +8,7 @@ namespace OmsiMapEditor.UI
     /// What a left drag on the map does: drag the selection freely, move it freely or along axis arrows, or turn the
     /// selected object. Every tool selects with a click.
     /// </summary>
-    internal enum EditorTool { Drag, Move, Rotate, Road }
+    internal enum EditorTool { Drag, Move, Rotate, Road, Rows }
 
     /// <summary>
     /// The tool bar at the bottom of the map: grouped buttons with an icon, a name and their key, as the corporate
@@ -38,6 +38,8 @@ namespace OmsiMapEditor.UI
             var world = AddGroup();
             AddTool(world, EditorTool.Road, "spline", "Road", "R",
                 "Build roads from the view from above: click to start, click for each bend, Esc ends. Roads join free spline ends.");
+            AddTool(world, EditorTool.Rows, "fence", "Rows", "T",
+                "Lay rows of objects along roads, such as lamps or posts: choose an object, point at a road and click.");
             objectsButton = AddButton(world, "box", "Objects", "3",
                 "Place scenery objects: choose one, then click into the map. Shift+click keeps placing, R turns it, Esc stops.",
                 () => ObjectsRequested?.Invoke());

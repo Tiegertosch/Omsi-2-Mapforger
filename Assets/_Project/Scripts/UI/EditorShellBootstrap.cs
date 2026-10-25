@@ -39,6 +39,9 @@ namespace OmsiMapEditor.UI
 
             /// <summary>A tile added or deleted; the map is read again, so it stays the only step in the history.</summary>
             public OmsiTileChange TileChange;
+
+            /// <summary>Rows of objects along roads laid or deleted.</summary>
+            public OmsiAttachmentChange AttachmentChange;
         }
 
         private const int HistoryLimit = 200;
@@ -125,6 +128,23 @@ namespace OmsiMapEditor.UI
 
         // True while the middle handle of the dragged spline bends it, rather than one of its ends moving.
         private bool bendingSpline;
+
+        // The row tool (ADR 037): its options beside the object library, the object it lays, how the map's rows lie, the
+        // rows laid out for picking, the road a first click started a row on and the row selected for deleting.
+        private RowToolOptions rowOptions;
+        private string rowAsset;
+        private OmsiSplineAttachmentLayout rowLayout;
+        private List<KeyValuePair<KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>, List<OmsiPlacedAttachment>>> rowObjects;
+        private OmsiSplinePoint rowStart;
+        private double rowStartAlong;
+        private KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>? selectedRow;
+
+        // Where a row was just laid; no new row is shown there until the pointer moves, so a second click cannot lay it twice.
+        private OmsiMapPoint? rowLaidAt;
+
+        /// <summary>A row snaps to a road within this many pixels, or at least <see cref="RowSnapMeters"/>, so pointing at a pavement finds its road.</summary>
+        private const float RowSnapPixels = 24f;
+        private const double RowSnapMeters = 15.0;
 
         // The junction made here whose arm is being turned at its handle, and that arm; null and -1 otherwise.
         private OmsiJunctionRebuild armRebuild;
@@ -286,7 +306,19 @@ namespace OmsiMapEditor.UI
             if (objectsPanelHost != null)
             {
                 objectsPanel = new ObjectLibraryPanel();
-                objectsPanel.ObjectChosen += StartPlacement;
+                objectsPanel.ObjectChosen += path =>
+                {
+                    if (activeTool == EditorTool.Rows)
+                        ChooseRowObject(path);
+                    else
+                        StartPlacement(path);
+                };
+                rowOptions = new RowToolOptions();
+                rowOptions.SettingsChanged += () =>
+                {
+                    if (activeTool == EditorTool.Rows)
+                        UpdateRowPreview();
+                };
                 objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
                 objectsPanel.PreviewRequested += path => objectRenderer?.RequestPreview(path);
                 objectsPanel.HeadingChanged += heading =>
@@ -355,9 +387,20 @@ namespace OmsiMapEditor.UI
                 mapCanvas.RoadPointerMoved += (x, y) =>
                 {
                     roadPointer = new OmsiMapPoint(x, y);
-                    UpdateRoadPreview();
+                    if (rowLaidAt.HasValue && Math.Abs(x - rowLaidAt.Value.X) + Math.Abs(y - rowLaidAt.Value.Y) > 1.0)
+                        rowLaidAt = null;
+                    if (activeTool == EditorTool.Rows)
+                        UpdateRowPreview();
+                    else
+                        UpdateRoadPreview();
                 };
-                mapCanvas.RoadClicked += BuildRoadTo;
+                mapCanvas.RoadClicked += (x, y) =>
+                {
+                    if (activeTool == EditorTool.Rows)
+                        ClickRow(x, y);
+                    else
+                        BuildRoadTo(x, y);
+                };
                 mapCanvas.SplineEndDragStarted += handle =>
                 {
                     bendingSpline = handle == SplineHandleKind.Curve;
@@ -959,6 +1002,27 @@ namespace OmsiMapEditor.UI
                     var target = OmsiMapGeometry.TileLocalToWorld(moveTileX, moveTileY, moveX, moveY, currentSummary.TileSizeMeters);
                     PreviewSplineEnd(target.X, target.Y, Array.IndexOf(args, "-moveCommit") >= 0, Array.IndexOf(args, "-moveAlt") >= 0);
                 }
+            }
+
+            // -rows <object> <tile x> <tile y> <x> <y> [-rowsLay]: points the row tool at a place with an object chosen, and
+            // with -rowsLay clicks there; -rowsBoth lays both sides, -rowsEvery <m> sets the distance between objects, -rowsHeading <°> turns them.
+            var rowsObject = Argument("-rows", 1);
+            if (rowsObject != null && int.TryParse(Argument("-rows", 2), out var rowsTileX) && int.TryParse(Argument("-rows", 3), out var rowsTileY) &&
+                double.TryParse(Argument("-rows", 4), NumberStyles.Float, CultureInfo.InvariantCulture, out var rowsX) &&
+                double.TryParse(Argument("-rows", 5), NumberStyles.Float, CultureInfo.InvariantCulture, out var rowsY))
+            {
+                var groundStarted = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundStarted < 300f)
+                    yield return null;
+                SetTool(EditorTool.Rows);
+                rowOptions?.Apply(Array.IndexOf(args, "-rowsBoth") >= 0, Argument("-rowsEvery", 1), Argument("-rowsHeading", 1));
+                ChooseRowObject(rowsObject);
+                var rowsAt = OmsiMapGeometry.TileLocalToWorld(rowsTileX, rowsTileY, rowsX, rowsY, currentSummary.TileSizeMeters);
+                roadPointer = rowsAt;
+                UpdateRowPreview();
+                if (Array.IndexOf(args, "-rowsLay") >= 0)
+                    ClickRow(rowsAt.X, rowsAt.Y);
+                Debug.Log("Rows: " + statusLabel?.text);
             }
 
             // -turnArm <object ID> <arm from 1> <heading in the object>: drags that arm handle of a junction made here.
@@ -1992,6 +2056,8 @@ namespace OmsiMapEditor.UI
         private void RefreshSplineViews(OmsiSplineChange change)
         {
             mapCanvas?.RefreshSplines();
+            // Rows along the changed splines follow them.
+            objectRenderer?.RefreshPlacements();
             if (groundRenderer != null && !groundRenderer.RefreshSplines(change.Tiles))
                 Debug.Log("Spline surfaces of the changed tiles are built once the ground has finished loading.");
             if (change.TerrainTiles.Count > 0)
@@ -3245,6 +3311,314 @@ namespace OmsiMapEditor.UI
             UpdateMapStateLabel();
         }
 
+        /// <summary>Starts the row tool: the object library with the row options beside it, and the map's road mode for pointing.</summary>
+        private void BeginRowTool()
+        {
+            if (objectsPanel == null || mapCanvas == null || currentSummary == null)
+                return;
+            UpdateObjectsCatalog();
+            StartInstallationScan();
+            objectsPanel.UseOptions(rowOptions, "Point at a road and click to lay a row of it; Esc ends the tool.");
+            if (roadPanel != null)
+                roadPanel.style.display = DisplayStyle.None;
+            objectsPanel.style.display = DisplayStyle.Flex;
+            objectsPanelHost.style.display = DisplayStyle.Flex;
+            mapCanvas.BeginRoad();
+            rowLayout = null;
+            rowObjects = null;
+            rowStart = null;
+            selectedRow = null;
+            rowOptions.ShowObject(rowAsset);
+            rowOptions.ShowPlan(rowAsset == null ? "Choose the object for the row in the library." : "Point at a road.", false);
+            SetStatus("Rows: choose an object in the library, point at a road and click; the row lies on the side of the pointer. " +
+                      "Click an object of a row to select the row, Del deletes it; Esc leaves the tool.");
+        }
+
+        private void EndRowTool()
+        {
+            mapCanvas?.EndRoad();
+            objectRenderer?.SetRowPreview(null, null);
+            rowLaidAt = null;
+            objectsPanel?.UseOptions(null, null);
+            if (objectsPanelHost != null && !objectsPanelOpen)
+                objectsPanelHost.style.display = DisplayStyle.None;
+            rowLayout = null;
+            rowObjects = null;
+            rowStart = null;
+            selectedRow = null;
+        }
+
+        private void ChooseRowObject(string assetPath)
+        {
+            rowAsset = assetPath;
+            rowOptions?.ShowObject(assetPath);
+            UpdateRowPreview();
+        }
+
+        /// <summary>
+        /// While pointing in the row tool: the row a click would lay, or the existing row under the pointer, drawn as marks
+        /// where its objects stand.
+        /// </summary>
+        private void UpdateRowPreview()
+        {
+            if (mapCanvas == null || currentSummary == null || rowOptions == null || activeTool != EditorTool.Rows)
+                return;
+            objectRenderer?.SetRowPreview(null, null);
+            if (rowLaidAt.HasValue)
+            {
+                mapCanvas.ClearRoadPreview();
+                rowOptions.ShowPlan("Laid. Move the pointer to lay another row.", false);
+                return;
+            }
+            if (selectedRow.HasValue)
+            {
+                ShowRowMarks(Placed(selectedRow.Value), true);
+                rowOptions.ShowPlan("Row of " + Path.GetFileNameWithoutExtension(selectedRow.Value.Value.AssetPath) + " selected: Del deletes it, Esc keeps it.", false);
+                return;
+            }
+            if (!roadPointer.HasValue)
+                return;
+            var pointer = roadPointer.Value;
+            var hovered = rowStart == null ? RowAt(pointer) : null;
+            if (hovered.HasValue)
+            {
+                var objects = Placed(hovered.Value);
+                ShowRowMarks(objects, true);
+                rowOptions.ShowPlan("Row of " + Path.GetFileNameWithoutExtension(hovered.Value.Value.AssetPath) + " with " + objects.Count +
+                                    " object(s); click selects it.", false);
+                return;
+            }
+            if (rowAsset == null)
+            {
+                mapCanvas.ClearRoadPreview();
+                rowOptions.ShowPlan("Choose the object for the row in the library.", true);
+                return;
+            }
+            var plans = PlanRows(pointer, out var problem);
+            if (plans == null)
+            {
+                mapCanvas.ClearRoadPreview();
+                rowOptions.ShowPlan(problem, problem != null && !problem.StartsWith("Point", StringComparison.Ordinal));
+                return;
+            }
+            var marks = new List<OmsiPlacedAttachment>();
+            var parts = 0;
+            string failure = null;
+            foreach (var plan in plans)
+            {
+                marks.AddRange(plan.Objects);
+                parts += plan.Parts.Count;
+                failure = failure ?? plan.Problem;
+            }
+            ShowRowMarks(marks, failure == null);
+            if (failure == null)
+                objectRenderer?.SetRowPreview(rowAsset, marks);
+            rowOptions.ShowPlan(failure ?? marks.Count + " object(s) in " + parts + " record(s)" +
+                                (rowStart != null ? "; click where the row ends" : rowOptions.WholeRoad ? "; click to lay them" : "; click where the row starts"), failure != null);
+        }
+
+        /// <summary>
+        /// The rows a click at the pointer would lay: on the side of the road the pointer is on, or on both sides; along the
+        /// whole road, or from the first click to the pointer. Null with the reason when the pointer is on no road.
+        /// </summary>
+        private List<OmsiAttachmentRowPlan> PlanRows(OmsiMapPoint pointer, out string problem)
+        {
+            problem = null;
+            rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
+            var reach = Math.Max(RowSnapMeters, RowSnapPixels * mapCanvas.MetersPerPixel);
+            var at = rowStart ?? OmsiSplinePoint.Nearest(currentSummary, pointer.X, pointer.Y, reach);
+            if (at == null)
+            {
+                problem = "Point at a road.";
+                return null;
+            }
+            // The side of the road the pointer is on, seen along the spline.
+            var size = currentSummary.TileSizeMeters;
+            OmsiMapGeometry.GetLocalFrameAt(at.Spline, at.Distance, out var local, out var radians);
+            var point = OmsiMapGeometry.TileLocalToWorld(at.Tile.X, at.Tile.Y, local.X, local.Y, size);
+            var right = (pointer.X - point.X) * Math.Cos(radians) - (pointer.Y - point.Y) * Math.Sin(radians) >= 0.0;
+            var profile = RoadProfiles().Get(at.Spline.AssetPath);
+
+            double? from = null, to = null;
+            if (!rowOptions.WholeRoad)
+            {
+                var chain = rowLayout.Chain(at.Tile, at.Spline);
+                var along = OmsiAttachmentRows.Project(rowLayout, chain, pointer.X, pointer.Y);
+                from = rowStart != null ? rowStartAlong : along;
+                to = along;
+            }
+            var plans = new List<OmsiAttachmentRowPlan>();
+            foreach (var onRight in rowOptions.BothSides ? new[] { true, false } : new[] { right })
+            {
+                // Without a distance typed, 0.5 m inside the edge of the road's profile, on the pavement.
+                var edge = profile == null ? 5.0 : Math.Max(0.5, (onRight ? profile.RightEdge : -profile.LeftEdge) - 0.5);
+                var distance = rowOptions.Offset ?? edge;
+                var request = new OmsiAttachmentRowRequest
+                {
+                    AssetPath = rowAsset, LateralOffset = onRight ? distance : -distance, Height = rowOptions.Height,
+                    HeadingDegrees = rowOptions.HeadingDegrees + (onRight ? 0.0 : 180.0), Interval = rowOptions.Interval
+                };
+                plans.Add(OmsiAttachmentRows.Plan(currentSummary, rowLayout, at.Tile, at.Spline, request, from, to));
+            }
+            return plans;
+        }
+
+        /// <summary>A click in the row tool: selects a row under the pointer, starts a row, or lays it.</summary>
+        private void ClickRow(double x, double y)
+        {
+            if (currentSummary == null || !CanEdit)
+                return;
+            var pointer = new OmsiMapPoint(x, y);
+            roadPointer = pointer;
+            if (rowStart == null)
+            {
+                var hovered = RowAt(pointer);
+                if (hovered.HasValue)
+                {
+                    selectedRow = hovered;
+                    UpdateRowPreview();
+                    SetStatus("Selected the row of " + hovered.Value.Value.AssetPath + " (#" + hovered.Value.Value.Id + "); Del deletes it.");
+                    return;
+                }
+            }
+            selectedRow = null;
+            if (rowAsset == null)
+            {
+                SetStatus("Choose the object for the row in the library first.");
+                return;
+            }
+            if (!rowOptions.WholeRoad && rowStart == null)
+            {
+                rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
+                var at = OmsiSplinePoint.Nearest(currentSummary, x, y, Math.Max(RowSnapMeters, RowSnapPixels * mapCanvas.MetersPerPixel));
+                if (at == null)
+                {
+                    SetStatus("Rows: point at a road.");
+                    return;
+                }
+                rowStart = at;
+                rowStartAlong = OmsiAttachmentRows.Project(rowLayout, rowLayout.Chain(at.Tile, at.Spline), x, y);
+                UpdateRowPreview();
+                SetStatus("Rows: click where the row ends; Esc starts again.");
+                return;
+            }
+            var plans = PlanRows(pointer, out var problem);
+            if (plans == null)
+            {
+                SetStatus("Rows: " + problem);
+                return;
+            }
+            var failed = plans.Find(plan => plan.Problem != null);
+            if (failed != null)
+            {
+                SetStatus("No row laid: " + failed.Problem);
+                return;
+            }
+            var changes = new List<OmsiAttachmentChange>();
+            try
+            {
+                foreach (var plan in plans)
+                    changes.Add(session.AddAttachmentRow(currentSummary, plan));
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                for (var index = changes.Count - 1; index >= 0; index--)
+                    session.Undo(currentSummary, changes[index]);
+                SetStatus("The row could not be laid: " + exception.Message);
+                return;
+            }
+            rowStart = null;
+            rowLayout = null;
+            rowObjects = null;
+            rowLaidAt = pointer;
+            var parts = new List<ObjectEditStep>();
+            var objects = 0;
+            foreach (var change in changes)
+                parts.Add(new ObjectEditStep { AttachmentChange = change });
+            foreach (var plan in plans)
+                objects += plan.Objects.Count;
+            var name = Path.GetFileNameWithoutExtension(rowAsset);
+            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = "the rows of " + name });
+            RefreshAfterChange(null);
+            UpdateRowPreview();
+            SetStatus("Laid " + objects + " " + name + " along the road" + (plans.Count > 1 ? " on both sides" : string.Empty) + ". Ctrl+Z takes it back.");
+        }
+
+        private void DeleteSelectedRow()
+        {
+            if (!selectedRow.HasValue || !CanEdit)
+                return;
+            var row = selectedRow.Value;
+            OmsiAttachmentDeletionResult result;
+            try
+            {
+                result = session.DeleteAttachmentRow(currentSummary, row.Key, row.Value);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The row could not be deleted: " + exception.Message);
+                return;
+            }
+            if (!result.Succeeded)
+            {
+                SetStatus("The row stays: " + DescribeReferences(result.Blockers) + " still name it.");
+                return;
+            }
+            selectedRow = null;
+            rowLayout = null;
+            rowObjects = null;
+            PushHistory(new ObjectEditStep { AttachmentChange = result.Change });
+            RefreshAfterChange(null);
+            UpdateRowPreview();
+            SetStatus("Deleted the row of " + row.Value.AssetPath + ". Ctrl+Z takes it back.");
+        }
+
+        /// <summary>Where the objects of a row of the map stand.</summary>
+        private List<OmsiPlacedAttachment> Placed(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row)
+        {
+            rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
+            return rowLayout.Place(row.Key, row.Value);
+        }
+
+        /// <summary>The row of the map with an object under the pointer, or null; the rows are laid out once while the tool lasts.</summary>
+        private KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>? RowAt(OmsiMapPoint pointer)
+        {
+            if (rowObjects == null)
+            {
+                rowObjects = new List<KeyValuePair<KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>, List<OmsiPlacedAttachment>>>();
+                foreach (var tile in currentSummary.Tiles)
+                    foreach (var row in tile.SplineAttachments)
+                        if (!row.IsRepeater)
+                        {
+                            var pair = new KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>(tile, row);
+                            rowObjects.Add(new KeyValuePair<KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>, List<OmsiPlacedAttachment>>(pair, Placed(pair)));
+                        }
+            }
+            var reach = Math.Max(1.5, 8.0 * mapCanvas.MetersPerPixel);
+            foreach (var entry in rowObjects)
+                foreach (var item in entry.Value)
+                    if (Math.Abs(item.WorldX - pointer.X) <= reach && Math.Abs(item.WorldY - pointer.Y) <= reach)
+                        return entry.Key;
+            return null;
+        }
+
+        /// <summary>Draws a mark where each object of a row stands, in the preview colour or red.</summary>
+        private void ShowRowMarks(List<OmsiPlacedAttachment> objects, bool valid)
+        {
+            var marks = new List<OmsiMapPoint[]>();
+            var half = Math.Max(0.6, 4.0 * mapCanvas.MetersPerPixel);
+            foreach (var item in objects)
+                marks.Add(new[]
+                {
+                    new OmsiMapPoint(item.WorldX, item.WorldY + half), new OmsiMapPoint(item.WorldX + half, item.WorldY),
+                    new OmsiMapPoint(item.WorldX, item.WorldY - half), new OmsiMapPoint(item.WorldX - half, item.WorldY),
+                    new OmsiMapPoint(item.WorldX, item.WorldY + half)
+                });
+            mapCanvas.SetRoadPreview(marks, valid, null, null, null);
+        }
+
         /// <summary>
         /// Fits the terrain again when an editor-placed junction moved, appeared or went, since fitted roads may join it
         /// (ADR 022). The terrain follows from the original and the roads, so this is no undo step of its own.
@@ -3314,7 +3688,36 @@ namespace OmsiMapEditor.UI
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
-                if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
+                if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Rows)
+                {
+                    if (rowStart != null || selectedRow != null)
+                    {
+                        rowStart = null;
+                        selectedRow = null;
+                        UpdateRowPreview();
+                        SetStatus("Rows: point at a road and click to lay a row; Esc leaves the tool.");
+                    }
+                    else
+                        SetTool(EditorTool.Drag);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Rows && selectedRow != null)
+                {
+                    DeleteSelectedRow();
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.R && activeTool == EditorTool.Rows && rowOptions != null)
+                {
+                    rowOptions.TurnBy(evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep);
+                    SetStatus("Rows: objects turned to " + rowOptions.HeadingDegrees.ToString("0.#", CultureInfo.InvariantCulture) + "° against the road.");
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.T && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Rows ? EditorTool.Drag : EditorTool.Rows);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
                 {
                     if (roadStarted)
                     {
@@ -3444,6 +3847,18 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (step.AttachmentChange != null)
+            {
+                if (undo)
+                    session.Undo(currentSummary, step.AttachmentChange);
+                else
+                    session.Redo(currentSummary, step.AttachmentChange);
+                rowLayout = null;
+                rowObjects = null;
+                selectedRow = null;
+                return;
+            }
+
             if (step.Change != null)
             {
                 if (undo)
@@ -3550,6 +3965,8 @@ namespace OmsiMapEditor.UI
                 return step.Description;
             if (step.TileChange != null)
                 return (step.TileChange.Added ? "the new tile " : "the deletion of tile ") + step.TileChange.X + ", " + step.TileChange.Y;
+            if (step.AttachmentChange != null)
+                return step.AttachmentChange.Added.Count > 0 ? "the new row of objects" : "the deletion of a row of objects";
             if (step.Group != null)
             {
                 var ids = new HashSet<int>();
@@ -3702,7 +4119,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (activeTool == EditorTool.Road)
+            if (activeTool == EditorTool.Road || activeTool == EditorTool.Rows)
                 SetTool(EditorTool.Drag);
             UpdateObjectsCatalog();
             StartInstallationScan();
@@ -4243,21 +4660,27 @@ namespace OmsiMapEditor.UI
                 return;
             if (tool != EditorTool.Drag && (!CanEdit))
             {
-                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : "move or rotate objects"));
+                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects" : "move or rotate objects"));
                 return;
             }
             // Another tool ends placing and closes the object library.
             ShowObjectsPanel(false);
             var wasRoad = activeTool == EditorTool.Road;
+            var wasRows = activeTool == EditorTool.Rows;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
+            // The old tool ends before the new one begins, as both use the map's road mode.
+            if (wasRoad && tool != EditorTool.Road)
+                EndRoadTool();
+            if (wasRows && tool != EditorTool.Rows)
+                EndRowTool();
             if (tool == EditorTool.Road)
                 BeginRoadTool();
-            else if (wasRoad)
-                EndRoadTool();
+            if (tool == EditorTool.Rows)
+                BeginRowTool();
             UpdateToolbar();
-            if (tool == EditorTool.Road)
+            if (tool == EditorTool.Road || tool == EditorTool.Rows)
                 return;
             SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
                 : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."

@@ -117,7 +117,13 @@ namespace OmsiMapEditor.World
         private double? previewHeight;
         private readonly Matrix4x4[] previewInstance = new Matrix4x4[1];
 
-        // Objects along splines; splines are not edited, so the rows are laid out once per map.
+        // A row about to be laid along a road, drawn as extra instances where its objects would stand.
+        private string rowPreviewAsset;
+        private readonly List<OmsiPlacedAttachment> rowPreview = new List<OmsiPlacedAttachment>();
+        private Matrix4x4[] rowPreviewInstances = new Matrix4x4[0];
+        private Matrix4x4[] rowPreviewCrossInstances = new Matrix4x4[0];
+
+        // Objects along splines, laid out again after edits (RefreshPlacements).
         private List<KeyValuePair<string, OmsiPlacedAttachment>> splineRows;
 
         /// <summary>Where each placement's matrix lives, so a drag can move single instances.</summary>
@@ -140,7 +146,8 @@ namespace OmsiMapEditor.World
 
         /// <summary>True while models are read or uploaded, placements wait to be updated or a placement preview waits to be read.</summary>
         public bool IsLoading => loading != null || pending != null || placementsDirty ||
-                                 (previewAsset != null && summary != null && !requestedKinds.Contains(previewAsset));
+                                 (previewAsset != null && summary != null && !requestedKinds.Contains(previewAsset)) ||
+                                 (rowPreviewAsset != null && summary != null && !requestedKinds.Contains(rowPreviewAsset));
 
         /// <summary>In the 3D view trees stand as crossed planes; from above they show their crown.</summary>
         public bool ThreeDimensional { get; set; }
@@ -199,11 +206,13 @@ namespace OmsiMapEditor.World
         }
 
         /// <summary>
-        /// Takes object edits into account: moved, added and removed objects. Kinds not loaded yet, such as a newly
-        /// placed object, are read in the background.
+        /// Takes object edits into account: moved, added and removed objects, and rows along splines laid, deleted or
+        /// moved with their roads. Kinds not loaded yet, such as a newly placed object, are read in the background.
         /// </summary>
         public void RefreshPlacements()
         {
+            // Rows along splines are laid out again: rows may have been laid or deleted, or the roads they follow moved.
+            splineRows = null;
             placementsDirty = true;
         }
 
@@ -274,10 +283,11 @@ namespace OmsiMapEditor.World
             if (pending != null)
                 ContinueUpload();
 
-            // A placement preview of a kind the map does not use yet; read like a newly placed kind.
-            if (previewAsset != null && loading == null && pending == null && summary != null && requestedKinds.Add(previewAsset))
+            // A placement or row preview of a kind the map does not use yet; read like a newly placed kind.
+            var previewed = previewAsset != null && !requestedKinds.Contains(previewAsset) ? previewAsset : rowPreviewAsset;
+            if (previewed != null && loading == null && pending == null && summary != null && requestedKinds.Add(previewed))
             {
-                var missing = new List<string> { previewAsset };
+                var missing = new List<string> { previewed };
                 var root = installationRoot;
                 loadingGeneration = generation;
                 loading = Task.Run(() =>
@@ -318,6 +328,29 @@ namespace OmsiMapEditor.World
                 previewInstance[0] = crossed ? CrossMatrix(preview.Model, frame) : InstanceMatrix(preview.Model, frame);
                 DrawKind(preview, previewInstance, previewInstance, 1);
             }
+            DrawRowPreview();
+        }
+
+        /// <summary>Draws the row about to be laid where its objects would stand, as rows along splines are drawn.</summary>
+        private void DrawRowPreview()
+        {
+            if (rowPreviewAsset == null || rowPreview.Count == 0 || !kinds.TryGetValue(rowPreviewAsset, out var kind) || kind.Mesh == null)
+                return;
+            if (rowPreviewInstances.Length < rowPreview.Count)
+            {
+                rowPreviewInstances = new Matrix4x4[rowPreview.Count];
+                rowPreviewCrossInstances = new Matrix4x4[rowPreview.Count];
+            }
+            for (var index = 0; index < rowPreview.Count; index++)
+            {
+                var placed = rowPreview[index];
+                var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
+                var frame = Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one);
+                rowPreviewInstances[index] = InstanceMatrix(kind.Model, frame);
+                if (kind.CrossMaterial != null)
+                    rowPreviewCrossInstances[index] = CrossMatrix(kind.Model, frame);
+            }
+            DrawKind(kind, rowPreviewInstances, rowPreviewCrossInstances, rowPreview.Count);
         }
 
         /// <summary>Draws instances of a kind: its model, or in 3D a tree's crossed planes, then blended materials.</summary>
@@ -1071,6 +1104,18 @@ namespace OmsiMapEditor.World
             previewPosition = mapPosition;
             previewHeading = headingDegrees;
             previewHeight = height;
+        }
+
+        /// <summary>
+        /// Shows a row about to be laid along a road: the object at each place it would stand; null or no places hide it.
+        /// A kind not read yet is read in the background and appears when it is ready.
+        /// </summary>
+        public void SetRowPreview(string assetPath, IEnumerable<OmsiPlacedAttachment> objects)
+        {
+            rowPreviewAsset = assetPath;
+            rowPreview.Clear();
+            if (assetPath != null && objects != null)
+                rowPreview.AddRange(objects);
         }
 
         /// <summary>

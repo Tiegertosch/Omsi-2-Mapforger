@@ -118,7 +118,10 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Mehrere Objekte gemeinsam drehen: Rotate-Werkzeug mit Griff in der Mitte der Auswahl (Draufsicht) oder grünem Ring um die Gruppe (3D), Positionen schwenken um die Mitte, Headings drehen mit, ein Rückgängig-Schritt
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
 - [x] Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen (24. Oktober 2026)
-- Andere Elemente anlegen und löschen: angehängte Objekte und Spline-Anhängungen (Splines: siehe Straßenbau)
+- [x] Reihen von Objekten entlang von Straßen anlegen und löschen (ADR 037): Werkzeug „Rows“ (T) mit Objekt-Bibliothek, Vorschau, ganze Straße oder von Klick zu Klick, beide Seiten, ein Datensatz je Kachel ohne Wiederholungen
+- Reihen beim Anbauen an den Kettenanfang mitführen: Startabstände der Reihen einer Kette um die Länge des neuen Stücks erhöhen, damit sie in OMSI nicht verrutschen
+- Vorhandene Reihen bearbeiten (Abstand, Versatz, Objekt) statt nur löschen und neu anlegen
+- Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht
 - [x] Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern: Bereich „Chrono“ im Projekt-Panel mit Datum, Variantenliste und „Base map“, Überlagerung im Hintergrund, Linienwege aus dem Fahrplan des Datums, Ansicht schreibgeschützt (ADR 020)

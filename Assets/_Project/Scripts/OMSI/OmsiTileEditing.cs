@@ -91,6 +91,34 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// Appends a new [splineAttachement] at the end of the tile, so no existing index changes. The ID comes from the
+        /// allocator; apply the allocator to global.cfg before saving it.
+        /// </summary>
+        public static OmsiSplineAttachmentView AppendSplineAttachment(OmsiRecordFile tile, OmsiIdAllocator ids, OmsiSplineAttachmentRecord row)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (ids == null)
+                throw new ArgumentNullException(nameof(ids));
+            if (row == null)
+                throw new ArgumentNullException(nameof(row));
+            if (tile.Version < 9)
+                throw new InvalidOperationException("Objects can only be added to tiles of version 9 or later.");
+            if (string.IsNullOrWhiteSpace(row.AssetPath))
+                throw new ArgumentException("An object file path is required.", nameof(row));
+
+            var fields = new List<string>
+            {
+                "0", row.AssetPath.Trim(), OmsiNumberFormat.Format(ids.Allocate()), row.SplineIndex.ToString(CultureInfo.InvariantCulture),
+                OmsiNumberFormat.Format(row.LateralOffset), OmsiNumberFormat.Format(row.Height), OmsiNumberFormat.Format(row.StartDistance),
+                OmsiNumberFormat.Format(row.HeadingDegrees), "0", "0", OmsiNumberFormat.Format(row.Interval), OmsiNumberFormat.Format(row.Range), "0", "0"
+            };
+            var record = tile.CreateRecord("splineAttachement", fields);
+            tile.InsertRecord(tile.Records.Count, record);
+            return (OmsiSplineAttachmentView)OmsiTileRecords.Create(tile, record);
+        }
+
+        /// <summary>
         /// Removes an element and the records that modify it. Nothing changes when other records still refer to the
         /// element; the blocking references are returned instead.
         /// </summary>

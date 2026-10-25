@@ -71,6 +71,11 @@ namespace OmsiMapEditor.UI
         private string chosen;
         private int shownPages = 1;
 
+        // The options column beside the picker: for placing objects, or another tool's, such as the row tool's.
+        private readonly VisualElement placingOptions;
+        private VisualElement shownOptions;
+        private string otherChosenHint;
+
         public ObjectLibraryPanel()
         {
             AddToClassList("picker-tool");
@@ -107,6 +112,8 @@ namespace OmsiMapEditor.UI
             hint.AddToClassList("panel-info");
             options.Add(hint);
             Add(options);
+            placingOptions = options;
+            shownOptions = options;
 
             // The picker beside them.
             var picker = new VisualElement();
@@ -188,6 +195,23 @@ namespace OmsiMapEditor.UI
             Add(picker);
 
             ShowTab(Tab.InMap, OmsiObjectCategory.Buildings);
+        }
+
+        /// <summary>
+        /// Shows another tool's options beside the picker, such as the row tool's, with what to do with a chosen object;
+        /// null brings back the options for placing objects.
+        /// </summary>
+        public void UseOptions(VisualElement options, string chosenHint)
+        {
+            var wanted = options ?? placingOptions;
+            if (!ReferenceEquals(wanted, shownOptions))
+            {
+                Remove(shownOptions);
+                Insert(0, wanted);
+                shownOptions = wanted;
+            }
+            otherChosenHint = options == null ? null : chosenHint;
+            UpdateInfo();
         }
 
         /// <summary>An object was clicked; placing it can start.</summary>
@@ -694,7 +718,7 @@ namespace OmsiMapEditor.UI
             titleLabel.tooltip = chosen;
             info.EnableInClassList("panel-info-warning", dlcWarning);
             if (chosen != null)
-                info.text = "Click into the map to place it; Shift+click keeps placing, R turns it, Esc stops.";
+                info.text = otherChosenHint ?? "Click into the map to place it; Shift+click keeps placing, R turns it, Esc stops.";
             else if (dlcWarning)
                 info.text = "This map uses " + Count(kinds, "DLC object") + " in " + Count(placements, "placement") +
                             "; players without that DLC miss them.";
