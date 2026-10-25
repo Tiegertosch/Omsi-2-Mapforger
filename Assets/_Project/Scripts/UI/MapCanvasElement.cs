@@ -451,6 +451,9 @@ namespace OmsiMapEditor.UI
         /// <summary>While building roads: a left click at a world position.</summary>
         public event Action<double, double> RoadClicked;
 
+        /// <summary>While building roads: the left button was let go, as when a brush stroke ends.</summary>
+        public event Action RoadReleased;
+
         /// <summary>A handle of the selected spline is being dragged.</summary>
         public event Action<SplineHandleKind> SplineEndDragStarted;
 
@@ -3241,6 +3244,11 @@ namespace OmsiMapEditor.UI
 
         private void OnPointerUp(PointerUpEvent evt)
         {
+            if (dragMode == DragMode.None && roadMode && evt.button == 0)
+            {
+                RoadReleased?.Invoke();
+                return;
+            }
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
                 return;
 

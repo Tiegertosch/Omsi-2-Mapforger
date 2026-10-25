@@ -970,6 +970,106 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TheTerrainBrushRaisesTheGroundWhereTilesMeetAlikeAndIsTakenBackAsOneStep()
+        {
+            WriteUtf16("global.cfg", "[friendlyname]", "Roadtown", "", "[NextIDCode]", "100", "", "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "");
+            var session = OpenProject();
+            var summary = session.Read();
+            var stroke = session.BeginTerrainStroke(summary);
+
+            // Raised for a second at half strength on the edge between the tiles, at x 300, where the slope lies at 15 m.
+            var touched = session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Raise, 300, 100, 20, 0.5, 1.0);
+            CollectionAssert.AreEquivalent(summary.Tiles.Where(tile => tile.Y == 0 && tile.X <= 1), touched);
+            var change = session.EndTerrainStroke(summary, stroke);
+
+            var west = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            var east = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain"));
+            Assert.AreEqual(21.0, west[60, 20], 1e-4);
+            Assert.AreEqual(21.0, east[0, 20], 1e-4);
+            // 10 m off, (1 − 0.25)² of it.
+            Assert.AreEqual(14.5 + 6.0 * 0.5625, west[58, 20], 1e-4);
+            Assert.AreEqual(west[60, 22], east[0, 22], 1e-6);
+            Assert.AreEqual(0.05 * 250, west[50, 20], 1e-4);
+            Assert.IsTrue(session.Workspace.IsModified(@"Mapforge\Terrain\tile_0_0.map.terrain"));
+
+            session.Undo(summary, change);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
+            Assert.IsFalse(session.Workspace.IsModified(@"Mapforge\Terrain\tile_0_0.map.terrain"));
+            session.Redo(summary, change);
+            Assert.AreEqual(21.0, OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain"))[0, 20], 1e-4);
+
+            // An export takes the ground as shown, not the shaped ground kept for the project.
+            var target = Path.Combine(Directory.GetParent(mapFolder).FullName, "Roadtown (MapWorks)");
+            var report = OmsiMapExporter.Export(session.Workspace, target, "Roadtown (MapWorks)");
+            Assert.AreEqual(21.0, OmsiTerrain.Parse(File.ReadAllBytes(Path.Combine(target, "tile_1_0.map.terrain")))[0, 20], 1e-4);
+            Assert.IsFalse(Directory.Exists(Path.Combine(target, "Mapforge")));
+            Assert.IsFalse(report.EditedFiles.Exists(file => file.StartsWith("Mapforge", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        [Test]
+        public void FlattenSmoothRoughenAndRampShapeTheGroundAsOpenMapperDoes()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var stroke = session.BeginTerrainStroke(summary);
+            // Away from the roads at x 100 and 200: flatten at full strength puts the middle right on the height;
+            // smoothing leaves an even slope as it is.
+            stroke.FlattenTo = 10.0;
+            session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Flatten, 60, 200, 15, 1.0, 1.0);
+            Assert.AreEqual(10.0, stroke.HeightAt(60, 200).Value, 1e-4);
+            session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Smooth, 240, 200, 15, 1.0, 1.0);
+            Assert.AreEqual(12.0, stroke.HeightAt(240, 200).Value, 1e-4);
+            // Roughening moves the ground by the rolls of that place.
+            session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Roughen, 250, 260, 15, 1.0, 0.5);
+            Assert.AreEqual(12.5 + OmsiTerrainBrush.Rolls(250, 260) * 1.5, stroke.HeightAt(250, 260).Value, 1e-4);
+            for (var x = -500.0; x < 500.0; x += 7.3)
+            {
+                Assert.LessOrEqual(Math.Abs(OmsiTerrainBrush.Rolls(x, x * 0.7)), 1.0);
+                Assert.Less(Math.Abs(OmsiTerrainBrush.Rolls(x, 3) - OmsiTerrainBrush.Rolls(x + 0.05, 3)), 0.05);
+            }
+
+            // A ramp from the flattened 10 m at x 60 up the slope to 12.5 m at x 250: even between, as wide as the brush.
+            session.ApplyTerrainRamp(stroke, 60, 200, 250, 200, 10, out var gradient);
+            Assert.AreEqual(2.5 / 190 * 100, gradient, 1e-3);
+            Assert.AreEqual(10.0 + 2.5 * 95 / 190, stroke.HeightAt(155, 200).Value, 1e-3);
+            Assert.AreEqual(10.0 + 2.5 * 95 / 190, stroke.HeightAt(155, 205).Value, 1e-3);
+            Assert.AreEqual(0.05 * 155, stroke.HeightAt(155, 215).Value, 1e-4);
+            Assert.IsNotNull(session.EndTerrainStroke(summary, stroke));
+        }
+
+        [Test]
+        public void GroundShapedByHandStaysWhenARoadFittedIntoItGoesAndNeverRisesThroughARoad()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A road with terrain fitting at x 100, 2 m high in a cutting through the 5 m ground.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+
+            // Raising beside the road and on it: beside, the ground rises; on the road it stays where it was.
+            var stroke = session.BeginTerrainStroke(summary);
+            var onRoad = stroke.HeightAt(100, 230).Value;
+            session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Raise, 160, 230, 20, 0.5, 1.0);
+            session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Raise, 100, 230, 20, 0.5, 1.0);
+            Assert.LessOrEqual(stroke.HeightAt(100, 230).Value, Math.Max(onRoad, 2.0 - 0.12) + 1e-4);
+            var change = session.EndTerrainStroke(summary, stroke);
+            Assert.AreEqual(0.05 * 160 + 6.0, OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"))[32, 46], 1e-4);
+
+            // Without the road the shaped ground comes back, not the original: the raise at x 160 stays.
+            foreach (var id in road.SplineIds.AsEnumerable().Reverse())
+            {
+                var spline = summary.Tiles[0].Splines.Single(item => item.Id == id);
+                Assert.IsTrue(session.DeleteSpline(summary, summary.Tiles[0], spline).Succeeded);
+            }
+            var terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+            Assert.AreEqual(0.05 * 160 + 6.0, terrain[32, 46], 1e-4);
+            Assert.IsNotNull(change);
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

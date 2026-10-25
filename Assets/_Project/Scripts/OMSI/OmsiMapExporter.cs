@@ -23,6 +23,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Marker file that identifies a folder as a Mapforge export.</summary>
         public const string MarkerFileName = "mapforge-export.txt";
 
+        /// <summary>The workspace folder of the project's own data, such as the ground shaped by hand; never exported.</summary>
+        public const string ProjectDataFolder = "Mapforge";
+
         private const string TemporarySuffix = ".mapforge-export-tmp";
 
         /// <summary>Suggests a sibling folder of the original map, for example "Grundorf (MapWorks)".</summary>
@@ -68,6 +71,9 @@ namespace OmsiMapEditor.OMSI
                 CopyFolder(workspace.RootPath, temporary, report);
                 foreach (var relative in workspace.ModifiedFiles())
                 {
+                    // The project's own data, such as the ground shaped by hand, is no part of the map.
+                    if (relative.Replace('/', '\\').StartsWith(ProjectDataFolder + "\\", StringComparison.OrdinalIgnoreCase))
+                        continue;
                     var destination = Path.Combine(temporary, relative);
                     Directory.CreateDirectory(Path.GetDirectoryName(destination));
                     File.WriteAllBytes(destination, workspace.ReadAllBytes(relative));

@@ -10,6 +10,14 @@ The vertex unscrambling of OMSI `.o3d` meshes in `Assets/_Project/Scripts/OMSI/O
 
 Format facts in the documentation also draw on openOMSI's `docs/FORMATS.md`; each document links to it where it does.
 
+## openMapper
+
+The terrain tool in `Assets/_Project/Scripts/OMSI/OmsiTerrainBrush.cs` follows openMapper's Terrain tool: the brush modes with their rates and soft rim, the rolls of the Roughen brush, the ramp, the map-wide sample grid whose tile edges are set in both tiles, and the rule that the ground stays 12 cm below a road beside it.
+
+- Source: <https://github.com/openOMSI-org/openMapper>, file `src/editor.rs` (`brush_terrain`, `ramp`, `rolls`, `world_sample`, `set_world_sample`, `ground_cap`), commit `f9e2aa4ab410196f639ec30912833cb43cb20c68`
+- Copyright: the openMapper contributors
+- License: GNU Affero General Public License v3.0 (see [LICENSE](LICENSE))
+
 ## Lucide
 
 The icon path data in `Assets/_Project/Scripts/UI/LucideIcons.cs` comes from Lucide:

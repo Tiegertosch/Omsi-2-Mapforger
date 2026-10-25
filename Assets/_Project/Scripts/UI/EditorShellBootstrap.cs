@@ -45,6 +45,9 @@ namespace OmsiMapEditor.UI
 
             /// <summary>Objects hung on attachment points or taken off them.</summary>
             public OmsiAttachedObjectChange AttachedChange;
+
+            /// <summary>Ground shaped with the terrain tool.</summary>
+            public OmsiTerrainChange TerrainChange;
         }
 
         private const int HistoryLimit = 200;
@@ -143,6 +146,16 @@ namespace OmsiMapEditor.UI
         private double rowStartAlong;
         private OmsiAttachmentRow selectedRow;
         private OmsiAttachmentRow hoveredRow;
+
+        // The terrain tool (ADR 040): its options, the stroke while the button is held, the time since its last step and
+        // where a ramp starts.
+        private TerrainToolOptions terrainOptions;
+        private OmsiTerrainStroke terrainStroke;
+        private double terrainSince;
+        private OmsiMapPoint? terrainRampStart;
+
+        /// <summary>A held brush works this often, so the map can draw the ground between steps.</summary>
+        private const double TerrainStepSeconds = 1.0 / 15.0;
 
         // Where a row was just laid; no new row is shown there until the pointer moves, so a second click cannot lay it twice.
         private OmsiMapPoint? rowLaidAt;
@@ -351,6 +364,14 @@ namespace OmsiMapEditor.UI
                 roadPanel.CloseRequested += () => SetTool(EditorTool.Drag);
                 roadPanel.SettingsChanged += UpdateRoadPreview;
                 objectsPanelHost.Add(roadPanel);
+                terrainOptions = new TerrainToolOptions();
+                terrainOptions.style.display = DisplayStyle.None;
+                terrainOptions.SettingsChanged += () =>
+                {
+                    if (activeTool == EditorTool.Terrain)
+                        ShowTerrainBrush();
+                };
+                objectsPanelHost.Add(terrainOptions);
             }
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -410,12 +431,21 @@ namespace OmsiMapEditor.UI
                         rowLaidAt = null;
                     if (activeTool == EditorTool.Rows)
                         UpdateRowPreview();
+                    else if (activeTool == EditorTool.Terrain)
+                        ShowTerrainBrush();
                     else
                         UpdateRoadPreview();
                 };
+                mapCanvas.RoadReleased += () =>
+                {
+                    if (activeTool == EditorTool.Terrain)
+                        ReleaseTerrain();
+                };
                 mapCanvas.RoadClicked += (x, y) =>
                 {
-                    if (activeTool == EditorTool.Rows)
+                    if (activeTool == EditorTool.Terrain)
+                        PressTerrain(x, y);
+                    else if (activeTool == EditorTool.Rows)
                         ClickRow(x, y);
                     else
                         BuildRoadTo(x, y);
@@ -682,6 +712,7 @@ namespace OmsiMapEditor.UI
         {
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
+            TickTerrain();
             var panelWidth = rootElement.worldBound.width;
             PlaceViewControls();
             mapCanvas.FitInsets = FreeMapInsets();
@@ -1069,6 +1100,43 @@ namespace OmsiMapEditor.UI
                     }
                     Debug.Log("Rows changed: " + statusLabel?.text);
                 }
+            }
+
+            // -terrain <raise|lower|smooth|flatten|roughen> <tile x> <tile y> <x> <y> [-terrainRadius m] [-terrainStrength s] [-terrainSeconds s]:
+            // holds the brush there for some seconds; -terrain ramp <tile x> <tile y> <x1> <y1> <x2> <y2> lays a ramp.
+            var terrainMode = Argument("-terrain", 1);
+            if (terrainMode != null && int.TryParse(Argument("-terrain", 2), out var terrainTileX) && int.TryParse(Argument("-terrain", 3), out var terrainTileY) &&
+                double.TryParse(Argument("-terrain", 4), NumberStyles.Float, CultureInfo.InvariantCulture, out var terrainX) &&
+                double.TryParse(Argument("-terrain", 5), NumberStyles.Float, CultureInfo.InvariantCulture, out var terrainY))
+            {
+                var groundWait = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundWait < 300f)
+                    yield return null;
+                SetTool(EditorTool.Terrain);
+                terrainOptions?.Apply(terrainMode, Argument("-terrainRadius", 1), Argument("-terrainStrength", 1));
+                var terrainTileSize = currentSummary.TileSizeMeters;
+                var terrainAt = OmsiMapGeometry.TileLocalToWorld(terrainTileX, terrainTileY, terrainX, terrainY, terrainTileSize);
+                roadPointer = terrainAt;
+                if (terrainOptions != null && !terrainOptions.Mode.HasValue &&
+                    double.TryParse(Argument("-terrain", 6), NumberStyles.Float, CultureInfo.InvariantCulture, out var rampX) &&
+                    double.TryParse(Argument("-terrain", 7), NumberStyles.Float, CultureInfo.InvariantCulture, out var rampY))
+                {
+                    ClickRamp(terrainAt.X, terrainAt.Y);
+                    var rampEnd = OmsiMapGeometry.TileLocalToWorld(terrainTileX, terrainTileY, rampX, rampY, terrainTileSize);
+                    roadPointer = rampEnd;
+                    ClickRamp(rampEnd.X, rampEnd.Y);
+                }
+                else
+                {
+                    PressTerrain(terrainAt.X, terrainAt.Y);
+                    var held = double.TryParse(Argument("-terrainSeconds", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var heldSeconds) ? heldSeconds : 1.0;
+                    var pressed = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - pressed < held)
+                        yield return null;
+                    ReleaseTerrain();
+                }
+                ShowTerrainBrush();
+                Debug.Log("Terrain: " + statusLabel?.text);
             }
 
             // -turnArm <object ID> <arm from 1> <heading in the object>: drags that arm handle of a junction made here.
@@ -3364,6 +3432,215 @@ namespace OmsiMapEditor.UI
             UpdateMapStateLabel();
         }
 
+        /// <summary>Starts the terrain tool: its options in the tool panel, and the map's road mode for pointing and holding.</summary>
+        private void BeginTerrainTool()
+        {
+            if (terrainOptions == null || mapCanvas == null || currentSummary == null)
+                return;
+            objectsPanel.style.display = DisplayStyle.None;
+            if (roadPanel != null)
+                roadPanel.style.display = DisplayStyle.None;
+            terrainOptions.style.display = DisplayStyle.Flex;
+            objectsPanelHost.style.display = DisplayStyle.Flex;
+            mapCanvas.BeginRoad();
+            terrainRampStart = null;
+            ShowTerrainBrush();
+            SetStatus("Terrain: hold the left button over the ground to shape it with the brush; Ramp lays an even slope between two clicks. Esc leaves the tool.");
+        }
+
+        private void EndTerrainTool()
+        {
+            ReleaseTerrain();
+            mapCanvas?.EndRoad();
+            mapCanvas?.ClearRoadPreview();
+            if (terrainOptions != null)
+                terrainOptions.style.display = DisplayStyle.None;
+            if (objectsPanelHost != null && !objectsPanelOpen)
+                objectsPanelHost.style.display = DisplayStyle.None;
+            terrainRampStart = null;
+        }
+
+        /// <summary>Draws the brush as a circle under the pointer, and a ramp from where it starts; says the height there.</summary>
+        private void ShowTerrainBrush()
+        {
+            if (mapCanvas == null || terrainOptions == null || activeTool != EditorTool.Terrain)
+                return;
+            if (!roadPointer.HasValue)
+            {
+                mapCanvas.ClearRoadPreview();
+                return;
+            }
+            var pointer = roadPointer.Value;
+            var radius = terrainOptions.Radius;
+            var marks = new List<OmsiMapPoint[]> { Circle(pointer, radius) };
+            var sampler = new OmsiTerrainSampler(currentSummary, session.Source);
+            var here = sampler.TryGetHeight(pointer.X, pointer.Y, out var height) ? height.ToString("0.0", CultureInfo.InvariantCulture) + " m" : "no terrain";
+            if (terrainOptions.Mode.HasValue)
+            {
+                mapCanvas.SetRoadPreview(marks, true, null, null, null);
+                terrainOptions.ShowPlan("Ground under the pointer: " + here + ".", false);
+                return;
+            }
+            if (!terrainRampStart.HasValue)
+            {
+                mapCanvas.SetRoadPreview(marks, true, null, null, null);
+                terrainOptions.ShowPlan("Ramp: click where it starts (" + here + ").", false);
+                return;
+            }
+            var start = terrainRampStart.Value;
+            marks.Add(Circle(start, radius));
+            marks.Add(new[] { start, pointer });
+            mapCanvas.SetRoadPreview(marks, true, null, null, null);
+            var length = Math.Sqrt((pointer.X - start.X) * (pointer.X - start.X) + (pointer.Y - start.Y) * (pointer.Y - start.Y));
+            var text = "Ramp over " + length.ToString("0", CultureInfo.InvariantCulture) + " m";
+            if (sampler.TryGetHeight(start.X, start.Y, out var from) && sampler.TryGetHeight(pointer.X, pointer.Y, out var to) && length > 0.01)
+                text += ", " + ((to - from) / length * 100.0).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " %";
+            terrainOptions.ShowPlan(text + "; click where it ends, Esc starts again.", false);
+        }
+
+        private static OmsiMapPoint[] Circle(OmsiMapPoint centre, double radius)
+        {
+            var points = new OmsiMapPoint[49];
+            for (var index = 0; index < points.Length; index++)
+            {
+                var angle = index * 2.0 * Math.PI / (points.Length - 1);
+                points[index] = new OmsiMapPoint(centre.X + Math.Cos(angle) * radius, centre.Y + Math.Sin(angle) * radius);
+            }
+            return points;
+        }
+
+        /// <summary>The left button pressed in the terrain tool: a stroke starts, or a ramp gets its start or its end.</summary>
+        private void PressTerrain(double x, double y)
+        {
+            if (!CanEdit || currentSummary == null || terrainOptions == null)
+                return;
+            roadPointer = new OmsiMapPoint(x, y);
+            if (!terrainOptions.Mode.HasValue)
+            {
+                ClickRamp(x, y);
+                return;
+            }
+            ReleaseTerrain();
+            try
+            {
+                terrainStroke = session.BeginTerrainStroke(currentSummary);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The ground cannot be shaped: " + exception.Message);
+                return;
+            }
+            terrainStroke.FlattenTo = terrainOptions.FlattenHeight ?? terrainStroke.HeightAt(x, y) ?? 0.0;
+            // The first step comes at once.
+            terrainSince = TerrainStepSeconds;
+        }
+
+        /// <summary>While the button is held, the brush works where the pointer is, a step at a time.</summary>
+        private void TickTerrain()
+        {
+            if (terrainStroke == null || !roadPointer.HasValue || activeTool != EditorTool.Terrain || !terrainOptions.Mode.HasValue)
+                return;
+            terrainSince += Time.unscaledDeltaTime;
+            if (terrainSince < TerrainStepSeconds)
+                return;
+            var seconds = Math.Min(terrainSince, 0.25);
+            terrainSince = 0.0;
+            List<OmsiTileSummary> touched;
+            try
+            {
+                touched = session.ApplyTerrainBrush(currentSummary, terrainStroke, terrainOptions.Mode.Value, roadPointer.Value.X, roadPointer.Value.Y,
+                    terrainOptions.Radius, terrainOptions.Strength, seconds);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The ground could not be shaped: " + exception.Message);
+                ReleaseTerrain();
+                return;
+            }
+            if (touched.Count > 0)
+                RefreshGround(touched);
+        }
+
+        /// <summary>The button let go: the stroke is kept as one step.</summary>
+        private void ReleaseTerrain()
+        {
+            var stroke = terrainStroke;
+            terrainStroke = null;
+            if (stroke == null)
+                return;
+            OmsiTerrainChange change;
+            try
+            {
+                change = session.EndTerrainStroke(currentSummary, stroke);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The shaped ground could not be kept: " + exception.Message);
+                return;
+            }
+            if (change == null)
+                return;
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "shaping the ground" });
+            RefreshGround(change.Tiles);
+            ShowTerrainBrush();
+            SetStatus("Shaped the ground of " + change.Tiles.Count + " tile(s). Ctrl+Z takes it back.");
+        }
+
+        /// <summary>A click of the ramp: its start, or its end, which lays it as one step.</summary>
+        private void ClickRamp(double x, double y)
+        {
+            if (!terrainRampStart.HasValue)
+            {
+                terrainRampStart = new OmsiMapPoint(x, y);
+                ShowTerrainBrush();
+                SetStatus("Ramp: click where it ends; Esc starts again.");
+                return;
+            }
+            var start = terrainRampStart.Value;
+            terrainRampStart = null;
+            OmsiTerrainChange change;
+            double gradient;
+            try
+            {
+                var stroke = session.BeginTerrainStroke(currentSummary);
+                session.ApplyTerrainRamp(stroke, start.X, start.Y, x, y, terrainOptions.Radius, out gradient);
+                change = session.EndTerrainStroke(currentSummary, stroke);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The ramp could not be laid: " + exception.Message);
+                return;
+            }
+            ShowTerrainBrush();
+            if (change == null)
+            {
+                SetStatus("No ramp: both ends must lie on terrain.");
+                return;
+            }
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the ramp" });
+            RefreshGround(change.Tiles);
+            var length = Math.Sqrt((x - start.X) * (x - start.X) + (y - start.Y) * (y - start.Y));
+            SetStatus("Laid a ramp of " + gradient.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " % over " +
+                      length.ToString("0", CultureInfo.InvariantCulture) + " m. Ctrl+Z takes it back.");
+        }
+
+        /// <summary>Draws the ground and the objects standing on it again where the terrain changed.</summary>
+        private void RefreshGround(IEnumerable<OmsiTileSummary> tiles)
+        {
+            var list = new List<OmsiTileSummary>(tiles);
+            if (list.Count == 0)
+                return;
+            groundRenderer?.RefreshTerrain(list);
+            objectRenderer?.RefreshTerrain(list, session.Source);
+            if (roadTerrain != null)
+                roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
+            UpdateMapStateLabel();
+        }
+
         /// <summary>Starts the row tool: the object library with the row options beside it, and the map's road mode for pointing.</summary>
         private void BeginRowTool()
         {
@@ -3926,6 +4203,23 @@ namespace OmsiMapEditor.UI
                     SetTool(activeTool == EditorTool.Rows ? EditorTool.Drag : EditorTool.Rows);
                     evt.StopPropagation();
                 }
+                else if (evt.keyCode == KeyCode.G && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Terrain ? EditorTool.Drag : EditorTool.Terrain);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Terrain)
+                {
+                    if (terrainRampStart.HasValue)
+                    {
+                        terrainRampStart = null;
+                        ShowTerrainBrush();
+                        SetStatus("Ramp: click where it starts.");
+                    }
+                    else
+                        SetTool(EditorTool.Drag);
+                    evt.StopPropagation();
+                }
                 else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
                 {
                     if (roadStarted)
@@ -4053,6 +4347,16 @@ namespace OmsiMapEditor.UI
                 else
                     session.Redo(currentSummary, step.SplineChange);
                 RefreshSplineViews(step.SplineChange);
+                return;
+            }
+
+            if (step.TerrainChange != null)
+            {
+                if (undo)
+                    session.Undo(currentSummary, step.TerrainChange);
+                else
+                    session.Redo(currentSummary, step.TerrainChange);
+                RefreshGround(step.TerrainChange.Tiles);
                 return;
             }
 
@@ -4962,13 +5266,15 @@ namespace OmsiMapEditor.UI
                 return;
             if (tool != EditorTool.Drag && (!CanEdit))
             {
-                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects" : "move or rotate objects"));
+                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"
+                    : tool == EditorTool.Terrain ? "shape the ground" : "move or rotate objects"));
                 return;
             }
             // Another tool ends placing and closes the object library.
             ShowObjectsPanel(false);
             var wasRoad = activeTool == EditorTool.Road;
             var wasRows = activeTool == EditorTool.Rows;
+            var wasTerrain = activeTool == EditorTool.Terrain;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
@@ -4977,12 +5283,16 @@ namespace OmsiMapEditor.UI
                 EndRoadTool();
             if (wasRows && tool != EditorTool.Rows)
                 EndRowTool();
+            if (wasTerrain && tool != EditorTool.Terrain)
+                EndTerrainTool();
             if (tool == EditorTool.Road)
                 BeginRoadTool();
             if (tool == EditorTool.Rows)
                 BeginRowTool();
+            if (tool == EditorTool.Terrain)
+                BeginTerrainTool();
             UpdateToolbar();
-            if (tool == EditorTool.Road || tool == EditorTool.Rows)
+            if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain)
                 return;
             SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
                 : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."

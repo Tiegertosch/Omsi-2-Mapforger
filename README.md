@@ -13,12 +13,13 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 - **See routes:** Display timetable lines, stops and the lanes their trips follow. Preview chrono variants for a selected date; these views are read-only.
 - **Edit scenery:** Place, move, rotate and delete objects, including multi-selection, undo and redo. Hang objects such as signs and lamp heads on the attachment points of others. Browse the objects available in your installation.
 - **Build roads:** Create OMSI spline roads with terrain-following or manually controlled heights. Generate junctions where roads meet and fit terrain to roads built in the editor. Lay rows of objects such as lamps or hedges along roads, then change or delete them.
+- **Shape the ground:** Raise, lower, smooth, flatten or roughen the terrain with a brush, or lay an even ramp between two points, the way openMapper does; roads fitted to the terrain stay fitted.
 - **Work with map tiles:** Create a map from an installed map template, then add or remove tiles as the layout grows.
 - **Export safely:** Save edits in a `.omproj` project and export them into a separate OMSI map folder. The original map remains unchanged.
 
 ## Current limitations
 
-Mapforge is still in development. Timetable and chrono data can be inspected but not edited. Terrain sculpting and editing chrono variants are not yet available. Some advanced OMSI records and tile-bound references also limit which structural edits are possible. See the [roadmap](Documentation/Roadmap.md) for project details.
+Mapforge is still in development. Timetable and chrono data can be inspected but not edited. Editing chrono variants is not yet available, and the terrain tools cover brushes and ramps so far. Some advanced OMSI records and tile-bound references also limit which structural edits are possible. See the [roadmap](Documentation/Roadmap.md) for project details.
 
 Maps are written to work in [openOMSI](https://github.com/openOMSI-org/openOMSI); where it and OMSI 2 differ, openOMSI decides. OMSI 2 and its content are not included. Mapforge reads the files from an installation you provide; the game and its assets must be obtained separately.
 

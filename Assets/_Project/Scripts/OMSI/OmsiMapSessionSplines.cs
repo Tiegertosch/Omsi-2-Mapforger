@@ -799,13 +799,22 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Fits the terrain of the changed tiles and their neighbours anew: the original terrain of each tile, fitted to
-        /// every road built here with terrain alignment that reaches it. The result replaces the workspace copy, which
+        /// Fits the terrain of the changed tiles and their neighbours anew: the terrain of each tile as shaped by hand, or
+        /// else the original, fitted to every road built here with terrain alignment that reaches it. The result replaces the workspace copy, which
         /// disappears again when it equals the original. Records the tiles whose terrain changed in the change.
         /// </summary>
         private void ReshapeTerrain(OmsiMapSummary summary, OmsiSplineChange change)
         {
             change.TerrainTiles.Clear();
+            ReshapeTerrainOf(summary, change.Tiles, change.TerrainTiles);
+        }
+
+        /// <summary>
+        /// Fits the ground of tiles and their neighbours to the roads anew, from the ground shaped by hand or else the
+        /// original map's (ADR 022, ADR 040); the tiles whose ground changed are added to <paramref name="reshaped"/>.
+        /// </summary>
+        private void ReshapeTerrainOf(OmsiMapSummary summary, IEnumerable<OmsiTileSummary> changedTiles, List<OmsiTileSummary> reshaped)
+        {
             if (summary == null)
                 return;
             var workspace = RequireWorkspace();
@@ -836,7 +845,7 @@ namespace OmsiMapEditor.OMSI
             junctions.Sort((left, right) => left.Object.Id.CompareTo(right.Object.Id));
 
             var targets = new List<OmsiTileSummary>();
-            foreach (var changed in change.Tiles)
+            foreach (var changed in changedTiles)
                 foreach (var tile in summary.Tiles)
                     if (Math.Abs(tile.X - changed.X) <= 1 && Math.Abs(tile.Y - changed.Y) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
                         targets.Add(tile);
@@ -844,7 +853,7 @@ namespace OmsiMapEditor.OMSI
             foreach (var tile in targets)
             {
                 var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
-                var original = workspace.ReadOriginalBytes(path);
+                var original = ShapedTerrainBytes(path);
                 if (original == null)
                     continue;
                 var heights = OmsiTerrain.Parse(original).CopyHeights();
@@ -859,7 +868,7 @@ namespace OmsiMapEditor.OMSI
                 if (SameBytes(bytes, workspace.ReadAllBytes(path)))
                     continue;
                 workspace.Save(path, bytes);
-                change.TerrainTiles.Add(tile);
+                reshaped.Add(tile);
             }
         }
 

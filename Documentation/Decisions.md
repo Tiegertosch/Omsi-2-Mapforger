@@ -437,3 +437,28 @@ Der Inspector des gewählten Objekts listet unter „Attached objects“ alles, 
 - Ohne Löschen samt Kindern ließe sich ein Mast mit angehängtem Objekt gar nicht mehr löschen.
 
 **Offen:** Reihen entlang von Straßen als Eltern (openOMSI hängt `[attachObj]` an das erste Objekt einer Reihe) und Kacheln vor Version 12.
+
+## ADR 040: Gelände-Werkzeuge wie openMapper, mit einer Grundlage für die Straßenanpassung
+
+**Status:** Angenommen, 25. Oktober 2026; Vorbild und Etappen nach Wahl des Nutzers (openMapper übernehmen, damit es sicher zu openOMSI passt; zuerst Pinsel und Rampe).
+
+**Entscheidung:** Das Werkzeug „Terrain“ (G) arbeitet wie openMappers Terrain-Werkzeug (`src/editor.rs`, siehe THIRD_PARTY_NOTICES):
+
+- Ein runder Pinsel wirkt, solange die linke Taste gedrückt ist, alle 1/15 s mit der seither vergangenen Zeit. Jeder Rasterpunkt im Radius ändert sich mit dem Gewicht (1 − (d/r)²)²:
+  - Raise und Lower um Stärke · 12 m/s,
+  - Smooth zum Mittel der acht Nachbarn mit Faktor Stärke · 6/s,
+  - Flatten zur Höhe beim Ansetzen oder einer eingetippten Höhe mit Stärke · 8/s,
+  - Roughen um Stärke · 3 m/s mal ein festes Wellenmuster aus Wertrauschen von etwa 40 m und 12 m.
+- Radius 3 bis 150 m (logarithmischer Regler, Standard 25 m), Stärke 0,05 bis 1 (Standard 0,5).
+- Die Rampe macht das Gelände zwischen zwei Klicks zu einer gleichmäßigen Steigung von der Höhe am ersten zur Höhe am zweiten Punkt, voll bis 60 % des Radius, weich bis zum Rand. Die Steigung wird angezeigt.
+- Das Gelände ist ein kartenweites Raster mit 60 Zellen je Kachel. Ein Punkt auf einer Kachelkante wird in beiden Kacheln gesetzt.
+- Neben einer Straße (jedes Profil am Boden, keine Leitungen, Zäune oder Hilfssplines) steigt das Gelände nie höher als 12 cm unter die Fahrbahn, außer es lag schon höher.
+
+Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihre Grundlage ist jetzt das von Hand geformte Gelände der Kachel, abgelegt in der Arbeitskopie unter `Mapforge\Terrain\<Kachel>.map.terrain`; fehlt es, gilt wie bisher das Original. Ein Pinselstrich ändert das gezeigte Gelände und diese Grundlage um denselben Betrag. Am Ende des Strichs wird die Grundlage gespeichert und das gezeigte Gelände der berührten Kacheln und ihrer Nachbarn daraus neu an die Straßen angepasst; das ist ein Rückgängig-Schritt (`OmsiTerrainChange` mit den Dateiständen der Grundlage). Der Export lässt den Ordner `Mapforge` aus (`OmsiMapExporter.ProjectDataFolder`). Im Editor angelegte Kacheln ohne Original werden erst angepasst, wenn auf ihnen modelliert wurde.
+
+**Grund:**
+- Der Nutzer will openMappers System übernehmen, damit Karten sicher zu openOMSI passen.
+- Ohne eigene Grundlage hätte der nächste Straßenbau alles überschrieben, was man modelliert hat, weil die Anpassung vom Original ausgeht.
+- Gemeinsame Kachelkanten verhindern Stufen an Kachelgrenzen.
+
+**Offen:** Gelände unter Objekten einebnen, Höhenkarte und See/Fluss (Roadmap, Etappen 2 bis 4).
