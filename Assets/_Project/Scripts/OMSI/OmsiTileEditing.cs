@@ -92,8 +92,10 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// Appends a new [attachObj] at the end of the tile, after its parent as OMSI needs it, so no existing index
-        /// changes; it hangs on attachment point <paramref name="pointIndex"/> of the parent, turned by the heading. The ID
-        /// comes from the allocator; apply the allocator to global.cfg before saving it.
+        /// changes; it hangs on attachment point <paramref name="pointIndex"/> of the parent, turned by the heading. A row
+        /// along a road ([splineAttachement]) can be the parent too: the object hangs on its first object, as openOMSI and
+        /// Omsi.exe read it (instance 0; later objects of a row are refused). The ID comes from the allocator; apply the
+        /// allocator to global.cfg before saving it.
         /// </summary>
         public static OmsiAttachedObjectView AppendAttachedObject(OmsiRecordFile tile, OmsiIdAllocator ids, string assetPath, int parentId, int pointIndex,
             double headingDegrees)
@@ -111,10 +113,10 @@ namespace OmsiMapEditor.OMSI
             var parentFound = false;
             foreach (var record in tile.Records)
                 if (OmsiTileRecords.Create(tile, record) is OmsiTileRecordView view && TryGetId(view, out var id) && id == parentId &&
-                    (view is OmsiObjectView || view is OmsiAttachedObjectView))
+                    (view is OmsiObjectView || view is OmsiAttachedObjectView || view is OmsiSplineAttachmentView row && !row.IsRepeater))
                     parentFound = true;
             if (!parentFound)
-                throw new InvalidOperationException("Object " + parentId + " is not in this tile.");
+                throw new InvalidOperationException("Object or row " + parentId + " is not in this tile.");
 
             var fields = new List<string>
             {

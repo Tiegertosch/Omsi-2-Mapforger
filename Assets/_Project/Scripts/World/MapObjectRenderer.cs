@@ -155,6 +155,10 @@ namespace OmsiMapEditor.World
         // Objects along splines, laid out again after edits (RefreshPlacements).
         private List<KeyValuePair<string, OmsiPlacedAttachment>> splineRows;
 
+        // The first object of each row along a road by tile, with the row's ID and object: an object can hang on it
+        // ([attachObj] naming the row, instance 0), as openOMSI and Omsi.exe read it.
+        private Dictionary<OmsiTileSummary, List<KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>>> rowFirsts;
+
         /// <summary>Where each placement's matrix lives, so a drag can move single instances.</summary>
         private readonly Dictionary<OmsiObjectRecord, Placement> instanceOf = new Dictionary<OmsiObjectRecord, Placement>();
         private readonly Dictionary<string, KindData> kinds = new Dictionary<string, KindData>(StringComparer.OrdinalIgnoreCase);
@@ -808,11 +812,22 @@ namespace OmsiMapEditor.World
             if (splineRows == null)
             {
                 splineRows = new List<KeyValuePair<string, OmsiPlacedAttachment>>();
+                rowFirsts = new Dictionary<OmsiTileSummary, List<KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>>>();
                 var layout = new OmsiSplineAttachmentLayout(summary);
                 foreach (var tile in summary.Tiles)
                     foreach (var row in tile.SplineAttachments)
-                        foreach (var placed in layout.Place(tile, row))
+                    {
+                        var placedRow = layout.Place(tile, row);
+                        foreach (var placed in placedRow)
                             splineRows.Add(new KeyValuePair<string, OmsiPlacedAttachment>(row.AssetPath, placed));
+                        // A continuation shares its row's ID: only the row's own record carries objects.
+                        if (row.IsRepeater || placedRow.Count == 0)
+                            continue;
+                        if (!rowFirsts.TryGetValue(tile, out var firsts))
+                            rowFirsts[tile] = firsts = new List<KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>>();
+                        firsts.Add(new KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>(row.Id,
+                            new KeyValuePair<string, OmsiPlacedAttachment>(row.AssetPath, placedRow[0])));
+                    }
             }
 
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -875,6 +890,19 @@ namespace OmsiMapEditor.World
                     SetFromFrame(kind, kind.InstanceCount++, frame);
                 }
 
+                // The first object of a row can carry objects too.
+                if (rowFirsts != null && rowFirsts.TryGetValue(tile, out var firstsOfTile))
+                    foreach (var first in firstsOfTile)
+                    {
+                        if (!kinds.TryGetValue(first.Value.Key, out var rowKind) || rowKind.Mesh == null)
+                            continue;
+                        var placed = first.Value.Value;
+                        var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
+                        frames[first.Key] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(
+                            Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one), rowKind.Model);
+                        RememberAttachParent(tile, first.Key, first.Value.Key, frames[first.Key]);
+                    }
+
                 // Attached objects hang at a point of their parent, which comes earlier in the tile; in file order an
                 // attached parent is placed before its children.
                 foreach (var attached in tile.AttachedObjects)
@@ -912,7 +940,7 @@ namespace OmsiMapEditor.World
 
         /// <summary>
         /// The free attachment point nearest to a world position, seen from above, within the reach: a point of a placed
-        /// object or attached object on which nothing hangs yet. False where there is none.
+        /// object, attached object or first object of a row on which nothing hangs yet. False where there is none.
         /// </summary>
         public bool TryFindAttachPoint(double worldX, double worldY, double reachMeters, out MapAttachSpot spot)
         {

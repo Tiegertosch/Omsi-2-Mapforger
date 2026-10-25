@@ -2291,6 +2291,44 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AnObjectHangsOnTheFirstObjectOfARowAndGoesWithTheRow()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 50, StartY = 100, StartHeight = 2, EndX = 250, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var tile = summary.Tiles[0];
+            var first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var plan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), tile, first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(plan.Problem);
+            session.AddAttachmentRow(summary, plan);
+            var row = tile.SplineAttachments.Single(item => item.AssetPath == @"Sceneryobjects\lamp.sco");
+
+            // As openOMSI reads it: an [attachObj] after the row naming the row's ID, instance 0, the point's index.
+            var hung = session.AttachObject(summary, tile, row.Id, 1, @"Sceneryobjects\head.sco", 0);
+            Assert.IsNotNull(hung);
+            var attached = tile.AttachedObjects.Single();
+            Assert.AreEqual(row.Id, attached.ParentId);
+            Assert.AreEqual(1, attached.AttachPointIndex);
+            var text = OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_0_0.map")).Replace("\r", string.Empty);
+            StringAssert.Contains("[attachObj]\n0\n" + @"Sceneryobjects\head.sco" + "\n" + attached.Id + "\n" + row.Id + "\n0\n1\n", text);
+            Assert.Greater(text.IndexOf("[attachObj]", StringComparison.Ordinal), text.IndexOf("[splineAttachement]", StringComparison.Ordinal));
+            Assert.AreEqual(1, session.Read().Tiles[0].AttachedObjects.Count(item => item.ParentId == row.Id));
+
+            // Deleting the row takes the object hung on it with it; taking it back brings both back.
+            var deleted = session.DeleteAttachmentRow(summary, tile, row);
+            Assert.IsTrue(deleted.Succeeded, string.Join("; ", deleted.Blockers.Select(blocker => blocker.ToString())));
+            Assert.AreEqual(0, tile.AttachedObjects.Count);
+            Assert.AreEqual(0, session.Read().Tiles[0].AttachedObjects.Count);
+            session.Undo(summary, deleted.Change);
+            Assert.AreEqual(1, tile.AttachedObjects.Count);
+            Assert.AreEqual(row.Id, session.Read().Tiles[0].AttachedObjects.Single().ParentId);
+        }
+
+        [Test]
         public void ARowOnlyLaysObjectsAlongItsOwnTileAndNotBeforeItsOwnSpline()
         {
             var session = OpenProject();

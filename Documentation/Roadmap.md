@@ -124,7 +124,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Kettenabstände pflegen und Reihen wie openOMSI auslegen (ADR 038): Feld 17 der Splines nach jeder Spline-Änderung, Reihen ab dem gespeicherten Kettenabstand und nur in der eigenen Kachel, Thema „Chain offsets“ der Kartenprüfung mit Reparatur
 - [x] Kacheln löschen: Kettenabstände und Reihen benachbarter Kacheln nachführen (ADR 038, Ergänzung)
 - [x] Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen (ADR 039): beim Platzieren an freien Punkten einrasten, im Inspector auflisten und abnehmen, Löschen nimmt sie mit
-- Angehängte Objekte an Reihen entlang von Straßen anlegen
+- [x] Angehängte Objekte an Reihen entlang von Straßen anlegen: am ersten Objekt der Reihe einrasten, im Inspector der Reihe auflisten, mit der Reihe löschen (ADR 039, Ergänzung)
 - Gelände-Werkzeuge wie openMapper (ADR 040, Entscheidung des Nutzers):
   - [x] Etappe 1: Werkzeug „Terrain“ (G) mit den Pinseln Raise, Lower, Smooth, Flatten (Starthöhe oder eingetippte Höhe) und Roughen, Radius 3–150 m und Stärke 0,05–1, Rampe zwischen zwei Klicks; Kachelränder gemeinsam, Gelände nie über einer Straße daneben; Grundlage je Kachel unter `Mapforge\Terrain`, auf die gebaute Straßen angepasst werden; ein Rückgängig-Schritt je Pinselstrich
   - [x] Etappe 2: Gelände unter einem Objekt einebnen („Level ground“ im Inspector, auch für eine Auswahl): Grundriss auf Höhe des Fußes, 3 m weicher Übergang, Bäume ausgelassen

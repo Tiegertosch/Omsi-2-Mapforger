@@ -405,8 +405,9 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Deletes a row of objects along a road. Nothing changes while timetables, chrono changes or other records name
-        /// it, such as a bus stop laid along a road; those references are returned.
+        /// Deletes a row of objects along a road, with the objects hung on its first object (ADR 039). Nothing changes while
+        /// timetables, chrono changes or other records name it, such as a bus stop laid along a road; those references are
+        /// returned.
         /// </summary>
         public OmsiAttachmentDeletionResult DeleteAttachmentRow(OmsiMapSummary summary, OmsiTileSummary tile, OmsiSplineAttachmentRecord row)
         {
@@ -432,7 +433,7 @@ namespace OmsiMapEditor.OMSI
             if (view == null)
                 throw new InvalidOperationException("Row " + row.Id + " was not found in " + tile.FileName + ".");
 
-            var result = OmsiTileEditing.Remove(tileFile, view, TileIndexOf(config, tilePath), config, BuildReferenceIndex());
+            var result = OmsiTileEditing.RemoveWithFamily(tileFile, view, tilePath, TileIndexOf(config, tilePath), config, BuildReferenceIndex());
             if (!result.Removed)
                 return new OmsiAttachmentDeletionResult(null, result.Blockers);
             var change = new OmsiAttachmentChange();
@@ -442,6 +443,7 @@ namespace OmsiMapEditor.OMSI
                 change.Files.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });
             ApplyFiles(change.Files, false);
             ApplyRows(summary, change, true);
+            ReadAttachedObjectsAgain(change);
             return new OmsiAttachmentDeletionResult(change, new OmsiReference[0]);
         }
 
@@ -454,6 +456,7 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidOperationException("The change has already been undone.");
             ApplyFiles(change.Files, true);
             ApplyRows(summary, change, false);
+            ReadAttachedObjectsAgain(change);
             change.IsApplied = false;
         }
 
@@ -466,7 +469,30 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidOperationException("The change is already applied.");
             ApplyFiles(change.Files, false);
             ApplyRows(summary, change, true);
+            ReadAttachedObjectsAgain(change);
             change.IsApplied = true;
+        }
+
+        /// <summary>
+        /// The objects hung on the rows of a change's tiles, read again from the workspace: deleting a row takes those on
+        /// its first object with it, and taking it back brings them back.
+        /// </summary>
+        private void ReadAttachedObjectsAgain(OmsiAttachmentChange change)
+        {
+            var workspace = RequireWorkspace();
+            var tiles = new List<OmsiTileSummary>();
+            foreach (var pair in change.Added)
+                if (!tiles.Contains(pair.Key))
+                    tiles.Add(pair.Key);
+            foreach (var pair in change.Removed)
+                if (!tiles.Contains(pair.Key))
+                    tiles.Add(pair.Key);
+            foreach (var tile in tiles)
+            {
+                var fresh = OmsiMapReader.ReadAddedElements(workspace, OmsiRelativePath.Normalize(tile.FileName), tile);
+                tile.AttachedObjects.Clear();
+                tile.AttachedObjects.AddRange(fresh.AttachedObjects);
+            }
         }
 
         /// <summary>Adds and removes the rows of a change in the summary, or the other way round when taking it back.</summary>

@@ -438,7 +438,9 @@ Der Inspector des gewählten Objekts listet unter „Attached objects“ alles, 
 - Die Lage der Punkte rechnet der Renderer ohnehin für das Zeichnen; er merkt sich dafür die Lage jedes Objekts mit Anhängepunkten.
 - Ohne Löschen samt Kindern ließe sich ein Mast mit angehängtem Objekt gar nicht mehr löschen.
 
-**Offen:** Reihen entlang von Straßen als Eltern (openOMSI hängt `[attachObj]` an das erste Objekt einer Reihe) und Kacheln vor Version 12.
+**Ergänzung vom 25. Oktober 2026 (Reihen als Eltern; vom Nutzer im Editor bestätigt, in openOMSI noch ungeprüft):** Ein `[attachObj]` darf eine Reihe entlang einer Straße (`[splineAttachement]`) als Eltern nennen; es hängt dann am ersten Objekt der Reihe, Instanz 0. Spätere Objekte einer Reihe lehnen Omsi.exe und openOMSI ab („nicht mehr unterstützt“, openOMSI `tile.rs`), Fortsetzungen (`[splineAttachement_repeater]`) teilen die ID ihrer Reihe und tragen deshalb nichts. Der Renderer merkt sich die Lage des ersten Objekts jeder Reihe als Eltern-Rahmen: Daran hängende Objekte werden gezeichnet, und beim Platzieren rastet die Vorschau an dessen freien Anhängepunkten ein wie bei Objekten. Der Inspector einer im Reihen-Werkzeug gewählten Reihe listet die angehängten Objekte mit „Delete“; eine Reihe zu löschen nimmt sie mit (`RemoveWithFamily`), Rückgängig bringt sie zurück.
+
+**Offen:** Kacheln vor Version 12.
 
 ## ADR 040: Gelände-Werkzeuge wie openMapper, mit einer Grundlage für die Straßenanpassung
 

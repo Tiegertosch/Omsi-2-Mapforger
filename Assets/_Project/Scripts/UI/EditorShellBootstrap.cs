@@ -6437,6 +6437,8 @@ namespace OmsiMapEditor.UI
                 AddObjectEditor(records, selectedObject);
             else if (selectedSpline != null)
                 AddSplineDetails(records, selectedSpline);
+            else if (selectedRow != null && activeTool == EditorTool.Rows)
+                AddRowAttachedObjects(records);
             else
                 AddTileButtons(records);
 
@@ -6560,6 +6562,25 @@ namespace OmsiMapEditor.UI
         private void AddAttachedObjects(VisualElement editor, OmsiObjectRecord item, bool canEdit)
         {
             var tile = TileHolding(new MapSelectionItem { Tile = selectedTile, Record = item }) ?? selectedTile;
+            AddAttachedObjects(editor, tile, item.Id, canEdit, "Place an object on a free point to hang it there; deleting the object takes these with it.");
+        }
+
+        /// <summary>
+        /// The objects hanging on the first object of the selected row, in each of its tiles (only the first object of a
+        /// row can carry objects in OMSI and openOMSI).
+        /// </summary>
+        private void AddRowAttachedObjects(VisualElement editor)
+        {
+            if (selectedRow == null)
+                return;
+            foreach (var record in selectedRow.Records)
+                if (!record.Value.IsRepeater)
+                    AddAttachedObjects(editor, record.Key, record.Value.Id, CanEdit,
+                        "Place an object on a free point of the row's first object to hang it there; deleting the row takes these with it.");
+        }
+
+        private void AddAttachedObjects(VisualElement editor, OmsiTileSummary tile, int parentId, bool canEdit, string hintText)
+        {
             var hanging = new List<KeyValuePair<int, OmsiAttachedObjectRecord>>();
             void Collect(int parentId, int depth)
             {
@@ -6570,7 +6591,7 @@ namespace OmsiMapEditor.UI
                         Collect(attached.Id, depth + 1);
                     }
             }
-            Collect(item.Id, 0);
+            Collect(parentId, 0);
             if (hanging.Count == 0)
                 return;
             var heading = new Label("ATTACHED OBJECTS");
@@ -6604,7 +6625,7 @@ namespace OmsiMapEditor.UI
             }
             if (canEdit)
             {
-                var hint = new Label("Place an object on a free point to hang it there; deleting the object takes these with it.");
+                var hint = new Label(hintText);
                 hint.AddToClassList("muted");
                 hint.AddToClassList("inspector-edit-hint");
                 editor.Add(hint);
