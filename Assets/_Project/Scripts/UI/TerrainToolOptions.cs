@@ -19,6 +19,7 @@ namespace OmsiMapEditor.UI
         private readonly Slider strengthSlider;
         private readonly Label strengthLabel;
         private readonly TextField flattenField;
+        private readonly TextField depthField;
         private readonly Label planLabel;
 
         // The height map: export and import, and the settings of a picture about to be laid on the map.
@@ -55,6 +56,10 @@ namespace OmsiMapEditor.UI
                 new KeyValuePair<string, OmsiTerrainBrushMode?>("Roughen", OmsiTerrainBrushMode.Roughen),
                 new KeyValuePair<string, OmsiTerrainBrushMode?>("Ramp", null)
             });
+            AddModes(Row(string.Empty), new[]
+            {
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("Lake / river", OmsiTerrainBrushMode.Water)
+            });
 
             radiusSlider = new Slider(0f, 1f) { tooltip = "How far the brush reaches, 3 to 150 m; it works fully in the middle and softly towards its rim" };
             radiusLabel = new Label();
@@ -66,6 +71,9 @@ namespace OmsiMapEditor.UI
             flattenField.AddToClassList("picker-field");
             flattenField.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             Row("Flatten to (m)").Add(flattenField);
+            depthField = new TextField { value = "1.5", tooltip = "How deep Lake / river digs under the water's surface" };
+            depthField.AddToClassList("picker-field");
+            Row("Water depth (m)").Add(depthField);
 
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
@@ -238,12 +246,19 @@ namespace OmsiMapEditor.UI
                 ? value
                 : (double?)null;
 
+        /// <summary>How deep Lake / river digs under the water's surface; 1.5 m unless a positive depth is typed.</summary>
+        public double WaterDepth =>
+            double.TryParse(depthField.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0.0 && !double.IsInfinity(value)
+                ? value
+                : 1.5;
+
         public void SetMode(OmsiTerrainBrushMode? mode)
         {
             Mode = mode;
             foreach (var pair in modeButtons)
                 pair.Key.EnableInClassList("panel-tab-active", pair.Value == mode);
             flattenField.SetEnabled(mode == OmsiTerrainBrushMode.Flatten);
+            depthField?.SetEnabled(mode == OmsiTerrainBrushMode.Water);
             SettingsChanged?.Invoke();
         }
 
@@ -296,6 +311,9 @@ namespace OmsiMapEditor.UI
                     return "Brings the ground to one height: where the stroke starts, or the height typed below";
                 case OmsiTerrainBrushMode.Roughen:
                     return "Adds the gentle rolls and dips of a natural field";
+                case OmsiTerrainBrushMode.Water:
+                    return "Digs a lake or a river bed under the water of the tile, or 0.3 m under the ground where the stroke starts, " +
+                           "and lays water on the tiles it reaches; it never fills";
                 default:
                     return "Click where it starts and where it ends: the ground between becomes one even slope as wide as the brush";
             }

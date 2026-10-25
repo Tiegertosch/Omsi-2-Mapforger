@@ -148,6 +148,10 @@ namespace OmsiMapEditor.World
         private Transform groundRoot;
         private Shader shader;
         private Shader splineShader;
+
+        // The water surfaces of tiles with [water], one quad each at their corner heights.
+        private Transform waterRoot;
+        private Material waterMaterial;
         private readonly Dictionary<string, Material> splineMaterials = new Dictionary<string, Material>(StringComparer.OrdinalIgnoreCase);
 
         // The spline meshes of each tile, so changed splines can be built again without reading the whole map.
@@ -1157,6 +1161,69 @@ namespace OmsiMapEditor.World
                 tileSplineObjects.Add(tileKey, objects);
             }
             objects.Add(item);
+        }
+
+        /// <summary>
+        /// Draws the water of the map's tiles as a see-through blue surface over each tile with [water], at the heights
+        /// of its corners; the ground above it hides it.
+        /// </summary>
+        public void RefreshWater(OmsiMapSummary summary)
+        {
+            if (waterRoot != null)
+            {
+                foreach (Transform child in waterRoot)
+                {
+                    var filter = child.GetComponent<MeshFilter>();
+                    if (filter != null)
+                        Destroy(filter.sharedMesh);
+                }
+                Destroy(waterRoot.gameObject);
+                waterRoot = null;
+            }
+            if (summary == null || splineShader == null)
+                return;
+            var size = (float)summary.TileSizeMeters;
+            foreach (var tile in summary.Tiles)
+            {
+                if (tile.Water == null || tile.Water.Length < 4 || !tile.IsAvailable)
+                    continue;
+                if (waterRoot == null)
+                {
+                    waterRoot = new GameObject("Map Water").transform;
+                    waterRoot.SetParent(transform, false);
+                }
+                if (waterMaterial == null)
+                {
+                    var colour = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                    colour.SetPixel(0, 0, new Color(0.18f, 0.38f, 0.52f, 0.72f));
+                    colour.Apply();
+                    waterMaterial = new Material(splineShader);
+                    waterMaterial.SetTexture("_MainTex", colour);
+                    waterMaterial.SetFloat("_SourceBlend", (float)BlendMode.SrcAlpha);
+                    waterMaterial.SetFloat("_DestinationBlend", (float)BlendMode.OneMinusSrcAlpha);
+                    waterMaterial.SetFloat("_DepthWrite", 0f);
+                    waterMaterial.SetFloat("_UseAlpha", 1f);
+                    waterMaterial.renderQueue = AlphaSplineQueue + 10;
+                }
+                // Corners (0, 0), (edge, 0), (0, edge), (edge, edge), as tile.map.water keeps them.
+                var mesh = new Mesh { name = "Water " + tile.X + ", " + tile.Y };
+                mesh.vertices = new[]
+                {
+                    new Vector3(0f, tile.Water[0], 0f), new Vector3(size, tile.Water[1], 0f), new Vector3(0f, tile.Water[2], size), new Vector3(size, tile.Water[3], size)
+                };
+                mesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one };
+                mesh.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                var surface = new GameObject(mesh.name) { layer = GroundLayer };
+                surface.transform.SetParent(waterRoot, false);
+                surface.transform.localPosition = new Vector3((float)(tile.X * summary.TileSizeMeters - originX), 0f, (float)(tile.Y * summary.TileSizeMeters - originY));
+                surface.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var renderer = surface.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = waterMaterial;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
         }
 
         /// <summary>One material per spline texture, shared by all tiles.</summary>

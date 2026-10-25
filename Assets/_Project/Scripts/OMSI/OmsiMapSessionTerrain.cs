@@ -42,6 +42,15 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Where Flatten works towards: the height where the stroke started, or a height typed.</summary>
         public double FlattenTo { get; set; }
 
+        /// <summary>The water's surface for the Water brush: the tile's water where the stroke started, else 0.3 m under the ground there.</summary>
+        public double WaterLevel { get; set; }
+
+        /// <summary>How deep the Water brush digs under the surface.</summary>
+        public double WaterDepth { get; set; } = 1.5;
+
+        /// <summary>The tiles the Water brush went over, which get water at its surface when they have none.</summary>
+        internal HashSet<OmsiTileSummary> WaterTiles { get; } = new HashSet<OmsiTileSummary>();
+
         /// <summary>The ground's height as shown at a world position; null outside the terrain.</summary>
         public double? HeightAt(double x, double y)
         {
@@ -113,7 +122,15 @@ namespace OmsiMapEditor.OMSI
             ShapeCatalogs();
             var roads = OmsiTerrainBrush.RoadPointsNear(summary, shapeProfiles, x, y, radius + 15.0);
             var before = Snapshot(stroke.Shown, x, y, radius);
-            OmsiTerrainBrush.Stroke(stroke.Shown, mode, x, y, radius, strength, seconds, stroke.FlattenTo, roads);
+            OmsiTerrainBrush.Stroke(stroke.Shown, mode, x, y, radius, strength, seconds, stroke.FlattenTo, roads, stroke.WaterLevel - stroke.WaterDepth);
+            if (mode == OmsiTerrainBrushMode.Water)
+                foreach (var point in new[] { new OmsiMapPoint(x, y), new OmsiMapPoint(x + radius, y), new OmsiMapPoint(x - radius, y), new OmsiMapPoint(x, y + radius),
+                             new OmsiMapPoint(x, y - radius) })
+                {
+                    var tile = TileAt(summary, point.X, point.Y);
+                    if (tile != null && tile.Water == null)
+                        stroke.WaterTiles.Add(tile);
+                }
             return Follow(stroke, before);
         }
 
@@ -247,9 +264,104 @@ namespace OmsiMapEditor.OMSI
             }
             if (change.Files.Count == 0)
                 return null;
+            // Tiles the Water brush dug in get water at its surface, as openMapper lays it.
+            foreach (var tile in stroke.WaterTiles)
+                if (tile.Water == null)
+                {
+                    AddWaterFiles(change, tile, stroke.WaterLevel);
+                    if (!change.Tiles.Contains(tile))
+                        change.Tiles.Add(tile);
+                }
             ApplyFiles(change.Files, false);
             FitTerrainToRoads(summary, change);
+            ReadWaterOf(change.Tiles);
             return change;
+        }
+
+        /// <summary>
+        /// Gives a tile water at a height, all four corners alike, or takes it away (null): the [water] section beside
+        /// [terrain] and tile.map.water with one surface. One step, or null when nothing changes.
+        /// </summary>
+        public OmsiTerrainChange SetTileWater(OmsiMapSummary summary, OmsiTileSummary tile, double? level)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            var change = new OmsiTerrainChange();
+            change.Tiles.Add(tile);
+            if (level.HasValue)
+                AddWaterFiles(change, tile, level.Value);
+            else
+                RemoveWaterFiles(change, tile);
+            if (change.Files.Count == 0)
+                return null;
+            ApplyFiles(change.Files, false);
+            ReadWaterOf(change.Tiles);
+            return change;
+        }
+
+        /// <summary>The bytes of tile.map.water with one surface at a height at all four corners.</summary>
+        internal static byte[] WaterBytes(double level)
+        {
+            var bytes = new byte[20];
+            BitConverter.GetBytes(1u).CopyTo(bytes, 0);
+            for (var corner = 0; corner < 4; corner++)
+                BitConverter.GetBytes((float)level).CopyTo(bytes, 4 + corner * 4);
+            return bytes;
+        }
+
+        private void AddWaterFiles(OmsiTerrainChange change, OmsiTileSummary tile, double level)
+        {
+            var workspace = RequireWorkspace();
+            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var mapBefore = workspace.ReadAllBytes(tilePath);
+            var file = OmsiRecordFile.Parse(mapBefore, OmsiTileRecordLayouts.Instance);
+            if (!file.Records.Exists(record => string.Equals(record.Name, "water", StringComparison.OrdinalIgnoreCase)))
+            {
+                // As OMSI's editor writes it: right after [terrain], an empty line of its own, then the blank line.
+                var terrain = file.Records.FindIndex(record => string.Equals(record.Name, "terrain", StringComparison.OrdinalIgnoreCase));
+                var version = file.Records.FindIndex(record => string.Equals(record.Name, "version", StringComparison.OrdinalIgnoreCase));
+                file.InsertRecord(terrain >= 0 ? terrain + 1 : version + 1, file.CreateRecord("water", new string[0], 2));
+                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = tilePath, Before = mapBefore, After = file.ToBytes() });
+            }
+            var waterPath = tilePath + ".water";
+            var waterBefore = workspace.FileExists(waterPath) ? workspace.ReadAllBytes(waterPath) : null;
+            var waterAfter = WaterBytes(level);
+            if (waterBefore == null || !SameBytes(waterBefore, waterAfter))
+                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = waterPath, Before = waterBefore, After = waterAfter });
+        }
+
+        private void RemoveWaterFiles(OmsiTerrainChange change, OmsiTileSummary tile)
+        {
+            var workspace = RequireWorkspace();
+            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var mapBefore = workspace.ReadAllBytes(tilePath);
+            var file = OmsiRecordFile.Parse(mapBefore, OmsiTileRecordLayouts.Instance);
+            var water = file.Records.FindAll(record => string.Equals(record.Name, "water", StringComparison.OrdinalIgnoreCase));
+            if (water.Count == 0)
+                return;
+            foreach (var record in water)
+                file.RemoveRecord(record);
+            change.Files.Add(new OmsiObjectChange.FileState { RelativePath = tilePath, Before = mapBefore, After = file.ToBytes() });
+            // Without [water] the game ignores tile.map.water; one the original map has stays, as OMSI's editor leaves it.
+            var waterPath = tilePath + ".water";
+            if (workspace.FileExists(waterPath) && workspace.ReadOriginalBytes(waterPath) == null)
+                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = waterPath, Before = workspace.ReadAllBytes(waterPath), After = null });
+        }
+
+        /// <summary>Reads the water of tiles again from the workspace.</summary>
+        private void ReadWaterOf(IEnumerable<OmsiTileSummary> tiles)
+        {
+            var workspace = RequireWorkspace();
+            foreach (var tile in tiles)
+            {
+                var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+                var file = OmsiRecordFile.Parse(workspace.ReadAllBytes(tilePath), OmsiTileRecordLayouts.Instance);
+                tile.Water = file.Records.Exists(record => string.Equals(record.Name, "water", StringComparison.OrdinalIgnoreCase))
+                    ? OmsiMapReader.ReadWater(workspace, tilePath)
+                    : null;
+            }
         }
 
         /// <summary>Takes back ground shaped by hand: the shaped ground as it was, and the ground shown fitted to the roads again.</summary>
@@ -261,6 +373,7 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidOperationException("The change has already been undone.");
             ApplyFiles(change.Files, true);
             FitTerrainToRoads(summary, change);
+            ReadWaterOf(change.Tiles);
             change.IsApplied = false;
         }
 
@@ -273,6 +386,7 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidOperationException("The change is already applied.");
             ApplyFiles(change.Files, false);
             FitTerrainToRoads(summary, change);
+            ReadWaterOf(change.Tiles);
             change.IsApplied = true;
         }
 

@@ -1162,6 +1162,51 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TheWaterBrushDigsABedAndLaysWaterOnTheTile()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsNull(tile.Water);
+            // At x 60 the ground lies at 3 m; the water 0.3 m under it, dug 1.5 m deeper, as openMapper starts a lake.
+            var stroke = session.BeginTerrainStroke(summary);
+            stroke.WaterLevel = 2.7;
+            stroke.WaterDepth = 1.5;
+            session.ApplyTerrainBrush(summary, stroke, OmsiTerrainBrushMode.Water, 60, 200, 20, 1.0, 1.0);
+            Assert.AreEqual(1.2, stroke.HeightAt(60, 200).Value, 1e-4);
+            // Ground already below the bed is never filled.
+            var change = session.EndTerrainStroke(summary, stroke);
+            CollectionAssert.AreEqual(new[] { 2.7f, 2.7f, 2.7f, 2.7f }, tile.Water);
+            var reread = session.Read().Tiles[0];
+            CollectionAssert.AreEqual(new[] { 2.7f, 2.7f, 2.7f, 2.7f }, reread.Water);
+            var text = Encoding.Unicode.GetString(session.Workspace.ReadAllBytes("tile_0_0.map"));
+            StringAssert.Contains("[version]\r\n14\r\n\r\n[water]\r\n\r\n\r\n", text);
+            Assert.AreEqual(20, session.Workspace.ReadAllBytes("tile_0_0.map.water").Length);
+
+            session.Undo(summary, change);
+            Assert.IsNull(tile.Water);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            Assert.IsFalse(session.Workspace.FileExists("tile_0_0.map.water"));
+
+            // By hand: water at 5 m on the second tile, raised to 6 m, then taken away.
+            var other = summary.Tiles[1];
+            Assert.IsNotNull(session.SetTileWater(summary, other, 5.0));
+            CollectionAssert.AreEqual(new[] { 5f, 5f, 5f, 5f }, other.Water);
+            Assert.IsNotNull(session.SetTileWater(summary, other, 6.0));
+            CollectionAssert.AreEqual(new[] { 6f, 6f, 6f, 6f }, session.Read().Tiles[1].Water);
+            Assert.IsNull(session.SetTileWater(summary, other, 6.0));
+            var off = session.SetTileWater(summary, other, null);
+            Assert.IsNull(other.Water);
+            Assert.IsFalse(session.Workspace.FileExists("tile_1_0.map.water"));
+            session.Undo(summary, off);
+            CollectionAssert.AreEqual(new[] { 6f, 6f, 6f, 6f }, other.Water);
+
+            // A [water] tile without its file has its surface at −5 m, as in Omsi.exe.
+            session.Workspace.Revert("tile_1_0.map.water");
+            CollectionAssert.AreEqual(new[] { -5f, -5f, -5f, -5f }, session.Read().Tiles[1].Water);
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

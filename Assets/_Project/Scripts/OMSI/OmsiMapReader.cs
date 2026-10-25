@@ -147,9 +147,12 @@ namespace OmsiMapEditor.OMSI
             var skippedOldSplines = 0;
             // Terrain alignment applies to the spline right before it; another placed element ends that.
             OmsiSplineRecord lastSpline = null;
+            var hasWater = false;
             foreach (var section in sections)
             {
                 TrackHighestId(section, summary);
+                if (string.Equals(section.Name, "water", StringComparison.OrdinalIgnoreCase))
+                    hasWater = true;
                 if ((string.Equals(section.Name, "spline_terrain_align", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(section.Name, "spline_terrain_align_2", StringComparison.OrdinalIgnoreCase)) && lastSpline != null)
                 {
@@ -195,9 +198,26 @@ namespace OmsiMapEditor.OMSI
                 }
             }
 
+            tile.Water = hasWater ? ReadWater(source, tilePath) : null;
             if (skippedOldSplines > 0)
                 summary.Warnings.Add(tile.FileName + " uses tile version " + version + "; its " + skippedOldSplines +
                                      " spline(s) use an older field layout and were counted but not decoded.");
+        }
+
+        /// <summary>
+        /// The water surface of a tile with [water]: the four corner heights of tile.map.water when it holds one surface,
+        /// else −5 m at every corner, as Omsi.exe and openOMSI take it.
+        /// </summary>
+        internal static float[] ReadWater(IOmsiFileSource source, string tilePath)
+        {
+            var path = tilePath + ".water";
+            if (source.FileExists(path))
+            {
+                var bytes = source.ReadAllBytes(path);
+                if (bytes.Length >= 20 && BitConverter.ToUInt32(bytes, 0) == 1)
+                    return new[] { BitConverter.ToSingle(bytes, 4), BitConverter.ToSingle(bytes, 8), BitConverter.ToSingle(bytes, 12), BitConverter.ToSingle(bytes, 16) };
+            }
+            return new[] { -5f, -5f, -5f, -5f };
         }
 
         private static void ReadTerrain(IOmsiFileSource source, string tilePath, OmsiTileSummary tile, OmsiMapSummary summary)

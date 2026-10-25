@@ -1471,6 +1471,7 @@ namespace OmsiMapEditor.UI
                 var installationRoot = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
                 groundRenderer?.Load(summary, session.Source, Path.GetFileName(session.GlobalConfigPath), installationRoot,
                     mapCanvas.OriginX, mapCanvas.OriginY);
+                groundRenderer?.RefreshWater(summary);
                 objectRenderer?.Load(summary, session.Source, installationRoot, mapCanvas.OriginX, mapCanvas.OriginY);
             }
             StartOutlineBuild(summary);
@@ -3585,6 +3586,12 @@ namespace OmsiMapEditor.UI
                 return;
             }
             terrainStroke.FlattenTo = terrainOptions.FlattenHeight ?? terrainStroke.HeightAt(x, y) ?? 0.0;
+            // A lake's surface: the tile's water if it has some, else a little under where the stroke starts (openMapper).
+            var size = currentSummary.TileSizeMeters;
+            var under = currentSummary.Tiles.Find(tile => tile.IsAvailable && tile.X == (int)Math.Floor(x / size) && tile.Y == (int)Math.Floor(y / size));
+            terrainStroke.WaterLevel = under?.Water != null ? (under.Water[0] + under.Water[1] + under.Water[2] + under.Water[3]) / 4.0
+                : (terrainStroke.HeightAt(x, y) ?? 0.0) - 0.3;
+            terrainStroke.WaterDepth = terrainOptions.WaterDepth;
             // The first step comes at once.
             terrainSince = TerrainStepSeconds;
         }
@@ -3780,6 +3787,69 @@ namespace OmsiMapEditor.UI
             SetStatus("Laid the height map over " + change.Tiles.Count + " tile(s). Ctrl+Z takes it back.");
         }
 
+        /// <summary>
+        /// The tile's water ([water], ADR 040 stage 4): its height, and buttons to lay it, raise or lower it to the height
+        /// typed, or take it away. A new water starts 1 m under the tile's lowest ground.
+        /// </summary>
+        private void AddWaterEditor(VisualElement container, OmsiTileSummary tile)
+        {
+            if (tile == null || !tile.IsAvailable || !tile.HasTerrain)
+                return;
+            var heading = new Label("WATER");
+            heading.AddToClassList("inspector-section-heading");
+            container.Add(heading);
+            var level = tile.Water != null ? (tile.Water[0] + tile.Water[1] + tile.Water[2] + tile.Water[3]) / 4.0 : tile.TerrainMinHeight - 1.0;
+            var field = AddEditField(container, "Height (m)", level);
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            var set = new Button(() =>
+            {
+                if (double.TryParse(field.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
+                    SetTileWater(tile, height);
+                else
+                    SetStatus("Type the water's height as a number.");
+            })
+            {
+                text = tile.Water != null ? "Set height" : "Add water",
+                tooltip = "Lays the tile's water at this height ([water]); it shows where the ground lies below it. Lower the ground for a lake or a river."
+            };
+            set.AddToClassList("map-control-button");
+            set.AddToClassList("inspector-edit-apply");
+            row.Add(set);
+            if (tile.Water != null)
+            {
+                var remove = new Button(() => SetTileWater(tile, null)) { text = "Remove water", tooltip = "Takes the tile's water away" };
+                remove.AddToClassList("map-control-button");
+                remove.AddToClassList("inspector-edit-delete");
+                row.Add(remove);
+            }
+            container.Add(row);
+        }
+
+        private void SetTileWater(OmsiTileSummary tile, double? level)
+        {
+            if (!CanEdit)
+                return;
+            OmsiTerrainChange change;
+            try
+            {
+                change = session.SetTileWater(currentSummary, tile, level);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The water could not be changed: " + exception.Message);
+                return;
+            }
+            if (change == null)
+                return;
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the water of tile " + tile.X + ", " + tile.Y });
+            RefreshGround(change.Tiles);
+            RenderInspector();
+            SetStatus((level.HasValue ? "Water at " + level.Value.ToString("0.##", CultureInfo.InvariantCulture) + " m on" : "Took the water off") +
+                      " tile " + tile.X + ", " + tile.Y + ". Ctrl+Z takes it back.");
+        }
+
         /// <summary>Levels the ground under the selected objects (ADR 040, stage 2), as one step.</summary>
         private void LevelSelectedGround()
         {
@@ -3815,6 +3885,7 @@ namespace OmsiMapEditor.UI
             if (list.Count == 0)
                 return;
             groundRenderer?.RefreshTerrain(list);
+            groundRenderer?.RefreshWater(currentSummary);
             objectRenderer?.RefreshTerrain(list, session.Source);
             if (roadTerrain != null)
                 roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
@@ -6698,6 +6769,7 @@ namespace OmsiMapEditor.UI
             if (!CanEdit)
                 return;
             var tile = selectedTile;
+            AddWaterEditor(container, tile);
             var armed = false;
             Button delete = null;
             delete = new Button(() =>

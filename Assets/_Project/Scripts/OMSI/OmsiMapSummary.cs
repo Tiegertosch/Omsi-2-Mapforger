@@ -57,6 +57,12 @@ namespace OmsiMapEditor.OMSI
         public float TerrainMinHeight { get; internal set; }
         public float TerrainMaxHeight { get; internal set; }
         public bool HasTerrain { get; internal set; }
+
+        /// <summary>
+        /// The tile's water ([water] and tile.map.water): the surface's height at the corners (0, 0), (edge, 0), (0, edge)
+        /// and (edge, edge); null without [water]. As in Omsi.exe, a missing or odd .water file puts all four at −5 m.
+        /// </summary>
+        public float[] Water { get; internal set; }
     }
 
     /// <summary>Placement values needed for a top-down map overview.</summary>

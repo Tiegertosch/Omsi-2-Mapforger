@@ -14,7 +14,10 @@ namespace OmsiMapEditor.OMSI
         Flatten,
 
         /// <summary>Towards a fixed pattern of rolls, the dips and rises of a natural field.</summary>
-        Roughen
+        Roughen,
+
+        /// <summary>A lake or a river bed: dug towards a depth under the water's surface, never filled.</summary>
+        Water
     }
 
     /// <summary>A point along a road, where the ground must stay below it: its place, height and half width.</summary>
@@ -159,8 +162,9 @@ namespace OmsiMapEditor.OMSI
         /// <param name="strength">0.05 to 1; raising at full strength lifts the middle 12 m a second.</param>
         /// <param name="flattenTo">The height Flatten works towards.</param>
         /// <param name="roads">Points along the roads near the brush; the ground stays below them.</param>
+        /// <param name="waterBed">The height the Water brush digs towards: the water's surface less its depth.</param>
         public static void Stroke(OmsiTerrainGrid grid, OmsiTerrainBrushMode mode, double x, double y, double radius, double strength, double seconds,
-            double flattenTo, IList<OmsiRoadPoint> roads)
+            double flattenTo, IList<OmsiRoadPoint> roads, double waterBed = 0.0)
         {
             if (grid == null)
                 throw new ArgumentNullException(nameof(grid));
@@ -209,6 +213,10 @@ namespace OmsiMapEditor.OMSI
                             break;
                         case OmsiTerrainBrushMode.Flatten:
                             next = height + (flattenTo - height) * Math.Min(1.0, strength * 8.0 * seconds * weight);
+                            break;
+                        case OmsiTerrainBrushMode.Water:
+                            // Dug towards the bed, never filled; the banks ease out with the brush's rim.
+                            next = height > waterBed ? height + (waterBed - height) * Math.Min(1.0, strength * 8.0 * seconds * weight) : height;
                             break;
                         default:
                             // Towards rolls that stay put wherever the brush goes, so holding it longer shapes them more.
