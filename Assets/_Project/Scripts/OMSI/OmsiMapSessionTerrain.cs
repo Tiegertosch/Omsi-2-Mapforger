@@ -182,6 +182,30 @@ namespace OmsiMapEditor.OMSI
             return EndTerrainStroke(summary, stroke);
         }
 
+        /// <summary>The ground as the map shows it, as a height map (ADR 040, stage 3).</summary>
+        public OmsiHeightMapExport ExportHeightMap(OmsiMapSummary summary)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            var name = string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName;
+            return OmsiHeightMap.Export(summary, BeginTerrainStroke(summary).Shown, name);
+        }
+
+        /// <summary>
+        /// A height map laid over the ground shaped by hand of all tiles, replacing it or added to it; the roads built with
+        /// terrain fitting are fitted into it again. One step, or null when nothing changed.
+        /// </summary>
+        public OmsiTerrainChange ImportHeightMap(OmsiMapSummary summary, OmsiGreyPicture picture, OmsiHeightRange range, bool add)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (picture == null)
+                throw new ArgumentNullException(nameof(picture));
+            var stroke = BeginTerrainStroke(summary);
+            OmsiHeightMap.Import(summary, stroke.Shaped, picture, range, add);
+            return EndTerrainStroke(summary, stroke);
+        }
+
         /// <summary>Whether an object keeps its height as written rather than above the ground, as junctions do.</summary>
         private static bool HasAbsoluteHeight(string installation, string assetPath)
         {

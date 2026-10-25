@@ -154,6 +154,9 @@ namespace OmsiMapEditor.UI
         private double terrainSince;
         private OmsiMapPoint? terrainRampStart;
 
+        // A height map chosen for import, waiting for its settings.
+        private OmsiGreyPicture pendingHeightMap;
+
         /// <summary>A held brush works this often, so the map can draw the ground between steps.</summary>
         private const double TerrainStepSeconds = 1.0 / 15.0;
 
@@ -371,6 +374,9 @@ namespace OmsiMapEditor.UI
                     if (activeTool == EditorTool.Terrain)
                         ShowTerrainBrush();
                 };
+                terrainOptions.ExportRequested += () => ExportHeightMap(null);
+                terrainOptions.ImportRequested += () => ChooseHeightMap(null);
+                terrainOptions.ImportConfirmed += LayHeightMap;
                 objectsPanelHost.Add(terrainOptions);
             }
             statusLabel = root.Q<Label>("status-message");
@@ -1099,6 +1105,43 @@ namespace OmsiMapEditor.UI
                         ChangeSelectedRow(Argument("-rowsChange", 2) is string swap && !swap.StartsWith("-", StringComparison.Ordinal) ? swap : null);
                     }
                     Debug.Log("Rows changed: " + statusLabel?.text);
+                }
+            }
+
+            // -heightmapExport <file.png>: writes the height map; -heightmapImport <file.png> [-heightmapAdd] [-heightmapSmooth n]
+            // [-heightmapLowest m] [-heightmapHighest m]: lays a picture over the map as the import's settings would.
+            var heightmapExport = Argument("-heightmapExport", 1);
+            var heightmapImport = Argument("-heightmapImport", 1);
+            if (heightmapExport != null || heightmapImport != null)
+            {
+                var heightWait = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - heightWait < 300f)
+                    yield return null;
+                SetTool(EditorTool.Terrain);
+                if (heightmapExport != null)
+                {
+                    ExportHeightMap(heightmapExport);
+                    Debug.Log("Height map: " + statusLabel?.text);
+                }
+                if (heightmapImport != null)
+                {
+                    ChooseHeightMap(heightmapImport);
+                    terrainOptions?.ApplyImport(Array.IndexOf(args, "-heightmapAdd") >= 0,
+                        int.TryParse(Argument("-heightmapSmooth", 1), out var smoothPasses) ? smoothPasses : (int?)null);
+                    if (terrainOptions != null && pendingHeightMap != null &&
+                        (Argument("-heightmapLowest", 1) != null || Argument("-heightmapHighest", 1) != null))
+                    {
+                        var current = terrainOptions.ImportRange ?? new OmsiHeightRange { Lowest = 0, Highest = 100 };
+                        terrainOptions.ShowImport(Path.GetFileName(heightmapImport), string.Empty, new OmsiHeightRange
+                        {
+                            Lowest = double.TryParse(Argument("-heightmapLowest", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var low) ? low : current.Lowest,
+                            Highest = double.TryParse(Argument("-heightmapHighest", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var high) ? high : current.Highest
+                        }, pendingHeightMap.Coarse);
+                        terrainOptions.ApplyImport(Array.IndexOf(args, "-heightmapAdd") >= 0,
+                            int.TryParse(Argument("-heightmapSmooth", 1), out var smoothAgain) ? smoothAgain : (int?)null);
+                    }
+                    LayHeightMap();
+                    Debug.Log("Height map: " + statusLabel?.text);
                 }
             }
 
@@ -3636,6 +3679,105 @@ namespace OmsiMapEditor.UI
             var length = Math.Sqrt((x - start.X) * (x - start.X) + (y - start.Y) * (y - start.Y));
             SetStatus("Laid a ramp of " + gradient.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " % over " +
                       length.ToString("0", CultureInfo.InvariantCulture) + " m. Ctrl+Z takes it back.");
+        }
+
+        /// <summary>
+        /// Writes the ground as a height map (ADR 040, stage 3): a 16-bit grey PNG and a .txt beside it with its lowest and
+        /// highest height, where the user chooses, or at the path given.
+        /// </summary>
+        private void ExportHeightMap(string path)
+        {
+            if (currentSummary == null || session == null)
+                return;
+            var name = string.IsNullOrWhiteSpace(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
+            path = path ?? WindowsFileDialog.SaveFile("Export the height map", WindowsFileDialog.PngFilter, "png", SanitizeFileName(name) + "_heights.png");
+            if (string.IsNullOrEmpty(path))
+                return;
+            try
+            {
+                var export = session.ExportHeightMap(currentSummary);
+                File.WriteAllBytes(path, export.Png);
+                File.WriteAllText(Path.ChangeExtension(path, ".txt"), export.Note);
+                SetStatus("Height map written: " + export.Width + " × " + export.Height + " px, " +
+                          export.Range.Lowest.ToString("0.0", CultureInfo.InvariantCulture) + " to " + export.Range.Highest.ToString("0.0", CultureInfo.InvariantCulture) +
+                          " m, with its heights in " + Path.GetFileName(Path.ChangeExtension(path, ".txt")) + ".");
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException ||
+                                              exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The height map could not be written: " + exception.Message);
+            }
+        }
+
+        /// <summary>Reads a picture to lay over the map and shows its settings: the heights from the .txt beside it, or 0 to 100 m.</summary>
+        private void ChooseHeightMap(string path)
+        {
+            if (currentSummary == null || terrainOptions == null)
+                return;
+            path = path ?? WindowsFileDialog.OpenFile("A height map for the whole map", WindowsFileDialog.PngFilter);
+            if (string.IsNullOrEmpty(path))
+                return;
+            try
+            {
+                pendingHeightMap = OmsiPng.DecodeGrey(File.ReadAllBytes(path));
+                var note = Path.ChangeExtension(path, ".txt");
+                var range = (File.Exists(note) ? OmsiHeightMap.ReadRange(File.ReadAllText(note)) : null) ?? new OmsiHeightRange { Lowest = 0, Highest = 100 };
+                var info = string.Empty;
+                if (OmsiHeightMap.Extent(currentSummary, out var minX, out var minY, out var maxX, out var maxY))
+                {
+                    var width = (maxX - minX + 1) * currentSummary.TileSizeMeters;
+                    var height = (maxY - minY + 1) * currentSummary.TileSizeMeters;
+                    info = pendingHeightMap.Width + " × " + pendingHeightMap.Height + " px over " + width.ToString("0", CultureInfo.InvariantCulture) + " × " +
+                           height.ToString("0", CultureInfo.InvariantCulture) + " m (" +
+                           (width / Math.Max(1, pendingHeightMap.Width - 1)).ToString("0.0", CultureInfo.InvariantCulture) + " m a pixel)";
+                }
+                terrainOptions.ShowImport(Path.GetFileName(path), info, range, pendingHeightMap.Coarse);
+                SetStatus("Height map " + Path.GetFileName(path) + ": choose the heights for black and white, then lay it on the map.");
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidDataException ||
+                                              exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                pendingHeightMap = null;
+                SetStatus("The picture could not be read: " + exception.Message);
+            }
+        }
+
+        /// <summary>Lays the chosen height map over all tiles with the settings shown, as one step.</summary>
+        private void LayHeightMap()
+        {
+            if (pendingHeightMap == null || terrainOptions == null || !CanEdit)
+                return;
+            var range = terrainOptions.ImportRange;
+            if (!range.HasValue)
+            {
+                SetStatus("Type the heights for black and white as numbers.");
+                return;
+            }
+            var picture = new OmsiGreyPicture(pendingHeightMap.Width, pendingHeightMap.Height, (float[])pendingHeightMap.Values.Clone(), pendingHeightMap.Coarse);
+            picture.Smooth(terrainOptions.ImportSmoothing);
+            OmsiTerrainChange change;
+            try
+            {
+                change = session.ImportHeightMap(currentSummary, picture, range.Value, terrainOptions.ImportAdds);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The height map could not be laid on the map: " + exception.Message);
+                return;
+            }
+            pendingHeightMap = null;
+            terrainOptions.HideImport();
+            if (change == null)
+            {
+                SetStatus("The height map changed nothing.");
+                return;
+            }
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the height map" });
+            RefreshGround(change.Tiles);
+            SetStatus("Laid the height map over " + change.Tiles.Count + " tile(s). Ctrl+Z takes it back.");
         }
 
         /// <summary>Levels the ground under the selected objects (ADR 040, stage 2), as one step.</summary>

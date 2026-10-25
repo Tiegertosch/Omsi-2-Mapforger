@@ -1108,6 +1108,60 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AHeightMapGivesTheGroundBackAndAddsToIt()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A slope and a bump across both tiles, as openMapper's own test has them.
+            var stroke = session.BeginTerrainStroke(summary);
+            for (long gy = 0; gy <= 60; gy++)
+                for (long gx = 0; gx <= 120; gx++)
+                    stroke.Shaped.Set(gx, gy, (float)(20.0 + gx * 5 * 0.05 + Math.Sin(gy * 5 * 0.02) * 4.0));
+            session.EndTerrainStroke(summary, stroke);
+            var before = new[] { OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain")), OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain")) };
+
+            var export = session.ExportHeightMap(summary);
+            Assert.AreEqual(121, export.Width);
+            Assert.AreEqual(61, export.Height);
+            var range = OmsiHeightMap.ReadRange(export.Note).Value;
+            Assert.AreEqual(export.Range.Lowest, range.Lowest, 1e-6);
+            Assert.AreEqual(export.Range.Highest, range.Highest, 1e-6);
+            StringAssert.Contains("tiles 0 0 to 1 0", export.Note);
+            var picture = OmsiPng.DecodeGrey(export.Png);
+            Assert.IsFalse(picture.Coarse);
+
+            // Laid back over flat ground, the ground comes back to a centimetre; added, it is twice as high.
+            session.ImportHeightMap(summary, new OmsiGreyPicture(2, 2, new float[4], false), new OmsiHeightRange { Lowest = 0, Highest = 1 }, false);
+            Assert.AreEqual(0.0, OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"))[30, 30], 1e-6);
+            var back = session.ImportHeightMap(summary, picture, range, false);
+            Assert.IsNotNull(back);
+            var after = new[] { OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain")), OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain")) };
+            for (var tile = 0; tile < 2; tile++)
+                for (var row = 0; row < OmsiTerrain.Resolution; row++)
+                    for (var column = 0; column < OmsiTerrain.Resolution; column++)
+                        Assert.AreEqual(before[tile][column, row], after[tile][column, row], 0.01, "tile " + tile + " at " + column + ", " + row);
+            session.ImportHeightMap(summary, picture, range, true);
+            Assert.AreEqual(before[0][30, 30] * 2, OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"))[30, 30], 0.02);
+        }
+
+        [Test]
+        public void PngPicturesInEightBitColourAreReadAsTheirGrey()
+        {
+            // 3 × 2 RGB, 8 bits, the first row filtered "Sub", the second "Paeth", made with Python's zlib.
+            var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAHUlEQVR4nGPkOiH31eIRI8N/lm/mjxobGn5V/QYAWAEKBL8nYeUAAAAASUVORK5CYII=");
+            var picture = OmsiPng.DecodeGrey(png);
+            Assert.AreEqual(3, picture.Width);
+            Assert.AreEqual(2, picture.Height);
+            Assert.IsTrue(picture.Coarse);
+            CollectionAssert.AreEqual(new[] { 0.577773, 0.2126, 0.0722, 0.7152, 0.501961, 0.980392 }, picture.Values.Select(value => Math.Round(value, 6)).ToArray());
+            // Halfway between the top-left and bottom-left pixel; smoothing evens a pixel out with its neighbours.
+            Assert.AreEqual((0.577773 + 0.7152) / 2, picture.At(0, 0.5), 1e-5);
+            picture.Smooth(1);
+            Assert.AreEqual((0.577773 + 0.2126 + 0.7152 + 0.501961) / 4, picture.Values[0], 1e-5);
+            Assert.Throws<System.IO.InvalidDataException>(() => OmsiPng.DecodeGrey(new byte[40]));
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

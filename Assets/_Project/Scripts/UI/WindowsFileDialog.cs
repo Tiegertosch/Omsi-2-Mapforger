@@ -10,6 +10,7 @@ namespace OmsiMapEditor.UI
         public const string GlobalConfigFilter = "OMSI map configuration (global.cfg)\0global.cfg\0All files\0*.*\0";
         public const string ProjectFilter = "MapWorks project (*.omproj)\0*.omproj\0";
         public const string ProjectExtension = "omproj";
+        public const string PngFilter = "PNG picture (*.png)\0*.png\0All files\0*.*\0";
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         private const int OverwritePrompt = 0x00000002;

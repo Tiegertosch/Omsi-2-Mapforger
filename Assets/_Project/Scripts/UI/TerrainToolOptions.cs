@@ -21,6 +21,20 @@ namespace OmsiMapEditor.UI
         private readonly TextField flattenField;
         private readonly Label planLabel;
 
+        // The height map: export and import, and the settings of a picture about to be laid on the map.
+        private readonly VisualElement importBox;
+        private readonly Label importName;
+        private readonly Label importInfo;
+        private readonly Label lowestLabel;
+        private readonly TextField lowestField;
+        private readonly Label highestLabel;
+        private readonly TextField highestField;
+        private readonly SliderInt smoothingSlider;
+        private readonly Label smoothingLabel;
+        private readonly Button replaceButton;
+        private readonly Button addButton;
+        private readonly Label coarseLabel;
+
         public TerrainToolOptions()
         {
             AddToClassList("tool-panel");
@@ -61,6 +75,84 @@ namespace OmsiMapEditor.UI
             hint.AddToClassList("panel-info");
             Add(hint);
 
+            var heightMapTitle = new Label("Height map");
+            heightMapTitle.AddToClassList("picker-options-title");
+            Add(heightMapTitle);
+            var heightMapHint = new Label("The ground as a grey picture, to shape in another program and bring back; openMapper reads and writes the same.");
+            heightMapHint.AddToClassList("panel-info");
+            Add(heightMapHint);
+            var buttons = new VisualElement();
+            buttons.AddToClassList("panel-tabs");
+            buttons.AddToClassList("picker-segmented");
+            var exportButton = new Button(() => ExportRequested?.Invoke())
+            {
+                text = "Export...", tooltip = "Writes the ground of all tiles as a 16-bit grey PNG, a pixel per terrain point, with its lowest and highest height in a .txt beside it"
+            };
+            var importButton = new Button(() => ImportRequested?.Invoke())
+            {
+                text = "Import...", tooltip = "Lays a grey picture (PNG, 8 or 16 bits) over all tiles, stretched to the map's outer edges"
+            };
+            foreach (var button in new[] { exportButton, importButton })
+            {
+                button.AddToClassList("panel-tab");
+                buttons.Add(button);
+            }
+            Add(buttons);
+
+            importBox = new VisualElement();
+            importBox.style.display = DisplayStyle.None;
+            Add(importBox);
+            importName = new Label();
+            importName.AddToClassList("picker-options-title");
+            importBox.Add(importName);
+            importInfo = new Label();
+            importInfo.AddToClassList("panel-info");
+            importBox.Add(importInfo);
+            var lowestRow = Row(importBox, string.Empty, out lowestLabel);
+            lowestField = new TextField { tooltip = "The height black stands for" };
+            lowestField.AddToClassList("picker-field");
+            lowestRow.Add(lowestField);
+            var highestRow = Row(importBox, string.Empty, out highestLabel);
+            highestField = new TextField { tooltip = "The height white stands for" };
+            highestField.AddToClassList("picker-field");
+            highestRow.Add(highestField);
+            smoothingSlider = new SliderInt(0, 6) { tooltip = "Passes of averaging each pixel with its neighbours, which hides the steps of an 8-bit picture" };
+            smoothingLabel = new Label();
+            smoothingSlider.AddToClassList("new-map-slider");
+            smoothingSlider.RegisterValueChangedCallback(_ => smoothingLabel.text = smoothingSlider.value.ToString(CultureInfo.InvariantCulture));
+            var smoothingRow = Row(importBox, "Smoothing", out _);
+            smoothingRow.Add(smoothingSlider);
+            smoothingLabel.AddToClassList("new-map-factor");
+            smoothingRow.Add(smoothingLabel);
+            var how = new VisualElement();
+            how.AddToClassList("panel-tabs");
+            how.AddToClassList("picker-segmented");
+            replaceButton = new Button(() => SetAdd(false)) { text = "Replace the ground", tooltip = "The picture's heights take the ground's place" };
+            addButton = new Button(() => SetAdd(true)) { text = "Add to it", tooltip = "The picture's heights are added to the ground as it is, as hills on a slope" };
+            foreach (var button in new[] { replaceButton, addButton })
+            {
+                button.AddToClassList("panel-tab");
+                how.Add(button);
+            }
+            importBox.Add(how);
+            var keep = new Label("Roads and objects keep their heights: best done before building. Roads fitted to the terrain are fitted again.");
+            keep.AddToClassList("panel-info");
+            importBox.Add(keep);
+            coarseLabel = new Label("An 8-bit picture has only 256 steps of height: smoothing hides them.");
+            coarseLabel.AddToClassList("panel-info");
+            importBox.Add(coarseLabel);
+            var actions = new VisualElement();
+            actions.AddToClassList("panel-tabs");
+            actions.AddToClassList("picker-segmented");
+            var lay = new Button(() => ImportConfirmed?.Invoke()) { text = "Lay it on the map" };
+            var cancel = new Button(HideImport) { text = "Cancel" };
+            foreach (var button in new[] { lay, cancel })
+            {
+                button.AddToClassList("panel-tab");
+                actions.Add(button);
+            }
+            importBox.Add(actions);
+
             radiusSlider.SetValueWithoutNotify(RadiusToSlider(25.0));
             strengthSlider.SetValueWithoutNotify(0.5f);
             ShowValues();
@@ -69,6 +161,68 @@ namespace OmsiMapEditor.UI
 
         /// <summary>A setting changed; the shell draws the brush again.</summary>
         public event Action SettingsChanged;
+
+        /// <summary>Export... was pressed; the shell asks where and writes the height map.</summary>
+        public event Action ExportRequested;
+
+        /// <summary>Import... was pressed; the shell asks for a picture and shows it with <see cref="ShowImport"/>.</summary>
+        public event Action ImportRequested;
+
+        /// <summary>"Lay it on the map" was pressed with the settings shown.</summary>
+        public event Action ImportConfirmed;
+
+        /// <summary>Whether the picture is added to the ground rather than taking its place.</summary>
+        public bool ImportAdds { get; private set; }
+
+        public int ImportSmoothing => smoothingSlider.value;
+
+        /// <summary>The heights black and white stand for, or null while one of them is no number.</summary>
+        public OmsiHeightRange? ImportRange
+        {
+            get
+            {
+                if (double.TryParse(lowestField.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var lowest) &&
+                    double.TryParse(highestField.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var highest))
+                    return new OmsiHeightRange { Lowest = lowest, Highest = highest };
+                return null;
+            }
+        }
+
+        /// <summary>Shows a picture about to be laid on the map: its name, how it fits, and the settings to choose.</summary>
+        public void ShowImport(string fileName, string info, OmsiHeightRange range, bool coarse)
+        {
+            importName.text = fileName;
+            importInfo.text = info;
+            lowestField.SetValueWithoutNotify(range.Lowest.ToString("0.##", CultureInfo.InvariantCulture));
+            highestField.SetValueWithoutNotify(range.Highest.ToString("0.##", CultureInfo.InvariantCulture));
+            smoothingSlider.value = coarse ? 2 : 0;
+            smoothingLabel.text = smoothingSlider.value.ToString(CultureInfo.InvariantCulture);
+            coarseLabel.style.display = coarse ? DisplayStyle.Flex : DisplayStyle.None;
+            SetAdd(false);
+            importBox.style.display = DisplayStyle.Flex;
+        }
+
+        public void HideImport()
+        {
+            importBox.style.display = DisplayStyle.None;
+        }
+
+        /// <summary>Sets the import's way and smoothing as a user would; for command-line checks.</summary>
+        public void ApplyImport(bool add, int? smoothing)
+        {
+            SetAdd(add);
+            if (smoothing.HasValue)
+                smoothingSlider.value = Math.Max(0, Math.Min(6, smoothing.Value));
+        }
+
+        private void SetAdd(bool add)
+        {
+            ImportAdds = add;
+            replaceButton.EnableInClassList("panel-tab-active", !add);
+            addButton.EnableInClassList("panel-tab-active", add);
+            lowestLabel.text = add ? "Black adds (m)" : "Black is (m)";
+            highestLabel.text = add ? "White adds (m)" : "White is (m)";
+        }
 
         /// <summary>The brush chosen, or null for the ramp.</summary>
         public OmsiTerrainBrushMode? Mode { get; private set; }
@@ -174,12 +328,17 @@ namespace OmsiMapEditor.UI
 
         private VisualElement Row(string label)
         {
+            return Row(this, label, out _);
+        }
+
+        private static VisualElement Row(VisualElement parent, string label, out Label text)
+        {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            var text = new Label(label);
+            text = new Label(label);
             text.AddToClassList("picker-option-label");
             row.Add(text);
-            Add(row);
+            parent.Add(row);
             return row;
         }
     }
