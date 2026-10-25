@@ -42,6 +42,9 @@ namespace OmsiMapEditor.UI
 
             /// <summary>Rows of objects along roads laid or deleted.</summary>
             public OmsiAttachmentChange AttachmentChange;
+
+            /// <summary>Objects hung on attachment points or taken off them.</summary>
+            public OmsiAttachedObjectChange AttachedChange;
         }
 
         private const int HistoryLimit = 200;
@@ -225,6 +228,13 @@ namespace OmsiMapEditor.UI
         // How the junction being placed would sit in the road under the pointer; null when it places freely.
         private OmsiJunctionInsertionPlan placementPlan;
         private string placementSnapMessage;
+
+        // The free attachment point the object being placed snapped onto, or null.
+        private MapAttachSpot placementAttach;
+
+        /// <summary>An object being placed snaps onto a free attachment point this close to the pointer, or at least <see cref="AttachSnapMeters"/>.</summary>
+        private const float AttachSnapPixels = 16f;
+        private const double AttachSnapMeters = 1.0;
 
         // Object outlines are computed in the background and kept per OMSI installation.
         private readonly Dictionary<string, OmsiObjectOutline> outlineCache = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
@@ -626,7 +636,16 @@ namespace OmsiMapEditor.UI
                 };
                 mapCanvas.HeadingPreviewed += objectRenderer.PreviewHeading;
                 mapCanvas.OrientationPreviewed += objectRenderer.PreviewOrientation;
-                mapCanvas.PlacementPreviewed += objectRenderer.SetPlacementPreview;
+                mapCanvas.PlacementPreviewed += (asset, position, heading, height) =>
+                {
+                    objectRenderer.SetPlacementPreview(asset, position, heading, height);
+                    // Hanging on a point, the preview takes the point's frame, turned by R against it.
+                    if (placementAttach != null)
+                        objectRenderer.SetPlacementFrame(placementAttach.Frame * Matrix4x4.Rotate(MapObjectRenderer.Orientation(mapCanvas.PlacementHeading, 0.0, 0.0)),
+                            placementAttach.WorldX, placementAttach.WorldY);
+                    else
+                        objectRenderer.SetPlacementFrame(null, 0.0, 0.0);
+                };
                 mapCanvas.PreviewEnded += objectRenderer.EndPreview;
                 mapCanvas.MovePreviewed += (items, offsetX, offsetY, offsetHeight) => PreviewJunctionMarkers(item => new[]
                 {
@@ -1100,10 +1119,17 @@ namespace OmsiMapEditor.UI
             var placeAsset = Argument("-place", 1);
             if (placeAsset != null)
             {
+                // Objects drawn first, so the preview can snap onto their attachment points.
+                var objectsStarted = Time.realtimeSinceStartup;
+                while (objectRenderer != null && objectRenderer.IsLoading && Time.realtimeSinceStartup - objectsStarted < 300f)
+                    yield return null;
+                for (var frame = 0; frame < 3; frame++)
+                    yield return null;
                 StartPlacement(placeAsset);
                 mapCanvas?.PointPlacementAtCenter();
                 if (Array.IndexOf(args, "-placeCommit") >= 0)
                     mapCanvas?.ClickPlacement();
+                Debug.Log("Place: " + statusLabel?.text);
             }
             var testProfile = Argument("-testJunction", 1);
             if (testProfile != null)
@@ -4030,6 +4056,15 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (step.AttachedChange != null)
+            {
+                if (undo)
+                    session.Undo(currentSummary, step.AttachedChange);
+                else
+                    session.Redo(currentSummary, step.AttachedChange);
+                return;
+            }
+
             if (step.AttachmentChange != null)
             {
                 if (undo)
@@ -4148,6 +4183,9 @@ namespace OmsiMapEditor.UI
                 return step.Description;
             if (step.TileChange != null)
                 return (step.TileChange.Added ? "the new tile " : "the deletion of tile ") + step.TileChange.X + ", " + step.TileChange.Y;
+            if (step.AttachedChange != null)
+                return step.AttachedChange.Added.Count > 0 ? "the attached " + Path.GetFileNameWithoutExtension(step.AttachedChange.Added[0].Value.AssetPath)
+                    : "taking off " + Path.GetFileNameWithoutExtension(step.AttachedChange.Removed[0].Value.AssetPath);
             if (step.AttachmentChange != null)
                 return step.AttachmentChange.Added.Count > 0 && step.AttachmentChange.Removed.Count > 0 ? "the change of a row of objects" :
                     step.AttachmentChange.Added.Count > 0 ? "the new row of objects" : "the deletion of a row of objects";
@@ -4425,6 +4463,11 @@ namespace OmsiMapEditor.UI
                 StopPlacement();
                 return;
             }
+            if (placement.Snapped && placementAttach != null)
+            {
+                AttachChosenObject(placement.KeepPlacing);
+                return;
+            }
             if (placement.Snapped && placementPlan != null)
             {
                 InsertChosenJunction(placement);
@@ -4478,11 +4521,12 @@ namespace OmsiMapEditor.UI
         private PlacementSnap SnapPlacement(double worldX, double worldY)
         {
             placementPlan = null;
+            placementAttach = null;
             if (placementAsset == null || !CanEdit || currentSummary == null)
                 return null;
             var catalog = Junctions();
             if (catalog == null || catalog.Helpers(placementAsset).Count < 2)
-                return null;
+                return SnapToAttachPoint(worldX, worldY);
             var point = OmsiSplinePoint.Nearest(currentSummary, worldX, worldY, JunctionSnapMeters);
             var plan = point == null ? null
                 : OmsiJunctionInsertion.Plan(currentSummary, catalog, placementAsset, point.Tile, point.Spline, point.Distance, worldX, worldY);
@@ -4494,6 +4538,80 @@ namespace OmsiMapEditor.UI
             placementPlan = plan;
             ShowSnapMessage(plan.Problem ?? "Click to insert the junction into the road; its other arms point to the side of the pointer. Alt places it freely.");
             return new PlacementSnap { WorldX = plan.Position.X, WorldY = plan.Position.Y, HeadingDegrees = plan.HeadingDegrees, Height = plan.Height };
+        }
+
+        /// <summary>
+        /// Snaps an object being placed onto the free attachment point of a placed object nearest to the pointer, such as
+        /// the end of a mast's arm; null places it freely.
+        /// </summary>
+        private PlacementSnap SnapToAttachPoint(double worldX, double worldY)
+        {
+            var reach = Math.Max(AttachSnapMeters, AttachSnapPixels * mapCanvas.MetersPerPixel);
+            if (objectRenderer == null || !objectRenderer.TryFindAttachPoint(worldX, worldY, reach, out var spot) || !spot.Tile.IsAvailable)
+            {
+                ShowSnapMessage(null);
+                return null;
+            }
+            placementAttach = spot;
+            ShowSnapMessage("Click to hang it on point " + (spot.PointIndex + 1) + " of #" + spot.ParentId +
+                            (spot.ParentAsset != null ? " (" + Path.GetFileNameWithoutExtension(spot.ParentAsset) + ")" : string.Empty) +
+                            "; R turns it on the point, Alt places it freely.");
+            return new PlacementSnap
+            {
+                WorldX = spot.WorldX, WorldY = spot.WorldY, HeadingDegrees = (spot.HeadingDegrees + mapCanvas.PlacementHeading) % 360.0, Height = spot.Height
+            };
+        }
+
+        /// <summary>Hangs the object being placed on the attachment point it snapped onto, as one undo step.</summary>
+        private void AttachChosenObject(bool keepPlacing)
+        {
+            var spot = placementAttach;
+            OmsiAttachedObjectChange change;
+            try
+            {
+                change = session.AttachObject(currentSummary, spot.Tile, spot.ParentId, spot.PointIndex, placementAsset, mapCanvas.PlacementHeading);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("Could not attach the object: " + exception.Message);
+                return;
+            }
+            var assetPath = placementAsset;
+            placementAttach = null;
+            if (!keepPlacing)
+                StopPlacement();
+            PushHistory(new ObjectEditStep { AttachedChange = change });
+            RefreshAfterChange(null);
+            SetStatus("Hung " + Path.GetFileNameWithoutExtension(assetPath) + " (#" + change.Added[0].Value.Id + ") on point " + (spot.PointIndex + 1) + " of #" + spot.ParentId +
+                      ". Ctrl+Z takes it back.");
+        }
+
+        /// <summary>Takes an attached object off its parent, with what hangs on it, as one undo step.</summary>
+        private void DeleteAttachedObject(OmsiTileSummary tile, OmsiAttachedObjectRecord record)
+        {
+            if (!CanEdit)
+                return;
+            OmsiAttachedObjectDeletionResult result;
+            try
+            {
+                result = session.DeleteAttachedObject(currentSummary, tile, record);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+            {
+                Debug.LogException(exception);
+                SetStatus("The attached object could not be deleted: " + exception.Message);
+                return;
+            }
+            if (!result.Succeeded)
+            {
+                SetStatus("The attached object stays: " + DescribeReferences(result.Blockers) + " still name it.");
+                return;
+            }
+            PushHistory(new ObjectEditStep { AttachedChange = result.Change });
+            RefreshAfterChange(null);
+            SetStatus("Took " + Path.GetFileNameWithoutExtension(record.AssetPath) + " (#" + record.Id + ") off" +
+                      (result.Change.Removed.Count > 1 ? " with " + (result.Change.Removed.Count - 1) + " object(s) hanging on it" : string.Empty) + ". Ctrl+Z takes it back.");
         }
 
         private void ShowSnapMessage(string message)
@@ -5803,6 +5921,64 @@ namespace OmsiMapEditor.UI
             container.Add(editor);
         }
 
+        /// <summary>
+        /// The objects hanging on the selected object, directly or through another, by attachment point; each can be taken
+        /// off. New ones are hung on by placing an object on a free point.
+        /// </summary>
+        private void AddAttachedObjects(VisualElement editor, OmsiObjectRecord item, bool canEdit)
+        {
+            var tile = TileHolding(new MapSelectionItem { Tile = selectedTile, Record = item }) ?? selectedTile;
+            var hanging = new List<KeyValuePair<int, OmsiAttachedObjectRecord>>();
+            void Collect(int parentId, int depth)
+            {
+                foreach (var attached in tile.AttachedObjects)
+                    if (attached.ParentId == parentId && depth < 8)
+                    {
+                        hanging.Add(new KeyValuePair<int, OmsiAttachedObjectRecord>(depth, attached));
+                        Collect(attached.Id, depth + 1);
+                    }
+            }
+            Collect(item.Id, 0);
+            if (hanging.Count == 0)
+                return;
+            var heading = new Label("ATTACHED OBJECTS");
+            heading.AddToClassList("inspector-section-heading");
+            editor.Add(heading);
+            foreach (var pair in hanging)
+            {
+                var attached = pair.Value;
+                var row = new VisualElement();
+                row.AddToClassList("inspector-attached-row");
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginLeft = 12 * pair.Key;
+                var label = new Label("Point " + (attached.AttachPointIndex + 1) + ": #" + attached.Id + "  " + Path.GetFileNameWithoutExtension(attached.AssetPath))
+                {
+                    tooltip = attached.AssetPath
+                };
+                label.AddToClassList("inspector-edit-name");
+                label.style.flexGrow = 1f;
+                label.style.flexShrink = 1f;
+                row.Add(label);
+                if (canEdit)
+                {
+                    var captured = attached;
+                    var off = new Button(() => DeleteAttachedObject(tile, captured)) { text = "Delete", tooltip = "Takes this object off, with what hangs on it" };
+                    off.AddToClassList("map-control-button");
+                    off.AddToClassList("inspector-edit-delete");
+                    row.Add(off);
+                }
+                editor.Add(row);
+            }
+            if (canEdit)
+            {
+                var hint = new Label("Place an object on a free point to hang it there; deleting the object takes these with it.");
+                hint.AddToClassList("muted");
+                hint.AddToClassList("inspector-edit-hint");
+                editor.Add(hint);
+            }
+        }
+
         /// <summary>Position and orientation fields for the selected object; read-only without a project.</summary>
         private void AddObjectEditor(VisualElement container, OmsiObjectRecord item)
         {
@@ -5854,6 +6030,7 @@ namespace OmsiMapEditor.UI
                 hint.AddToClassList("inspector-edit-hint");
                 editor.Add(hint);
             }
+            AddAttachedObjects(editor, item, canEdit);
 
             container.Add(editor);
         }

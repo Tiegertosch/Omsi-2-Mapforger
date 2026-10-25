@@ -422,3 +422,18 @@ Eine Reihe wird als ein Datensatz je Kachel geschrieben, in der ihre Objekte ste
 - Die Abgleiche in Grundorf, Stadtückheim und Berlin-Spandau bestätigen die Bedeutung des Felds.
 
 **Offen:** Kacheln löschen führt Kettenabstände und Reihen benachbarter Kacheln noch nicht nach. Reihen, die mit früheren Versionen über eine Kachelgrenze gelegt wurden, bleiben auf den falschen Wert gerechnet. „Store offsets“ hält sie dort, wo openOMSI sie zeigt; solche Reihen löscht man am besten und legt sie neu.
+
+## ADR 039: Angehängte Objekte beim Platzieren einrasten
+
+**Status:** Angenommen, 25. Oktober 2026; Bedienung nach Wahl des Nutzers („Beim Platzieren einrasten“), vom Nutzer im Editor bestätigt.
+
+**Entscheidung:** Ein Objekt aus der Bibliothek wird platziert wie bisher. Kommt die Vorschau einem freien Anhängepunkt (`[new_attachment]`) eines Objekts oder angehängten Objekts der Karte nahe (16 Pixel, mindestens 1 m, von oben gesehen), rastet sie dort ein und steht in der Lage des Punkts; R dreht sie am Punkt, Alt platziert frei. Ein Klick schreibt ein `[attachObj]` ans Ende der Kachel des Elternobjekts, also hinter das Elternobjekt (TileRecordInventory), mit neuer ID, Instanz 0, Punktindex und der Drehung gegen den Punkt (`OmsiTileEditing.AppendAttachedObject`, `OmsiMapSession.AttachObject`). Frei ist ein Punkt, an dem noch kein angehängtes Objekt hängt. Kreuzungen rasten weiter an Straßen ein, nicht an Punkten.
+
+Der Inspector des gewählten Objekts listet unter „Attached objects“ alles, was daran hängt, auch über mehrere Stufen, je mit „Delete“ (`DeleteAttachedObject`, nimmt auch ab, was daran hängt). Ein Objekt zu löschen, nimmt seine angehängten Objekte mit (`OmsiTileEditing.RemoveWithFamily`); bisher verweigerte der Editor das, weil die Kinder auf ihr Elternobjekt verweisen. Andere Verweise, etwa aus Fahrplänen, Chrono-Dateien oder Einstiegspunkten, verhindern das Löschen weiter. Alles ist rückgängig zu machen (`OmsiAttachedObjectChange`, Dateistände).
+
+**Grund:**
+- Der Nutzer wählte das Einrasten: Es braucht keinen eigenen Arbeitsschritt, und man sieht vorher, wo das Objekt hängt.
+- Die Lage der Punkte rechnet der Renderer ohnehin für das Zeichnen; er merkt sich dafür die Lage jedes Objekts mit Anhängepunkten.
+- Ohne Löschen samt Kindern ließe sich ein Mast mit angehängtem Objekt gar nicht mehr löschen.
+
+**Offen:** Reihen entlang von Straßen als Eltern (openOMSI hängt `[attachObj]` an das erste Objekt einer Reihe) und Kacheln vor Version 12.

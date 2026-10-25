@@ -91,6 +91,81 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// Appends a new [attachObj] at the end of the tile, after its parent as OMSI needs it, so no existing index
+        /// changes; it hangs on attachment point <paramref name="pointIndex"/> of the parent, turned by the heading. The ID
+        /// comes from the allocator; apply the allocator to global.cfg before saving it.
+        /// </summary>
+        public static OmsiAttachedObjectView AppendAttachedObject(OmsiRecordFile tile, OmsiIdAllocator ids, string assetPath, int parentId, int pointIndex,
+            double headingDegrees)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (ids == null)
+                throw new ArgumentNullException(nameof(ids));
+            if (tile.Version < 12)
+                throw new InvalidOperationException("Objects can only be attached in tiles of version 12 or later.");
+            if (string.IsNullOrWhiteSpace(assetPath))
+                throw new ArgumentException("An object file path is required.", nameof(assetPath));
+            if (pointIndex < 0)
+                throw new ArgumentOutOfRangeException(nameof(pointIndex));
+            var parentFound = false;
+            foreach (var record in tile.Records)
+                if (OmsiTileRecords.Create(tile, record) is OmsiTileRecordView view && TryGetId(view, out var id) && id == parentId &&
+                    (view is OmsiObjectView || view is OmsiAttachedObjectView))
+                    parentFound = true;
+            if (!parentFound)
+                throw new InvalidOperationException("Object " + parentId + " is not in this tile.");
+
+            var fields = new List<string>
+            {
+                "0", assetPath.Trim(), OmsiNumberFormat.Format(ids.Allocate()), OmsiNumberFormat.Format(parentId), "0",
+                pointIndex.ToString(CultureInfo.InvariantCulture), OmsiNumberFormat.Format(headingDegrees), "0", "0", "0"
+            };
+            var created = tile.CreateRecord("attachObj", fields);
+            tile.InsertRecord(tile.Records.Count, created);
+            return (OmsiAttachedObjectView)OmsiTileRecords.Create(tile, created);
+        }
+
+        /// <summary>
+        /// Removes an object or attached object together with the attached objects hanging on it, directly or through
+        /// another, each with its rules and variables. Their references to each other in this tile do not count; any other
+        /// reference to one of them keeps all, and is returned instead.
+        /// </summary>
+        /// <param name="tilePath">The tile's relative path, to tell references from within it.</param>
+        public static OmsiRemovalResult RemoveWithFamily(OmsiRecordFile tile, OmsiTileRecordView element, string tilePath, int tileIndex,
+            OmsiRecordFile globalConfig, OmsiReferenceIndex references)
+        {
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (element == null)
+                throw new ArgumentNullException(nameof(element));
+            if (globalConfig == null)
+                throw new ArgumentNullException(nameof(globalConfig));
+            if (references == null)
+                throw new ArgumentNullException(nameof(references));
+            var family = Family(tile, element);
+            var total = new OmsiRemovalResult();
+            foreach (var member in family)
+                if (TryGetId(member, out var id))
+                    foreach (var reference in references.To(id))
+                        if (reference.Kind != "attached object parent" || !string.Equals(OmsiRelativePath.Normalize(reference.File), tilePath, StringComparison.OrdinalIgnoreCase))
+                            total.Blockers.Add(reference);
+            if (total.Blockers.Count > 0)
+                return total;
+            // Children first, so every parent is still there while its children go.
+            for (var index = family.Count - 1; index >= 0; index--)
+            {
+                var result = Detach(tile, family[index], tileIndex, globalConfig, new List<OmsiReference>(), null);
+                if (!result.Removed)
+                    return result;
+                total.RemovedRecordCount += result.RemovedRecordCount;
+                total.ShiftedEntryPointIndices += result.ShiftedEntryPointIndices;
+            }
+            total.Removed = true;
+            return total;
+        }
+
+        /// <summary>
         /// Appends a new [splineAttachement] at the end of the tile, so no existing index changes. The ID comes from the
         /// allocator; apply the allocator to global.cfg before saving it.
         /// </summary>
@@ -164,13 +239,15 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>The object and every attached object hanging on it, directly or through another, in file order.</summary>
-        public static List<OmsiTileRecordView> Family(OmsiRecordFile tile, OmsiObjectView item)
+        public static List<OmsiTileRecordView> Family(OmsiRecordFile tile, OmsiTileRecordView item)
         {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
-            var ids = new HashSet<int> { item.Id };
+            if (!TryGetId(item, out var id))
+                throw new ArgumentException("Only objects and attached objects carry others.", nameof(item));
+            var ids = new HashSet<int> { id };
             var family = new List<OmsiTileRecordView> { item };
             // Attached objects stand after their parent in the same tile (TileRecordInventory).
             for (var position = tile.Records.IndexOf(item.Record) + 1; position > 0 && position < tile.Records.Count; position++)

@@ -123,7 +123,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Vorhandene Reihen bearbeiten (ADR 037, zweite Ergänzung): Ein Klick wählt die ganze Reihe samt ihren Teilen auf anderen Kacheln, die Felder zeigen ihre Werte (Abstand, Abstand von der Mitte, Höhe, Drehung), Enter ändert sie, ein Objekt aus der Bibliothek ersetzt ihre Objekte, R dreht sie; die Reihe wird über dieselbe Strecke neu geplant, ihre Datensätze behalten ihre IDs; Reihen mit Wiederholungen bekommen die Werte in jedem Datensatz
 - [x] Kettenabstände pflegen und Reihen wie openOMSI auslegen (ADR 038): Feld 17 der Splines nach jeder Spline-Änderung, Reihen ab dem gespeicherten Kettenabstand und nur in der eigenen Kachel, Thema „Chain offsets“ der Kartenprüfung mit Reparatur
 - Kacheln löschen: Kettenabstände und Reihen benachbarter Kacheln nachführen
-- Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen
+- [x] Angehängte Objekte (`[attachObj]`) an Anhängepunkten anlegen (ADR 039): beim Platzieren an freien Punkten einrasten, im Inspector auflisten und abnehmen, Löschen nimmt sie mit
+- Angehängte Objekte an Reihen entlang von Straßen anlegen
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht
 - [x] Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern: Bereich „Chrono“ im Projekt-Panel mit Datum, Variantenliste und „Base map“, Überlagerung im Hintergrund, Linienwege aus dem Fahrplan des Datums, Ansicht schreibgeschützt (ADR 020)

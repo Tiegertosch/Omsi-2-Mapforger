@@ -71,6 +71,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Attached objects a transfer took along into the target tile.</summary>
         internal List<OmsiAttachedObjectRecord> MovedAttachedObjects { get; } = new List<OmsiAttachedObjectRecord>();
 
+        /// <summary>Attached objects a deletion took off with the object.</summary>
+        internal List<OmsiAttachedObjectRecord> RemovedAttachedObjects { get; } = new List<OmsiAttachedObjectRecord>();
+
+        /// <summary>How many attached objects a deletion took off with the object.</summary>
+        public int RemovedAttachedObjectCount => RemovedAttachedObjects.Count;
+
         /// <summary>The object file before and after a replacement; null for other changes.</summary>
         public string AssetBefore { get; internal set; }
 
@@ -302,9 +308,9 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Deletes an object with the rules and variables that follow it and keeps the entry point indices of
-        /// global.cfg valid. Nothing changes while tiles, chrono patches, entry points or timetables still refer to the
-        /// object; those references are returned instead.
+        /// Deletes an object with the rules and variables that follow it, and the attached objects hanging on it, and keeps
+        /// the entry point indices of global.cfg valid. Nothing changes while tiles, chrono patches, entry points or
+        /// timetables still refer to one of them; those references are returned instead.
         /// </summary>
         /// <param name="references">An index of the current files, shared by several deletions; null builds one.</param>
         public OmsiObjectChangeResult DeleteObject(OmsiMapSummary summary, OmsiTileSummary tile, OmsiObjectRecord record,
@@ -324,14 +330,22 @@ namespace OmsiMapEditor.OMSI
             var tileFile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
             var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
             var view = FindObject(tileFile, record.Id, tile.FileName);
+            var family = OmsiTileEditing.Family(tileFile, view);
 
             references = references ?? BuildReferenceIndex();
-            var result = OmsiTileEditing.Remove(tileFile, view, TileIndexOf(config, tilePath), config, references);
+            var result = OmsiTileEditing.RemoveWithFamily(tileFile, view, tilePath, TileIndexOf(config, tilePath), config, references);
             if (!result.Removed)
                 return new OmsiObjectChangeResult(null, result.Blockers);
 
             var listIndex = tile.Objects.IndexOf(record);
             var change = new OmsiObjectChange(OmsiObjectChangeKind.Deletion, tile, record, listIndex < 0 ? tile.Objects.Count : listIndex);
+            foreach (var member in family)
+                if (member is OmsiAttachedObjectView attachedView)
+                {
+                    var attached = tile.AttachedObjects.Find(item => item.Id == attachedView.Id);
+                    if (attached != null)
+                        change.RemovedAttachedObjects.Add(attached);
+                }
             AddFile(change, tilePath, tileBefore, tileFile.ToBytes());
             if (result.ShiftedEntryPointIndices > 0)
                 AddFile(change, GlobalConfigFileName, configBefore, config.ToBytes());
@@ -575,10 +589,25 @@ namespace OmsiMapEditor.OMSI
             change.Tile.ObjectCount++;
             if (summary != null)
                 summary.ObjectCount++;
+            foreach (var attached in change.RemovedAttachedObjects)
+                if (!change.Tile.AttachedObjects.Contains(attached))
+                {
+                    change.Tile.AttachedObjects.Add(attached);
+                    change.Tile.AttachmentCount++;
+                    if (summary != null)
+                        summary.AttachmentCount++;
+                }
         }
 
         private static void RemoveFromSummary(OmsiMapSummary summary, OmsiObjectChange change)
         {
+            foreach (var attached in change.RemovedAttachedObjects)
+                if (change.Tile.AttachedObjects.Remove(attached))
+                {
+                    change.Tile.AttachmentCount--;
+                    if (summary != null)
+                        summary.AttachmentCount--;
+                }
             if (!change.Tile.Objects.Remove(change.Record))
                 return;
             change.Tile.ObjectCount--;

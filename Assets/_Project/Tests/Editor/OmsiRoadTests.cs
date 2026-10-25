@@ -970,6 +970,50 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var mast = session.PlaceObject(summary, tile, @"Sceneryobjects\mast.sco", 100, 100, 0, 30).Record;
+            var before = session.Workspace.ReadAllBytes("tile_0_0.map");
+
+            // A lamp head on point 2 of the mast, and a sign on point 1 of the lamp head.
+            var lamp = session.AttachObject(summary, tile, mast.Id, 1, @"Sceneryobjects\lamp.sco", 0);
+            var lampRecord = lamp.Added.Single().Value;
+            var sign = session.AttachObject(summary, tile, lampRecord.Id, 0, @"Sceneryobjects\sign.sco", 90);
+            var reread = session.Read().Tiles[0];
+            Assert.AreEqual(2, reread.AttachedObjects.Count);
+            var readLamp = reread.AttachedObjects.Single(item => item.Id == lampRecord.Id);
+            Assert.AreEqual(mast.Id, readLamp.ParentId);
+            Assert.AreEqual(1, readLamp.AttachPointIndex);
+            Assert.AreEqual(90.0, reread.AttachedObjects.Single(item => item.ParentId == lampRecord.Id).HeadingDegrees, 1e-9);
+            Assert.Throws<InvalidOperationException>(() => session.AttachObject(summary, tile, mast.Id, 1, @"Sceneryobjects\lamp.sco", 0));
+
+            // Deleting the mast takes both off with it; taking that back brings all three again.
+            var deletion = session.DeleteObject(summary, tile, mast);
+            Assert.IsTrue(deletion.Succeeded);
+            Assert.AreEqual(2, deletion.Change.RemovedAttachedObjectCount);
+            Assert.AreEqual(0, tile.AttachedObjects.Count);
+            Assert.AreEqual(0, session.Read().Tiles[0].AttachedObjects.Count);
+            session.Undo(summary, deletion.Change);
+            Assert.AreEqual(2, tile.AttachedObjects.Count);
+            Assert.AreEqual(2, session.Read().Tiles[0].AttachedObjects.Count);
+
+            // Taking the lamp head off takes the sign with it, and only them.
+            var off = session.DeleteAttachedObject(summary, tile, tile.AttachedObjects.Single(item => item.Id == lampRecord.Id));
+            Assert.IsTrue(off.Succeeded);
+            Assert.AreEqual(2, off.Change.Removed.Count);
+            Assert.AreEqual(1, session.Read().Tiles[0].Objects.Count(item => item.Id == mast.Id));
+            Assert.AreEqual(0, session.Read().Tiles[0].AttachedObjects.Count);
+            session.Undo(summary, off.Change);
+            session.Undo(summary, sign);
+            session.Undo(summary, lamp);
+            CollectionAssert.AreEqual(before, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            Assert.AreEqual(0, tile.AttachedObjects.Count);
+        }
+
+        [Test]
         public void SplinesBuiltAcrossATileBorderStoreHowFarAlongTheirChainTheyBegin()
         {
             var session = OpenProject();

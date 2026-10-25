@@ -38,6 +38,41 @@ namespace OmsiMapEditor.OMSI
         public bool Succeeded => Change != null;
     }
 
+    /// <summary>
+    /// Objects hung on attachment points or taken off them ([attachObj]): the bytes of every file before and after, and
+    /// the records added or removed, so the step can be taken back and done again exactly.
+    /// </summary>
+    public sealed class OmsiAttachedObjectChange
+    {
+        internal OmsiAttachedObjectChange()
+        {
+        }
+
+        public bool IsApplied { get; internal set; } = true;
+
+        /// <summary>The attached objects the change added, with their tiles.</summary>
+        public List<KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>> Added { get; } = new List<KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>>();
+
+        /// <summary>The attached objects the change removed, with their tiles.</summary>
+        public List<KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>> Removed { get; } = new List<KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>>();
+
+        internal List<OmsiObjectChange.FileState> Files { get; } = new List<OmsiObjectChange.FileState>();
+    }
+
+    /// <summary>What deleting an attached object did, or the references that keep it.</summary>
+    public sealed class OmsiAttachedObjectDeletionResult
+    {
+        internal OmsiAttachedObjectDeletionResult(OmsiAttachedObjectChange change, IReadOnlyList<OmsiReference> blockers)
+        {
+            Change = change;
+            Blockers = blockers;
+        }
+
+        public OmsiAttachedObjectChange Change { get; }
+        public IReadOnlyList<OmsiReference> Blockers { get; }
+        public bool Succeeded => Change != null;
+    }
+
     /// <summary>What changing a row did, or why it stayed as it was: references to records it would remove, or a problem of the plan.</summary>
     public sealed class OmsiAttachmentEditResult
     {
@@ -56,6 +91,137 @@ namespace OmsiMapEditor.OMSI
 
     public sealed partial class OmsiMapSession
     {
+        /// <summary>
+        /// Hangs an object on attachment point <paramref name="pointIndex"/> of an object or attached object of the tile:
+        /// an [attachObj] at the end of the tile with a new map-wide ID, turned by the heading against the point, and
+        /// [NextIDCode] raised in global.cfg.
+        /// </summary>
+        public OmsiAttachedObjectChange AttachObject(OmsiMapSummary summary, OmsiTileSummary tile, int parentId, int pointIndex, string assetPath,
+            double headingDegrees)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (pointIndex < 0)
+                throw new ArgumentOutOfRangeException(nameof(pointIndex));
+            if (tile.AttachedObjects.Exists(item => item.ParentId == parentId && item.AttachPointIndex == pointIndex))
+                throw new InvalidOperationException("Point " + (pointIndex + 1) + " of object " + parentId + " already carries an object.");
+
+            var workspace = RequireWorkspace();
+            ids = ids ?? OmsiIdAllocator.ForMap(workspace, GlobalConfigFileName);
+            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var tileBefore = workspace.ReadAllBytes(tilePath);
+            var tileFile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
+            var view = OmsiTileEditing.AppendAttachedObject(tileFile, ids, assetPath, parentId, pointIndex, headingDegrees);
+            var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+            var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
+            ids.ApplyTo(config);
+
+            var change = new OmsiAttachedObjectChange();
+            change.Added.Add(new KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>(tile, new OmsiAttachedObjectRecord
+            {
+                AssetPath = view.AssetPath, Id = view.Id, ParentId = parentId, AttachPointIndex = pointIndex, HeadingDegrees = view.HeadingDegrees
+            }));
+            change.Files.Add(new OmsiObjectChange.FileState { RelativePath = tilePath, Before = tileBefore, After = tileFile.ToBytes() });
+            change.Files.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });
+            ApplyFiles(change.Files, false);
+            ApplyAttachedObjects(summary, change, true);
+            summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, view.Id);
+            summary.NextIdCode = ids.NextFreeId;
+            return change;
+        }
+
+        /// <summary>
+        /// Takes an attached object off its parent, with the attached objects hanging on it in turn. Nothing changes while
+        /// timetables, chrono changes or other records name one of them; those references are returned.
+        /// </summary>
+        public OmsiAttachedObjectDeletionResult DeleteAttachedObject(OmsiMapSummary summary, OmsiTileSummary tile, OmsiAttachedObjectRecord record)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+
+            var workspace = RequireWorkspace();
+            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var tileBefore = workspace.ReadAllBytes(tilePath);
+            var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+            var tileFile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
+            var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
+            OmsiAttachedObjectView view = null;
+            foreach (var candidate in OmsiTileRecords.Of<OmsiAttachedObjectView>(tileFile))
+                if (candidate.Id == record.Id)
+                    view = candidate;
+            if (view == null)
+                throw new InvalidOperationException("Attached object " + record.Id + " was not found in " + tile.FileName + ".");
+
+            var family = OmsiTileEditing.Family(tileFile, view);
+            var result = OmsiTileEditing.RemoveWithFamily(tileFile, view, tilePath, TileIndexOf(config, tilePath), config, BuildReferenceIndex());
+            if (!result.Removed)
+                return new OmsiAttachedObjectDeletionResult(null, result.Blockers);
+            var change = new OmsiAttachedObjectChange();
+            foreach (var member in family)
+            {
+                var id = ((OmsiAttachedObjectView)member).Id;
+                var removed = tile.AttachedObjects.Find(item => item.Id == id);
+                if (removed != null)
+                    change.Removed.Add(new KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>(tile, removed));
+            }
+            change.Files.Add(new OmsiObjectChange.FileState { RelativePath = tilePath, Before = tileBefore, After = tileFile.ToBytes() });
+            if (result.ShiftedEntryPointIndices > 0)
+                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });
+            ApplyFiles(change.Files, false);
+            ApplyAttachedObjects(summary, change, true);
+            return new OmsiAttachedObjectDeletionResult(change, new OmsiReference[0]);
+        }
+
+        /// <summary>Takes back objects hung on or taken off: writes the files as they were, unless one was changed since.</summary>
+        public void Undo(OmsiMapSummary summary, OmsiAttachedObjectChange change)
+        {
+            if (change == null)
+                throw new ArgumentNullException(nameof(change));
+            if (!change.IsApplied)
+                throw new InvalidOperationException("The change has already been undone.");
+            ApplyFiles(change.Files, true);
+            ApplyAttachedObjects(summary, change, false);
+            change.IsApplied = false;
+        }
+
+        /// <summary>Applies an undone change of attached objects again.</summary>
+        public void Redo(OmsiMapSummary summary, OmsiAttachedObjectChange change)
+        {
+            if (change == null)
+                throw new ArgumentNullException(nameof(change));
+            if (change.IsApplied)
+                throw new InvalidOperationException("The change is already applied.");
+            ApplyFiles(change.Files, false);
+            ApplyAttachedObjects(summary, change, true);
+            change.IsApplied = true;
+        }
+
+        /// <summary>Adds and removes the attached objects of a change in the summary, or the other way round when taking it back.</summary>
+        private static void ApplyAttachedObjects(OmsiMapSummary summary, OmsiAttachedObjectChange change, bool forward)
+        {
+            foreach (var pair in forward ? change.Added : change.Removed)
+                if (!pair.Key.AttachedObjects.Contains(pair.Value))
+                {
+                    pair.Key.AttachedObjects.Add(pair.Value);
+                    pair.Key.AttachmentCount++;
+                    if (summary != null)
+                        summary.AttachmentCount++;
+                }
+            foreach (var pair in forward ? change.Removed : change.Added)
+                if (pair.Key.AttachedObjects.Remove(pair.Value))
+                {
+                    pair.Key.AttachmentCount--;
+                    if (summary != null)
+                        summary.AttachmentCount--;
+                }
+        }
+
         /// <summary>
         /// Changes a row of the map (<see cref="OmsiAttachmentRows.RowOf"/>) to new values: plans it again over the same
         /// stretch of road and writes the parts into its records tile by tile in order, keeping their IDs; further parts go

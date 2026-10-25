@@ -8,6 +8,24 @@ using UnityEngine.Rendering;
 
 namespace OmsiMapEditor.World
 {
+    /// <summary>A free attachment point of an object on the map: its parent, which point, and its frame and place in world metres.</summary>
+    public sealed class MapAttachSpot
+    {
+        public OmsiTileSummary Tile;
+        public int ParentId;
+        public string ParentAsset;
+        public int PointIndex;
+        public double WorldX;
+        public double WorldY;
+        public double Height;
+
+        /// <summary>The direction the point faces, clockwise from north.</summary>
+        public double HeadingDegrees;
+
+        /// <summary>The point's frame relative to the drawing origin.</summary>
+        public Matrix4x4 Frame;
+    }
+
     /// <summary>
     /// Draws the scenery objects of a map with their models and textures, seen from above by the ground camera. Every
     /// object kind becomes one mesh with a material per texture; its placements are drawn with GPU instancing. Objects
@@ -116,6 +134,17 @@ namespace OmsiMapEditor.World
         private double previewHeading;
         private double? previewHeight;
         private readonly Matrix4x4[] previewInstance = new Matrix4x4[1];
+
+        // Where the object about to be placed hangs when it snapped onto an attachment point, and at which world place;
+        // used while the preview stands there.
+        private Matrix4x4? previewFrame;
+        private double previewFrameX;
+        private double previewFrameY;
+
+        // Every placed object that has attachment points, with its frame, for snapping onto free points.
+        private readonly List<KeyValuePair<KeyValuePair<OmsiTileSummary, int>, KeyValuePair<Matrix4x4, OmsiObjectModel>>> attachParents =
+            new List<KeyValuePair<KeyValuePair<OmsiTileSummary, int>, KeyValuePair<Matrix4x4, OmsiObjectModel>>>();
+        private readonly Dictionary<int, string> attachParentAssets = new Dictionary<int, string>();
 
         // A row about to be laid along a road, drawn as extra instances where its objects would stand.
         private string rowPreviewAsset;
@@ -324,6 +353,8 @@ namespace OmsiMapEditor.World
                 var ground = previewHeight ?? GroundAt(position.x + originX, position.y + originY);
                 var frame = Matrix4x4.TRS(new Vector3(position.x, (float)ground, position.y),
                     Orientation(previewHeading, 0.0, 0.0), Vector3.one);
+                if (previewFrame.HasValue && Math.Abs(position.x + originX - previewFrameX) < 0.01 && Math.Abs(position.y + originY - previewFrameY) < 0.01)
+                    frame = previewFrame.Value;
                 var crossed = ThreeDimensional && preview.CrossMaterial != null;
                 previewInstance[0] = crossed ? CrossMatrix(preview.Model, frame) : InstanceMatrix(preview.Model, frame);
                 DrawKind(preview, previewInstance, previewInstance, 1);
@@ -826,6 +857,8 @@ namespace OmsiMapEditor.World
                 kind.InstanceCount = 0;
             }
             instanceOf.Clear();
+            attachParents.Clear();
+            attachParentAssets.Clear();
             var frames = new Dictionary<int, KeyValuePair<Matrix4x4, OmsiObjectModel>>();
             foreach (var tile in summary.Tiles)
             {
@@ -837,6 +870,7 @@ namespace OmsiMapEditor.World
                     var frame = PlacementFrame(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees,
                         item.PitchDegrees, item.BankDegrees);
                     frames[item.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
+                    RememberAttachParent(tile, item.Id, item.AssetPath, frames[item.Id]);
                     instanceOf[item] = new Placement { Kind = kind, Index = kind.InstanceCount, Tile = tile, Frame = frame };
                     SetFromFrame(kind, kind.InstanceCount++, frame);
                 }
@@ -852,6 +886,7 @@ namespace OmsiMapEditor.World
                     var frame = parent.Key * AttachMatrix(parent.Value.AttachPoints[attached.AttachPointIndex]) *
                                 Matrix4x4.Rotate(Orientation(attached.HeadingDegrees, attached.PitchDegrees, attached.BankDegrees));
                     frames[attached.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
+                    RememberAttachParent(tile, attached.Id, attached.AssetPath, frames[attached.Id]);
                     SetFromFrame(kind, kind.InstanceCount++, frame);
                 }
             }
@@ -864,6 +899,63 @@ namespace OmsiMapEditor.World
                 var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
                 SetFromFrame(kind, kind.InstanceCount++, Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one));
             }
+        }
+
+        private void RememberAttachParent(OmsiTileSummary tile, int id, string assetPath, KeyValuePair<Matrix4x4, OmsiObjectModel> frame)
+        {
+            if (frame.Value.AttachPoints.Count == 0)
+                return;
+            attachParents.Add(new KeyValuePair<KeyValuePair<OmsiTileSummary, int>, KeyValuePair<Matrix4x4, OmsiObjectModel>>(
+                new KeyValuePair<OmsiTileSummary, int>(tile, id), frame));
+            attachParentAssets[id] = assetPath;
+        }
+
+        /// <summary>
+        /// The free attachment point nearest to a world position, seen from above, within the reach: a point of a placed
+        /// object or attached object on which nothing hangs yet. False where there is none.
+        /// </summary>
+        public bool TryFindAttachPoint(double worldX, double worldY, double reachMeters, out MapAttachSpot spot)
+        {
+            spot = null;
+            var best = reachMeters * reachMeters;
+            foreach (var parent in attachParents)
+            {
+                var tile = parent.Key.Key;
+                var id = parent.Key.Value;
+                var points = parent.Value.Value.AttachPoints;
+                for (var index = 0; index < points.Count; index++)
+                {
+                    var pointIndex = index;
+                    if (tile.AttachedObjects.Exists(item => item.ParentId == id && item.AttachPointIndex == pointIndex))
+                        continue;
+                    var frame = parent.Value.Key * AttachMatrix(points[index]);
+                    var position = frame.GetColumn(3);
+                    var dx = position.x + originX - worldX;
+                    var dy = position.z + originY - worldY;
+                    if (dx * dx + dy * dy > best)
+                        continue;
+                    best = dx * dx + dy * dy;
+                    var forward = frame.MultiplyVector(Vector3.forward);
+                    attachParentAssets.TryGetValue(id, out var asset);
+                    spot = new MapAttachSpot
+                    {
+                        Tile = tile, ParentId = id, ParentAsset = asset, PointIndex = index, WorldX = position.x + originX, WorldY = position.z + originY,
+                        Height = position.y, HeadingDegrees = (Math.Atan2(forward.x, forward.z) * 180.0 / Math.PI + 360.0) % 360.0, Frame = frame
+                    };
+                }
+            }
+            return spot != null;
+        }
+
+        /// <summary>
+        /// Draws the object about to be placed in this frame while its preview stands at the world place, as when it
+        /// snapped onto an attachment point; null draws it upright on the terrain again.
+        /// </summary>
+        public void SetPlacementFrame(Matrix4x4? frame, double worldX, double worldY)
+        {
+            previewFrame = frame;
+            previewFrameX = worldX;
+            previewFrameY = worldY;
         }
 
         /// <summary>
