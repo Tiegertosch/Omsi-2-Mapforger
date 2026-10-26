@@ -149,6 +149,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Texture files to copy next to the object, as paths relative to the installation.</summary>
         public List<string> Textures { get; } = new List<string>();
+
+        /// <summary>Files the editor makes for the object, such as the plain textures of road markings, by their path in its folder.</summary>
+        public Dictionary<string, byte[]> Files { get; } = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -213,11 +216,21 @@ namespace OmsiMapEditor.OMSI
         /// connection point at the end of each arm suggesting its profile, and lanes for every way through.
         /// </summary>
         /// <param name="roadTexture">A plain carriageway texture relative to the installation, or null for the first arm's.</param>
-        public static OmsiGeneratedObject Junction(IEnumerable<OmsiJunctionArm> arms, string roadTexture, string friendlyName)
+        /// <param name="markings">Road markings to build in (ADR 044), by the anchors of the arms; null or empty for none.</param>
+        public static OmsiGeneratedObject Junction(IEnumerable<OmsiJunctionArm> arms, string roadTexture, string friendlyName,
+            IList<OmsiMarkingLine> markings = null)
         {
             var layout = OmsiJunctionLayout.Build(arms, roadTexture);
-            var generated = new OmsiGeneratedObject { Model = OmsiXWriter.Write(layout.Meshes) };
+            var meshes = new List<OmsiGeneratedMesh>(layout.Meshes);
+            if (markings != null && markings.Count > 0)
+                OmsiJunctionMarkings.AddMeshes(OmsiJunctionMarkings.Anchors(layout), markings, meshes);
+            var generated = new OmsiGeneratedObject { Model = OmsiXWriter.Write(meshes) };
             generated.Textures.AddRange(layout.Textures.Values);
+            foreach (var mesh in meshes)
+                if (string.Equals(mesh.Texture, OmsiJunctionMarkings.WhiteTexture, StringComparison.OrdinalIgnoreCase))
+                    generated.Files["texture\\" + OmsiJunctionMarkings.WhiteTexture] = OmsiJunctionMarkings.PlainBitmap(240, 240, 235);
+                else if (string.Equals(mesh.Texture, OmsiJunctionMarkings.YellowTexture, StringComparison.OrdinalIgnoreCase))
+                    generated.Files["texture\\" + OmsiJunctionMarkings.YellowTexture] = OmsiJunctionMarkings.PlainBitmap(245, 190, 30);
 
             var sco = new StringBuilder();
             sco.Append("Made by OMSI MapWorks: a junction of ").Append(layout.Arms.Count).Append(" arms.\r\n");
@@ -232,7 +245,10 @@ namespace OmsiMapEditor.OMSI
                 if (arm.Mirrored)
                     sco.Append(" mirrored");
             }
-            sco.Append("\r\n\r\n");
+            sco.Append("\r\n");
+            if (markings != null && markings.Count > 0)
+                sco.Append(OmsiJunctionMarkings.Write(markings)).Append("\r\n");
+            sco.Append("\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");
             Section(sco, "rendertype", "surface");
@@ -302,6 +318,8 @@ namespace OmsiMapEditor.OMSI
                         File.Copy(from, to);
                 }
             }
+            foreach (var file in generated.Files)
+                File.WriteAllBytes(Path.Combine(folder, file.Key.Replace('\\', Path.DirectorySeparatorChar)), file.Value);
             var scoName = folderName + ".sco";
             File.WriteAllBytes(Path.Combine(folder, scoName), OmsiTextFile.Encode(generated.Sco, OmsiTextEncoding.Windows1252));
             return Folder + "\\" + project + "\\" + folderName + "\\" + scoName;

@@ -250,6 +250,12 @@ namespace OmsiMapEditor.UI
         // Dashed construction lines of the road tool, such as the legs to a curve's control point; in map coordinates.
         private readonly List<Vector2[]> roadGuides = new List<Vector2[]>();
 
+        // The anchors of the markings tool (ADR 044) in map coordinates with their heights, the one under the pointer and
+        // the one a line starts from; -1 for none.
+        private readonly List<Vector3> markingAnchors = new List<Vector3>();
+        private int hoveredAnchor = -1;
+        private int pickedAnchor = -1;
+
         private readonly List<JunctionMarker> junctionMarkers = new List<JunctionMarker>();
         private Vector2? roadStart;
         private OmsiSplineRecord selectedSpline;
@@ -522,6 +528,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>When false, splines and junction arms show no handles, as while a chrono variant is edited.</summary>
         public bool AllowSplineEditing { get; set; } = true;
+
+        /// <summary>When false, the road mode shows no circles at free spline ends, as the markings tool needs none.</summary>
+        public bool ShowSplineEnds { get; set; } = true;
 
         /// <summary>
         /// The active tool: dragging an object moves the selection freely with <see cref="EditorTool.Drag"/> and
@@ -802,6 +811,24 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>
+        /// The anchors the markings tool offers, as world points with heights, replacing those drawn before; null clears them.
+        /// <paramref name="hovered"/> and <paramref name="picked"/> are indices into them, or -1.
+        /// </summary>
+        public void SetMarkingAnchors(IList<OmsiMapPoint> points, IList<double> heights, int hovered, int picked)
+        {
+            markingAnchors.Clear();
+            if (points != null)
+                for (var index = 0; index < points.Count; index++)
+                {
+                    var map = WorldToMap(points[index]);
+                    markingAnchors.Add(new Vector3(map.x, heights != null && index < heights.Count ? (float)heights[index] : float.NaN, map.y));
+                }
+            hoveredAnchor = hovered;
+            pickedAnchor = picked;
+            MarkDirtyRepaint();
+        }
+
         /// <summary>Dashed construction lines for the road tool as world polylines, replacing those drawn before; null clears them.</summary>
         public void SetRoadGuides(IEnumerable<OmsiMapPoint[]> lines)
         {
@@ -820,6 +847,7 @@ namespace OmsiMapEditor.UI
         public void ClearRoadPreview()
         {
             roadGuides.Clear();
+            markingAnchors.Clear();
             roadPreview.Clear();
             roadPreviewHeights.Clear();
             roadIssues.Clear();
@@ -1576,7 +1604,7 @@ namespace OmsiMapEditor.UI
         {
             if (!roadMode && roadPreview.Count == 0)
                 return;
-            if (roadMode && metersPerPixel <= FreeEndMetersPerPixel)
+            if (roadMode && ShowSplineEnds && metersPerPixel <= FreeEndMetersPerPixel)
             {
                 painter.strokeColor = splineColor;
                 painter.lineWidth = 1.5f;
@@ -1597,6 +1625,10 @@ namespace OmsiMapEditor.UI
             foreach (var line in roadGuides)
                 guides.Add(new List<Vector2>(Array.ConvertAll(line, MapToScreen)));
             DrawRoadGuides(painter, guides);
+            var anchors = new List<Vector2>();
+            foreach (var anchor in markingAnchors)
+                anchors.Add(MapToScreen(new Vector2(anchor.x, anchor.z)));
+            DrawMarkingAnchors(painter, anchors);
 
             if (roadPreview.Count > 0)
             {
@@ -1681,6 +1713,16 @@ namespace OmsiMapEditor.UI
                     guides.Add(projected);
             }
             DrawRoadGuides(painter, guides);
+            var anchors = new List<Vector2>();
+            foreach (var anchor in markingAnchors)
+            {
+                var ground = new Vector2(anchor.x, anchor.z);
+                // Anchors behind the camera keep their place in the list, so the hovered and picked indices still fit.
+                anchors.Add(camera.TryProject(new Vector3(anchor.x, (float.IsNaN(anchor.y) ? GroundAt(ground) : anchor.y) + lift, anchor.z), out var screen)
+                    ? screen
+                    : new Vector2(float.NaN, float.NaN));
+            }
+            DrawMarkingAnchors(painter, anchors);
 
             for (var pass = 0; pass < 2; pass++)
             {
@@ -1889,6 +1931,30 @@ namespace OmsiMapEditor.UI
                         phase = 0f;
                 }
                 last = point;
+            }
+        }
+
+        /// <summary>
+        /// The anchors of the markings tool as small rings, the one under the pointer larger and the one a line starts from
+        /// filled in the placement colour.
+        /// </summary>
+        private void DrawMarkingAnchors(Painter2D painter, List<Vector2> screen)
+        {
+            if (screen.Count == 0)
+                return;
+            painter.lineWidth = 1.5f;
+            for (var index = 0; index < screen.Count; index++)
+            {
+                if (float.IsNaN(screen[index].x))
+                    continue;
+                var picked = index == pickedAnchor;
+                var hovered = index == hoveredAnchor;
+                painter.fillColor = picked ? placementColor : handleFillColor;
+                painter.strokeColor = picked || hovered ? placementColor : splineColor;
+                painter.BeginPath();
+                AddCircle(painter, screen[index], picked || hovered ? 6f : 4f);
+                painter.Fill();
+                painter.Stroke();
             }
         }
 

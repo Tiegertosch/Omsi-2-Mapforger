@@ -8,7 +8,7 @@ namespace OmsiMapEditor.UI
     /// What a left drag on the map does: drag the selection freely, move it freely or along axis arrows, or turn the
     /// selected object. Every tool selects with a click.
     /// </summary>
-    internal enum EditorTool { Drag, Move, Rotate, Road, Rows, Terrain }
+    internal enum EditorTool { Drag, Move, Rotate, Road, Rows, Terrain, Markings }
 
     /// <summary>
     /// The tool bar at the bottom of the map: grouped buttons with an icon, a name and their key, as the corporate
@@ -42,6 +42,8 @@ namespace OmsiMapEditor.UI
                 "Lay rows of objects along roads, such as lamps or posts: choose an object, point at a road and click.");
             AddTool(world, EditorTool.Terrain, "mountain", "Terrain", "G",
                 "Shape the ground with a brush held over it, raising, lowering, smoothing, flattening or roughening it, or lay a ramp between two clicks.");
+            AddTool(world, EditorTool.Markings, "brush", "Markings", "M",
+                "Draw road markings on junctions made in this project: click an anchor, then another; click a line to change or delete it.");
             objectsButton = AddButton(world, "box", "Objects", "3",
                 "Place scenery objects: choose one, then click into the map. Shift+click keeps placing, R turns it, Esc stops.",
                 () => ObjectsRequested?.Invoke());

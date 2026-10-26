@@ -941,7 +941,7 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>Adds a triangle facing up, turning it over when its corners run the other way.</summary>
-        private static void AddUpward(OmsiGeneratedMesh mesh, int a, int b, int c)
+        internal static void AddUpward(OmsiGeneratedMesh mesh, int a, int b, int c)
         {
             double X(int vertex) => mesh.Positions[vertex * 3];
             double Z(int vertex) => mesh.Positions[vertex * 3 + 2];

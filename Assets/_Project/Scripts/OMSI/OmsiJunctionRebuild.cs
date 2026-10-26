@@ -31,6 +31,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>True when the .sco says which arms are main and turned over; otherwise those are guessed.</summary>
         public bool SidesKnown { get; private set; }
 
+        /// <summary>Its road markings (ADR 044), by the anchors of its arms.</summary>
+        public List<OmsiMarkingLine> Markings { get; } = new List<OmsiMarkingLine>();
+
         /// <summary>True for an object file the editor makes, under Sceneryobjects\Mapforge.</summary>
         public static bool IsMadeHere(string assetPath)
         {
@@ -72,6 +75,7 @@ namespace OmsiMapEditor.OMSI
                 {
                     HeadingDegrees = Normalize360(helper.HeadingDegrees), ProfilePath = helper.SplinePath, Profile = profiles?.Invoke(helper.SplinePath)
                 });
+            junction.Markings.AddRange(OmsiJunctionMarkings.Read(text));
             var sides = ReadSides(text, helpers.Count);
             if (sides != null)
             {
