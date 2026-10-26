@@ -10,7 +10,8 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 
 - **Explore maps:** View textured terrain, roads, tracks and scenery in a continuous 2D map or a navigable 3D view. Large maps that use OMSI world coordinates are supported.
 - **Inspect and validate:** Review map contents, object and spline references, IDs, junction connections, timetable data, chrono variants and DLC usage in a report that links findings to their tiles.
-- **See routes:** Display timetable lines, stops and the lanes their trips follow. Preview chrono variants for a selected date; these views are read-only.
+- **See routes:** Display timetable lines, stops and the lanes their trips follow. Preview chrono variants for a selected date.
+- **Edit chrono variants:** Make a variant that applies from a date on, such as road works, or edit an existing one. Place, move, turn and delete objects in it; the base map stays as it is. Objects of the base map that a variant moves become copies with new IDs, as OMSI's own variants do it.
 - **Edit scenery:** Place, move, rotate and delete objects, including multi-selection, undo and redo. Hang objects such as signs and lamp heads on the attachment points of others. Browse the objects available in your installation.
 - **Build roads:** Create OMSI spline roads with terrain-following or manually controlled heights. Generate junctions where roads meet and fit terrain to roads built in the editor. Lay rows of objects such as lamps or hedges along roads, then change or delete them.
 - **Shape the ground:** Raise, lower, smooth, flatten or roughen the terrain with a brush, or lay an even ramp between two points, the way openMapper does; level the ground under houses; dig lakes and rivers and give tiles water; export the ground as a 16-bit height map and lay a height map back over the map. Roads fitted to the terrain stay fitted.
@@ -20,7 +21,7 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 
 ## Current limitations
 
-Mapforge is still in development. Timetable and chrono data can be inspected but not edited. Editing chrono variants is not yet available. Some advanced OMSI records and tile-bound references also limit which structural edits are possible. See the [roadmap](Documentation/Roadmap.md) for project details.
+Mapforge is still in development. Timetable data can be inspected but not edited. Chrono variants take objects only so far; roads, rules and timetables of a variant cannot be edited yet. Some advanced OMSI records and tile-bound references also limit which structural edits are possible. See the [roadmap](Documentation/Roadmap.md) for project details.
 
 Maps are written to work in [openOMSI](https://github.com/openOMSI-org/openOMSI); where it and OMSI 2 differ, openOMSI decides. OMSI 2 and its content are not included. Mapforge reads the files from an installation you provide; the game and its assets must be obtained separately.
 

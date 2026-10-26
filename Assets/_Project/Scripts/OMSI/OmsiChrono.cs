@@ -32,10 +32,14 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Its change lists, relative to the map, such as <c>Chrono\0100_BaustelleNordspitze\tile_1_1.map</c>.</summary>
         public List<string> TileFiles { get; } = new List<string>();
 
+        /// <summary>As Omsi.exe and openOMSI decide it: a variant without any date never applies.</summary>
         public bool IsActiveOn(DateTime date)
         {
-            return (!Start.HasValue || date.Date >= Start.Value) && (!End.HasValue || date.Date <= End.Value);
+            return (Start.HasValue || End.HasValue) && (!Start.HasValue || date.Date >= Start.Value) && (!End.HasValue || date.Date <= End.Value);
         }
+
+        /// <summary>A day the variant applies on: its first, or for one that applies from the start, its last.</summary>
+        public DateTime? FirstDay => Start ?? End;
 
         public override string ToString()
         {
@@ -44,10 +48,31 @@ namespace OmsiMapEditor.OMSI
         }
     }
 
+    /// <summary>The variant and change list that add an element of a chrono overlay.</summary>
+    public sealed class OmsiChronoOrigin
+    {
+        public OmsiChronoOrigin(OmsiChronoVariant variant, string file)
+        {
+            Variant = variant ?? throw new ArgumentNullException(nameof(variant));
+            File = file ?? throw new ArgumentNullException(nameof(file));
+        }
+
+        public OmsiChronoVariant Variant { get; }
+
+        /// <summary>The change list relative to the map, such as <c>Chrono\0100_Works\tile_1_1.map</c>.</summary>
+        public string File { get; }
+    }
+
     /// <summary>What applying chrono variants to a map did.</summary>
     public sealed class OmsiChronoOverlayReport
     {
         public List<OmsiChronoVariant> Variants { get; } = new List<OmsiChronoVariant>();
+
+        /// <summary>
+        /// Where the elements the variants add come from, by record: objects, attached objects, splines and rows along
+        /// splines. Elements of the base map are not listed.
+        /// </summary>
+        public Dictionary<object, OmsiChronoOrigin> Origins { get; } = new Dictionary<object, OmsiChronoOrigin>();
         public int AddedObjects { get; internal set; }
         public int AddedSplines { get; internal set; }
         public int DeletedElements { get; internal set; }
@@ -155,6 +180,28 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// A folder name for a new variant after <paramref name="variants"/>, such as <c>0200_Road works</c>: the next
+        /// hundred after the highest leading number, then the title without characters a folder name cannot hold.
+        /// </summary>
+        public static string NewVariantName(IEnumerable<OmsiChronoVariant> variants, string title)
+        {
+            var highest = 0;
+            foreach (var variant in variants)
+            {
+                var digits = 0;
+                while (digits < variant.Name.Length && digits < 9 && char.IsDigit(variant.Name[digits]))
+                    digits++;
+                if (digits > 0)
+                    highest = Math.Max(highest, int.Parse(variant.Name.Substring(0, digits), CultureInfo.InvariantCulture));
+            }
+            var invalid = Path.GetInvalidFileNameChars();
+            var name = new System.Text.StringBuilder();
+            foreach (var character in (title ?? string.Empty).Trim())
+                name.Append(Array.IndexOf(invalid, character) >= 0 ? '_' : character);
+            return ((highest / 100 + 1) * 100).ToString("0000", CultureInfo.InvariantCulture) + "_" + name.ToString().TrimEnd('.', ' ');
+        }
+
+        /// <summary>
         /// A copy of <paramref name="baseMap"/> with the change lists of <paramref name="variants"/> applied in their order.
         /// </summary>
         public static OmsiMapSummary Overlay(OmsiMapSummary baseMap, IOmsiFileSource source, IEnumerable<OmsiChronoVariant> variants,
@@ -181,10 +228,20 @@ namespace OmsiMapEditor.OMSI
                 report.Variants.Add(variant);
                 foreach (var file in variant.TileFiles)
                 {
-                    if (!tilesByFile.TryGetValue(Path.GetFileName(file), out var tile))
+                    // A change list undone in a project may still be listed.
+                    if (!tilesByFile.TryGetValue(Path.GetFileName(file), out var tile) || !source.FileExists(file))
                         continue;
                     ApplyChanges(source, file, tile, splineSlots[tile], report);
                     var added = OmsiMapReader.ReadAddedElements(source, file, tile);
+                    var origin = new OmsiChronoOrigin(variant, file);
+                    foreach (var item in added.Objects)
+                        report.Origins[item] = origin;
+                    foreach (var item in added.Splines)
+                        report.Origins[item] = origin;
+                    foreach (var item in added.AttachedObjects)
+                        report.Origins[item] = origin;
+                    foreach (var item in added.SplineAttachments)
+                        report.Origins[item] = origin;
                     tile.Objects.AddRange(added.Objects);
                     tile.Splines.AddRange(added.Splines);
                     splineSlots[tile].AddRange(added.Splines);
@@ -249,6 +306,8 @@ namespace OmsiMapEditor.OMSI
                             var changed = Copy(original);
                             changed.AssetPath = values[0];
                             tile.Objects[tile.Objects.IndexOf(original)] = changed;
+                            if (report.Origins.TryGetValue(original, out var origin))
+                                report.Origins[changed] = origin;
                             selected = changed;
                             report.ChangedTypes++;
                         }
@@ -258,6 +317,8 @@ namespace OmsiMapEditor.OMSI
                             changed.AssetPath = values[0];
                             tile.Splines[tile.Splines.IndexOf(spline)] = changed;
                             splineSlots[splineSlots.IndexOf(spline)] = changed;
+                            if (report.Origins.TryGetValue(spline, out var splineOrigin))
+                                report.Origins[changed] = splineOrigin;
                             selected = changed;
                             report.ChangedTypes++;
                         }
@@ -297,7 +358,12 @@ namespace OmsiMapEditor.OMSI
                     report.DeletedElements++;
                 }
                 else if (position != row.SplineIndex)
-                    tile.SplineAttachments[index] = Copy(row, position);
+                {
+                    var moved = Copy(row, position);
+                    tile.SplineAttachments[index] = moved;
+                    if (report.Origins.TryGetValue(row, out var origin))
+                        report.Origins[moved] = origin;
+                }
             }
         }
 

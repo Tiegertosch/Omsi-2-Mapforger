@@ -13,7 +13,13 @@ namespace OmsiMapEditor.OMSI
         Transfer,
 
         /// <summary>The object got another object file, keeping its ID and place, such as a junction made again.</summary>
-        Replacement
+        Replacement,
+
+        /// <summary>
+        /// A chrono variant took an object of the base map or of an earlier variant away and added a copy with a new ID
+        /// where it was moved or turned to; chrono change lists cannot move what they did not add.
+        /// </summary>
+        Copy
     }
 
     /// <summary>
@@ -53,7 +59,22 @@ namespace OmsiMapEditor.OMSI
         /// <summary>True when the object exists in the summary in the current state of the change.</summary>
         public bool ObjectExists => Kind == OmsiObjectChangeKind.Deletion
             ? !IsApplied
-            : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || IsApplied;
+            : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || Kind == OmsiObjectChangeKind.Copy || IsApplied;
+
+        /// <summary>The object in the summary in the current state of the change: for an undone copy the original.</summary>
+        public OmsiObjectRecord CurrentRecord => Kind == OmsiObjectChangeKind.Copy && !IsApplied ? ReplacedRecord : Record;
+
+        /// <summary>For a copy the object it replaces; null for other changes.</summary>
+        public OmsiObjectRecord ReplacedRecord { get; internal set; }
+
+        /// <summary>Attached objects a copy added on the copied object, in place of <see cref="RemovedAttachedObjects"/>.</summary>
+        internal List<OmsiAttachedObjectRecord> AddedAttachedObjects { get; } = new List<OmsiAttachedObjectRecord>();
+
+        /// <summary>
+        /// References to the objects a copy replaced that name their IDs and do not follow to the copy, such as bus stops
+        /// and timetables; the copy is saved anyway.
+        /// </summary>
+        public List<OmsiReference> StaleReferences { get; } = new List<OmsiReference>();
 
         /// <summary>The tile that holds the object in the current state of the change.</summary>
         public OmsiTileSummary CurrentTile => Kind == OmsiObjectChangeKind.Transfer && IsApplied ? TargetTile : Tile;
@@ -206,6 +227,8 @@ namespace OmsiMapEditor.OMSI
             var oldY = target.Y;
             var oldZ = target.Z;
             var oldHeading = target.HeadingDegrees;
+            // Entry points name base tiles only; objects of a chrono change list have none.
+            var isChronoFile = IsChronoFile(relative);
             var changed = false;
             if (target.X != x) { target.X = x; changed = true; }
             if (target.Y != y) { target.Y = y; changed = true; }
@@ -215,10 +238,13 @@ namespace OmsiMapEditor.OMSI
             if (bankDegrees.HasValue && target.BankDegrees != bankDegrees.Value) { target.BankDegrees = bankDegrees.Value; changed = true; }
             if (!changed)
                 return false;
-            var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
-            if (config.Records.Exists(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase)) &&
-                OmsiTileEditing.FollowEntryPoints(tile, target, TileIndexOf(config, relative), config, oldX, oldY, oldZ, oldHeading) > 0)
-                workspace.Save(GlobalConfigFileName, config);
+            if (!isChronoFile)
+            {
+                var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
+                if (config.Records.Exists(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase)) &&
+                    OmsiTileEditing.FollowEntryPoints(tile, target, TileIndexOf(config, relative), config, oldX, oldY, oldZ, oldHeading) > 0)
+                    workspace.Save(GlobalConfigFileName, config);
+            }
             workspace.Save(relative, tile);
             return true;
         }
@@ -244,7 +270,7 @@ namespace OmsiMapEditor.OMSI
             if (record == null)
                 throw new ArgumentNullException(nameof(record));
 
-            if (!UpdateObject(tile.FileName, record.Id, x, y, z, headingDegrees, pitchDegrees, bankDegrees))
+            if (!UpdateObject(FileHolding(tile, record), record.Id, x, y, z, headingDegrees, pitchDegrees, bankDegrees))
                 return false;
             record.LocalX = AsWritten(x);
             record.LocalY = AsWritten(y);
@@ -276,10 +302,11 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidOperationException("The tile file " + tile.FileName + " is missing.");
 
             var workspace = RequireWorkspace();
-            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
-            var tileBefore = workspace.ReadAllBytes(tilePath);
+            // While a chrono variant is edited, new objects go into its change list for the tile.
+            var tilePath = EditedVariant != null ? ChronoFileOf(tile) : OmsiRelativePath.Normalize(tile.FileName);
+            var tileBefore = workspace.FileExists(tilePath) ? workspace.ReadAllBytes(tilePath) : null;
             var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
-            var tileFile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
+            var tileFile = tileBefore != null ? OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance) : NewChronoTileFor(tile);
             var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
 
             ids = ids ?? OmsiIdAllocator.ForMap(workspace, GlobalConfigFileName);
@@ -302,7 +329,10 @@ namespace OmsiMapEditor.OMSI
             AddFile(change, GlobalConfigFileName, configBefore, config.ToBytes());
             WriteFiles(change, false);
             AddToSummary(summary, change);
-            summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, record.Id);
+            if (EditedVariant != null)
+                AddToEditedVariant(record, tilePath);
+            else
+                summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, record.Id);
             summary.NextIdCode = ids.NextFreeId;
             return change;
         }
@@ -322,6 +352,8 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(tile));
             if (record == null)
                 throw new ArgumentNullException(nameof(record));
+            if (EditedVariant != null)
+                return DeleteInEditedVariant(summary, tile, record, references);
 
             var workspace = RequireWorkspace();
             var tilePath = OmsiRelativePath.Normalize(tile.FileName);
@@ -377,6 +409,8 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentException("The target must be another tile.", nameof(target));
             if (!target.IsAvailable)
                 throw new InvalidOperationException("The tile file " + target.FileName + " is missing.");
+            if (EditedVariant != null)
+                throw new InvalidOperationException("Objects of a chrono variant stay in their tile; end editing the variant to move objects between tiles.");
 
             var workspace = RequireWorkspace();
             var tilePath = OmsiRelativePath.Normalize(tile.FileName);
@@ -473,7 +507,7 @@ namespace OmsiMapEditor.OMSI
         private static OmsiRecordFile NewChronoTile(OmsiRecordFile like)
         {
             var text = "File created with OMSI MapWorks on " + DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) +
-                       "\r\n\r\n[version]\r\n" + (like.Version > 0 ? like.Version : 14).ToString(System.Globalization.CultureInfo.InvariantCulture) + "\r\n";
+                       "\r\n\r\n[version]\r\n" + (like.Version > 0 ? like.Version : 14).ToString(System.Globalization.CultureInfo.InvariantCulture) + "\r\n\r\n";
             return OmsiRecordFile.Parse(OmsiTextFile.Encode(text, like.Encoding), OmsiTileRecordLayouts.Instance);
         }
 
@@ -548,6 +582,8 @@ namespace OmsiMapEditor.OMSI
                 AddToSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Replacement)
                 change.Record.AssetPath = change.AssetBefore;
+            else if (change.Kind == OmsiObjectChangeKind.Copy)
+                SwapCopyInSummary(change, false);
             else
                 MoveInSummary(change, false);
             change.IsApplied = false;
@@ -567,6 +603,8 @@ namespace OmsiMapEditor.OMSI
                 RemoveFromSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Replacement)
                 change.Record.AssetPath = change.AssetAfter;
+            else if (change.Kind == OmsiObjectChangeKind.Copy)
+                SwapCopyInSummary(change, true);
             else
                 MoveInSummary(change, true);
             change.IsApplied = true;

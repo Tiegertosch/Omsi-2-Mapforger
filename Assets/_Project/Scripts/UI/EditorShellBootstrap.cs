@@ -179,7 +179,7 @@ namespace OmsiMapEditor.UI
         private OmsiSplineRecord selectedSpline;
 
         // Chrono view: the map as OMSI loads it on a date, with the variants active then laid over the base map. It is
-        // read-only; the base map stays in baseSummary and returns unchanged.
+        // read-only, unless a variant is edited (ADR 042); the base map stays in baseSummary and returns unchanged.
         private OmsiMapSummary baseSummary;
         private List<OmsiChronoVariant> chronoVariants = new List<OmsiChronoVariant>();
         private DateTime? chronoDate;
@@ -187,11 +187,26 @@ namespace OmsiMapEditor.UI
         private int chronoGeneration;
         private TextField chronoDateField;
 
+        // The variant whose objects are edited in the chrono view, or null; the form for a new variant while it is open.
+        private OmsiChronoVariant editedVariant;
+        private bool newVariantFormOpen;
+
+        // A variant made in this project that was clicked once for deletion; the second click deletes it.
+        private OmsiChronoVariant variantToDelete;
+
         /// <summary>
         /// Edits are possible: a project is open, the base map is shown, not a chrono date, and no map check or chrono
         /// overlay is reading the map's lists on a worker thread.
         /// </summary>
         private bool CanEdit => session != null && session.CanEdit && chronoDate == null && !ReadingMapInBackground;
+
+        /// <summary>
+        /// Objects can be placed, moved, turned and deleted: the base map can be edited, or a chrono variant is edited;
+        /// roads, rows, the ground and tiles stay with the base map.
+        /// </summary>
+        private bool CanEditObjects => CanEdit || EditingVariant && !ReadingMapInBackground;
+
+        private bool EditingVariant => editedVariant != null && chronoDate != null && session != null && session.EditedVariant != null;
 
         private bool ReadingMapInBackground => chronoTask != null || checkTask != null;
 
@@ -911,6 +926,29 @@ namespace OmsiMapEditor.UI
                 mapCanvas?.SetOrbit(yaw, pitch, distance);
             }
 
+            // -chronoNew <name> <yyyy-MM-dd> [<yyyy-MM-dd>] makes a chrono variant and edits it; -chronoEdit <folder or name> edits
+            // one. Both come before selecting and moving, which then work in the variant; the status goes to the log as "Chrono edit:".
+            var newVariantName = Argument("-chronoNew", 1);
+            var editVariantName = Argument("-chronoEdit", 1);
+            if (newVariantName != null && TryParseDay(Argument("-chronoNew", 2), out var newVariantStart))
+                CreateChronoVariant(newVariantName, newVariantStart, TryParseDay(Argument("-chronoNew", 3), out var newVariantEnd) ? newVariantEnd : (DateTime?)null);
+            else if (editVariantName != null)
+            {
+                var variant = chronoVariants.Find(candidate => string.Equals(candidate.Name, editVariantName, StringComparison.OrdinalIgnoreCase) ||
+                                                               string.Equals(candidate.Title, editVariantName, StringComparison.OrdinalIgnoreCase));
+                if (variant != null)
+                    EditChronoVariant(variant);
+                else
+                    Debug.LogWarning("-chronoEdit: the map has no chrono variant " + editVariantName + ".");
+            }
+            if (newVariantName != null || editVariantName != null)
+            {
+                var chronoStarted = Time.realtimeSinceStartup;
+                while (chronoTask != null && Time.realtimeSinceStartup - chronoStarted < 120f)
+                    yield return null;
+                Debug.Log("Chrono edit: " + statusLabel?.text);
+            }
+
             // Several IDs select several objects, as Ctrl+click does.
             for (var offset = 1; int.TryParse(Argument("-select", offset), NumberStyles.Integer, CultureInfo.InvariantCulture, out var selectId); offset++)
             {
@@ -949,6 +987,12 @@ namespace OmsiMapEditor.UI
                     });
                 CommitEdits(edits);
                 Debug.Log("Move selection: " + statusLabel?.text);
+            }
+
+            if (Array.IndexOf(args, "-deleteSelection") >= 0 && selection.Count > 0)
+            {
+                DeleteSelectedObjects();
+                Debug.Log("Delete selection: " + statusLabel?.text);
             }
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
@@ -1413,6 +1457,9 @@ namespace OmsiMapEditor.UI
             chronoDate = null;
             chronoGeneration++;
             chronoTask = null;
+            editedVariant = null;
+            newVariantFormOpen = false;
+            variantToDelete = null;
             chronoVariants = ReadChronoVariants(newSession.Source);
             currentProjectName = projectName ?? string.Empty;
             undoSteps.Clear();
@@ -1465,9 +1512,11 @@ namespace OmsiMapEditor.UI
 
             if (mapCanvas != null)
             {
-                mapCanvas.AllowEditing = CanEdit;
-                // A map without a project or a chrono view can only be looked at; selecting is the only tool then.
-                if (!CanEdit)
+                mapCanvas.AllowEditing = CanEditObjects;
+                mapCanvas.AllowSplineEditing = CanEdit;
+                // A map without a project or a chrono view can only be looked at; selecting is the only tool then. A
+                // variant being edited keeps the object tools.
+                if (!CanEditObjects || !CanEdit && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate)
                     activeTool = EditorTool.Drag;
                 mapCanvas.Tool = activeTool;
                 mapCanvas.SetMap(summary, keepView);
@@ -1498,8 +1547,11 @@ namespace OmsiMapEditor.UI
 
         private string ReadOnlyMessage(string action)
         {
-            if (session != null && session.CanEdit && chronoDate == null && ReadingMapInBackground)
+            if (session != null && session.CanEdit && (chronoDate == null || EditingVariant) && ReadingMapInBackground)
                 return "The map is being read for the map check or a chrono date; " + action + " again in a moment.";
+            if (EditingVariant)
+                return "The chrono variant " + editedVariant.Title + " is being edited; it takes objects only. Choose Base map in the project browser to " +
+                       action + ".";
             return chronoDate != null
                 ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
                   " with its chrono variants and is read-only. Choose Base map in the project browser to " + action + "."
@@ -1513,11 +1565,114 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void ShowChronoDate(DateTime? date)
         {
+            ShowChrono(date, null);
+        }
+
+        /// <summary>
+        /// Edits a chrono variant (ADR 042): the map is shown on the variant's first day with the variants up to it in name
+        /// order that apply then, the ones it builds on; later ones stay away. Objects placed, moved, turned or deleted go
+        /// into the variant until Base map ends editing.
+        /// </summary>
+        private void EditChronoVariant(OmsiChronoVariant variant)
+        {
+            if (session == null || !session.CanEdit)
+            {
+                SetStatus("Save a MapWorks project (File > Save map project as...) to edit chrono variants.");
+                return;
+            }
+            if (variant?.FirstDay == null)
+            {
+                SetStatus("The chrono variant " + variant?.Title + " has no date, so OMSI never applies it; give its Chrono.cfg a [startdate] to edit it.");
+                return;
+            }
+            ShowChrono(variant.FirstDay, variant);
+        }
+
+        /// <summary>Makes a chrono variant after the map's others and starts editing it.</summary>
+        private void CreateChronoVariant(string title, DateTime start, DateTime? end)
+        {
+            if (session == null || !session.CanEdit)
+            {
+                SetStatus("Save a MapWorks project (File > Save map project as...) to make chrono variants.");
+                return;
+            }
+            OmsiChronoVariant made;
+            try
+            {
+                LeaveEditedVariant();
+                made = session.CreateChronoVariant(title, start, end);
+            }
+            catch (Exception exception) when (exception is ArgumentException || exception is IOException || exception is UnauthorizedAccessException)
+            {
+                SetStatus("Could not make the chrono variant: " + exception.Message);
+                return;
+            }
+            newVariantFormOpen = false;
+            chronoVariants = ReadChronoVariants(session.Source);
+            var listed = chronoVariants.Find(candidate => string.Equals(candidate.Name, made.Name, StringComparison.OrdinalIgnoreCase));
+            Debug.Log("Chrono variant made: " + made.Folder);
+            EditChronoVariant(listed ?? made);
+        }
+
+        /// <summary>Deletes a variant made in this project after a second click; variants of the original map stay.</summary>
+        private void DeleteChronoVariant(OmsiChronoVariant variant)
+        {
+            if (!ReferenceEquals(variantToDelete, variant))
+            {
+                variantToDelete = variant;
+                RenderProjectBrowser();
+                SetStatus("Click Delete again to delete the chrono variant " + variant.Title + " with everything it changes.");
+                return;
+            }
+            variantToDelete = null;
+            try
+            {
+                session.DeleteChronoVariant(variant);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is UnauthorizedAccessException)
+            {
+                SetStatus("Could not delete the chrono variant: " + exception.Message);
+                return;
+            }
+            chronoVariants = ReadChronoVariants(session.Source);
+            if (chronoDate != null)
+                ShowChronoDate(chronoDate);
+            else
+                RenderProjectBrowser();
+            SetStatus("Deleted the chrono variant " + variant.Title + ".");
+        }
+
+        /// <summary>
+        /// Ends editing a variant: edits go to the base map again. The history is cleared, as its steps belong to the
+        /// variant's view; the variants are read again, as edits may have added change lists.
+        /// </summary>
+        private void LeaveEditedVariant()
+        {
+            if (editedVariant == null)
+                return;
+            editedVariant = null;
+            session?.EditChronoVariant(null, null);
+            undoSteps.Clear();
+            redoSteps.Clear();
+            if (session != null)
+                chronoVariants = ReadChronoVariants(session.Source);
+        }
+
+        private static bool TryParseDay(string text, out DateTime day)
+        {
+            return DateTime.TryParseExact(text?.Trim() ?? string.Empty, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out day);
+        }
+
+        /// <param name="edit">The variant to edit on <paramref name="date"/>, or null for a read-only view.</param>
+        private void ShowChrono(DateTime? date, OmsiChronoVariant edit)
+        {
             if (session == null || baseSummary == null)
                 return;
             var generation = ++chronoGeneration;
             StopPlacement();
             ShowObjectsPanel(false);
+            var wasEditing = editedVariant != null;
+            LeaveEditedVariant();
             if (date == null)
             {
                 chronoTask = null;
@@ -1525,11 +1680,18 @@ namespace OmsiMapEditor.UI
                     return;
                 chronoDate = null;
                 PresentChrono(baseSummary, null);
-                SetStatus(session.CanEdit ? "Base map shown; it can be edited again." : "Base map shown.");
+                SetStatus(session.CanEdit ? "Base map shown; it can be edited again." + (wasEditing ? " The edits of the chrono variant are saved in the project." : string.Empty)
+                    : "Base map shown.");
                 return;
             }
 
-            var active = OmsiChrono.ActiveOn(chronoVariants, date.Value);
+            // Leaving a variant read the variants again; the one to edit is found by its folder.
+            if (edit != null)
+                edit = chronoVariants.Find(variant => string.Equals(variant.Name, edit.Name, StringComparison.OrdinalIgnoreCase)) ?? edit;
+            var editIndex = edit != null ? chronoVariants.IndexOf(edit) : -1;
+            var active = edit == null
+                ? OmsiChrono.ActiveOn(chronoVariants, date.Value)
+                : chronoVariants.FindAll(variant => chronoVariants.IndexOf(variant) <= editIndex && variant.IsActiveOn(date.Value));
             var source = session.Source;
             var baseMap = baseSummary;
             var dateText = date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -1558,6 +1720,19 @@ namespace OmsiMapEditor.UI
                 chronoDate = date.Value.Date;
                 StopPlacement();
                 ShowObjectsPanel(false);
+                if (edit != null)
+                {
+                    editedVariant = edit;
+                    session.EditChronoVariant(edit, report);
+                    // Steps of the view before refer to other records; they cannot be undone here.
+                    undoSteps.Clear();
+                    redoSteps.Clear();
+                    PresentChrono(task.Result, active);
+                    SetStatus("Editing the chrono variant " + edit.Title + " on " + dateText + (active.Count > 1 ? " on top of " + (active.Count - 1) +
+                              " earlier variant(s)" : string.Empty) + ". Objects you place, move, turn or delete go into it; objects of the base map " +
+                              "move as copies with new IDs. Base map ends editing.");
+                    return;
+                }
                 PresentChrono(task.Result, active);
                 SetStatus(dateText + ": " + active.Count + " chrono variant(s) active, " + report.AddedObjects + " objects and " + report.AddedSplines +
                           " splines added, " + report.DeletedElements + " element(s) removed, " + report.ChangedTypes + " object(s) swapped" +
@@ -3255,7 +3430,7 @@ namespace OmsiMapEditor.UI
             if (centerView)
                 mapCanvas?.CenterOn(tile, item);
             SetStatus("Selected object #" + item.Id + " (" + item.AssetPath + ")" +
-                      (CanEdit ? "" : chronoDate != null ? " - chrono view, read-only" : " - read-only; save a project to edit"));
+                      (CanEditObjects ? "" : chronoDate != null ? " - chrono view, read-only" : " - read-only; save a project to edit"));
         }
 
         /// <summary>Adds an object to the selection or takes it out (Ctrl+click).</summary>
@@ -3350,7 +3525,7 @@ namespace OmsiMapEditor.UI
         {
             if (edits == null || edits.Count == 0)
                 return;
-            if (!CanEdit)
+            if (!CanEditObjects)
             {
                 SetStatus(ReadOnlyMessage("edit it"));
                 return;
@@ -3359,12 +3534,39 @@ namespace OmsiMapEditor.UI
             var parts = new List<ObjectEditStep>();
             var kept = new List<string>();
             var transfers = new List<string>();
+            var copies = new Dictionary<OmsiObjectRecord, OmsiObjectRecord>();
+            var stale = new List<OmsiReference>();
             OmsiReferenceIndex references = null;
             string failure = null;
             foreach (var edit in edits)
             {
                 try
                 {
+                    // A variant moves its own objects in their tile; others it replaces by a copy (ADR 042).
+                    if (EditingVariant && !session.IsInEditedVariant(edit.Record))
+                    {
+                        if (SameValues(edit.Record, edit))
+                            continue;
+                        references = references ?? session.BuildReferenceIndex();
+                        var copied = session.CopyInEditedVariant(currentSummary, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height,
+                            edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees, references);
+                        if (copied.Succeeded)
+                        {
+                            parts.Add(new ObjectEditStep { Change = copied.Change });
+                            copies[edit.Record] = copied.Change.Record;
+                            stale.AddRange(copied.Change.StaleReferences);
+                        }
+                        else
+                        {
+                            kept.Add("#" + edit.Record.Id + " (" + DescribeReferences(copied.Blockers) + ")");
+                        }
+                        continue;
+                    }
+                    if (EditingVariant)
+                    {
+                        AddValueStep(parts, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit);
+                        continue;
+                    }
                     var target = OtherTileAt(edit.Tile, edit.LocalX, edit.LocalY, out var targetX, out var targetY);
                     if (target != null)
                     {
@@ -3394,11 +3596,20 @@ namespace OmsiMapEditor.UI
 
             if (parts.Count > 0)
                 PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts });
+            // Copies stay selected in place of the objects they replace.
+            foreach (var entry in selection)
+                if (copies.TryGetValue(entry.Record, out var copy))
+                    entry.Record = copy;
             RefreshAfterChange(null);
 
             if (failure != null)
             {
                 SetStatus(failure + (parts.Count > 0 ? " The changes before it were saved; Ctrl+Z undoes them." : string.Empty));
+                return;
+            }
+            if (parts.Count == 0 && kept.Count > 0)
+            {
+                SetStatus("Not changed in " + editedVariant.Title + ": " + JoinLimited(kept) + ".");
                 return;
             }
             if (parts.Count == 0)
@@ -3407,13 +3618,32 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var message = edits.Count == 1
-                ? "Object #" + edits[0].Record.Id + " saved to the project workspace."
-                : edits.Count + " objects saved to the project workspace.";
+                ? "Object #" + edits[0].Record.Id + " saved to " + (EditingVariant ? "the chrono variant " + editedVariant.Title : "the project workspace") + "."
+                : edits.Count + " objects saved to " + (EditingVariant ? "the chrono variant " + editedVariant.Title : "the project workspace") + ".";
+            if (copies.Count > 0)
+            {
+                var named = new List<string>();
+                foreach (var pair in copies)
+                    named.Add("#" + pair.Key.Id + " by #" + pair.Value.Id);
+                message += " The variant took away and replaced " + JoinLimited(named) + "." +
+                           (stale.Count > 0 ? " Still naming the old ID: " + DescribeReferences(stale) + "." : string.Empty);
+            }
             if (transfers.Count > 0)
                 message += " Moved " + JoinLimited(transfers) + ".";
             if (kept.Count > 0)
-                message += " Kept in their tile because references tie them to it: " + JoinLimited(kept) + ".";
+                message += (EditingVariant ? " Not changed: " : " Kept in their tile because references tie them to it: ") + JoinLimited(kept) + ".";
             SetStatus(message + " Ctrl+Z undoes it.");
+        }
+
+        /// <summary>True when an edit leaves the object's place and orientation as written.</summary>
+        private static bool SameValues(OmsiObjectRecord item, MapObjectEdit edit)
+        {
+            var after = new[] { edit.LocalX, edit.LocalY, edit.Height, edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees };
+            var before = Values(item);
+            for (var index = 0; index < after.Length; index++)
+                if (OmsiNumberFormat.Format(after[index]) != OmsiNumberFormat.Format(before[index]))
+                    return false;
+            return true;
         }
 
         /// <summary>Saves the edit's height and orientation at a tile-local position and records it for undo.</summary>
@@ -4609,7 +4839,7 @@ namespace OmsiMapEditor.UI
 
         private void StepHistory(List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)
         {
-            if (!CanEdit || from.Count == 0)
+            if (!CanEditObjects || from.Count == 0)
             {
                 SetStatus(from.Count > 0 && session != null && session.CanEdit ? ReadOnlyMessage(undo ? "undo" : "redo") : undo ? "Nothing to undo." : "Nothing to redo.");
                 return;
@@ -4701,7 +4931,7 @@ namespace OmsiMapEditor.UI
                 else
                     session.Redo(currentSummary, step.Change);
                 if (step.Change.ObjectExists)
-                    Touch(touched, step.Change.CurrentTile, step.Change.Record);
+                    Touch(touched, step.Change.CurrentTile, step.Change.CurrentRecord);
                 return;
             }
 
@@ -4830,6 +5060,8 @@ namespace OmsiMapEditor.UI
                     return "the deletion of object #" + step.Change.Record.Id;
                 case OmsiObjectChangeKind.Replacement:
                     return "the new shape of object #" + step.Change.Record.Id;
+                case OmsiObjectChangeKind.Copy:
+                    return "the copy #" + step.Change.Record.Id + " of object #" + step.Change.ReplacedRecord.Id;
                 default:
                     return "the move of object #" + step.Change.Record.Id + " into tile " + step.Change.TargetTile.X + ", " + step.Change.TargetTile.Y;
             }
@@ -4865,7 +5097,7 @@ namespace OmsiMapEditor.UI
                 SetStatus("Select an object to delete.");
                 return;
             }
-            if (!CanEdit)
+            if (!CanEditObjects)
             {
                 SetStatus(ReadOnlyMessage("edit it"));
                 return;
@@ -4909,7 +5141,8 @@ namespace OmsiMapEditor.UI
             if (failure != null)
                 SetStatus(failure + (parts.Count > 0 ? " " + parts.Count + " object(s) were deleted before; Ctrl+Z restores them." : string.Empty));
             else if (targets.Count == 1 && parts.Count == 1)
-                SetStatus("Deleted object #" + targets[0].Record.Id + " (" + targets[0].Record.AssetPath + ") from " + targets[0].Tile.FileName + ". Ctrl+Z restores it.");
+                SetStatus("Deleted object #" + targets[0].Record.Id + " (" + targets[0].Record.AssetPath + ") " +
+                          (EditingVariant ? "in the chrono variant " + editedVariant.Title : "from " + targets[0].Tile.FileName) + ". Ctrl+Z restores it.");
             else if (targets.Count == 1)
                 SetStatus("Object #" + targets[0].Record.Id + " was not deleted; it is still referenced by " + DescribeReferences(blockers) + ".");
             else
@@ -4953,7 +5186,7 @@ namespace OmsiMapEditor.UI
                 SetStatus("Open an OMSI map before placing objects.");
                 return;
             }
-            if (!CanEdit)
+            if (!CanEditObjects)
             {
                 SetStatus(ReadOnlyMessage("place objects"));
                 return;
@@ -5031,7 +5264,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Starts placement mode with an object file relative to the OMSI installation.</summary>
         private void StartPlacement(string assetPath)
         {
-            if (!CanEdit)
+            if (!CanEditObjects)
             {
                 SetStatus(ReadOnlyMessage("place objects"));
                 return;
@@ -5076,7 +5309,7 @@ namespace OmsiMapEditor.UI
 
         private void PlaceChosenObject(MapPlacement placement)
         {
-            if (placementAsset == null || !CanEdit)
+            if (placementAsset == null || !CanEditObjects)
             {
                 StopPlacement();
                 return;
@@ -5126,7 +5359,7 @@ namespace OmsiMapEditor.UI
             if (objectsPanelOpen)
                 UpdateObjectsCatalog();
             SetStatus("Placed object #" + change.Record.Id + " (" + assetPath + ") in tile " + placement.Tile.X + ", " + placement.Tile.Y +
-                      ". Ctrl+Z undoes it." +
+                      (EditingVariant ? " of the chrono variant " + editedVariant.Title : string.Empty) + ". Ctrl+Z undoes it." +
                       (placementHasAbsoluteHeight
                           ? " Its height is absolute, not above the terrain, and was set to the terrain under it, " + change.Record.Height.ToString("0.00", CultureInfo.InvariantCulture) + " m."
                           : string.Empty));
@@ -5531,7 +5764,9 @@ namespace OmsiMapEditor.UI
             var mapName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName)
                 ? currentSummary.Name
                 : currentSummary.FriendlyName;
-            var mode = chronoDate != null
+            var mode = EditingVariant
+                ? "editing chrono variant " + editedVariant.Title + ", " + session.ModifiedFiles().Count + " edited file(s)"
+                : chronoDate != null
                 ? "chrono " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", read-only"
                 : CanEdit
                     ? session.ModifiedFiles().Count + " edited file(s)"
@@ -5578,7 +5813,8 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null)
                 return;
-            if (tool != EditorTool.Drag && (!CanEdit))
+            var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate;
+            if (tool != EditorTool.Drag && !(objectTool ? CanEditObjects : CanEdit))
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"
                     : tool == EditorTool.Terrain ? "shape the ground" : "move or rotate objects"));
@@ -5615,7 +5851,7 @@ namespace OmsiMapEditor.UI
 
         private void UpdateToolbar()
         {
-            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, CanEdit, selection.Count > 0);
+            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, CanEdit, CanEditObjects, selection.Count > 0);
         }
 
         /// <summary>
@@ -6179,6 +6415,9 @@ namespace OmsiMapEditor.UI
                 mapHintLabel.text = view + (CanEdit
                     ? "\nTools: Q drag objects freely, W move along axis arrows (Shift: whole metres), E rotate (round handle from above, rings in 3D; Shift: 15° steps), " +
                       "Del delete, 3 place objects.\nCtrl+click or Ctrl+drag selects several. Ctrl+Z / Ctrl+Y undo and redo."
+                    : EditingVariant
+                    ? "\nEditing the chrono variant " + editedVariant.Title + ": Q, W and E move and turn objects, Del deletes, 3 places objects; " +
+                      "objects of the base map move as copies with new IDs.\nCtrl+Z / Ctrl+Y undo and redo. Base map in the project browser ends editing."
                     : chronoDate != null
                         ? "\nClick an object to inspect it. The chrono view is read-only; choose Base map in the project browser to edit."
                         : "\nClick an object to inspect it. Save a project (File > Save map project as...) to edit the map.");
@@ -6264,7 +6503,8 @@ namespace OmsiMapEditor.UI
                 projectPanel.Add(description);
             }
 
-            if (chronoVariants.Count > 0)
+            // A project can make variants, so it shows the section even without any.
+            if (chronoVariants.Count > 0 || session != null && session.CanEdit)
                 projectPanel.Add(ChronoSection());
 
             lineEntries.Clear();
@@ -6313,16 +6553,21 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// The chrono variants with their dates, a date to show the map on and the way back to the base map. Clicking a
-        /// variant shows its first day.
+        /// variant shows its first day; in a project, Edit edits it (ADR 042), New variant makes one and variants made in the
+        /// project can be deleted.
         /// </summary>
         private VisualElement ChronoSection()
         {
-            var section = new Foldout { text = "Chrono (" + chronoVariants.Count + " variants)", value = chronoDate != null };
+            var canEditVariants = session != null && session.CanEdit;
+            var section = new Foldout { text = "Chrono (" + chronoVariants.Count + " variants)", value = chronoDate != null || newVariantFormOpen };
             section.AddToClassList("browser-chrono");
-            var state = new Label(chronoDate == null
-                ? "Showing the base map. Enter a date to see the map as OMSI loads it then."
-                : "Showing " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " with " +
-                  OmsiChrono.ActiveOn(chronoVariants, chronoDate.Value).Count + " active variant(s), read-only.");
+            var state = new Label(EditingVariant
+                ? "Editing " + editedVariant.Title + " on " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
+                  ": objects you place, move, turn or delete go into it. Base map ends editing."
+                : chronoDate == null
+                    ? "Showing the base map. Enter a date to see the map as OMSI loads it then" + (canEditVariants ? ", or edit a variant." : ".")
+                    : "Showing " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " with " +
+                      OmsiChrono.ActiveOn(chronoVariants, chronoDate.Value).Count + " active variant(s), read-only.");
             state.AddToClassList("browser-chrono-state");
             section.Add(state);
 
@@ -6350,10 +6595,13 @@ namespace OmsiMapEditor.UI
             foreach (var variant in chronoVariants)
             {
                 var captured = variant;
+                var line = new VisualElement();
+                line.style.flexDirection = FlexDirection.Row;
+                line.style.alignItems = Align.Center;
                 var entry = new Button(() =>
                 {
                     if (chronoDateField != null)
-                        chronoDateField.value = (captured.Start ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                        chronoDateField.value = (captured.FirstDay ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                     ShowChronoDateFromField();
                 })
                 {
@@ -6363,11 +6611,99 @@ namespace OmsiMapEditor.UI
                 };
                 entry.AddToClassList("browser-tile-entry");
                 entry.AddToClassList("browser-chrono-variant");
-                entry.EnableInClassList("browser-tile-entry-selected", chronoDate != null && variant.IsActiveOn(chronoDate.Value));
-                list.Add(entry);
+                entry.style.flexGrow = 1f;
+                entry.style.flexShrink = 1f;
+                var edited = EditingVariant && string.Equals(editedVariant.Name, variant.Name, StringComparison.OrdinalIgnoreCase);
+                entry.EnableInClassList("browser-tile-entry-selected", edited || !EditingVariant && chronoDate != null && variant.IsActiveOn(chronoDate.Value));
+                line.Add(entry);
+                if (canEditVariants)
+                {
+                    var edit = new Button(() => EditChronoVariant(captured))
+                    {
+                        text = edited ? "Editing" : "Edit",
+                        tooltip = "Edit this variant on its first day: objects placed, moved, turned or deleted go into its change lists"
+                    };
+                    edit.AddToClassList("map-control-button");
+                    edit.SetEnabled(!edited && variant.FirstDay != null);
+                    line.Add(edit);
+                    if (session.IsMadeInProject(variant))
+                    {
+                        var delete = new Button(() => DeleteChronoVariant(captured))
+                        {
+                            text = ReferenceEquals(variantToDelete, captured) ? "Delete?" : "Delete",
+                            tooltip = "Deletes this variant, made in this project, with all it changes; a second click confirms"
+                        };
+                        delete.AddToClassList("map-control-button");
+                        delete.AddToClassList("inspector-edit-delete");
+                        delete.SetEnabled(!edited);
+                        line.Add(delete);
+                    }
+                }
+                list.Add(line);
             }
             section.Add(list);
+            if (canEditVariants)
+                section.Add(NewVariantForm());
             return section;
+        }
+
+        /// <summary>The New variant button, or while it is open the form for the new variant's name and dates.</summary>
+        private VisualElement NewVariantForm()
+        {
+            var box = new VisualElement();
+            box.style.marginTop = 6;
+            if (!newVariantFormOpen)
+            {
+                var open = new Button(() =>
+                {
+                    newVariantFormOpen = true;
+                    RenderProjectBrowser();
+                }) { text = "New variant...", tooltip = "Make a chrono variant that applies from a date on, such as road works or a new line" };
+                open.AddToClassList("map-control-button");
+                box.Add(open);
+                return box;
+            }
+
+            var name = new TextField("Name") { value = "Road works" };
+            var start = new TextField("First day") { value = (chronoDate ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+            var end = new TextField("Last day") { value = string.Empty, tooltip = "Empty: the variant stays from its first day on" };
+            foreach (var field in new[] { name, start, end })
+            {
+                field.AddToClassList("browser-chrono-date");
+                box.Add(field);
+            }
+            var buttons = new VisualElement();
+            buttons.AddToClassList("browser-chrono-row");
+            var create = new Button(() =>
+            {
+                if (!TryParseDay(start.value, out var first))
+                {
+                    SetStatus("Enter the first day as year-month-day, for example 1992-04-05.");
+                    return;
+                }
+                DateTime? last = null;
+                if (!string.IsNullOrWhiteSpace(end.value))
+                {
+                    if (!TryParseDay(end.value, out var lastDay))
+                    {
+                        SetStatus("Enter the last day as year-month-day, or leave it empty.");
+                        return;
+                    }
+                    last = lastDay;
+                }
+                CreateChronoVariant(name.value, first, last);
+            }) { text = "Make and edit" };
+            create.AddToClassList("map-control-button");
+            buttons.Add(create);
+            var cancel = new Button(() =>
+            {
+                newVariantFormOpen = false;
+                RenderProjectBrowser();
+            }) { text = "Cancel" };
+            cancel.AddToClassList("map-control-button");
+            buttons.Add(cancel);
+            box.Add(buttons);
+            return box;
         }
 
         /// <summary>Refreshes the map totals in the header and the project browser after objects were added or removed.</summary>
@@ -6529,17 +6865,20 @@ namespace OmsiMapEditor.UI
             names.AddToClassList("inspector-edit-name");
             editor.Add(names);
 
-            var canEdit = CanEdit;
+            var canEdit = CanEditObjects;
             if (canEdit)
             {
-                var level = new Button(LevelSelectedGround)
+                if (CanEdit)
                 {
-                    text = "Level ground under them",
-                    tooltip = "Makes the ground under each object's outline level with its foot, easing into the ground around over 3 m; trees are left out"
-                };
-                level.AddToClassList("map-control-button");
-                level.AddToClassList("inspector-edit-apply");
-                editor.Add(level);
+                    var level = new Button(LevelSelectedGround)
+                    {
+                        text = "Level ground under them",
+                        tooltip = "Makes the ground under each object's outline level with its foot, easing into the ground around over 3 m; trees are left out"
+                    };
+                    level.AddToClassList("map-control-button");
+                    level.AddToClassList("inspector-edit-apply");
+                    editor.Add(level);
+                }
                 var delete = new Button(DeleteSelectedObjects) { text = "Delete " + selection.Count + " objects" };
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
@@ -6643,6 +6982,7 @@ namespace OmsiMapEditor.UI
             var name = new Label("#" + item.Id + "  " + item.AssetPath);
             name.AddToClassList("inspector-edit-name");
             editor.Add(name);
+            AddChronoOrigin(editor, item);
             AddJunctionDetails(editor, item);
 
             var xField = AddEditField(editor, "X (m)", item.LocalX);
@@ -6652,7 +6992,7 @@ namespace OmsiMapEditor.UI
             var pitchField = AddEditField(editor, "Pitch (°)", item.PitchDegrees);
             var bankField = AddEditField(editor, "Bank (°)", item.BankDegrees);
 
-            var canEdit = CanEdit;
+            var canEdit = CanEditObjects;
             if (canEdit)
             {
                 if (!CanTilt(item))
@@ -6668,19 +7008,26 @@ namespace OmsiMapEditor.UI
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
-                var level = new Button(LevelSelectedGround)
+                if (CanEdit)
                 {
-                    text = "Level ground",
-                    tooltip = "Makes the ground under the object's outline level with its foot, easing into the ground around over 3 m, as for a house on a slope"
+                    var level = new Button(LevelSelectedGround)
+                    {
+                        text = "Level ground",
+                        tooltip = "Makes the ground under the object's outline level with its foot, easing into the ground around over 3 m, as for a house on a slope"
+                    };
+                    level.AddToClassList("map-control-button");
+                    level.AddToClassList("inspector-edit-apply");
+                    editor.Add(level);
+                }
+                var delete = new Button(DeleteSelectedObjects)
+                {
+                    text = EditingVariant && !session.IsInEditedVariant(item) ? "Delete in variant" : "Delete object"
                 };
-                level.AddToClassList("map-control-button");
-                level.AddToClassList("inspector-edit-apply");
-                editor.Add(level);
-                var delete = new Button(DeleteSelectedObjects) { text = "Delete object" };
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);
-                AddRevertTileButton(editor);
+                if (CanEdit)
+                    AddRevertTileButton(editor);
             }
             else
             {
@@ -6691,9 +7038,25 @@ namespace OmsiMapEditor.UI
                 hint.AddToClassList("inspector-edit-hint");
                 editor.Add(hint);
             }
-            AddAttachedObjects(editor, item, canEdit);
+            // Taking off attached objects works on the base map's tiles only.
+            AddAttachedObjects(editor, item, CanEdit);
 
             container.Add(editor);
+        }
+
+        /// <summary>While a chrono variant is edited: where the selected object comes from, and what editing it there does.</summary>
+        private void AddChronoOrigin(VisualElement editor, OmsiObjectRecord item)
+        {
+            if (!EditingVariant)
+                return;
+            var origin = session.OriginOf(item);
+            var label = new Label(session.IsInEditedVariant(item)
+                ? "Added by " + editedVariant.Title + "; it moves, turns and goes there."
+                : "From " + (origin != null ? "the variant " + origin.Title : "the base map") + ". Moving or turning it puts a copy with a new ID into " +
+                  editedVariant.Title + " in its place; deleting it takes it away there. The " + (origin != null ? "variant" : "base map") + " keeps it.");
+            label.AddToClassList("muted");
+            label.AddToClassList("inspector-edit-hint");
+            editor.Add(label);
         }
 
         /// <summary>

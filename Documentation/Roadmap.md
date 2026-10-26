@@ -141,7 +141,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht
 - [x] Chrono-Varianten als geordnete Änderungsebenen laden und für ein gewähltes Datum überlagern: Bereich „Chrono“ im Projekt-Panel mit Datum, Variantenliste und „Base map“, Überlagerung im Hintergrund, Linienwege aus dem Fahrplan des Datums, Ansicht schreibgeschützt (ADR 020)
-- Chrono-Varianten bearbeiten: Änderungen einer Variante zuordnen statt der Kachel
+- [x] Chrono-Varianten bearbeiten, Etappe 1 (ADR 042): „Edit“ je Variante zeigt die Karte bis zur Variante an ihrem ersten Tag; Objekte platzieren, verschieben, drehen und löschen schreibt in ihre Änderungslisten, Basisobjekte werden als Kopie mit neuer ID verschoben und mit `[selobject]`/`[delete]` weggenommen; „New variant...“ legt Varianten mit Name und Datum an, im Projekt angelegte lassen sich wieder löschen
+- Chrono-Varianten bearbeiten, weitere Etappen: Typwechsel und Beschriftung im Inspector, Regeln, Straßen und Splines, Fahrpläne der Variante
 - [x] Angehängte Objekte (`[attachObj]`, auch mehrstufig) und Spline-Anhängungen zeichnen; der Startabstand zählt ab dem gespeicherten Kettenabstand des Splines (ADR 038)
 - [x] Rückseiten wie OMSI weglassen, Glas überblenden, `[matl_transmap]` als Deckkraft auswerten, Bäume in 3D als gekreuzte Flächen
 - [x] Transparenzkarten am 70er-Wartehäuschen im Player prüfen (22. Oktober 2026: Seitenscheiben halbdurchsichtig)

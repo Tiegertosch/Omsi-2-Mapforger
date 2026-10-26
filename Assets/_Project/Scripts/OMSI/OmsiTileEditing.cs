@@ -240,6 +240,18 @@ namespace OmsiMapEditor.OMSI
             return Detach(tile, element, tileIndex, globalConfig, new List<OmsiReference>(blockers ?? new OmsiReference[0]), null);
         }
 
+        /// <summary>A record of the tile and the records after it that modify it, such as its rules.</summary>
+        internal static List<OmsiRecord> WithModifiers(OmsiRecordFile tile, OmsiRecord record)
+        {
+            var position = tile.Records.IndexOf(record);
+            if (position < 0)
+                throw new ArgumentException("The record does not belong to this tile.", nameof(record));
+            var records = new List<OmsiRecord> { record };
+            while (++position < tile.Records.Count && ModifierSections.Contains(tile.Records[position].Name))
+                records.Add(tile.Records[position]);
+            return records;
+        }
+
         /// <summary>The object and every attached object hanging on it, directly or through another, in file order.</summary>
         public static List<OmsiTileRecordView> Family(OmsiRecordFile tile, OmsiTileRecordView item)
         {

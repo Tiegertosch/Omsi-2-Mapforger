@@ -161,7 +161,7 @@
 
 ## ADR 020: Chrono-Datum als schreibgeschützte Ansicht
 
-**Status:** Angenommen, 23. Oktober 2026.
+**Status:** Angenommen, 23. Oktober 2026. Bearbeiten von Varianten regelt ADR 042.
 
 **Entscheidung:** Die App zeigt eine Karte auf Wunsch so, wie OMSI sie an einem Datum lädt: Die an diesem Tag gültigen Chrono-Varianten werden in Namensreihenfolge über eine Kopie der Basiskarte gelegt (`OmsiChrono.Overlay`), Fahrplan und Linienwege kommen aus den Fahrplänen dieser Varianten (`OmsiTimetable.ReadForVariants`). Die Chrono-Ansicht ist schreibgeschützt: Ziehen, Werkzeuge, Platzieren, Löschen, Inspector-Felder, Zurücksetzen von Kacheln sowie Rückgängig und Wiederholen sind gesperrt (`CanEdit`), bis **Base map** zur Basiskarte zurückkehrt. Die Basiskarte und ihre Bearbeitungen bleiben unterdessen unverändert im Speicher; Export, Speichern und die Kartenprüfung betreffen immer die Basiskarte.
 
@@ -511,3 +511,20 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - Die Lizenzen der Quellen sind verschieden. Deshalb bleiben die Bilder im Projekt und gehen nicht in die exportierte Karte.
 
 **Offen:** Google als Quelle (für Konten außerhalb des EWR), eigene Höhenquellen (Terrarium).
+
+## ADR 042: Chrono-Varianten bearbeiten, Objekte zuerst
+
+**Status:** Angenommen, 26. Oktober 2026 (Etappe 1, vom Nutzer im Editor bestätigt; in openOMSI noch ungeprüft). Die drei Grundsatzfragen hat der Nutzer entschieden: Basisobjekte werden als Kopie mit neuer ID verschoben, neue Varianten lassen sich schon in Etappe 1 anlegen, und beim Bearbeiten ist die Karte bis zur Variante zu sehen. Ergänzt ADR 020.
+
+**Entscheidung:**
+
+- **Bearbeiten statt nur Ansehen:** Im Bereich „Chrono“ des Projekt-Panels hat jede Variante einen Knopf „Edit“. Die Karte zeigt dann den ersten Tag der Variante mit allen Varianten bis einschließlich dieser, in Namensreihenfolge und soweit sie an diesem Tag gelten. Darauf baut die Variante auf; spätere Varianten bleiben weg. „Base map“ beendet das Bearbeiten. Beim Betreten und Verlassen wird der Rückgängig-Verlauf geleert, weil seine Schritte zu einer anderen Ansicht gehören.
+- **Was in die Variante geht:** In Etappe 1 nur Objekte. Platzieren, Verschieben, Drehen und Löschen (Werkzeuge Q, W, E, Entf und 3) schreiben in die Änderungsliste der Variante für die Kachel (`Chrono\<Variante>\tile_X_Y.map`); fehlt sie, wird sie in Kodierung und Version der Basiskachel angelegt. Straßen, Reihen, Gelände, Kacheln, Kreuzungen und angehängte Objekte bleiben der Basiskarte vorbehalten. Einrasten an Anhängepunkten gibt es dort nicht. Die Basiskacheln bleiben unberührt; neue IDs kommen wie bisher aus `[NextIDCode]`.
+- **Eigene und fremde Objekte:** Das Overlay merkt sich für jedes Element, welche Variante und Datei es hinzufügt (`OmsiChronoOverlayReport.Origins`). Objekte der bearbeiteten Variante bewegen sich an Ort und Stelle und verschwinden beim Löschen samt angehängter Objekte aus ihrer Liste. Objekte der Basiskarte oder einer früheren Variante löscht die Variante mit `[selobject]` und `[delete]`, die angehängten Objekte daran ebenso.
+- **Verschieben fremder Objekte als Kopie (Entscheidung des Nutzers):** Wird ein solches Objekt verschoben oder gedreht, nimmt die Variante es samt angehängter Objekte weg und fügt Kopien mit neuen IDs an der neuen Stelle ein. Die Kopien tragen die Regeln des Originals und dessen Objektdatei, auch nach einem `[typ]`. So macht es Grundorfs Baustelle mit der verlegten Haltestelle. Die Kopie bleibt gewählt und gehört danach der Variante. Verweise auf die alte ID, etwa Haltestellen, Fahrwege oder Auswahlen anderer Varianten, folgen der Kopie nicht; die Statuszeile nennt sie. Die Kopie unterbleibt, wenn eine andere Änderungsliste Objekte an das Original hängt oder die Kachelversionen nicht passen.
+- **Neue Varianten:** „New variant...“ fragt Name, ersten und optional letzten Tag ab und legt `Chrono\NNNN_Name` an, mit der nächsten vollen Hundert nach der höchsten Nummer. Darin liegen `Chrono.cfg` mit `[startdate]` und `[enddate]` (Windows-1252, wie in Grundorf) und `Chrono_ENG.dsc` mit dem Namen (UTF-16). Danach wird die Variante gleich bearbeitet. Varianten, deren Dateien alle im Projekt entstanden sind, lassen sich mit zwei Klicks wieder löschen.
+- **Gültigkeit wie Omsi.exe:** Eine Variante ganz ohne Datum gilt nie, wie in openOMSIs `ChronoCfg::active_on`. Bis dahin hatte die Ansicht sie immer überlagert.
+
+**Grund:** Chrono-Änderungslisten kennen nur Hinzufügen, Auswählen, Löschen, Typwechsel, Neubeschriften und Regeln (TimetableChronoInventory, openOMSIs `Tile::apply_chrono`); einen Befehl zum Verschieben gibt es nicht. Eine Kopie mit neuer ID ist deshalb der einzige Weg, ein fremdes Objekt in einer Variante woanders hinzustellen. Den Weg gehen auch die mitgelieferten Varianten. Die Ansicht bis zur Variante zeigt genau das, worauf ihre Auswahlen zielen. Spätere Varianten würden Objekte zeigen, die sie nicht kennt. Objekte zuerst, weil Splines Nachbar-IDs in Basiskacheln tragen, die eine Änderungsliste nicht umschreiben kann; Straßen in Varianten brauchen eine eigene Entscheidung.
+
+**Offen:** Typwechsel (`[typ]`) und Beschriftung (`[relabel]`) im Inspector, Regeln, Straßen und Splines in Varianten, Fahrpläne der Variante, eine weggenommene Basisobjekt-Auswahl wieder zurücknehmen. Regeln, die frühere Varianten per Auswahl an ein Original hängen, übernimmt die Kopie nicht.

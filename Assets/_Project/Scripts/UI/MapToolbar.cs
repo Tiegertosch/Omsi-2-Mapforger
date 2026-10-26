@@ -52,16 +52,19 @@ namespace OmsiMapEditor.UI
         public event Action ObjectsRequested;
 
         /// <summary>Highlights the active tool; while placing, the Objects button is active instead.</summary>
-        public void ShowState(EditorTool tool, bool placing, bool canEdit, bool hasSelection)
+        /// <param name="canEdit">Every tool works, as on the base map of a project.</param>
+        /// <param name="canEditObjects">Only objects can be edited, as in a chrono variant: Drag, Move, Rotate, Objects and Delete.</param>
+        public void ShowState(EditorTool tool, bool placing, bool canEdit, bool canEditObjects, bool hasSelection)
         {
             foreach (var pair in toolButtons)
             {
                 pair.Value.EnableInClassList("tool-button-active", !placing && pair.Key == tool);
-                pair.Value.SetEnabled(canEdit || pair.Key == EditorTool.Drag);
+                pair.Value.SetEnabled(canEdit || pair.Key == EditorTool.Drag ||
+                                      canEditObjects && (pair.Key == EditorTool.Move || pair.Key == EditorTool.Rotate));
             }
             objectsButton.EnableInClassList("tool-button-active", placing);
-            objectsButton.SetEnabled(canEdit);
-            deleteButton.SetEnabled(canEdit && hasSelection);
+            objectsButton.SetEnabled(canEditObjects);
+            deleteButton.SetEnabled(canEditObjects && hasSelection);
         }
 
         private VisualElement AddGroup()

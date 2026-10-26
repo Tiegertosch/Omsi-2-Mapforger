@@ -517,6 +517,9 @@ namespace OmsiMapEditor.UI
         /// <summary>When false, objects can be selected but not dragged.</summary>
         public bool AllowEditing { get; set; }
 
+        /// <summary>When false, splines and junction arms show no handles, as while a chrono variant is edited.</summary>
+        public bool AllowSplineEditing { get; set; } = true;
+
         /// <summary>
         /// The active tool: dragging an object moves the selection freely with <see cref="EditorTool.Drag"/> and
         /// <see cref="EditorTool.Move"/>, which also shows axis arrows; the rotation handle and rings appear only with
@@ -1496,7 +1499,7 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private bool SplineHandlesShown => selectedSpline != null && AllowEditing && !roadMode && placementAsset == null && !ThreeDimensional;
+        private bool SplineHandlesShown => selectedSpline != null && AllowEditing && AllowSplineEditing && !roadMode && placementAsset == null && !ThreeDimensional;
 
         /// <summary>The handle of the selected spline under a screen position, or none.</summary>
         private SplineHandleKind? SplineHandleAt(Vector2 screen)
@@ -1516,7 +1519,7 @@ namespace OmsiMapEditor.UI
             return null;
         }
 
-        private bool ArmHandlesShown => armHandles.Count > 0 && AllowEditing && !roadMode && placementAsset == null && !ThreeDimensional;
+        private bool ArmHandlesShown => armHandles.Count > 0 && AllowEditing && AllowSplineEditing && !roadMode && placementAsset == null && !ThreeDimensional;
 
         /// <summary>Round handles on the arms of the selected junction made here; hidden while one is dragged, as the preview shows the arms.</summary>
         private void DrawArmHandles(Painter2D painter)
