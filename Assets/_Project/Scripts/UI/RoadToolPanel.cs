@@ -37,6 +37,12 @@ namespace OmsiMapEditor.UI
         private readonly Button smoothButton;
         private readonly Button manualButton;
         private readonly TextField cornerRadiusField;
+        private readonly Button parallelOffButton;
+        private readonly Button parallelLeftButton;
+        private readonly Button parallelRightButton;
+        private readonly Button parallelBothButton;
+        private readonly TextField parallelDistanceField;
+        private readonly Toggle parallelOppositeToggle;
         private readonly TextField endHeightField;
         private readonly TextField pieceLengthField;
         private readonly TextField gradientField;
@@ -130,6 +136,31 @@ namespace OmsiMapEditor.UI
             cornerRadiusField = Field(Row(options, "Corner radius (m)"), "15",
                 "Straight: where a road turns off the road it continues, the corner is rounded with this radius; that road is cut back for it. " +
                 "0 leaves a sharp corner. Only roads built in this project are cut back.");
+
+            // Roads beside the one being drawn, at a distance (ADR 043).
+            var parallels = new VisualElement();
+            parallels.AddToClassList("panel-tabs");
+            parallels.AddToClassList("picker-segmented");
+            parallelOffButton = new Button(() => SetParallel(false, false)) { text = "Off", tooltip = "Build only the road you draw." };
+            parallelLeftButton = new Button(() => SetParallel(true, false)) { text = "Left", tooltip = "Build a second road at the distance below, left of the road you draw." };
+            parallelRightButton = new Button(() => SetParallel(false, true)) { text = "Right", tooltip = "Build a second road at the distance below, right of the road you draw." };
+            parallelBothButton = new Button(() => SetParallel(true, true)) { text = "Both", tooltip = "Build a road on each side at the distance below." };
+            foreach (var button in new[] { parallelOffButton, parallelLeftButton, parallelRightButton, parallelBothButton })
+            {
+                button.AddToClassList("panel-tab");
+                parallels.Add(button);
+            }
+            Row(options, "Parallel").Add(parallels);
+            parallelDistanceField = Field(Row(options, "Distance (m)"), "15",
+                "How far the parallel roads lie from the road you draw, centre line to centre line, in the same profile");
+            parallelOppositeToggle = new Toggle
+            {
+                value = false,
+                tooltip = "The parallel roads run the other way, as the other carriageway of a dual road with one-way profiles"
+            };
+            parallelOppositeToggle.AddToClassList("picker-option-toggle");
+            parallelOppositeToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
+            Row(options, "Opposite way").Add(parallelOppositeToggle);
 
             var heightRow = Row(options, "Height");
             var modes = new VisualElement();
@@ -250,6 +281,7 @@ namespace OmsiMapEditor.UI
             SetHeightMode(OmsiRoadHeightMode.FollowTerrain);
             SetShape(OmsiRoadShape.Free);
             SetSnapping(true, true, true);
+            SetParallel(false, false);
             schedule.Execute(TakePreviews).Every(100);
         }
 
@@ -287,6 +319,17 @@ namespace OmsiMapEditor.UI
         public double? EndHeight => Number(endHeightField, double.MinValue);
 
         public double PieceLength => Number(pieceLengthField, 1.0) ?? 25.0;
+
+        /// <summary>True when a road is built beside the drawn one on its left; the same for the right.</summary>
+        public bool ParallelLeft { get; private set; }
+
+        public bool ParallelRight { get; private set; }
+
+        /// <summary>The distance of parallel roads, centre line to centre line; 0 while the field holds no number.</summary>
+        public double ParallelDistance => Number(parallelDistanceField, 0.0) ?? 0.0;
+
+        /// <summary>True when parallel roads run the other way.</summary>
+        public bool ParallelOpposite => parallelOppositeToggle.value;
 
         /// <summary>The radius Straight roads round the corner with where they turn off the road they continue; 0 for none.</summary>
         public double CornerRadius => Number(cornerRadiusField, 0.0) ?? 0.0;
@@ -380,6 +423,26 @@ namespace OmsiMapEditor.UI
             freeButton.EnableInClassList("panel-tab-active", shape == OmsiRoadShape.Free);
             ShapeChanged?.Invoke();
             SettingsChanged?.Invoke();
+        }
+
+        public void SetParallel(bool left, bool right)
+        {
+            ParallelLeft = left;
+            ParallelRight = right;
+            parallelOffButton.EnableInClassList("panel-tab-active", !left && !right);
+            parallelLeftButton.EnableInClassList("panel-tab-active", left && !right);
+            parallelRightButton.EnableInClassList("panel-tab-active", right && !left);
+            parallelBothButton.EnableInClassList("panel-tab-active", left && right);
+            parallelDistanceField.parent.SetEnabled(left || right);
+            parallelOppositeToggle.parent.SetEnabled(left || right);
+            SettingsChanged?.Invoke();
+        }
+
+        /// <summary>Sets the distance of parallel roads and whether they run the other way; for command-line checks.</summary>
+        public void SetParallelOptions(double distance, bool opposite)
+        {
+            parallelDistanceField.value = distance.ToString(CultureInfo.InvariantCulture);
+            parallelOppositeToggle.value = opposite;
         }
 
         public void SetSnapping(bool roads, bool angles, bool guides)

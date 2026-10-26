@@ -118,6 +118,14 @@ namespace OmsiMapEditor.UI
         // False while a road is built with junctions or transitions, whose parts keep the corner they start at.
         private bool roundCorners = true;
 
+        // The free end of the last parallel road on each side (-1 left, 1 right), by spline ID and end, so the next part
+        // joins it; empty at a road's start (ADR 043).
+        private readonly Dictionary<int, KeyValuePair<int, bool>> parallelEnds = new Dictionary<int, KeyValuePair<int, bool>>();
+
+        // The splines of the parallel roads of the part before: the road goes on beside them, so it never makes junctions
+        // with them, and they are cut back for a rounded corner instead.
+        private readonly HashSet<int> parallelSplineIds = new HashSet<int>();
+
         // Guide lines of the free spline ends and connection points, for the connection points they were read with; null
         // reads them again. The lines the pointer last snapped to, to draw.
         private List<OmsiGuideLine> roadGuideLines;
@@ -1077,6 +1085,15 @@ namespace OmsiMapEditor.UI
                     var snaps = new List<string>(roadSnap.ToLowerInvariant().Split(','));
                     var all = snaps.Contains("all");
                     roadPanel.SetSnapping(all || snaps.Contains("roads"), all || snaps.Contains("angles"), all || snaps.Contains("guides"));
+                }
+                // -roadParallel left|right|both [distance] and -roadOpposite.
+                var roadParallel = Argument("-roadParallel", 1);
+                if (roadPanel != null && roadParallel != null)
+                {
+                    roadPanel.SetParallel(roadParallel == "left" || roadParallel == "both", roadParallel == "right" || roadParallel == "both");
+                    roadPanel.SetParallelOptions(
+                        double.TryParse(Argument("-roadParallel", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var parallelDistance) ? parallelDistance : 15.0,
+                        Array.IndexOf(args, "-roadOpposite") >= 0);
                 }
                 // The profile list fills once the installation is listed.
                 var scanStarted = Time.realtimeSinceStartup;
@@ -2594,6 +2611,8 @@ namespace OmsiMapEditor.UI
             roadStartHeading = null;
             roadStartHeight = null;
             roadControl = null;
+            parallelEnds.Clear();
+            parallelSplineIds.Clear();
             UpdateRoadPreview();
         }
 
@@ -2827,6 +2846,15 @@ namespace OmsiMapEditor.UI
             return roadProfiles;
         }
 
+        /// <summary>The width of the chosen road profile from edge to edge, or null when there is none or it cannot be read.</summary>
+        private double? RoadProfileWidth()
+        {
+            if (roadPanel?.Profile == null || currentSummary == null)
+                return null;
+            var profile = RoadProfiles().Get(roadPanel.Profile);
+            return profile != null && profile.RightEdge > profile.LeftEdge ? profile.RightEdge - profile.LeftEdge : (double?)null;
+        }
+
         /// <summary>Half the width of the chosen road profile, or null when there is none or it cannot be read.</summary>
         private double? RoadProfileHalfWidth()
         {
@@ -2852,7 +2880,7 @@ namespace OmsiMapEditor.UI
             var profiles = RoadProfiles();
             if (!OmsiRoadJunctions.IsRoad(profiles.Get(roadPanel.Profile)))
                 return;
-            var ignore = new HashSet<int>();
+            var ignore = new HashSet<int>(parallelSplineIds);
             if (roadStartJoin != null)
                 ignore.Add(roadStartJoin.Spline.Id);
             if (endJoin != null)
@@ -3268,7 +3296,7 @@ namespace OmsiMapEditor.UI
         private OmsiRoadCrossing NextCrossing(OmsiRoadPlan plan, OmsiMapPoint target, OmsiSplineEnd startJoin, OmsiSplineEnd endJoin, bool endsOnRoad)
         {
             var profiles = RoadProfiles();
-            var ignore = new HashSet<int>();
+            var ignore = new HashSet<int>(parallelSplineIds);
             if (startJoin != null)
                 ignore.Add(startJoin.Spline.Id);
             if (endJoin != null)
@@ -3431,21 +3459,30 @@ namespace OmsiMapEditor.UI
                 ShowRoadGuides(joined ? (OmsiMapPoint?)null : planEnd);
             var pieces = new List<OmsiMapPoint[]>();
             var heights = new List<double[]>();
-            foreach (var piece in plan.Pieces)
+            var issues = new List<OmsiRoadIssue>(plan.Issues);
+            var shownPlans = new List<OmsiRoadPlan> { plan };
+            foreach (var pair in ParallelPlans(plan))
+                shownPlans.Add(pair.Value);
+            foreach (var shown in shownPlans)
             {
-                var steps = Math.Max(2, (int)Math.Ceiling(piece.LengthMeters / 2.0));
-                var points = new OmsiMapPoint[steps + 1];
-                var pointHeights = new double[steps + 1];
-                for (var step = 0; step <= steps; step++)
+                if (!ReferenceEquals(shown, plan))
+                    issues.AddRange(shown.Issues);
+                foreach (var piece in shown.Pieces)
                 {
-                    piece.PointAt(piece.LengthMeters * step / steps, out var x, out var y, out var height);
-                    points[step] = new OmsiMapPoint(x, y);
-                    pointHeights[step] = height;
+                    var steps = Math.Max(2, (int)Math.Ceiling(piece.LengthMeters / 2.0));
+                    var points = new OmsiMapPoint[steps + 1];
+                    var pointHeights = new double[steps + 1];
+                    for (var step = 0; step <= steps; step++)
+                    {
+                        piece.PointAt(piece.LengthMeters * step / steps, out var x, out var y, out var height);
+                        points[step] = new OmsiMapPoint(x, y);
+                        pointHeights[step] = height;
+                    }
+                    pieces.Add(points);
+                    heights.Add(pointHeights);
                 }
-                pieces.Add(points);
-                heights.Add(pointHeights);
             }
-            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues,
+            mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, issues,
                 endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position, roadStart, heights);
             FindJunction(plan, planEnd, endJoin, endPort, out var tee, out var crossings);
             var meets = string.Empty;
@@ -3461,7 +3498,12 @@ namespace OmsiMapEditor.UI
                 meets += " Ends on spline #" + tee.Spline.Id + ": a click joins it with a new T junction.";
             if (meets.Length == 0 && (NeedsTransition(roadStartJoin, false) || NeedsTransition(endJoin, true)))
                 meets = " Joins a road of another width: a click puts a transition between them.";
-            roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort) + meets, plan.HasErrors || plan.Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Warning));
+            var besides = string.Empty;
+            for (var index = plan.Issues.Count; index < issues.Count; index++)
+                if (issues[index].Severity != OmsiRoadIssueSeverity.Note && besides.IndexOf(issues[index].Message, StringComparison.Ordinal) < 0)
+                    besides += "\nParallel " + issues[index].Severity.ToString().ToLowerInvariant() + ": " + issues[index].Message;
+            roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort) + meets + besides,
+                plan.HasErrors || issues.Exists(issue => issue.Severity != OmsiRoadIssueSeverity.Note));
         }
 
         private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin, OmsiJunctionPort endPort)
@@ -3570,8 +3612,16 @@ namespace OmsiMapEditor.UI
                 // When a part failed, the corner was taken back with it; the road goes on from where it was.
                 if (corner != null && corner.Count > 0 && !SplineExists(((OmsiSplineChange)corner[corner.Count - 1]).SplineIds[0]))
                     RestoreRoadStart(before);
+                // Parallel roads are not built through junctions yet; the next part starts them anew.
+                parallelEnds.Clear();
+                parallelSplineIds.Clear();
+                if (roadPanel.ParallelLeft || roadPanel.ParallelRight)
+                    SetStatus((statusLabel?.text ?? string.Empty) + " No parallel road was built here, as the road meets junctions.");
                 return;
             }
+            // Planned on the terrain as it is, before the road fits the terrain to itself.
+            var parallels = ParallelPlans(plan);
+            var parallelNote = string.Empty;
             var steps = new List<object>();
             OmsiSplineChange change;
             try
@@ -3590,6 +3640,7 @@ namespace OmsiMapEditor.UI
                 }
                 change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, startJoin, endJoin, roadPanel.FitTerrain);
                 steps.Add(change);
+                parallelNote = BuildParallels(plan, parallels, steps);
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
@@ -3601,7 +3652,8 @@ namespace OmsiMapEditor.UI
             if (steps.Count > 1)
                 PushHistory(new ObjectEditStep
                 {
-                    Group = steps.ConvertAll(step => new ObjectEditStep { SplineChange = (OmsiSplineChange)step }), Description = "the road round the corner"
+                    Group = steps.ConvertAll(step => new ObjectEditStep { SplineChange = (OmsiSplineChange)step }),
+                    Description = parallels.Count > 0 ? "the road with its parallel roads" : "the road round the corner"
                 });
             else
                 PushHistory(new ObjectEditStep { SplineChange = change });
@@ -3610,7 +3662,7 @@ namespace OmsiMapEditor.UI
             var warnings = plan.Issues.FindAll(issue => issue.Severity != OmsiRoadIssueSeverity.Note).Count;
             var built = "Built " + plan.LengthMeters.ToString("F1") + " m of road in " + change.SplineIds.Count + " spline(s)" +
                         (plan.StartTrimMeters > 0.0 ? ", rounding the corner with a radius of " + plan.CornerRadiusMeters.ToString("F1") + " m" : string.Empty) +
-                        (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty);
+                        (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty) + parallelNote;
             if (endJoin != null || endPort != null)
             {
                 EndRoad();
@@ -3660,6 +3712,81 @@ namespace OmsiMapEditor.UI
                 SetStatus("The corner could not be rounded: " + exception.Message);
                 return null;
             }
+        }
+
+        /// <summary>The roads to build beside a planned road with the road panel's Parallel settings, by side (-1 left, 1 right).</summary>
+        private List<KeyValuePair<int, OmsiRoadPlan>> ParallelPlans(OmsiRoadPlan plan)
+        {
+            var result = new List<KeyValuePair<int, OmsiRoadPlan>>();
+            if (roadPanel == null || !(roadPanel.ParallelDistance > 0.0) || plan.HasErrors || plan.Pieces.Count == 0)
+                return result;
+            foreach (var side in new[] { -1, 1 })
+                if (side < 0 ? roadPanel.ParallelLeft : roadPanel.ParallelRight)
+                    result.Add(new KeyValuePair<int, OmsiRoadPlan>(side, OmsiRoadPlanner.Offset(plan, side * roadPanel.ParallelDistance, roadPanel.ParallelOpposite,
+                        roadPanel.HeightMode, roadTerrain, RoadProfileHalfWidth(), RoadProfileWidth())));
+            return result;
+        }
+
+        /// <summary>
+        /// Builds the parallel roads of a road just built (ADR 043). Each joins the parallel road of the part before on its
+        /// side where they meet, at its start or, running the other way, at its end; that road is cut back like the road
+        /// itself for a rounded corner. Adds the changes to the steps and returns what to add to the status.
+        /// </summary>
+        private string BuildParallels(OmsiRoadPlan plan, List<KeyValuePair<int, OmsiRoadPlan>> parallels, List<object> steps)
+        {
+            var lastEnds = new Dictionary<int, KeyValuePair<int, bool>>(parallelEnds);
+            parallelEnds.Clear();
+            parallelSplineIds.Clear();
+            if (parallels.Count == 0)
+                return string.Empty;
+            var opposite = roadPanel.ParallelOpposite;
+            var ends = new Dictionary<int, KeyValuePair<int, bool>>();
+            var problems = new List<string>();
+            foreach (var pair in parallels)
+            {
+                var parallel = pair.Value;
+                if (parallel.HasErrors)
+                {
+                    problems.Add(parallel.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                    continue;
+                }
+                var first = parallel.Pieces[0];
+                var last = parallel.Pieces[parallel.Pieces.Count - 1];
+                last.PointAt(last.LengthMeters, out var endX, out var endY, out _);
+                var joint = opposite ? new OmsiMapPoint(endX, endY) : new OmsiMapPoint(first.StartX, first.StartY);
+                var known = lastEnds.TryGetValue(pair.Key, out var before);
+                var join = known ? FindSplineEnd(before.Key, before.Value) : null;
+                if (join != null && plan.StartTrimMeters > 0.0 && join.Spline.RadiusMeters == 0.0 && session.IsBuiltHere(join.Spline) &&
+                    join.Spline.LengthMeters - plan.StartTrimMeters >= OmsiRoadPlanner.MinimumLength)
+                {
+                    var cut = session.UpdateSplines(currentSummary,
+                        new[] { OmsiSplineEditing.CutBack(join, plan.StartTrimMeters, opposite ? parallel.EndHeight : first.StartHeight) });
+                    steps.Add(cut);
+                    RefreshSplineViews(cut);
+                    join = FindSplineEnd(before.Key, before.Value);
+                }
+                if (join != null && (!join.IsFree || Distance(join.Position(currentSummary.TileSizeMeters), joint) > 0.5))
+                    join = null;
+                var change = session.CreateRoad(currentSummary, parallel, roadPanel.Profile, opposite ? null : join, opposite ? join : null, roadPanel.FitTerrain);
+                steps.Add(change);
+                RefreshSplineViews(change);
+                parallelSplineIds.UnionWith(change.SplineIds);
+                ends[pair.Key] = opposite
+                    ? new KeyValuePair<int, bool>(change.SplineIds[0], false)
+                    : new KeyValuePair<int, bool>(change.SplineIds[change.SplineIds.Count - 1], true);
+            }
+            foreach (var end in ends)
+                parallelEnds[end.Key] = end.Value;
+            return (ends.Count > 0 ? ", and " + ends.Count + " parallel road(s) " + roadPanel.ParallelDistance.ToString("0.#", CultureInfo.InvariantCulture) + " m beside it" : string.Empty) +
+                   (problems.Count > 0 ? "; no parallel road where " + string.Join("; ", problems) : string.Empty);
+        }
+
+        /// <summary>A spline end found again by the spline's ID, or null when the spline went.</summary>
+        private OmsiSplineEnd FindSplineEnd(int id, bool atEnd)
+        {
+            var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+            var spline = tile?.Splines.Find(candidate => candidate.Id == id);
+            return spline != null ? new OmsiSplineEnd(tile, spline, atEnd) : null;
         }
 
         /// <summary>Where the road being drawn goes on from, to restore it.</summary>

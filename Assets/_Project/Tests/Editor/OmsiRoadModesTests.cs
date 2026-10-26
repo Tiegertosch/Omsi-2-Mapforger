@@ -154,6 +154,64 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(OmsiRoadSnapping.SnapArcEnd(0, 0, 0, 40 * Math.Sin(pointer), 40 * Math.Cos(pointer), out _, out _));
         }
 
+        private sealed class SlopeTerrain : IOmsiTerrainHeights
+        {
+            public bool TryGetHeight(double worldX, double worldY, out double value)
+            {
+                value = 0.1 * worldX;
+                return true;
+            }
+        }
+
+        [Test]
+        public void ParallelRoadsKeepTheirDistanceAndCanRunTheOtherWay()
+        {
+            // A quarter circle of 50 m to the right, from 0, 0 heading north to 50, 50 heading east.
+            var main = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 0, StartY = 0, ControlX = 0, ControlY = 50, EndX = 50, EndY = 50, Shape = OmsiRoadShape.Curved, HeightMode = OmsiRoadHeightMode.Manual,
+                StartHeight = 2, EndHeight = 4
+            }, new FlatTerrain());
+
+            // 5 m to its right: the inner road, a radius of 45 m around the same centre.
+            var inner = OmsiRoadPlanner.Offset(main, 5, false, OmsiRoadHeightMode.Manual, new FlatTerrain());
+            Assert.IsFalse(inner.HasErrors);
+            Assert.AreEqual(5.0, inner.Pieces[0].StartX, 1e-9);
+            Assert.AreEqual(0.0, inner.Pieces[0].StartY, 1e-9);
+            Assert.IsTrue(inner.Pieces.All(piece => Math.Abs(piece.RadiusMeters - 45.0) < 1e-6));
+            Assert.AreEqual(main.LengthMeters * 0.9, inner.LengthMeters, 1e-6);
+            AssertEndsAt(inner, 50, 45);
+            // Heights as on the road it runs beside.
+            Assert.AreEqual(2.0, inner.Pieces[0].StartHeight, 1e-9);
+            Assert.AreEqual(4.0, inner.EndHeight, 1e-9);
+
+            // The other way round: from the end back to the start, turning left.
+            var back = OmsiRoadPlanner.Offset(main, 5, true, OmsiRoadHeightMode.Manual, new FlatTerrain());
+            Assert.AreEqual(50.0, back.Pieces[0].StartX, 1e-6);
+            Assert.AreEqual(45.0, back.Pieces[0].StartY, 1e-6);
+            Assert.AreEqual(270.0, back.Pieces[0].HeadingDegrees, 1e-6);
+            Assert.IsTrue(back.Pieces.All(piece => Math.Abs(piece.RadiusMeters + 45.0) < 1e-6));
+            Assert.AreEqual(4.0, back.Pieces[0].StartHeight, 1e-9);
+            Assert.AreEqual(2.0, back.EndHeight, 1e-9);
+            AssertEndsAt(back, 5, 0);
+            AssertWithoutKinks(back);
+
+            // Closer than the road is wide, the two overlap: reported, still built.
+            var overlapping = OmsiRoadPlanner.Offset(main, 5, false, OmsiRoadHeightMode.Manual, new FlatTerrain(), 5.25, 10.5);
+            Assert.IsFalse(overlapping.HasErrors);
+            Assert.That(overlapping.Issues.Select(issue => issue.Message), Has.Some.Contains("overlaps it"));
+
+            // 60 m to the right would pass the centre of the curve.
+            Assert.IsTrue(OmsiRoadPlanner.Offset(main, 60, false, OmsiRoadHeightMode.Manual, new FlatTerrain()).HasErrors);
+
+            // Following the terrain, the road 10 m to the left of a road going north lies on the terrain there.
+            var straight = OmsiRoadPlanner.Plan(new OmsiRoadRequest { StartX = 20, StartY = 0, EndX = 20, EndY = 40 }, new SlopeTerrain());
+            var left = OmsiRoadPlanner.Offset(straight, -10, false, OmsiRoadHeightMode.FollowTerrain, new SlopeTerrain());
+            Assert.AreEqual(10.0, left.Pieces[0].StartX, 1e-9);
+            Assert.AreEqual(1.0, left.Pieces[0].StartHeight, 1e-9);
+            Assert.AreEqual(1.0, left.EndHeight, 1e-9);
+        }
+
         [Test]
         public void PointersSnapOntoGuideLinesAndWhereTheyCross()
         {

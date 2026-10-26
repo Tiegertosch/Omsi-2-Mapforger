@@ -488,6 +488,120 @@ namespace OmsiMapEditor.OMSI
             return new OmsiSplinePiece { StartX = startX, StartY = startY, HeadingDegrees = headingDegrees, LengthMeters = length, RadiusMeters = radius };
         }
 
+        /// <summary>
+        /// A road beside a planned one (ADR 043, Parallel): every piece moved sideways by <paramref name="offset"/> metres,
+        /// to the right of the road's direction for a positive offset. Straight pieces stay as long; arcs keep their centre,
+        /// so the radius changes by the offset and the length with it. Following the terrain the heights come from the
+        /// terrain under the new road, otherwise from the planned road. <paramref name="opposite"/> turns it round to run the
+        /// other way, as the other carriageway of a dual road. An arc whose centre the offset would pass is refused.
+        /// </summary>
+        /// <param name="halfWidthMeters">Half the profile's width for the check of tight curves, as in <see cref="OmsiRoadRequest.HalfWidthMeters"/>.</param>
+        /// <param name="widthMeters">The profile's width from edge to edge; a road closer than that overlaps the one it runs beside.</param>
+        public static OmsiRoadPlan Offset(OmsiRoadPlan plan, double offset, bool opposite, OmsiRoadHeightMode heightMode, IOmsiTerrainHeights terrain,
+            double? halfWidthMeters = null, double? widthMeters = null)
+        {
+            if (plan == null)
+                throw new ArgumentNullException(nameof(plan));
+            var result = new OmsiRoadPlan();
+            if (plan.HasErrors || plan.Pieces.Count == 0)
+            {
+                result.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "There is no road to run beside.", 0.0, 0.0));
+                return result;
+            }
+            var count = plan.Pieces.Count;
+            if (widthMeters.HasValue && Math.Abs(offset) < widthMeters.Value)
+                result.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                    "The road beside it overlaps it; set a distance of at least the road's width, " + Meters(widthMeters.Value) + ".",
+                    plan.Pieces[0].StartX, plan.Pieces[0].StartY));
+            var pieces = new List<OmsiSplinePiece>();
+            var heights = new double[count + 1];
+            for (var index = 0; index < count; index++)
+            {
+                var piece = plan.Pieces[index];
+                var side = (piece.HeadingDegrees + 90.0) * Math.PI / 180.0;
+                var startX = piece.StartX + Math.Sin(side) * offset;
+                var startY = piece.StartY + Math.Cos(side) * offset;
+                var radius = piece.RadiusMeters == 0.0 ? 0.0 : piece.RadiusMeters - offset;
+                if (piece.RadiusMeters != 0.0 && (Math.Sign(radius) != Math.Sign(piece.RadiusMeters) || Math.Abs(radius) < MinimumLength))
+                {
+                    result.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error,
+                        "The curve radius of " + Meters(Math.Abs(piece.RadiusMeters)) + " is too tight for a road " + Meters(Math.Abs(offset)) + " beside it.", startX, startY));
+                    return result;
+                }
+                var length = piece.RadiusMeters == 0.0 ? piece.LengthMeters : piece.LengthMeters * radius / piece.RadiusMeters;
+                pieces.Add(new OmsiSplinePiece
+                {
+                    StartX = startX, StartY = startY, HeadingDegrees = piece.HeadingDegrees, LengthMeters = length, RadiusMeters = radius,
+                    GradientStartPercent = piece.GradientStartPercent * piece.LengthMeters / length, GradientEndPercent = piece.GradientEndPercent * piece.LengthMeters / length
+                });
+                heights[index] = piece.StartHeight;
+                if (radius != 0.0 && halfWidthMeters.HasValue && Math.Abs(radius) < halfWidthMeters.Value)
+                    result.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                        "The curve radius of " + Meters(Math.Abs(radius)) + " beside the road is tighter than half the road's width; its inner edge folds over.", startX, startY));
+            }
+            heights[count] = plan.Pieces[count - 1].EndHeight;
+
+            if (heightMode == OmsiRoadHeightMode.FollowTerrain)
+            {
+                // Each boundary on the terrain under the new road, each piece with an even gradient.
+                for (var index = 0; index <= count; index++)
+                {
+                    double x, y;
+                    if (index < count)
+                    {
+                        x = pieces[index].StartX;
+                        y = pieces[index].StartY;
+                    }
+                    else
+                        pieces[count - 1].PointAt(pieces[count - 1].LengthMeters, out x, out y, out _);
+                    var ground = TerrainHeight(terrain, x, y);
+                    if (!ground.HasValue)
+                    {
+                        result.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Error, "The road beside it leaves the terrain.", x, y));
+                        return result;
+                    }
+                    heights[index] = ground.Value;
+                }
+                for (var index = 0; index < count; index++)
+                    pieces[index].GradientStartPercent = pieces[index].GradientEndPercent = (heights[index + 1] - heights[index]) / pieces[index].LengthMeters * 100.0;
+            }
+            for (var index = 0; index < count; index++)
+                pieces[index].StartHeight = heights[index];
+
+            if (opposite)
+            {
+                var reversed = new List<OmsiSplinePiece>();
+                for (var index = count - 1; index >= 0; index--)
+                {
+                    var piece = pieces[index];
+                    piece.PointAt(piece.LengthMeters, out var endX, out var endY, out _);
+                    var turn = piece.RadiusMeters == 0.0 ? 0.0 : piece.LengthMeters / piece.RadiusMeters * 180.0 / Math.PI;
+                    reversed.Add(new OmsiSplinePiece
+                    {
+                        StartX = endX, StartY = endY, StartHeight = heights[index + 1], HeadingDegrees = Normalize360(piece.HeadingDegrees + turn + 180.0),
+                        LengthMeters = piece.LengthMeters, RadiusMeters = -piece.RadiusMeters, GradientStartPercent = -piece.GradientEndPercent,
+                        GradientEndPercent = -piece.GradientStartPercent
+                    });
+                }
+                pieces = reversed;
+            }
+            result.Pieces.AddRange(pieces);
+            foreach (var piece in pieces)
+            {
+                result.LengthMeters += piece.LengthMeters;
+                result.MaximumGradientPercent = Math.Max(result.MaximumGradientPercent, Math.Max(Math.Abs(piece.GradientStartPercent), Math.Abs(piece.GradientEndPercent)));
+            }
+            var last = pieces[pieces.Count - 1];
+            result.EndHeight = last.EndHeight;
+            result.EndHeadingDegrees = EndHeading(last);
+            return result;
+        }
+
+        private static double Normalize360(double degrees)
+        {
+            return (degrees % 360.0 + 360.0) % 360.0;
+        }
+
         /// <summary>Corners sharper than this are left as a kink; a rounded hairpin would need a road far longer than the click.</summary>
         private const double MaximumRoundedTurnDegrees = 170.0;
 
