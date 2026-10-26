@@ -107,6 +107,17 @@ namespace OmsiMapEditor.UI
         private double? roadStartHeight;
         private OmsiSplineEnd roadStartJoin;
 
+        // A Curved road's control point once clicked, and the direction right angles are taken from at a free start: a
+        // road near it, else north (ADR 043).
+        private OmsiMapPoint? roadControl;
+        private double roadReferenceHeading;
+
+        /// <summary>A free start takes its right angles from a road this close.</summary>
+        private const double RoadReferenceReach = 40.0;
+
+        // False while a road is built with junctions or transitions, whose parts keep the corner they start at.
+        private bool roundCorners = true;
+
         // The connection point of a junction object the road starts from, or null.
         private OmsiJunctionPort roadStartPort;
 
@@ -381,6 +392,8 @@ namespace OmsiMapEditor.UI
                 roadPanel.style.display = DisplayStyle.None;
                 roadPanel.CloseRequested += () => SetTool(EditorTool.Drag);
                 roadPanel.SettingsChanged += UpdateRoadPreview;
+                // Another mode starts the next part anew; a control point belongs to Curved.
+                roadPanel.ShapeChanged += () => roadControl = null;
                 objectsPanelHost.Add(roadPanel);
                 terrainOptions = new TerrainToolOptions();
                 terrainOptions.style.display = DisplayStyle.None;
@@ -1043,6 +1056,12 @@ namespace OmsiMapEditor.UI
                 if (roadPanel != null && Enum.TryParse<OmsiRoadHeightMode>(Argument("-roadMode", 1) == "follow" ? "FollowTerrain" : Argument("-roadMode", 1) ?? string.Empty, true,
                         out var roadMode))
                     roadPanel.SetHeightMode(roadMode);
+                // -roadShape straight|curved|free and -roadSnap none|roads|angles|all (ADR 043).
+                if (roadPanel != null && Enum.TryParse<OmsiRoadShape>(Argument("-roadShape", 1) ?? string.Empty, true, out var roadShape))
+                    roadPanel.SetShape(roadShape);
+                var roadSnap = Argument("-roadSnap", 1);
+                if (roadPanel != null && roadSnap != null)
+                    roadPanel.SetSnapping(roadSnap == "roads" || roadSnap == "all", roadSnap == "angles" || roadSnap == "all");
                 // The profile list fills once the installation is listed.
                 var scanStarted = Time.realtimeSinceStartup;
                 while (installationScan != null && !installationScan.IsCompleted && Time.realtimeSinceStartup - scanStarted < 120f)
@@ -2556,6 +2575,7 @@ namespace OmsiMapEditor.UI
             roadStartPort = null;
             roadStartHeading = null;
             roadStartHeight = null;
+            roadControl = null;
             UpdateRoadPreview();
         }
 
@@ -2608,6 +2628,10 @@ namespace OmsiMapEditor.UI
         /// <summary>The free spline end or connection point a road snaps to at a point, whichever is nearer.</summary>
         private void Snap(OmsiMapPoint point, out OmsiSplineEnd join, out OmsiJunctionPort port)
         {
+            join = null;
+            port = null;
+            if (roadPanel != null && !roadPanel.SnapToRoads)
+                return;
             join = SnapEnd(point);
             port = SnapPort(point);
             if (join == null || port == null)
@@ -2629,24 +2653,72 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// The road from the current start to <paramref name="target"/>, joining a free spline end or connection point there
-        /// if there is one.
+        /// The road from the current start to the pointer: to a free spline end or connection point there if the road snaps
+        /// to roads, else to the pointer snapped to right angles; <paramref name="end"/> is where it ends.
         /// </summary>
-        private OmsiRoadPlan PlanRoad(OmsiMapPoint target, out OmsiSplineEnd endJoin, out OmsiJunctionPort endPort)
+        private OmsiRoadPlan PlanRoad(OmsiMapPoint pointer, out OmsiSplineEnd endJoin, out OmsiJunctionPort endPort, out OmsiMapPoint end)
         {
-            Snap(target, out endJoin, out endPort);
-            var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
+            Snap(pointer, out endJoin, out endPort);
+            end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? SnapRoadPointer(pointer);
             return PlanRoadBetween(roadStart, roadStartHeading, roadStartHeight, roadStartJoin?.OutwardGradientPercent, end, endJoin, endPort);
+        }
+
+        /// <summary>
+        /// The pointer snapped to right angles for the next point of the road (ADR 043), or as it is: the end of a Curved
+        /// road square to the leg to its control point, a Free road ending straight on or square to its start, and other
+        /// points square to the road continued, else to the reference of the start.
+        /// </summary>
+        private OmsiMapPoint SnapRoadPointer(OmsiMapPoint pointer)
+        {
+            if (!roadStarted || roadPanel == null || !roadPanel.SnapToAngles)
+                return pointer;
+            double x, y;
+            if (roadPanel.Shape == OmsiRoadShape.Curved && roadControl.HasValue)
+            {
+                var control = roadControl.Value;
+                var leg = OmsiRoadPlanner.ChordHeading(roadStart.X, roadStart.Y, control.X, control.Y);
+                return OmsiRoadSnapping.SnapToAngle(control.X, control.Y, leg, 90.0, pointer.X, pointer.Y, out x, out y) ? new OmsiMapPoint(x, y) : pointer;
+            }
+            if (roadPanel.Shape == OmsiRoadShape.Free && roadStartHeading.HasValue)
+                return OmsiRoadSnapping.SnapArcEnd(roadStart.X, roadStart.Y, roadStartHeading.Value, pointer.X, pointer.Y, out x, out y) ? new OmsiMapPoint(x, y) : pointer;
+            return OmsiRoadSnapping.SnapToAngle(roadStart.X, roadStart.Y, roadStartHeading ?? roadReferenceHeading, 90.0, pointer.X, pointer.Y, out x, out y)
+                ? new OmsiMapPoint(x, y)
+                : pointer;
+        }
+
+        /// <summary>
+        /// The control point of a Curved road a click at the pointer sets: on the heading of the road it continues, as the
+        /// road must leave that way, else the pointer snapped to right angles.
+        /// </summary>
+        private OmsiMapPoint ControlPointAt(OmsiMapPoint pointer)
+        {
+            if (!roadStartHeading.HasValue)
+                return SnapRoadPointer(pointer);
+            var heading = roadStartHeading.Value * Math.PI / 180.0;
+            var along = Math.Max(1.0, (pointer.X - roadStart.X) * Math.Sin(heading) + (pointer.Y - roadStart.Y) * Math.Cos(heading));
+            return new OmsiMapPoint(roadStart.X + Math.Sin(heading) * along, roadStart.Y + Math.Cos(heading) * along);
         }
 
         /// <summary>Plans a road with the road panel's settings from a start, with its heading, height and gradient where known, to an end.</summary>
         private OmsiRoadPlan PlanRoadBetween(OmsiMapPoint start, double? startHeading, double? startHeight, double? startGradient, OmsiMapPoint end,
             OmsiSplineEnd endJoin, OmsiJunctionPort endPort)
         {
+            // The mode shapes the road from where it starts; parts after a junction or a transition run straight in Straight
+            // mode and bend on tangentially otherwise.
+            var fromStart = roadStarted && Math.Abs(start.X - roadStart.X) < 1e-6 && Math.Abs(start.Y - roadStart.Y) < 1e-6;
+            var shape = roadPanel.Shape == OmsiRoadShape.Straight ? OmsiRoadShape.Straight : fromStart ? roadPanel.Shape : OmsiRoadShape.Free;
+            var control = fromStart && shape == OmsiRoadShape.Curved ? roadControl : null;
+            // A Straight road rounds the corner where it turns off a straight road built here, which is cut back for it.
+            var cornerSpline = fromStart && roundCorners && shape == OmsiRoadShape.Straight && roadStartJoin != null &&
+                               roadStartJoin.Spline.RadiusMeters == 0.0 && session.IsBuiltHere(roadStartJoin.Spline)
+                ? roadStartJoin.Spline
+                : null;
             var request = new OmsiRoadRequest
             {
                 StartX = start.X, StartY = start.Y, StartHeadingDegrees = startHeading, StartHeight = startHeight, EndX = end.X, EndY = end.Y,
-                StartGradientPercent = startGradient,
+                StartGradientPercent = startGradient, Shape = shape, ControlX = control?.X, ControlY = control?.Y,
+                CornerRadiusMeters = cornerSpline != null ? roadPanel.CornerRadius : 0.0,
+                StartTrimMaximumMeters = cornerSpline != null ? cornerSpline.LengthMeters - OmsiRoadPlanner.MinimumLength : 0.0,
                 HeightMode = roadPanel.HeightMode, MaximumPieceLength = roadPanel.PieceLength, GradientWarningPercent = roadPanel.GradientWarningPercent,
                 EndHeight = endJoin?.Height ?? endPort?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
                 // Driving into the joined spline or junction continues opposite to the way a road would leave it.
@@ -3203,6 +3275,7 @@ namespace OmsiMapEditor.UI
             }
             roadStartJoin = new OmsiSplineEnd(lastTile, last, true);
             roadStartPort = null;
+            roadControl = null;
             roadStart = roadStartJoin.Position(currentSummary.TileSizeMeters);
             roadStartHeading = roadStartJoin.OutwardHeadingDegrees;
             roadStartHeight = roadStartJoin.Height;
@@ -3219,6 +3292,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.ClearRoadPreview();
                 return;
             }
+            mapCanvas.SetRoadGuides(null);
             if (!roadStarted)
             {
                 Snap(roadPointer.Value, out var join, out var port);
@@ -3241,7 +3315,19 @@ namespace OmsiMapEditor.UI
                 roadPanel.ShowPlan("Click where the road should go next; Esc ends it.", false);
                 return;
             }
-            var plan = PlanRoad(roadPointer.Value, out var endJoin, out var endPort);
+            if (roadPanel.Shape == OmsiRoadShape.Curved && !roadControl.HasValue)
+            {
+                // Curved: first the control point the road leaves towards.
+                var control = ControlPointAt(roadPointer.Value);
+                mapCanvas.SetRoadPreview(null, true, null, null, roadStart);
+                mapCanvas.SetRoadGuides(new[] { new[] { roadStart, control } });
+                roadPanel.ShowPlan("Click the control point: the road leaves towards it" + (roadStartHeading.HasValue ? ", along the road it continues" : string.Empty) +
+                                   ". Then click where it ends; Esc ends the road.", false);
+                return;
+            }
+            var plan = PlanRoad(roadPointer.Value, out var endJoin, out var endPort, out var planEnd);
+            if (roadPanel.Shape == OmsiRoadShape.Curved && roadControl.HasValue)
+                mapCanvas.SetRoadGuides(new[] { new[] { roadStart, roadControl.Value, planEnd } });
             var pieces = new List<OmsiMapPoint[]>();
             var heights = new List<double[]>();
             foreach (var piece in plan.Pieces)
@@ -3260,7 +3346,7 @@ namespace OmsiMapEditor.UI
             }
             mapCanvas.SetRoadPreview(pieces, !plan.HasErrors && roadPanel.Profile != null, plan.Issues,
                 endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position, roadStart, heights);
-            FindJunction(plan, roadPointer.Value, endJoin, endPort, out var tee, out var crossings);
+            FindJunction(plan, planEnd, endJoin, endPort, out var tee, out var crossings);
             var meets = string.Empty;
             if (crossings.Count == 1)
                 meets = " Crosses spline #" + crossings[0].Road.Spline.Id + " after " + crossings[0].Along.ToString("F0") + " m: a click makes crossroads there.";
@@ -3283,6 +3369,10 @@ namespace OmsiMapEditor.UI
                 ? "No road here."
                 : plan.LengthMeters.ToString("F1") + " m in " + plan.Pieces.Count + " spline(s), " +
                   (plan.Pieces[0].RadiusMeters == 0 ? "straight" : "radius " + Math.Abs(plan.Pieces[0].RadiusMeters).ToString("F0") + " m") +
+                  (plan.StartTrimMeters > 0.0
+                      ? ", corner rounded with a radius of " + plan.CornerRadiusMeters.ToString("F1") + " m (the road before is cut back " +
+                        plan.StartTrimMeters.ToString("F1") + " m)"
+                      : string.Empty) +
                   ", gradient up to " + plan.MaximumGradientPercent.ToString("F1") + " %, end height " + plan.EndHeight.ToString("F2") + " m" +
                   (endJoin != null ? "; joins spline #" + endJoin.Spline.Id : endPort != null ? "; joins " + DescribePort(endPort) : string.Empty) + ".";
             foreach (var issue in plan.Issues)
@@ -3314,11 +3404,15 @@ namespace OmsiMapEditor.UI
                     roadStartHeight = roadTerrain != null && roadTerrain.TryGetHeight(point.X, point.Y, out var ground) ? ground : roadPanel.EndHeight;
                 if (roadPanel.HeightMode == OmsiRoadHeightMode.Manual && roadStartHeight.HasValue)
                     roadPanel.SuggestEndHeight(roadStartHeight.Value);
+                // A free start takes its right angles from a road nearby, else from north.
+                roadReferenceHeading = roadStartHeading ?? OmsiRoadSnapping.NearbyRoadHeading(currentSummary, roadStart.X, roadStart.Y, RoadReferenceReach) ?? 0.0;
                 roadStarted = true;
                 UpdateRoadPreview();
-                SetStatus(join != null ? "Continuing spline #" + join.Spline.Id + ". Click where the road should go; Esc ends it."
-                    : port != null ? "Road started at " + DescribePort(port) + ", leaving it the way the point faces. Click where it should go; Esc ends it."
-                    : "Road started. Click where it should go; it leaves straight towards the first click and then bends tangentially.");
+                var next = roadPanel.Shape == OmsiRoadShape.Curved ? "Click the control point the road leaves towards, then where it ends"
+                    : "Click where it should go";
+                SetStatus(join != null ? "Continuing spline #" + join.Spline.Id + ". " + next + "; Esc ends it."
+                    : port != null ? "Road started at " + DescribePort(port) + ", leaving it the way the point faces. " + next + "; Esc ends it."
+                    : "Road started. " + next + "; Esc ends it.");
                 return;
             }
 
@@ -3327,41 +3421,83 @@ namespace OmsiMapEditor.UI
                 SetStatus("Choose a spline profile in the road panel first.");
                 return;
             }
-            var plan = PlanRoad(point, out var endJoin, out var endPort);
+            if (roadPanel.Shape == OmsiRoadShape.Curved && !roadControl.HasValue)
+            {
+                var control = ControlPointAt(point);
+                if (Distance(control, roadStart) < OmsiRoadPlanner.MinimumLength)
+                {
+                    SetStatus("Click the control point a little away from the start.");
+                    return;
+                }
+                roadControl = control;
+                UpdateRoadPreview();
+                SetStatus("Control point set. Click where the curve ends; Esc takes the control point back.");
+                return;
+            }
+            var plan = PlanRoad(point, out var endJoin, out var endPort, out var end);
             if (plan.HasErrors)
             {
                 SetStatus("This road cannot be built: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
                 return;
             }
-            FindJunction(plan, point, endJoin, endPort, out var tee, out var crossings);
-            if (tee != null || crossings.Count > 0)
-            {
-                BuildJunctions(point, tee != null);
-                return;
-            }
+            FindJunction(plan, end, endJoin, endPort, out var tee, out var crossings);
             var transitionAtStart = NeedsTransition(roadStartJoin, false);
             var transitionAtEnd = NeedsTransition(endJoin, true);
-            if (transitionAtStart || transitionAtEnd)
+            if (tee != null || crossings.Count > 0 || transitionAtStart || transitionAtEnd)
             {
-                BuildWithTransitions(point, endJoin, endPort, transitionAtStart, transitionAtEnd);
+                // Their parts are planned again from the start as it is; the corner there stays sharp.
+                roundCorners = false;
+                try
+                {
+                    if (tee != null || crossings.Count > 0)
+                        BuildJunctions(end, tee != null);
+                    else
+                        BuildWithTransitions(end, endJoin, endPort, transitionAtStart, transitionAtEnd);
+                }
+                finally
+                {
+                    roundCorners = true;
+                }
                 return;
             }
+            var steps = new List<object>();
             OmsiSplineChange change;
             try
             {
-                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, roadStartJoin, endJoin, roadPanel.FitTerrain);
+                var startJoin = roadStartJoin;
+                if (plan.StartTrimMeters > 0.0)
+                {
+                    // The road before is cut back to where the rounded corner begins.
+                    var startJoinId = roadStartJoin.Spline.Id;
+                    var cut = session.UpdateSplines(currentSummary, new[] { OmsiSplineEditing.CutBack(roadStartJoin, plan.StartTrimMeters, plan.Pieces[0].StartHeight) });
+                    steps.Add(cut);
+                    RefreshSplineViews(cut);
+                    startJoin = RefindStartJoin(startJoinId);
+                    if (startJoin == null)
+                        throw new InvalidOperationException("the road before could not be found again after cutting it back.");
+                }
+                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, startJoin, endJoin, roadPanel.FitTerrain);
+                steps.Add(change);
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
+                RevertSteps(steps);
                 SetStatus("The road could not be built: " + exception.Message);
                 return;
             }
-            PushHistory(new ObjectEditStep { SplineChange = change });
+            if (steps.Count > 1)
+                PushHistory(new ObjectEditStep
+                {
+                    Group = steps.ConvertAll(step => new ObjectEditStep { SplineChange = (OmsiSplineChange)step }), Description = "the road round the corner"
+                });
+            else
+                PushHistory(new ObjectEditStep { SplineChange = change });
             RefreshSplineViews(change);
 
             var warnings = plan.Issues.FindAll(issue => issue.Severity != OmsiRoadIssueSeverity.Note).Count;
             var built = "Built " + plan.LengthMeters.ToString("F1") + " m of road in " + change.SplineIds.Count + " spline(s)" +
+                        (plan.StartTrimMeters > 0.0 ? ", rounding the corner with a radius of " + plan.CornerRadiusMeters.ToString("F1") + " m" : string.Empty) +
                         (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty);
             if (endJoin != null || endPort != null)
             {
@@ -4765,7 +4901,13 @@ namespace OmsiMapEditor.UI
                 }
                 else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
                 {
-                    if (roadStarted)
+                    if (roadControl.HasValue)
+                    {
+                        roadControl = null;
+                        UpdateRoadPreview();
+                        SetStatus("Control point taken back. Click it again, or Esc ends the road.");
+                    }
+                    else if (roadStarted)
                     {
                         EndRoad();
                         SetStatus("Road ended. Click to start the next one, Esc leaves the road tool.");

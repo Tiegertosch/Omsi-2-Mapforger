@@ -247,6 +247,9 @@ namespace OmsiMapEditor.UI
         private readonly List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>> roadIssues = new List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>>();
         private Vector2? roadSnap;
 
+        // Dashed construction lines of the road tool, such as the legs to a curve's control point; in map coordinates.
+        private readonly List<Vector2[]> roadGuides = new List<Vector2[]>();
+
         private readonly List<JunctionMarker> junctionMarkers = new List<JunctionMarker>();
         private Vector2? roadStart;
         private OmsiSplineRecord selectedSpline;
@@ -799,8 +802,24 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>Dashed construction lines for the road tool as world polylines, replacing those drawn before; null clears them.</summary>
+        public void SetRoadGuides(IEnumerable<OmsiMapPoint[]> lines)
+        {
+            roadGuides.Clear();
+            if (lines != null)
+                foreach (var line in lines)
+                {
+                    var points = new Vector2[line.Length];
+                    for (var index = 0; index < line.Length; index++)
+                        points[index] = WorldToMap(line[index]);
+                    roadGuides.Add(points);
+                }
+            MarkDirtyRepaint();
+        }
+
         public void ClearRoadPreview()
         {
+            roadGuides.Clear();
             roadPreview.Clear();
             roadPreviewHeights.Clear();
             roadIssues.Clear();
@@ -1574,6 +1593,11 @@ namespace OmsiMapEditor.UI
                 painter.Stroke();
             }
 
+            var guides = new List<List<Vector2>>();
+            foreach (var line in roadGuides)
+                guides.Add(new List<Vector2>(Array.ConvertAll(line, MapToScreen)));
+            DrawRoadGuides(painter, guides);
+
             if (roadPreview.Count > 0)
             {
                 painter.strokeColor = handleFillColor;
@@ -1645,6 +1669,18 @@ namespace OmsiMapEditor.UI
                 }
                 painter.Stroke();
             }
+
+            var guides = new List<List<Vector2>>();
+            foreach (var line in roadGuides)
+            {
+                var projected = new List<Vector2>();
+                foreach (var point in line)
+                    if (camera.TryProject(new Vector3(point.x, GroundAt(point) + lift, point.y), out var screen))
+                        projected.Add(screen);
+                if (projected.Count == line.Length)
+                    guides.Add(projected);
+            }
+            DrawRoadGuides(painter, guides);
 
             for (var pass = 0; pass < 2; pass++)
             {
@@ -1823,6 +1859,60 @@ namespace OmsiMapEditor.UI
             }
             if (any)
                 painter.Stroke();
+        }
+
+        /// <summary>Adds a screen polyline to the path as dashes, the pattern running on over its points.</summary>
+        private static void AddDashedPath(Painter2D painter, IReadOnlyList<Vector2> points, float dash, float gap)
+        {
+            if (points.Count < 2)
+                return;
+            var last = points[0];
+            painter.MoveTo(last);
+            var phase = 0f;
+            for (var index = 1; index < points.Count; index++)
+            {
+                var point = points[index];
+                var length = Vector2.Distance(last, point);
+                var travelled = 0f;
+                while (travelled < length)
+                {
+                    var inDash = phase < dash;
+                    var step = Mathf.Min(length - travelled, inDash ? dash - phase : dash + gap - phase);
+                    travelled += step;
+                    phase += step;
+                    var at = Vector2.Lerp(last, point, travelled / length);
+                    if (inDash)
+                        painter.LineTo(at);
+                    else
+                        painter.MoveTo(at);
+                    if (phase >= dash + gap)
+                        phase = 0f;
+                }
+                last = point;
+            }
+        }
+
+        /// <summary>The road tool's construction lines, dashed, with a dot at each inner point such as a curve's control point.</summary>
+        private void DrawRoadGuides(Painter2D painter, List<List<Vector2>> screenLines)
+        {
+            if (screenLines.Count == 0)
+                return;
+            painter.strokeColor = splineColor;
+            painter.lineWidth = 1.5f;
+            painter.lineCap = LineCap.Butt;
+            painter.lineJoin = LineJoin.Miter;
+            painter.BeginPath();
+            foreach (var line in screenLines)
+                AddDashedPath(painter, line, 7f, 5f);
+            painter.Stroke();
+            painter.fillColor = splineColor;
+            foreach (var line in screenLines)
+                for (var index = 1; index < line.Count - 1; index++)
+                {
+                    painter.BeginPath();
+                    AddCircle(painter, line[index], 4f);
+                    painter.Fill();
+                }
         }
 
         /// <summary>Overhead lines as dashes of 6 pixels with gaps of 4, fences as a solid line, both 1 pixel wide.</summary>

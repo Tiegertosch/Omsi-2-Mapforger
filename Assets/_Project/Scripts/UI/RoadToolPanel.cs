@@ -27,9 +27,15 @@ namespace OmsiMapEditor.UI
         private readonly VisualElement tabRow;
         private readonly ScrollView tiles;
         private readonly Label emptyLabel;
+        private readonly Button straightButton;
+        private readonly Button curvedButton;
+        private readonly Button freeButton;
+        private readonly Button snapRoadsButton;
+        private readonly Button snapAnglesButton;
         private readonly Button followButton;
         private readonly Button smoothButton;
         private readonly Button manualButton;
+        private readonly TextField cornerRadiusField;
         private readonly TextField endHeightField;
         private readonly TextField pieceLengthField;
         private readonly TextField gradientField;
@@ -69,6 +75,54 @@ namespace OmsiMapEditor.UI
             var optionsTitle = new Label("Options");
             optionsTitle.AddToClassList("picker-options-title");
             options.Add(optionsTitle);
+
+            // How the road runs to the click (ADR 043), as the building modes of Cities: Skylines.
+            var shapes = new VisualElement();
+            shapes.AddToClassList("panel-tabs");
+            shapes.AddToClassList("picker-segmented");
+            straightButton = new Button(() => SetShape(OmsiRoadShape.Straight))
+            {
+                text = "Straight", tooltip = "Each click ends a straight piece of road, whatever way the road before it runs."
+            };
+            curvedButton = new Button(() => SetShape(OmsiRoadShape.Curved))
+            {
+                text = "Curved",
+                tooltip = "Click a control point, then the end: the road leaves towards the control point and arrives coming from it. " +
+                          "Ending on a road it meets it in its direction, with an S curve where needed."
+            };
+            freeButton = new Button(() => SetShape(OmsiRoadShape.Free))
+            {
+                text = "Free", tooltip = "Each click bends the road on from the way it runs, without a kink."
+            };
+            foreach (var button in new[] { straightButton, curvedButton, freeButton })
+            {
+                button.AddToClassList("panel-tab");
+                shapes.Add(button);
+            }
+            Row(options, "Mode").Add(shapes);
+
+            var snaps = new VisualElement();
+            snaps.AddToClassList("panel-tabs");
+            snaps.AddToClassList("picker-segmented");
+            snapRoadsButton = new Button(() => SetSnapping(!SnapToRoads, SnapToAngles))
+            {
+                text = "Roads", tooltip = "Roads start and end on free spline ends and on free connection points of junctions near the pointer."
+            };
+            snapAnglesButton = new Button(() => SetSnapping(SnapToRoads, !SnapToAngles))
+            {
+                text = "90°",
+                tooltip = "Directions snap to right angles: to the road a new road continues or to a road near its start, else to north. " +
+                          "Free roads snap to end straight on or square to their start."
+            };
+            foreach (var button in new[] { snapRoadsButton, snapAnglesButton })
+            {
+                button.AddToClassList("panel-tab");
+                snaps.Add(button);
+            }
+            Row(options, "Snap").Add(snaps);
+            cornerRadiusField = Field(Row(options, "Corner radius (m)"), "15",
+                "Straight: where a road turns off the road it continues, the corner is rounded with this radius; that road is cut back for it. " +
+                "0 leaves a sharp corner. Only roads built in this project are cut back.");
 
             var heightRow = Row(options, "Height");
             var modes = new VisualElement();
@@ -187,6 +241,8 @@ namespace OmsiMapEditor.UI
             Add(picker);
 
             SetHeightMode(OmsiRoadHeightMode.FollowTerrain);
+            SetShape(OmsiRoadShape.Free);
+            SetSnapping(true, true);
             schedule.Execute(TakePreviews).Every(100);
         }
 
@@ -200,6 +256,17 @@ namespace OmsiMapEditor.UI
 
         public OmsiRoadHeightMode HeightMode { get; private set; }
 
+        public OmsiRoadShape Shape { get; private set; }
+
+        /// <summary>True when roads start and end on free spline ends and connection points near the pointer.</summary>
+        public bool SnapToRoads { get; private set; }
+
+        /// <summary>True when road directions snap to right angles.</summary>
+        public bool SnapToAngles { get; private set; }
+
+        /// <summary>The mode changed; a road being drawn starts its next part anew.</summary>
+        public event Action ShapeChanged;
+
         /// <summary>True when the terrain should be fitted to new roads.</summary>
         public bool FitTerrain => fitTerrainToggle.value;
 
@@ -210,6 +277,9 @@ namespace OmsiMapEditor.UI
         public double? EndHeight => Number(endHeightField, double.MinValue);
 
         public double PieceLength => Number(pieceLengthField, 1.0) ?? 25.0;
+
+        /// <summary>The radius Straight roads round the corner with where they turn off the road they continue; 0 for none.</summary>
+        public double CornerRadius => Number(cornerRadiusField, 0.0) ?? 0.0;
 
         public double GradientWarningPercent => Number(gradientField, 0.0) ?? 10.0;
 
@@ -289,6 +359,26 @@ namespace OmsiMapEditor.UI
                     ChooseTab(pair.Value.Key, pair.Value.Value);
                     return;
                 }
+        }
+
+        public void SetShape(OmsiRoadShape shape)
+        {
+            Shape = shape;
+            straightButton.EnableInClassList("panel-tab-active", shape == OmsiRoadShape.Straight);
+            cornerRadiusField.parent.SetEnabled(shape == OmsiRoadShape.Straight);
+            curvedButton.EnableInClassList("panel-tab-active", shape == OmsiRoadShape.Curved);
+            freeButton.EnableInClassList("panel-tab-active", shape == OmsiRoadShape.Free);
+            ShapeChanged?.Invoke();
+            SettingsChanged?.Invoke();
+        }
+
+        public void SetSnapping(bool roads, bool angles)
+        {
+            SnapToRoads = roads;
+            SnapToAngles = angles;
+            snapRoadsButton.EnableInClassList("panel-tab-active", roads);
+            snapAnglesButton.EnableInClassList("panel-tab-active", angles);
+            SettingsChanged?.Invoke();
         }
 
         public void SetHeightMode(OmsiRoadHeightMode mode)

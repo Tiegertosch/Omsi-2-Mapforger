@@ -528,3 +528,23 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grund:** Chrono-Änderungslisten kennen nur Hinzufügen, Auswählen, Löschen, Typwechsel, Neubeschriften und Regeln (TimetableChronoInventory, openOMSIs `Tile::apply_chrono`); einen Befehl zum Verschieben gibt es nicht. Eine Kopie mit neuer ID ist deshalb der einzige Weg, ein fremdes Objekt in einer Variante woanders hinzustellen. Den Weg gehen auch die mitgelieferten Varianten. Die Ansicht bis zur Variante zeigt genau das, worauf ihre Auswahlen zielen. Spätere Varianten würden Objekte zeigen, die sie nicht kennt. Objekte zuerst, weil Splines Nachbar-IDs in Basiskacheln tragen, die eine Änderungsliste nicht umschreiben kann; Straßen in Varianten brauchen eine eigene Entscheidung.
 
 **Offen:** Typwechsel (`[typ]`) und Beschriftung (`[relabel]`) im Inspector, Regeln, Straßen und Splines in Varianten, Fahrpläne der Variante, eine weggenommene Basisobjekt-Auswahl wieder zurücknehmen. Regeln, die frühere Varianten per Auswahl an ein Original hängen, übernimmt die Kopie nicht.
+
+## ADR 043: Bauarten und Einrasten im Straßenwerkzeug wie in Cities: Skylines
+
+**Status:** Angenommen, 26. Oktober 2026, auf Wunsch des Nutzers (Bauarten Straight, Curved, Freebending, Parallel; Einrasten an Straßen, rechten Winkeln und Hilfslinien). Free bleibt nach Entscheidung des Nutzers das bisherige tangentiale Weiterbiegen. Etappe 1: Bauarten und Einrasten an Straßen und rechten Winkeln, samt Eckausrundung vom Nutzer im Editor bestätigt.
+
+**Entscheidung:**
+
+- **Mode** im Optionen-Panel des Straßenwerkzeugs:
+  - **Straight:** Jeder Klick beendet ein gerades Stück. Biegt es von einer geraden, im Projekt gebauten Straße ab, wird die Ecke mit einem Bogen ausgerundet (Wunsch des Nutzers nach dem ersten Test, mit Bild einer offenen 90°-Ecke). Den Radius stellt „Corner radius“ ein, Standard 15 m. Die vorige Straße wird um die Tangentenlänge R·tan(Winkel/2) gekürzt (`OmsiSplineEditing.CutBack`). Ihr freies Ende bekommt die Höhe, an der der Bogen beginnt. Der Bogen trifft beide Geraden knickfrei. Reicht die vorige Straße oder das neue Stück nicht für die volle Tangente, wird der Radius kleiner. Kürzen und Bauen sind ein Rückgängig-Schritt. Straßen der Originalkarte, Bögen, Kreuzungsarme, Winkel über 170° sowie Klicks, die Kreuzungen oder Übergänge ergeben, behalten den Knick; er wird als Warnung gemeldet. Bei 0 m bleibt die Ecke immer spitz.
+  - **Curved:** Der erste Klick nach dem Start setzt einen Kontrollpunkt, der zweite das Ende. Die Straße verlässt den Start zum Kontrollpunkt hin und kommt vom Kontrollpunkt her am Ende an, wie eine quadratische Kurve. Gebaut wird sie aus zwei knickfreien Bögen (Biarc, ADR 024), auf einem Kreis aus einem. Endet sie an einer Straße oder einem Anschlusspunkt, gilt deren Richtung, was wo nötig eine S-Kurve ergibt. Setzt sie eine Straße fort, liegt der Kontrollpunkt auf deren Richtung, weil die Straße so weiterlaufen muss. Esc nimmt erst den Kontrollpunkt zurück, dann endet die Straße.
+  - **Free:** wie bisher. Ein freier Start geht gerade zum ersten Klick, jeder weitere biegt tangential weiter.
+  - Kreuzt eine Straße andere oder endet sie auf einer, wird das erste Stück bis zur ersten Kreuzung in der gewählten Bauart gebaut. Die Stücke dahinter laufen in Straight gerade und sonst tangential vom Kreuzungsarm weiter.
+- **Snap:**
+  - **Roads:** Einrasten an freien Spline-Enden und Anschlusspunkten, wie bisher, jetzt abschaltbar.
+  - **90°:** Richtungen innerhalb von 4° eines rechten Winkels rasten ein (`OmsiRoadSnapping`). Bezug ist die fortgesetzte Straße, bei einem freien Start die nächste Straße im Umkreis von 40 m, sonst Norden. Bei Curved rastet der Kontrollpunkt so ein und das Ende im rechten Winkel zum Schenkel zum Kontrollpunkt. Bei Free rastet das Ende ein, wenn der Bogen geradeaus oder um 90° weiterführt. Der Zeiger wird auf die eingerastete Richtung projiziert, die Länge bleibt.
+- Die Schenkel zum Kontrollpunkt zeigt die Karte gestrichelt, von oben und in 3D.
+
+**Grund:** Der Nutzer kennt die Bauarten aus Cities: Skylines. OMSI speichert Kreisbögen, und eine quadratische Kurve lässt sich durch ihre Endtangenten bestimmen. Zwei Bögen mit genau diesen Tangenten treffen beide Richtungen knickfrei und bleiben, was die Datei speichert (ADR 021). Rechte Winkel zur fortgesetzten oder benachbarten Straße ergeben Blöcke, die zueinander passen. Nur nach Norden auszurichten passt nicht zu Karten, deren Straßen schräg liegen.
+
+**Offen:** Etappe 2 (Hilfslinien) und Etappe 3 (Parallel).

@@ -67,6 +67,43 @@ namespace OmsiMapEditor.OMSI
         private const double GradientChangeTolerancePercent = 0.5;
 
         /// <summary>
+        /// A straight spline cut back by <paramref name="meters"/> at the given end, so a road can round the corner there
+        /// (ADR 043): the other end keeps its place, height and gradient, and the cut end gets <paramref name="cutHeight"/>.
+        /// </summary>
+        public static OmsiSplineGeometry CutBack(OmsiSplineEnd end, double meters, double cutHeight)
+        {
+            if (end == null)
+                throw new ArgumentNullException(nameof(end));
+            var spline = end.Spline;
+            if (spline.RadiusMeters != 0.0)
+                throw new ArgumentException("Only straight splines are cut back for a corner.", nameof(end));
+            var length = spline.LengthMeters - meters;
+            if (!(meters > 0.0) || length < OmsiRoadPlanner.MinimumLength)
+                throw new ArgumentOutOfRangeException(nameof(meters), "Spline " + spline.Id + " is too short to be cut back by " + meters + " m.");
+            var geometry = new OmsiSplineGeometry
+            {
+                Tile = end.Tile, Spline = spline, LocalX = spline.LocalX, LocalY = spline.LocalY, Height = spline.Height, HeadingDegrees = spline.HeadingDegrees,
+                LengthMeters = length, RadiusMeters = 0.0
+            };
+            if (end.AtEnd)
+            {
+                geometry.GradientStartPercent = spline.GradientAtPercent(0.0);
+                geometry.GradientEndPercent = 200.0 * (cutHeight - spline.Height) / length - geometry.GradientStartPercent;
+            }
+            else
+            {
+                // The start moves along the spline; its end and the gradient there stay.
+                var heading = spline.HeadingDegrees * Math.PI / 180.0;
+                geometry.LocalX = spline.LocalX + Math.Sin(heading) * meters;
+                geometry.LocalY = spline.LocalY + Math.Cos(heading) * meters;
+                geometry.Height = cutHeight;
+                geometry.GradientEndPercent = spline.GradientAtPercent(spline.LengthMeters);
+                geometry.GradientStartPercent = 200.0 * (spline.EndHeight - cutHeight) / length - geometry.GradientEndPercent;
+            }
+            return geometry;
+        }
+
+        /// <summary>
         /// Plans moving the end of a placed spline to a new point. The moved spline and the spline joined at that end keep
         /// their other ends and how far they turn, so their shape follows the joint without bending; kinks this leaves are
         /// reported. With <paramref name="tangential"/> nothing kinks instead: the joint keeps the heading the road passes

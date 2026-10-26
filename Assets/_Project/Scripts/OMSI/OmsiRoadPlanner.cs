@@ -20,6 +20,22 @@ namespace OmsiMapEditor.OMSI
         Smooth
     }
 
+    /// <summary>How a new road runs from its start to the point clicked (ADR 043).</summary>
+    public enum OmsiRoadShape
+    {
+        /// <summary>A tangent arc out of a joined start, straight from a free one, as Freeform in Cities: Skylines.</summary>
+        Free,
+
+        /// <summary>A straight line, whatever way the road it continues runs.</summary>
+        Straight,
+
+        /// <summary>
+        /// Leaves its start towards a control point and reaches the end coming from it, in one or two arcs without a kink;
+        /// an end on another road is met in its direction, which makes an S curve where needed.
+        /// </summary>
+        Curved
+    }
+
     public enum OmsiRoadIssueSeverity
     {
         /// <summary>Worth knowing, such as a road high above the terrain.</summary>
@@ -127,6 +143,27 @@ namespace OmsiMapEditor.OMSI
 
         public OmsiRoadHeightMode HeightMode { get; set; } = OmsiRoadHeightMode.FollowTerrain;
 
+        public OmsiRoadShape Shape { get; set; } = OmsiRoadShape.Free;
+
+        /// <summary>
+        /// The control point of a <see cref="OmsiRoadShape.Curved"/> road: it leaves its start towards it, unless the start
+        /// heading is given, and reaches its end coming from it, unless the end joins a road. Null plans it as
+        /// <see cref="OmsiRoadShape.Free"/>.
+        /// </summary>
+        public double? ControlX { get; set; }
+
+        public double? ControlY { get; set; }
+
+        /// <summary>
+        /// The radius a <see cref="OmsiRoadShape.Straight"/> road rounds the corner with where it continues a road at an
+        /// angle; 0 leaves the kink. The road it continues is cut back by up to <see cref="StartTrimMaximumMeters"/> for it,
+        /// and the radius shrinks when that or the new road is too short.
+        /// </summary>
+        public double CornerRadiusMeters { get; set; }
+
+        /// <summary>How far the road a Straight road continues may be cut back to round the corner; 0 leaves the kink.</summary>
+        public double StartTrimMaximumMeters { get; set; }
+
         /// <summary>Longer roads are split into pieces of at most this length, so each piece can follow the terrain.</summary>
         public double MaximumPieceLength { get; set; } = 25.0;
 
@@ -155,6 +192,15 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The steepest gradient of any piece, as a positive percentage.</summary>
         public double MaximumGradientPercent { get; internal set; }
+
+        /// <summary>
+        /// How far the road it continues must be cut back, as the plan rounds the corner there and starts that far before
+        /// the requested start; 0 when it starts at the requested start.
+        /// </summary>
+        public double StartTrimMeters { get; internal set; }
+
+        /// <summary>The radius of the rounded corner at the start, or 0.</summary>
+        public double CornerRadiusMeters { get; internal set; }
 
         public bool HasErrors => Issues.Exists(issue => issue.Severity == OmsiRoadIssueSeverity.Error);
     }
@@ -197,7 +243,8 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(request));
             // A free start and a joined end: the road is planned from the end, so it meets the joined road or junction
             // without a kink, and then turned round to run from the start.
-            if (!request.StartHeadingDegrees.HasValue && request.EndJoinHeadingDegrees.HasValue)
+            var curved = request.Shape == OmsiRoadShape.Curved && request.ControlX.HasValue && request.ControlY.HasValue;
+            if (request.Shape != OmsiRoadShape.Straight && !curved && !request.StartHeadingDegrees.HasValue && request.EndJoinHeadingDegrees.HasValue)
                 return Reversed(Plan(new OmsiRoadRequest
                 {
                     StartX = request.EndX, StartY = request.EndY, StartHeadingDegrees = request.EndJoinHeadingDegrees.Value + 180.0,
@@ -220,12 +267,54 @@ namespace OmsiMapEditor.OMSI
                 return plan;
             }
 
-            var heading = request.StartHeadingDegrees ?? ChordHeading(request.StartX, request.StartY, request.EndX, request.EndY);
-            // With a heading at both ends one arc would meet the end with a kink, which leaves a gap at the joint where OMSI
-            // draws each spline square to its own end; two arcs meet both headings without one.
-            var arcs = request.StartHeadingDegrees.HasValue && request.EndJoinHeadingDegrees.HasValue
-                ? Biarc(request.StartX, request.StartY, heading, request.EndX, request.EndY, request.EndJoinHeadingDegrees.Value)
-                : new List<OmsiSplinePiece> { Arc(request.StartX, request.StartY, heading, request.EndX, request.EndY) };
+            var chordHeading = ChordHeading(request.StartX, request.StartY, request.EndX, request.EndY);
+            double heading;
+            List<OmsiSplinePiece> arcs;
+            if (request.Shape == OmsiRoadShape.Straight)
+            {
+                heading = chordHeading;
+                arcs = new List<OmsiSplinePiece> { Arc(request.StartX, request.StartY, heading, request.EndX, request.EndY) };
+                var corner = request.StartHeadingDegrees.HasValue ? RoundCorner(request, heading, chord) : null;
+                if (corner != null)
+                {
+                    // The road starts on the road it continues, cut back by the corner's tangent, and runs round the corner.
+                    plan.StartTrimMeters = corner.Value.Key;
+                    plan.CornerRadiusMeters = Math.Abs(corner.Value.Value[0].RadiusMeters);
+                    arcs = corner.Value.Value;
+                    heading = arcs[0].HeadingDegrees;
+                    request = StartingEarlier(request, arcs[0].StartX, arcs[0].StartY, corner.Value.Key);
+                }
+                else if (request.StartHeadingDegrees.HasValue)
+                {
+                    var kink = Math.Abs(Normalize(heading - request.StartHeadingDegrees.Value));
+                    if (kink > JoinToleranceDegrees)
+                        plan.Issues.Add(new OmsiRoadIssue(OmsiRoadIssueSeverity.Warning,
+                            "The road leaves the road it continues with a kink of " + kink.ToString("0", CultureInfo.InvariantCulture) + "°.", request.StartX, request.StartY));
+                }
+            }
+            else if (curved)
+            {
+                // Like a curve in Cities: Skylines: the road leaves towards the control point and arrives coming from it, in
+                // two arcs that meet without a kink, as a quadratic curve has those tangents at its ends.
+                var controlX = request.ControlX.Value;
+                var controlY = request.ControlY.Value;
+                heading = request.StartHeadingDegrees ??
+                          (Distance(request.StartX, request.StartY, controlX, controlY) < MinimumLength ? chordHeading : ChordHeading(request.StartX, request.StartY, controlX, controlY));
+                var arrival = request.EndJoinHeadingDegrees ??
+                              (Distance(controlX, controlY, request.EndX, request.EndY) < MinimumLength ? (double?)null : ChordHeading(controlX, controlY, request.EndX, request.EndY));
+                arcs = arrival.HasValue
+                    ? Biarc(request.StartX, request.StartY, heading, request.EndX, request.EndY, arrival.Value)
+                    : new List<OmsiSplinePiece> { Arc(request.StartX, request.StartY, heading, request.EndX, request.EndY) };
+            }
+            else
+            {
+                heading = request.StartHeadingDegrees ?? chordHeading;
+                // With a heading at both ends one arc would meet the end with a kink, which leaves a gap at the joint where
+                // OMSI draws each spline square to its own end; two arcs meet both headings without one.
+                arcs = request.StartHeadingDegrees.HasValue && request.EndJoinHeadingDegrees.HasValue
+                    ? Biarc(request.StartX, request.StartY, heading, request.EndX, request.EndY, request.EndJoinHeadingDegrees.Value)
+                    : new List<OmsiSplinePiece> { Arc(request.StartX, request.StartY, heading, request.EndX, request.EndY) };
+            }
             var length = 0.0;
             foreach (var arc in arcs)
             {
@@ -397,6 +486,58 @@ namespace OmsiMapEditor.OMSI
         {
             TangentArc(startX, startY, headingDegrees, endX, endY, out var length, out var radius, out _);
             return new OmsiSplinePiece { StartX = startX, StartY = startY, HeadingDegrees = headingDegrees, LengthMeters = length, RadiusMeters = radius };
+        }
+
+        /// <summary>Corners sharper than this are left as a kink; a rounded hairpin would need a road far longer than the click.</summary>
+        private const double MaximumRoundedTurnDegrees = 170.0;
+
+        /// <summary>
+        /// The arc that rounds the corner between the road a Straight road continues and the new straight line, and that
+        /// line from the arc's end on, with the length the road before must be cut back by; null when the corner is not
+        /// rounded. The arc's tangents are equal, so it leaves the road before and meets the new line without a kink; its
+        /// radius shrinks when the road before or the new line is shorter than the tangent.
+        /// </summary>
+        private static KeyValuePair<double, List<OmsiSplinePiece>>? RoundCorner(OmsiRoadRequest request, double heading, double chord)
+        {
+            var turn = Math.Abs(Normalize(heading - request.StartHeadingDegrees.Value));
+            if (!(request.CornerRadiusMeters > 0.0) || !(request.StartTrimMaximumMeters > 0.0) || turn <= JoinToleranceDegrees || turn >= MaximumRoundedTurnDegrees)
+                return null;
+            var halfTurn = Math.Tan(turn / 2.0 * Math.PI / 180.0);
+            var trim = Math.Min(request.CornerRadiusMeters * halfTurn, Math.Min(request.StartTrimMaximumMeters, chord - MinimumLength));
+            if (trim < 0.05)
+                return null;
+            var inHeading = request.StartHeadingDegrees.Value * Math.PI / 180.0;
+            var outHeading = heading * Math.PI / 180.0;
+            var startX = request.StartX - Math.Sin(inHeading) * trim;
+            var startY = request.StartY - Math.Cos(inHeading) * trim;
+            var joinX = request.StartX + Math.Sin(outHeading) * trim;
+            var joinY = request.StartY + Math.Cos(outHeading) * trim;
+            var pieces = new List<OmsiSplinePiece> { Arc(startX, startY, request.StartHeadingDegrees.Value, joinX, joinY) };
+            if (Distance(joinX, joinY, request.EndX, request.EndY) > 1e-6)
+                pieces.Add(Arc(joinX, joinY, heading, request.EndX, request.EndY));
+            return new KeyValuePair<double, List<OmsiSplinePiece>>(trim, pieces);
+        }
+
+        /// <summary>
+        /// The request starting <paramref name="trim"/> metres back on the road it continues, at the height that road has
+        /// there by its gradient at the joint.
+        /// </summary>
+        private static OmsiRoadRequest StartingEarlier(OmsiRoadRequest request, double startX, double startY, double trim)
+        {
+            return new OmsiRoadRequest
+            {
+                StartX = startX, StartY = startY, StartHeadingDegrees = request.StartHeadingDegrees,
+                StartHeight = request.StartHeight - trim * (request.StartGradientPercent ?? 0.0) / 100.0,
+                StartGradientPercent = request.StartGradientPercent, EndX = request.EndX, EndY = request.EndY, EndHeight = request.EndHeight,
+                EndJoinHeadingDegrees = request.EndJoinHeadingDegrees, HeightMode = request.HeightMode, Shape = request.Shape, ControlX = request.ControlX,
+                ControlY = request.ControlY, MaximumPieceLength = request.MaximumPieceLength, GradientWarningPercent = request.GradientWarningPercent,
+                SmoothingMeters = request.SmoothingMeters, HalfWidthMeters = request.HalfWidthMeters
+            };
+        }
+
+        private static double Distance(double x1, double y1, double x2, double y2)
+        {
+            return Math.Sqrt(Square(x2 - x1) + Square(y2 - y1));
         }
 
         private static double EndHeading(OmsiSplinePiece piece)
