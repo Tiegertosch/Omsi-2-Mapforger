@@ -154,6 +154,44 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(OmsiRoadSnapping.SnapArcEnd(0, 0, 0, 40 * Math.Sin(pointer), 40 * Math.Cos(pointer), out _, out _));
         }
 
+        [Test]
+        public void PointersSnapOntoGuideLinesAndWhereTheyCross()
+        {
+            // A road ends at 0, 0 heading north: its extension runs north, the line square to it east and west.
+            var north = new OmsiGuideLine(0, 0, 0, false);
+            var across = new OmsiGuideLine(0, 0, 90, true);
+            // Another free end at 30, 40 facing west: its extension runs west along y = 40, its square line through x = 30.
+            var other = new OmsiGuideLine(30, 40, 270, false);
+            var square = new OmsiGuideLine(30, 40, 180, true);
+            var lines = new[] { north, across, other, square };
+            var used = new System.Collections.Generic.List<OmsiGuideLine>();
+
+            // Near one line: onto it.
+            Assert.IsTrue(OmsiRoadGuides.Snap(lines, 1.5, 60, 2, 200, null, out var x, out var y, used));
+            Assert.AreEqual(0.0, x, 1e-9);
+            Assert.AreEqual(60.0, y, 1e-9);
+            CollectionAssert.AreEqual(new[] { north }, used);
+
+            // Near where the extension meets the other end's east line: onto the crossing.
+            used.Clear();
+            Assert.IsTrue(OmsiRoadGuides.Snap(lines, 1, 41.5, 2, 200, null, out x, out y, used));
+            Assert.AreEqual(0.0, x, 1e-9);
+            Assert.AreEqual(40.0, y, 1e-9);
+            CollectionAssert.AreEquivalent(new[] { north, other }, used);
+
+            // Behind a ray's origin it does not count, and nothing else is near.
+            Assert.IsFalse(OmsiRoadGuides.Snap(lines, 1, -60, 2, 200, null, out _, out _, null));
+            // Lines whose origin is out of reach are left out.
+            Assert.IsFalse(OmsiRoadGuides.Snap(lines, 1.5, 60, 2, 20, null, out _, out _, null));
+
+            // A road already heading west from 100, 20 only snaps where a guide crosses its direction.
+            var west = new OmsiGuideLine(100, 20, 270, false);
+            Assert.IsTrue(OmsiRoadGuides.Snap(lines, 31.5, 20, 2, 200, west, out x, out y, null));
+            Assert.AreEqual(30.0, x, 1e-9);
+            Assert.AreEqual(20.0, y, 1e-9);
+            Assert.IsFalse(OmsiRoadGuides.Snap(lines, 15, 20, 2, 200, west, out _, out _, null));
+        }
+
         private static void AssertEndsAt(OmsiRoadPlan plan, double x, double y)
         {
             var last = plan.Pieces.Last();

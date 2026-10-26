@@ -32,6 +32,7 @@ namespace OmsiMapEditor.UI
         private readonly Button freeButton;
         private readonly Button snapRoadsButton;
         private readonly Button snapAnglesButton;
+        private readonly Button snapGuidesButton;
         private readonly Button followButton;
         private readonly Button smoothButton;
         private readonly Button manualButton;
@@ -104,17 +105,23 @@ namespace OmsiMapEditor.UI
             var snaps = new VisualElement();
             snaps.AddToClassList("panel-tabs");
             snaps.AddToClassList("picker-segmented");
-            snapRoadsButton = new Button(() => SetSnapping(!SnapToRoads, SnapToAngles))
+            snapRoadsButton = new Button(() => SetSnapping(!SnapToRoads, SnapToAngles, SnapToGuides))
             {
                 text = "Roads", tooltip = "Roads start and end on free spline ends and on free connection points of junctions near the pointer."
             };
-            snapAnglesButton = new Button(() => SetSnapping(SnapToRoads, !SnapToAngles))
+            snapAnglesButton = new Button(() => SetSnapping(SnapToRoads, !SnapToAngles, SnapToGuides))
             {
                 text = "90°",
                 tooltip = "Directions snap to right angles: to the road a new road continues or to a road near its start, else to north. " +
                           "Free roads snap to end straight on or square to their start."
             };
-            foreach (var button in new[] { snapRoadsButton, snapAnglesButton })
+            snapGuidesButton = new Button(() => SetSnapping(SnapToRoads, SnapToAngles, !SnapToGuides))
+            {
+                text = "Guides",
+                tooltip = "Free spline ends and connection points of junctions nearby cast guide lines: the road's extension and the line square to it. " +
+                          "The pointer snaps onto them and onto where two cross, also where they cross a right-angle direction."
+            };
+            foreach (var button in new[] { snapRoadsButton, snapAnglesButton, snapGuidesButton })
             {
                 button.AddToClassList("panel-tab");
                 snaps.Add(button);
@@ -242,7 +249,7 @@ namespace OmsiMapEditor.UI
 
             SetHeightMode(OmsiRoadHeightMode.FollowTerrain);
             SetShape(OmsiRoadShape.Free);
-            SetSnapping(true, true);
+            SetSnapping(true, true, true);
             schedule.Execute(TakePreviews).Every(100);
         }
 
@@ -263,6 +270,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>True when road directions snap to right angles.</summary>
         public bool SnapToAngles { get; private set; }
+
+        /// <summary>True when the pointer snaps onto guide lines of the roads nearby.</summary>
+        public bool SnapToGuides { get; private set; }
 
         /// <summary>The mode changed; a road being drawn starts its next part anew.</summary>
         public event Action ShapeChanged;
@@ -372,12 +382,14 @@ namespace OmsiMapEditor.UI
             SettingsChanged?.Invoke();
         }
 
-        public void SetSnapping(bool roads, bool angles)
+        public void SetSnapping(bool roads, bool angles, bool guides)
         {
             SnapToRoads = roads;
             SnapToAngles = angles;
+            SnapToGuides = guides;
             snapRoadsButton.EnableInClassList("panel-tab-active", roads);
             snapAnglesButton.EnableInClassList("panel-tab-active", angles);
+            snapGuidesButton.EnableInClassList("panel-tab-active", guides);
             SettingsChanged?.Invoke();
         }
 
