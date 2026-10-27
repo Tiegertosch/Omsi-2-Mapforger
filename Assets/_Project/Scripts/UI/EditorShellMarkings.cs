@@ -164,6 +164,7 @@ namespace OmsiMapEditor.UI
                 ApplyMarkings(lines, CopyAreas(), markingSelected, "Changed the curvature of the line");
             };
             markingOptions.DeleteRequested += DeleteSelectedMarking;
+            markingOptions.CloseRequested += () => SetTool(EditorTool.Drag);
             objectsPanelHost.Add(markingOptions);
         }
 
@@ -925,11 +926,13 @@ namespace OmsiMapEditor.UI
                                             (dependentAreas > 0 ? ", with " + dependentAreas + " area(s) at them" : string.Empty));
         }
 
-        /// <summary>Switches the style for the next line, or of the selected line, to the next one, as Y does.</summary>
+        /// <summary>Switches to the next marking of the chosen kind, for the next one or the selected one, as Y does.</summary>
         private void NextMarkingStyle()
         {
-            markingOptions?.ChooseStyle(markingOptions.NextStyle());
-            SetStatus("Markings: " + OmsiMarkingStyleInfo.Of(markingOptions.Style).Name.ToLowerInvariant() + ".");
+            if (markingOptions == null)
+                return;
+            markingOptions.ChooseNext();
+            SetStatus("Markings: " + markingOptions.ChoiceName.ToLowerInvariant() + ".");
         }
 
         /// <summary>
@@ -1055,7 +1058,7 @@ namespace OmsiMapEditor.UI
                           markingAnchorPoints[index].Y.ToString("0.0", CultureInfo.InvariantCulture));
             if (markingJunction != null && string.Equals(argument, "auto", StringComparison.OrdinalIgnoreCase))
                 SuggestMarkings();
-            else if (markingJunction != null && !string.Equals(argument, "show", StringComparison.OrdinalIgnoreCase))
+            else if (markingJunction != null && !argument.StartsWith("show", StringComparison.OrdinalIgnoreCase))
             {
                 var lines = CopyMarkings();
                 var areas = CopyAreas();
@@ -1094,6 +1097,36 @@ namespace OmsiMapEditor.UI
                 }
                 ApplyMarkings(lines, areas, arrows, -1, "Drew " + (lines.Count - markingMade.Markings.Count) + " line(s), " + (areas.Count - markingMade.Areas.Count) +
                                                         " area(s) and " + (arrows.Count - markingMade.Arrows.Count) + " arrow(s)");
+            }
+            // Then the menu as a click would leave it: "choose:key" picks a marking, "select:line|area|arrow:n" selects one.
+            foreach (var part in argument.Split(','))
+            {
+                var pieces = part.Trim().Split(':');
+                if (pieces.Length == 2 && pieces[0] == "choose")
+                {
+                    if (OmsiMarkingStyleInfo.ByKey(pieces[1]) is OmsiMarkingStyleInfo style)
+                        markingOptions.ChooseStyle(style.Style);
+                    else if (OmsiMarkingFillInfo.ByKey(pieces[1]) is OmsiMarkingFillInfo fill)
+                        markingOptions.ChooseFill(fill.Fill);
+                    else if (OmsiMarkingArrowInfo.ByKey(pieces[1]) is OmsiMarkingArrowInfo kind)
+                        markingOptions.ChooseArrow(kind.Kind);
+                }
+                else if (pieces.Length == 3 && pieces[0] == "select" && markingMade != null && int.TryParse(pieces[2], out var index) && index >= 0)
+                {
+                    if (pieces[1] == "line" && index < markingMade.Markings.Count)
+                    {
+                        markingSelected = index;
+                        markingOptions.ShowLine(markingMade.Markings[index], null);
+                    }
+                    else if (pieces[1] == "area" && index < markingMade.Areas.Count)
+                    {
+                        markingArea = index;
+                        markingOptions.ShowArea(markingMade.Areas[index]);
+                    }
+                    else if (pieces[1] == "arrow" && index < markingMade.Arrows.Count)
+                        SelectMarkingArrow(index);
+                    UpdateMarkingPreview();
+                }
             }
             Debug.Log("Markings: " + statusLabel?.text);
         }

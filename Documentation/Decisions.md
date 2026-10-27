@@ -599,3 +599,21 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Panel:** Das Werkzeug wählt immer genau eins aus Linienart, Füllung und Pfeilart; das bestimmt, was ein Klick auf die Kreuzung macht. Damit das Panel die Ansichtsknöpfe frei lässt, zeigt es nur die Felder der gewählten Art („Apply to“, „Hide piece“ und „Curvature“ bei Linien, „Stripe angle“ bei Flächen, „Arrow distance“ bei Pfeilen). Füllungen und Pfeile stehen je in einer Zeile.
 
 **Offen:** Pfeile, Zebrastreifen und Flächen auf der anschließenden Straße folgen nicht deren Steigung.
+
+## ADR 045: Markierungsmenü wie das Straßenmenü
+
+**Status:** Angenommen, 27. Oktober 2026, auf Wunsch des Nutzers („das Road Markings Menü komplett überarbeiten, da es super unübersichtlich ist“). Aufbau und Lage nach seiner Wahl. Ersetzt die Angaben zum Panel in ADR 044 (Stile in zwei Spalten, 300 px Breite, Knöpfe für Füllungen und Pfeile).
+
+**Entscheidung:** Das Werkzeug Markings zeigt zwei Panels über der unteren Werkzeugleiste, gebaut wie das Straßenmenü (ADR 029) aus dessen Bausteinen (`picker-tool`, `picker-options`, `picker-panel`, `picker-tile`). Die Bibliothek ist mit 560 × 300 px kleiner, damit die Kreuzung in der Bildmitte frei bleibt.
+- **Links „Options“:** Die Kreuzung mit der Zahl ihrer Linien, Flächen und Pfeile, „Auto markings“, darunter die Einstellungen des gewählten Elements oder des nächsten:
+  - „Selected line“ bzw. „Next line“ mit „Apply to“ und „Hide piece“ (nur bei gewählter Linie) und „Curvature“.
+  - „Selected area“ bzw. „Next area“ mit „Stripe angle“.
+  - „Selected arrow“ mit „Distance“; ein neuer Pfeil liegt, wo man klickt, und braucht keine.
+  - Ein Löschknopf nur bei gewähltem Element.
+- **Rechts die Bibliothek:** In der Kopfzeile stehen Name und Hinweis zum nächsten Klick, daneben ein Schließen-Knopf. Darunter folgen die Reiter „Lines“, „Areas“, „Arrows“ und „Favorites“ mit Kacheln für jede Markierung.
+  - Jede Kachel zeichnet die Markierung so, wie sie gelegt wird, weiß oder gelb auf dunklem Grund: Linien mit ihren Strichen, Doppellinie, Zebrastreifen, Flächen schraffiert mit Rand, Pfeile mit ihren Ästen.
+  - Kacheln tragen kurze Namen; der volle Name steht in Titel und Tooltip.
+- **Favoriten:** Ein Stern auf jeder Kachel, wie im Straßenmenü. Favoriten stehen in ihrem Reiter vorn und gesammelt unter „Favorites“. Linienarten bleiben unter ihrem alten Schlüssel gespeichert, Flächen als `area:…`, Pfeile als `arrow:…`.
+- **Eine Wahl:** Es ist immer genau eine Markierung gewählt; sie bestimmt, was ein Klick auf die Kreuzung macht. Wird ein Element auf der Kreuzung gewählt, springt die Bibliothek auf seinen Reiter. Y schaltet innerhalb der Art der Wahl weiter, Favoriten zuerst.
+
+**Grund:** Im alten Panel standen Linienarten, Flächen, Pfeile und alle Felder untereinander, nur mit Namen. Mit den Etappen 3 und 4 wurde es so hoch, dass es die Ansichtsknöpfe verdeckte, und es lag mitten über der Kreuzung. Bilder erkennt man schneller als Namen wie „Broken edge line“; Reiter und nur die passenden Felder halten beide Panels flach. Das Muster kennt der Nutzer schon aus Straßen- und Objektmenü.

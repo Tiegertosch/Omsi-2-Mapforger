@@ -45,6 +45,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Dialog für neue Karten (ADR 032): Größe bis 9 × 9 Kacheln, Geländehöhe, Bodentextur mit Vorschaubildern, Rechts- oder Linksverkehr, Autos und Fahrgäste, echte Schienen, Jahre und Jahresversatz, Währung, Fahrscheine, Jahreszeiten und Beschreibung; alles beginnt mit den Werten der Vorlage
 - [x] Kacheln hinzufügen und löschen (ADR 031): blasses Plus auf freien Plätzen neben der Karte, deckend unter dem Mauszeiger, Gelände setzt die Nachbarn fort; **Delete tile** mit zweitem Klick, Kachelindizes in Einstiegspunkten, Fahrplan, Signalrouten und Wiederholungen werden nachgezogen, Verweise von außen verhindern das Löschen; rückgängig machbar
 - [x] Straßenmenü wie in Cities: Skylines (ADR 029): Optionen links, Straßenauswahl mit Reitern nach Art (automatisch aus den Spuren), „In map“, „Favorites“, Suche und Kacheln mit Vorschaubildern aus den Texturen
+- [x] Markierungsmenü wie das Straßenmenü (ADR 045): Optionen links mit nur den Feldern des gewählten Elements, Bibliothek mit Reitern Lines, Areas, Arrows, Favorites und gezeichneten Vorschauen jeder Markierung
 - [x] Farben der Vektorebene an das Corporate Design anpassen: Auswahl rot, gewählte Kachel gold, Splines orange, Objekte blau, Bäume und Platzieren grün; die Farben kommen aus den Design-Tokens
 
 ## Später
