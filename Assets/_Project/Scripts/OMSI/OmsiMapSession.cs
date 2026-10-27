@@ -19,7 +19,10 @@ namespace OmsiMapEditor.OMSI
         /// A chrono variant took an object of the base map or of an earlier variant away and added a copy with a new ID
         /// where it was moved or turned to; chrono change lists cannot move what they did not add.
         /// </summary>
-        Copy
+        Copy,
+
+        /// <summary>The [rule] records after the object changed, such as the right of way of its paths (ADR 047).</summary>
+        Rules
     }
 
     /// <summary>
@@ -59,7 +62,8 @@ namespace OmsiMapEditor.OMSI
         /// <summary>True when the object exists in the summary in the current state of the change.</summary>
         public bool ObjectExists => Kind == OmsiObjectChangeKind.Deletion
             ? !IsApplied
-            : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || Kind == OmsiObjectChangeKind.Copy || IsApplied;
+            : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || Kind == OmsiObjectChangeKind.Copy ||
+              Kind == OmsiObjectChangeKind.Rules || IsApplied;
 
         /// <summary>The object in the summary in the current state of the change: for an undone copy the original.</summary>
         public OmsiObjectRecord CurrentRecord => Kind == OmsiObjectChangeKind.Copy && !IsApplied ? ReplacedRecord : Record;
@@ -102,6 +106,11 @@ namespace OmsiMapEditor.OMSI
         public string AssetBefore { get; internal set; }
 
         public string AssetAfter { get; internal set; }
+
+        /// <summary>The object's rules before and after a change of its rules; null for other changes.</summary>
+        internal List<OmsiPathRule> RulesBefore { get; set; }
+
+        internal List<OmsiPathRule> RulesAfter { get; set; }
 
         internal List<FileState> Files { get; } = new List<FileState>();
     }
@@ -582,6 +591,8 @@ namespace OmsiMapEditor.OMSI
                 AddToSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Replacement)
                 change.Record.AssetPath = change.AssetBefore;
+            else if (change.Kind == OmsiObjectChangeKind.Rules)
+                SetRules(change.Record, change.RulesBefore);
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, false);
             else
@@ -603,6 +614,8 @@ namespace OmsiMapEditor.OMSI
                 RemoveFromSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Replacement)
                 change.Record.AssetPath = change.AssetAfter;
+            else if (change.Kind == OmsiObjectChangeKind.Rules)
+                SetRules(change.Record, change.RulesAfter);
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, true);
             else

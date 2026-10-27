@@ -30,6 +30,12 @@ namespace OmsiMapEditor.UI
         }
 
         private readonly List<PathLine> pathLines = new List<PathLine>();
+
+        // The signs of the arms of the junction the priority tool works on (ADR 047): where they stand, their levels
+        // (0 normal, 1 main road, 2 give way) and the one under the pointer, -1 for none.
+        private readonly List<Vector2> priorityHandles = new List<Vector2>();
+        private readonly List<int> priorityLevels = new List<int>();
+        private int priorityHovered = -1;
         private readonly bool[] pathKinds = { true, true, true };
         private bool showPaths;
 
@@ -72,6 +78,76 @@ namespace OmsiMapEditor.UI
                     });
                 }
             MarkDirtyRepaint();
+        }
+
+        /// <summary>The signs of a junction's arms for the priority tool, as world points with their levels; null clears them.</summary>
+        /// <param name="levels">0 normal, 1 main road, 2 give way, by sign.</param>
+        public void SetPriorityHandles(IList<OmsiMapPoint> points, IList<int> levels, int hovered)
+        {
+            priorityHandles.Clear();
+            priorityLevels.Clear();
+            if (points != null)
+                for (var index = 0; index < points.Count; index++)
+                {
+                    priorityHandles.Add(WorldToMap(points[index]));
+                    priorityLevels.Add(levels[index]);
+                }
+            priorityHovered = hovered;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>A round sign per arm: a yellow diamond for a main road, a red-edged triangle for give way, a grey ring for normal.</summary>
+        private void DrawPriorityHandles(Painter2D painter)
+        {
+            for (var index = 0; index < priorityHandles.Count; index++)
+            {
+                var at = MapToScreen(priorityHandles[index]);
+                var radius = index == priorityHovered ? 16f : 13f;
+                painter.fillColor = handleFillColor;
+                painter.strokeColor = index == priorityHovered ? splineColor : tileBorderColor;
+                painter.lineWidth = 2f;
+                painter.lineJoin = LineJoin.Round;
+                painter.BeginPath();
+                painter.Arc(at, radius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                painter.Fill();
+                painter.Stroke();
+                var size = radius * 0.62f;
+                if (priorityLevels[index] == 1)
+                {
+                    painter.fillColor = selectedTileColor;
+                    painter.strokeColor = routeColor;
+                    painter.lineWidth = 1.5f;
+                    painter.BeginPath();
+                    painter.MoveTo(at + new Vector2(0f, -size));
+                    painter.LineTo(at + new Vector2(size, 0f));
+                    painter.LineTo(at + new Vector2(0f, size));
+                    painter.LineTo(at + new Vector2(-size, 0f));
+                    painter.ClosePath();
+                    painter.Fill();
+                    painter.Stroke();
+                }
+                else if (priorityLevels[index] == 2)
+                {
+                    painter.fillColor = routeColor;
+                    painter.strokeColor = selectedObjectColor;
+                    painter.lineWidth = 2.5f;
+                    painter.BeginPath();
+                    painter.MoveTo(at + new Vector2(-size, -size * 0.7f));
+                    painter.LineTo(at + new Vector2(size, -size * 0.7f));
+                    painter.LineTo(at + new Vector2(0f, size));
+                    painter.ClosePath();
+                    painter.Fill();
+                    painter.Stroke();
+                }
+                else
+                {
+                    painter.strokeColor = wireColor;
+                    painter.lineWidth = 2f;
+                    painter.BeginPath();
+                    painter.Arc(at, size * 0.55f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                    painter.Stroke();
+                }
+            }
         }
 
         /// <summary>Centres the view from above on a point in world metres, close enough to see the paths there.</summary>

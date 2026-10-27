@@ -427,6 +427,7 @@ namespace OmsiMapEditor.UI
                 terrainOptions.ImportConfirmed += LayHeightMap;
                 objectsPanelHost.Add(terrainOptions);
                 CreateMarkingOptions();
+                CreatePriorityOptions();
             }
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -490,6 +491,8 @@ namespace OmsiMapEditor.UI
                         ShowTerrainBrush();
                     else if (activeTool == EditorTool.Markings)
                         UpdateMarkingPreview();
+                    else if (activeTool == EditorTool.Priorities)
+                        UpdatePriorityPreview();
                     else
                         UpdateRoadPreview();
                 };
@@ -506,6 +509,8 @@ namespace OmsiMapEditor.UI
                         ClickRow(x, y);
                     else if (activeTool == EditorTool.Markings)
                         ClickMarking(x, y);
+                    else if (activeTool == EditorTool.Priorities)
+                        ClickPriority(x, y);
                     else
                         BuildRoadTo(x, y);
                 };
@@ -1039,6 +1044,16 @@ namespace OmsiMapEditor.UI
             var markingArgument = Argument("-markings", 1);
             if (markingArgument != null)
                 RunMarkingArgument(markingArgument);
+
+            // -priorities [n ...] opens the priority tool on the selected junction and clicks the signs given (ADR 047).
+            var priorityAt = Array.IndexOf(args, "-priorities");
+            if (priorityAt >= 0)
+            {
+                var signs = new List<string>();
+                for (var index = priorityAt + 1; index < args.Length && !args[index].StartsWith("-", StringComparison.Ordinal); index++)
+                    signs.Add(args[index]);
+                RunPriorityArgument(signs);
+            }
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
                 SetTextures(false);
@@ -1580,6 +1595,12 @@ namespace OmsiMapEditor.UI
             {
                 activeTool = EditorTool.Drag;
                 EndMarkingTool();
+            }
+            // So does the priority tool.
+            if (activeTool == EditorTool.Priorities)
+            {
+                activeTool = EditorTool.Drag;
+                EndPriorityTool();
             }
             ClearSelectedSpline();
             var previousTile = selectedTile;
@@ -2977,6 +2998,8 @@ namespace OmsiMapEditor.UI
                 if (step is OmsiSplineChange change)
                     RefreshSplineViews(change);
             steps.AddRange(result.Steps);
+            // The main road's arms get the right of way, the others give way (ADR 047).
+            ApplyMadePriorities(result.Junction, arms, steps);
             // The road tool snaps to the new junction's points from now on.
             roadPorts = null;
             return result.Junction;
@@ -4225,6 +4248,9 @@ namespace OmsiMapEditor.UI
             // Undo may have put another file of the junction back; the markings tool reads it anew.
             if (activeTool == EditorTool.Markings)
                 UpdateMarkingPreview();
+            // Undo may have put other rules back; the priority tool reads the arms anew.
+            if (activeTool == EditorTool.Priorities)
+                RefreshPriorityTarget();
         }
 
         /// <summary>Starts the terrain tool: its options in the tool panel, and the map's road mode for pointing and holding.</summary>
@@ -5267,6 +5293,16 @@ namespace OmsiMapEditor.UI
                     EscapeMarking();
                     evt.StopPropagation();
                 }
+                else if (evt.keyCode == KeyCode.V && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Priorities ? EditorTool.Drag : EditorTool.Priorities);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Priorities)
+                {
+                    SetTool(EditorTool.Drag);
+                    evt.StopPropagation();
+                }
                 else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Markings && (markingSelected >= 0 || markingArea >= 0 || markingArrow >= 0))
                 {
                     DeleteSelectedMarking();
@@ -5592,6 +5628,8 @@ namespace OmsiMapEditor.UI
                     return "the deletion of object #" + step.Change.Record.Id;
                 case OmsiObjectChangeKind.Replacement:
                     return "the new shape of object #" + step.Change.Record.Id;
+                case OmsiObjectChangeKind.Rules:
+                    return "the rules of object #" + step.Change.Record.Id;
                 case OmsiObjectChangeKind.Copy:
                     return "the copy #" + step.Change.Record.Id + " of object #" + step.Change.ReplacedRecord.Id;
                 default:
@@ -6349,7 +6387,8 @@ namespace OmsiMapEditor.UI
             if (tool != EditorTool.Drag && !(objectTool ? CanEditObjects : CanEdit))
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"
-                    : tool == EditorTool.Terrain ? "shape the ground" : tool == EditorTool.Markings ? "draw road markings" : "move or rotate objects"));
+                    : tool == EditorTool.Terrain ? "shape the ground" : tool == EditorTool.Markings ? "draw road markings"
+                    : tool == EditorTool.Priorities ? "set the right of way" : "move or rotate objects"));
                 return;
             }
             // Another tool ends placing and closes the object library.
@@ -6358,6 +6397,7 @@ namespace OmsiMapEditor.UI
             var wasRows = activeTool == EditorTool.Rows;
             var wasTerrain = activeTool == EditorTool.Terrain;
             var wasMarkings = activeTool == EditorTool.Markings;
+            var wasPriorities = activeTool == EditorTool.Priorities;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
@@ -6370,6 +6410,8 @@ namespace OmsiMapEditor.UI
                 EndTerrainTool();
             if (wasMarkings && tool != EditorTool.Markings)
                 EndMarkingTool();
+            if (wasPriorities && tool != EditorTool.Priorities)
+                EndPriorityTool();
             if (tool == EditorTool.Road)
                 BeginRoadTool();
             if (tool == EditorTool.Rows)
@@ -6378,8 +6420,10 @@ namespace OmsiMapEditor.UI
                 BeginTerrainTool();
             if (tool == EditorTool.Markings && !wasMarkings)
                 BeginMarkingTool();
+            if (tool == EditorTool.Priorities && !wasPriorities)
+                BeginPriorityTool();
             UpdateToolbar();
-            if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings)
+            if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities)
                 return;
             SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
                 : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."

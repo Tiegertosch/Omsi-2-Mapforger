@@ -635,3 +635,32 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Inspector:** Bei gewähltem Objekt oder Spline stehen unter „AI paths“ seine Pfade mit Art, Richtung, Länge, Blinker, offenen Enden und Regeln (Vorfahrt mit Deutung, Tempolimit, Verkehrsdichte mit Gruppe, weitere mit Namen).
 
 **Grund:** Vorfahrt und Fahrstreifen-Verbindungen (Etappen 2 und 3) lassen sich nur bearbeiten, wenn man die Pfade sieht. Offene Enden sind der häufigste Grund für hängenbleibende KI an selbst gebauten Kreuzungen. Pfade und Regeln folgen openOMSI, weil der Nutzer nur dort testet. openOMSI bestätigt auch, dass `[blockpath]` weder in Omsi.exe noch in openOMSI wirkt; die Vorfahrt kommt allein aus `[rule] priority` (ohne Regel 128, in den Originalkarten 192 und 64).
+
+## ADR 047: Vorfahrt an Kreuzungen wie „Priorities“
+
+**Status:** Angenommen, 27. Oktober 2026, als Etappe 2 des Plans „KI-Pfade“. Entscheidung des Nutzers: drei Stufen, kein eigenes „Halt“. Vorbild ist das Priorities-Werkzeug der Mod „Traffic“ für Cities: Skylines II; übernommen ist nur das Konzept, kein Code.
+
+**Entscheidung:**
+- **Arme** (`OmsiJunctionPriorities.Arms`): Die Straßenpfade eines Kreuzungsobjekts, ob aus der Originalkarte oder im Editor erzeugt, teilen sich nach dem Ort, an dem der Verkehr hereinkommt.
+  - Einfahrten sind Pfade, in die kein anderer Pfad mündet (nach openOMSIs Regel: höchstens 1,5 m, unter 40°). Einfahrten mit höchstens 30° Richtungsunterschied und höchstens 15 m Abstand bilden einen Arm.
+  - Ein Pfad, in den nur Pfade eines Arms münden, gehört zu diesem Arm, etwa die Abbiegebögen hinter einem Einfahrtsstück. Ein Ausfahrtstück, in das mehrere Arme münden, gehört zu keinem Arm; seine Regeln bleiben, wie sie sind.
+  - Objekte mit weniger als zwei Armen sind keine Kreuzung.
+- **Stufen** wie in den Originalkarten:
+  - **Vorfahrt:** 192 auf den Pfaden geradeaus (unter 30° Drehung) und nach rechts (Blinker 3, ohne Blinker eine Rechtskurve). Linksabbieger kreuzen den Gegenverkehr und behalten 128.
+  - **Vorfahrt achten:** 64 auf allen Pfaden des Arms.
+  - **Normal:** keine Regel.
+  - Gelesen wird die Stufe aus den Regeln: Hat ein Pfad weniger als 128, muss der Arm Vorfahrt achten; hat ein Hauptpfad mehr als 128, ist es eine Vorfahrtstraße. Ein Arm mit gemischten Regeln, etwa einer freien Rechtsabbiegespur mit 192, gilt deshalb als „Vorfahrt achten“.
+  - Probe an den Originalkarten: In Grundorf ergeben die gelesenen Stufen für alle 49 geregelten Pfade wieder denselben Wert, in Berlin-Spandau für 745 von 816.
+  - Für Karten mit Linksverkehr gelten Rechtsabbieger weiter als Hauptpfade.
+- **Schreiben** (`OmsiMapSession.SetPriorities`, Änderungsart `Rules`, ein Rückgängig-Schritt): Für jeden Pfad des geänderten Arms gehen seine `[rule]`- und `[kill_rule]`-Datensätze mit `priority`. Ein Pfad mit Wert bekommt direkt hinter dem Objekt einen neuen Datensatz wie in den Originalkarten (`4 priority 64 0`).
+  - Die anderen Regeln des Objekts und die Vorfahrt der übrigen Arme bleiben unberührt. Die Originalkarten setzen ihre Regeln sparsam, oft nur auf dem Pfad, der sich wirklich mit einem anderen kreuzt; das bleibt so erhalten.
+  - Ein `[kill_rule] priority` für einen Pfad des Arms entfällt, damit er die neue Regel nicht wieder wegnimmt.
+- **Werkzeug „Priority“ (V):** Ein Klick auf eine Kreuzung zeigt 5 m vor jedem Arm ein rundes Schild: gelbe Raute für Vorfahrt, rot umrandetes Dreieck für Vorfahrt achten, grauer Ring für Normal. Ein Klick auf ein Schild schaltet Normal → Vorfahrt → Vorfahrt achten → Normal. „All arms normal“ nimmt die Regeln aller Arme weg.
+  - Solange das Werkzeug an ist, sind die KI-Pfade zu sehen (ADR 046), breit mit Vorfahrt und gestrichelt beim Vorfahrt achten.
+  - Das Werkzeug wirkt nur auf der Basiskarte eines Projekts; Chrono-Varianten folgen mit ihren Regeln später.
+- **Erzeugte Kreuzungen:** Beim Bauen einer Straße bekommt eine neue Kreuzung die Vorfahrt aus ihren Armen, im selben Rückgängig-Schritt (`ForMadeJunction`). Die Arme der Hauptstraße haben Vorfahrt, die übrigen müssen Vorfahrt achten, wie „Auto markings“ sie zeichnet; ohne Hauptstraße bleibt alles normal.
+  - Die Pfad-Arme werden den erzeugten Armen über die Einfahrtsrichtung zugeordnet, höchstens 45° neben der Gegenrichtung des Arms.
+  - Neu erzeugte Kreuzungsdateien (Markierungen, Arm-Drehen) behalten den Datensatz und damit die Regeln. Die Pfade entstehen in derselben Reihenfolge, die Indizes bleiben also gültig.
+- **Kommandozeile:** `-priorities [n ...]` öffnet das Werkzeug an der gewählten Kreuzung, schreibt die Arme ins Log und klickt die Schilder mit den Nummern n ab 1.
+
+**Grund:** In openOMSI entscheidet nur `[rule] priority`, wer an einer Kreuzung zuerst fährt; `[blockpath]` wirkt nicht (ADR 046). Mit Armen und drei Stufen lässt sich das so einstellen, wie man es an einer echten Kreuzung beschildert, statt Pfad für Pfad. Selbst gebaute Kreuzungen fahren so gleich richtig, ohne Nacharbeit.
