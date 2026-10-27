@@ -34,6 +34,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Its road markings (ADR 044), by the anchors of its arms.</summary>
         public List<OmsiMarkingLine> Markings { get; } = new List<OmsiMarkingLine>();
 
+        /// <summary>Its marked areas, such as restricted areas, by the anchors round them.</summary>
+        public List<OmsiMarkingArea> Areas { get; } = new List<OmsiMarkingArea>();
+
+        /// <summary>Its direction arrows, by the anchors either side of their lanes.</summary>
+        public List<OmsiMarkingArrow> Arrows { get; } = new List<OmsiMarkingArrow>();
+
         /// <summary>True for an object file the editor makes, under Sceneryobjects\Mapforge.</summary>
         public static bool IsMadeHere(string assetPath)
         {
@@ -76,6 +82,8 @@ namespace OmsiMapEditor.OMSI
                     HeadingDegrees = Normalize360(helper.HeadingDegrees), ProfilePath = helper.SplinePath, Profile = profiles?.Invoke(helper.SplinePath)
                 });
             junction.Markings.AddRange(OmsiJunctionMarkings.Read(text));
+            junction.Areas.AddRange(OmsiJunctionMarkings.ReadAreas(text));
+            junction.Arrows.AddRange(OmsiJunctionMarkings.ReadArrows(text));
             var sides = ReadSides(text, helpers.Count);
             if (sides != null)
             {

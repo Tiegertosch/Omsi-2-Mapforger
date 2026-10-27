@@ -2237,8 +2237,9 @@ namespace OmsiMapEditor.UI
             string assetPath;
             try
             {
-                // The markings go along; their anchors are named by arm, so they follow the turned arm.
-                var made = OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + rebuild.Made.Name, rebuild.Made.Markings);
+                // The markings, areas and arrows go along; their anchors are named by arm, so they follow the turned arm.
+                var made = OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + rebuild.Made.Name, rebuild.Made.Markings, rebuild.Made.Areas,
+                    rebuild.Made.Arrows);
                 assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, rebuild.Made.Name, made);
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
@@ -5239,7 +5240,7 @@ namespace OmsiMapEditor.UI
                     EscapeMarking();
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Markings && markingSelected >= 0)
+                else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Markings && (markingSelected >= 0 || markingArea >= 0 || markingArrow >= 0))
                 {
                     DeleteSelectedMarking();
                     evt.StopPropagation();

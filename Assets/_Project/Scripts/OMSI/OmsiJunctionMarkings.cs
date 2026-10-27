@@ -30,6 +30,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Wartelinie (sign 341): 0.5 m wide, 0.5 m strokes and 0.25 m gaps.</summary>
         GiveWayLine,
 
+        /// <summary>
+        /// Fußgängerüberweg (sign 293): bars 0.5 m wide and 0.5 m apart, 4 m long, along the traffic. Across one arm the
+        /// bars lie beside the line, in the arm away from the junction.
+        /// </summary>
+        Crosswalk,
+
         /// <summary>A yellow Leitlinie, as for road works.</summary>
         YellowLaneLine,
 
@@ -72,6 +78,9 @@ namespace OmsiMapEditor.OMSI
         public bool TwoLines { get; }
         public bool Yellow { get; }
 
+        /// <summary>True for a band beside its line rather than on it, as a pedestrian crossing lies in its arm.</summary>
+        public bool Beside => Style == OmsiMarkingStyle.Crosswalk;
+
         public static readonly IReadOnlyList<OmsiMarkingStyleInfo> All = new[]
         {
             new OmsiMarkingStyleInfo(OmsiMarkingStyle.LaneLine, "laneline", "Lane line", "Leitlinie (sign 340): 0.12 m, 3 m strokes, 6 m gaps", 0.12, 3.0, 6.0, false, false),
@@ -81,6 +90,9 @@ namespace OmsiMapEditor.OMSI
             new OmsiMarkingStyleInfo(OmsiMarkingStyle.BrokenEdgeLine, "brokenedge", "Broken edge line", "Unterbrochener Breitstrich, as across a side road: 0.25 m, 3 m strokes, 1.5 m gaps", 0.25, 3.0, 1.5, false, false),
             new OmsiMarkingStyleInfo(OmsiMarkingStyle.StopLine, "stop", "Stop line", "Haltlinie (sign 294): 0.5 m, unbroken", 0.5, 0.0, 0.0, false, false),
             new OmsiMarkingStyleInfo(OmsiMarkingStyle.GiveWayLine, "giveway", "Give-way line", "Wartelinie (sign 341): 0.5 m, 0.5 m strokes, 0.25 m gaps", 0.5, 0.5, 0.25, false, false),
+            new OmsiMarkingStyleInfo(OmsiMarkingStyle.Crosswalk, "zebra", "Zebra crossing",
+                "Fußgängerüberweg (sign 293): bars 0.5 m wide and 0.5 m apart, 4 m long; drawn across an arm, it lies in the arm behind the line", 4.0, 0.5, 0.5,
+                false, false),
             new OmsiMarkingStyleInfo(OmsiMarkingStyle.YellowLaneLine, "yellowlaneline", "Yellow lane line", "A yellow Leitlinie, as for road works", 0.12, 3.0, 6.0, false, true),
             new OmsiMarkingStyleInfo(OmsiMarkingStyle.YellowBoundary, "yellowboundary", "Yellow boundary", "A yellow Fahrstreifenbegrenzung, as for road works", 0.12, 0.0, 0.0, false, true)
         };
@@ -221,6 +233,179 @@ namespace OmsiMapEditor.OMSI
         public double Middle => LineLength > 0.0 ? (From + To) / 2.0 / LineLength : 0.5;
     }
 
+    /// <summary>How a marked area is filled (ADR 044, stage 3).</summary>
+    public enum OmsiMarkingFill
+    {
+        /// <summary>Sperrfläche (sign 298): stripes 0.5 m wide with 1 m between them, 45° to the traffic.</summary>
+        Hatched,
+
+        /// <summary>A yellow Sperrfläche, as for road works.</summary>
+        YellowHatched
+    }
+
+    /// <summary>How a fill is drawn and named.</summary>
+    public sealed class OmsiMarkingFillInfo
+    {
+        private OmsiMarkingFillInfo(OmsiMarkingFill fill, string key, string name, string description, double stroke, double gap, bool yellow)
+        {
+            Fill = fill;
+            Key = key;
+            Name = name;
+            Description = description;
+            Stroke = stroke;
+            Gap = gap;
+            Yellow = yellow;
+        }
+
+        public OmsiMarkingFill Fill { get; }
+
+        /// <summary>The word the .sco stores the fill by.</summary>
+        public string Key { get; }
+
+        public string Name { get; }
+        public string Description { get; }
+
+        /// <summary>Width of each stripe and of the space between two, in metres, across the stripes.</summary>
+        public double Stroke { get; }
+
+        public double Gap { get; }
+        public bool Yellow { get; }
+
+        public static readonly IReadOnlyList<OmsiMarkingFillInfo> All = new[]
+        {
+            new OmsiMarkingFillInfo(OmsiMarkingFill.Hatched, "hatched", "Restricted area", "Sperrfläche (sign 298): stripes 0.5 m wide, 1 m apart, 45° to the traffic",
+                0.5, 1.0, false),
+            new OmsiMarkingFillInfo(OmsiMarkingFill.YellowHatched, "yellowhatched", "Yellow restricted area", "A yellow Sperrfläche, as for road works", 0.5, 1.0, true)
+        };
+
+        public static OmsiMarkingFillInfo Of(OmsiMarkingFill fill)
+        {
+            foreach (var info in All)
+                if (info.Fill == fill)
+                    return info;
+            return All[0];
+        }
+
+        public static OmsiMarkingFillInfo ByKey(string key)
+        {
+            foreach (var info in All)
+                if (string.Equals(info.Key, key, StringComparison.OrdinalIgnoreCase))
+                    return info;
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// A marked area, such as a Sperrfläche, by the anchors round it in order. Between two corners on one line its side
+    /// follows the line, else it runs straight.
+    /// </summary>
+    public sealed class OmsiMarkingArea
+    {
+        public const double DefaultAngle = 45.0;
+
+        public List<string> Corners { get; } = new List<string>();
+        public OmsiMarkingFill Fill { get; set; }
+
+        /// <summary>The angle of the stripes in degrees, counter-clockwise from the longest side between two corners.</summary>
+        public double Angle { get; set; } = DefaultAngle;
+
+        public OmsiMarkingArea Copy()
+        {
+            var copy = new OmsiMarkingArea { Fill = Fill, Angle = Angle };
+            copy.Corners.AddRange(Corners);
+            return copy;
+        }
+    }
+
+    /// <summary>Which ways a direction arrow (sign 297) points (ADR 044, stage 4).</summary>
+    public enum OmsiMarkingArrowKind
+    {
+        Straight,
+        Left,
+        Right,
+        StraightLeft,
+        StraightRight,
+        LeftRight,
+        All
+    }
+
+    /// <summary>How an arrow kind is named.</summary>
+    public sealed class OmsiMarkingArrowInfo
+    {
+        private OmsiMarkingArrowInfo(OmsiMarkingArrowKind kind, string key, string name, bool straight, bool left, bool right)
+        {
+            Kind = kind;
+            Key = key;
+            Name = name;
+            Straight = straight;
+            Left = left;
+            Right = right;
+        }
+
+        public OmsiMarkingArrowKind Kind { get; }
+
+        /// <summary>The word the .sco stores the kind by.</summary>
+        public string Key { get; }
+
+        public string Name { get; }
+        public bool Straight { get; }
+        public bool Left { get; }
+        public bool Right { get; }
+
+        public static readonly IReadOnlyList<OmsiMarkingArrowInfo> All = new[]
+        {
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.Straight, "straight", "Straight on", true, false, false),
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.Left, "left", "Left", false, true, false),
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.Right, "right", "Right", false, false, true),
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.StraightLeft, "straightleft", "Straight on or left", true, true, false),
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.StraightRight, "straightright", "Straight on or right", true, false, true),
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.LeftRight, "leftright", "Left or right", false, true, true),
+            new OmsiMarkingArrowInfo(OmsiMarkingArrowKind.All, "all", "Straight on, left or right", true, true, true)
+        };
+
+        public static OmsiMarkingArrowInfo Of(OmsiMarkingArrowKind kind)
+        {
+            foreach (var info in All)
+                if (info.Kind == kind)
+                    return info;
+            return All[0];
+        }
+
+        public static OmsiMarkingArrowInfo ByKey(string key)
+        {
+            foreach (var info in All)
+                if (string.Equals(info.Key, key, StringComparison.OrdinalIgnoreCase))
+                    return info;
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// A direction arrow in the lane between two neighbouring anchors of an arm, a distance behind them; it points into the
+    /// junction on a lane that runs in, out of it on one that runs out.
+    /// </summary>
+    public sealed class OmsiMarkingArrow
+    {
+        public const double DefaultDistance = 1.0;
+
+        /// <summary>The anchors on either side of the lane, such as <c>1.1.0</c> and <c>1.1.1</c>.</summary>
+        public string From { get; set; }
+
+        public string To { get; set; }
+        public OmsiMarkingArrowKind Kind { get; set; }
+
+        /// <summary>Metres from the anchors out along the arm to the end of the arrow nearer the junction.</summary>
+        public double Distance { get; set; } = DefaultDistance;
+
+        /// <summary>True on a lane running out of the junction, so the arrow points away from it.</summary>
+        public bool Outward { get; set; }
+
+        public OmsiMarkingArrow Copy()
+        {
+            return new OmsiMarkingArrow { From = From, To = To, Kind = Kind, Distance = Distance, Outward = Outward };
+        }
+    }
+
     /// <summary>
     /// Road markings of junctions the editor makes (ADR 044), modelled on Town Road Lane for Cities: Skylines II: lines only
     /// run between anchors on the arms or where lines cross, as curves leaving each anchor along its lane, and are built
@@ -235,6 +420,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Strips lie this far above the carriageway, so they never flicker with it.</summary>
         public const double Lift = 0.02;
 
+        /// <summary>Areas lie a little lower than lines, so the lines round them never flicker with their stripes.</summary>
+        public const double AreaLift = 0.015;
+
         /// <summary>The largest curvature a line takes; beyond it short curves loop back on themselves.</summary>
         public const double MaximumCurvature = 0.8;
 
@@ -246,6 +434,21 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Lines touching within this distance of an end do not cross there, such as two lines from one anchor.</summary>
         private const double EndClearance = 0.3;
+
+        /// <summary>Stripes of areas are laid in bands this wide at most, so their ends follow the outline.</summary>
+        private const double HatchStep = 0.1;
+
+        internal const string AreasPrefix = "MapWorks marking areas:";
+        internal const string ArrowsPrefix = "MapWorks marking arrows:";
+
+        /// <summary>Direction arrows are 5 m long, as in towns.</summary>
+        public const double ArrowLength = 5.0;
+
+        private const double ArrowShaft = 0.18;
+        private const double ArrowHeadWidth = 0.65;
+        private const double ArrowHeadLength = 1.5;
+        private const double ArrowTurnRadius = 0.5;
+        private const double ArrowTurnHead = 0.9;
 
         /// <summary>
         /// The anchors of a junction's arms, in the order of its connection points: on each arm its carriageway edges, the
@@ -530,29 +733,31 @@ namespace OmsiMapEditor.OMSI
         /// Adds the markings to a model: each visible piece of each line as flat strips just above the carriageway, its
         /// strokes cut along its length, two strips for a double line, in white or yellow. A piece in its line's style keeps
         /// the line's run of strokes; one in another style starts its own. Lines whose anchors the junction no longer has
-        /// are left out.
+        /// are left out. Areas lie just below the lines, so lines drawn round them stay on top.
         /// </summary>
         /// <param name="anchors">The anchors of the arms; those of the crossings are added here.</param>
-        public static void AddMeshes(IReadOnlyList<OmsiMarkingAnchor> anchors, IEnumerable<OmsiMarkingLine> lines, List<OmsiGeneratedMesh> meshes)
+        /// <param name="areas">Marked areas to fill; null for none.</param>
+        /// <param name="arrows">Direction arrows; null for none.</param>
+        public static void AddMeshes(IReadOnlyList<OmsiMarkingAnchor> anchors, IEnumerable<OmsiMarkingLine> lines, List<OmsiGeneratedMesh> meshes,
+            IEnumerable<OmsiMarkingArea> areas = null, IEnumerable<OmsiMarkingArrow> arrows = null)
         {
             var list = new List<OmsiMarkingLine>(lines);
             var all = new List<OmsiMarkingAnchor>(anchors);
             if (!all.Exists(anchor => anchor.IsCrossing))
                 all.AddRange(CrossingAnchors(anchors, list));
             OmsiGeneratedMesh white = null, yellow = null;
+            OmsiGeneratedMesh MeshFor(bool isYellow) => isYellow
+                ? yellow = yellow ?? new OmsiGeneratedMesh { Texture = YellowTexture }
+                : white = white ?? new OmsiGeneratedMesh { Texture = WhiteTexture };
             foreach (var piece in Pieces(all, list))
             {
                 if (piece.Hidden)
                     continue;
                 var path = Path(all, list[piece.Line]);
                 var info = OmsiMarkingStyleInfo.Of(piece.Style);
-                OmsiGeneratedMesh mesh;
-                if (info.Yellow)
-                    mesh = yellow = yellow ?? new OmsiGeneratedMesh { Texture = YellowTexture };
-                else
-                    mesh = white = white ?? new OmsiGeneratedMesh { Texture = WhiteTexture };
+                var mesh = MeshFor(info.Yellow);
                 var distances = Distances(path);
-                var offsets = info.TwoLines ? new[] { -info.Width, info.Width } : new[] { 0.0 };
+                var offsets = info.TwoLines ? new[] { -info.Width, info.Width } : new[] { info.Beside ? BesideOffset(all, list[piece.Line], path, info.Width) : 0.0 };
                 // The line's own strokes run on from its start across its pieces; another style starts at the piece.
                 var origin = piece.Style == list[piece.Line].Style ? 0.0 : piece.From;
                 foreach (var offset in offsets)
@@ -571,6 +776,43 @@ namespace OmsiMapEditor.OMSI
                     }
                 }
             }
+            if (areas != null)
+                foreach (var area in areas)
+                {
+                    var outline = Outline(all, list, area);
+                    if (outline == null)
+                        continue;
+                    var info = OmsiMarkingFillInfo.Of(area.Fill);
+                    Hatch(MeshFor(info.Yellow), outline, StripeDegrees(all, area), info.Stroke, info.Gap);
+                }
+            if (arrows != null)
+                foreach (var arrow in arrows)
+                {
+                    if (!ArrowFrame(all, arrow, out var tail, out var direction, out var height))
+                        continue;
+                    var mesh = MeshFor(false);
+                    ArrowParts(arrow.Kind, out var shafts, out var heads);
+                    foreach (var shaft in shafts)
+                    {
+                        var path = shaft.ConvertAll(point => ArrowPoint(tail, direction, height, point));
+                        var distances = Distances(path);
+                        Strip(mesh, path, distances, 0.0, distances[path.Count - 1], 0.0, ArrowShaft);
+                    }
+                    foreach (var head in heads)
+                    {
+                        var first = mesh.Positions.Count / 3;
+                        foreach (var corner in head)
+                        {
+                            var point = ArrowPoint(tail, direction, height, corner);
+                            mesh.Positions.Add(point[0]);
+                            mesh.Positions.Add(height + Lift);
+                            mesh.Positions.Add(point[1]);
+                            mesh.Uvs.Add(0.0);
+                            mesh.Uvs.Add(0.0);
+                        }
+                        OmsiJunctionLayout.AddUpward(mesh, first, first + 1, first + 2);
+                    }
+                }
             if (white != null && white.Triangles.Count > 0)
                 meshes.Add(white);
             if (yellow != null && yellow.Triangles.Count > 0)
@@ -620,6 +862,354 @@ namespace OmsiMapEditor.OMSI
                 OmsiJunctionLayout.AddUpward(mesh, a, a + 1, a + 2);
                 OmsiJunctionLayout.AddUpward(mesh, a + 1, a + 3, a + 2);
             }
+        }
+
+        /// <summary>
+        /// The shape of an arrow in its own frame, metres across to the right and forward from its tail: the centre lines of
+        /// its shafts, 0.18 m wide, and the corners of its heads, one for each way it points. Turns bend off the shaft through
+        /// a quarter circle; with a way straight on they leave it lower down.
+        /// </summary>
+        public static void ArrowParts(OmsiMarkingArrowKind kind, out List<List<double[]>> shafts, out List<double[][]> heads)
+        {
+            var info = OmsiMarkingArrowInfo.Of(kind);
+            shafts = new List<List<double[]>>();
+            heads = new List<double[][]>();
+            var neck = ArrowLength - ArrowHeadLength;
+            if (info.Straight)
+            {
+                shafts.Add(new List<double[]> { new[] { 0.0, 0.0 }, new[] { 0.0, neck } });
+                heads.Add(new[] { new[] { -ArrowHeadWidth / 2.0, neck }, new[] { ArrowHeadWidth / 2.0, neck }, new[] { 0.0, ArrowLength } });
+            }
+            var bend = info.Straight ? 2.2 : 3.4;
+            foreach (var side in new[] { info.Left ? -1.0 : 0.0, info.Right ? 1.0 : 0.0 })
+            {
+                if (side == 0.0)
+                    continue;
+                var shaft = new List<double[]> { new[] { 0.0, 0.0 } };
+                for (var step = 0; step <= 8; step++)
+                {
+                    var angle = Math.PI / 2.0 * step / 8.0;
+                    shaft.Add(new[] { side * ArrowTurnRadius * (1.0 - Math.Cos(angle)), bend + ArrowTurnRadius * Math.Sin(angle) });
+                }
+                shafts.Add(shaft);
+                var endX = side * ArrowTurnRadius;
+                var endY = bend + ArrowTurnRadius;
+                heads.Add(new[] { new[] { endX, endY - ArrowHeadWidth / 2.0 }, new[] { endX, endY + ArrowHeadWidth / 2.0 }, new[] { endX + side * ArrowTurnHead, endY } });
+            }
+        }
+
+        /// <summary>
+        /// Where an arrow lies in the object frame: its tail, the direction it points and its height; false when its anchors
+        /// are gone or not on one arm.
+        /// </summary>
+        public static bool ArrowFrame(IReadOnlyList<OmsiMarkingAnchor> anchors, OmsiMarkingArrow arrow, out double[] tail, out double[] direction, out double height)
+        {
+            tail = direction = null;
+            height = 0.0;
+            var from = Find(anchors, arrow.From);
+            var to = Find(anchors, arrow.To);
+            if (from == null || to == null || from.IsCrossing || to.IsCrossing || from.Arm != to.Arm)
+                return false;
+            var outX = -Math.Sin(from.InwardDegrees * Math.PI / 180.0);
+            var outY = -Math.Cos(from.InwardDegrees * Math.PI / 180.0);
+            // The end nearer the junction lies the distance out from the anchors.
+            var nearX = (from.X + to.X) / 2.0 + outX * arrow.Distance;
+            var nearY = (from.Y + to.Y) / 2.0 + outY * arrow.Distance;
+            height = (from.Height + to.Height) / 2.0;
+            if (arrow.Outward)
+            {
+                tail = new[] { nearX, nearY };
+                direction = new[] { outX, outY };
+            }
+            else
+            {
+                tail = new[] { nearX + outX * ArrowLength, nearY + outY * ArrowLength };
+                direction = new[] { -outX, -outY };
+            }
+            return true;
+        }
+
+        /// <summary>A point of an arrow's own frame in the object frame, with the arrow's height.</summary>
+        private static double[] ArrowPoint(double[] tail, double[] direction, double height, double[] local)
+        {
+            // Right of the direction (dx, dy) in plan is (dy, -dx).
+            return new[]
+            {
+                tail[0] + direction[1] * local[0] + direction[0] * local[1], tail[1] - direction[0] * local[0] + direction[1] * local[1], height
+            };
+        }
+
+        /// <summary>An arrow as lines in the object frame to show it by: its shafts and its heads closed; null when it cannot lie.</summary>
+        public static List<List<double[]>> ArrowOutlines(IReadOnlyList<OmsiMarkingAnchor> anchors, OmsiMarkingArrow arrow)
+        {
+            if (!ArrowFrame(anchors, arrow, out var tail, out var direction, out var height))
+                return null;
+            ArrowParts(arrow.Kind, out var shafts, out var heads);
+            var outlines = new List<List<double[]>>();
+            foreach (var shaft in shafts)
+                outlines.Add(shaft.ConvertAll(point => ArrowPoint(tail, direction, height, point)));
+            foreach (var head in heads)
+            {
+                var outline = new List<double[]>();
+                foreach (var corner in head)
+                    outline.Add(ArrowPoint(tail, direction, height, corner));
+                outline.Add(outline[0]);
+                outlines.Add(outline);
+            }
+            return outlines;
+        }
+
+        /// <summary>
+        /// The anchors on either side of the lane of an arm around a point of the object frame, at the arm's mouth, or null.
+        /// The point lies between them across the arm and from a metre inside the mouth to <paramref name="reach"/> metres
+        /// beyond it; the space between two edges of a median is no lane.
+        /// </summary>
+        public static OmsiMarkingAnchor[] LaneAt(IReadOnlyList<OmsiMarkingAnchor> anchors, double x, double y, double reach)
+        {
+            var arms = new SortedDictionary<int, List<OmsiMarkingAnchor>>();
+            foreach (var anchor in anchors)
+                if (!anchor.IsCrossing && anchor.Row == 1)
+                {
+                    if (!arms.TryGetValue(anchor.Arm, out var row))
+                        arms[anchor.Arm] = row = new List<OmsiMarkingAnchor>();
+                    row.Add(anchor);
+                }
+            foreach (var row in arms.Values)
+            {
+                row.Sort((first, second) => first.Index.CompareTo(second.Index));
+                // The arm leaves the junction against its inward direction.
+                var heading = (row[0].InwardDegrees - 180.0) * Math.PI / 180.0;
+                var along = x * Math.Sin(heading) + y * Math.Cos(heading);
+                var lateral = x * Math.Cos(heading) - y * Math.Sin(heading);
+                var mouth = row[0].X * Math.Sin(heading) + row[0].Y * Math.Cos(heading);
+                if (along < mouth - 1.0 || along > mouth + reach)
+                    continue;
+                for (var index = 1; index < row.Count; index++)
+                    if (lateral >= row[index - 1].Lateral && lateral <= row[index].Lateral && !(row[index - 1].Kind == "median" && row[index].Kind == "median"))
+                        return new[] { row[index - 1], row[index] };
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// True when the lane between two anchors of an arm runs into the junction, as the profile says; true too where it
+        /// says nothing. In the arm's frame lanes against the profile's direction run in.
+        /// </summary>
+        public static bool RunsIn(OmsiJunctionLayout layout, OmsiMarkingAnchor from, OmsiMarkingAnchor to)
+        {
+            if (layout == null || from == null || to == null || from.Arm < 0 || from.Arm >= layout.Arms.Count || layout.Arms[from.Arm].Profile == null)
+                return true;
+            var middle = (from.Lateral + to.Lateral) / 2.0;
+            OmsiSplineLane nearest = null;
+            foreach (var lane in layout.Arms[from.Arm].Profile.Lanes)
+                if (lane.Kind == 0 && Math.Abs(lane.X - middle) <= HalfWidth(lane) && (nearest == null || Math.Abs(lane.X - middle) < Math.Abs(nearest.X - middle)))
+                    nearest = lane;
+            return nearest == null || nearest.Direction != 0;
+        }
+
+        /// <summary>
+        /// How far right of a line a band beside it lies, so that across one arm it lies in the arm away from the junction;
+        /// 0 for a line between arms or from a crossing.
+        /// </summary>
+        private static double BesideOffset(IReadOnlyList<OmsiMarkingAnchor> anchors, OmsiMarkingLine line, List<double[]> path, double width)
+        {
+            var from = Find(anchors, line.From);
+            var to = Find(anchors, line.To);
+            if (from == null || to == null || from.IsCrossing || to.IsCrossing || from.Arm != to.Arm || path.Count < 2)
+                return 0.0;
+            var dx = path[path.Count - 1][0] - path[0][0];
+            var dy = path[path.Count - 1][1] - path[0][1];
+            // The arm leaves the junction against its inward direction; right of the line is (dy, -dx).
+            var outX = -Math.Sin(from.InwardDegrees * Math.PI / 180.0);
+            var outY = -Math.Cos(from.InwardDegrees * Math.PI / 180.0);
+            return dy * outX - dx * outY >= 0.0 ? width / 2.0 : -width / 2.0;
+        }
+
+        /// <summary>
+        /// The outline of an area in the object frame as points (x, y, height), each once, or null when it has fewer than
+        /// three corners or one of them is gone. Between two corners on one line the side follows the line, the shortest
+        /// way where several lines join them; otherwise it runs straight.
+        /// </summary>
+        public static List<double[]> Outline(IReadOnlyList<OmsiMarkingAnchor> anchors, IList<OmsiMarkingLine> lines, OmsiMarkingArea area)
+        {
+            if (area == null || area.Corners.Count < 3)
+                return null;
+            var corners = new List<OmsiMarkingAnchor>();
+            foreach (var key in area.Corners)
+            {
+                var corner = Find(anchors, key);
+                if (corner == null)
+                    return null;
+                corners.Add(corner);
+            }
+            var paths = new List<List<double[]>>();
+            foreach (var line in lines ?? new List<OmsiMarkingLine>())
+                if (Path(anchors, line) is List<double[]> path)
+                    paths.Add(path);
+            var outline = new List<double[]>();
+            for (var index = 0; index < corners.Count; index++)
+            {
+                var side = Side(paths, corners[index], corners[(index + 1) % corners.Count]);
+                for (var point = 0; point < side.Count - 1; point++)
+                    outline.Add(side[point]);
+            }
+            return outline.Count >= 3 ? outline : null;
+        }
+
+        /// <summary>The side of an area from one corner to the next: along the shortest stretch of a line through both, or straight.</summary>
+        private static List<double[]> Side(List<List<double[]>> paths, OmsiMarkingAnchor from, OmsiMarkingAnchor to)
+        {
+            List<double[]> best = null;
+            var bestLength = double.MaxValue;
+            foreach (var path in paths)
+            {
+                var distances = Distances(path);
+                var start = Along(path, distances, from);
+                var end = Along(path, distances, to);
+                if (start < 0.0 || end < 0.0 || Math.Abs(end - start) < 0.01 || Math.Abs(end - start) >= bestLength)
+                    continue;
+                best = Cut(path, Math.Min(start, end), Math.Max(start, end));
+                if (start > end)
+                    best.Reverse();
+                bestLength = Math.Abs(end - start);
+            }
+            return best ?? new List<double[]> { new[] { from.X, from.Y, from.Height }, new[] { to.X, to.Y, to.Height } };
+        }
+
+        /// <summary>How far along a path an anchor lies, or -1 when it lies off the path.</summary>
+        private static double Along(List<double[]> path, double[] distances, OmsiMarkingAnchor anchor)
+        {
+            var best = -1.0;
+            var bestDistance = 0.05;
+            for (var index = 1; index < path.Count; index++)
+            {
+                var a = path[index - 1];
+                var b = path[index];
+                var dx = b[0] - a[0];
+                var dy = b[1] - a[1];
+                var lengthSquared = dx * dx + dy * dy;
+                var t = lengthSquared < 1e-12 ? 0.0 : Math.Max(0.0, Math.Min(1.0, ((anchor.X - a[0]) * dx + (anchor.Y - a[1]) * dy) / lengthSquared));
+                var distance = Math.Sqrt(Square(a[0] + dx * t - anchor.X) + Square(a[1] + dy * t - anchor.Y));
+                if (distance <= bestDistance)
+                {
+                    bestDistance = distance;
+                    best = distances[index - 1] + (distances[index] - distances[index - 1]) * t;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The direction of an area's stripes in degrees counter-clockwise from x: its angle from the longest side between two
+        /// corners, which mostly runs with the traffic.
+        /// </summary>
+        public static double StripeDegrees(IReadOnlyList<OmsiMarkingAnchor> anchors, OmsiMarkingArea area)
+        {
+            var longest = -1.0;
+            var degrees = 0.0;
+            for (var index = 0; index < area.Corners.Count; index++)
+            {
+                var from = Find(anchors, area.Corners[index]);
+                var to = Find(anchors, area.Corners[(index + 1) % area.Corners.Count]);
+                if (from == null || to == null)
+                    continue;
+                var length = Square(to.X - from.X) + Square(to.Y - from.Y);
+                if (length <= longest)
+                    continue;
+                longest = length;
+                degrees = Math.Atan2(to.Y - from.Y, to.X - from.X) * 180.0 / Math.PI;
+            }
+            return degrees + area.Angle;
+        }
+
+        /// <summary>
+        /// Fills an outline with stripes in a direction, cut along the outline: each stripe is laid in thin bands across it,
+        /// each band from where the outline crosses its one edge to where it crosses the other.
+        /// </summary>
+        private static void Hatch(OmsiGeneratedMesh mesh, List<double[]> outline, double degrees, double stroke, double gap)
+        {
+            var radians = degrees * Math.PI / 180.0;
+            var ux = Math.Cos(radians);
+            var uy = Math.Sin(radians);
+            // u runs along the stripes, v across them.
+            var u = new double[outline.Count];
+            var v = new double[outline.Count];
+            double lowest = double.MaxValue, highest = double.MinValue;
+            for (var index = 0; index < outline.Count; index++)
+            {
+                u[index] = outline[index][0] * ux + outline[index][1] * uy;
+                v[index] = -outline[index][0] * uy + outline[index][1] * ux;
+                lowest = Math.Min(lowest, v[index]);
+                highest = Math.Max(highest, v[index]);
+            }
+            var period = stroke + gap;
+            var count = (int)Math.Floor((highest - lowest - stroke) / period) + 1;
+            if (count < 1)
+                return;
+            // The stripes sit in the middle of the area.
+            var first = lowest + (highest - lowest - (count - 1) * period - stroke) / 2.0;
+            var steps = Math.Max(1, (int)Math.Ceiling(stroke / HatchStep));
+            for (var stripe = 0; stripe < count; stripe++)
+            {
+                var level = first + stripe * period;
+                var before = Across(u, v, level);
+                for (var step = 1; step <= steps; step++)
+                {
+                    var next = level + stroke * step / steps;
+                    var after = Across(u, v, next);
+                    // Where the outline turns within the band, the crossings do not pair up; the band is left out there.
+                    if (before.Count == after.Count)
+                        for (var pair = 0; pair + 1 < after.Count; pair += 2)
+                        {
+                            var corner = mesh.Positions.Count / 3;
+                            AddAreaPoint(mesh, outline, ux, uy, before[pair], next - stroke / steps);
+                            AddAreaPoint(mesh, outline, ux, uy, before[pair + 1], next - stroke / steps);
+                            AddAreaPoint(mesh, outline, ux, uy, after[pair + 1], next);
+                            AddAreaPoint(mesh, outline, ux, uy, after[pair], next);
+                            OmsiJunctionLayout.AddUpward(mesh, corner, corner + 1, corner + 2);
+                            OmsiJunctionLayout.AddUpward(mesh, corner, corner + 2, corner + 3);
+                        }
+                    before = after;
+                }
+            }
+        }
+
+        /// <summary>Where an outline crosses a line across the stripes, along them, in order.</summary>
+        private static List<double> Across(double[] u, double[] v, double level)
+        {
+            var found = new List<double>();
+            for (var index = 0; index < u.Length; index++)
+            {
+                var next = (index + 1) % u.Length;
+                if (v[index] <= level && v[next] > level || v[next] <= level && v[index] > level)
+                    found.Add(u[index] + (u[next] - u[index]) * (level - v[index]) / (v[next] - v[index]));
+            }
+            found.Sort();
+            return found;
+        }
+
+        private static void AddAreaPoint(OmsiGeneratedMesh mesh, List<double[]> outline, double ux, double uy, double along, double across)
+        {
+            var x = along * ux - across * uy;
+            var y = along * uy + across * ux;
+            // The height of the outline round the point, weighted by nearness.
+            double weights = 0.0, sum = 0.0, height = double.NaN;
+            foreach (var point in outline)
+            {
+                var squared = Square(point[0] - x) + Square(point[1] - y);
+                if (squared < 1e-8)
+                {
+                    height = point[2];
+                    break;
+                }
+                weights += 1.0 / squared;
+                sum += point[2] / squared;
+            }
+            mesh.Positions.Add(x);
+            mesh.Positions.Add((double.IsNaN(height) ? sum / weights : height) + AreaLift);
+            mesh.Positions.Add(y);
+            mesh.Uvs.Add(0.0);
+            mesh.Uvs.Add(0.0);
         }
 
         private static double[] At(List<double[]> path, double[] distances, double distance)
@@ -816,6 +1406,94 @@ namespace OmsiMapEditor.OMSI
                 break;
             }
             return lines;
+        }
+
+        /// <summary>
+        /// The line of a .sco that keeps the marked areas, such as
+        /// <c>MapWorks marking areas: hatched 45 0.1.0,1.1.2,x0.0.1~1.0.2~1.0.1~2.0.1~0</c>: the fill, the angle of its
+        /// stripes and the corners in order.
+        /// </summary>
+        public static string WriteAreas(IEnumerable<OmsiMarkingArea> areas)
+        {
+            var text = new StringBuilder(AreasPrefix);
+            var first = true;
+            foreach (var area in areas)
+            {
+                text.Append(first ? " " : "; ").Append(OmsiMarkingFillInfo.Of(area.Fill).Key).Append(' ')
+                    .Append(area.Angle.ToString("0.#", CultureInfo.InvariantCulture)).Append(' ').Append(string.Join(",", area.Corners));
+                first = false;
+            }
+            return text.ToString();
+        }
+
+        /// <summary>The marked areas in the text of a .sco; none without an areas line. Areas it cannot read are left out.</summary>
+        public static List<OmsiMarkingArea> ReadAreas(string scoText)
+        {
+            var areas = new List<OmsiMarkingArea>();
+            foreach (var raw in (scoText ?? string.Empty).Split('\n'))
+            {
+                var text = raw.Trim();
+                if (!text.StartsWith(AreasPrefix, StringComparison.Ordinal))
+                    continue;
+                foreach (var part in text.Substring(AreasPrefix.Length).Split(';'))
+                {
+                    var words = part.Trim().Split(' ');
+                    var fill = words.Length == 3 ? OmsiMarkingFillInfo.ByKey(words[0]) : null;
+                    if (fill == null || !double.TryParse(words[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var angle))
+                        continue;
+                    var area = new OmsiMarkingArea { Fill = fill.Fill, Angle = angle };
+                    area.Corners.AddRange(words[2].Split(','));
+                    if (area.Corners.Count >= 3)
+                        areas.Add(area);
+                }
+                break;
+            }
+            return areas;
+        }
+
+        /// <summary>
+        /// The line of a .sco that keeps the arrows, such as <c>MapWorks marking arrows: 1.1.0~1.1.1 straightleft 1; 1.1.1~1.1.2 straight 1 out</c>:
+        /// the anchors of the lane, the kind, the distance and <c>out</c> for a lane running out.
+        /// </summary>
+        public static string WriteArrows(IEnumerable<OmsiMarkingArrow> arrows)
+        {
+            var text = new StringBuilder(ArrowsPrefix);
+            var first = true;
+            foreach (var arrow in arrows)
+            {
+                text.Append(first ? " " : "; ").Append(arrow.From).Append('~').Append(arrow.To).Append(' ').Append(OmsiMarkingArrowInfo.Of(arrow.Kind).Key)
+                    .Append(' ').Append(arrow.Distance.ToString("0.##", CultureInfo.InvariantCulture));
+                if (arrow.Outward)
+                    text.Append(" out");
+                first = false;
+            }
+            return text.ToString();
+        }
+
+        /// <summary>The arrows in the text of a .sco; none without an arrows line. Arrows it cannot read are left out.</summary>
+        public static List<OmsiMarkingArrow> ReadArrows(string scoText)
+        {
+            var arrows = new List<OmsiMarkingArrow>();
+            foreach (var raw in (scoText ?? string.Empty).Split('\n'))
+            {
+                var text = raw.Trim();
+                if (!text.StartsWith(ArrowsPrefix, StringComparison.Ordinal))
+                    continue;
+                foreach (var part in text.Substring(ArrowsPrefix.Length).Split(';'))
+                {
+                    var words = part.Trim().Split(' ');
+                    var lane = words[0].Split('~');
+                    var kind = words.Length >= 3 ? OmsiMarkingArrowInfo.ByKey(words[1]) : null;
+                    if (lane.Length != 2 || kind == null || !double.TryParse(words[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var distance))
+                        continue;
+                    arrows.Add(new OmsiMarkingArrow
+                    {
+                        From = lane[0], To = lane[1], Kind = kind.Kind, Distance = distance, Outward = words.Length > 3 && words[3] == "out"
+                    });
+                }
+                break;
+            }
+            return arrows;
         }
 
         /// <summary>

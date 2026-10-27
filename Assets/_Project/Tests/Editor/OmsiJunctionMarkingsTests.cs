@@ -238,6 +238,162 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void APedestrianCrossingAcrossAnArmLiesInTheArmAsBarsAlongTheTraffic()
+        {
+            var anchors = OmsiJunctionMarkings.Anchors(OmsiJunctionLayout.Build(Tee(), null));
+            var meshes = new List<OmsiGeneratedMesh>();
+
+            // Across the east arm at its mouth (x = 10), from its north edge to its south edge, 8 m.
+            OmsiJunctionMarkings.AddMeshes(anchors, new[] { new OmsiMarkingLine { From = "1.1.0", To = "1.1.2", Style = OmsiMarkingStyle.Crosswalk } }, meshes);
+
+            var mesh = meshes.Single();
+            var points = Enumerable.Range(0, mesh.Positions.Count / 3).Select(index => new[] { mesh.Positions[index * 3], mesh.Positions[index * 3 + 2] }).ToList();
+            // 4 m long into the arm, away from the junction.
+            Assert.AreEqual(10.0, points.Min(point => point[0]), 1e-6);
+            Assert.AreEqual(14.0, points.Max(point => point[0]), 1e-6);
+            // Eight bars of 0.5 m, 0.5 m apart, the first at the north edge.
+            Assert.AreEqual(8 * 4, points.Count);
+            Assert.AreEqual(4.0, points.Max(point => point[1]), 1e-6);
+            Assert.IsTrue(points.Any(point => Math.Abs(point[1] - 3.5) < 1e-6));
+            Assert.IsFalse(points.Any(point => point[1] < 3.49 && point[1] > 3.01));
+        }
+
+        [Test]
+        public void AnAreaIsHatchedWithinItsOutlineAndFollowsTheLinesRoundIt()
+        {
+            var layout = OmsiJunctionLayout.Build(Tee(), null);
+            var anchors = OmsiJunctionMarkings.Anchors(layout);
+            // The east arm between its end and its mouth: 2 m by 8 m.
+            var area = new OmsiMarkingArea { Fill = OmsiMarkingFill.Hatched };
+            area.Corners.AddRange(new[] { "1.0.0", "1.0.2", "1.1.2", "1.1.0" });
+            var meshes = new List<OmsiGeneratedMesh>();
+
+            OmsiJunctionMarkings.AddMeshes(anchors, new OmsiMarkingLine[0], meshes, new[] { area });
+
+            var mesh = meshes.Single();
+            Assert.AreEqual(OmsiJunctionMarkings.WhiteTexture, mesh.Texture);
+            var covered = 0.0;
+            for (var index = 0; index < mesh.Triangles.Count; index += 3)
+            {
+                double X(int vertex) => mesh.Positions[mesh.Triangles[index + vertex] * 3];
+                double Z(int vertex) => mesh.Positions[mesh.Triangles[index + vertex] * 3 + 2];
+                var up = (Z(1) - Z(0)) * (X(2) - X(0)) - (X(1) - X(0)) * (Z(2) - Z(0));
+                Assert.Greater(up, 0.0);
+                covered += up / 2.0;
+            }
+            for (var index = 0; index < mesh.Positions.Count; index += 3)
+            {
+                Assert.That(mesh.Positions[index], Is.InRange(10.0 - 1e-6, 12.0 + 1e-6));
+                Assert.That(mesh.Positions[index + 2], Is.InRange(-4.0 - 1e-6, 4.0 + 1e-6));
+                Assert.AreEqual(0.1 + OmsiJunctionMarkings.AreaLift, mesh.Positions[index + 1], 1e-9);
+            }
+            // Stripes of 0.5 m with 1 m between cover about a third of the 16 m².
+            Assert.That(covered, Is.InRange(16.0 / 3.0 - 1.0, 16.0 / 3.0 + 1.0));
+            // The stripes run at 45° to the longest side, which runs north to south.
+            Assert.AreEqual(-45.0, OmsiJunctionMarkings.StripeDegrees(anchors, area), 1e-9);
+
+            // A side between two corners on a line follows it: here the quarter circle about (12, 12) round the corner.
+            var corner = new OmsiMarkingLine { From = "0.0.2", To = "1.0.0", Style = OmsiMarkingStyle.EdgeLine };
+            var round = new OmsiMarkingArea();
+            round.Corners.AddRange(new[] { "0.0.2", "1.0.0", "1.0.1" });
+            var outline = OmsiJunctionMarkings.Outline(anchors, new[] { corner }, round);
+            Assert.Greater(outline.Count, 6);
+            var middle = outline[outline.Count / 3];
+            Assert.AreEqual(8.0, Math.Sqrt((middle[0] - 12.0) * (middle[0] - 12.0) + (middle[1] - 12.0) * (middle[1] - 12.0)), 0.05);
+            // Without the line it runs straight, and a missing corner gives none.
+            Assert.AreEqual(3, OmsiJunctionMarkings.Outline(anchors, new OmsiMarkingLine[0], round).Count);
+            round.Corners.Add("7.0.0");
+            Assert.IsNull(OmsiJunctionMarkings.Outline(anchors, new[] { corner }, round));
+        }
+
+        [Test]
+        public void AreasAreBuiltIntoTheJunctionAndReadBackFromItsFile()
+        {
+            var area = new OmsiMarkingArea { Fill = OmsiMarkingFill.YellowHatched, Angle = -30.0 };
+            area.Corners.AddRange(new[] { "1.0.0", "1.0.2", "x0.0.1~1.0.2~1.0.1~2.0.1~0" });
+
+            var made = OmsiJunctionGenerator.Junction(Tee(), null, "Areas", null, new[] { area });
+
+            StringAssert.Contains("MapWorks marking areas: yellowhatched -30 1.0.0,1.0.2,x0.0.1~1.0.2~1.0.1~2.0.1~0", made.Sco);
+            StringAssert.DoesNotContain("MapWorks markings:", made.Sco);
+            var assetPath = OmsiGeneratedObjectStore.Write(installation, "Test", "Areas", made);
+            var back = OmsiGeneratedJunction.Read(installation, assetPath, path => OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), path));
+            Assert.AreEqual(0, back.Markings.Count);
+            var read = back.Areas.Single();
+            Assert.AreEqual(OmsiMarkingFill.YellowHatched, read.Fill);
+            Assert.AreEqual(-30.0, read.Angle);
+            CollectionAssert.AreEqual(area.Corners, read.Corners);
+        }
+
+        [Test]
+        public void ArrowsLieInTheirLanePointingTheWayTheLaneRuns()
+        {
+            var layout = OmsiJunctionLayout.Build(Tee(), null);
+            var anchors = OmsiJunctionMarkings.Anchors(layout);
+
+            // East of the mouth of the east arm (x = 10): north of its centre the lane coming in, south the one going out.
+            var lane = OmsiJunctionMarkings.LaneAt(anchors, 13.0, 2.0, 12.0);
+            CollectionAssert.AreEqual(new[] { "1.1.0", "1.1.1" }, lane.Select(anchor => anchor.Key));
+            Assert.IsTrue(OmsiJunctionMarkings.RunsIn(layout, lane[0], lane[1]));
+            var outbound = OmsiJunctionMarkings.LaneAt(anchors, 13.0, -2.0, 12.0);
+            CollectionAssert.AreEqual(new[] { "1.1.1", "1.1.2" }, outbound.Select(anchor => anchor.Key));
+            Assert.IsFalse(OmsiJunctionMarkings.RunsIn(layout, outbound[0], outbound[1]));
+            Assert.IsNull(OmsiJunctionMarkings.LaneAt(anchors, 30.0, 2.0, 12.0));
+
+            // A left arrow coming in 1 m behind the mouth: it ends at x = 11 and turns south, to the left of westward traffic.
+            var meshes = new List<OmsiGeneratedMesh>();
+            var left = new OmsiMarkingArrow { From = "1.1.0", To = "1.1.1", Kind = OmsiMarkingArrowKind.Left };
+            OmsiJunctionMarkings.AddMeshes(anchors, new OmsiMarkingLine[0], meshes, null, new[] { left });
+            var mesh = meshes.Single();
+            var xs = Enumerable.Range(0, mesh.Positions.Count / 3).Select(index => mesh.Positions[index * 3]).ToList();
+            var ys = Enumerable.Range(0, mesh.Positions.Count / 3).Select(index => mesh.Positions[index * 3 + 2]).ToList();
+            Assert.AreEqual(16.0, xs.Max(), 1e-6);
+            Assert.Greater(xs.Min(), 11.0 - 1e-6);
+            Assert.AreEqual(2.0 - 1.4, ys.Min(), 1e-6);
+            Assert.Less(ys.Max(), 2.0 + 0.4);
+            for (var index = 0; index < mesh.Positions.Count; index += 3)
+                Assert.AreEqual(0.1 + OmsiJunctionMarkings.Lift, mesh.Positions[index + 1], 1e-9);
+            for (var index = 0; index < mesh.Triangles.Count; index += 3)
+            {
+                double X(int vertex) => mesh.Positions[mesh.Triangles[index + vertex] * 3];
+                double Z(int vertex) => mesh.Positions[mesh.Triangles[index + vertex] * 3 + 2];
+                Assert.Greater((Z(1) - Z(0)) * (X(2) - X(0)) - (X(1) - X(0)) * (Z(2) - Z(0)), 0.0);
+            }
+
+            // Straight on, out of the junction: from 1 m behind the mouth away from it, the tip at x = 16.
+            var straight = new OmsiMarkingArrow { From = "1.1.1", To = "1.1.2", Kind = OmsiMarkingArrowKind.Straight, Outward = true };
+            var outline = OmsiJunctionMarkings.ArrowOutlines(anchors, straight);
+            Assert.AreEqual(2, outline.Count);
+            Assert.AreEqual(16.0, outline[1].Max(point => point[0]), 1e-6);
+            Assert.AreEqual(11.0, outline[0][0][0], 1e-6);
+            Assert.AreEqual(-2.0, outline[0][0][1], 1e-6);
+        }
+
+        [Test]
+        public void ArrowsAreBuiltIntoTheJunctionAndReadBackFromItsFile()
+        {
+            var arrows = new[]
+            {
+                new OmsiMarkingArrow { From = "1.1.0", To = "1.1.1", Kind = OmsiMarkingArrowKind.StraightLeft, Distance = 2.5 },
+                new OmsiMarkingArrow { From = "1.1.1", To = "1.1.2", Kind = OmsiMarkingArrowKind.All, Outward = true }
+            };
+
+            var made = OmsiJunctionGenerator.Junction(Tee(), null, "Arrows", null, null, arrows);
+
+            StringAssert.Contains("MapWorks marking arrows: 1.1.0~1.1.1 straightleft 2.5; 1.1.1~1.1.2 all 1 out", made.Sco);
+            StringAssert.Contains(OmsiJunctionMarkings.WhiteTexture, made.Model);
+            var assetPath = OmsiGeneratedObjectStore.Write(installation, "Test", "Arrows", made);
+            var back = OmsiGeneratedJunction.Read(installation, assetPath, path => OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), path));
+            Assert.AreEqual(2, back.Arrows.Count);
+            Assert.AreEqual(OmsiMarkingArrowKind.StraightLeft, back.Arrows[0].Kind);
+            Assert.AreEqual(2.5, back.Arrows[0].Distance);
+            Assert.IsFalse(back.Arrows[0].Outward);
+            Assert.AreEqual("1.1.2", back.Arrows[1].To);
+            Assert.IsTrue(back.Arrows[1].Outward);
+            Assert.AreEqual(0, back.Areas.Count);
+        }
+
+        [Test]
         public void CircularCurvatureIsAThirdStraightOnAndAboutAHalfForAQuarterTurn()
         {
             Assert.AreEqual(1.0 / 3.0, OmsiJunctionMarkings.CircularCurvature(0, 1, 0, 1), 1e-9);

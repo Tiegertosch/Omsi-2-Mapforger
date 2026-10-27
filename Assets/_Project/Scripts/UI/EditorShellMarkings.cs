@@ -39,12 +39,27 @@ namespace OmsiMapEditor.UI
         // The piece of the selected line under the pointer when it was clicked, by its place in markingPieces; -1 for none.
         private int markingPiece = -1;
 
+        // The anchors round the area being outlined, by their place in markingAnchors, and the selected area, -1 for none.
+        private readonly List<int> markingCorners = new List<int>();
+        private int markingArea = -1;
+
+        // The selected arrow, -1 for none.
+        private int markingArrow = -1;
+
         private void CreateMarkingOptions()
         {
             markingOptions = new MarkingToolOptions();
             markingOptions.style.display = DisplayStyle.None;
             markingOptions.StyleChosen += style =>
             {
+                // A line style ends outlining an area and lets go of a selected area or arrow.
+                markingCorners.Clear();
+                if (markingArea >= 0 || markingArrow >= 0)
+                {
+                    markingArea = -1;
+                    markingArrow = -1;
+                    markingOptions.ShowLine(null, null);
+                }
                 if (markingSelected < 0 || markingMade == null)
                 {
                     UpdateMarkingPreview();
@@ -58,14 +73,77 @@ namespace OmsiMapEditor.UI
                         return;
                     var lines = CopyMarkings();
                     ChangePiece(lines[piece.Line], piece, setting => setting.Style = style == lines[piece.Line].Style ? (OmsiMarkingStyle?)null : style);
-                    ApplyMarkings(lines, markingSelected, "Changed the piece to " + name);
+                    ApplyMarkings(lines, CopyAreas(), markingSelected, "Changed the piece to " + name);
                 }
                 else if (markingMade.Markings[markingSelected].Style != style)
                 {
                     var lines = CopyMarkings();
                     lines[markingSelected].Style = style;
-                    ApplyMarkings(lines, markingSelected, "Changed the line to " + name);
+                    ApplyMarkings(lines, CopyAreas(), markingSelected, "Changed the line to " + name);
                 }
+            };
+            markingOptions.FillChosen += fill =>
+            {
+                // A fill starts outlining an area; with an area selected it changes that area.
+                markingFrom = -1;
+                markingArrow = -1;
+                if (markingSelected >= 0)
+                {
+                    markingSelected = -1;
+                    markingPiece = -1;
+                    markingOptions.ShowLine(null, null);
+                }
+                if (markingArea < 0 || markingMade == null)
+                {
+                    UpdateMarkingPreview();
+                    SetStatus("Markings: click the anchors round the area, then the first one again to close it.");
+                    return;
+                }
+                if (markingMade.Areas[markingArea].Fill == fill)
+                    return;
+                var areas = CopyAreas();
+                areas[markingArea].Fill = fill;
+                ApplyMarkings(CopyMarkings(), areas, -1, "Changed the area to " + OmsiMarkingFillInfo.Of(fill).Name.ToLowerInvariant(), markingArea);
+            };
+            markingOptions.AngleCommitted += () =>
+            {
+                if (markingArea < 0 || markingMade == null || Math.Abs(markingMade.Areas[markingArea].Angle - markingOptions.Angle) < 0.05)
+                    return;
+                var areas = CopyAreas();
+                areas[markingArea].Angle = markingOptions.Angle;
+                ApplyMarkings(CopyMarkings(), areas, -1, "Changed the angle of the stripes", markingArea);
+            };
+            markingOptions.ArrowChosen += kind =>
+            {
+                // An arrow kind lays arrows on clicked lanes; with an arrow selected it changes that arrow.
+                markingFrom = -1;
+                markingCorners.Clear();
+                markingArea = -1;
+                if (markingSelected >= 0)
+                {
+                    markingSelected = -1;
+                    markingPiece = -1;
+                    markingOptions.ShowLine(null, null);
+                }
+                if (markingArrow < 0 || markingMade == null)
+                {
+                    UpdateMarkingPreview();
+                    SetStatus("Markings: click a lane of an arm to lay a " + OmsiMarkingArrowInfo.Of(kind).Name.ToLowerInvariant() + " arrow there.");
+                    return;
+                }
+                if (markingMade.Arrows[markingArrow].Kind == kind)
+                    return;
+                var arrows = CopyArrows();
+                arrows[markingArrow].Kind = kind;
+                ApplyMarkings(CopyMarkings(), CopyAreas(), arrows, -1, "Changed the arrow to " + OmsiMarkingArrowInfo.Of(kind).Name.ToLowerInvariant(), -1, markingArrow);
+            };
+            markingOptions.DistanceCommitted += () =>
+            {
+                if (markingArrow < 0 || markingMade == null || Math.Abs(markingMade.Arrows[markingArrow].Distance - markingOptions.Distance) < 0.005)
+                    return;
+                var arrows = CopyArrows();
+                arrows[markingArrow].Distance = markingOptions.Distance;
+                ApplyMarkings(CopyMarkings(), CopyAreas(), arrows, -1, "Moved the arrow", -1, markingArrow);
             };
             markingOptions.PieceVisibilityToggled += () =>
             {
@@ -74,7 +152,7 @@ namespace OmsiMapEditor.UI
                 var piece = markingPieces[markingPiece];
                 var lines = CopyMarkings();
                 ChangePiece(lines[piece.Line], piece, setting => setting.Hidden = !piece.Hidden);
-                ApplyMarkings(lines, markingSelected, piece.Hidden ? "Showed the piece again" : "Hid the piece");
+                ApplyMarkings(lines, CopyAreas(), markingSelected, piece.Hidden ? "Showed the piece again" : "Hid the piece");
             };
             markingOptions.AutoRequested += SuggestMarkings;
             markingOptions.CurvatureCommitted += () =>
@@ -83,7 +161,7 @@ namespace OmsiMapEditor.UI
                     return;
                 var lines = CopyMarkings();
                 lines[markingSelected].Curvature = markingOptions.Curvature;
-                ApplyMarkings(lines, markingSelected, "Changed the curvature of the line");
+                ApplyMarkings(lines, CopyAreas(), markingSelected, "Changed the curvature of the line");
             };
             markingOptions.DeleteRequested += DeleteSelectedMarking;
             objectsPanelHost.Add(markingOptions);
@@ -137,6 +215,9 @@ namespace OmsiMapEditor.UI
             markingHover = -1;
             markingSelected = -1;
             markingPiece = -1;
+            markingCorners.Clear();
+            markingArea = -1;
+            markingArrow = -1;
             markingOptions?.ShowLine(null, null);
             markingOptions?.ShowJunction("Click a junction made in this project.");
             markingOptions?.ShowPlan(string.Empty, false);
@@ -168,6 +249,8 @@ namespace OmsiMapEditor.UI
                 return false;
             }
             var keep = ReferenceEquals(record, markingJunction) ? markingSelected : -1;
+            var keepArea = ReferenceEquals(record, markingJunction) ? markingArea : -1;
+            var keepArrow = ReferenceEquals(record, markingJunction) ? markingArrow : -1;
             markingTile = tile;
             markingJunction = record;
             markingMade = made;
@@ -183,9 +266,18 @@ namespace OmsiMapEditor.UI
                 markingAnchorHeights.Add(record.Height + anchor.Height + OmsiJunctionMarkings.Lift);
             }
             markingFrom = -1;
+            // Anchors are counted anew, so an outline begun is let go.
+            markingCorners.Clear();
             markingSelected = keep >= 0 && keep < made.Markings.Count ? keep : -1;
+            markingArea = keepArea >= 0 && keepArea < made.Areas.Count ? keepArea : -1;
+            markingArrow = keepArrow >= 0 && keepArrow < made.Arrows.Count ? keepArrow : -1;
             markingOptions.ShowLine(markingSelected >= 0 ? made.Markings[markingSelected] : null, null);
-            markingOptions.ShowJunction("Junction #" + record.Id + ": " + made.Arms.Count + " arms, " + made.Markings.Count + " line(s).");
+            if (markingArea >= 0)
+                markingOptions.ShowArea(made.Areas[markingArea]);
+            if (markingArrow >= 0)
+                markingOptions.ShowArrow(made.Arrows[markingArrow]);
+            markingOptions.ShowJunction("Junction #" + record.Id + ": " + made.Arms.Count + " arms, " + made.Markings.Count + " line(s), " + made.Areas.Count +
+                                        " area(s), " + made.Arrows.Count + " arrow(s).");
             if (selection.Count != 1 || !ReferenceEquals(selection[0].Record, record))
             {
                 selection.Clear();
@@ -193,8 +285,174 @@ namespace OmsiMapEditor.UI
                 ApplySelection(tile);
             }
             UpdateMarkingPreview();
-            SetStatus("Markings of junction #" + record.Id + ": click an anchor, then another to draw a line; click a line to select it. Esc leaves the tool.");
+            SetStatus("Markings of junction #" + record.Id + ": click an anchor, then another to draw a line; click a line or an area to select it. Esc leaves the tool.");
             return true;
+        }
+
+        /// <summary>An area's outline in world metres, closed, or null when its corners are gone.</summary>
+        private OmsiMapPoint[] AreaPolygon(OmsiMarkingArea area)
+        {
+            var outline = OmsiJunctionMarkings.Outline(markingAnchors, markingMade.Markings, area);
+            if (outline == null)
+                return null;
+            var points = new OmsiMapPoint[outline.Count + 1];
+            for (var index = 0; index < outline.Count; index++)
+                points[index] = ObjectToWorld(markingTile, markingJunction, outline[index][0], outline[index][1]);
+            points[outline.Count] = points[0];
+            return points;
+        }
+
+        /// <summary>The area of the junction a point lies in, the last drawn where several overlap, or -1.</summary>
+        private int MarkingAreaAt(OmsiMapPoint point)
+        {
+            if (markingMade == null)
+                return -1;
+            for (var area = markingMade.Areas.Count - 1; area >= 0; area--)
+            {
+                var polygon = AreaPolygon(markingMade.Areas[area]);
+                if (polygon == null)
+                    continue;
+                var inside = false;
+                for (int index = 0, previous = polygon.Length - 1; index < polygon.Length; previous = index++)
+                    if (polygon[index].Y > point.Y != polygon[previous].Y > point.Y &&
+                        point.X < (polygon[previous].X - polygon[index].X) * (point.Y - polygon[index].Y) / (polygon[previous].Y - polygon[index].Y) + polygon[index].X)
+                        inside = !inside;
+                if (inside)
+                    return area;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// A click on an anchor while outlining an area: adds it as the next corner, takes the last corner back when clicked
+        /// again, or closes the area on the first corner and marks it, as one undo step.
+        /// </summary>
+        private void ClickAreaCorner(int anchor)
+        {
+            var fill = markingOptions.AreaFill ?? OmsiMarkingFill.Hatched;
+            if (markingCorners.Count >= 3 && anchor == markingCorners[0])
+            {
+                var area = new OmsiMarkingArea { Fill = fill, Angle = markingOptions.Angle };
+                foreach (var corner in markingCorners)
+                    area.Corners.Add(markingAnchors[corner].Key);
+                markingCorners.Clear();
+                var areas = CopyAreas();
+                areas.Add(area);
+                ApplyMarkings(CopyMarkings(), areas, -1, "Marked a " + OmsiMarkingFillInfo.Of(fill).Name.ToLowerInvariant());
+                return;
+            }
+            if (markingCorners.Count > 0 && anchor == markingCorners[markingCorners.Count - 1])
+            {
+                markingCorners.RemoveAt(markingCorners.Count - 1);
+                SetStatus("Took the last corner back.");
+            }
+            else if (markingCorners.Contains(anchor))
+                SetStatus(anchor == markingCorners[0] ? "An area needs three corners at least." : "That anchor is a corner already; click the first corner to close the area.");
+            else
+            {
+                markingCorners.Add(anchor);
+                SetStatus(markingCorners.Count >= 3
+                    ? "Corner " + markingCorners.Count + ": click the next anchor, or the first one to close the area."
+                    : "Corner " + markingCorners.Count + ": click the next anchor round the area.");
+            }
+            UpdateMarkingPreview();
+        }
+
+        private List<OmsiMarkingArea> CopyAreas()
+        {
+            var areas = new List<OmsiMarkingArea>();
+            foreach (var area in markingMade.Areas)
+                areas.Add(area.Copy());
+            return areas;
+        }
+
+        private List<OmsiMarkingArrow> CopyArrows()
+        {
+            var arrows = new List<OmsiMarkingArrow>();
+            foreach (var arrow in markingMade.Arrows)
+                arrows.Add(arrow.Copy());
+            return arrows;
+        }
+
+        /// <summary>A point in world metres in the frame of the marked junction (x right, y forward), as ObjectToWorld undoes.</summary>
+        private double[] WorldToObject(OmsiMapPoint point)
+        {
+            var centre = OmsiMapGeometry.TileLocalToWorld(markingTile.X, markingTile.Y, markingJunction.LocalX, markingJunction.LocalY, currentSummary.TileSizeMeters);
+            var heading = markingJunction.HeadingDegrees * Math.PI / 180.0;
+            var dx = point.X - centre.X;
+            var dy = point.Y - centre.Y;
+            return new[] { dx * Math.Cos(heading) - dy * Math.Sin(heading), dx * Math.Sin(heading) + dy * Math.Cos(heading) };
+        }
+
+        /// <summary>An arrow as lines in world metres, its shafts and heads; null when it cannot lie.</summary>
+        private List<OmsiMapPoint[]> ArrowLines(OmsiMarkingArrow arrow)
+        {
+            var outlines = OmsiJunctionMarkings.ArrowOutlines(markingAnchors, arrow);
+            if (outlines == null)
+                return null;
+            var lines = new List<OmsiMapPoint[]>();
+            foreach (var outline in outlines)
+                lines.Add(outline.ConvertAll(point => ObjectToWorld(markingTile, markingJunction, point[0], point[1])).ToArray());
+            return lines;
+        }
+
+        /// <summary>The arrow of the junction under a point, the one whose middle line lies nearest, or -1.</summary>
+        private int MarkingArrowAt(OmsiMapPoint point)
+        {
+            if (markingMade == null)
+                return -1;
+            var local = WorldToObject(point);
+            var best = -1;
+            var bestAcross = 1.6;
+            for (var arrow = 0; arrow < markingMade.Arrows.Count; arrow++)
+            {
+                if (!OmsiJunctionMarkings.ArrowFrame(markingAnchors, markingMade.Arrows[arrow], out var tail, out var direction, out _))
+                    continue;
+                var dx = local[0] - tail[0];
+                var dy = local[1] - tail[1];
+                var along = dx * direction[0] + dy * direction[1];
+                var across = Math.Abs(dx * direction[1] - dy * direction[0]);
+                if (along < -0.3 || along > OmsiJunctionMarkings.ArrowLength + 0.3 || across > bestAcross)
+                    continue;
+                best = arrow;
+                bestAcross = across;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The arrow the chosen kind would make in the lane under a point, its middle at the point to half a metre, at least
+        /// at the mouth; null off the lanes.
+        /// </summary>
+        private OmsiMarkingArrow ArrowAt(OmsiMapPoint point)
+        {
+            if (markingMade == null || !markingOptions.ArrowKind.HasValue)
+                return null;
+            var local = WorldToObject(point);
+            var lane = OmsiJunctionMarkings.LaneAt(markingAnchors, local[0], local[1], 15.0);
+            if (lane == null)
+                return null;
+            var outX = -Math.Sin(lane[0].InwardDegrees * Math.PI / 180.0);
+            var outY = -Math.Cos(lane[0].InwardDegrees * Math.PI / 180.0);
+            var along = (local[0] - (lane[0].X + lane[1].X) / 2.0) * outX + (local[1] - (lane[0].Y + lane[1].Y) / 2.0) * outY;
+            return new OmsiMarkingArrow
+            {
+                From = lane[0].Key, To = lane[1].Key, Kind = markingOptions.ArrowKind.Value, Outward = !OmsiJunctionMarkings.RunsIn(markingLayout, lane[0], lane[1]),
+                Distance = Math.Max(0.0, Math.Round((along - OmsiJunctionMarkings.ArrowLength / 2.0) * 2.0) / 2.0)
+            };
+        }
+
+        private void SelectMarkingArrow(int arrow)
+        {
+            markingFrom = -1;
+            markingSelected = -1;
+            markingPiece = -1;
+            markingArea = -1;
+            markingArrow = arrow;
+            markingOptions.ShowArrow(markingMade.Arrows[arrow]);
+            UpdateMarkingPreview();
+            SetStatus("Selected a " + OmsiMarkingArrowInfo.Of(markingMade.Arrows[arrow].Kind).Name.ToLowerInvariant() +
+                      " arrow: choose another kind or distance in the panel, Del deletes it.");
         }
 
         /// <summary>The junction was made again or taken back, such as by undo: its markings are read anew.</summary>
@@ -331,7 +589,12 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var replaced = markingMade.Markings.Count;
-            ApplyMarkings(lines, -1, "Put in " + lines.Count + " suggested line(s)" + (replaced > 0 ? " in place of " + replaced : string.Empty));
+            // Areas stay where their corners still are; those at crossings of lines that go, go too.
+            var anchors = OmsiJunctionMarkings.AllAnchors(markingLayout, lines);
+            var areas = CopyAreas();
+            var gone = areas.RemoveAll(area => area.Corners.Exists(corner => !anchors.Exists(anchor => anchor.Key == corner)));
+            ApplyMarkings(lines, areas, -1, "Put in " + lines.Count + " suggested line(s)" + (replaced > 0 ? " in place of " + replaced : string.Empty) +
+                                            (gone > 0 ? ", without " + gone + " area(s) at crossings that went" : string.Empty));
         }
 
         private static double DistanceToSegment(OmsiMapPoint point, OmsiMapPoint a, OmsiMapPoint b)
@@ -395,12 +658,66 @@ namespace OmsiMapEditor.UI
                 if (points != null && line != markingSelected)
                     lines.Add(points);
             }
+            for (var area = 0; area < markingMade.Areas.Count; area++)
+            {
+                var points = AreaPolygon(markingMade.Areas[area]);
+                if (points != null && area != markingArea)
+                    lines.Add(points);
+            }
+            for (var arrow = 0; arrow < markingMade.Arrows.Count; arrow++)
+            {
+                var parts = arrow != markingArrow ? ArrowLines(markingMade.Arrows[arrow]) : null;
+                if (parts != null)
+                    lines.AddRange(parts);
+            }
             // The lines are many points each; no dots at them.
             mapCanvas.SetRoadGuides(lines, false);
 
             var shown = new List<OmsiMapPoint[]>();
             string plan;
-            if (markingFrom >= 0)
+            if (markingCorners.Count > 0)
+            {
+                // With the anchor under the pointer as the next corner, the area shows as it would be closed.
+                var corners = new List<int>(markingCorners);
+                if (markingHover >= 0 && !corners.Contains(markingHover))
+                    corners.Add(markingHover);
+                var outline = new OmsiMarkingArea();
+                foreach (var corner in corners)
+                    outline.Corners.Add(markingAnchors[corner].Key);
+                var polygon = corners.Count >= 3 ? AreaPolygon(outline) : null;
+                if (polygon != null)
+                    shown.Add(polygon);
+                else
+                {
+                    var open = new List<OmsiMapPoint>();
+                    foreach (var corner in corners)
+                        open.Add(markingAnchorPoints[corner]);
+                    if (markingHover < 0 && roadPointer.HasValue)
+                        open.Add(roadPointer.Value);
+                    if (open.Count >= 2)
+                        shown.Add(open.ToArray());
+                }
+                plan = markingHover >= 0 && markingHover == markingCorners[0] && markingCorners.Count >= 3
+                    ? "Click to close the " + OmsiMarkingFillInfo.Of(markingOptions.AreaFill ?? OmsiMarkingFill.Hatched).Name.ToLowerInvariant() + "."
+                    : "Click the next anchor round the area, the first to close it; Esc lets go.";
+            }
+            else if (markingArea >= 0)
+            {
+                var polygon = AreaPolygon(markingMade.Areas[markingArea]);
+                if (polygon != null)
+                    shown.Add(polygon);
+                plan = "Selected: " + OmsiMarkingFillInfo.Of(markingMade.Areas[markingArea].Fill).Name.ToLowerInvariant() +
+                       ". Choose another fill or stripe angle, or press Del.";
+            }
+            else if (markingArrow >= 0)
+            {
+                var parts = ArrowLines(markingMade.Arrows[markingArrow]);
+                if (parts != null)
+                    shown.AddRange(parts);
+                plan = "Selected: " + OmsiMarkingArrowInfo.Of(markingMade.Arrows[markingArrow].Kind).Name.ToLowerInvariant() +
+                       " arrow. Choose another kind or distance, or press Del.";
+            }
+            else if (markingFrom >= 0)
             {
                 var from = markingAnchors[markingFrom];
                 if (markingHover >= 0 && markingHover != markingFrom)
@@ -431,8 +748,22 @@ namespace OmsiMapEditor.UI
                 plan = "Selected: " + OmsiMarkingStyleInfo.Of(markingMade.Markings[markingSelected].Style).Name.ToLowerInvariant() +
                        (count > 1 ? " in " + count + " pieces" : string.Empty) + ". Choose another style or curvature, hide the piece, or press Del.";
             }
+            else if (markingOptions.ArrowKind.HasValue)
+            {
+                // The arrow a click would lay, in the lane under the pointer.
+                var candidate = roadPointer.HasValue ? ArrowAt(roadPointer.Value) : null;
+                var parts = candidate != null ? ArrowLines(candidate) : null;
+                if (parts != null)
+                    shown.AddRange(parts);
+                plan = parts != null
+                    ? "Click to lay the arrow " + candidate.Distance.ToString("0.#", CultureInfo.InvariantCulture) + " m behind the mouth" +
+                      (candidate.Outward ? ", pointing out of the junction as the lane runs." : ".")
+                    : "Point at a lane of an arm to lay an arrow, or click an arrow to select it.";
+            }
+            else if (markingOptions.AreaFill.HasValue)
+                plan = markingHover >= 0 ? "Click to start an area at this anchor." : "Click the anchors round an area, or an area to select it.";
             else
-                plan = markingHover >= 0 ? "Click to start a line at this anchor." : "Click an anchor to start a line, or a line to select it.";
+                plan = markingHover >= 0 ? "Click to start a line at this anchor." : "Click an anchor to start a line, or a line or an area to select it.";
             mapCanvas.SetRoadPreview(shown, true, null, null, null);
             markingOptions.ShowPlan(plan, false);
         }
@@ -450,11 +781,37 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("draw road markings"));
                 return;
             }
-            var anchor = markingJunction != null ? MarkingAnchorAt(point) : -1;
+            // With an arrow kind chosen a click selects an arrow or lays one in the lane under it.
+            if (markingJunction != null && markingOptions.ArrowKind.HasValue)
+            {
+                var arrowHit = MarkingArrowAt(point);
+                if (arrowHit >= 0)
+                {
+                    SelectMarkingArrow(arrowHit);
+                    return;
+                }
+                var arrow = ArrowAt(point);
+                if (arrow != null)
+                {
+                    var arrows = CopyArrows();
+                    arrows.Add(arrow);
+                    ApplyMarkings(CopyMarkings(), CopyAreas(), arrows, -1, "Laid a " + OmsiMarkingArrowInfo.Of(arrow.Kind).Name.ToLowerInvariant() + " arrow");
+                    return;
+                }
+            }
+            var anchor = markingJunction != null && !markingOptions.ArrowKind.HasValue ? MarkingAnchorAt(point) : -1;
             if (anchor >= 0)
             {
                 markingSelected = -1;
+                markingArea = -1;
+                markingArrow = -1;
                 markingOptions.ShowLine(null, null);
+                if (markingOptions.AreaFill.HasValue)
+                {
+                    markingFrom = -1;
+                    ClickAreaCorner(anchor);
+                    return;
+                }
                 if (markingFrom < 0 || markingFrom == anchor)
                 {
                     markingFrom = markingFrom == anchor ? -1 : anchor;
@@ -469,19 +826,46 @@ namespace OmsiMapEditor.UI
                 markingFrom = -1;
                 var lines = CopyMarkings();
                 lines.Add(line);
-                ApplyMarkings(lines, -1, "Drew a " + OmsiMarkingStyleInfo.Of(line.Style).Name.ToLowerInvariant());
+                ApplyMarkings(lines, CopyAreas(), -1, "Drew a " + OmsiMarkingStyleInfo.Of(line.Style).Name.ToLowerInvariant());
+                return;
+            }
+            if (markingCorners.Count > 0)
+            {
+                SetStatus("Click the next anchor round the area, or the first one to close it; Esc lets go of the area.");
                 return;
             }
             var hit = markingJunction != null ? MarkingPieceAt(point) : -1;
             if (hit >= 0)
             {
                 markingFrom = -1;
+                markingArea = -1;
+                markingArrow = -1;
                 markingPiece = hit;
                 markingSelected = markingPieces[hit].Line;
                 markingOptions.ShowLine(markingMade.Markings[markingSelected], markingPieces[hit]);
                 UpdateMarkingPreview();
                 SetStatus("Selected a " + OmsiMarkingStyleInfo.Of(markingMade.Markings[markingSelected].Style).Name.ToLowerInvariant() +
                           " and its piece under the pointer: choose another style or curvature in the panel, hide the piece, Y switches the style, Del deletes the line.");
+                return;
+            }
+            var arrowAt = markingJunction != null ? MarkingArrowAt(point) : -1;
+            if (arrowAt >= 0)
+            {
+                SelectMarkingArrow(arrowAt);
+                return;
+            }
+            var areaHit = markingJunction != null ? MarkingAreaAt(point) : -1;
+            if (areaHit >= 0)
+            {
+                markingFrom = -1;
+                markingSelected = -1;
+                markingPiece = -1;
+                markingArrow = -1;
+                markingArea = areaHit;
+                markingOptions.ShowArea(markingMade.Areas[areaHit]);
+                UpdateMarkingPreview();
+                SetStatus("Selected a " + OmsiMarkingFillInfo.Of(markingMade.Areas[areaHit].Fill).Name.ToLowerInvariant() +
+                          ": choose another fill or stripe angle in the panel, Del deletes it.");
                 return;
             }
             if (MadeJunctionAt(point, out var tile, out var record) && !ReferenceEquals(record, markingJunction))
@@ -491,6 +875,8 @@ namespace OmsiMapEditor.UI
             }
             markingFrom = -1;
             markingSelected = -1;
+            markingArea = -1;
+            markingArrow = -1;
             markingOptions.ShowLine(null, null);
             UpdateMarkingPreview();
             if (markingJunction == null)
@@ -507,15 +893,36 @@ namespace OmsiMapEditor.UI
 
         private void DeleteSelectedMarking()
         {
-            if (markingSelected < 0 || markingMade == null)
+            if (markingMade == null)
+                return;
+            if (markingArrow >= 0)
+            {
+                var keptArrows = CopyArrows();
+                keptArrows.RemoveAt(markingArrow);
+                markingArrow = -1;
+                ApplyMarkings(CopyMarkings(), CopyAreas(), keptArrows, -1, "Deleted the arrow");
+                return;
+            }
+            if (markingArea >= 0)
+            {
+                var kept = CopyAreas();
+                kept.RemoveAt(markingArea);
+                markingArea = -1;
+                ApplyMarkings(CopyMarkings(), kept, -1, "Deleted the area");
+                return;
+            }
+            if (markingSelected < 0)
                 return;
             var lines = CopyMarkings();
             var gone = lines[markingSelected].Ends;
             lines.RemoveAt(markingSelected);
-            // Lines drawn from a crossing of this line lose their anchor and go with it.
-            var dependent = lines.RemoveAll(line => line.From.StartsWith("x", StringComparison.Ordinal) && line.From.Contains(gone) ||
-                                                    line.To.StartsWith("x", StringComparison.Ordinal) && line.To.Contains(gone));
-            ApplyMarkings(lines, -1, "Deleted the line" + (dependent > 0 ? " and " + dependent + " line(s) drawn from its crossings" : string.Empty));
+            bool AtItsCrossing(string key) => key.StartsWith("x", StringComparison.Ordinal) && key.Contains(gone);
+            // Lines and areas drawn from a crossing of this line lose their anchor and go with it.
+            var dependent = lines.RemoveAll(line => AtItsCrossing(line.From) || AtItsCrossing(line.To));
+            var areas = CopyAreas();
+            var dependentAreas = areas.RemoveAll(area => area.Corners.Exists(AtItsCrossing));
+            ApplyMarkings(lines, areas, -1, "Deleted the line" + (dependent > 0 ? " and " + dependent + " line(s) drawn from its crossings" : string.Empty) +
+                                            (dependentAreas > 0 ? ", with " + dependentAreas + " area(s) at them" : string.Empty));
         }
 
         /// <summary>Switches the style for the next line, or of the selected line, to the next one, as Y does.</summary>
@@ -527,9 +934,20 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Makes the junction again with these markings under Sceneryobjects\Mapforge and puts it in place of the old one, as
-        /// one undo step; <paramref name="select"/> is the line to keep selected, or -1.
+        /// one undo step, with its arrows as they are.
         /// </summary>
-        private void ApplyMarkings(List<OmsiMarkingLine> lines, int select, string done)
+        private void ApplyMarkings(List<OmsiMarkingLine> lines, List<OmsiMarkingArea> areas, int select, string done, int selectArea = -1)
+        {
+            ApplyMarkings(lines, areas, CopyArrows(), select, done, selectArea);
+        }
+
+        /// <summary>
+        /// Makes the junction again with these markings under Sceneryobjects\Mapforge and puts it in place of the old one, as
+        /// one undo step; <paramref name="select"/> is the line to keep selected, <paramref name="selectArea"/> the area and
+        /// <paramref name="selectArrow"/> the arrow, each -1 for none.
+        /// </summary>
+        private void ApplyMarkings(List<OmsiMarkingLine> lines, List<OmsiMarkingArea> areas, List<OmsiMarkingArrow> arrows, int select, string done,
+            int selectArea = -1, int selectArrow = -1)
         {
             if (!CanEdit)
             {
@@ -556,7 +974,7 @@ namespace OmsiMapEditor.UI
             string assetPath;
             try
             {
-                assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, made.Name, OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + made.Name, lines));
+                assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, made.Name, OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + made.Name, lines, areas, arrows));
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
@@ -589,7 +1007,21 @@ namespace OmsiMapEditor.UI
             roadPorts = null;
             PushSteps(steps, "the markings of junction #" + record.Id);
             markingSelected = -1;
+            markingArea = -1;
+            markingArrow = -1;
             TargetMarkingJunction(markingTile, record);
+            if (selectArea >= 0 && selectArea < markingMade.Areas.Count)
+            {
+                markingArea = selectArea;
+                markingOptions.ShowArea(markingMade.Areas[selectArea]);
+                UpdateMarkingPreview();
+            }
+            if (selectArrow >= 0 && selectArrow < markingMade.Arrows.Count)
+            {
+                markingArrow = selectArrow;
+                markingOptions.ShowArrow(markingMade.Arrows[selectArrow]);
+                UpdateMarkingPreview();
+            }
             if (select >= 0 && select < markingMade.Markings.Count)
             {
                 markingSelected = select;
@@ -603,13 +1035,15 @@ namespace OmsiMapEditor.UI
                 markingOptions.ShowLine(markingMade.Markings[select], markingPiece >= 0 ? markingPieces[markingPiece] : null);
                 UpdateMarkingPreview();
             }
-            SetStatus(done + " on junction #" + record.Id + ", now " + markingMade.Markings.Count + " line(s), made again as " +
+            SetStatus(done + " on junction #" + record.Id + ", now " + markingMade.Markings.Count + " line(s), " + markingMade.Areas.Count + " area(s) and " + markingMade.Arrows.Count + " arrow(s), made again as " +
                       Path.GetFileNameWithoutExtension(assetPath) + ". Ctrl+Z takes it back.");
         }
 
         /// <summary>
         /// For command-line checks: opens the markings tool on the selected junction and, unless the argument is "show", draws
-        /// lines given as <c>from-to:style</c>, separated by commas, such as <c>1.0.1-2.0.1:laneline,0.1.0-0.1.1:stop</c>. The
+        /// lines given as <c>from-to:style</c>, separated by commas, such as <c>1.0.1-2.0.1:laneline,0.1.0-0.1.1:stop</c>, and
+        /// areas given as <c>area:fill:corner+corner+corner[:angle]</c>, such as <c>area:hatched:1.0.0+1.0.2+1.1.2+1.1.0</c>,
+        /// and arrows given as <c>arrow:kind:from~to[:distance]</c>, such as <c>arrow:straightleft:1.1.0~1.1.1:2</c>. The
         /// status goes to the log as "Markings:".
         /// </summary>
         private void RunMarkingArgument(string argument)
@@ -624,28 +1058,57 @@ namespace OmsiMapEditor.UI
             else if (markingJunction != null && !string.Equals(argument, "show", StringComparison.OrdinalIgnoreCase))
             {
                 var lines = CopyMarkings();
+                var areas = CopyAreas();
+                var arrows = CopyArrows();
                 foreach (var part in argument.Split(','))
                 {
                     var pieces = part.Split(':');
+                    if (pieces.Length >= 3 && pieces[0].Trim() == "area" && OmsiMarkingFillInfo.ByKey(pieces[1].Trim()) is OmsiMarkingFillInfo fill)
+                    {
+                        var area = new OmsiMarkingArea { Fill = fill.Fill };
+                        foreach (var corner in pieces[2].Split('+'))
+                            area.Corners.Add(corner.Trim());
+                        if (pieces.Length > 3 && double.TryParse(pieces[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var angle))
+                            area.Angle = angle;
+                        areas.Add(area);
+                        continue;
+                    }
+                    if (pieces.Length >= 3 && pieces[0].Trim() == "arrow" && OmsiMarkingArrowInfo.ByKey(pieces[1].Trim()) is OmsiMarkingArrowInfo kind)
+                    {
+                        var lane = pieces[2].Split('~');
+                        var from = markingAnchors.Find(candidate => candidate.Key == lane[0].Trim());
+                        var to = lane.Length == 2 ? markingAnchors.Find(candidate => candidate.Key == lane[1].Trim()) : null;
+                        if (from == null || to == null)
+                            continue;
+                        var arrow = new OmsiMarkingArrow { From = from.Key, To = to.Key, Kind = kind.Kind, Outward = !OmsiJunctionMarkings.RunsIn(markingLayout, from, to) };
+                        if (pieces.Length > 3 && double.TryParse(pieces[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var distance))
+                            arrow.Distance = distance;
+                        arrows.Add(arrow);
+                        continue;
+                    }
                     var ends = pieces[0].Split('-');
                     if (ends.Length != 2)
                         continue;
                     var style = pieces.Length > 1 ? OmsiMarkingStyleInfo.ByKey(pieces[1]) : null;
                     lines.Add(new OmsiMarkingLine { From = ends[0].Trim(), To = ends[1].Trim(), Style = style?.Style ?? markingOptions.Style });
                 }
-                ApplyMarkings(lines, -1, "Drew " + (lines.Count - markingMade.Markings.Count) + " line(s)");
+                ApplyMarkings(lines, areas, arrows, -1, "Drew " + (lines.Count - markingMade.Markings.Count) + " line(s), " + (areas.Count - markingMade.Areas.Count) +
+                                                        " area(s) and " + (arrows.Count - markingMade.Arrows.Count) + " arrow(s)");
             }
             Debug.Log("Markings: " + statusLabel?.text);
         }
 
-        /// <summary>Esc with the markings tool: lets go of the anchor, then of the selected line, then leaves the tool.</summary>
+        /// <summary>Esc with the markings tool: lets go of the anchor or the area begun, then of the selected line or area, then leaves the tool.</summary>
         private void EscapeMarking()
         {
-            if (markingFrom >= 0 || markingSelected >= 0)
+            if (markingFrom >= 0 || markingSelected >= 0 || markingCorners.Count > 0 || markingArea >= 0 || markingArrow >= 0)
             {
                 markingFrom = -1;
                 markingSelected = -1;
                 markingPiece = -1;
+                markingCorners.Clear();
+                markingArea = -1;
+                markingArrow = -1;
                 markingOptions.ShowLine(null, null);
                 UpdateMarkingPreview();
                 SetStatus("Markings: click an anchor to start a line, or a line to select it; Esc leaves the tool.");

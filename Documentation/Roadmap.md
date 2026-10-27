@@ -94,8 +94,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - Fahrbahnmarkierungen auf erzeugten Kreuzungen wie Town Road Lane (ADR 044):
     - [x] Etappe 1: Werkzeug „Markings“ (M): Anker an Fahrbahnrändern, Fahrstreifengrenzen und Mittelstreifen jedes Arms (Ende und Einmündung), Linien aus zwei Klicks als Kurven, Linienarten nach StVO (Leitlinie, Fahrstreifenbegrenzung, Doppellinie, Breitstrich, unterbrochener Breitstrich, Haltlinie, Wartelinie, gelbe Varianten), Krümmung, Wählen, Ändern und Löschen; als Streifen im Modell, in der `.sco` beschrieben, beim Arm-Drehen mitgenommen, Rückgängig
     - [x] Etappe 2: Teilstücke an Schnittpunkten (ausblenden, eigener Stil), Schnittpunkte als Anker, „Auto markings“ nach Vorfahrt (Leitlinien der Hauptstraße, unterbrochener Breitstrich über Einmündungen, Wartelinien der Nebenstraßen, sonst Haltlinien), Favoriten
-    - Etappe 3: Flächen: Sperrfläche (Zeichen 298), Fußgängerüberweg (Zeichen 293)
-    - Etappe 4: Richtungspfeile
+    - [x] Etappe 3: Flächen aus Ankern reihum (Ränder folgen Linien), Sperrfläche (Zeichen 298) weiß und gelb mit einstellbarem Streifenwinkel, Fußgängerüberweg (Zeichen 293) als Linienart über einen Arm; Wählen, Ändern, Löschen, Rückgängig
+    - [x] Etappe 4: Richtungspfeile (Zeichen 297) in sieben Arten, per Klick in einen Fahrstreifen, Richtung nach dem Profil, Abstand einstellbar; Wählen, Ändern, Löschen, Rückgängig
   - Bauarten und Einrasten wie in Cities: Skylines (ADR 043):
     - [x] Etappe 1: „Mode“ Straight (gerade Stücke, Ecken zu im Projekt gebauten Geraden mit „Corner radius“ ausgerundet), Curved (Start, Kontrollpunkt, Ende; ein oder zwei knickfreie Bögen, S-Kurve an einer angeschlossenen Straße), Free (tangential weiter wie bisher); „Snap“ Roads (freie Enden und Anschlusspunkte) und 90° (rechte Winkel zur fortgesetzten Straße, zu einer Straße nahe dem Start oder nach Norden; Free endet geradeaus oder im rechten Winkel)
     - [x] Etappe 2: „Guides“: Hilfslinien aus freien Spline-Enden und Anschlusspunkten (Verlängerung, Senkrechte), Einrasten auf Linien, Schnittpunkten und wo sie die eingerastete Richtung kreuzen
