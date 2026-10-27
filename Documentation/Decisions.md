@@ -570,4 +570,15 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 **Grund:** Wie bei Town Road Lane sitzen Linien mit zwei Klicks genau auf den Fahrstreifen, weil nur Anker wählbar sind. Gespeichert wird nur die Beschreibung, die Geometrie folgt den Armen. OMSIs eigene Kreuzungen tragen ihre Markierungen ebenso im Modell; Splines oder einzelne Objekte dafür ließen sich nicht an die Kreuzung binden.
 
-**Offen:** Etappe 2: Teilstücke an Schnittpunkten, „Auto markings“ nach Vorfahrt, Favoriten. Etappe 3: Flächen wie Sperrfläche (Zeichen 298) und Fußgängerüberweg (Zeichen 293). Etappe 4: Richtungspfeile.
+**Ergänzung vom 26. Oktober 2026 (Etappe 2):**
+- **Teilstücke:** Wo sich Linien kreuzen, zerfallen sie in Teilstücke (`OmsiJunctionMarkings.Pieces`). Ein Klick auf eine Linie wählt auch das Teilstück unter dem Zeiger. Mit „Apply to: This piece“ ändert ein Stil nur dieses Stück, „Hide piece“ blendet es aus oder wieder ein. Gespeichert wird so eine Einstellung bei der Mitte des Teilstücks als Anteil der Linienlänge, etwa `0.75:hide` oder `0.1:stop` hinter der Linie in der `.sco`. Kommen andere Linien hinzu oder fallen weg, bleibt sie bei dem Teilstück, in dem dieser Anteil liegt. Ein Teilstück im Stil seiner Linie setzt deren Strichfolge fort; eines in anderem Stil beginnt eine eigene.
+- **Schnittpunkte als Anker:** Wo zwei Linien zwischen Armankern sich kreuzen, gibt es einen weiteren Anker (`CrossingAnchors`). Er heißt nach den Enden beider Linien und der Nummer des Schnittpunkts, etwa `x0.0.1~1.0.1~0.0.2~2.0.0~0`, und bleibt so gültig, wenn andere Linien wegfallen. Linien von oder zu einem Schnittpunkt sind gerade und erzeugen selbst keine Schnittpunkt-Anker; so hängen Schnittpunkte nie voneinander ab. Wird eine Linie gelöscht, gehen die Linien an ihren Schnittpunkten mit.
+- **„Auto markings“** (`Suggest`) ersetzt die Linien der Kreuzung durch einen Vorschlag nach Vorfahrt und ist ein Rückgängig-Schritt:
+  - **Hauptstraße:** Jede Fahrstreifengrenze ihrer Arme läuft als Leitlinie zur Grenze an derselben Stelle des gegenüberliegenden Arms.
+  - **Breitstrich:** Auf jeder Seite, auf der eine Nebenstraße abgeht, quert ein unterbrochener Breitstrich deren Einmündung.
+  - **Nebenstraßen:** Sie bekommen an der Einmündung eine Wartelinie über die einmündenden Fahrstreifen. Im Arm laufen Fahrstreifen gegen die Richtung des Profils hinein, weil das Layout die Profile ankommender Straßen umdreht. Die Linie reicht von Anker zu Anker, die diese Fahrstreifen einschließen; bei OMSI-Profilen sind die Fahrstreifen oft schmaler als die Fahrbahn (Seeburger: 3,28 m bei ±1,64 m, Fahrbahn ±5,5 m).
+  - **Ohne Hauptstraße:** Jeder Arm bekommt eine Haltlinie.
+  - **Kreuzung aus zwei Armen:** Die Leitlinien laufen durch.
+- **Favoriten:** Ein Stern hebt einen Stil nach oben, gespeichert je Benutzer wie im Straßenmenü. Y schaltet in dieser Reihenfolge weiter. Die Stile stehen in zwei Spalten, damit das Panel die Kreuzung frei lässt.
+
+**Offen:** Etappe 3: Flächen wie Sperrfläche (Zeichen 298) und Fußgängerüberweg (Zeichen 293). Etappe 4: Richtungspfeile.

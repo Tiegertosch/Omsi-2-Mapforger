@@ -156,6 +156,88 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void CrossingLinesFallIntoPiecesThatCanBeHiddenOrRestyledAndGiveAnchors()
+        {
+            var layout = OmsiJunctionLayout.Build(Tee(), null);
+            // East to west through the centre, and from the forward arm round to the right edge of the east arm, crossing it.
+            var through = new OmsiMarkingLine { From = "1.0.1", To = "2.0.1", Style = OmsiMarkingStyle.LaneLine };
+            var turn = new OmsiMarkingLine { From = "0.0.1", To = "1.0.2", Style = OmsiMarkingStyle.LaneBoundary };
+            var lines = new List<OmsiMarkingLine> { through, turn };
+
+            var anchors = OmsiJunctionMarkings.AllAnchors(layout, lines);
+
+            var crossing = anchors.Single(anchor => anchor.IsCrossing);
+            Assert.AreEqual("x0.0.1~1.0.2~1.0.1~2.0.1~0", crossing.Key);
+            Assert.AreEqual(0.0, crossing.Y, 0.02);
+            Assert.Greater(crossing.X, 0.0);
+            var pieces = OmsiJunctionMarkings.Pieces(anchors, lines);
+            Assert.AreEqual(2, pieces.Count(piece => piece.Line == 0));
+            Assert.AreEqual(2, pieces.Count(piece => piece.Line == 1));
+            // The through line's pieces meet at the crossing, 12 m minus its x from the east end.
+            Assert.AreEqual(12.0 - crossing.X, pieces.First(piece => piece.Line == 0).To, 0.05);
+
+            // The western piece hidden, the eastern one a stop line: nothing is drawn west of the crossing.
+            through.Pieces.Add(new OmsiMarkingPieceSetting { At = 0.75, Hidden = true });
+            through.Pieces.Add(new OmsiMarkingPieceSetting { At = 0.1, Style = OmsiMarkingStyle.StopLine });
+            pieces = OmsiJunctionMarkings.Pieces(anchors, lines);
+            Assert.IsTrue(pieces.Single(piece => piece.Line == 0 && piece.Middle > 0.5).Hidden);
+            Assert.AreEqual(OmsiMarkingStyle.StopLine, pieces.Single(piece => piece.Line == 0 && piece.Middle < 0.5).Style);
+            var meshes = new List<OmsiGeneratedMesh>();
+            OmsiJunctionMarkings.AddMeshes(OmsiJunctionMarkings.Anchors(layout), lines, meshes);
+            var mesh = meshes.Single();
+            for (var index = 0; index < mesh.Positions.Count; index += 3)
+                Assert.Greater(mesh.Positions[index], -0.5);
+
+            // A line from the crossing is straight, and the settings survive the .sco.
+            var fromCrossing = new OmsiMarkingLine { From = crossing.Key, To = "2.0.0", Style = OmsiMarkingStyle.EdgeLine };
+            Assert.AreEqual(2, OmsiJunctionMarkings.Path(anchors, fromCrossing).Count);
+            lines.Add(fromCrossing);
+            var back = OmsiJunctionMarkings.Read(OmsiJunctionMarkings.Write(lines));
+            Assert.AreEqual(3, back.Count);
+            Assert.AreEqual(crossing.Key, back[2].From);
+            Assert.AreEqual(2, back[0].Pieces.Count);
+            Assert.IsTrue(back[0].Pieces[0].Hidden);
+            Assert.IsNull(back[0].Pieces[0].Style);
+            Assert.AreEqual(OmsiMarkingStyle.StopLine, back[0].Pieces[1].Style);
+            Assert.IsFalse(back[0].Pieces[1].Hidden);
+        }
+
+        [Test]
+        public void TheSuggestionFollowsTheRightOfWay()
+        {
+            var arms = Tee();
+            // East and west are the main road; the side road comes in from the north.
+            arms[0].Main = true;
+            arms[1].Main = true;
+
+            var lines = OmsiJunctionMarkings.Suggest(OmsiJunctionLayout.Build(arms, null));
+
+            Assert.AreEqual(3, lines.Count);
+            var through = lines.Single(line => line.Style == OmsiMarkingStyle.LaneLine);
+            CollectionAssert.AreEquivalent(new[] { "1.0.1", "2.0.1" }, new[] { through.From, through.To });
+            // The broken edge line runs along the north side of the main road, across the mouth of the side road.
+            var edge = lines.Single(line => line.Style == OmsiMarkingStyle.BrokenEdgeLine);
+            CollectionAssert.AreEquivalent(new[] { "1.0.0", "2.0.2" }, new[] { edge.From, edge.To });
+            // The give-way line covers the lane coming in, left of the side road's centre as seen leaving it.
+            var giveWay = lines.Single(line => line.Style == OmsiMarkingStyle.GiveWayLine);
+            CollectionAssert.AreEquivalent(new[] { "0.1.0", "0.1.1" }, new[] { giveWay.From, giveWay.To });
+
+            // Without a main road every arm gets a stop line.
+            var equal = OmsiJunctionMarkings.Suggest(OmsiJunctionLayout.Build(Tee(), null));
+            Assert.AreEqual(3, equal.Count(line => line.Style == OmsiMarkingStyle.StopLine));
+
+            // Lanes narrower than the carriageway, as on many OMSI roads, still find the edge beyond them.
+            var narrow = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile.Replace("-2\r\n0.1\r\n3.6", "-1.2\r\n0.1\r\n2").Replace("\r\n2\r\n0.1\r\n3.6", "\r\n1.2\r\n0.1\r\n2")),
+                ProfilePath);
+            var narrowArms = new[] { 90.0, 270.0, 0.0 }.Select(heading => new OmsiJunctionArm
+            {
+                HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = narrow, Main = heading != 0.0
+            }).ToList();
+            var narrowGiveWay = OmsiJunctionMarkings.Suggest(OmsiJunctionLayout.Build(narrowArms, null)).Single(line => line.Style == OmsiMarkingStyle.GiveWayLine);
+            CollectionAssert.AreEquivalent(new[] { "0.1.0", "0.1.1" }, new[] { narrowGiveWay.From, narrowGiveWay.To });
+        }
+
+        [Test]
         public void CircularCurvatureIsAThirdStraightOnAndAboutAHalfForAQuarterTurn()
         {
             Assert.AreEqual(1.0 / 3.0, OmsiJunctionMarkings.CircularCurvature(0, 1, 0, 1), 1e-9);

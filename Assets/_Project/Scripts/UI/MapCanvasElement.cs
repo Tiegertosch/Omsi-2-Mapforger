@@ -249,6 +249,7 @@ namespace OmsiMapEditor.UI
 
         // Dashed construction lines of the road tool, such as the legs to a curve's control point; in map coordinates.
         private readonly List<Vector2[]> roadGuides = new List<Vector2[]>();
+        private bool roadGuideDots = true;
 
         // The anchors of the markings tool (ADR 044) in map coordinates with their heights, the one under the pointer and
         // the one a line starts from; -1 for none.
@@ -830,9 +831,11 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Dashed construction lines for the road tool as world polylines, replacing those drawn before; null clears them.</summary>
-        public void SetRoadGuides(IEnumerable<OmsiMapPoint[]> lines)
+        /// <param name="dots">Marks the inner points, such as a curve's control point; false for lines drawn as many points.</param>
+        public void SetRoadGuides(IEnumerable<OmsiMapPoint[]> lines, bool dots = true)
         {
             roadGuides.Clear();
+            roadGuideDots = dots;
             if (lines != null)
                 foreach (var line in lines)
                 {
@@ -1972,7 +1975,7 @@ namespace OmsiMapEditor.UI
                 AddDashedPath(painter, line, 7f, 5f);
             painter.Stroke();
             painter.fillColor = splineColor;
-            foreach (var line in screenLines)
+            foreach (var line in roadGuideDots ? screenLines : new List<List<Vector2>>())
                 for (var index = 1; index < line.Count - 1; index++)
                 {
                     painter.BeginPath();

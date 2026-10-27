@@ -8,18 +8,27 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The options of the markings tool (ADR 044): the style of the next line or of the selected one, its curvature and
-    /// deleting it. The shell picks the anchors, draws the lines and makes the junction again; the options only hold the
-    /// settings. While a line of the junction is selected, they show its style and curvature, and changing them changes it.
+    /// The options of the markings tool (ADR 044): the style of the next line or of the selected one or its piece, the
+    /// curvature, hiding a piece, deleting a line and the suggestion after the right of way. The shell picks the anchors,
+    /// draws the lines and makes the junction again; the options only hold the settings. Favourite styles stand at the top,
+    /// kept per user as in the road menu.
     /// </summary>
     internal sealed class MarkingToolOptions : VisualElement
     {
+        private const string FavoritesKey = "Mapforge.MarkingFavorites";
+
         private readonly Label title;
         private readonly Label junctionLabel;
+        private readonly VisualElement styleList;
         private readonly Dictionary<OmsiMarkingStyle, Button> styleButtons = new Dictionary<OmsiMarkingStyle, Button>();
+        private readonly HashSet<OmsiMarkingStyle> favorites = new HashSet<OmsiMarkingStyle>();
+        private readonly Button wholeLineButton;
+        private readonly Button pieceButton;
+        private readonly Button hideButton;
         private readonly TextField curvatureField;
         private readonly Button deleteButton;
         private readonly Label planLabel;
+        private bool pieceSelected;
 
         public MarkingToolOptions()
         {
@@ -33,29 +42,51 @@ namespace OmsiMapEditor.UI
             junctionLabel.AddToClassList("panel-info");
             Add(junctionLabel);
 
-            var styles = new VisualElement();
-            styles.AddToClassList("panel-tabs");
-            styles.style.flexDirection = FlexDirection.Row;
-            styles.style.flexWrap = Wrap.Wrap;
-            foreach (var info in OmsiMarkingStyleInfo.All)
+            var auto = new Button(() => AutoRequested?.Invoke())
             {
-                var style = info.Style;
-                var button = new Button(() => ChooseStyle(style)) { text = info.Name, tooltip = info.Description };
-                button.AddToClassList("panel-tab");
-                styles.Add(button);
-                styleButtons[style] = button;
-            }
-            Add(styles);
+                text = "Auto markings",
+                tooltip = "Puts in a suggestion after the right of way in place of the junction's lines: lane lines along the main road, a broken " +
+                          "edge line across each side road and give-way lines on the side roads; stop lines on every arm without a main road. Ctrl+Z brings the lines back."
+            };
+            auto.AddToClassList("map-control-button");
+            Add(auto);
 
-            var curvatureRow = new VisualElement();
-            curvatureRow.AddToClassList("picker-option");
-            var curvatureLabel = new Label("Curvature (%)");
-            curvatureLabel.AddToClassList("picker-option-label");
-            curvatureRow.Add(curvatureLabel);
+            LoadFavorites();
+            // Two styles to a row, so the panel leaves the junction in view.
+            styleList = new VisualElement();
+            styleList.style.flexDirection = FlexDirection.Row;
+            styleList.style.flexWrap = Wrap.Wrap;
+            Add(styleList);
+            BuildStyleList();
+
+            var scope = new VisualElement();
+            scope.AddToClassList("panel-tabs");
+            scope.AddToClassList("picker-segmented");
+            wholeLineButton = new Button(() => SetPieceScope(false)) { text = "Whole line", tooltip = "Styles and curvature change the whole selected line" };
+            pieceButton = new Button(() => SetPieceScope(true))
+            {
+                text = "This piece", tooltip = "A style changes only the piece of the line between crossings that was clicked"
+            };
+            foreach (var button in new[] { wholeLineButton, pieceButton })
+            {
+                button.AddToClassList("panel-tab");
+                scope.Add(button);
+            }
+            var scopeRow = Row("Apply to");
+            scopeRow.Add(scope);
+
+            hideButton = new Button(() => PieceVisibilityToggled?.Invoke())
+            {
+                text = "Hide piece", tooltip = "Hides the clicked piece of the line between crossings, such as where a median crosses a turning lane; shows a hidden one again"
+            };
+            hideButton.AddToClassList("map-control-button");
+            Add(hideButton);
+
+            var curvatureRow = Row("Curvature (%)");
             curvatureField = new TextField
             {
                 value = string.Empty,
-                tooltip = "How far the curve bulges between two arms, 0 to 80; empty bends it like a circle. Lines across one arm stay straight."
+                tooltip = "How far the curve bulges between two arms, 0 to 80; empty bends it like a circle. Lines across one arm or from a crossing stay straight."
             };
             curvatureField.AddToClassList("picker-field");
             curvatureField.RegisterCallback<KeyDownEvent>(evt =>
@@ -66,9 +97,11 @@ namespace OmsiMapEditor.UI
             curvatureField.RegisterCallback<FocusOutEvent>(_ => CurvatureCommitted?.Invoke());
             curvatureRow.tooltip = curvatureField.tooltip;
             curvatureRow.Add(curvatureField);
-            Add(curvatureRow);
 
-            deleteButton = new Button(() => DeleteRequested?.Invoke()) { text = "Delete line", tooltip = "Deletes the selected line (Del)" };
+            deleteButton = new Button(() => DeleteRequested?.Invoke())
+            {
+                text = "Delete line", tooltip = "Deletes the selected line (Del), and the lines drawn from its crossings"
+            };
             deleteButton.AddToClassList("map-control-button");
             deleteButton.AddToClassList("inspector-edit-delete");
             Add(deleteButton);
@@ -76,22 +109,27 @@ namespace OmsiMapEditor.UI
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
             Add(planLabel);
-            var hint = new Label("Click an anchor, then another: a line in the chosen style joins them. Click a line to select it; " +
-                                 "Y switches the style, Del deletes it. Esc lets go of an anchor or a line, then ends the tool.");
+            var hint = new Label("Anchor, then anchor: a line. Click a line to select it and its piece. Y: next style, Del: delete, Esc: let go.");
             hint.AddToClassList("panel-info");
             Add(hint);
-            ShowLine(null);
+            SetPieceScope(false);
+            ShowLine(null, null);
         }
 
-        /// <summary>A style was chosen; the shell changes a selected line to it.</summary>
+        /// <summary>A style was chosen; the shell changes a selected line or piece to it.</summary>
         public event Action<OmsiMarkingStyle> StyleChosen;
 
         /// <summary>Enter was pressed in the curvature field or it lost focus; the shell changes a selected line.</summary>
         public event Action CurvatureCommitted;
 
         public event Action DeleteRequested;
+        public event Action AutoRequested;
+        public event Action PieceVisibilityToggled;
 
         public OmsiMarkingStyle Style { get; private set; } = OmsiMarkingStyle.LaneLine;
+
+        /// <summary>True when a style changes only the selected piece rather than its whole line.</summary>
+        public bool PieceScope { get; private set; }
 
         /// <summary>The curvature typed, as a share of the line's chord, or null for a circle-like curve.</summary>
         public double? Curvature
@@ -105,14 +143,12 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>The style after the current one, as Y switches it.</summary>
+        /// <summary>The style after the current one in the list, favourites first, as Y switches it.</summary>
         public OmsiMarkingStyle NextStyle()
         {
-            var all = OmsiMarkingStyleInfo.All;
-            for (var index = 0; index < all.Count; index++)
-                if (all[index].Style == Style)
-                    return all[(index + 1) % all.Count].Style;
-            return all[0].Style;
+            var order = Ordered();
+            var index = order.IndexOf(Style);
+            return order[(index + 1) % order.Count];
         }
 
         /// <summary>Chooses a style as a click on its button does.</summary>
@@ -122,14 +158,21 @@ namespace OmsiMapEditor.UI
             StyleChosen?.Invoke(style);
         }
 
-        /// <summary>Shows a selected line's style and curvature, or with null the values for the next line.</summary>
-        public void ShowLine(OmsiMarkingLine line)
+        /// <summary>
+        /// Shows a selected line's style and curvature, or with null the values for the next line; with a piece, that piece's
+        /// style in piece scope and whether it is hidden.
+        /// </summary>
+        public void ShowLine(OmsiMarkingLine line, OmsiMarkingPiece piece)
         {
-            title.text = line != null ? "Selected line" : "Road markings";
+            pieceSelected = piece != null;
+            title.text = line == null ? "Road markings" : piece != null && PieceScope ? "Selected piece" : "Selected line";
             deleteButton.SetEnabled(line != null);
+            hideButton.SetEnabled(piece != null);
+            hideButton.text = piece != null && piece.Hidden ? "Show piece" : "Hide piece";
+            pieceButton.SetEnabled(piece != null);
             if (line == null)
                 return;
-            ShowStyle(line.Style);
+            ShowStyle(piece != null && PieceScope ? piece.Style : line.Style);
             curvatureField.SetValueWithoutNotify(line.Curvature.HasValue ? (line.Curvature.Value * 100.0).ToString("0.#", CultureInfo.InvariantCulture) : string.Empty);
         }
 
@@ -145,11 +188,96 @@ namespace OmsiMapEditor.UI
             planLabel.EnableInClassList("panel-info-warning", problem);
         }
 
+        private void SetPieceScope(bool piece)
+        {
+            PieceScope = piece;
+            wholeLineButton.EnableInClassList("panel-tab-active", !piece);
+            pieceButton.EnableInClassList("panel-tab-active", piece);
+            if (title != null && pieceSelected)
+                title.text = piece ? "Selected piece" : "Selected line";
+        }
+
         private void ShowStyle(OmsiMarkingStyle style)
         {
             Style = style;
             foreach (var pair in styleButtons)
                 pair.Value.EnableInClassList("panel-tab-active", pair.Key == style);
+        }
+
+        /// <summary>The styles with the favourites first, each group in the order of the StVO list.</summary>
+        private List<OmsiMarkingStyle> Ordered()
+        {
+            var order = new List<OmsiMarkingStyle>();
+            foreach (var info in OmsiMarkingStyleInfo.All)
+                if (favorites.Contains(info.Style))
+                    order.Add(info.Style);
+            foreach (var info in OmsiMarkingStyleInfo.All)
+                if (!favorites.Contains(info.Style))
+                    order.Add(info.Style);
+            return order;
+        }
+
+        /// <summary>A row per style: its button and a star that makes it a favourite.</summary>
+        private void BuildStyleList()
+        {
+            styleList.Clear();
+            styleButtons.Clear();
+            foreach (var style in Ordered())
+            {
+                var info = OmsiMarkingStyleInfo.Of(style);
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.width = new Length(50f, LengthUnit.Percent);
+                var button = new Button(() => ChooseStyle(style)) { text = info.Name, tooltip = info.Description };
+                button.AddToClassList("panel-tab");
+                button.style.flexGrow = 1f;
+                button.EnableInClassList("panel-tab-active", style == Style);
+                row.Add(button);
+                styleButtons[style] = button;
+                var star = new Button { tooltip = favorites.Contains(style) ? "Remove from favourites" : "Add to favourites; favourites stand at the top" };
+                star.AddToClassList("panel-icon-button");
+                star.AddToClassList("favorite-button");
+                star.EnableInClassList("favorite-on", favorites.Contains(style));
+                star.Add(new IconElement("star"));
+                star.clicked += () =>
+                {
+                    if (!favorites.Remove(style))
+                        favorites.Add(style);
+                    SaveFavorites();
+                    BuildStyleList();
+                };
+                row.Add(star);
+                styleList.Add(row);
+            }
+        }
+
+        private VisualElement Row(string label)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("picker-option");
+            var text = new Label(label);
+            text.AddToClassList("picker-option-label");
+            row.Add(text);
+            Add(row);
+            return row;
+        }
+
+        private void LoadFavorites()
+        {
+            favorites.Clear();
+            foreach (var key in PlayerPrefs.GetString(FavoritesKey, string.Empty).Split('\n'))
+                if (OmsiMarkingStyleInfo.ByKey(key.Trim()) is OmsiMarkingStyleInfo info)
+                    favorites.Add(info.Style);
+        }
+
+        private void SaveFavorites()
+        {
+            var keys = new List<string>();
+            foreach (var style in favorites)
+                keys.Add(OmsiMarkingStyleInfo.Of(style).Key);
+            PlayerPrefs.SetString(FavoritesKey, string.Join("\n", keys));
+            PlayerPrefs.Save();
         }
     }
 }

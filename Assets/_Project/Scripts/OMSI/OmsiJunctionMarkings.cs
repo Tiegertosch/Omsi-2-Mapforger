@@ -104,11 +104,14 @@ namespace OmsiMapEditor.OMSI
 
     /// <summary>
     /// A point a marking line can start or end at: on an arm of the junction, at its end where the road joins it (row 0)
-    /// or at its mouth where the kerbs turn off (row 1), on a carriageway edge, a lane boundary or a median edge. In the
-    /// object frame: x right, y forward, heights up.
+    /// or at its mouth where the kerbs turn off (row 1), on a carriageway edge, a lane boundary or a median edge; or where
+    /// two lines between arms cross. In the object frame: x right, y forward, heights up.
     /// </summary>
     public sealed class OmsiMarkingAnchor
     {
+        private string crossingKey;
+
+        /// <summary>The arm, or -1 for a crossing of two lines.</summary>
         public int Arm { get; internal set; }
 
         /// <summary>0 at the arm's end, 1 at its mouth.</summary>
@@ -117,19 +120,46 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Its place across the arm, from the left as seen leaving the junction.</summary>
         public int Index { get; internal set; }
 
+        /// <summary>Metres right of the arm's centre line, as seen leaving the junction.</summary>
+        public double Lateral { get; internal set; }
+
         public double X { get; internal set; }
         public double Y { get; internal set; }
         public double Height { get; internal set; }
 
-        /// <summary>The direction into the junction along the arm.</summary>
+        /// <summary>The direction into the junction along the arm; NaN for a crossing.</summary>
         public double InwardDegrees { get; internal set; }
 
-        /// <summary>"edge", "lane" or "median".</summary>
+        /// <summary>"edge", "lane", "median" or "crossing".</summary>
         public string Kind { get; internal set; }
 
-        /// <summary>How the .sco names it: arm, row and index, such as <c>2.0.1</c>.</summary>
-        public string Key => Arm.ToString(CultureInfo.InvariantCulture) + "." + Row.ToString(CultureInfo.InvariantCulture) + "." +
-                             Index.ToString(CultureInfo.InvariantCulture);
+        public bool IsCrossing => Kind == "crossing";
+
+        /// <summary>
+        /// How the .sco names it: arm, row and index, such as <c>2.0.1</c>; a crossing by the ends of both lines and which
+        /// of their crossings it is, such as <c>x0.0.1~2.0.1~1.1.0~1.1.1~0</c>.
+        /// </summary>
+        public string Key
+        {
+            get => crossingKey ?? Arm.ToString(CultureInfo.InvariantCulture) + "." + Row.ToString(CultureInfo.InvariantCulture) + "." +
+                   Index.ToString(CultureInfo.InvariantCulture);
+            internal set => crossingKey = value;
+        }
+    }
+
+    /// <summary>
+    /// How one piece of a line between crossings differs from the line: hidden or in another style. It is kept by where the
+    /// piece lay, as a share of the line's length, so it stays with its piece when other lines come or go.
+    /// </summary>
+    public sealed class OmsiMarkingPieceSetting
+    {
+        /// <summary>The middle of the piece, as a share of the line's length from its start.</summary>
+        public double At { get; set; }
+
+        public bool Hidden { get; set; }
+
+        /// <summary>Another style for the piece, or null for the line's.</summary>
+        public OmsiMarkingStyle? Style { get; set; }
     }
 
     /// <summary>A marking line between two anchors, in a style, with the curvature of its curve or null for one like a circle.</summary>
@@ -141,21 +171,62 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// How far the curve's control points lie from its ends along their directions, as a share of the distance between
-        /// the ends: 0 is straight, null takes the share that comes closest to a circular arc. Lines on one arm are straight.
+        /// the ends: 0 is straight, null takes the share that comes closest to a circular arc. Lines on one arm or from a
+        /// crossing are straight.
         /// </summary>
         public double? Curvature { get; set; }
 
+        /// <summary>Pieces between crossings that are hidden or in another style.</summary>
+        public List<OmsiMarkingPieceSetting> Pieces { get; } = new List<OmsiMarkingPieceSetting>();
+
+        /// <summary>The ends as one name, the same either way round, such as <c>0.0.1~2.0.1</c>.</summary>
+        public string Ends => string.CompareOrdinal(From, To) <= 0 ? From + "~" + To : To + "~" + From;
+
         public OmsiMarkingLine Copy()
         {
-            return new OmsiMarkingLine { From = From, To = To, Style = Style, Curvature = Curvature };
+            var copy = new OmsiMarkingLine { From = From, To = To, Style = Style, Curvature = Curvature };
+            foreach (var piece in Pieces)
+                copy.Pieces.Add(new OmsiMarkingPieceSetting { At = piece.At, Hidden = piece.Hidden, Style = piece.Style });
+            return copy;
         }
+
+        /// <summary>The setting of the piece from one share of the length to another, or null.</summary>
+        public OmsiMarkingPieceSetting SettingBetween(double from, double to)
+        {
+            foreach (var piece in Pieces)
+                if (piece.At >= from && piece.At <= to)
+                    return piece;
+            return null;
+        }
+    }
+
+    /// <summary>One piece of a line between the crossings with other lines, as it is drawn.</summary>
+    public sealed class OmsiMarkingPiece
+    {
+        /// <summary>The line's place in the junction's list.</summary>
+        public int Line { get; internal set; }
+
+        /// <summary>Where the piece starts and ends, in metres along the line.</summary>
+        public double From { get; internal set; }
+
+        public double To { get; internal set; }
+
+        /// <summary>The whole line's length.</summary>
+        public double LineLength { get; internal set; }
+
+        public bool Hidden { get; internal set; }
+        public OmsiMarkingStyle Style { get; internal set; }
+
+        /// <summary>The middle of the piece as a share of the line's length, as a <see cref="OmsiMarkingPieceSetting"/> keeps it.</summary>
+        public double Middle => LineLength > 0.0 ? (From + To) / 2.0 / LineLength : 0.5;
     }
 
     /// <summary>
     /// Road markings of junctions the editor makes (ADR 044), modelled on Town Road Lane for Cities: Skylines II: lines only
-    /// run between anchors on the arms, as curves leaving each anchor along its lane, and are built into the junction's
-    /// model as flat strips just above the carriageway. The .sco keeps them as a line of text, so the junction can be made
-    /// again with them, such as with an arm turned.
+    /// run between anchors on the arms or where lines cross, as curves leaving each anchor along its lane, and are built
+    /// into the junction's model as flat strips just above the carriageway. Where lines cross they fall into pieces, each of
+    /// which can be hidden or take another style. The .sco keeps them as a line of text, so the junction can be made again
+    /// with them, such as with an arm turned.
     /// </summary>
     public static class OmsiJunctionMarkings
     {
@@ -172,6 +243,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Points along curves lie this far apart at most.</summary>
         private const double SampleMeters = 0.25;
+
+        /// <summary>Lines touching within this distance of an end do not cross there, such as two lines from one anchor.</summary>
+        private const double EndClearance = 0.3;
 
         /// <summary>
         /// The anchors of a junction's arms, in the order of its connection points: on each arm its carriageway edges, the
@@ -196,13 +270,21 @@ namespace OmsiMapEditor.OMSI
                     for (var index = 0; index < across.Count; index++)
                         anchors.Add(new OmsiMarkingAnchor
                         {
-                            Arm = arm, Row = row, Index = index,
+                            Arm = arm, Row = row, Index = index, Lateral = across[index].Key,
                             X = Math.Sin(heading) * along + Math.Cos(heading) * across[index].Key,
                             Y = Math.Cos(heading) * along - Math.Sin(heading) * across[index].Key,
                             Height = section.RoadHeight, InwardDegrees = junctionArm.HeadingDegrees + 180.0, Kind = across[index].Value
                         });
                 }
             }
+            return anchors;
+        }
+
+        /// <summary>The anchors of the arms and of the crossings of the lines between them.</summary>
+        public static List<OmsiMarkingAnchor> AllAnchors(OmsiJunctionLayout layout, IList<OmsiMarkingLine> lines)
+        {
+            var anchors = Anchors(layout);
+            anchors.AddRange(CrossingAnchors(anchors, lines));
             return anchors;
         }
 
@@ -221,8 +303,8 @@ namespace OmsiMapEditor.OMSI
                 var right = lanes[index];
                 if (right.X - left.X < 0.05)
                     continue;
-                var leftHalf = (left.Width > 0.0 ? left.Width : 3.0) / 2.0;
-                var rightHalf = (right.Width > 0.0 ? right.Width : 3.0) / 2.0;
+                var leftHalf = HalfWidth(left);
+                var rightHalf = HalfWidth(right);
                 // Lanes farther apart than they are wide have a median between them, with an edge on each side.
                 if (right.X - left.X > leftHalf + rightHalf + 0.5)
                 {
@@ -240,9 +322,102 @@ namespace OmsiMapEditor.OMSI
             return places;
         }
 
+        private static double HalfWidth(OmsiSplineLane lane)
+        {
+            return (lane.Width > 0.0 ? lane.Width : 3.0) / 2.0;
+        }
+
+        /// <summary>
+        /// The crossings of lines between arm anchors, as anchors other lines can start or end at, in a stable order. Lines
+        /// that start or end at a crossing make none of their own, so crossings never depend on each other.
+        /// </summary>
+        public static List<OmsiMarkingAnchor> CrossingAnchors(IReadOnlyList<OmsiMarkingAnchor> armAnchors, IEnumerable<OmsiMarkingLine> lines)
+        {
+            var paths = new List<KeyValuePair<OmsiMarkingLine, List<double[]>>>();
+            foreach (var line in lines)
+            {
+                if (line.From.StartsWith("x", StringComparison.Ordinal) || line.To.StartsWith("x", StringComparison.Ordinal))
+                    continue;
+                var path = Path(armAnchors, line);
+                if (path != null)
+                    paths.Add(new KeyValuePair<OmsiMarkingLine, List<double[]>>(line, path));
+            }
+            paths.Sort((first, second) => string.CompareOrdinal(first.Key.Ends, second.Key.Ends));
+            var crossings = new List<OmsiMarkingAnchor>();
+            for (var first = 0; first < paths.Count; first++)
+                for (var second = first + 1; second < paths.Count; second++)
+                {
+                    var found = Crossings(paths[first].Value, paths[second].Value);
+                    for (var index = 0; index < found.Count; index++)
+                        crossings.Add(new OmsiMarkingAnchor
+                        {
+                            Arm = -1, Row = -1, Index = index, Kind = "crossing", InwardDegrees = double.NaN, X = found[index][2], Y = found[index][3],
+                            Height = found[index][4],
+                            Key = "x" + paths[first].Key.Ends + "~" + paths[second].Key.Ends + "~" + index.ToString(CultureInfo.InvariantCulture)
+                        });
+                }
+            return crossings;
+        }
+
+        /// <summary>
+        /// Where two paths cross, away from their ends, in order along the first: distance along each, x, y and height.
+        /// </summary>
+        private static List<double[]> Crossings(List<double[]> first, List<double[]> second)
+        {
+            var found = new List<double[]>();
+            var firstDistances = Distances(first);
+            var secondDistances = Distances(second);
+            var firstLength = firstDistances[first.Count - 1];
+            var secondLength = secondDistances[second.Count - 1];
+            for (var a = 1; a < first.Count; a++)
+                for (var b = 1; b < second.Count; b++)
+                {
+                    if (!SegmentsCross(first[a - 1], first[a], second[b - 1], second[b], out var s, out var t))
+                        continue;
+                    var alongFirst = firstDistances[a - 1] + (firstDistances[a] - firstDistances[a - 1]) * s;
+                    var alongSecond = secondDistances[b - 1] + (secondDistances[b] - secondDistances[b - 1]) * t;
+                    if (alongFirst < EndClearance || alongFirst > firstLength - EndClearance || alongSecond < EndClearance || alongSecond > secondLength - EndClearance)
+                        continue;
+                    // A crossing on a joint of points shows on both segments meeting there.
+                    if (found.Count > 0 && Math.Abs(found[found.Count - 1][0] - alongFirst) < 0.05)
+                        continue;
+                    found.Add(new[]
+                    {
+                        alongFirst, alongSecond, first[a - 1][0] + (first[a][0] - first[a - 1][0]) * s, first[a - 1][1] + (first[a][1] - first[a - 1][1]) * s,
+                        first[a - 1][2] + (first[a][2] - first[a - 1][2]) * s
+                    });
+                }
+            found.Sort((x, y) => x[0].CompareTo(y[0]));
+            return found;
+        }
+
+        private static bool SegmentsCross(double[] a, double[] b, double[] c, double[] d, out double s, out double t)
+        {
+            s = t = 0.0;
+            var rx = b[0] - a[0];
+            var ry = b[1] - a[1];
+            var qx = d[0] - c[0];
+            var qy = d[1] - c[1];
+            var cross = rx * qy - ry * qx;
+            if (Math.Abs(cross) < 1e-12)
+                return false;
+            s = ((c[0] - a[0]) * qy - (c[1] - a[1]) * qx) / cross;
+            t = ((c[0] - a[0]) * ry - (c[1] - a[1]) * rx) / cross;
+            return s >= 0.0 && s <= 1.0 && t >= 0.0 && t <= 1.0;
+        }
+
+        private static double[] Distances(List<double[]> path)
+        {
+            var distances = new double[path.Count];
+            for (var index = 1; index < path.Count; index++)
+                distances[index] = distances[index - 1] + Math.Sqrt(Square(path[index][0] - path[index - 1][0]) + Square(path[index][1] - path[index - 1][1]));
+            return distances;
+        }
+
         /// <summary>
         /// The centre line of a marking as points (x, y, height) in the object frame, or null when an anchor is missing.
-        /// Between arms it is a cubic curve leaving each anchor into the junction along its arm; on one arm it is straight.
+        /// Between arms it is a cubic curve leaving each anchor into the junction along its arm; on one arm or from a crossing
+        /// it is straight.
         /// </summary>
         public static List<double[]> Path(IReadOnlyList<OmsiMarkingAnchor> anchors, OmsiMarkingLine line)
         {
@@ -252,7 +427,7 @@ namespace OmsiMapEditor.OMSI
                 return null;
             var chord = Math.Sqrt((to.X - from.X) * (to.X - from.X) + (to.Y - from.Y) * (to.Y - from.Y));
             var points = new List<double[]>();
-            if (from.Arm == to.Arm || chord < 1e-6)
+            if (from.Arm == to.Arm || from.IsCrossing || to.IsCrossing || chord < 1e-6)
             {
                 points.Add(new[] { from.X, from.Y, from.Height });
                 points.Add(new[] { to.X, to.Y, to.Height });
@@ -302,38 +477,98 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Adds the markings to a model: each line as flat strips just above the carriageway, its strokes cut along its
-        /// length, two strips for a double line, in white or yellow. Lines whose anchors the junction no longer has are left out.
+        /// The pieces of every line between its crossings with the other lines, in the order of the lines and along each,
+        /// with what its settings make of them. Lines whose anchors are gone have none.
         /// </summary>
-        public static void AddMeshes(IReadOnlyList<OmsiMarkingAnchor> anchors, IEnumerable<OmsiMarkingLine> lines, List<OmsiGeneratedMesh> meshes)
+        /// <param name="anchors">The anchors of the arms and of the crossings, as <see cref="AllAnchors"/> gives them.</param>
+        public static List<OmsiMarkingPiece> Pieces(IReadOnlyList<OmsiMarkingAnchor> anchors, IList<OmsiMarkingLine> lines)
         {
-            OmsiGeneratedMesh white = null, yellow = null;
+            var paths = new List<List<double[]>>();
             foreach (var line in lines)
+                paths.Add(Path(anchors, line));
+            var pieces = new List<OmsiMarkingPiece>();
+            for (var index = 0; index < lines.Count; index++)
             {
-                var path = Path(anchors, line);
+                var path = paths[index];
                 if (path == null)
                     continue;
-                var info = OmsiMarkingStyleInfo.Of(line.Style);
+                var length = Distances(path)[path.Count - 1];
+                var cuts = new List<double> { 0.0, length };
+                for (var other = 0; other < lines.Count; other++)
+                    if (other != index && paths[other] != null)
+                        foreach (var crossing in Crossings(path, paths[other]))
+                            cuts.Add(crossing[0]);
+                cuts.Sort();
+                for (var cut = 1; cut < cuts.Count; cut++)
+                {
+                    if (cuts[cut] - cuts[cut - 1] < 0.05)
+                        continue;
+                    var setting = length > 0.0 ? lines[index].SettingBetween(cuts[cut - 1] / length, cuts[cut] / length) : null;
+                    pieces.Add(new OmsiMarkingPiece
+                    {
+                        Line = index, From = cuts[cut - 1], To = cuts[cut], LineLength = length, Hidden = setting != null && setting.Hidden,
+                        Style = setting?.Style ?? lines[index].Style
+                    });
+                }
+            }
+            return pieces;
+        }
+
+        /// <summary>The points of a piece of a path, from one distance along it to another.</summary>
+        public static List<double[]> Cut(List<double[]> path, double from, double to)
+        {
+            var distances = Distances(path);
+            var points = new List<double[]> { At(path, distances, from) };
+            for (var index = 0; index < path.Count; index++)
+                if (distances[index] > from + 1e-6 && distances[index] < to - 1e-6)
+                    points.Add(path[index]);
+            points.Add(At(path, distances, to));
+            return points;
+        }
+
+        /// <summary>
+        /// Adds the markings to a model: each visible piece of each line as flat strips just above the carriageway, its
+        /// strokes cut along its length, two strips for a double line, in white or yellow. A piece in its line's style keeps
+        /// the line's run of strokes; one in another style starts its own. Lines whose anchors the junction no longer has
+        /// are left out.
+        /// </summary>
+        /// <param name="anchors">The anchors of the arms; those of the crossings are added here.</param>
+        public static void AddMeshes(IReadOnlyList<OmsiMarkingAnchor> anchors, IEnumerable<OmsiMarkingLine> lines, List<OmsiGeneratedMesh> meshes)
+        {
+            var list = new List<OmsiMarkingLine>(lines);
+            var all = new List<OmsiMarkingAnchor>(anchors);
+            if (!all.Exists(anchor => anchor.IsCrossing))
+                all.AddRange(CrossingAnchors(anchors, list));
+            OmsiGeneratedMesh white = null, yellow = null;
+            foreach (var piece in Pieces(all, list))
+            {
+                if (piece.Hidden)
+                    continue;
+                var path = Path(all, list[piece.Line]);
+                var info = OmsiMarkingStyleInfo.Of(piece.Style);
                 OmsiGeneratedMesh mesh;
                 if (info.Yellow)
                     mesh = yellow = yellow ?? new OmsiGeneratedMesh { Texture = YellowTexture };
                 else
                     mesh = white = white ?? new OmsiGeneratedMesh { Texture = WhiteTexture };
-                var distances = new double[path.Count];
-                for (var index = 1; index < path.Count; index++)
-                    distances[index] = distances[index - 1] + Math.Sqrt(Square(path[index][0] - path[index - 1][0]) + Square(path[index][1] - path[index - 1][1]));
-                var length = distances[path.Count - 1];
+                var distances = Distances(path);
                 var offsets = info.TwoLines ? new[] { -info.Width, info.Width } : new[] { 0.0 };
+                // The line's own strokes run on from its start across its pieces; another style starts at the piece.
+                var origin = piece.Style == list[piece.Line].Style ? 0.0 : piece.From;
                 foreach (var offset in offsets)
                 {
                     if (info.Stroke <= 0.0)
                     {
-                        Strip(mesh, path, distances, 0.0, length, offset, info.Width);
+                        Strip(mesh, path, distances, piece.From, piece.To, offset, info.Width);
                         continue;
                     }
-                    // Strokes from the start, the last one cut short where the line ends.
-                    for (var start = 0.0; start < length - 0.01; start += info.Stroke + info.Gap)
-                        Strip(mesh, path, distances, start, Math.Min(length, start + info.Stroke), offset, info.Width);
+                    for (var start = origin; start < piece.To - 0.01; start += info.Stroke + info.Gap)
+                    {
+                        var from = Math.Max(start, piece.From);
+                        var to = Math.Min(start + info.Stroke, piece.To);
+                        if (to > from)
+                            Strip(mesh, path, distances, from, to, offset, info.Width);
+                    }
                 }
             }
             if (white != null && white.Triangles.Count > 0)
@@ -406,7 +641,120 @@ namespace OmsiMapEditor.OMSI
             return value * value;
         }
 
-        /// <summary>The line of a .sco that keeps the markings, such as <c>MapWorks markings: 0.0.1-2.0.1 laneline auto; 1.1.0-1.1.2 stop 0</c>.</summary>
+        /// <summary>
+        /// A proposal after the right of way (ADR 044, stage 2): along the main road the lane lines run through and a broken
+        /// edge line crosses the mouth of each side road, and side roads get a give-way line over the lanes coming in. A
+        /// junction of two arms carries the lane lines through; one without a main road gets stop lines on every arm.
+        /// </summary>
+        public static List<OmsiMarkingLine> Suggest(OmsiJunctionLayout layout)
+        {
+            if (layout == null)
+                throw new ArgumentNullException(nameof(layout));
+            var anchors = Anchors(layout);
+            var lines = new List<OmsiMarkingLine>();
+            var mains = new List<int>();
+            for (var arm = 0; arm < layout.Arms.Count; arm++)
+                if (layout.Arms[arm].Main)
+                    mains.Add(arm);
+            if (layout.Arms.Count == 2)
+                mains = new List<int> { 0, 1 };
+            if (mains.Count == 2)
+            {
+                var a = mains[0];
+                var b = mains[1];
+                var ends = anchors.FindAll(anchor => anchor.Row == 0);
+                // Each boundary between lanes runs on to the one at the same place across the other arm, seen from its side.
+                foreach (var from in ends.FindAll(anchor => anchor.Arm == a && anchor.Kind == "lane"))
+                {
+                    var to = Nearest(ends.FindAll(anchor => anchor.Arm == b && anchor.Kind == "lane"), -from.Lateral, 0.5);
+                    if (to != null)
+                        lines.Add(new OmsiMarkingLine { From = from.Key, To = to.Key, Style = OmsiMarkingStyle.LaneLine });
+                }
+                // A side road on either side of the main road gets the broken edge line across its mouth.
+                var aEdges = ends.FindAll(anchor => anchor.Arm == a && anchor.Kind == "edge");
+                var bEdges = ends.FindAll(anchor => anchor.Arm == b && anchor.Kind == "edge");
+                if (aEdges.Count == 2 && bEdges.Count == 2)
+                {
+                    var heading = layout.Arms[a].HeadingDegrees;
+                    var left = false;
+                    var right = false;
+                    for (var arm = 0; arm < layout.Arms.Count; arm++)
+                    {
+                        if (mains.Contains(arm))
+                            continue;
+                        var turn = OmsiRoadPlanner.Normalize(layout.Arms[arm].HeadingDegrees - heading);
+                        left |= turn < 0.0;
+                        right |= turn > 0.0;
+                    }
+                    // The arms face opposite ways: the left edge of arm a lies on the side of the right edge of arm b.
+                    if (left)
+                        lines.Add(new OmsiMarkingLine { From = aEdges[0].Key, To = bEdges[1].Key, Style = OmsiMarkingStyle.BrokenEdgeLine });
+                    if (right)
+                        lines.Add(new OmsiMarkingLine { From = aEdges[1].Key, To = bEdges[0].Key, Style = OmsiMarkingStyle.BrokenEdgeLine });
+                }
+            }
+            for (var arm = 0; arm < layout.Arms.Count; arm++)
+            {
+                if (mains.Contains(arm))
+                    continue;
+                var style = mains.Count == 2 ? OmsiMarkingStyle.GiveWayLine : OmsiMarkingStyle.StopLine;
+                var across = Inbound(layout.Arms[arm].Profile, anchors.FindAll(anchor => anchor.Arm == arm && anchor.Row == 1));
+                if (across != null)
+                    lines.Add(new OmsiMarkingLine { From = across[0].Key, To = across[1].Key, Style = style, Curvature = 0.0 });
+            }
+            return lines;
+        }
+
+        /// <summary>
+        /// The anchors bounding the lanes that come into the junction on an arm, left and right, or null without such lanes.
+        /// In the arm's frame lanes against the profile's direction run in (the layout turns profiles of incoming roads over).
+        /// </summary>
+        private static OmsiMarkingAnchor[] Inbound(OmsiSplineProfile profile, List<OmsiMarkingAnchor> row)
+        {
+            if (profile == null || row.Count < 2)
+                return null;
+            double left = double.MaxValue, right = double.MinValue;
+            foreach (var lane in profile.Lanes)
+                if (lane.Kind == 0 && lane.Direction != 0)
+                {
+                    left = Math.Min(left, lane.X - HalfWidth(lane));
+                    right = Math.Max(right, lane.X + HalfWidth(lane));
+                }
+            if (left > right)
+                return null;
+            // The anchors enclosing those lanes: the last at or left of their left side, the first at or right of their right side.
+            OmsiMarkingAnchor from = null, to = null;
+            foreach (var anchor in row)
+            {
+                if (anchor.Lateral <= left + 0.25 && (from == null || anchor.Lateral > from.Lateral))
+                    from = anchor;
+                if (anchor.Lateral >= right - 0.25 && (to == null || anchor.Lateral < to.Lateral))
+                    to = anchor;
+            }
+            return from != null && to != null && !ReferenceEquals(from, to) ? new[] { from, to } : null;
+        }
+
+        private static OmsiMarkingAnchor Nearest(List<OmsiMarkingAnchor> anchors, double lateral, double reach)
+        {
+            OmsiMarkingAnchor best = null;
+            var bestDistance = reach;
+            foreach (var anchor in anchors)
+            {
+                var distance = Math.Abs(anchor.Lateral - lateral);
+                if (distance <= bestDistance)
+                {
+                    best = anchor;
+                    bestDistance = distance;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// The line of a .sco that keeps the markings, such as
+        /// <c>MapWorks markings: 0.0.1-2.0.1 laneline auto 0.42:hide; 1.1.0-1.1.1 stop 0</c>; a piece setting is its middle as a
+        /// share of the line's length, then <c>hide</c> and or another style.
+        /// </summary>
         public static string Write(IEnumerable<OmsiMarkingLine> lines)
         {
             var text = new StringBuilder(Prefix);
@@ -416,6 +764,14 @@ namespace OmsiMapEditor.OMSI
                 text.Append(first ? " " : "; ").Append(line.From).Append('-').Append(line.To).Append(' ')
                     .Append(OmsiMarkingStyleInfo.Of(line.Style).Key).Append(' ')
                     .Append(line.Curvature.HasValue ? line.Curvature.Value.ToString("0.###", CultureInfo.InvariantCulture) : "auto");
+                foreach (var piece in line.Pieces)
+                {
+                    text.Append(' ').Append(piece.At.ToString("0.####", CultureInfo.InvariantCulture));
+                    if (piece.Hidden)
+                        text.Append(":hide");
+                    if (piece.Style.HasValue)
+                        text.Append(':').Append(OmsiMarkingStyleInfo.Of(piece.Style.Value).Key);
+                }
                 first = false;
             }
             return text.ToString();
@@ -439,10 +795,23 @@ namespace OmsiMapEditor.OMSI
                     var style = OmsiMarkingStyleInfo.ByKey(words[1]);
                     if (ends.Length != 2 || style == null)
                         continue;
-                    double? curvature = null;
+                    var line = new OmsiMarkingLine { From = ends[0], To = ends[1], Style = style.Style };
                     if (words.Length > 2 && double.TryParse(words[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
-                        curvature = value;
-                    lines.Add(new OmsiMarkingLine { From = ends[0], To = ends[1], Style = style.Style, Curvature = curvature });
+                        line.Curvature = value;
+                    for (var index = 3; index < words.Length; index++)
+                    {
+                        var fields = words[index].Split(':');
+                        if (!double.TryParse(fields[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var at))
+                            continue;
+                        var setting = new OmsiMarkingPieceSetting { At = at };
+                        for (var field = 1; field < fields.Length; field++)
+                            if (fields[field] == "hide")
+                                setting.Hidden = true;
+                            else if (OmsiMarkingStyleInfo.ByKey(fields[field]) is OmsiMarkingStyleInfo pieceStyle)
+                                setting.Style = pieceStyle.Style;
+                        line.Pieces.Add(setting);
+                    }
+                    lines.Add(line);
                 }
                 break;
             }

@@ -93,7 +93,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
     - [x] Unbenutzte erzeugte Objekte aufräumen (ADR 036): Thema „Made objects“ in der Kartenprüfung (Tools) listet die Ordner unter `Sceneryobjects\Mapforge\<Projekt>`, die keine Karte der Installation, kein Export, keine Chrono-Variante, nicht die Arbeitskopie und nicht die Rückgängig-Liste nennt; „Delete unused“ löscht sie nach einem zweiten Klick
   - Fahrbahnmarkierungen auf erzeugten Kreuzungen wie Town Road Lane (ADR 044):
     - [x] Etappe 1: Werkzeug „Markings“ (M): Anker an Fahrbahnrändern, Fahrstreifengrenzen und Mittelstreifen jedes Arms (Ende und Einmündung), Linien aus zwei Klicks als Kurven, Linienarten nach StVO (Leitlinie, Fahrstreifenbegrenzung, Doppellinie, Breitstrich, unterbrochener Breitstrich, Haltlinie, Wartelinie, gelbe Varianten), Krümmung, Wählen, Ändern und Löschen; als Streifen im Modell, in der `.sco` beschrieben, beim Arm-Drehen mitgenommen, Rückgängig
-    - Etappe 2: Teilstücke an Schnittpunkten, „Auto markings“ nach Vorfahrt, Favoriten
+    - [x] Etappe 2: Teilstücke an Schnittpunkten (ausblenden, eigener Stil), Schnittpunkte als Anker, „Auto markings“ nach Vorfahrt (Leitlinien der Hauptstraße, unterbrochener Breitstrich über Einmündungen, Wartelinien der Nebenstraßen, sonst Haltlinien), Favoriten
     - Etappe 3: Flächen: Sperrfläche (Zeichen 298), Fußgängerüberweg (Zeichen 293)
     - Etappe 4: Richtungspfeile
   - Bauarten und Einrasten wie in Cities: Skylines (ADR 043):
