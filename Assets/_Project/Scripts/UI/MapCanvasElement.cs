@@ -1276,6 +1276,7 @@ namespace OmsiMapEditor.UI
             DrawSplines(painter, visible);
             var splinesDone = watch.Elapsed.TotalMilliseconds;
             DrawObjects(context, painter, visible);
+            DrawPaths(painter, visible);
             DrawRoutes(context, painter, visible);
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);

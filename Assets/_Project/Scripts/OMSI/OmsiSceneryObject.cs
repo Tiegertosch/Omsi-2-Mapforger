@@ -67,6 +67,18 @@ namespace OmsiMapEditor.OMSI
         public double RadiusMeters { get; internal set; }
         public double LengthMeters { get; internal set; }
         public double WidthMeters { get; internal set; }
+
+        /// <summary>Height above the object's origin.</summary>
+        public double Height { get; internal set; }
+
+        /// <summary>0 for roads, 1 for pedestrians, 2 for rails, as in a .sli.</summary>
+        public int Kind { get; internal set; }
+
+        /// <summary>0 along the path, 1 against it, 2 both ways.</summary>
+        public int Direction { get; internal set; }
+
+        /// <summary>The indicator a vehicle sets on it: 0 none, 2 left, 3 right.</summary>
+        public int Blinker { get; internal set; }
     }
 
     /// <summary>A spline connection point of a crossing or switch, in the object frame (x right, y forward).</summary>
@@ -208,7 +220,10 @@ namespace OmsiMapEditor.OMSI
                         if (TryNumbers(values, 10, out var path))
                             result.Paths.Add(new OmsiObjectPath
                             {
-                                X = path[0], Y = path[1], HeadingDegrees = path[3], RadiusMeters = path[4], LengthMeters = path[5], WidthMeters = path[9]
+                                X = path[0], Y = path[1], Height = path[2], HeadingDegrees = path[3], RadiusMeters = path[4], LengthMeters = path[5],
+                                Kind = (int)path[8], WidthMeters = path[9],
+                                Direction = values.Count > 10 && double.TryParse(values[10], NumberStyles.Float, CultureInfo.InvariantCulture, out var direction) ? (int)direction : 0,
+                                Blinker = values.Count > 11 && double.TryParse(values[11], NumberStyles.Float, CultureInfo.InvariantCulture, out var blinker) ? (int)blinker : 0
                             });
                         break;
                     case "absheight":

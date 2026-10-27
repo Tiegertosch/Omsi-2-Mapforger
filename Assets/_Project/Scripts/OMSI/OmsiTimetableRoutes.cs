@@ -227,16 +227,7 @@ namespace OmsiMapEditor.OMSI
                 if (profile == null || entry.PathIndex < 0 || entry.PathIndex >= profile.Lanes.Count || !(spline.LengthMeters > 0.0) ||
                     double.IsInfinity(spline.LengthMeters))
                     return null;
-                var offset = profile.Lanes[entry.PathIndex].X * (spline.IsMirrored ? -1.0 : 1.0);
-                var count = SegmentCount(spline.LengthMeters);
-                var points = new OmsiMapPoint[count + 1];
-                for (var index = 0; index <= count; index++)
-                {
-                    OmsiMapGeometry.GetLocalFrameAt(spline, spline.LengthMeters * index / count, out var position, out var heading);
-                    points[index] = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, position.X + Math.Cos(heading) * offset,
-                        position.Y - Math.Sin(heading) * offset, summary.TileSizeMeters);
-                }
-                return points;
+                return OmsiMapPaths.SplineLane(tile, spline, profile.Lanes[entry.PathIndex].X * (spline.IsMirrored ? -1.0 : 1.0), summary.TileSizeMeters);
             }
 
             private OmsiMapPoint[] ObjectLane(OmsiPathEntry entry)
@@ -249,31 +240,7 @@ namespace OmsiMapEditor.OMSI
                 var path = sceneryObject.Paths[entry.PathIndex];
                 if (!(path.LengthMeters > 0.0) || double.IsInfinity(path.LengthMeters))
                     return null;
-
-                // The lane in the object frame (x right, y forward) like a spline from its start, then turned by the heading.
-                var lane = new OmsiSplineRecord
-                {
-                    LocalX = path.X, LocalY = path.Y, HeadingDegrees = path.HeadingDegrees, LengthMeters = path.LengthMeters,
-                    RadiusMeters = path.RadiusMeters
-                };
-                var heading = record.HeadingDegrees * Math.PI / 180.0;
-                var cos = Math.Cos(heading);
-                var sin = Math.Sin(heading);
-                var count = SegmentCount(path.LengthMeters);
-                var points = new OmsiMapPoint[count + 1];
-                for (var index = 0; index <= count; index++)
-                {
-                    OmsiMapGeometry.GetLocalFrameAt(lane, path.LengthMeters * index / count, out var local, out _);
-                    points[index] = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, record.LocalX + local.X * cos + local.Y * sin,
-                        record.LocalY - local.X * sin + local.Y * cos, summary.TileSizeMeters);
-                }
-                return points;
-            }
-
-            /// <summary>A point every 4 m, at least 2 and at most 256 segments.</summary>
-            private static int SegmentCount(double length)
-            {
-                return Math.Max(2, Math.Min(256, (int)Math.Ceiling(length / 4.0)));
+                return OmsiMapPaths.ObjectLane(tile, record, path, summary.TileSizeMeters);
             }
         }
     }

@@ -559,6 +559,7 @@ namespace OmsiMapEditor.UI
             DecorateButton(groundToggleButton, "layers", "Textures");
             DecorateButton(view3DButton, "rotate-3d", "3D");
             DecorateButton(routesToggleButton, "route", "Routes");
+            CreatePathsButton();
             DecorateButton(projectCollapseButton, "chevron-left", null);
             DecorateButton(inspectorCollapseButton, "chevron-right", null);
             AddPanelIcon(projectFrame, "map");
@@ -825,6 +826,7 @@ namespace OmsiMapEditor.UI
             }
             groundToggleButton?.SetEnabled(!mapCanvas.ThreeDimensional);
             routesToggleButton?.SetEnabled(routes != null && !mapCanvas.ThreeDimensional);
+            pathsToggleButton?.SetEnabled(!mapCanvas.ThreeDimensional);
             groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (objectRenderer != null)
                 objectRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
@@ -1065,6 +1067,20 @@ namespace OmsiMapEditor.UI
                 var chronoStarted = Time.realtimeSinceStartup;
                 while (chronoTask != null && Time.realtimeSinceStartup - chronoStarted < 120f)
                     yield return null;
+            }
+
+            if (Array.IndexOf(args, "-paths") >= 0)
+            {
+                ShowPaths(true);
+                var pathsStarted = Time.realtimeSinceStartup;
+                while (pathsTask != null && Time.realtimeSinceStartup - pathsStarted < 120f)
+                    yield return null;
+                // "-paths open" goes to the first open end, a number to that one.
+                var openEnd = Argument("-paths", 1);
+                if (openEnd == "open" || int.TryParse(openEnd, out _))
+                    for (var step = int.TryParse(openEnd, out var count) ? count : 1; step > 0; step--)
+                        NextOpenEnd();
+                Debug.Log("Paths: " + statusLabel?.text);
             }
 
             var roadAt = Array.IndexOf(args, "-road");
@@ -1376,8 +1392,10 @@ namespace OmsiMapEditor.UI
             if (screenshot != null)
             {
                 var started = Time.realtimeSinceStartup;
+                // Paths read again after an edit come in after the 300 ms the rebuild waits.
                 while ((groundRenderer.IsLoading || objectRenderer.IsLoading || objectRenderer.PreviewsPending && Array.IndexOf(args, "-noPreviewWait") < 0 || outlinesBuilding || checkTask != null ||
-                        (installationScan != null && !installationScan.IsCompleted)) && Time.realtimeSinceStartup - started < 300f)
+                        (installationScan != null && !installationScan.IsCompleted) || pathsShown && (routesRebuild != null || pathsTask != null)) &&
+                       Time.realtimeSinceStartup - started < 300f)
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
@@ -1534,6 +1552,7 @@ namespace OmsiMapEditor.UI
             PresentSummary(summary, keepView);
             LoadStoredImagery(globalConfigPath + "|" + projectFilePath);
             StartRoutesBuild(summary);
+            ResetPaths(summary);
             UpdateMapHeader();
             RenderProjectBrowser();
             RenderInspector();
@@ -1813,6 +1832,7 @@ namespace OmsiMapEditor.UI
         {
             PresentSummary(summary, true);
             StartRoutesBuild(summary, variants);
+            ResetPaths(summary);
             UpdateMapHeader();
             RenderProjectBrowser();
             RenderInspector();
@@ -2517,8 +2537,7 @@ namespace OmsiMapEditor.UI
                 UpdateBrowserEntry(tile);
             UpdateMapStateLabel();
             RenderInspector();
-            if (routes != null || routesTask != null)
-                ScheduleRoutesRebuild();
+            ScheduleRoutesRebuild();
         }
 
         private void BeginRoadTool()
@@ -3850,17 +3869,26 @@ namespace OmsiMapEditor.UI
             return currentSummary.Tiles.Exists(tile => tile.Splines.Exists(spline => spline.Id == id));
         }
 
-        /// <summary>Builds the routes again 300 ms after the last edit; edits in between push the build back.</summary>
+        /// <summary>
+        /// Builds the routes and the AI paths again 300 ms after the last edit, those that were read; edits in between push
+        /// the build back. A map without a timetable has no routes, but its paths still follow.
+        /// </summary>
         private void ScheduleRoutesRebuild()
         {
             if (mapCanvas == null)
+                return;
+            var rebuildRoutes = routes != null || routesTask != null;
+            var rebuildPaths = mapPaths != null || pathsTask != null;
+            if (!rebuildRoutes && !rebuildPaths)
                 return;
             routesRebuild?.Pause();
             routesRebuild = mapCanvas.schedule.Execute(() =>
             {
                 routesRebuild = null;
-                if (currentSummary != null && chronoDate == null)
+                if (rebuildRoutes && currentSummary != null && chronoDate == null)
                     StartRoutesBuild(currentSummary);
+                if (rebuildPaths && currentSummary != null)
+                    StartPathsBuild(currentSummary, false);
             }).StartingIn(300);
         }
 
@@ -4189,8 +4217,7 @@ namespace OmsiMapEditor.UI
             objectRenderer?.RefreshPlacements();
             groundRenderer?.RefreshTerrainHoles(currentSummary);
             // Moved stops and crossings move their routes.
-            if (routes != null || routesTask != null)
-                ScheduleRoutesRebuild();
+            ScheduleRoutesRebuild();
             foreach (var tile in browserEntries.Keys)
                 UpdateBrowserEntry(tile);
             UpdateCounts();
@@ -7042,6 +7069,8 @@ namespace OmsiMapEditor.UI
                 lines.Add(lineList);
                 projectPanel.Add(lines);
             }
+            if (pathsShown && mapPaths != null)
+                projectPanel.Add(PathsSection());
 
             var tileList = new ScrollView(ScrollViewMode.Vertical);
             tileList.AddToClassList("browser-tile-list");
@@ -7287,6 +7316,8 @@ namespace OmsiMapEditor.UI
                 AddRowAttachedObjects(records);
             else
                 AddTileButtons(records);
+            if (pathsShown && mapPaths != null && selection.Count <= 1 && (selectedObject != null || selectedSpline != null))
+                AddPathDetails(records, selectedTile, selectedObject?.Id ?? selectedSpline.Id, selectedObject == null);
 
             var objectsHeading = new Label("OBJECT PLACEMENTS");
             objectsHeading.AddToClassList("inspector-section-heading");

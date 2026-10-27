@@ -83,6 +83,30 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Tilt about the object's forward axis; positive raises its right side.</summary>
         public double BankDegrees { get; internal set; }
+
+        /// <summary>The [rule] and [kill_rule] records after it in its tile, for its [path]s.</summary>
+        public List<OmsiPathRule> Rules { get; } = new List<OmsiPathRule>();
+    }
+
+    /// <summary>
+    /// A [rule] for one path of the object or spline before it in the tile, such as <c>0 priority 192 0</c>: who goes
+    /// first at a junction, a speed limit, how much traffic uses the path, or which vehicles may. [kill_rule] takes away a
+    /// rule the element brings, as a chrono variant does.
+    /// </summary>
+    public sealed class OmsiPathRule
+    {
+        /// <summary>The path of the element, from 0.</summary>
+        public int PathIndex { get; internal set; }
+
+        /// <summary>Such as priority, speedlimit, trafficdensity, trucks, no_cars or bus.</summary>
+        public string Name { get; internal set; }
+
+        public double Value { get; internal set; }
+
+        /// <summary>The last field: for trafficdensity the traffic group.</summary>
+        public double Extra { get; internal set; }
+
+        public bool Kills { get; internal set; }
     }
 
     /// <summary>An object attached to an attachment point ([new_attachment]) of its parent object.</summary>
@@ -199,6 +223,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True when the record ends with "mirror": the cross-section is turned over.</summary>
         public bool IsMirrored { get; internal set; }
+
+        /// <summary>The [rule] and [kill_rule] records after it in its tile, for the paths of its profile.</summary>
+        public List<OmsiPathRule> Rules { get; } = new List<OmsiPathRule>();
 
         /// <summary>
         /// The record's last number (tile version 11 on): how far along its chain the spline begins, as OMSI's editor

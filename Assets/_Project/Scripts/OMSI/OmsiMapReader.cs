@@ -147,12 +147,22 @@ namespace OmsiMapEditor.OMSI
             var skippedOldSplines = 0;
             // Terrain alignment applies to the spline right before it; another placed element ends that.
             OmsiSplineRecord lastSpline = null;
+            // Rules belong to the object or spline right before them; another placed element ends that.
+            List<OmsiPathRule> lastRules = null;
             var hasWater = false;
             foreach (var section in sections)
             {
                 TrackHighestId(section, summary);
                 if (string.Equals(section.Name, "water", StringComparison.OrdinalIgnoreCase))
                     hasWater = true;
+                if (string.Equals(section.Name, "rule", StringComparison.OrdinalIgnoreCase) || string.Equals(section.Name, "kill_rule", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (lastRules != null && TryReadRule(section, out var rule))
+                        lastRules.Add(rule);
+                    continue;
+                }
+                if (PlacedSections.Contains(section.Name))
+                    lastRules = null;
                 if ((string.Equals(section.Name, "spline_terrain_align", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(section.Name, "spline_terrain_align_2", StringComparison.OrdinalIgnoreCase)) && lastSpline != null)
                 {
@@ -165,7 +175,10 @@ namespace OmsiMapEditor.OMSI
                 {
                     tile.ObjectCount++;
                     if (TryReadObject(section, out var objectRecord))
+                    {
                         tile.Objects.Add(objectRecord);
+                        lastRules = objectRecord.Rules;
+                    }
                     else
                         summary.Warnings.Add("Could not decode an [object] placement in " + tile.FileName + ".");
                 }
@@ -179,6 +192,7 @@ namespace OmsiMapEditor.OMSI
                     {
                         tile.Splines.Add(splineRecord);
                         lastSpline = splineRecord;
+                        lastRules = splineRecord.Rules;
                     }
                     else
                         summary.Warnings.Add("Could not decode a [" + section.Name + "] placement in " + tile.FileName + ".");
@@ -297,6 +311,23 @@ namespace OmsiMapEditor.OMSI
                 HeadingDegrees = heading,
                 PitchDegrees = pitch,
                 BankDegrees = bank
+            };
+            return true;
+        }
+
+        /// <summary>A [rule] or [kill_rule]: path index, name, value and the extra number.</summary>
+        private static bool TryReadRule(Section section, out OmsiPathRule rule)
+        {
+            rule = null;
+            var values = Values(section);
+            if (values.Count < 3 || !int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var path) || !TryDouble(values, 2, out var value))
+                return false;
+            var extra = 0.0;
+            if (values.Count > 3)
+                TryDouble(values, 3, out extra);
+            rule = new OmsiPathRule
+            {
+                PathIndex = path, Name = values[1], Value = value, Extra = extra, Kills = string.Equals(section.Name, "kill_rule", StringComparison.OrdinalIgnoreCase)
             };
             return true;
         }

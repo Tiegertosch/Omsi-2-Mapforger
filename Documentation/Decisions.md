@@ -617,3 +617,21 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Eine Wahl:** Es ist immer genau eine Markierung gewählt; sie bestimmt, was ein Klick auf die Kreuzung macht. Wird ein Element auf der Kreuzung gewählt, springt die Bibliothek auf seinen Reiter. Y schaltet innerhalb der Art der Wahl weiter, Favoriten zuerst.
 
 **Grund:** Im alten Panel standen Linienarten, Flächen, Pfeile und alle Felder untereinander, nur mit Namen. Mit den Etappen 3 und 4 wurde es so hoch, dass es die Ansichtsknöpfe verdeckte, und es lag mitten über der Kreuzung. Bilder erkennt man schneller als Namen wie „Broken edge line“; Reiter und nur die passenden Felder halten beide Panels flach. Das Muster kennt der Nutzer schon aus Straßen- und Objektmenü.
+
+## ADR 046: KI-Pfade anzeigen
+
+**Status:** Angenommen, 27. Oktober 2026, als Etappe 1 des Plans „KI-Pfade“ (Roadmap) auf Wunsch des Nutzers. Vorbild für die späteren Etappen ist die Mod „Traffic“ für Cities: Skylines II (github.com/krzychu124/Traffic). Sie hat keine Lizenz, übernommen wird nur das Konzept, kein Code.
+
+**Entscheidung:**
+- **Pfade wie openOMSI** (`OmsiMapPaths`): Jeder `[path]` des Profils eines Splines liegt mit seinem Versatz neben dem Spline. Bei einem gespiegelten Spline liegt er auf der anderen Seite und läuft andersherum (Richtung 0 und 1 tauschen), wie openOMSI es in `omsi-scene/src/lanes.rs` beschreibt. Jeder `[path]` eines Objekts liegt im Objektrahmen und dreht mit dem Objekt; Höhe, Art, Richtung und Blinker liest `OmsiSceneryObject` jetzt mit. Die Geometrie teilen sich Pfade und Linienwege (`SplineLane`, `ObjectLane`).
+- **Regeln:** Der Kachelleser hängt `[rule]` und `[kill_rule]` an das Objekt oder den Spline davor (`OmsiPathRule`: Pfadindex, Name, Wert, Zusatzzahl). Ein Pfad zeigt die Regeln für seinen Index; ein `[kill_rule]` nimmt eine gleichnamige Regel wieder weg.
+- **Offene Enden:** Wie in openOMSI (`Network::link`, Toleranz 1,5 m) verbindet sich ein Pfadende mit dem Anfang eines Pfads derselben Art, der höchstens 1,5 m entfernt liegt und um weniger als 40° anders läuft. Ein Pfad in beiden Richtungen zählt in beide Richtungen. Ein Ende, an dem in einer genutzten Richtung nichts weiterführt oder nichts hineinführt, gilt als offen. Die Höhe vergleicht der Editor nicht.
+- **Anzeige:** Der Knopf „Paths“ neben „Routes“ (im Code erzeugt, die UXML bleibt gleich) zeigt die Pfade in der Draufsicht, in 3D ist er gesperrt.
+  - Sichtbar sind sie unter 1,5 m/px, Pfeile in Fahrtrichtung unter 0,35 m/px; in beide Richtungen genutzte Pfade bekommen Doppelpfeile.
+  - Farben aus den vorhandenen Tokens: Straße wie Objekte (info, blau), Fußweg wie Bäume (success, grün), Gleis wie die gewählte Kachel (warning, gelb), offene Enden als rote Ringe (error). Es gibt keine neuen USS-Tokens, die Freigabeliste bleibt unberührt.
+  - Ein Pfad mit `priority` über 128 wird doppelt so breit gezeichnet, einer darunter gestrichelt. So ist die Vorfahrt der Karte schon vor dem Vorfahrt-Werkzeug zu sehen.
+- **Gelesen** werden die Pfade im Hintergrund für die ganze Karte: in Grundorf 577 Pfade in rund 50 ms, in Berlin-Spandau 12.427 Pfade mit rund 150.000 Punkten in rund 1,1 s. Nach Änderungen und Chrono-Daten werden sie neu gelesen; bis dahin bleiben die alten sichtbar.
+- **Projekt-Panel:** „AI paths“ listet Straßen, Fußwege und Gleise mit Anzahl und offenen Enden; ein Klick blendet eine Art aus oder ein. „Next open end“ springt zum nächsten offenen Ende, wählt seinen Spline oder sein Objekt und nennt es in der Statuszeile.
+- **Inspector:** Bei gewähltem Objekt oder Spline stehen unter „AI paths“ seine Pfade mit Art, Richtung, Länge, Blinker, offenen Enden und Regeln (Vorfahrt mit Deutung, Tempolimit, Verkehrsdichte mit Gruppe, weitere mit Namen).
+
+**Grund:** Vorfahrt und Fahrstreifen-Verbindungen (Etappen 2 und 3) lassen sich nur bearbeiten, wenn man die Pfade sieht. Offene Enden sind der häufigste Grund für hängenbleibende KI an selbst gebauten Kreuzungen. Pfade und Regeln folgen openOMSI, weil der Nutzer nur dort testet. openOMSI bestätigt auch, dass `[blockpath]` weder in Omsi.exe noch in openOMSI wirkt; die Vorfahrt kommt allein aus `[rule] priority` (ohne Regel 128, in den Originalkarten 192 und 64).
