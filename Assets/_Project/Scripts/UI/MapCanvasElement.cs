@@ -249,6 +249,7 @@ namespace OmsiMapEditor.UI
 
         // Dashed construction lines of the road tool, such as the legs to a curve's control point; in map coordinates.
         private readonly List<Vector2[]> roadGuides = new List<Vector2[]>();
+        private readonly List<float[]> roadGuideHeights = new List<float[]>();
         private bool roadGuideDots = true;
 
         // The anchors of the markings tool (ADR 044) in map coordinates with their heights, the one under the pointer and
@@ -578,6 +579,9 @@ namespace OmsiMapEditor.UI
         /// <summary>Ground height at a map position, for the point the 3D camera looks at.</summary>
         public Func<Vector2, float> GroundHeight { get; set; }
 
+        /// <summary>Changes whenever the heights <see cref="GroundHeight"/> gives change, so heights kept for drawing are taken anew.</summary>
+        public Func<int> GroundVersion { get; set; }
+
         /// <summary>The point the 3D camera looks at, in map-relative metres.</summary>
         public Vector2 OrbitTarget { get; private set; }
 
@@ -832,9 +836,11 @@ namespace OmsiMapEditor.UI
 
         /// <summary>Dashed construction lines for the road tool as world polylines, replacing those drawn before; null clears them.</summary>
         /// <param name="dots">Marks the inner points, such as a curve's control point; false for lines drawn as many points.</param>
-        public void SetRoadGuides(IEnumerable<OmsiMapPoint[]> lines, bool dots = true)
+        /// <param name="heights">Heights of the lines' points in the 3D view, by line; null, or a line without them, for the ground.</param>
+        public void SetRoadGuides(IEnumerable<OmsiMapPoint[]> lines, bool dots = true, IReadOnlyList<double[]> heights = null)
         {
             roadGuides.Clear();
+            roadGuideHeights.Clear();
             roadGuideDots = dots;
             if (lines != null)
                 foreach (var line in lines)
@@ -842,7 +848,12 @@ namespace OmsiMapEditor.UI
                     var points = new Vector2[line.Length];
                     for (var index = 0; index < line.Length; index++)
                         points[index] = WorldToMap(line[index]);
+                    float[] pointHeights = null;
+                    var lineIndex = roadGuides.Count;
+                    if (heights != null && lineIndex < heights.Count && heights[lineIndex] != null && heights[lineIndex].Length == line.Length)
+                        pointHeights = Array.ConvertAll(heights[lineIndex], height => (float)height);
                     roadGuides.Add(points);
+                    roadGuideHeights.Add(pointHeights);
                 }
             MarkDirtyRepaint();
         }
@@ -850,6 +861,7 @@ namespace OmsiMapEditor.UI
         public void ClearRoadPreview()
         {
             roadGuides.Clear();
+            roadGuideHeights.Clear();
             markingAnchors.Clear();
             roadPreview.Clear();
             roadPreviewHeights.Clear();
@@ -1278,6 +1290,7 @@ namespace OmsiMapEditor.UI
             DrawObjects(context, painter, visible);
             DrawPaths(painter, visible);
             DrawPriorityHandles(painter);
+            DrawLaneEnds(painter);
             DrawRoutes(context, painter, visible);
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
@@ -1708,11 +1721,13 @@ namespace OmsiMapEditor.UI
             }
 
             var guides = new List<List<Vector2>>();
-            foreach (var line in roadGuides)
+            for (var lineIndex = 0; lineIndex < roadGuides.Count; lineIndex++)
             {
+                var line = roadGuides[lineIndex];
+                var heights = roadGuideHeights[lineIndex];
                 var projected = new List<Vector2>();
-                foreach (var point in line)
-                    if (camera.TryProject(new Vector3(point.x, GroundAt(point) + lift, point.y), out var screen))
+                for (var index = 0; index < line.Length; index++)
+                    if (camera.TryProject(new Vector3(line[index].x, (heights != null ? heights[index] : GroundAt(line[index])) + lift, line[index].y), out var screen))
                         projected.Add(screen);
                 if (projected.Count == line.Length)
                     guides.Add(projected);
@@ -1909,13 +1924,14 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Adds a screen polyline to the path as dashes, the pattern running on over its points.</summary>
-        private static void AddDashedPath(Painter2D painter, IReadOnlyList<Vector2> points, float dash, float gap)
+        private static int AddDashedPath(Painter2D painter, IReadOnlyList<Vector2> points, float dash, float gap)
         {
             if (points.Count < 2)
-                return;
+                return 0;
             var last = points[0];
             painter.MoveTo(last);
             var phase = 0f;
+            var dashes = 0;
             for (var index = 1; index < points.Count; index++)
             {
                 var point = points[index];
@@ -1929,7 +1945,10 @@ namespace OmsiMapEditor.UI
                     phase += step;
                     var at = Vector2.Lerp(last, point, travelled / length);
                     if (inDash)
+                    {
                         painter.LineTo(at);
+                        dashes++;
+                    }
                     else
                         painter.MoveTo(at);
                     if (phase >= dash + gap)
@@ -1937,6 +1956,7 @@ namespace OmsiMapEditor.UI
                 }
                 last = point;
             }
+            return dashes;
         }
 
         /// <summary>
@@ -3119,13 +3139,37 @@ namespace OmsiMapEditor.UI
         {
             if (ObjectRenderer == null || layout.width < 1f || layout.height < 1f)
                 return;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             var camera = OrbitCamera();
             DrawTileBorder3D(painter, camera);
             DrawTileAdders(painter);
             DrawMarkers3D(painter, camera);
+            var markersDone = watch.Elapsed.TotalMilliseconds;
+            pathShownCount = 0;
+            pathProjectMilliseconds = 0.0;
+            DrawPaths3D(painter, camera);
+            var pathsDone = watch.Elapsed.TotalMilliseconds;
+            Draw3DHandles(painter, camera);
+
+            // As from above, slow redraws are reported once per new maximum.
+            var milliseconds = (float)watch.Elapsed.TotalMilliseconds;
+            if (milliseconds > 50f && milliseconds > slowestDrawMilliseconds * 1.5f)
+            {
+                slowestDrawMilliseconds = milliseconds;
+                Debug.LogWarning("3D view redraw took " + milliseconds.ToString("0") + " ms at " + OrbitDistance.ToString("0") + " m: markers " +
+                                 markersDone.ToString("0") + ", paths " + (pathsDone - markersDone).ToString("0") + " (" + pathShownCount + " shown, projecting " +
+                                 pathProjectMilliseconds.ToString("0") + "), rest " + (milliseconds - pathsDone).ToString("0") + " ms.");
+            }
+        }
+
+        /// <summary>The 3D overlay above the paths: road and tool previews, junction markers, selection boxes, arrows and rings.</summary>
+        private void Draw3DHandles(Painter2D painter, MapOrbitCamera camera)
+        {
             DrawPlacement3D(painter, camera);
             DrawRoad3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
+            DrawPriorityHandles(painter, camera);
+            DrawLaneEnds(painter, camera);
             DrawBox(painter);
             painter.lineWidth = 1.5f;
             painter.strokeColor = selectedObjectColor;

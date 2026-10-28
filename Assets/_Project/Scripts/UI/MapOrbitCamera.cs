@@ -14,6 +14,7 @@ namespace OmsiMapEditor.UI
 
         private readonly Vector3 position;
         private readonly Quaternion rotation;
+        private readonly Quaternion inverse;
         private readonly Vector2 size;
 
         // Element pixels per unit of tangent; the same scale on both axes, as the camera fills the element.
@@ -26,6 +27,7 @@ namespace OmsiMapEditor.UI
         public MapOrbitCamera(Vector3 target, float yawDegrees, float pitchDegrees, float distance, Vector2 viewSize)
         {
             rotation = Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
+            inverse = Quaternion.Inverse(rotation);
             position = target - rotation * Vector3.forward * distance;
             size = viewSize;
             focal = viewSize.y * 0.5f / Mathf.Tan(MapGroundRenderer.OrbitFieldOfView * 0.5f * Mathf.Deg2Rad);
@@ -51,7 +53,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The element position of a world point; false when it lies behind the near plane.</summary>
         public bool TryProject(Vector3 world, out Vector2 screen)
         {
-            var local = Quaternion.Inverse(rotation) * (world - position);
+            var local = inverse * (world - position);
             if (local.z < NearPlane)
             {
                 screen = Vector2.zero;

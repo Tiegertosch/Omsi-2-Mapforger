@@ -349,16 +349,26 @@ namespace OmsiMapEditor.OMSI
 
         private readonly Dictionary<string, OmsiGeneratedMesh> parts = new Dictionary<string, OmsiGeneratedMesh>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>The ways through to build as lanes, such as <c>0.1>2.2</c>; null for every way through (ADR 048).</summary>
+        private ICollection<string> connections;
+
+        /// <summary>True for two arms facing away from each other: a transition between cross-sections, without ways to choose.</summary>
+        public bool IsTransition { get; private set; }
+
         /// <param name="roadTexture">
         /// A plain asphalt texture relative to the installation, or null. It replaces the carriageway texture of the first
         /// arm only where that is asphalt, whose lane markings would otherwise run across the junction; cobbles and other
         /// surfaces keep their own texture.
         /// </param>
-        public static OmsiJunctionLayout Build(IEnumerable<OmsiJunctionArm> arms, string roadTexture)
+        /// <param name="connections">
+        /// The ways through to build as lanes, by <see cref="OmsiLaneConnections.Key"/>; null builds every way through, as
+        /// junctions without chosen connections have them.
+        /// </param>
+        public static OmsiJunctionLayout Build(IEnumerable<OmsiJunctionArm> arms, string roadTexture, ICollection<string> connections = null)
         {
             if (arms == null)
                 throw new ArgumentNullException(nameof(arms));
-            var layout = new OmsiJunctionLayout();
+            var layout = new OmsiJunctionLayout { connections = connections };
             // Arms whose road runs towards the junction see their profile turned over.
             foreach (var arm in arms)
                 layout.Arms.Add(new OmsiJunctionArm
@@ -383,6 +393,7 @@ namespace OmsiMapEditor.OMSI
             // Two arms facing away from each other make a transition between their cross-sections.
             if (layout.Arms.Count == 2 && layout.Opposite(0, 1))
             {
+                layout.IsTransition = true;
                 layout.BuildTransition(sections, roadTexture);
                 return layout;
             }
@@ -840,8 +851,8 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// A lane for every way through: from each lane into the junction to each lane out of it on another arm, as one or
-        /// two arcs meeting without a kink, with the blinker for the turn.
+        /// A lane for every way through, or for the chosen ones: from each lane into the junction to each lane out of it on
+        /// another arm, as one or two arcs meeting without a kink, with the blinker for the turn.
         /// </summary>
         private void BuildLanes(List<OmsiProfileSections> sections)
         {
@@ -850,19 +861,17 @@ namespace OmsiMapEditor.OMSI
                 {
                     if (from == to)
                         continue;
-                    foreach (var inbound in Arms[from].Profile.Lanes)
+                    for (var inboundIndex = 0; inboundIndex < Arms[from].Profile.Lanes.Count; inboundIndex++)
                     {
-                        // Only lanes on the arm's carriageway; on a dual road the far one runs through.
-                        if (!Within(inbound, sections[from], false))
+                        var inbound = Arms[from].Profile.Lanes[inboundIndex];
+                        if (!LeadsIn(inbound, sections[from]))
                             continue;
-                        // Lanes used both ways lead in and out.
-                        if (inbound.Kind != 0 || inbound.Direction == 0)
-                            continue;
-                        foreach (var outbound in Arms[to].Profile.Lanes)
+                        for (var outboundIndex = 0; outboundIndex < Arms[to].Profile.Lanes.Count; outboundIndex++)
                         {
-                            if (!Within(outbound, sections[to], false))
+                            var outbound = Arms[to].Profile.Lanes[outboundIndex];
+                            if (!LeadsOut(outbound, sections[to]))
                                 continue;
-                            if (outbound.Kind != 0 || outbound.Direction == 1)
+                            if (connections != null && !connections.Contains(OmsiLaneConnections.Key(from, inboundIndex, to, outboundIndex)))
                                 continue;
                             var start = Point.Along(Arms[from], Arms[from].Length, inbound.X);
                             var end = Point.Along(Arms[to], Arms[to].Length, outbound.X);
@@ -894,6 +903,45 @@ namespace OmsiMapEditor.OMSI
                 AddArcs(Point.Along(first, first.Length, right.X), first.HeadingDegrees + 180.0, Point.Along(second, second.Length, left.X), second.HeadingDegrees,
                     right.Height, 1, right.Width, 2, 0);
             }
+        }
+
+        /// <summary>A road lane on the arm's carriageway that leads into the junction; one used both ways leads in and out. On a dual road the far one runs through.</summary>
+        private static bool LeadsIn(OmsiSplineLane lane, OmsiProfileSections section)
+        {
+            return Within(lane, section, false) && lane.Kind == 0 && lane.Direction != 0;
+        }
+
+        private static bool LeadsOut(OmsiSplineLane lane, OmsiProfileSections section)
+        {
+            return Within(lane, section, false) && lane.Kind == 0 && lane.Direction != 1;
+        }
+
+        /// <summary>
+        /// Where the lanes of the arms meet the junction, at the arms' ends: those leading in, where its lanes start, and
+        /// those leading out, where they end (ADR 048). A transition has none to choose.
+        /// </summary>
+        public List<OmsiLaneEnd> LaneEnds()
+        {
+            var ends = new List<OmsiLaneEnd>();
+            if (IsTransition)
+                return ends;
+            for (var arm = 0; arm < Arms.Count; arm++)
+            {
+                var section = OmsiProfileSections.Of(Arms[arm].Profile);
+                for (var lane = 0; lane < Arms[arm].Profile.Lanes.Count; lane++)
+                {
+                    var profileLane = Arms[arm].Profile.Lanes[lane];
+                    var point = Point.Along(Arms[arm], Arms[arm].Length, profileLane.X);
+                    foreach (var inbound in new[] { true, false })
+                        if (inbound ? LeadsIn(profileLane, section) : LeadsOut(profileLane, section))
+                            ends.Add(new OmsiLaneEnd
+                            {
+                                Arm = arm, Lane = lane, Inbound = inbound, X = point.X, Y = point.Y, Height = profileLane.Height,
+                                HeadingDegrees = inbound ? Arms[arm].HeadingDegrees + 180.0 : Arms[arm].HeadingDegrees
+                            });
+                }
+            }
+            return ends;
         }
 
         /// <summary>True when a lane lies on the arm's carriageway, or for footpaths within its outer edges.</summary>

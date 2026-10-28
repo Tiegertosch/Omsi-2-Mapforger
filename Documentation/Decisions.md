@@ -664,3 +664,21 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Kommandozeile:** `-priorities [n ...]` öffnet das Werkzeug an der gewählten Kreuzung, schreibt die Arme ins Log und klickt die Schilder mit den Nummern n ab 1.
 
 **Grund:** In openOMSI entscheidet nur `[rule] priority`, wer an einer Kreuzung zuerst fährt; `[blockpath]` wirkt nicht (ADR 046). Mit Armen und drei Stufen lässt sich das so einstellen, wie man es an einer echten Kreuzung beschildert, statt Pfad für Pfad. Selbst gebaute Kreuzungen fahren so gleich richtig, ohne Nacharbeit.
+
+## ADR 048: Fahrstreifen verbinden wie der „Lane Connector“
+
+**Status:** Angenommen, 27. Oktober 2026, als Etappe 3 des Plans „KI-Pfade“; vom Nutzer am 28. Oktober 2026 bestätigt. Entscheidung des Nutzers: nur auf im Editor erzeugten Kreuzungen. Vorbild ist der Lane Connector der Mod „Traffic“ für Cities: Skylines II; übernommen ist nur das Konzept, kein Code.
+
+**Entscheidung:**
+- **Verbindungen** (`OmsiLaneConnections`): Eine Verbindung heißt nach dem Arm und dem `[path]` des Armprofils, aus dem sie kommt und in den sie führt, etwa `0.1>2.2`. Die Arme zählen wie die Anschlusspunkte nach Kurs. Die Spurnummer bleibt auch bei gespiegelten Armen gleich, weil `Mirrored()` die Reihenfolge der Spuren behält.
+  - Einfahrend ist eine Straßenspur auf der Fahrbahn des Arms, die nicht nur hinausführt; ausfahrend eine, die nicht nur hineinführt (`OmsiJunctionLayout.LaneEnds`).
+  - Ohne Wahl führt wie bisher jede einfahrende Spur zu jeder ausfahrenden der anderen Arme. Mit Wahl entstehen in `BuildLanes` nur die gewählten Pfade, in derselben Reihenfolge wie zuvor. Fußwege bleiben, wie sie sind.
+- **Gespeichert** als Zeile `MapWorks lanes: 0.1>1.2 0.1>2.2` in der `.sco`, neben Armen und Markierungen. Fehlt die Zeile, gilt jede Verbindung; sind alle gewählt, schreibt der Editor die Zeile nicht. Markierungen und Arm-Drehen erzeugen die Kreuzung mit denselben Verbindungen neu.
+- **Werkzeug „Lanes“ (L):** Auf einer im Projekt erzeugten Kreuzung zeigt es an jedem Armende einen Punkt je einfahrender Spur und einen Ring je ausfahrender.
+  - Alle Verbindungen sind blass als Bögen zu sehen. Ein Klick auf einen Punkt wählt die Spur (orange); ihre Verbindungen werden hervorgehoben und ihre Ziele grün. Ein Klick auf einen Ring fügt die Verbindung hinzu oder nimmt sie weg, mit Vorschau unter dem Zeiger.
+  - Zurück in den eigenen Arm führt keine Verbindung. „Every way through“ stellt das volle Netz wieder her. „No ways through“ nimmt auf Wunsch des Nutzers alle Wege weg, damit sich eine Kreuzung mit vielen Spuren neu verbinden lässt; bis dahin kann die KI sie nicht durchfahren. Esc lässt erst die Spur los, dann endet das Werkzeug. Übergänge zwischen zwei Querschnitten haben nichts zu wählen.
+- **Neu erzeugen:** Jede Änderung erzeugt die Kreuzung neu wie bei den Markierungen (`PlanTurn` ohne Drehung, `RebuildJunction`), als ein Rückgängig-Schritt. Weil sich dabei Pfadindizes verschieben, wird die Vorfahrt (ADR 047) mitgenommen.
+  - Jeder neue Arm übernimmt die Stufe des alten Arms mit derselben Einfahrtsrichtung (unter 30°). Die Regeln werden für alle Pfadindizes neu geschrieben; Regeln auf weggefallenen Pfaden gehen. Hatte die Kreuzung zuvor keine Wege und damit keine Arme, bekommen die Hauptstraßen-Arme die Vorfahrt wie beim Bau (`ForMadeJunction`).
+- **Kommandozeile:** `-lanes [von>nach ...|every|none]` öffnet das Werkzeug an der gewählten Kreuzung, schreibt Spurenden und Verbindungen ins Log und schaltet die genannten Verbindungen um.
+
+**Grund:** Über welche Spuren die KI durch eine Kreuzung fährt, steht in openOMSI allein in den `[path]`s des Objekts; Spuren verbinden sich über nahe Enden (ADR 046). Ohne Wahl kann jede Spur in jede abbiegen, auch von der linken Spur nach rechts. Mit dem Werkzeug lassen sich Abbiegespuren wie an einer echten Kreuzung festlegen. Originalkreuzungen bleiben unverändert: Ihre Pfade ließen sich nur über eine Kopie des Objekts ändern.

@@ -192,7 +192,9 @@ namespace OmsiMapEditor.UI
         private int PriorityHandleAt(OmsiMapPoint point)
         {
             var best = -1;
-            var bestDistance = Math.Max(0.5, PriorityPickPixels * (mapCanvas?.MetersPerPixel ?? 1f));
+            var bestDistance = mapCanvas != null && mapCanvas.ThreeDimensional
+                ? Math.Max(0.8, mapCanvas.OrbitDistance * 0.025)
+                : Math.Max(0.5, PriorityPickPixels * (mapCanvas?.MetersPerPixel ?? 1f));
             for (var index = 0; index < priorityHandlePoints.Count; index++)
             {
                 var distance = Distance(priorityHandlePoints[index], point);
@@ -241,9 +243,14 @@ namespace OmsiMapEditor.UI
                 return;
             priorityHover = roadPointer.HasValue ? PriorityHandleAt(roadPointer.Value) : -1;
             var levels = new List<int>();
+            var heights = new List<double>();
             foreach (var arm in priorityArms)
+            {
                 levels.Add((int)arm.Level);
-            mapCanvas.SetPriorityHandles(priorityHandlePoints, levels, priorityHover);
+                // In the 3D view the signs stand at the junction's height, not on the ground below a bridge or in a cutting.
+                heights.Add(priorityJunction.Height);
+            }
+            mapCanvas.SetPriorityHandles(priorityHandlePoints, levels, priorityHover, heights);
             if (priorityPlanLabel == null)
                 return;
             priorityPlanLabel.text = priorityJunction == null ? "Click a junction to see its arms."

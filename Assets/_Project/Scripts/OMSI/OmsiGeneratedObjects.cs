@@ -219,10 +219,12 @@ namespace OmsiMapEditor.OMSI
         /// <param name="markings">Road markings to build in (ADR 044), by the anchors of the arms; null or empty for none.</param>
         /// <param name="areas">Marked areas to build in, such as restricted areas; null or empty for none.</param>
         /// <param name="arrows">Direction arrows to build in; null or empty for none.</param>
+        /// <param name="connections">The ways through to build as lanes (ADR 048); null for every way through.</param>
         public static OmsiGeneratedObject Junction(IEnumerable<OmsiJunctionArm> arms, string roadTexture, string friendlyName,
-            IList<OmsiMarkingLine> markings = null, IList<OmsiMarkingArea> areas = null, IList<OmsiMarkingArrow> arrows = null)
+            IList<OmsiMarkingLine> markings = null, IList<OmsiMarkingArea> areas = null, IList<OmsiMarkingArrow> arrows = null,
+            ICollection<string> connections = null)
         {
-            var layout = OmsiJunctionLayout.Build(arms, roadTexture);
+            var layout = OmsiJunctionLayout.Build(arms, roadTexture, connections);
             var meshes = new List<OmsiGeneratedMesh>(layout.Meshes);
             markings = markings ?? new List<OmsiMarkingLine>();
             areas = areas ?? new List<OmsiMarkingArea>();
@@ -257,6 +259,8 @@ namespace OmsiMapEditor.OMSI
                 sco.Append(OmsiJunctionMarkings.WriteAreas(areas)).Append("\r\n");
             if (arrows.Count > 0)
                 sco.Append(OmsiJunctionMarkings.WriteArrows(arrows)).Append("\r\n");
+            if (connections != null)
+                sco.Append(OmsiLaneConnections.Write(connections)).Append("\r\n");
             sco.Append("\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");

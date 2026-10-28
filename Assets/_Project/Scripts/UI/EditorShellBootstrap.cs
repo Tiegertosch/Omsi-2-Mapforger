@@ -428,6 +428,7 @@ namespace OmsiMapEditor.UI
                 objectsPanelHost.Add(terrainOptions);
                 CreateMarkingOptions();
                 CreatePriorityOptions();
+                CreateLaneOptions();
             }
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -493,6 +494,8 @@ namespace OmsiMapEditor.UI
                         UpdateMarkingPreview();
                     else if (activeTool == EditorTool.Priorities)
                         UpdatePriorityPreview();
+                    else if (activeTool == EditorTool.Lanes)
+                        UpdateLanePreview();
                     else
                         UpdateRoadPreview();
                 };
@@ -511,6 +514,8 @@ namespace OmsiMapEditor.UI
                         ClickMarking(x, y);
                     else if (activeTool == EditorTool.Priorities)
                         ClickPriority(x, y);
+                    else if (activeTool == EditorTool.Lanes)
+                        ClickLane(x, y);
                     else
                         BuildRoadTo(x, y);
                 };
@@ -770,6 +775,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.ObjectRenderer = objectRenderer;
                 objectRenderer.PreviewReady += (path, image) => objectsPanel?.SetPreview(path, image);
                 mapCanvas.GroundHeight = groundRenderer.HeightAt;
+                mapCanvas.GroundVersion = () => groundRenderer.TerrainVersion;
             }
         }
 
@@ -1053,6 +1059,16 @@ namespace OmsiMapEditor.UI
                 for (var index = priorityAt + 1; index < args.Length && !args[index].StartsWith("-", StringComparison.Ordinal); index++)
                     signs.Add(args[index]);
                 RunPriorityArgument(signs);
+            }
+
+            // -lanes [from>to ...|every] opens the lanes tool on the selected junction and adds or takes away the ways (ADR 048).
+            var lanesAt = Array.IndexOf(args, "-lanes");
+            if (lanesAt >= 0)
+            {
+                var ways = new List<string>();
+                for (var index = lanesAt + 1; index < args.Length && !args[index].StartsWith("-", StringComparison.Ordinal); index++)
+                    ways.Add(args[index]);
+                RunLaneArgument(ways);
             }
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
@@ -1596,11 +1612,16 @@ namespace OmsiMapEditor.UI
                 activeTool = EditorTool.Drag;
                 EndMarkingTool();
             }
-            // So does the priority tool.
+            // So do the priority and lanes tools.
             if (activeTool == EditorTool.Priorities)
             {
                 activeTool = EditorTool.Drag;
                 EndPriorityTool();
+            }
+            if (activeTool == EditorTool.Lanes)
+            {
+                activeTool = EditorTool.Drag;
+                EndLaneTool();
             }
             ClearSelectedSpline();
             var previousTile = selectedTile;
@@ -2280,7 +2301,7 @@ namespace OmsiMapEditor.UI
             {
                 // The markings, areas and arrows go along; their anchors are named by arm, so they follow the turned arm.
                 var made = OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + rebuild.Made.Name, rebuild.Made.Markings, rebuild.Made.Areas,
-                    rebuild.Made.Arrows);
+                    rebuild.Made.Arrows, rebuild.Made.Connections);
                 assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, rebuild.Made.Name, made);
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
@@ -4251,6 +4272,9 @@ namespace OmsiMapEditor.UI
             // Undo may have put other rules back; the priority tool reads the arms anew.
             if (activeTool == EditorTool.Priorities)
                 RefreshPriorityTarget();
+            // Undo may have put another file of the junction back; the lanes tool reads it anew.
+            if (activeTool == EditorTool.Lanes)
+                UpdateLanePreview();
         }
 
         /// <summary>Starts the terrain tool: its options in the tool panel, and the map's road mode for pointing and holding.</summary>
@@ -5301,6 +5325,16 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Priorities)
                 {
                     SetTool(EditorTool.Drag);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.L && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Lanes ? EditorTool.Drag : EditorTool.Lanes);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Lanes)
+                {
+                    EscapeLane();
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Markings && (markingSelected >= 0 || markingArea >= 0 || markingArrow >= 0))
@@ -6388,7 +6422,7 @@ namespace OmsiMapEditor.UI
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"
                     : tool == EditorTool.Terrain ? "shape the ground" : tool == EditorTool.Markings ? "draw road markings"
-                    : tool == EditorTool.Priorities ? "set the right of way" : "move or rotate objects"));
+                    : tool == EditorTool.Priorities ? "set the right of way" : tool == EditorTool.Lanes ? "choose the lanes of junctions" : "move or rotate objects"));
                 return;
             }
             // Another tool ends placing and closes the object library.
@@ -6398,6 +6432,7 @@ namespace OmsiMapEditor.UI
             var wasTerrain = activeTool == EditorTool.Terrain;
             var wasMarkings = activeTool == EditorTool.Markings;
             var wasPriorities = activeTool == EditorTool.Priorities;
+            var wasLanes = activeTool == EditorTool.Lanes;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
@@ -6412,6 +6447,8 @@ namespace OmsiMapEditor.UI
                 EndMarkingTool();
             if (wasPriorities && tool != EditorTool.Priorities)
                 EndPriorityTool();
+            if (wasLanes && tool != EditorTool.Lanes)
+                EndLaneTool();
             if (tool == EditorTool.Road)
                 BeginRoadTool();
             if (tool == EditorTool.Rows)
@@ -6422,8 +6459,15 @@ namespace OmsiMapEditor.UI
                 BeginMarkingTool();
             if (tool == EditorTool.Priorities && !wasPriorities)
                 BeginPriorityTool();
+            if (tool == EditorTool.Lanes && !wasLanes)
+                BeginLaneTool();
+            // Choosing the tool that is on again keeps its panel in view, which closing the object library hid above.
+            if (objectsPanelHost != null && (tool == EditorTool.Markings && wasMarkings || tool == EditorTool.Priorities && wasPriorities ||
+                                             tool == EditorTool.Lanes && wasLanes))
+                objectsPanelHost.style.display = DisplayStyle.Flex;
             UpdateToolbar();
-            if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities)
+            if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities ||
+                tool == EditorTool.Lanes)
                 return;
             SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
                 : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."

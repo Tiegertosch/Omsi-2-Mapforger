@@ -426,6 +426,7 @@ namespace OmsiMapEditor.World
             SplineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
             splineMaterials.Clear();
             terrains.Clear();
+            TerrainVersion++;
             tileSplineObjects.Clear();
             queuedSplineTiles.Clear();
             queuedTerrainTiles.Clear();
@@ -487,6 +488,7 @@ namespace OmsiMapEditor.World
                     continue;
                 }
                 terrains[key] = terrain;
+                TerrainVersion++;
                 var mesh = CreateTerrainMesh(terrain, (float)tileSize);
                 owned.Add(mesh);
                 if (tileMaterials.TryGetValue(key, out var renderers))
@@ -579,6 +581,9 @@ namespace OmsiMapEditor.World
                     material.SetFloat("_DepthWrite", value ? 1f : 0f);
             }
         }
+
+        /// <summary>Counts the changes to the terrain <see cref="HeightAt"/> reads, so a view keeping heights knows when to take them anew.</summary>
+        public int TerrainVersion { get; private set; }
 
         /// <summary>Terrain height at map-relative metres; 0 where no terrain was read.</summary>
         public float HeightAt(Vector2 mapPosition)
@@ -1119,6 +1124,7 @@ namespace OmsiMapEditor.World
             if (tile.Terrain != null)
             {
                 terrains[TileKey(tile.X, tile.Y)] = tile.Terrain;
+                TerrainVersion++;
                 mesh = CreateTerrainMesh(tile.Terrain, (float)tileSize);
                 owned.Add(mesh);
             }

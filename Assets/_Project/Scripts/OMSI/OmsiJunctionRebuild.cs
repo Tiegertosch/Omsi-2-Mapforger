@@ -40,6 +40,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Its direction arrows, by the anchors either side of their lanes.</summary>
         public List<OmsiMarkingArrow> Arrows { get; } = new List<OmsiMarkingArrow>();
 
+        /// <summary>The ways through it has lanes for (ADR 048), or null for every way through.</summary>
+        public HashSet<string> Connections { get; private set; }
+
         /// <summary>True for an object file the editor makes, under Sceneryobjects\Mapforge.</summary>
         public static bool IsMadeHere(string assetPath)
         {
@@ -84,6 +87,7 @@ namespace OmsiMapEditor.OMSI
             junction.Markings.AddRange(OmsiJunctionMarkings.Read(text));
             junction.Areas.AddRange(OmsiJunctionMarkings.ReadAreas(text));
             junction.Arrows.AddRange(OmsiJunctionMarkings.ReadArrows(text));
+            junction.Connections = OmsiLaneConnections.Read(text);
             var sides = ReadSides(text, helpers.Count);
             if (sides != null)
             {
