@@ -77,6 +77,38 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        // The paths the traffic rules editor changes, drawn over the others.
+        private readonly List<Vector2[]> highlightedPaths = new List<Vector2[]>();
+
+        /// <summary>Paths to draw over the others in the accent colour, such as those whose rules are being set; null for none.</summary>
+        public void SetHighlightedPaths(IEnumerable<OmsiMapPath> paths)
+        {
+            highlightedPaths.Clear();
+            if (paths != null && summary != null)
+                foreach (var path in paths)
+                {
+                    if (path.Points == null || path.Points.Length < 2)
+                        continue;
+                    var points = new Vector2[path.Points.Length];
+                    for (var index = 0; index < points.Length; index++)
+                        points[index] = WorldToMap(path.Points[index]);
+                    highlightedPaths.Add(points);
+                }
+            MarkDirtyRepaint();
+        }
+
+        private void DrawHighlightedPaths(Painter2D painter)
+        {
+            if (!showPaths || highlightedPaths.Count == 0 || metersPerPixel > PathMetersPerPixel)
+                return;
+            painter.strokeColor = splineColor;
+            painter.lineWidth = Mathf.Clamp(1.2f / metersPerPixel, 3f, 7f);
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
+            foreach (var points in highlightedPaths)
+                StrokePolyline(painter, points);
+        }
+
         /// <summary>Takes the AI paths of the loaded map; null removes them.</summary>
         public void SetPaths(IList<OmsiMapPath> paths)
         {

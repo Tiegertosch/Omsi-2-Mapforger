@@ -440,6 +440,34 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void RulesOfSplinePathsAreSetForSeveralSplinesAsOneUndoStep()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var edits = tile.Splines.Where(spline => spline.Id == 10 || spline.Id == 11).Select(spline =>
+            {
+                var edit = new OmsiSplinePathRules { Tile = tile, Spline = spline, Names = new[] { "no_cars", "bus" } };
+                edit.Rules.Add(new OmsiPathRule(1, "no_cars", 0));
+                edit.Rules.Add(new OmsiPathRule(1, "bus", 0));
+                return edit;
+            }).ToList();
+
+            var change = session.SetSplinePathRules(summary, edits);
+
+            Assert.AreEqual(OmsiSplineChangeKind.Rules, change.Kind);
+            CollectionAssert.AreEquivalent(new[] { 10, 11 }, change.SplineIds);
+            foreach (var spline in summary.Tiles[0].Splines.Where(spline => spline.Id == 10 || spline.Id == 11))
+                CollectionAssert.AreEqual(new[] { "1 no_cars", "1 bus" }, spline.Rules.Select(rule => rule.PathIndex + " " + rule.Name));
+            // Written again, the rules are replaced, not doubled.
+            Assert.IsNull(session.SetSplinePathRules(summary, edits));
+            session.Undo(summary, change);
+            Assert.IsTrue(summary.Tiles[0].Splines.Where(spline => spline.Id == 10 || spline.Id == 11).All(spline => spline.Rules.Count == 0));
+            session.Redo(summary, change);
+            Assert.AreEqual(2, summary.Tiles[0].Splines.Single(spline => spline.Id == 11).Rules.Count);
+        }
+
+        [Test]
         public void RoadsCannotJoinTakenEndsOrStartOutsideTheTiles()
         {
             var session = OpenProject();

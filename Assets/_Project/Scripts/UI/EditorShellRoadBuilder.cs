@@ -108,12 +108,18 @@ namespace OmsiMapEditor.UI
                 return;
             var failed = new List<string>();
             var changes = RelayRows(touched, null, null, failed, out var objects);
-            if (changes.Count > 0)
+            var busRules = KeepBusLanes(touched, null, null);
+            if (changes.Count > 0 || busRules != null)
             {
                 var parts = new List<ObjectEditStep> { step };
                 foreach (var change in changes)
                     parts.Add(new ObjectEditStep { AttachmentChange = change });
-                undoSteps[undoSteps.Count - 1] = new ObjectEditStep { Group = parts, Description = DescribeStep(step) + " with its rows of objects" };
+                if (busRules != null)
+                    parts.Add(new ObjectEditStep { SplineChange = busRules });
+                undoSteps[undoSteps.Count - 1] = new ObjectEditStep
+                {
+                    Group = parts, Description = DescribeStep(step) + (changes.Count > 0 ? " with its rows of objects" : " with its bus lanes")
+                };
                 rowLayout = null;
                 rowObjects = null;
                 RefreshAfterChange(null);
@@ -264,6 +270,65 @@ namespace OmsiMapEditor.UI
                     stretches.Add(stretch);
                 }
             return stretches;
+        }
+
+        /// <summary>
+        /// Keeps the bus lanes of the road types of the given splines for buses (stage 4 of the AI paths): on each spline of
+        /// a road type with bus lanes, or that had them as <paramref name="previous"/>, the rules no_cars and bus of all
+        /// paths go and the paths of its bus lanes get them, as AI cars then keep off them and AI buses may use them. Null
+        /// when nothing changes.
+        /// </summary>
+        private OmsiSplineChange KeepBusLanes(HashSet<int> splineIds, string previousPath, OmsiRoadType previous)
+        {
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            var types = new Dictionary<string, OmsiRoadType>(StringComparer.OrdinalIgnoreCase);
+            var edits = new List<OmsiSplinePathRules>();
+            foreach (var tile in currentSummary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (!splineIds.Contains(spline.Id) || !OmsiRoadTypeStore.IsMade(spline.AssetPath))
+                        continue;
+                    var path = spline.AssetPath.Trim();
+                    if (!types.TryGetValue(path, out var type))
+                    {
+                        try
+                        {
+                            var file = OmsiRelativePath.Resolve(root, path);
+                            type = File.Exists(file) ? OmsiRoadTypeStore.Read(File.ReadAllBytes(file)) : null;
+                        }
+                        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                        {
+                            type = null;
+                        }
+                        types[path] = type;
+                    }
+                    var buses = type?.BusPaths() ?? new List<int>();
+                    var had = previous != null && SameAsset(path, previousPath) && previous.BusPaths().Count > 0;
+                    if (buses.Count == 0 && !had)
+                        continue;
+                    var edit = new OmsiSplinePathRules { Tile = tile, Spline = spline, Names = new[] { "no_cars", "bus" } };
+                    foreach (var bus in buses)
+                    {
+                        edit.Rules.Add(new OmsiPathRule(bus, "no_cars", 0));
+                        edit.Rules.Add(new OmsiPathRule(bus, "bus", 0));
+                    }
+                    edits.Add(edit);
+                }
+            if (edits.Count == 0)
+                return null;
+            try
+            {
+                var change = session.SetSplinePathRules(currentSummary, edits);
+                if (change != null)
+                    RefreshSplineViews(change);
+                return change;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus((statusLabel?.text ?? string.Empty) + " The bus lanes could not be kept for buses: " + exception.Message);
+                return null;
+            }
         }
 
         /// <summary>A stretch of one road type along a chain, which its rows are laid along.</summary>
@@ -488,6 +553,15 @@ namespace OmsiMapEditor.UI
             var rowChanges = LayRows(rowRoads, keptRows, rowsFailed, out var rowObjectCount);
             foreach (var rowChange in rowChanges)
                 parts.Add(new ObjectEditStep { AttachmentChange = rowChange });
+            // Its bus lanes stay kept for buses where their paths are now.
+            var ofType = new HashSet<int>();
+            foreach (var tile in currentSummary.Tiles)
+                foreach (var spline in tile.Splines)
+                    if (SameAsset(spline.AssetPath, path))
+                        ofType.Add(spline.Id);
+            var busRules = KeepBusLanes(ofType, path, previous);
+            if (busRules != null)
+                parts.Add(new ObjectEditStep { SplineChange = busRules });
             rowLayout = null;
             rowObjects = null;
             PushHistory(new ObjectEditStep { Group = parts, Description = "the change of road type " + name });

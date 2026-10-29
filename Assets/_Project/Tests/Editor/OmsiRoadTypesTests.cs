@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -545,6 +546,31 @@ namespace OmsiMapEditor.Tests
             var shifted = Profile("walk 3 | drive 3.25 back | tram 4 back cars | tram 4 cars | drive 3.25 | walk 3", out _);
             arms[2].Profile = shifted;
             Assert.IsFalse(OmsiJunctionLayout.Build(arms, null).Paths.Exists(path => path.Kind == OmsiSplineCategories.RailLane));
+        }
+
+        [Test]
+        public void BusPathsAreTheIndexesOfTheBusLanesInTheWrittenProfile()
+        {
+            foreach (var lanes in new[]
+                     {
+                         "walk 3 | bus 3.25 back | drive 3.25 back | drive 3.25 | bus 3.25 | walk 3",
+                         "walk 3 | bus 3.25 back | tram 3 back cars | tram 3 | bus 3.25 | parking 2 | walk 3",
+                         TwoLanes
+                     })
+            {
+                var type = OmsiRoadType.Parse(lanes);
+                var profile = Profile(lanes, out _);
+                var x = -type.Width / 2.0;
+                var expected = new List<int>();
+                foreach (var lane in type.Lanes)
+                {
+                    if (lane.Kind == OmsiRoadLaneKind.Bus)
+                        expected.Add(profile.Lanes.FindIndex(path => path.Kind == 0 && Math.Abs(path.X - (x + lane.Width / 2.0)) < 1e-6));
+                    x += lane.Width;
+                }
+                CollectionAssert.AreEqual(expected, type.BusPaths(), lanes);
+            }
+            Assert.IsEmpty(OmsiRoadType.Parse(TwoLanes).BusPaths());
         }
 
         [Test]

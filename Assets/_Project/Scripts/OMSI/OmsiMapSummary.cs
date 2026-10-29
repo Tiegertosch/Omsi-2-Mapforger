@@ -95,6 +95,19 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public sealed class OmsiPathRule
     {
+        internal OmsiPathRule()
+        {
+        }
+
+        /// <summary>A rule to write, such as <c>new OmsiPathRule(2, "speedlimit", 30)</c>.</summary>
+        public OmsiPathRule(int pathIndex, string name, double value, double extra = 0.0)
+        {
+            PathIndex = pathIndex;
+            Name = name;
+            Value = value;
+            Extra = extra;
+        }
+
         /// <summary>The path of the element, from 0.</summary>
         public int PathIndex { get; internal set; }
 

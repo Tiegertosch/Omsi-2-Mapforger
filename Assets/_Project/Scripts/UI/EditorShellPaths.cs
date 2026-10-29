@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
@@ -237,6 +238,8 @@ namespace OmsiMapEditor.UI
         private void AddPathDetails(VisualElement container, OmsiTileSummary tile, int elementId, bool onSpline)
         {
             var paths = mapPaths.FindAll(path => path.TileX == tile.X && path.TileY == tile.Y && path.ElementId == elementId && path.OnSpline == onSpline);
+            if (CanEdit && paths.Exists(path => path.Kind == 0))
+                AddPathRuleEditor(container, tile, elementId, onSpline, paths);
             var heading = new Label("AI PATHS  " + paths.Count);
             heading.AddToClassList("inspector-section-heading");
             container.Add(heading);
@@ -255,6 +258,313 @@ namespace OmsiMapEditor.UI
                     text += "\n" + (rule.Kills ? "takes away " : string.Empty) + DescribeRule(rule);
                 AddInspectorRecord(container, text, "inspector-record");
             }
+        }
+
+        // The road lanes the rule editor changes, for the element it was last shown for.
+        private string ruleEditorElement;
+        private readonly HashSet<int> ruleEditorPaths = new HashSet<int>();
+
+        /// <summary>Traffic densities the editor offers, by name; null for the map's normal traffic, without a rule.</summary>
+        private static readonly KeyValuePair<string, double?>[] TrafficLevels =
+        {
+            new KeyValuePair<string, double?>("Default", null), new KeyValuePair<string, double?>("None", 0.0), new KeyValuePair<string, double?>("Low", 0.1),
+            new KeyValuePair<string, double?>("Half", 0.5), new KeyValuePair<string, double?>("High", 3.0)
+        };
+
+        /// <summary>
+        /// The rules of the element's road lanes (stage 4 of the AI paths): which lanes, a speed limit, how much random
+        /// traffic, and whether AI cars, buses and trucks may use them, as openOMSI reads [rule] no_cars, bus and trucks.
+        /// Shown with the values of the first lane chosen; Apply writes them to every lane chosen, as one undo step.
+        /// </summary>
+        private void AddPathRuleEditor(VisualElement container, OmsiTileSummary tile, int elementId, bool onSpline, List<OmsiMapPath> paths)
+        {
+            var lanes = new SortedSet<int>(paths.Where(path => path.Kind == 0).Select(path => path.PathIndex));
+            var key = tile.X + "|" + tile.Y + "|" + elementId + "|" + onSpline;
+            if (ruleEditorElement != key || !ruleEditorPaths.IsSubsetOf(lanes) || ruleEditorPaths.Count == 0)
+            {
+                ruleEditorElement = key;
+                ruleEditorPaths.Clear();
+                ruleEditorPaths.UnionWith(lanes);
+            }
+            // On splines the rules go to the selected one and those chosen with Ctrl+click of the same road type.
+            var skipped = 0;
+            var targets = onSpline ? RuleSplines(out skipped) : null;
+            var heading = new Label("TRAFFIC RULES" + (targets != null && targets.Count > 1 ? "  " + targets.Count + " SPLINES" : string.Empty));
+            heading.AddToClassList("inspector-section-heading");
+            container.Add(heading);
+            if (onSpline)
+            {
+                var whole = new Button(() =>
+                {
+                    var chain = new OmsiSplineAttachmentLayout(currentSummary).Chain(selectedSplineTile, selectedSpline);
+                    SetMoreSplines(chain.Where(segment => SameAsset(segment.Spline.AssetPath, selectedSpline.AssetPath))
+                        .Select(segment => new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(segment.Tile, segment.Spline)));
+                    RenderInspector();
+                    SetStatus("Traffic rules: chose the " + (moreSplines.Count + 1) + " pieces of this road from junction or end to junction or end; Ctrl+click adds or takes away more.");
+                })
+                {
+                    text = "Whole road", tooltip = "Chooses every piece of this road from junction or free end to junction or free end; Ctrl+click on the map adds or takes away pieces"
+                };
+                whole.AddToClassList("map-control-button");
+                whole.AddToClassList("inspector-rule-whole");
+                container.Add(whole);
+                if (skipped > 0)
+                {
+                    var note = new Label(skipped + (skipped == 1 ? " spline chosen has" : " splines chosen have") + " another road type; its lanes are numbered otherwise, so it is left out.");
+                    note.AddToClassList("panel-info");
+                    container.Add(note);
+                }
+            }
+
+            // Which road lanes: all, or single ones by their number in the list below.
+            var chips = new VisualElement();
+            chips.AddToClassList("panel-tabs");
+            chips.AddToClassList("inspector-rule-lanes");
+            var all = new Button(() =>
+            {
+                ruleEditorPaths.Clear();
+                ruleEditorPaths.UnionWith(lanes);
+                RenderInspector();
+            }) { text = "All", tooltip = "Every road lane of it" };
+            all.AddToClassList("panel-tab");
+            all.EnableInClassList("panel-tab-active", ruleEditorPaths.SetEquals(lanes));
+            chips.Add(all);
+            foreach (var lane in lanes)
+            {
+                var each = lane;
+                var chip = new Button(() =>
+                {
+                    if (ruleEditorPaths.SetEquals(lanes))
+                        ruleEditorPaths.Clear();
+                    if (!ruleEditorPaths.Remove(each))
+                        ruleEditorPaths.Add(each);
+                    if (ruleEditorPaths.Count == 0)
+                        ruleEditorPaths.UnionWith(lanes);
+                    RenderInspector();
+                }) { text = lane.ToString(CultureInfo.InvariantCulture), tooltip = "Path " + lane + "; click more to change several" };
+                chip.AddToClassList("panel-tab");
+                chip.EnableInClassList("panel-tab-active", !ruleEditorPaths.SetEquals(lanes) && ruleEditorPaths.Contains(lane));
+                chips.Add(chip);
+            }
+            container.Add(chips);
+
+            // The values of the first lane chosen.
+            var first = paths.First(path => path.Kind == 0 && path.PathIndex == ruleEditorPaths.Min());
+            double? Rule(string name) => first.Rules.LastOrDefault(rule => !rule.Kills && string.Equals(rule.Name, name, StringComparison.OrdinalIgnoreCase) &&
+                                                                            (name != "trafficdensity" || Math.Abs(rule.Extra) < 0.5))?.Value;
+            var limit = Rule("speedlimit");
+            var density = Rule("trafficdensity");
+            var level = Array.FindIndex(TrafficLevels, pair => pair.Value.HasValue == density.HasValue && (!density.HasValue || Math.Abs(pair.Value.Value - density.Value) < 1e-6));
+
+            var limitRow = RuleRow(container, "Speed limit (km/h)");
+            var limitField = new TextField
+            {
+                value = limit.HasValue ? limit.Value.ToString("0.#", CultureInfo.InvariantCulture) : string.Empty,
+                tooltip = "Empty for none; AI traffic then keeps to the speed of the road"
+            };
+            limitField.AddToClassList("picker-field");
+            limitRow.Add(limitField);
+
+            var trafficRow = RuleRow(container, "Traffic");
+            var levels = new VisualElement();
+            levels.AddToClassList("panel-tabs");
+            levels.AddToClassList("picker-segmented");
+            var chosenLevel = level;
+            var levelButtons = new List<Button>();
+            for (var index = 0; index < TrafficLevels.Length; index++)
+            {
+                var each = index;
+                var button = new Button { text = TrafficLevels[index].Key };
+                button.tooltip = TrafficLevels[index].Value.HasValue
+                    ? "Random traffic " + TrafficLevels[index].Value.Value.ToString("0.###", CultureInfo.InvariantCulture) + " times the normal ([rule] trafficdensity)"
+                    : "The map's normal random traffic, without a rule";
+                button.AddToClassList("panel-tab");
+                button.clicked += () =>
+                {
+                    chosenLevel = each;
+                    for (var other = 0; other < levelButtons.Count; other++)
+                        levelButtons[other].EnableInClassList("panel-tab-active", other == chosenLevel);
+                };
+                button.EnableInClassList("panel-tab-active", index == level);
+                levelButtons.Add(button);
+                levels.Add(button);
+            }
+            trafficRow.Add(levels);
+
+            var cars = RuleToggle(container, "AI cars", "AI cars may drive here; off writes [rule] no_cars, as on a bus lane", !Rule("no_cars").HasValue);
+            var buses = RuleToggle(container, "AI buses", "Buses of the random traffic may drive here ([rule] bus); timetable buses always may", Rule("bus").HasValue);
+            var trucks = RuleToggle(container, "AI trucks", "Trucks of the random traffic may drive here ([rule] trucks)", Rule("trucks").HasValue);
+
+            var apply = new Button(() =>
+            {
+                double? newLimit = null;
+                var text = limitField.value.Trim().Replace(',', '.');
+                if (text.Length > 0)
+                {
+                    if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) || parsed <= 0.0)
+                    {
+                        SetStatus("Traffic rules: the speed limit must be a number of km/h above 0, or empty for none.");
+                        return;
+                    }
+                    newLimit = parsed;
+                }
+                ApplyPathRules(tile, elementId, onSpline, new List<int>(ruleEditorPaths), newLimit,
+                    chosenLevel >= 0 ? TrafficLevels[chosenLevel].Value : density, cars.value, buses.value, trucks.value);
+            })
+            {
+                text = (ruleEditorPaths.Count == 1 ? "Apply to path " + ruleEditorPaths.Min() : "Apply to " + ruleEditorPaths.Count + " lanes") +
+                       (targets != null && targets.Count > 1 ? " of " + targets.Count + " splines" : string.Empty),
+                tooltip = "Writes the rules of the lanes chosen, marked orange on the map; Ctrl+Z undoes it"
+            };
+            apply.AddToClassList("map-control-button");
+            apply.AddToClassList("dialog-primary");
+            apply.AddToClassList("inspector-rule-apply");
+            container.Add(apply);
+
+            // The lanes chosen, on every spline they apply to, marked on the map.
+            var marked = mapPaths.FindAll(path => path.Kind == 0 && ruleEditorPaths.Contains(path.PathIndex) && path.OnSpline == onSpline &&
+                                                  (onSpline
+                                                      ? targets.Exists(target => target.Key.X == path.TileX && target.Key.Y == path.TileY && target.Value.Id == path.ElementId)
+                                                      : path.TileX == tile.X && path.TileY == tile.Y && path.ElementId == elementId));
+            mapCanvas?.SetHighlightedPaths(marked);
+        }
+
+        /// <summary>
+        /// The splines the traffic rules go to: the selected one and those chosen with Ctrl+click of its road type, whose
+        /// lanes are numbered alike; <paramref name="skipped"/> counts the others.
+        /// </summary>
+        private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> RuleSplines(out int skipped)
+        {
+            skipped = 0;
+            var splines = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            if (selectedSpline == null || selectedSplineTile == null)
+                return splines;
+            splines.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(selectedSplineTile, selectedSpline));
+            foreach (var pair in moreSplines)
+                if (SameAsset(pair.Value.AssetPath, selectedSpline.AssetPath))
+                    splines.Add(pair);
+                else
+                    skipped++;
+            return splines;
+        }
+
+        private static VisualElement RuleRow(VisualElement container, string label)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("picker-option");
+            var text = new Label(label);
+            text.AddToClassList("picker-option-label");
+            row.Add(text);
+            container.Add(row);
+            return row;
+        }
+
+        private static Toggle RuleToggle(VisualElement container, string label, string tooltip, bool value)
+        {
+            var row = RuleRow(container, label);
+            row.tooltip = tooltip;
+            var toggle = new Toggle { value = value, tooltip = tooltip };
+            toggle.AddToClassList("picker-option-toggle");
+            row.Add(toggle);
+            return toggle;
+        }
+
+        /// <summary>For command-line checks: writes traffic rules of the selected object's or spline's road lanes from six arguments.</summary>
+        private void RunPathRulesArgument(string[] args, int at)
+        {
+            if (selectedTile == null || mapPaths == null || selectedObject == null && selectedSpline == null)
+            {
+                SetStatus("Traffic rules: select an object or a spline with -select first.");
+                return;
+            }
+            var onSpline = selectedObject == null;
+            var id = selectedObject?.Id ?? selectedSpline.Id;
+            var lanes = mapPaths.Where(path => path.TileX == selectedTile.X && path.TileY == selectedTile.Y && path.ElementId == id && path.OnSpline == onSpline &&
+                                               path.Kind == 0).Select(path => path.PathIndex).Distinct().ToList();
+            if (args[at] != "all")
+                lanes = args[at].Split(',').Select(text => int.Parse(text, CultureInfo.InvariantCulture)).Where(lanes.Contains).ToList();
+            double? Number(string text) => text == "-" ? (double?)null : double.Parse(text, CultureInfo.InvariantCulture);
+            // The editor shows the lanes chosen, as clicking them would.
+            ruleEditorElement = selectedTile.X + "|" + selectedTile.Y + "|" + id + "|" + onSpline;
+            ruleEditorPaths.Clear();
+            ruleEditorPaths.UnionWith(lanes);
+            ApplyPathRules(selectedTile, id, onSpline, lanes, Number(args[at + 1]), Number(args[at + 2]), args[at + 3] == "1", args[at + 4] == "1", args[at + 5] == "1");
+        }
+
+        /// <summary>Writes the traffic rules of road lanes of an object or spline as one undo step.</summary>
+        private void ApplyPathRules(OmsiTileSummary tile, int elementId, bool onSpline, List<int> lanes, double? limit, double? density, bool cars, bool buses, bool trucks)
+        {
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("change traffic rules"));
+                return;
+            }
+            var rules = new List<OmsiPathRule>();
+            foreach (var lane in lanes)
+            {
+                if (limit.HasValue)
+                    rules.Add(new OmsiPathRule(lane, "speedlimit", limit.Value));
+                if (density.HasValue)
+                    rules.Add(new OmsiPathRule(lane, "trafficdensity", density.Value));
+                if (!cars)
+                    rules.Add(new OmsiPathRule(lane, "no_cars", 0));
+                if (buses)
+                    rules.Add(new OmsiPathRule(lane, "bus", 0));
+                if (trucks)
+                    rules.Add(new OmsiPathRule(lane, "trucks", 0));
+            }
+            var names = OmsiMapSession.TrafficRuleNames.ToList();
+            var what = (lanes.Count == 1 ? "path " + lanes[0] : lanes.Count + " lanes") + " of " + (onSpline ? "spline #" : "object #") + elementId;
+            try
+            {
+                if (onSpline)
+                {
+                    var targets = RuleSplines(out _);
+                    if (targets.Count == 0)
+                        return;
+                    var edits = new List<OmsiSplinePathRules>();
+                    foreach (var target in targets)
+                    {
+                        var edit = new OmsiSplinePathRules { Tile = target.Key, Spline = target.Value, Paths = lanes, Names = names };
+                        edit.Rules.AddRange(rules);
+                        edits.Add(edit);
+                    }
+                    if (targets.Count > 1)
+                        what = (lanes.Count == 1 ? "path " + lanes[0] : lanes.Count + " lanes") + " of " + targets.Count + " splines";
+                    var change = session.SetSplinePathRules(currentSummary, edits);
+                    if (change == null)
+                    {
+                        SetStatus("Traffic rules: " + what + " already have these rules.");
+                        return;
+                    }
+                    // The splines are read again; the selection finds them by their IDs.
+                    RefreshSplineViews(change);
+                    PushHistory(new ObjectEditStep { SplineChange = change, Description = "the traffic rules of " + what });
+                }
+                else
+                {
+                    var record = tile.Objects.Find(candidate => candidate.Id == elementId);
+                    if (record == null)
+                        return;
+                    var change = session.SetObjectPathRules(tile, record, lanes, names, rules);
+                    if (change == null)
+                    {
+                        SetStatus("Traffic rules: " + what + " already have these rules.");
+                        return;
+                    }
+                    PushHistory(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = record.Id, Change = change, Description = "the traffic rules of " + what });
+                }
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is System.IO.IOException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatus("Traffic rules could not be written: " + exception.Message);
+                return;
+            }
+            RefreshAfterChange(null);
+            SetStatus("Traffic rules of " + what + ": " + (limit.HasValue ? limit.Value.ToString("0.#", CultureInfo.InvariantCulture) + " km/h" : "no speed limit") +
+                      ", " + (density.HasValue ? "traffic " + density.Value.ToString("0.###", CultureInfo.InvariantCulture) : "normal traffic") +
+                      (cars ? string.Empty : ", no AI cars") + (buses ? ", AI buses" : string.Empty) + (trucks ? ", AI trucks" : string.Empty) + ". Ctrl+Z undoes it.");
         }
 
         /// <summary>One path of a kind, as the status and the inspector name it.</summary>

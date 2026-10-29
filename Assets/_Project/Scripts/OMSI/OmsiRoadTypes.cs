@@ -547,6 +547,27 @@ namespace OmsiMapEditor.OMSI
                 }
         }
 
+        /// <summary>
+        /// The indexes of the [path]s of bus lanes in the road type's .sli, in the order <see cref="OmsiRoadTypeWriter"/>
+        /// writes them: a track's path and then its path for cars, a path per driving and bus lane and per sidewalk. A road
+        /// built of it keeps these paths for buses with [rule] no_cars and bus (ADR 049, stage 4 of the AI paths).
+        /// </summary>
+        public List<int> BusPaths()
+        {
+            var paths = new List<int>();
+            var index = 0;
+            foreach (var lane in Lanes)
+            {
+                if (lane.Kind == OmsiRoadLaneKind.Bus)
+                    paths.Add(index);
+                if (lane.Kind == OmsiRoadLaneKind.Tram)
+                    index += lane.Shared ? 2 : 1;
+                else if (lane.Kind == OmsiRoadLaneKind.Driving || lane.Kind == OmsiRoadLaneKind.Bus || lane.Kind == OmsiRoadLaneKind.Sidewalk)
+                    index++;
+            }
+            return paths;
+        }
+
         /// <summary>A lane's row keeps this far from the side it stands by, so trunks and posts clear the kerb.</summary>
         public const double RowInset = 0.75;
 

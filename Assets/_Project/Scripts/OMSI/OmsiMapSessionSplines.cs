@@ -91,7 +91,10 @@ namespace OmsiMapEditor.OMSI
         Split,
 
         /// <summary>Stored chain offsets were set to where the splines' chains put them.</summary>
-        ChainOffsets
+        ChainOffsets,
+
+        /// <summary>The [rule] records of splines' paths changed, such as speed limits or a lane kept for buses.</summary>
+        Rules
     }
 
     /// <summary>A spline whose stored chain offset is not where its chain puts it.</summary>

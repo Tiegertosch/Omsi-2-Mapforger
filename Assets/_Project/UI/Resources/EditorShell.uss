@@ -456,6 +456,9 @@
 .road-builder-rail-right { right: 10%; }
 .road-builder-lane-row-icon { position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; color: var(--mf-color-text-primary); }
 .road-builder-every { width: 56px; flex-grow: 0; margin-right: var(--mf-space-2); }
+.inspector-rule-lanes { flex-wrap: wrap; margin-bottom: var(--mf-space-2); }
+.inspector-rule-whole { align-self: flex-start; margin: 0 0 var(--mf-space-2); }
+.inspector-rule-apply { align-self: flex-end; margin: var(--mf-space-2) 0 var(--mf-space-3); }
 .road-builder-lane-textured { -unity-background-scale-mode: scale-and-crop; }
 .road-builder-lane-textured > Label, .road-builder-lane-textured > .icon { color: var(--mf-color-text-primary); background-color: rgba(23, 28, 35, 0.6); border-radius: var(--mf-radius-sm); padding: 0 3px; }
 .road-builder-choices { flex-wrap: wrap; margin-bottom: var(--mf-space-2); }

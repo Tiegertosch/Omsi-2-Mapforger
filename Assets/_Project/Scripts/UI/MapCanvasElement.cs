@@ -875,8 +875,24 @@ namespace OmsiMapEditor.UI
         public void SetSelectedSpline(OmsiSplineRecord spline)
         {
             selectedSpline = spline;
+            moreSelectedSplines.Clear();
             MarkDirtyRepaint();
         }
+
+        // Splines chosen with Ctrl besides the selected one, drawn like it without handles.
+        private readonly List<OmsiSplineRecord> moreSelectedSplines = new List<OmsiSplineRecord>();
+
+        /// <summary>The splines chosen with Ctrl+click besides the selected spline; null or empty for none.</summary>
+        public void SetMoreSelectedSplines(IEnumerable<OmsiSplineRecord> splines)
+        {
+            moreSelectedSplines.Clear();
+            if (splines != null)
+                moreSelectedSplines.AddRange(splines);
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>A spline was clicked with Ctrl: it should join the selected splines or leave them.</summary>
+        public event Action<OmsiTileSummary, OmsiSplineRecord> SplineToggled;
 
         /// <summary>Draws the splines again after splines were built, deleted, undone or redone.</summary>
         public void RefreshSplines()
@@ -1289,6 +1305,7 @@ namespace OmsiMapEditor.UI
             var splinesDone = watch.Elapsed.TotalMilliseconds;
             DrawObjects(context, painter, visible);
             DrawPaths(painter, visible);
+            DrawHighlightedPaths(painter);
             DrawPriorityHandles(painter);
             DrawLaneEnds(painter);
             DrawRoutes(context, painter, visible);
@@ -1524,6 +1541,17 @@ namespace OmsiMapEditor.UI
 
         private void DrawSelectedSpline(Painter2D painter)
         {
+            foreach (var more in moreSelectedSplines)
+            {
+                var line = splines.Find(candidate => ReferenceEquals(candidate.Record, more));
+                if (line == null)
+                    continue;
+                painter.strokeColor = selectedObjectColor;
+                painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                StrokePolyline(painter, line.Points);
+            }
             if (selectedSpline == null)
                 return;
             var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
@@ -2482,6 +2510,13 @@ namespace OmsiMapEditor.UI
             if (TryPickObject(position, out var tile, out var item))
             {
                 SelectPicked(tile, item, toggle, evt.pointerId, position);
+                evt.StopPropagation();
+                return;
+            }
+
+            if (toggle && TryPickSpline(position, out var toggledTile, out var toggledSpline))
+            {
+                SplineToggled?.Invoke(toggledTile, toggledSpline);
                 evt.StopPropagation();
                 return;
             }

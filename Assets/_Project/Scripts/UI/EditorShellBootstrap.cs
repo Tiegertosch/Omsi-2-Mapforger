@@ -493,6 +493,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.ObjectsEdited += CommitEdits;
                 mapCanvas.PlacementRequested += PlaceChosenObject;
                 mapCanvas.SplineClicked += SelectSpline;
+                mapCanvas.SplineToggled += ToggleSpline;
                 mapCanvas.RoadPointerMoved += (x, y) =>
                 {
                     roadPointer = new OmsiMapPoint(x, y);
@@ -1124,6 +1125,29 @@ namespace OmsiMapEditor.UI
                     for (var step = int.TryParse(openEnd, out var count) ? count : 1; step > 0; step--)
                         NextOpenEnd();
                 Debug.Log("Paths: " + statusLabel?.text);
+                // -pathRules all|n[,n] km/h|- density|- cars buses trucks (0 or 1): the traffic rules of the selected element's
+                // road lanes, as the inspector's Apply writes them; "Path rules:" in the log.
+                var rulesAt = Array.IndexOf(args, "-pathRules");
+                if (rulesAt >= 0 && rulesAt + 6 < args.Length)
+                {
+                    // A spline to change the rules of is chosen here, as -selectSpline is read only further on.
+                    if (int.TryParse(Argument("-selectSpline", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var rulesSpline))
+                        foreach (var tile in currentSummary.Tiles)
+                            if (tile.Splines.Find(spline => spline.Id == rulesSpline) is OmsiSplineRecord found)
+                                SelectSpline(tile, found);
+                    // -wholeRoad chooses every piece of the selected spline's road, as Whole road in the inspector does.
+                    if (Array.IndexOf(args, "-wholeRoad") >= 0 && selectedSpline != null)
+                    {
+                        var wholeRoad = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+                        foreach (var segment in new OmsiSplineAttachmentLayout(currentSummary).Chain(selectedSplineTile, selectedSpline))
+                            if (SameAsset(segment.Spline.AssetPath, selectedSpline.AssetPath))
+                                wholeRoad.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(segment.Tile, segment.Spline));
+                        SetMoreSplines(wholeRoad);
+                    }
+                    RunPathRulesArgument(args, rulesAt + 1);
+                    RenderInspector();
+                    Debug.Log("Path rules: " + statusLabel?.text);
+                }
             }
 
             // -roadBuilder ["lanes"] [-roadBuilderSelect n] [-roadBuilderSave <name>] opens the road builder (ADR 049); a saved
@@ -1252,7 +1276,8 @@ namespace OmsiMapEditor.UI
             if (int.TryParse(Argument("-selectSpline", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var splineId))
             {
                 var splineTile = currentSummary.Tiles.Find(tile => tile.Splines.Exists(spline => spline.Id == splineId));
-                if (splineTile != null)
+                // Chosen already for -pathRules, it keeps the splines chosen with it.
+                if (splineTile != null && selectedSpline?.Id != splineId)
                     SelectSpline(splineTile, splineTile.Splines.Find(spline => spline.Id == splineId));
                 if (selectedSpline != null &&
                     double.TryParse(Argument("-splineHeights", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var startHeight) &&
@@ -1482,6 +1507,26 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
+                // -inspectorTo <heading> scrolls the inspector to the section of that heading, such as "TRAFFIC RULES".
+                var inspectorTo = Argument("-inspectorTo", 1);
+                if (inspectorTo != null)
+                {
+                    var records = rootElement?.Q<ScrollView>(className: "inspector-records");
+                    var section = records?.Query<Label>(className: "inspector-section-heading").Where(label => label.text.StartsWith(inspectorTo, StringComparison.OrdinalIgnoreCase)).First();
+                    if (section != null)
+                        records.scrollOffset = new Vector2(0f, section.layout.y);
+                    else
+                        Debug.LogWarning("Inspector: no section \"" + inspectorTo + "\".");
+                    for (var frame = 0; frame < 3; frame++)
+                        yield return null;
+                    // -inspectorRedraw draws it again, as a click in it does; it should stay where it was scrolled to.
+                    if (Array.IndexOf(args, "-inspectorRedraw") >= 0)
+                    {
+                        RenderInspector();
+                        for (var frame = 0; frame < 5; frame++)
+                            yield return null;
+                    }
+                }
                 // At the end of the frame the screen holds the cameras and the UI on top.
                 yield return new WaitForEndOfFrame();
                 SaveScreenshot(screenshot);
@@ -2071,10 +2116,46 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
+        // Splines chosen with Ctrl+click besides the selected one, such as the other pieces of a road whose traffic rules are set.
+        private readonly List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> moreSplines = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+
+        /// <summary>A spline clicked with Ctrl joins the selected splines, or leaves them; without a selected spline it is selected.</summary>
+        private void ToggleSpline(OmsiTileSummary tile, OmsiSplineRecord spline)
+        {
+            if (tile == null || spline == null)
+                return;
+            if (selectedSpline == null)
+            {
+                SelectSpline(tile, spline);
+                return;
+            }
+            if (ReferenceEquals(spline, selectedSpline))
+                return;
+            var index = moreSplines.FindIndex(pair => ReferenceEquals(pair.Value, spline));
+            if (index >= 0)
+                moreSplines.RemoveAt(index);
+            else
+                moreSplines.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(tile, spline));
+            mapCanvas?.SetMoreSelectedSplines(moreSplines.ConvertAll(pair => pair.Value));
+            RenderInspector();
+            SetStatus((moreSplines.Count + 1) + " splines selected; Ctrl+click adds or takes away another. The traffic rules apply to all of them.");
+        }
+
+        /// <summary>Chooses splines besides the selected one, as Ctrl+click does, such as all pieces of its road.</summary>
+        private void SetMoreSplines(IEnumerable<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> splines)
+        {
+            moreSplines.Clear();
+            foreach (var pair in splines)
+                if (!ReferenceEquals(pair.Value, selectedSpline) && !moreSplines.Exists(other => ReferenceEquals(other.Value, pair.Value)))
+                    moreSplines.Add(pair);
+            mapCanvas?.SetMoreSelectedSplines(moreSplines.ConvertAll(pair => pair.Value));
+        }
+
         private void SelectSpline(OmsiTileSummary tile, OmsiSplineRecord spline)
         {
             if (tile == null || spline == null)
                 return;
+            moreSplines.Clear();
             selection.Clear();
             selectedSplineTile = tile;
             selectedSpline = spline;
@@ -2086,6 +2167,7 @@ namespace OmsiMapEditor.UI
 
         private void ClearSelectedSpline()
         {
+            moreSplines.Clear();
             if (selectedSpline == null)
                 return;
             selectedSpline = null;
@@ -2623,7 +2705,16 @@ namespace OmsiMapEditor.UI
                 {
                     selectedSplineTile = tile;
                     selectedSpline = tile.Splines.Find(spline => spline.Id == id);
+                    // The splines chosen besides it are found again the same way; those gone leave the choice.
+                    var more = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+                    foreach (var pair in moreSplines)
+                    {
+                        var moreTile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == pair.Value.Id));
+                        if (moreTile != null)
+                            more.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(moreTile, moreTile.Splines.Find(spline => spline.Id == pair.Value.Id)));
+                    }
                     mapCanvas?.SetSelectedSpline(selectedSpline);
+                    SetMoreSplines(more);
                 }
             }
             UpdateCounts();
@@ -7447,12 +7538,28 @@ namespace OmsiMapEditor.UI
             entry.EnableInClassList("browser-tile-entry-edited", edited);
         }
 
+        // What the inspector showed when it was last drawn, to keep its scroll position while that stays.
+        private string inspectorScrollKey;
+
+        private string InspectorScrollKey()
+        {
+            return (selectedTile != null ? selectedTile.X + "," + selectedTile.Y : "-") + "|" + (selectedObject?.Id.ToString() ?? "-") + "|" +
+                   (selectedSpline?.Id.ToString() ?? "-") + "|" + selection.Count;
+        }
+
         private void RenderInspector()
         {
             if (inspectorPanel == null)
                 return;
 
+            // Drawn again for the same tile and selection, such as after a click in the traffic rules editor, the inspector
+            // keeps where it was scrolled to.
+            var scrollKey = InspectorScrollKey();
+            var keptScroll = scrollKey == inspectorScrollKey ? inspectorPanel.Q<ScrollView>(className: "inspector-records")?.scrollOffset : null;
+            inspectorScrollKey = scrollKey;
             inspectorPanel.Clear();
+            // The traffic rules editor marks its lanes again when it shows.
+            mapCanvas?.SetHighlightedPaths(null);
             RefreshJunctionMarkers();
 
             if (selectedTile == null)
@@ -7539,6 +7646,18 @@ namespace OmsiMapEditor.UI
                 record.RegisterCallback<ClickEvent>(_ => SelectSpline(selectedTile, capturedSpline));
             }
             inspectorPanel.Add(records);
+            if (keptScroll.HasValue)
+            {
+                var offset = keptScroll.Value;
+                // The new list has its size only after the next layout.
+                records.contentContainer.RegisterCallback<GeometryChangedEvent>(KeepScroll);
+
+                void KeepScroll(GeometryChangedEvent evt)
+                {
+                    records.contentContainer.UnregisterCallback<GeometryChangedEvent>(KeepScroll);
+                    records.scrollOffset = offset;
+                }
+            }
         }
 
         private void AddInspectorValue(string label, string value)

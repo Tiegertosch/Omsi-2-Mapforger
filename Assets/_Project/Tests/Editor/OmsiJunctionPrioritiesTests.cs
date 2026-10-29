@@ -157,6 +157,56 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(192.0, junction.Rules[0].Value);
         }
 
+        [Test]
+        public void TrafficRulesOfPathsAreReplacedAfterTheOtherRulesAndTakenBackByUndo()
+        {
+            var session = OmsiMapSession.OpenProject(System.IO.Path.Combine(original, "global.cfg"), System.IO.Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var map = session.Read();
+            var tile = map.Tiles[0];
+            var junction = tile.Objects.Single(item => item.Id == 5);
+
+            // Paths 0 and 1: a speed limit, and path 1 kept for buses; the trucks rule of path 0 goes, the priorities stay.
+            var change = session.SetObjectPathRules(tile, junction, new[] { 0, 1 }, OmsiMapSession.TrafficRuleNames.ToList(),
+                new[] { new OmsiPathRule(0, "speedlimit", 30), new OmsiPathRule(1, "no_cars", 0), new OmsiPathRule(1, "bus", 0) });
+
+            Assert.AreEqual(OmsiObjectChangeKind.Rules, change.Kind);
+            CollectionAssert.AreEqual(new[] { "3 priority 64", "4 priority 128", "0 speedlimit 30", "1 no_cars 0", "1 bus 0" }, junction.Rules.Select(Describe));
+            var read = session.Read().Tiles[0].Objects.Single(item => item.Id == 5);
+            CollectionAssert.AreEqual(junction.Rules.Select(Describe), read.Rules.Select(Describe));
+            Assert.IsTrue(read.Rules.Single(rule => rule.PathIndex == 4).Kills);
+            var text = OmsiTextFile.Decode(File.ReadAllBytes(System.IO.Path.Combine(testRoot, "Projects", "Test.workspace", "tile_0_0.map")));
+            StringAssert.Contains("[rule]\r\n0\r\nspeedlimit\r\n30.000\r\n0", text);
+            StringAssert.Contains("[rule]\r\n1\r\nbus\r\n0\r\n0", text);
+            // The tree after the junction keeps its place.
+            Assert.AreEqual(1, session.Read().Tiles[0].Objects.Count(item => item.Id == 6));
+            // The same again changes nothing.
+            Assert.IsNull(session.SetObjectPathRules(tile, junction, new[] { 0, 1 }, OmsiMapSession.TrafficRuleNames.ToList(),
+                new[] { new OmsiPathRule(0, "speedlimit", 30), new OmsiPathRule(1, "no_cars", 0), new OmsiPathRule(1, "bus", 0) }));
+
+            session.Undo(map, change);
+            CollectionAssert.AreEqual(new[] { "0 trucks 0", "3 priority 64", "4 priority 128" }, junction.Rules.Select(Describe));
+            session.Redo(map, change);
+            Assert.AreEqual(5, junction.Rules.Count);
+        }
+
+        [Test]
+        public void TrafficDensitiesOfOtherGroupsStayWhenThePathsRulesAreSet()
+        {
+            Write("tile_0_0.map", "[version]", "14", "",
+                "[object]", "0", "tee.sco", "5", "100", "100", "0", "0", "0", "0", "0", "",
+                "[rule]", "0", "trafficdensity", "0.500", "0", "",
+                "[rule]", "0", "trafficdensity", "3.000", "4", "");
+            var session = OmsiMapSession.OpenProject(System.IO.Path.Combine(original, "global.cfg"), System.IO.Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var map = session.Read();
+            var junction = map.Tiles[0].Objects.Single(item => item.Id == 5);
+
+            session.SetObjectPathRules(map.Tiles[0], junction, new[] { 0 }, OmsiMapSession.TrafficRuleNames.ToList(), new[] { new OmsiPathRule(0, "trafficdensity", 0.1) });
+
+            CollectionAssert.AreEqual(new[] { "0 trafficdensity 3", "0 trafficdensity 0.1" },
+                junction.Rules.Select(rule => rule.PathIndex + " " + rule.Name + " " + rule.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            Assert.AreEqual(4.0, junction.Rules[0].Extra);
+        }
+
         private static string Describe(OmsiPathRule rule)
         {
             return rule.PathIndex + " " + rule.Name + " " + rule.Value;
