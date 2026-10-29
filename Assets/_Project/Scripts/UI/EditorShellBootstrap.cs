@@ -48,6 +48,9 @@ namespace OmsiMapEditor.UI
 
             /// <summary>Ground shaped with the terrain tool.</summary>
             public OmsiTerrainChange TerrainChange;
+
+            /// <summary>A road type of the road builder changed or deleted in the installation (ADR 049).</summary>
+            public OmsiRoadTypeChange RoadTypeChange;
         }
 
         private const int HistoryLimit = 200;
@@ -384,7 +387,9 @@ namespace OmsiMapEditor.UI
                 objectsPanel = new ObjectLibraryPanel();
                 objectsPanel.ObjectChosen += path =>
                 {
-                    if (activeTool == EditorTool.Rows)
+                    if (pickingRowObject)
+                        EndRowObjectPick(path);
+                    else if (activeTool == EditorTool.Rows)
                         ChooseRowObject(path);
                     else
                         StartPlacement(path);
@@ -400,7 +405,13 @@ namespace OmsiMapEditor.UI
                     if (activeTool == EditorTool.Rows && selectedRow != null)
                         ChangeSelectedRow(null);
                 };
-                objectsPanel.CloseRequested += () => ShowObjectsPanel(false);
+                objectsPanel.CloseRequested += () =>
+                {
+                    if (pickingRowObject)
+                        EndRowObjectPick(null);
+                    else
+                        ShowObjectsPanel(false);
+                };
                 objectsPanel.PreviewRequested += path => objectRenderer?.RequestPreview(path);
                 objectsPanel.HeadingChanged += heading =>
                 {
@@ -1116,7 +1127,9 @@ namespace OmsiMapEditor.UI
             }
 
             // -roadBuilder ["lanes"] [-roadBuilderSelect n] [-roadBuilderSave <name>] opens the road builder (ADR 049); a saved
-            // road type is then chosen for -road.
+            // road type is then chosen for -road. -roadBuilderEdit <Splines\Mapforge\...\x.sli> opens a road type made with it,
+            // -roadBuilderReplace saves it over itself and -roadBuilderDelete deletes it; -roadBuilderFrom <x.sli> takes a
+            // profile apart into lanes.
             var builderAt = Array.IndexOf(args, "-roadBuilder");
             if (builderAt >= 0)
             {
@@ -1126,7 +1139,21 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 yield return null;
                 var builderLanes = builderAt + 1 < args.Length && !args[builderAt + 1].StartsWith("-", StringComparison.Ordinal) ? args[builderAt + 1] : null;
-                RunRoadBuilderArgument(builderLanes, Argument("-roadBuilderSelect", 1), Argument("-roadBuilderLine", 1), Argument("-roadBuilderSave", 1));
+                RunRoadBuilderArgument(builderLanes, Argument("-roadBuilderSelect", 1), Argument("-roadBuilderLine", 1), Argument("-roadBuilderSave", 1),
+                    Argument("-roadBuilderEdit", 1), Argument("-roadBuilderFrom", 1), Array.IndexOf(args, "-roadBuilderReplace") >= 0,
+                    Array.IndexOf(args, "-roadBuilderDelete") >= 0);
+                var deleteStarted = Time.realtimeSinceStartup;
+                while (roadTypeUsers != null && Time.realtimeSinceStartup - deleteStarted < 120f)
+                    yield return null;
+                if (Array.IndexOf(args, "-roadBuilderDelete") >= 0)
+                    Debug.Log("Road builder: " + statusLabel?.text);
+                // -undo [n] undoes the last n steps, as Ctrl+Z does; the status goes to the log as "Undo:".
+                if (Array.IndexOf(args, "-undo") >= 0)
+                    for (var undo = int.TryParse(Argument("-undo", 1), out var undoCount) ? undoCount : 1; undo > 0; undo--)
+                    {
+                        StepHistory(undoSteps, redoSteps, true);
+                        Debug.Log("Undo: " + statusLabel?.text);
+                    }
                 // -roadBuilderSurfaces opens the surface picker of the lane picked and waits for its textures and previews.
                 if (Array.IndexOf(args, "-roadBuilderSurfaces") >= 0 && roadBuilder != null)
                 {
@@ -2633,6 +2660,14 @@ namespace OmsiMapEditor.UI
                 roadPanel.style.display = DisplayStyle.None;
             if (roadBuilder != null)
                 roadBuilder.style.display = DisplayStyle.None;
+            if (pickingRowObject)
+            {
+                // The library stood in for the road builder to choose a row's object; it closes with the road tool.
+                pickingRowObject = false;
+                objectsPanel.UseOptions(null, null);
+                if (!objectsPanelOpen)
+                    objectsPanel.style.display = DisplayStyle.None;
+            }
             if (objectsPanelHost != null && !objectsPanelOpen)
                 objectsPanelHost.style.display = DisplayStyle.None;
             roadTerrain = null;
@@ -3632,7 +3667,17 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>A click with the road tool: starts a road, or builds it to the click and continues from its end.</summary>
+        /// <summary>A click of the road tool; roads it builds get the rows of objects their road types ask for (ADR 049).</summary>
         private void BuildRoadTo(double x, double y)
+        {
+            var before = undoSteps.Count > 0 ? undoSteps[undoSteps.Count - 1] : null;
+            BuildRoadClick(x, y);
+            var after = undoSteps.Count > 0 ? undoSteps[undoSteps.Count - 1] : null;
+            if (after != null && !ReferenceEquals(after, before))
+                LayRoadTypeRows(after);
+        }
+
+        private void BuildRoadClick(double x, double y)
         {
             if (currentSummary == null || roadPanel == null)
                 return;
@@ -5388,7 +5433,9 @@ namespace OmsiMapEditor.UI
                 }
                 else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
                 {
-                    if (RoadBuilderShown)
+                    if (pickingRowObject)
+                        EndRowObjectPick(null);
+                    else if (RoadBuilderShown)
                     {
                         ShowRoadBuilder(false);
                         SetStatus("Road builder closed without saving.");
@@ -5524,6 +5571,16 @@ namespace OmsiMapEditor.UI
                 else
                     session.Redo(currentSummary, step.SplineChange);
                 RefreshSplineViews(step.SplineChange);
+                return;
+            }
+
+            if (step.RoadTypeChange != null)
+            {
+                if (undo)
+                    step.RoadTypeChange.Undo();
+                else
+                    step.RoadTypeChange.Redo();
+                AfterRoadTypeChange(step.RoadTypeChange.AssetPath);
                 return;
             }
 

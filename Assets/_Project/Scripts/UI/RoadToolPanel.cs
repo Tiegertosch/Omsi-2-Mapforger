@@ -301,6 +301,9 @@ namespace OmsiMapEditor.UI
         /// <summary>New road type... was clicked: the road builder should open.</summary>
         public event Action NewRoadTypeRequested;
 
+        /// <summary>The pencil on a road type the builder made was clicked: it should open in the road builder.</summary>
+        public event Action<string> EditRoadTypeRequested;
+
         /// <summary>A setting changed; the preview should be planned again.</summary>
         public event Action SettingsChanged;
 
@@ -391,6 +394,19 @@ namespace OmsiMapEditor.UI
                 SetProfile(profiles[0]);
             if (!tabChosen)
                 tab = used.Count > 0 ? Tab.InMap : Tab.Category;
+            StartSorting();
+            Refresh();
+        }
+
+        /// <summary>Draws a profile's preview and sorts it into its tab again, after a road type was changed (ADR 049).</summary>
+        public void ForgetProfile(string path)
+        {
+            lock (previewLock)
+                previewRequested.Remove(path);
+            if (previews.TryGetValue(path, out var texture) && texture != null)
+                UnityEngine.Object.Destroy(texture);
+            previews.Remove(path);
+            categories?.Remove(path);
             StartSorting();
             Refresh();
         }
@@ -670,9 +686,18 @@ namespace OmsiMapEditor.UI
                 Refresh();
             };
             tile.Add(star);
+            Button edit = null;
+            if (OmsiRoadTypeStore.IsMade(path))
+            {
+                edit = new Button(() => EditRoadTypeRequested?.Invoke(path)) { tooltip = "Opens the road type in the road builder to change it, with every spline of it" };
+                edit.AddToClassList("panel-icon-button");
+                edit.AddToClassList("picker-tile-edit");
+                edit.Add(new IconElement("pencil"));
+                tile.Add(edit);
+            }
             tile.RegisterCallback<ClickEvent>(evt =>
             {
-                if (evt.target is VisualElement target && (target == star || star.Contains(target)))
+                if (evt.target is VisualElement target && (target == star || star.Contains(target) || edit != null && (target == edit || edit.Contains(target))))
                     return;
                 SetProfile(path);
             });

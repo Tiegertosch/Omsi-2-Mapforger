@@ -510,6 +510,16 @@ namespace OmsiMapEditor.World
         }
 
         /// <summary>
+        /// Reads the spline profiles again and builds the surfaces of some tiles anew, after a road type they use was
+        /// changed (ADR 049).
+        /// </summary>
+        public bool RefreshProfiles(IEnumerable<OmsiTileSummary> tiles)
+        {
+            refreshProfiles = null;
+            return RefreshSplines(tiles);
+        }
+
+        /// <summary>
         /// Builds the spline surfaces of some tiles again from their current splines, after roads were built, deleted,
         /// undone or redone. Other tiles stay as they are. While the map is still loading, the load reads the new state.
         /// </summary>

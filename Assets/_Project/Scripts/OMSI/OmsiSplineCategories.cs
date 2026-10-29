@@ -41,9 +41,10 @@ namespace OmsiMapEditor.OMSI
         {
             if (profile == null || profile.EditorOnly || profile.LineKind != OmsiSplineLineKind.None || profile.Strips.Count == 0)
                 return OmsiSplineCategory.Other;
-            if (profile.Lanes.Exists(lane => lane.Kind == RailLane))
-                return OmsiSplineCategory.Rail;
+            // Tracks in a street with lanes for cars make a road (ADR 049, stage 4); tracks alone are rails.
             var vehicle = profile.Lanes.FindAll(lane => lane.Kind == 0 && lane.Width > 0.0);
+            if (vehicle.Count == 0 && profile.Lanes.Exists(lane => lane.Kind == RailLane))
+                return OmsiSplineCategory.Rail;
             if (vehicle.Count == 0)
                 return profile.Lanes.Exists(lane => lane.Kind == 1) ? OmsiSplineCategory.Path : OmsiSplineCategory.Other;
             if (OmsiProfileSections.Of(profile).HasMedian)

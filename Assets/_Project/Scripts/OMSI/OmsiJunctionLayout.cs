@@ -417,6 +417,7 @@ namespace OmsiMapEditor.OMSI
             layout.BuildCarriageway(sections, corners, roadTexture);
             layout.BuildPavements(sections, corners);
             layout.BuildLanes(sections);
+            layout.BuildRails(sections);
             layout.BuildFootpaths(sections, corners);
             if (through != null)
                 layout.BuildThrough(through);
@@ -882,6 +883,93 @@ namespace OmsiMapEditor.OMSI
                         }
                     }
                 }
+        }
+
+        /// <summary>Tracks of two arms facing each other meet when their middles lie this close, seen along one arm.</summary>
+        public const double RailMatchMeters = 0.3;
+
+        /// <summary>
+        /// Tram tracks straight through (ADR 049, stage 4): a track on an arm's carriageway goes on to the track of the arm
+        /// opposite that lies where it would run on, as a [path] for rails in the direction the tracks are used. Tracks
+        /// made by the road builder are drawn across as grooved rails; turning tracks are not made.
+        /// </summary>
+        private void BuildRails(List<OmsiProfileSections> sections)
+        {
+            for (var first = 0; first < Arms.Count; first++)
+                for (var second = first + 1; second < Arms.Count; second++)
+                {
+                    if (!Opposite(first, second))
+                        continue;
+                    foreach (var rail in Arms[first].Profile.Lanes)
+                    {
+                        if (rail.Kind != OmsiSplineCategories.RailLane || !Within(rail, sections[first], false))
+                            continue;
+                        // Seen along the arm opposite, left and right swap.
+                        var partner = Arms[second].Profile.Lanes.Find(lane => lane.Kind == OmsiSplineCategories.RailLane &&
+                                                                               Math.Abs(lane.X + rail.X) <= RailMatchMeters && Within(lane, sections[second], false));
+                        if (partner == null)
+                            continue;
+                        // A track used towards the junction on the first arm leads from it; one used away from it leads to it.
+                        var fromFirst = rail.Direction != 0;
+                        var from = fromFirst ? first : second;
+                        var to = fromFirst ? second : first;
+                        var start = Point.Along(Arms[from], Arms[from].Length, fromFirst ? rail.X : partner.X);
+                        var end = Point.Along(Arms[to], Arms[to].Length, fromFirst ? partner.X : rail.X);
+                        var startHeading = Arms[from].HeadingDegrees + 180.0;
+                        AddArcs(start, startHeading, end, Arms[to].HeadingDegrees, rail.Height, rail.Kind, rail.Width, rail.Direction == 2 ? 2 : 0, 0);
+                        var groove = Arms[first].Profile.Textures.Find(texture =>
+                            string.Equals(System.IO.Path.GetFileName(texture.Path), OmsiRoadTypeWriter.GrooveTexture, StringComparison.OrdinalIgnoreCase));
+                        if (groove != null)
+                            AddRails(OmsiRoadPlanner.Biarc(start.X, start.Y, startHeading, end.X, end.Y, Arms[to].HeadingDegrees), rail.Height + OmsiRoadTypeWriter.RailLift,
+                                groove.Path);
+                    }
+                }
+        }
+
+        /// <summary>The two grooved rails of a track along its pieces, sampled every metre, the grooves on the inside.</summary>
+        private void AddRails(List<OmsiSplinePiece> pieces, double height, string groovePath)
+        {
+            var points = new List<Point>();
+            foreach (var piece in pieces)
+            {
+                var steps = Math.Max(1, (int)Math.Ceiling(piece.LengthMeters));
+                for (var step = points.Count == 0 ? 0 : 1; step <= steps; step++)
+                {
+                    piece.PointAt(piece.LengthMeters * step / steps, out var x, out var y, out _);
+                    points.Add(new Point(x, y));
+                }
+            }
+            if (points.Count < 2)
+                return;
+            var mesh = MeshFor(groovePath, "rails");
+            var inner = OmsiRoadTypeWriter.Gauge / 2.0;
+            foreach (var side in new[] { -1.0, 1.0 })
+            {
+                // The head outside, the groove inside; u 0 at the head as in the road type's strips.
+                var outerOffset = side * (inner + OmsiRoadTypeWriter.RailHeadWidth);
+                var grooveOffset = side * (inner - OmsiRoadTypeWriter.RailGrooveWidth);
+                var first = mesh.Positions.Count / 3;
+                var along = 0.0;
+                for (var index = 0; index < points.Count; index++)
+                {
+                    if (index > 0)
+                        along += points[index].DistanceTo(points[index - 1]);
+                    var a = points[Math.Max(0, index - 1)];
+                    var b = points[Math.Min(points.Count - 1, index + 1)];
+                    var length = a.DistanceTo(b);
+                    var rightX = (b.Y - a.Y) / length;
+                    var rightY = -(b.X - a.X) / length;
+                    var v = along * 0.2;
+                    Add(mesh, new Point(points[index].X + rightX * outerOffset, points[index].Y + rightY * outerOffset), height, 0.0, v);
+                    Add(mesh, new Point(points[index].X + rightX * grooveOffset, points[index].Y + rightY * grooveOffset), height, 1.0, v);
+                }
+                for (var index = 0; index + 1 < points.Count; index++)
+                {
+                    var at = first + index * 2;
+                    AddUpward(mesh, at, at + 1, at + 2);
+                    AddUpward(mesh, at + 1, at + 3, at + 2);
+                }
+            }
         }
 
         /// <summary>Footpaths around each corner, from the pavement path of one arm to the one of the next, walked both ways.</summary>

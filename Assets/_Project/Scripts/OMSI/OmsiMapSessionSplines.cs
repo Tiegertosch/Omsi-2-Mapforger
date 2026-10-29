@@ -885,6 +885,12 @@ namespace OmsiMapEditor.OMSI
             return shapeProfiles;
         }
 
+        /// <summary>Reads the spline profiles again when next needed, such as after a road type was changed (ADR 049).</summary>
+        public void ForgetProfiles()
+        {
+            shapeProfiles = null;
+        }
+
         /// <summary>
         /// A junction object to fit the terrain to: its footprint and the highest kerb among the profiles it suggests at its
         /// connection points; null when its model gives no footprint.

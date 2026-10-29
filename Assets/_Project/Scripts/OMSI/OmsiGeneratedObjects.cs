@@ -274,10 +274,15 @@ namespace OmsiMapEditor.OMSI
                     OmsiXWriter.Number(Math.Cos(radians) * arm.Length), OmsiXWriter.Number(arm.HeadingDegrees), "0", "0");
             }
             foreach (var path in layout.Paths)
+            {
                 Section(sco, "path", OmsiXWriter.Number(path.X), OmsiXWriter.Number(path.Y), OmsiXWriter.Number(path.Height),
                     OmsiXWriter.Number(path.HeadingDegrees), OmsiXWriter.Number(path.RadiusMeters), OmsiXWriter.Number(path.LengthMeters), "0", "0",
                     path.Kind.ToString(CultureInfo.InvariantCulture), OmsiXWriter.Number(path.Width), path.Direction.ToString(CultureInfo.InvariantCulture),
                     path.Blinker.ToString(CultureInfo.InvariantCulture));
+                // Tracks through the junction lie as evenly as the street's (ADR 049, stage 4).
+                if (path.Kind == OmsiSplineCategories.RailLane)
+                    Section(sco, "rail_enh", OmsiRoadTypeWriter.StreetTrack);
+            }
             Section(sco, "mesh", "model.x");
             Section(sco, "collision_mesh", "model.x");
             generated.Sco = sco.ToString();

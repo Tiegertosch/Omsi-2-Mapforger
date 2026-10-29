@@ -30,7 +30,8 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(OmsiRoadLaneDirection.Forward, type.Lanes[2].Direction);
             Assert.AreEqual("walk 3.00 | drive 3.50 back | drive 3.25 | median 2.00 | shoulder 1.25", type.Describe());
             Assert.AreEqual(type.Describe(), OmsiRoadType.Parse(OmsiRoadType.DescriptionPrefix + " " + type.Describe()).Describe());
-            Assert.Throws<FormatException>(() => OmsiRoadType.Parse("tram 2"));
+            Assert.Throws<FormatException>(() => OmsiRoadType.Parse("train 2"));
+            Assert.Throws<FormatException>(() => OmsiRoadType.Parse("drive 3 cars"));
             Assert.Throws<FormatException>(() => OmsiRoadType.Parse("drive wide"));
         }
 
@@ -340,6 +341,262 @@ namespace OmsiMapEditor.Tests
                 if (Directory.Exists(installation))
                     Directory.Delete(installation, true);
             }
+        }
+
+        private static string BaseTextures()
+        {
+            var installation = Path.Combine(Path.GetTempPath(), "mapforge-roadtype-" + Guid.NewGuid().ToString("N"));
+            var marcel = Path.Combine(installation, "Splines", "Marcel", "texture");
+            Directory.CreateDirectory(marcel);
+            foreach (var texture in new[] { "str_asphdrk.bmp", "str_side1.bmp", "str_gruenstreifen.bmp" })
+                File.WriteAllBytes(Path.Combine(marcel, texture), new byte[] { 1 });
+            return installation;
+        }
+
+        [Test]
+        public void ARoadTypeIsWrittenAnewUnderItsPathAndUndoPutsTheFileBefore()
+        {
+            var installation = BaseTextures();
+            try
+            {
+                var path = OmsiRoadTypeStore.Write(installation, "P", "Town road", OmsiRoadType.Parse(TwoLanes));
+                var file = Path.Combine(installation, path);
+                var before = File.ReadAllBytes(file);
+                var wider = OmsiRoadType.Parse("walk 3 | drive 3.25 back | median 2 | drive 3.25 | walk 3");
+
+                var change = OmsiRoadTypeStore.Replace(installation, path, wider);
+
+                Assert.AreEqual(path, change.AssetPath);
+                Assert.IsFalse(change.Deleted);
+                FileAssert.DoesNotExist(Path.Combine(installation, "Splines", "Mapforge", "P", "Town road_2.sli"));
+                FileAssert.DoesNotExist(file + ".tmp");
+                Assert.AreEqual(wider.Describe(), OmsiRoadTypeStore.Read(File.ReadAllBytes(file)).Describe());
+                // The median needs its texture, copied beside the others.
+                FileAssert.Exists(Path.Combine(installation, "Splines", "Mapforge", "P", "texture", "str_gruenstreifen.bmp"));
+                change.Undo();
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(file));
+                change.Redo();
+                Assert.AreEqual(wider.Describe(), OmsiRoadTypeStore.Read(File.ReadAllBytes(file)).Describe());
+
+                // Only road types the builder made are changed, and only those there.
+                Assert.Throws<ArgumentException>(() => OmsiRoadTypeStore.Replace(installation, @"Splines\Marcel\str_2spur.sli", wider));
+                Assert.Throws<FileNotFoundException>(() => OmsiRoadTypeStore.Replace(installation, @"Splines\Mapforge\P\Gone.sli", wider));
+                // A road type that cannot be made leaves the file as it was.
+                Assert.Throws<ArgumentException>(() => OmsiRoadTypeStore.Replace(installation, path, OmsiRoadType.Parse("drive 6")));
+                Assert.AreEqual(wider.Describe(), OmsiRoadTypeStore.Read(File.ReadAllBytes(file)).Describe());
+
+                var deletion = OmsiRoadTypeStore.Delete(installation, path);
+                Assert.IsTrue(deletion.Deleted);
+                FileAssert.DoesNotExist(file);
+                FileAssert.Exists(Path.Combine(installation, "Splines", "Mapforge", "P", "texture", "str_asphdrk.bmp"));
+                deletion.Undo();
+                Assert.AreEqual(wider.Describe(), OmsiRoadTypeStore.Read(File.ReadAllBytes(file)).Describe());
+            }
+            finally
+            {
+                Directory.Delete(installation, true);
+            }
+        }
+
+        [Test]
+        public void ARoadTypeIsUsedWhileAMapAWorkspaceOrAMadeJunctionNamesIt()
+        {
+            var installation = BaseTextures();
+            var workspace = Path.Combine(installation, "work");
+            try
+            {
+                var path = OmsiRoadTypeStore.Write(installation, "P", "Town road", OmsiRoadType.Parse(TwoLanes));
+                Assert.IsNull(OmsiRoadTypeStore.UsedBy(installation, workspace, path));
+
+                // Tile files name it in any case and with either slash.
+                var map = Path.Combine(installation, "maps", "Town");
+                Directory.CreateDirectory(map);
+                var tile = Path.Combine(map, "tile_0_0.map");
+                File.WriteAllText(tile, "[spline]\r\n0\r\nsplines/mapforge/p/TOWN ROAD.sli\r\n");
+                Assert.AreEqual(tile, OmsiRoadTypeStore.UsedBy(installation, workspace, path));
+                File.WriteAllText(tile, "[spline]\r\n0\r\nSplines\\Mapforge\\P\\Town road_2.sli\r\n");
+                Assert.IsNull(OmsiRoadTypeStore.UsedBy(installation, workspace, path));
+
+                var junction = Path.Combine(installation, "Sceneryobjects", "Mapforge", "P", "Junction", "Junction.sco");
+                Directory.CreateDirectory(Path.GetDirectoryName(junction));
+                File.WriteAllText(junction, "[splinehelper]\r\n" + path + "\r\n");
+                Assert.AreEqual(junction, OmsiRoadTypeStore.UsedBy(installation, workspace, path));
+                File.Delete(junction);
+
+                Directory.CreateDirectory(workspace);
+                var edited = Path.Combine(workspace, "tile_1_0.map");
+                File.WriteAllText(edited, path);
+                Assert.AreEqual(edited, OmsiRoadTypeStore.UsedBy(installation, workspace, path));
+            }
+            finally
+            {
+                Directory.Delete(installation, true);
+            }
+        }
+
+        [Test]
+        public void ProfilesAreTakenApartIntoTheirLanes()
+        {
+            // The builder's own profiles come apart into the lanes they were made from.
+            foreach (var lanes in new[]
+                     {
+                         TwoLanes, "walk 3.5 | drive 3.25 back | drive 3.25 back | median 3 | drive 3.25 | drive 3.25 | walk 3.5",
+                         "walk 3 | drive 3.25 | drive 3.25 | walk 3", "shoulder 1 | drive 3.25 back | drive 3.25 | shoulder 1", "walk 4 | drive 3.5 back | drive 3.5"
+                     })
+            {
+                var notes = new System.Collections.Generic.List<string>();
+                var type = OmsiRoadType.FromProfile(Profile(lanes, out _), notes);
+                Assert.IsNotNull(type, lanes);
+                Assert.AreEqual(OmsiRoadType.Parse(lanes).Describe(), type.Describe(), lanes);
+                CollectionAssert.IsEmpty(notes, lanes);
+            }
+
+            // Bus lanes have a [path] like driving lanes; bike and parking lanes have none and become a shoulder.
+            var parking = OmsiRoadType.FromProfile(Profile("walk 2.5 | parking 2 | drive 3.25 back | drive 3.25 | walk 2.5", out _), null);
+            Assert.AreEqual("walk 2.50 | shoulder 2.00 | drive 3.25 back | drive 3.25 | walk 2.50", parking.Describe());
+
+            // A footpath is one sidewalk; a wide one is made as wide as its texture allows, with a note.
+            Assert.AreEqual("walk 3.00", OmsiRoadType.FromProfile(Profile("walk 3", out _), null).Describe());
+            var wide = OmsiRoadType.Parse("walk 4.9 | walk 4.9");
+            var notesWide = new System.Collections.Generic.List<string>();
+            var footpath = OmsiRoadType.FromProfile(OmsiSplineProfile.Parse(OmsiTextFile.Encode(OmsiRoadTypeWriter.Write(wide).Sli, OmsiTextEncoding.Windows1252), ProfilePath), notesWide);
+            Assert.AreEqual("walk 4.90", footpath.Describe());
+            Assert.AreEqual(1, notesWide.Count);
+
+            // Without a carriageway or anyone walking there is nothing to take apart.
+            var fence = OmsiSplineProfile.Parse(OmsiTextFile.Encode("[texture]\r\nfence.bmp\r\n[profile]\r\n0\r\n[profilepnt]\r\n0\r\n0\r\n0\r\n1\r\n[profilepnt]\r\n0\r\n2\r\n1\r\n1\r\n",
+                OmsiTextEncoding.Windows1252), @"Splines\x\fence.sli");
+            Assert.IsNull(OmsiRoadType.FromProfile(fence, null));
+        }
+
+        [Test]
+        public void TramLanesLayGroovedRailsAndATrackWithCarsOnItWhenShared()
+        {
+            var type = OmsiRoadType.Parse("walk 3 | drive 3.25 back | tram 3 back cars | tram 3 | drive 3.25 | walk 3");
+            Assert.AreEqual("walk 3.00 | drive 3.25 back | tram 3.00 back cars | tram 3.00 | drive 3.25 | walk 3.00", type.Describe());
+            Assert.IsTrue(type.Lanes[2].CarriesTraffic);
+            Assert.IsFalse(type.Lanes[3].CarriesTraffic);
+            StringAssert.Contains(" tram ", type.SuggestName());
+            Assert.AreEqual("Tram track 6m", OmsiRoadType.Parse("tram back | tram").SuggestName());
+
+            // A track shared with cars is a driving lane to the lines; one of its own is kept apart with a solid line.
+            Assert.AreEqual(OmsiRoadMarking.Dashed, type.MarkingAfter(1));
+            Assert.AreEqual(OmsiRoadMarking.Solid, type.MarkingAfter(2));
+            Assert.AreEqual(OmsiRoadMarking.Solid, type.MarkingAfter(3));
+
+            var profile = Profile(type.Describe(), out var files);
+            var rails = profile.Lanes.Where(lane => lane.Kind == OmsiSplineCategories.RailLane).ToList();
+            Assert.AreEqual(2, rails.Count);
+            Assert.AreEqual(-1.5, rails[0].X, 1e-6);
+            Assert.AreEqual(1, rails[0].Direction);
+            Assert.AreEqual(1.5, rails[1].X, 1e-6);
+            Assert.AreEqual(0, rails[1].Direction);
+            // Cars share only the first track.
+            Assert.IsTrue(profile.Lanes.Exists(lane => lane.Kind == 0 && Math.Abs(lane.X + 1.5) < 1e-6));
+            Assert.IsFalse(profile.Lanes.Exists(lane => lane.Kind == 0 && Math.Abs(lane.X - 1.5) < 1e-6));
+            StringAssert.Contains("[rail_enh]\r\n200\r\n0\r\n30\r\n0.01", files.Sli);
+            Assert.IsTrue(files.Files.ContainsKey(OmsiRoadTypeWriter.GrooveTexture));
+            CollectionAssert.AreEqual(new byte[] { (byte)'B', (byte)'M' }, files.Files[OmsiRoadTypeWriter.GrooveTexture].Take(2).ToArray());
+
+            // Two strips per track, the head outside the gauge and the groove inside it.
+            var groove = profile.Textures.FindIndex(texture => Path.GetFileName(texture.Path) == OmsiRoadTypeWriter.GrooveTexture);
+            var strips = profile.Strips.Where(strip => strip.TextureIndex == groove).ToList();
+            Assert.AreEqual(4, strips.Count);
+            Assert.AreEqual(-1.5 - OmsiRoadTypeWriter.Gauge / 2.0 - OmsiRoadTypeWriter.RailHeadWidth, strips[0].Points[0].X, 1e-3);
+            Assert.AreEqual(-1.5 - OmsiRoadTypeWriter.Gauge / 2.0 + OmsiRoadTypeWriter.RailGrooveWidth, strips[0].Points[1].X, 1e-3);
+
+            // A street with tracks and lanes for cars stays a road, for the road menu and for junctions.
+            Assert.AreNotEqual(OmsiSplineCategory.Rail, OmsiSplineCategories.Of(profile));
+            Assert.IsTrue(OmsiRoadJunctions.IsRoad(profile));
+
+            // Taken apart again, the tracks come back as tram lanes, shared where cars run on them.
+            Assert.AreEqual(type.Describe(), OmsiRoadType.FromProfile(profile, null).Describe());
+        }
+
+        [Test]
+        public void TracksRunStraightThroughAJunctionWithGroovedRails()
+        {
+            var tram = Profile("walk 3 | drive 3.25 back | tram 3 back cars | tram 3 cars | drive 3.25 | walk 3", out _);
+            var plain = Profile(TwoLanes, out _);
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0.0, ProfilePath = ProfilePath, Profile = tram, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 90.0, ProfilePath = ProfilePath, Profile = plain },
+                new OmsiJunctionArm { HeadingDegrees = 180.0, ProfilePath = ProfilePath, Profile = tram, Main = true, Mirrored = true },
+                new OmsiJunctionArm { HeadingDegrees = 270.0, ProfilePath = ProfilePath, Profile = plain, Mirrored = true }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, null);
+
+            var rails = layout.Paths.Where(path => path.Kind == OmsiSplineCategories.RailLane).ToList();
+            Assert.AreEqual(2, rails.Count);
+            var length = layout.Arms[0].Length + layout.Arms[2].Length;
+            Assert.AreEqual(length, rails.Sum(path => path.LengthMeters) / 2.0, 1e-6);
+            // Each track one way: the one used towards the junction on the first arm comes in along it, at its place.
+            Assert.IsTrue(rails.All(path => path.Direction == 0 && Math.Abs(path.RadiusMeters) < 1e-9));
+            Assert.IsTrue(rails.Exists(path => Math.Abs(path.X + 1.5) < 1e-6 && Math.Abs(path.HeadingDegrees - 180.0) < 1e-6));
+            Assert.IsTrue(rails.Exists(path => Math.Abs(path.X - 1.5) < 1e-6 && Math.Abs(path.HeadingDegrees) < 1e-6));
+            Assert.IsTrue(layout.Meshes.Exists(mesh => mesh.Texture == OmsiRoadTypeWriter.GrooveTexture && mesh.Triangles.Count > 0));
+
+            var junction = OmsiJunctionGenerator.Junction(arms, null, "Tram junction");
+            Assert.AreEqual(2, junction.Sco.Split(new[] { "[rail_enh]" }, StringSplitOptions.None).Length - 1);
+
+            // Tracks that do not meet across the junction end at it.
+            var shifted = Profile("walk 3 | drive 3.25 back | tram 4 back cars | tram 4 cars | drive 3.25 | walk 3", out _);
+            arms[2].Profile = shifted;
+            Assert.IsFalse(OmsiJunctionLayout.Build(arms, null).Paths.Exists(path => path.Kind == OmsiSplineCategories.RailLane));
+        }
+
+        [Test]
+        public void RowsStandByTheKerbInTheMiddleOrAtTheFarSide()
+        {
+            var type = OmsiRoadType.Parse("walk 3 row=\"Sceneryobjects\\Trees\\linde.sco\" every=15 | drive 3.25 back | median 2 row=\"Sceneryobjects\\x\\lamp.sco\" at=middle | " +
+                                          "drive 3.25 | walk 3 row=\"Sceneryobjects\\Trees\\linde.sco\" at=outer");
+            Assert.AreEqual(type.Describe(), OmsiRoadType.Parse(type.Describe()).Describe());
+            StringAssert.Contains("every=15", type.Describe());
+            StringAssert.Contains("at=middle", type.Describe());
+            Assert.Throws<FormatException>(() => OmsiRoadType.Parse("walk 3 at=nowhere"));
+            CollectionAssert.IsNotEmpty(OmsiRoadType.Parse("walk 3 row=\"a.sco\" every=1").Problems());
+
+            var rows = type.Rows();
+            Assert.AreEqual(3, rows.Count);
+            // The left sidewalk from -7.25 to -4.25: by its kerb on the right, facing back along the road.
+            Assert.AreEqual(-4.25 - OmsiRoadType.RowInset, rows[0].X, 1e-9);
+            Assert.AreEqual(15.0, rows[0].Interval, 1e-9);
+            Assert.AreEqual(180.0, rows[0].HeadingDegrees, 1e-9);
+            Assert.AreEqual(OmsiRoadTypeWriter.RaisedHeight, rows[0].Height, 1e-9);
+            Assert.AreEqual(0.0, rows[1].X, 1e-9);
+            Assert.AreEqual(OmsiRoadLane.DefaultRowInterval, rows[1].Interval, 1e-9);
+            // The right sidewalk from 4.25 to 7.25, at its far side.
+            Assert.AreEqual(7.25 - OmsiRoadType.RowInset, rows[2].X, 1e-9);
+            Assert.AreEqual(0.0, rows[2].HeadingDegrees, 1e-9);
+            // Objects stand only beside the traffic: a row on a driving lane is refused and not laid.
+            var onRoad = OmsiRoadType.Parse("walk 3 | drive 3.25 back row=\"Sceneryobjects\\Trees\\linde.sco\" | drive 3.25 | walk 3");
+            Assert.IsTrue(onRoad.Problems().Exists(problem => problem.Contains("cannot stand on driving lane 2")));
+            CollectionAssert.IsEmpty(onRoad.Rows());
+            Assert.IsTrue(OmsiRoadLane.CanHoldRow(OmsiRoadLaneKind.Parking));
+            Assert.IsFalse(OmsiRoadLane.CanHoldRow(OmsiRoadLaneKind.Tram));
+
+            // A turn is kept and turns the objects on both sides alike.
+            var hedge = OmsiRoadType.Parse("drive 3.25 back | median 3 row=\"Sceneryobjects\\Trees\\hedge.sco\" at=middle turn=90 | drive 3.25");
+            Assert.AreEqual(hedge.Describe(), OmsiRoadType.Parse(hedge.Describe()).Describe());
+            StringAssert.Contains("turn=90", hedge.Describe());
+            Assert.AreEqual(90.0, hedge.Rows()[0].HeadingDegrees, 1e-9);
+            Assert.AreEqual(0.0, hedge.Rows()[0].X, 1e-9);
+
+            // A long object modelled across is turned to run along the road; a round one is not.
+            OmsiObjectOutline Box(double across, double deep) => new OmsiObjectOutline
+            {
+                Points = new[] { new OmsiMapPoint(-across / 2, -deep / 2), new OmsiMapPoint(across / 2, -deep / 2), new OmsiMapPoint(across / 2, deep / 2), new OmsiMapPoint(-across / 2, deep / 2) }
+            };
+            Assert.AreEqual(90.0, OmsiRoadLane.SuggestedRowTurn(Box(20.0, 1.2)), 1e-9);
+            Assert.AreEqual(0.0, OmsiRoadLane.SuggestedRowTurn(Box(1.2, 20.0)), 1e-9);
+            Assert.AreEqual(0.0, OmsiRoadLane.SuggestedRowTurn(Box(4.0, 4.0)), 1e-9);
+            Assert.AreEqual(0.0, OmsiRoadLane.SuggestedRowTurn(null), 1e-9);
+
+            // Rows do not change the profile.
+            Assert.AreEqual(OmsiRoadTypeWriter.Write(OmsiRoadType.Parse("walk 3 | drive 3.25 back | median 2 | drive 3.25 | walk 3")).Sli.Split('\n').Skip(2).ToArray(),
+                OmsiRoadTypeWriter.Write(type).Sli.Split('\n').Skip(2).ToArray());
         }
     }
 }
