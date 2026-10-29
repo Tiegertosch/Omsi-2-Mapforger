@@ -415,6 +415,7 @@ namespace OmsiMapEditor.UI
                 // Another mode starts the next part anew; a control point belongs to Curved.
                 roadPanel.ShapeChanged += () => roadControl = null;
                 objectsPanelHost.Add(roadPanel);
+                CreateRoadBuilder();
                 terrainOptions = new TerrainToolOptions();
                 terrainOptions.style.display = DisplayStyle.None;
                 terrainOptions.SettingsChanged += () =>
@@ -1112,6 +1113,30 @@ namespace OmsiMapEditor.UI
                     for (var step = int.TryParse(openEnd, out var count) ? count : 1; step > 0; step--)
                         NextOpenEnd();
                 Debug.Log("Paths: " + statusLabel?.text);
+            }
+
+            // -roadBuilder ["lanes"] [-roadBuilderSelect n] [-roadBuilderSave <name>] opens the road builder (ADR 049); a saved
+            // road type is then chosen for -road.
+            var builderAt = Array.IndexOf(args, "-roadBuilder");
+            if (builderAt >= 0)
+            {
+                SetTool(EditorTool.Road);
+                var scanStarted = Time.realtimeSinceStartup;
+                while (installationScan != null && !installationScan.IsCompleted && Time.realtimeSinceStartup - scanStarted < 120f)
+                    yield return null;
+                yield return null;
+                var builderLanes = builderAt + 1 < args.Length && !args[builderAt + 1].StartsWith("-", StringComparison.Ordinal) ? args[builderAt + 1] : null;
+                RunRoadBuilderArgument(builderLanes, Argument("-roadBuilderSelect", 1), Argument("-roadBuilderLine", 1), Argument("-roadBuilderSave", 1));
+                // -roadBuilderSurfaces opens the surface picker of the lane picked and waits for its textures and previews.
+                if (Array.IndexOf(args, "-roadBuilderSurfaces") >= 0 && roadBuilder != null)
+                {
+                    roadBuilder.ShowSurfaces();
+                    var surfacesStarted = Time.realtimeSinceStartup;
+                    while (!roadBuilder.SurfacesReady && Time.realtimeSinceStartup - surfacesStarted < 60f)
+                        yield return null;
+                    for (var frame = 0; frame < 60; frame++)
+                        yield return null;
+                }
             }
 
             var roadAt = Array.IndexOf(args, "-road");
@@ -2606,6 +2631,8 @@ namespace OmsiMapEditor.UI
             mapCanvas?.EndRoad();
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.None;
+            if (roadBuilder != null)
+                roadBuilder.style.display = DisplayStyle.None;
             if (objectsPanelHost != null && !objectsPanelOpen)
                 objectsPanelHost.style.display = DisplayStyle.None;
             roadTerrain = null;
@@ -2708,7 +2735,7 @@ namespace OmsiMapEditor.UI
                     counts[spline.AssetPath] = count + 1;
                 }
             roadPanel.SetInstallation(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath));
-            roadPanel.SetProfiles(installationCatalog?.SplineProfiles, counts);
+            roadPanel.SetProfiles(RoadProfilePaths(), counts);
         }
 
         private OmsiSplineEnd SnapEnd(OmsiMapPoint point)
@@ -5361,7 +5388,12 @@ namespace OmsiMapEditor.UI
                 }
                 else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
                 {
-                    if (roadControl.HasValue)
+                    if (RoadBuilderShown)
+                    {
+                        ShowRoadBuilder(false);
+                        SetStatus("Road builder closed without saving.");
+                    }
+                    else if (roadControl.HasValue)
                     {
                         roadControl = null;
                         UpdateRoadPreview();

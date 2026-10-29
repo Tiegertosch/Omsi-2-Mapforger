@@ -19,6 +19,15 @@
     --mf-color-error: #E06464;
     --mf-color-info: #65A9D9;
 
+    /* Surfaces of the road builder's lane bar (ADR 049) */
+    --mf-color-lane-asphalt: #3B4048;
+    --mf-color-lane-shoulder: #4A505A;
+    --mf-color-lane-walk: #8C9199;
+    --mf-color-lane-grass: #4F7A3A;
+    --mf-color-lane-bus: #6A4B3A;
+    --mf-color-lane-bike: #7A3E3E;
+    --mf-color-lane-parking: #44494F;
+
     --mf-space-1: 4px;
     --mf-space-2: 8px;
     --mf-space-3: 12px;
@@ -409,3 +418,43 @@
 .satellite-foldout > .unity-foldout__content { margin-left: 0; }
 .satellite-result-chosen, .satellite-result-chosen:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
 .imagery-attribution { position: absolute; right: 310px; bottom: var(--mf-space-1); padding: 2px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
+
+/* Road builder (ADR 049): a cross-section of lanes above the lane settings, in place of the road picker */
+.road-picker-new { flex-direction: row; align-items: center; flex-shrink: 0; margin: 0 0 0 var(--mf-space-2); }
+.road-picker-new > .icon { width: 16px; height: 16px; margin-right: 6px; }
+.road-picker-new > Label { margin: 0; padding: 0; }
+.road-builder { height: auto; min-height: 362px; }
+.road-builder-name { width: 220px; margin: 0 var(--mf-space-2); flex-shrink: 0; }
+.road-builder-lanes { height: 112px; margin-bottom: var(--mf-space-3); background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); overflow: hidden; }
+.road-builder-lane-row { flex-grow: 1; flex-direction: row; align-items: stretch; }
+.road-builder-lane { flex-basis: 0; min-width: 26px; margin-top: 22px; align-items: center; justify-content: center; background-color: var(--mf-color-lane-asphalt); border-width: 2px; border-color: rgba(0, 0, 0, 0); }
+.road-builder-lane-raised { margin-top: 8px; }
+.road-builder-lane-walk { background-color: var(--mf-color-lane-walk); }
+.road-builder-lane-median { background-color: var(--mf-color-lane-grass); }
+.road-builder-lane-shoulder { background-color: var(--mf-color-lane-shoulder); }
+.road-builder-lane:hover { border-color: var(--mf-color-text-secondary); }
+.road-builder-lane-selected, .road-builder-lane-selected:hover { border-color: var(--mf-color-accent); }
+.road-builder-lane-arrow { width: 20px; height: 20px; margin-bottom: 2px; color: var(--mf-color-text-primary); }
+.road-builder-lane-kind { margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); }
+.road-builder-lane-width { margin: 0; padding: 0; font-size: 10px; color: var(--mf-color-text-primary); }
+.road-builder-lane-walk > Label { color: var(--mf-color-bg); }
+.road-builder-markings { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.road-builder-bottom { flex-direction: row; }
+.road-builder-column { flex-grow: 1; flex-basis: 0; margin-right: var(--mf-space-4); }
+.road-builder-lane-options { margin-right: 0; }
+.road-builder-buttons { flex-direction: row; flex-wrap: wrap; margin-bottom: var(--mf-space-2); }
+.road-builder-buttons > .map-control-button { margin-bottom: var(--mf-space-1); }
+
+.road-builder-lane-bus { background-color: var(--mf-color-lane-bus); }
+.road-builder-lane-bike { background-color: var(--mf-color-lane-bike); }
+.road-builder-lane-parking { background-color: var(--mf-color-lane-parking); }
+.road-builder-lane-textured { -unity-background-scale-mode: scale-and-crop; }
+.road-builder-lane-textured > Label, .road-builder-lane-textured > .icon { color: var(--mf-color-text-primary); background-color: rgba(23, 28, 35, 0.6); border-radius: var(--mf-radius-sm); padding: 0 3px; }
+.road-builder-choices { flex-wrap: wrap; margin-bottom: var(--mf-space-2); }
+.road-builder-choices > .panel-tab { flex-grow: 1; flex-basis: 23%; height: 26px; padding: 0 4px; font-size: var(--mf-font-secondary); }
+.road-builder-remove { color: var(--mf-color-error); }
+.road-builder-surface { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.road-builder-surfaces { height: 250px; }
+.road-builder-surface-header { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-2); }
+.road-builder-grow { flex-grow: 1; margin-bottom: 0; }
+.road-builder-surface-tiles { flex-grow: 1; min-height: 0; }

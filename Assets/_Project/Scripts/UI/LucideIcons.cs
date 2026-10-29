@@ -71,6 +71,8 @@ namespace OmsiMapEditor.UI
             ["maximize"] = new[] { "M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3" },
             ["minus"] = new[] { "M5 12h14" },
             ["plus"] = new[] { "M5 12h14", "M12 5v14" },
+            ["arrow-up"] = new[] { "m5 12 7-7 7 7", "M12 19V5" },
+            ["arrow-down"] = new[] { "M12 5v14", "m19 12-7 7-7-7" },
             // The circle cx 12, cy 12, r 10.
             ["crosshair"] = new[] { "M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0", "M22 12h-4", "M6 12H2", "M12 6V2", "M12 22v-4" },
             ["layers"] = new[]

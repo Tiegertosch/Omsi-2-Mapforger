@@ -17,7 +17,7 @@ namespace OmsiMapEditor.UI
     /// </summary>
     internal sealed class RoadToolPanel : VisualElement
     {
-        private enum Tab { InMap, Favorites, Category }
+        private enum Tab { InMap, Favorites, MyRoads, Category }
 
         private const string FavoritesKey = "Mapforge.RoadFavorites";
         private const int PreviewWidth = 96;
@@ -237,6 +237,15 @@ namespace OmsiMapEditor.UI
             planLabel.AddToClassList("picker-subtitle");
             titles.Add(planLabel);
             header.Add(titles);
+            var newType = new Button(() => NewRoadTypeRequested?.Invoke())
+            {
+                tooltip = "Opens the road builder: put lanes together into a road type of your own (ADR 049)"
+            };
+            newType.AddToClassList("map-control-button");
+            newType.AddToClassList("road-picker-new");
+            newType.Add(new IconElement("plus"));
+            newType.Add(new Label("New road type..."));
+            header.Add(newType);
             var searchRow = new VisualElement();
             searchRow.AddToClassList("panel-search");
             searchRow.AddToClassList("picker-search");
@@ -260,6 +269,7 @@ namespace OmsiMapEditor.UI
             tabRow.AddToClassList("picker-tabs");
             AddTab(Tab.InMap, OmsiSplineCategory.Other, "In map", "Profiles this map uses, most used first");
             AddTab(Tab.Favorites, OmsiSplineCategory.Other, "Favorites", "Profiles you marked with the star");
+            AddTab(Tab.MyRoads, OmsiSplineCategory.Other, "My roads", "Road types you made with the road builder, kept under Splines\\Mapforge");
             foreach (OmsiSplineCategory each in Enum.GetValues(typeof(OmsiSplineCategory)))
                 AddTab(Tab.Category, each, OmsiSplineCategories.Name(each), TabTooltip(each));
             picker.Add(tabRow);
@@ -287,6 +297,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The panel wants to close the road tool.</summary>
         public event Action CloseRequested;
+
+        /// <summary>New road type... was clicked: the road builder should open.</summary>
+        public event Action NewRoadTypeRequested;
 
         /// <summary>A setting changed; the preview should be planned again.</summary>
         public event Action SettingsChanged;
@@ -604,7 +617,7 @@ namespace OmsiMapEditor.UI
                         shown.Add(path);
                     continue;
                 }
-                if (tab == Tab.InMap && used.ContainsKey(path) || tab == Tab.Favorites && favorites.Contains(path) ||
+                if (tab == Tab.InMap && used.ContainsKey(path) || tab == Tab.Favorites && favorites.Contains(path) || tab == Tab.MyRoads && OmsiRoadTypeStore.IsMade(path) ||
                     tab == Tab.Category && categories != null && categories.TryGetValue(path, out var each) && each == category)
                     shown.Add(path);
             }
@@ -615,6 +628,7 @@ namespace OmsiMapEditor.UI
                 : tab == Tab.Category && categories == null ? "Sorting the profiles of the installation..."
                 : tab == Tab.InMap ? "This map uses no spline profiles yet."
                 : tab == Tab.Favorites ? "Mark profiles with the star to find them here."
+                : tab == Tab.MyRoads ? "Road types you make with New road type... show here."
                 : "No profile of this kind in the installation.";
             // The empty note lies over the tile area, which keeps its size.
             emptyLabel.style.display = shown.Count > 0 ? DisplayStyle.None : DisplayStyle.Flex;
