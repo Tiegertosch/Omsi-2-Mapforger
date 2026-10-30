@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace OmsiMapEditor.OMSI
@@ -1236,6 +1237,72 @@ namespace OmsiMapEditor.OMSI
         /// edge line crosses the mouth of each side road, and side roads get a give-way line over the lanes coming in. A
         /// junction of two arms carries the lane lines through; one without a main road gets stop lines on every arm.
         /// </summary>
+        /// <summary>
+        /// Direction arrows from the ways through chosen with the lanes tool (ADR 048, stage 4 of the AI paths): on each lane
+        /// leading in, an arrow for where its connections go, straight on within 30° as the paths' indicators are set, else
+        /// left or right. An arm gets them where a lane leading in does not go every way the arm can, such as a lane kept
+        /// for turning left; then each of its lanes with a way through gets one. Arms whose lanes all go every way, and
+        /// lanes without a way through, get none. Null for a junction with every way through, which says nothing a driver
+        /// needs an arrow for.
+        /// </summary>
+        public static List<OmsiMarkingArrow> SuggestArrows(OmsiJunctionLayout layout, ICollection<string> connections)
+        {
+            if (layout == null)
+                throw new ArgumentNullException(nameof(layout));
+            if (connections == null || layout.IsTransition)
+                return null;
+            var anchors = Anchors(layout);
+            var ends = layout.LaneEnds();
+            var arrows = new List<OmsiMarkingArrow>();
+            for (var arm = 0; arm < layout.Arms.Count; arm++)
+            {
+                var inbound = ends.FindAll(end => end.Inbound && end.Arm == arm);
+                // Where this arm's traffic could go: the arms with lanes leading out.
+                var possible = Directions(layout, arm, ends.FindAll(end => !end.Inbound && end.Arm != arm).Select(end => end.Arm).Distinct());
+                var ways = new List<int>();
+                foreach (var end in inbound)
+                {
+                    var targets = new List<int>();
+                    foreach (var key in connections)
+                        if (key.StartsWith(arm.ToString(CultureInfo.InvariantCulture) + "." + end.Lane.ToString(CultureInfo.InvariantCulture) + ">", StringComparison.Ordinal) &&
+                            int.TryParse(key.Substring(key.IndexOf('>') + 1).Split('.')[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var to))
+                            targets.Add(to);
+                    ways.Add(Directions(layout, arm, targets.Distinct()));
+                }
+                if (ways.TrueForAll(directions => directions == 0 || directions == possible))
+                    continue;
+                for (var index = 0; index < inbound.Count; index++)
+                {
+                    var end = inbound[index];
+                    var directions = ways[index];
+                    if (directions == 0)
+                        continue;
+                    var lane = LaneAt(anchors, end.X, end.Y, 15.0);
+                    if (lane == null)
+                        continue;
+                    var info = OmsiMarkingArrowInfo.All.FirstOrDefault(each =>
+                        each.Straight == ((directions & 1) != 0) && each.Left == ((directions & 2) != 0) && each.Right == ((directions & 4) != 0));
+                    if (info != null)
+                        arrows.Add(new OmsiMarkingArrow { From = lane[0].Key, To = lane[1].Key, Kind = info.Kind });
+                }
+            }
+            return arrows;
+        }
+
+        /// <summary>The ways from one arm to others: 1 straight on, 2 left, 4 right, added together.</summary>
+        private static int Directions(OmsiJunctionLayout layout, int from, IEnumerable<int> arms)
+        {
+            var directions = 0;
+            foreach (var to in arms)
+            {
+                if (to == from)
+                    continue;
+                var turn = OmsiRoadPlanner.Normalize(layout.Arms[to].HeadingDegrees - (layout.Arms[from].HeadingDegrees + 180.0));
+                directions |= Math.Abs(turn) < 30.0 ? 1 : turn > 0.0 ? 4 : 2;
+            }
+            return directions;
+        }
+
         public static List<OmsiMarkingLine> Suggest(OmsiJunctionLayout layout)
         {
             if (layout == null)

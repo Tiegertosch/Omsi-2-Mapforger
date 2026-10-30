@@ -574,6 +574,49 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ArrowsAreSuggestedFromTheWaysThroughTheLanes()
+        {
+            var road = Profile("walk 3 | drive 3.25 back | drive 3.25 back | drive 3.25 | drive 3.25 | walk 3", out _);
+            var arms = new[] { 0.0, 90.0, 180.0, 270.0 }.Select((heading, index) =>
+                new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = road, Main = index % 2 == 0, Mirrored = index >= 2 }).ToList();
+            var layout = OmsiJunctionLayout.Build(arms, null);
+            var ends = layout.LaneEnds();
+            var into = ends.Where(end => end.Inbound && end.Arm == 0).ToList();
+            Assert.AreEqual(2, into.Count);
+            int TurnTo(int to)
+            {
+                var turn = OmsiRoadPlanner.Normalize(layout.Arms[to].HeadingDegrees - (layout.Arms[0].HeadingDegrees + 180.0));
+                return Math.Abs(turn) < 30.0 ? 0 : turn > 0.0 ? 1 : -1;
+            }
+            var left = Enumerable.Range(1, 3).Single(arm => TurnTo(arm) == -1);
+            var straight = Enumerable.Range(1, 3).Single(arm => TurnTo(arm) == 0);
+            var right = Enumerable.Range(1, 3).Single(arm => TurnTo(arm) == 1);
+            string Way(OmsiLaneEnd from, int arm) => OmsiLaneConnections.Key(from, ends.First(end => !end.Inbound && end.Arm == arm));
+            // One lane turns left, the other goes straight on or right; the other arms have no ways through.
+            var connections = new HashSet<string> { Way(into[0], left), Way(into[1], straight), Way(into[1], right) };
+
+            var arrows = OmsiJunctionMarkings.SuggestArrows(layout, connections);
+
+            CollectionAssert.AreEquivalent(new[] { OmsiMarkingArrowKind.Left, OmsiMarkingArrowKind.StraightRight }, arrows.Select(arrow => arrow.Kind));
+            Assert.IsTrue(arrows.All(arrow => arrow.From.StartsWith("0.1.", StringComparison.Ordinal) && arrow.To.StartsWith("0.1.", StringComparison.Ordinal) && !arrow.Outward));
+            Assert.AreNotEqual(arrows[0].From, arrows[1].From);
+            // Arms whose lanes all go every way get none, though lanes of other arms are kept to some ways.
+            var all = OmsiLaneConnections.All(ends);
+            all.RemoveWhere(key => key.StartsWith("0.", StringComparison.Ordinal));
+            all.UnionWith(connections);
+            CollectionAssert.AreEquivalent(new[] { OmsiMarkingArrowKind.Left, OmsiMarkingArrowKind.StraightRight },
+                OmsiJunctionMarkings.SuggestArrows(layout, all).Select(arrow => arrow.Kind));
+            // Every way through says nothing an arrow would.
+            Assert.IsNull(OmsiJunctionMarkings.SuggestArrows(layout, null));
+            // A single lane in that goes every way its arm can gets none.
+            var oneLane = Profile(TwoLanes, out _);
+            var small = OmsiJunctionLayout.Build(new[] { 0.0, 90.0, 180.0, 270.0 }.Select((heading, index) =>
+                new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = oneLane, Main = index % 2 == 0, Mirrored = index >= 2 }), null);
+            var smallEnds = small.LaneEnds();
+            Assert.IsEmpty(OmsiJunctionMarkings.SuggestArrows(small, OmsiLaneConnections.All(smallEnds)));
+        }
+
+        [Test]
         public void RowsStandByTheKerbInTheMiddleOrAtTheFarSide()
         {
             var type = OmsiRoadType.Parse("walk 3 row=\"Sceneryobjects\\Trees\\linde.sco\" every=15 | drive 3.25 back | median 2 row=\"Sceneryobjects\\x\\lamp.sco\" at=middle | " +

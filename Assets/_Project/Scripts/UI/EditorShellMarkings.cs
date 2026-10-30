@@ -594,8 +594,11 @@ namespace OmsiMapEditor.UI
             var anchors = OmsiJunctionMarkings.AllAnchors(markingLayout, lines);
             var areas = CopyAreas();
             var gone = areas.RemoveAll(area => area.Corners.Exists(corner => !anchors.Exists(anchor => anchor.Key == corner)));
-            ApplyMarkings(lines, areas, -1, "Put in " + lines.Count + " suggested line(s)" + (replaced > 0 ? " in place of " + replaced : string.Empty) +
-                                            (gone > 0 ? ", without " + gone + " area(s) at crossings that went" : string.Empty));
+            // With ways through chosen with the lanes tool, the arrows show them; otherwise the arrows stay.
+            var arrows = OmsiJunctionMarkings.SuggestArrows(markingLayout, markingMade.Connections);
+            ApplyMarkings(lines, areas, arrows ?? CopyArrows(), -1, "Put in " + lines.Count + " suggested line(s)" + (replaced > 0 ? " in place of " + replaced : string.Empty) +
+                                                                   (gone > 0 ? ", without " + gone + " area(s) at crossings that went" : string.Empty) +
+                                                                   (arrows != null ? " and " + arrows.Count + " arrow(s) for the ways through the lanes" : string.Empty));
         }
 
         private static double DistanceToSegment(OmsiMapPoint point, OmsiMapPoint a, OmsiMapPoint b)
