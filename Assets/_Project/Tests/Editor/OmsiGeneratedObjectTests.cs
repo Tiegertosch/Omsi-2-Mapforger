@@ -322,6 +322,85 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ALeftTurnLaneIsTakenOutOfTheMedianBesideANarrowIslandAndOnlyItTurnsLeft()
+        {
+            var dual = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Dual), @"Splines\Test\dual.sli");
+            var street = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Cobbled), @"Splines\Test\street.sli");
+            // The dual road runs north, a street crosses it; the northern arm gets a turn lane, the street asks for one too.
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0, ProfilePath = @"Splines\Test\dual.sli", Profile = dual, Main = true, TurnLane = new OmsiTurnLane() },
+                new OmsiJunctionArm { HeadingDegrees = 180, ProfilePath = @"Splines\Test\dual.sli", Profile = dual, Main = true, Mirrored = true },
+                new OmsiJunctionArm { HeadingDegrees = 90, ProfilePath = @"Splines\Test\street.sli", Profile = street, TurnLane = new OmsiTurnLane() },
+                new OmsiJunctionArm { HeadingDegrees = 270, ProfilePath = @"Splines\Test\street.sli", Profile = street, Mirrored = true }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            // The northern arm reaches on by 30 m of storage and 20 m of taper beyond its corners; its mouth stays.
+            var north = layout.Arms.Single(arm => arm.HeadingDegrees == 0);
+            var northIndex = layout.Arms.IndexOf(north);
+            var south = layout.Arms.Single(arm => arm.HeadingDegrees == 180);
+            Assert.AreEqual(south.Length + 50.0, north.Length, 1e-6);
+            Assert.AreEqual(south.Mouth, north.Mouth, 1e-6);
+            Assert.IsNull(layout.TurnLaneProblems[northIndex]);
+            StringAssert.Contains("no median", layout.TurnLaneProblems[layout.Arms.FindIndex(arm => arm.HeadingDegrees == 90)]);
+
+            // Traffic comes in west of the 3 m median, so the 2.5 m turn lane lies on its west side, from -1.5 to 1 m, and a
+            // 0.5 m island stays on its east side; over the taper the island widens to the full median.
+            var mouth = north.Mouth;
+            var island = layout.Meshes.Where(mesh => mesh.Texture == "grass.bmp").ToList();
+            Assert.IsTrue(island.Any(mesh => Covers(mesh, 1.25, mouth + 10.0)));
+            Assert.IsFalse(island.Any(mesh => Covers(mesh, 0.0, mouth + 10.0) || Covers(mesh, -1.0, mouth + 29.0)));
+            Assert.IsTrue(island.Any(mesh => Covers(mesh, 0.0, north.Length - 1.0) && Covers(mesh, -1.4, north.Length - 1.0)));
+            // The carriageways run on in the road's asphalt, the turn lane on plain asphalt.
+            Assert.IsTrue(layout.Meshes.Any(mesh => mesh.Texture == "asphalt.bmp" && Covers(mesh, -5.0, mouth + 20.0)));
+            Assert.IsTrue(layout.Meshes.Any(mesh => mesh.Texture == "plain.bmp" && Covers(mesh, 0.0, mouth + 10.0)));
+            // A line beside the turn lane and two left arrows in it.
+            Assert.IsTrue(layout.Meshes.Any(mesh => mesh.Texture == OmsiJunctionMarkings.WhiteTexture && Covers(mesh, -1.5, mouth + 15.0)));
+
+            // The lane next to the median runs on to the taper's outer end, then on straight and over into the turn lane;
+            // only the turn lane turns left, towards the east, and the lane next to it no longer does.
+            var branch = mouth + 50.0;
+            Assert.AreEqual(1, layout.Paths.Count(path => Math.Abs(path.X - -4.5) < 1e-6 && Math.Abs(path.Y - north.Length) < 1e-6 && path.RadiusMeters == 0.0));
+            Assert.IsTrue(layout.Paths.Any(path => Math.Abs(path.X - -4.5) < 1e-6 && Math.Abs(path.Y - branch) < 1e-6 && path.RadiusMeters != 0.0));
+            Assert.IsTrue(layout.Paths.Any(path => Math.Abs(path.X - -0.25) < 1e-6 && Math.Abs(path.Y - mouth) < 1e-6 && path.Blinker == 2 && path.RadiusMeters != 0.0));
+            Assert.IsFalse(layout.Paths.Any(path => Math.Abs(path.X - -4.5) < 1e-6 && Math.Abs(path.Y - mouth) < 1e-6 && path.Blinker == 2));
+            Assert.IsTrue(layout.Paths.Any(path => Math.Abs(path.X - -4.5) < 1e-6 && Math.Abs(path.Y - mouth) < 1e-6 && path.Blinker == 0));
+            var east = layout.Arms.FindIndex(arm => arm.HeadingDegrees == 90);
+            Assert.IsTrue(layout.WaysThrough.Any(way => way.StartsWith(northIndex + ".4>" + east + ".", StringComparison.Ordinal)));
+            Assert.IsFalse(layout.WaysThrough.Any(way => way.StartsWith(northIndex + ".1>" + east + ".", StringComparison.Ordinal)));
+            // Arrows may be laid along the whole approach, 50 m longer than on the other arms, but not in the turn lane, which has its own.
+            var anchors = OmsiJunctionMarkings.Anchors(layout);
+            Assert.AreEqual(OmsiJunctionMarkings.ArrowReachMeters + 50.0, OmsiJunctionMarkings.ArrowReach(layout, northIndex), 1e-6);
+            Assert.AreEqual(OmsiJunctionMarkings.ArrowReachMeters, OmsiJunctionMarkings.ArrowReach(layout, layout.Arms.IndexOf(south)), 1e-6);
+            Assert.IsNotNull(OmsiJunctionMarkings.LaneAt(anchors, -4.5, mouth + 45.0, arm => OmsiJunctionMarkings.ArrowReach(layout, arm)));
+            Assert.IsNull(OmsiJunctionMarkings.LaneAt(anchors, -4.5, mouth + 45.0, OmsiJunctionMarkings.ArrowReachMeters));
+            Assert.IsNull(OmsiJunctionMarkings.LaneAt(anchors, 0.0, mouth + 10.0, arm => OmsiJunctionMarkings.ArrowReach(layout, arm)));
+
+            // The lanes tool sees the turn lane after the profile's four lanes, at the mouth.
+            var end = layout.LaneEnds().Single(each => each.Arm == northIndex && each.Lane == 4);
+            Assert.IsTrue(end.Inbound);
+            Assert.AreEqual(mouth, end.Y, 1e-6);
+
+            // The junction keeps its turn lanes in its .sco and reads them back.
+            var made = OmsiJunctionGenerator.Junction(arms, @"Splines\Test\texture\plain.bmp", "Turn");
+            StringAssert.Contains("MapWorks turn lanes: " + northIndex + " 20 30\r\n", made.Sco);
+            var back = OmsiGeneratedJunction.Parse(@"Sceneryobjects\Mapforge\Test\Turn\Turn.sco", Encoding.UTF8.GetBytes(made.Sco), path => path.EndsWith("dual.sli") ? dual : street);
+            Assert.AreEqual(20.0, back.Arms[northIndex].TurnLane.TaperMeters);
+            Assert.AreEqual(30.0, back.Arms[northIndex].TurnLane.StorageMeters);
+            Assert.AreEqual(1, back.Arms.Count(arm => arm.TurnLane != null));
+
+            // A texture whose alpha cuts it, such as broken lines, keeps doing so on the approach.
+            var cut = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Dual.Replace("asphalt.bmp\r\n", "asphalt.bmp\r\n[matl_alpha]\r\n1\r\n")), @"Splines\Test\dual.sli");
+            arms[0].Profile = cut;
+            arms[1].Profile = cut;
+            made = OmsiJunctionGenerator.Junction(arms, @"Splines\Test\texture\plain.bmp", "Turn");
+            StringAssert.Contains("[matl]\r\nasphalt.bmp\r\n0\r\n\r\n[matl_alpha]\r\n1\r\n", made.Sco);
+            Assert.AreEqual(1, OmsiSceneryObject.Parse(Encoding.UTF8.GetBytes(made.Sco)).Meshes[0].Materials.Count(material => material.AlphaMode == 1 && material.Texture == "asphalt.bmp"));
+        }
+
+        [Test]
         public void AJunctionOfTwoRoadsKeepsEachSurfaceAndBlendsThePavementsRoundTheCorners()
         {
             var road = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);

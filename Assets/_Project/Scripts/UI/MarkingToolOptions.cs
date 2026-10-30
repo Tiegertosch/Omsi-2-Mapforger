@@ -310,14 +310,18 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>The distance typed for the selected arrow in metres, 0 to 50; the default when nothing sensible is typed.</summary>
+        /// <summary>
+        /// The distance typed for the selected arrow in metres, from 0 up to the end of the longest approach a left-turn lane
+        /// makes; the default when nothing sensible is typed.
+        /// </summary>
         public double Distance
         {
             get
             {
                 var text = distanceField.value?.Trim().Replace(',', '.') ?? string.Empty;
+                var farthest = 2.0 * OmsiTurnLane.LongestMeters + OmsiJunctionMarkings.ArrowReachMeters;
                 return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var metres) && !double.IsInfinity(metres) && !double.IsNaN(metres)
-                    ? Math.Max(0.0, Math.Min(50.0, metres))
+                    ? Math.Max(0.0, Math.Min(farthest, metres))
                     : OmsiMarkingArrow.DefaultDistance;
             }
         }

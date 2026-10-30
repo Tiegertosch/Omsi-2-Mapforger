@@ -1084,6 +1084,16 @@ namespace OmsiMapEditor.UI
                 RunLaneArgument(ways);
             }
 
+            // -turnLane n [taper storage|off] gives arm n of the selected junction a left-turn lane or takes it away (ADR 051).
+            var turnLaneAt = Array.IndexOf(args, "-turnLane");
+            if (turnLaneAt >= 0)
+            {
+                var words = new List<string>();
+                for (var index = turnLaneAt + 1; index < args.Length && !args[index].StartsWith("-", StringComparison.Ordinal); index++)
+                    words.Add(args[index]);
+                RunTurnLaneArgument(words);
+            }
+
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
                 SetTextures(false);
 

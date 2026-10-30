@@ -26,8 +26,15 @@ namespace OmsiMapEditor.UI
         private readonly List<OmsiMapPoint> laneEndPoints = new List<OmsiMapPoint>();
         private readonly List<double> laneEndHeights = new List<double>();
         private HashSet<string> laneConnections = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>The ways through the junction has without chosen ones, as it was made.</summary>
+        private HashSet<string> laneDefaultWays = new HashSet<string>(StringComparer.Ordinal);
+
         private int laneSource = -1;
         private int laneHover = -1;
+        private VisualElement laneTurnRows;
+        private TextField laneTaperField;
+        private TextField laneStorageField;
 
         private void CreateLaneOptions()
         {
@@ -58,6 +65,19 @@ namespace OmsiMapEditor.UI
             };
             none.AddToClassList("map-control-button");
             laneOptions.Add(none);
+
+            // Left-turn lanes out of the median of an arm (ADR 051, stage 2).
+            var turnTitle = new Label("Left-turn lanes");
+            turnTitle.AddToClassList("picker-options-title");
+            turnTitle.style.marginTop = 8f;
+            laneOptions.Add(turnTitle);
+            laneTaperField = LaneNumberRow("Taper (m)", OmsiTurnLane.DefaultTaperMeters,
+                "How long the median's kerb takes to lead back to its full width beyond the storage");
+            laneStorageField = LaneNumberRow("Storage (m)", OmsiTurnLane.DefaultStorageMeters,
+                "How long the turn lane runs at its full width before the stop line, for the cars waiting to turn");
+            laneTurnRows = new VisualElement();
+            laneOptions.Add(laneTurnRows);
+
             lanePlanLabel = new Label();
             lanePlanLabel.AddToClassList("panel-info");
             laneOptions.Add(lanePlanLabel);
@@ -65,6 +85,152 @@ namespace OmsiMapEditor.UI
             hint.AddToClassList("panel-info");
             laneOptions.Add(hint);
             objectsPanelHost.Add(laneOptions);
+        }
+
+        private TextField LaneNumberRow(string label, double value, string tooltip)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("picker-option");
+            row.tooltip = tooltip;
+            var text = new Label(label);
+            text.AddToClassList("picker-option-label");
+            row.Add(text);
+            var field = new TextField { value = value.ToString("0.#", CultureInfo.InvariantCulture), tooltip = tooltip };
+            field.AddToClassList("picker-field");
+            row.Add(field);
+            laneOptions.Add(row);
+            return field;
+        }
+
+        /// <summary>The lengths in the fields, kept within the bounds a turn lane allows.</summary>
+        private OmsiTurnLane LaneTurnLengths()
+        {
+            double Read(TextField field, double fallback) =>
+                double.TryParse(field.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var meters) ? OmsiTurnLane.Clamp(meters) : fallback;
+            return new OmsiTurnLane
+            {
+                TaperMeters = Read(laneTaperField, OmsiTurnLane.DefaultTaperMeters), StorageMeters = Read(laneStorageField, OmsiTurnLane.DefaultStorageMeters)
+            };
+        }
+
+        /// <summary>A row for each arm of the junction with a median: a left-turn lane to add, or to take away or give the lengths in the fields.</summary>
+        private void RefreshLaneTurnRows(OmsiJunctionLayout layout)
+        {
+            if (laneTurnRows == null)
+                return;
+            laneTurnRows.Clear();
+            if (layout == null || laneMade == null)
+                return;
+            for (var arm = 0; arm < layout.Arms.Count && arm < laneMade.Arms.Count; arm++)
+            {
+                var lane = laneMade.Arms[arm].TurnLane;
+                if (lane == null && (arm >= layout.IslandNoses.Length || double.IsNaN(layout.IslandNoses[arm])))
+                    continue;
+                var each = arm;
+                var name = "arm " + (arm + 1) + " (" + LaneArmDirection(layout.Arms[arm]) + ")";
+                var toggle = new Button(() => ApplyTurnLane(each, lane == null ? LaneTurnLengths() : null))
+                {
+                    text = lane == null
+                        ? "Add on " + name
+                        : "Remove from " + name + ", " + lane.TaperMeters.ToString("0.#", CultureInfo.InvariantCulture) + " + " +
+                          lane.StorageMeters.ToString("0.#", CultureInfo.InvariantCulture) + " m",
+                    tooltip = lane == null
+                        ? "Takes a left-turn lane out of this arm's median, with the taper and storage above; the road joined to it is cut back to make room"
+                        : "Gives the median back its full width up to the mouth"
+                };
+                toggle.AddToClassList("map-control-button");
+                toggle.style.whiteSpace = WhiteSpace.Normal;
+                laneTurnRows.Add(toggle);
+                if (lane == null)
+                    continue;
+                var lengths = new Button(() => ApplyTurnLane(each, LaneTurnLengths()))
+                {
+                    text = "Lengths above for " + name, tooltip = "Makes this arm's left-turn lane as long as the taper and storage above"
+                };
+                lengths.AddToClassList("map-control-button");
+                lengths.style.whiteSpace = WhiteSpace.Normal;
+                laneTurnRows.Add(lengths);
+            }
+        }
+
+        /// <summary>The way an arm of the selected junction points on the map, such as "north-east".</summary>
+        private string LaneArmDirection(OmsiJunctionArm arm)
+        {
+            var radians = arm.HeadingDegrees * Math.PI / 180.0;
+            var centre = ObjectToWorld(laneTile, laneJunction, 0.0, 0.0);
+            var end = ObjectToWorld(laneTile, laneJunction, Math.Sin(radians) * 10.0, Math.Cos(radians) * 10.0);
+            var bearing = (Math.Atan2(end.X - centre.X, end.Y - centre.Y) * 180.0 / Math.PI + 360.0) % 360.0;
+            var names = new[] { "north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west" };
+            return names[(int)Math.Round(bearing / 45.0) % 8];
+        }
+
+        /// <summary>
+        /// Gives an arm of the selected junction a left-turn lane with these lengths, or takes it away with null, making the
+        /// junction again as one undo step. Chosen ways through stay, but for the ways from that arm, which become the ones
+        /// the junction has without chosen ways.
+        /// </summary>
+        private void ApplyTurnLane(int arm, OmsiTurnLane lane)
+        {
+            if (laneJunction == null || laneMade == null || arm < 0 || arm >= laneMade.Arms.Count)
+            {
+                SetStatus("Lanes: click a junction made in this project first.");
+                return;
+            }
+            if (!CanEdit)
+            {
+                SetStatus(ReadOnlyMessage("change the lanes of junctions"));
+                return;
+            }
+            var made = laneMade;
+            var before = made.Arms[arm].TurnLane;
+            made.Arms[arm].TurnLane = lane;
+            try
+            {
+                var plain = PlainRoadTexture();
+                var rebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, laneTile, laneJunction);
+                if (rebuild == null)
+                {
+                    SetStatus("Junction #" + laneJunction.Id + " cannot be made again: its connection points do not match its file.");
+                    return;
+                }
+                OmsiJunctionLayout layout;
+                try
+                {
+                    layout = OmsiJunctionLayout.Build(rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, plain).Arms, plain);
+                }
+                catch (ArgumentException exception)
+                {
+                    SetStatus("Junction #" + laneJunction.Id + " cannot be laid out: " + exception.Message);
+                    return;
+                }
+                if (lane != null && arm < layout.TurnLaneProblems.Length && layout.TurnLaneProblems[arm] != null)
+                {
+                    SetStatus("No left-turn lane: " + layout.TurnLaneProblems[arm]);
+                    return;
+                }
+                HashSet<string> connections = null;
+                if (made.Connections != null)
+                {
+                    var prefix = arm.ToString(CultureInfo.InvariantCulture) + ".";
+                    connections = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var way in made.Connections)
+                        if (!way.StartsWith(prefix, StringComparison.Ordinal))
+                            connections.Add(way);
+                    foreach (var way in layout.WaysThrough)
+                        if (way.StartsWith(prefix, StringComparison.Ordinal))
+                            connections.Add(way);
+                }
+                ApplyLaneConnections(connections, lane == null
+                    ? "Took the left-turn lane of arm " + (arm + 1) + " away"
+                    : (before == null ? "Added a left-turn lane to arm " : "Gave the left-turn lane of arm ") + (arm + 1) +
+                      (before == null ? " with " : " ") + lane.TaperMeters.ToString("0.#", CultureInfo.InvariantCulture) + " m of taper and " +
+                      lane.StorageMeters.ToString("0.#", CultureInfo.InvariantCulture) + " m of storage", layout.WaysThrough);
+            }
+            finally
+            {
+                // The junction made again is read from its own file; the one it replaced stays as it was, for undo.
+                made.Arms[arm].TurnLane = before;
+            }
         }
 
         private void BeginLaneTool()
@@ -120,8 +286,11 @@ namespace OmsiMapEditor.UI
             mapCanvas?.SetLaneEnds(null, null, -1);
         }
 
-        /// <summary>The arms of a made junction as it would be made again, laid out; null with the reason shown when it cannot be.</summary>
-        private OmsiJunctionLayout LaneLayout(OmsiTileSummary tile, OmsiObjectRecord record, OmsiGeneratedJunction made)
+        /// <summary>
+        /// The arms of a made junction as it would be made again, laid out with these ways through, null for those it has
+        /// without chosen ones; null with the reason shown when it cannot be.
+        /// </summary>
+        private OmsiJunctionLayout LaneLayout(OmsiTileSummary tile, OmsiObjectRecord record, OmsiGeneratedJunction made, ICollection<string> connections)
         {
             var rebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, tile, record);
             if (rebuild == null)
@@ -131,7 +300,7 @@ namespace OmsiMapEditor.UI
             }
             try
             {
-                return OmsiJunctionLayout.Build(rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, PlainRoadTexture()).Arms, PlainRoadTexture(), made.Connections);
+                return OmsiJunctionLayout.Build(rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, PlainRoadTexture()).Arms, PlainRoadTexture(), connections);
             }
             catch (ArgumentException exception)
             {
@@ -146,9 +315,10 @@ namespace OmsiMapEditor.UI
             var made = MadeJunction(record.AssetPath);
             if (made == null)
                 return false;
-            var layout = LaneLayout(tile, record, made);
+            var layout = LaneLayout(tile, record, made, made.Connections);
             if (layout == null)
                 return false;
+            var defaults = made.Connections == null ? layout : LaneLayout(tile, record, made, null);
             if (layout.IsTransition)
             {
                 SetStatus("Object #" + record.Id + " joins two cross-sections; it has no ways through to choose.");
@@ -159,7 +329,8 @@ namespace OmsiMapEditor.UI
             laneJunction = record;
             laneMade = made;
             laneEnds = layout.LaneEnds();
-            laneConnections = made.Connections != null ? new HashSet<string>(made.Connections, StringComparer.Ordinal) : OmsiLaneConnections.All(laneEnds);
+            laneConnections = new HashSet<string>(layout.WaysThrough, StringComparer.Ordinal);
+            laneDefaultWays = new HashSet<string>(defaults?.WaysThrough ?? layout.WaysThrough, StringComparer.Ordinal);
             laneEndPoints.Clear();
             laneEndHeights.Clear();
             foreach (var end in laneEnds)
@@ -170,6 +341,7 @@ namespace OmsiMapEditor.UI
             laneSource = keepSource >= 0 && keepSource < laneEnds.Count && laneEnds[keepSource].Inbound ? keepSource : -1;
             laneJunctionLabel.text = "Junction #" + record.Id + ": " + made.Arms.Count + " arms, " + laneConnections.Count + " of " +
                                      OmsiLaneConnections.All(laneEnds).Count + " ways through.";
+            RefreshLaneTurnRows(layout);
             if (selection.Count != 1 || !ReferenceEquals(selection[0].Record, record))
             {
                 selection.Clear();
@@ -343,22 +515,23 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Makes the junction again with these ways through under Sceneryobjects\Mapforge and puts it in place of the old one,
-        /// keeping its markings; its arms keep their right of way on the new paths. One undo step. Null, or every way
-        /// through, makes it as it was made.
+        /// keeping its markings and turn lanes; its arms keep their right of way on the new paths. One undo step. Null, or
+        /// the ways it has without chosen ones (<paramref name="defaults"/>, else those of the junction now), makes it as it
+        /// was made. False when it stays as it is.
         /// </summary>
-        private void ApplyLaneConnections(HashSet<string> connections, string done)
+        private bool ApplyLaneConnections(HashSet<string> connections, string done, HashSet<string> defaults = null)
         {
             if (laneJunction == null || laneMade == null)
             {
                 SetStatus("Lanes: click a junction made in this project first.");
-                return;
+                return false;
             }
             if (!CanEdit)
             {
                 SetStatus(ReadOnlyMessage("choose the lanes of junctions"));
-                return;
+                return false;
             }
-            if (connections != null && connections.SetEquals(OmsiLaneConnections.All(laneEnds)))
+            if (connections != null && connections.SetEquals(defaults ?? laneDefaultWays))
                 connections = null;
             var record = laneJunction;
             var tile = laneTile;
@@ -367,14 +540,14 @@ namespace OmsiMapEditor.UI
             if (rebuild == null)
             {
                 SetStatus("Junction #" + record.Id + " cannot be made again: its connection points do not match its file.");
-                return;
+                return false;
             }
             var plain = PlainRoadTexture();
             var turn = rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, plain);
             if (turn.HasErrors)
             {
                 SetStatus("Junction #" + record.Id + " stays: " + (turn.Problem ?? "the roads at it cannot be kept as they are."));
-                return;
+                return false;
             }
             // The right of way of the arms as the old paths have it, to put on the new ones.
             var oldObject = PrioritySceneryObject(record.AssetPath);
@@ -390,7 +563,7 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 SetStatus("The junction could not be made again: " + exception.Message);
-                return;
+                return false;
             }
             OmsiJunctionInsertionResult result;
             try
@@ -402,13 +575,13 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
                 RefreshAfterChange(null);
                 SetStatus("Junction #" + record.Id + " could not be made again: " + exception.Message);
-                return;
+                return false;
             }
             if (!result.Succeeded)
             {
                 RefreshAfterChange(null);
                 SetStatus("Junction #" + record.Id + " stays: " + DescribeReferences(result.Blockers) + " still need it as it is.");
-                return;
+                return false;
             }
             var steps = new List<object>(result.Steps);
             foreach (var step in steps)
@@ -421,6 +594,7 @@ namespace OmsiMapEditor.UI
             TargetLaneJunction(tile, record);
             SetStatus(done + " on junction #" + record.Id + ", now " + laneConnections.Count + " way(s) through, made again as " +
                       Path.GetFileNameWithoutExtension(assetPath) + ". Ctrl+Z takes it back.");
+            return true;
         }
 
         /// <summary>
@@ -487,6 +661,28 @@ namespace OmsiMapEditor.UI
             }
             else
                 SetTool(EditorTool.Drag);
+        }
+
+        /// <summary>
+        /// For command-line checks: opens the lanes tool on the selected junction and gives arm <c>n</c> (from 1) a left-turn
+        /// lane, with <c>n taper storage</c> those lengths, or takes it away with <c>n off</c>. The status goes to the log
+        /// as "Turn lane:".
+        /// </summary>
+        private void RunTurnLaneArgument(IList<string> words)
+        {
+            SetTool(EditorTool.Lanes);
+            if (words.Count == 0 || !int.TryParse(words[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var arm))
+            {
+                Debug.Log("Turn lane: give the arm, from 1, then its taper and storage in metres or off.");
+                return;
+            }
+            if (words.Count >= 3)
+            {
+                laneTaperField.value = words[1];
+                laneStorageField.value = words[2];
+            }
+            ApplyTurnLane(arm - 1, words.Count >= 2 && words[1] == "off" ? null : LaneTurnLengths());
+            Debug.Log("Turn lane: " + statusLabel?.text);
         }
 
         /// <summary>

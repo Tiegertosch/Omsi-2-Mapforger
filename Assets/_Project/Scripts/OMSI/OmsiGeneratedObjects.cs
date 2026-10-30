@@ -15,6 +15,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The texture file name, looked up in the <c>texture</c> folder next to the .sco.</summary>
         public string Texture { get; set; }
 
+        /// <summary>True when the texture's alpha channel cuts it, as for broken lines of a road profile ([matl_alpha] 1).</summary>
+        public bool UsesAlpha { get; set; }
+
         public List<double> Positions { get; } = new List<double>();
         public List<double> Uvs { get; } = new List<double>();
         public List<int> Triangles { get; } = new List<int>();
@@ -261,6 +264,9 @@ namespace OmsiMapEditor.OMSI
                 sco.Append(OmsiJunctionMarkings.WriteArrows(arrows)).Append("\r\n");
             if (connections != null)
                 sco.Append(OmsiLaneConnections.Write(connections)).Append("\r\n");
+            var turnLanes = OmsiTurnLane.Write(layout.Arms);
+            if (turnLanes != null)
+                sco.Append(turnLanes).Append("\r\n");
             sco.Append("\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");
@@ -284,6 +290,17 @@ namespace OmsiMapEditor.OMSI
                     Section(sco, "rail_enh", OmsiRoadTypeWriter.StreetTrack);
             }
             Section(sco, "mesh", "model.x");
+            // Materials whose texture's alpha cuts them, by their place among the model's materials of that texture.
+            var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var mesh in meshes)
+            {
+                seen.TryGetValue(mesh.Texture ?? string.Empty, out var place);
+                seen[mesh.Texture ?? string.Empty] = place + 1;
+                if (!mesh.UsesAlpha)
+                    continue;
+                Section(sco, "matl", mesh.Texture, place.ToString(CultureInfo.InvariantCulture));
+                Section(sco, "matl_alpha", "1");
+            }
             Section(sco, "collision_mesh", "model.x");
             generated.Sco = sco.ToString();
             return generated;

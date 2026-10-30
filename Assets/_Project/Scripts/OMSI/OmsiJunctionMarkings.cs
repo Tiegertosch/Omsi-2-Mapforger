@@ -484,7 +484,7 @@ namespace OmsiMapEditor.OMSI
                 var heading = junctionArm.HeadingDegrees * Math.PI / 180.0;
                 for (var row = 0; row < 2; row++)
                 {
-                    var along = row == 0 ? junctionArm.Length : Math.Max(0.0, junctionArm.Length - OmsiJunctionLayout.ArmExtension);
+                    var along = row == 0 ? junctionArm.Mouth + OmsiJunctionLayout.ArmExtension : junctionArm.Mouth;
                     for (var index = 0; index < across.Count; index++)
                         anchors.Add(new OmsiMarkingAnchor
                         {
@@ -805,28 +805,35 @@ namespace OmsiMapEditor.OMSI
                 {
                     if (!ArrowFrame(all, arrow, out var tail, out var direction, out var height))
                         continue;
-                    var mesh = MeshFor(false);
-                    // The parts overlap where they join; the paint is opaque, so that does not show.
-                    foreach (var part in ArrowShape(arrow.Kind))
-                    {
-                        var ring = part.ConvertAll(point => ArrowPoint(tail, direction, height, point));
-                        var first = mesh.Positions.Count / 3;
-                        foreach (var point in ring)
-                        {
-                            mesh.Positions.Add(point[0]);
-                            mesh.Positions.Add(height + Lift);
-                            mesh.Positions.Add(point[1]);
-                            mesh.Uvs.Add(0.0);
-                            mesh.Uvs.Add(0.0);
-                        }
-                        foreach (var triangle in OmsiJunctionLayout.Triangulate(ring))
-                            OmsiJunctionLayout.AddUpward(mesh, first + triangle[0], first + triangle[1], first + triangle[2]);
-                    }
+                    AddArrow(MeshFor(false), tail, direction, height + Lift, arrow.Kind);
                 }
             if (white != null && white.Triangles.Count > 0)
                 meshes.Add(white);
             if (yellow != null && yellow.Triangles.Count > 0)
                 meshes.Add(yellow);
+        }
+
+        /// <summary>
+        /// Adds an arrow to a mesh, lying flat at a height with its tail at a point of the object frame and pointing the
+        /// given way. Its parts overlap where they join; the paint is opaque, so that does not show.
+        /// </summary>
+        internal static void AddArrow(OmsiGeneratedMesh mesh, double[] tail, double[] direction, double height, OmsiMarkingArrowKind kind)
+        {
+            foreach (var part in ArrowShape(kind))
+            {
+                var ring = part.ConvertAll(point => ArrowPoint(tail, direction, height, point));
+                var first = mesh.Positions.Count / 3;
+                foreach (var point in ring)
+                {
+                    mesh.Positions.Add(point[0]);
+                    mesh.Positions.Add(height);
+                    mesh.Positions.Add(point[1]);
+                    mesh.Uvs.Add(0.0);
+                    mesh.Uvs.Add(0.0);
+                }
+                foreach (var triangle in OmsiJunctionLayout.Triangulate(ring))
+                    OmsiJunctionLayout.AddUpward(mesh, first + triangle[0], first + triangle[1], first + triangle[2]);
+            }
         }
 
         /// <summary>A flat strip along a path from one distance to another, <paramref name="offset"/> metres to its right.</summary>
@@ -1118,6 +1125,22 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public static OmsiMarkingAnchor[] LaneAt(IReadOnlyList<OmsiMarkingAnchor> anchors, double x, double y, double reach)
         {
+            return LaneAt(anchors, x, y, arm => reach);
+        }
+
+        /// <summary>Arrows are laid up to this far beyond an arm's mouth, and beyond the approach of an arm with a left-turn lane.</summary>
+        public const double ArrowReachMeters = 15.0;
+
+        /// <summary>How far beyond an arm's mouth arrows may lie: <see cref="ArrowReachMeters"/> beyond the arm's end of the junction.</summary>
+        public static double ArrowReach(OmsiJunctionLayout layout, int arm)
+        {
+            var junctionArm = layout.Arms[arm];
+            return ArrowReachMeters + Math.Max(0.0, junctionArm.Length - junctionArm.Mouth - OmsiJunctionLayout.ArmExtension);
+        }
+
+        /// <summary>As <see cref="LaneAt(IReadOnlyList{OmsiMarkingAnchor}, double, double, double)"/>, with a reach for each arm.</summary>
+        public static OmsiMarkingAnchor[] LaneAt(IReadOnlyList<OmsiMarkingAnchor> anchors, double x, double y, Func<int, double> reach)
+        {
             var arms = new SortedDictionary<int, List<OmsiMarkingAnchor>>();
             foreach (var anchor in anchors)
                 if (!anchor.IsCrossing && anchor.Row == 1)
@@ -1134,7 +1157,7 @@ namespace OmsiMapEditor.OMSI
                 var along = x * Math.Sin(heading) + y * Math.Cos(heading);
                 var lateral = x * Math.Cos(heading) - y * Math.Sin(heading);
                 var mouth = row[0].X * Math.Sin(heading) + row[0].Y * Math.Cos(heading);
-                if (along < mouth - 1.0 || along > mouth + reach)
+                if (along < mouth - 1.0 || along > mouth + reach(row[0].Arm))
                     continue;
                 for (var index = 1; index < row.Count; index++)
                     if (lateral >= row[index - 1].Lateral && lateral <= row[index].Lateral && !(row[index - 1].Kind == "median" && row[index].Kind == "median"))
@@ -1407,7 +1430,8 @@ namespace OmsiMapEditor.OMSI
             var arrows = new List<OmsiMarkingArrow>();
             for (var arm = 0; arm < layout.Arms.Count; arm++)
             {
-                var inbound = ends.FindAll(end => end.Inbound && end.Arm == arm);
+                // A left-turn lane paints its own arrows.
+                var inbound = ends.FindAll(end => end.Inbound && end.Arm == arm && end.Lane < layout.Arms[arm].Profile.Lanes.Count);
                 // Where this arm's traffic could go: the arms with lanes leading out.
                 var possible = Directions(layout, arm, ends.FindAll(end => !end.Inbound && end.Arm != arm).Select(end => end.Arm).Distinct());
                 var ways = new List<int>();

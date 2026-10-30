@@ -430,7 +430,10 @@ namespace OmsiMapEditor.UI
             if (markingMade == null || !markingOptions.ArrowKind.HasValue)
                 return null;
             var local = WorldToObject(point);
-            var lane = OmsiJunctionMarkings.LaneAt(markingAnchors, local[0], local[1], 15.0);
+            // Up to the end of an arm's approach with a left-turn lane, else a little beyond its mouth.
+            var layout = markingLayout;
+            var lane = OmsiJunctionMarkings.LaneAt(markingAnchors, local[0], local[1],
+                arm => layout != null && arm < layout.Arms.Count ? OmsiJunctionMarkings.ArrowReach(layout, arm) : OmsiJunctionMarkings.ArrowReachMeters);
             if (lane == null)
                 return null;
             var outX = -Math.Sin(lane[0].InwardDegrees * Math.PI / 180.0);
