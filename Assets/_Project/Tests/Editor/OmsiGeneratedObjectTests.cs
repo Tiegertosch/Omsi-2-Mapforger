@@ -257,6 +257,71 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AMedianEndsInACrossroadsAsAnIslandWithARoundedNoseAndTheLanesTurnPastIt()
+        {
+            var dual = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Dual), @"Splines\Test\dual.sli");
+            var street = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Cobbled), @"Splines\Test\street.sli");
+            // The dual road runs north; a street crosses it from east to west.
+            var arms = new[]
+            {
+                new OmsiJunctionArm { HeadingDegrees = 0, ProfilePath = @"Splines\Test\dual.sli", Profile = dual, Main = true },
+                new OmsiJunctionArm { HeadingDegrees = 180, ProfilePath = @"Splines\Test\dual.sli", Profile = dual, Main = true, Mirrored = true },
+                new OmsiJunctionArm { HeadingDegrees = 90, ProfilePath = @"Splines\Test\street.sli", Profile = street },
+                new OmsiJunctionArm { HeadingDegrees = 270, ProfilePath = @"Splines\Test\street.sli", Profile = street, Mirrored = true }
+            };
+
+            var layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+
+            // The 3 m grass median runs on 2 m into the junction on both dual arms, its nose a half circle ending at the
+            // mouth; the street's arms have none.
+            var north = layout.Arms.FindIndex(arm => arm.HeadingDegrees == 0);
+            var south = layout.Arms.FindIndex(arm => arm.HeadingDegrees == 180);
+            var nose = layout.Arms[north].Length - OmsiJunctionLayout.ArmExtension;
+            Assert.AreEqual(nose, layout.IslandNoses[north], 1e-9);
+            Assert.AreEqual(layout.Arms[south].Length - OmsiJunctionLayout.ArmExtension, layout.IslandNoses[south], 1e-9);
+            Assert.AreEqual(2, layout.IslandNoses.Count(value => !double.IsNaN(value)));
+            var island = layout.Meshes.Single(mesh => mesh.Texture == "grass.bmp");
+            Assert.IsTrue(Covers(island, 0, nose + 0.1) && Covers(island, 0, layout.Arms[north].Length - 0.1) && Covers(island, -1.4, nose + 1.6));
+            Assert.IsFalse(Covers(island, 0, nose - 0.1) || Covers(island, -1.4, nose + 0.2) || Covers(island, 0, 0));
+            Assert.IsTrue(Covers(island, 0, -nose - 0.1));
+            for (var index = 0; index < island.Positions.Count; index += 3)
+                Assert.AreEqual(0.25, island.Positions[index + 1], 1e-9);
+
+            // The inner lane coming in from the north runs straight to the nose once, then turns left towards the east
+            // from there; nothing turns off before the nose.
+            var leadIns = layout.Paths.FindAll(path => Math.Abs(path.X - -4.5) < 1e-6 && Math.Abs(path.Y - layout.Arms[north].Length) < 1e-6);
+            Assert.AreEqual(1, leadIns.Count);
+            Assert.AreEqual(180.0, leadIns[0].HeadingDegrees, 1e-6);
+            Assert.AreEqual(OmsiJunctionLayout.ArmExtension, leadIns[0].LengthMeters, 1e-6);
+            Assert.AreEqual(0.0, leadIns[0].RadiusMeters);
+            Assert.IsTrue(layout.Paths.Any(path => Math.Abs(path.X - -4.5) < 1e-6 && Math.Abs(path.Y - nose) < 1e-6 && path.Blinker == 2));
+            Assert.IsFalse(layout.Paths.Any(path => path.Kind == 0 && path.RadiusMeters != 0.0 && Math.Abs(path.Y) > nose + 1e-6));
+
+            // A median laid in two halves, its texture from the stones at each kerb (u 0.97) to the middle (u 0.76), as the
+            // road builder lays it: the stones run round the nose, all along its edge.
+            var halves = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Dual.Replace(
+                "[profile]\r\n2\r\n[profilepnt]\r\n-1.5\r\n0.25\r\n0\r\n0.2\r\n[profilepnt]\r\n1.5\r\n0.25\r\n1\r\n0.2\r\n",
+                "[profile]\r\n2\r\n[profilepnt]\r\n-1.5\r\n0.25\r\n0.97\r\n0.2\r\n[profilepnt]\r\n0\r\n0.25\r\n0.76\r\n0.2\r\n" +
+                "[profile]\r\n2\r\n[profilepnt]\r\n0\r\n0.25\r\n0.76\r\n0.2\r\n[profilepnt]\r\n1.5\r\n0.25\r\n0.97\r\n0.2\r\n")), @"Splines\Test\dual.sli");
+            foreach (var arm in arms.Where(arm => arm.HeadingDegrees == 0 || arm.HeadingDegrees == 180))
+                arm.Profile = halves;
+            layout = OmsiJunctionLayout.Build(arms, @"Splines\Test\texture\plain.bmp");
+            island = layout.Meshes.Single(mesh => mesh.Texture == "grass.bmp");
+            var edge = 0;
+            for (var index = 0; index < island.Positions.Count / 3; index++)
+            {
+                var x = island.Positions[index * 3];
+                var y = island.Positions[index * 3 + 2];
+                if (y < nose + 1.5 && y > 0.0 && Math.Abs(Math.Sqrt(x * x + (y - nose - 1.5) * (y - nose - 1.5)) - 1.5) < 1e-6)
+                {
+                    Assert.AreEqual(0.97, island.Uvs[index * 2], 1e-6, "at " + x + ", " + y);
+                    edge++;
+                }
+            }
+            Assert.Greater(edge, 8);
+        }
+
+        [Test]
         public void AJunctionOfTwoRoadsKeepsEachSurfaceAndBlendsThePavementsRoundTheCorners()
         {
             var road = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);

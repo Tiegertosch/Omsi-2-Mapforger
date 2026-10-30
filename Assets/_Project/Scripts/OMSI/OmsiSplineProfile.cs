@@ -157,8 +157,17 @@ namespace OmsiMapEditor.OMSI
                     if (high < from - 1e-6 || low > to + 1e-6)
                         continue;
                     var piece = new OmsiProfileStrip { TextureIndex = strip.TextureIndex };
-                    piece.Points.Add(Cut(a, b, Math.Max(from, Math.Min(to, a.X))));
-                    piece.Points.Add(Cut(a, b, Math.Max(from, Math.Min(to, b.X))));
+                    if (Math.Abs(b.X - a.X) < 1e-9)
+                    {
+                        // An upright strip, such as a kerb face, lies within the bounds whole.
+                        piece.Points.Add(a);
+                        piece.Points.Add(b);
+                    }
+                    else
+                    {
+                        piece.Points.Add(Cut(a, b, Math.Max(from, Math.Min(to, a.X))));
+                        piece.Points.Add(Cut(a, b, Math.Max(from, Math.Min(to, b.X))));
+                    }
                     result.Strips.Add(piece);
                     left = Math.Min(left, Math.Max(from, low));
                     right = Math.Max(right, Math.Min(to, high));

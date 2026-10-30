@@ -331,6 +331,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Each arm reaches this far past where its corners end, so its cross-section is the road's at the point.</summary>
         public const double ArmExtension = 2.0;
 
+        /// <summary>The nose of a median island is rounded with half its width, or at most this radius at its two corners.</summary>
+        public const double NoseRadius = 2.0;
+
         private const int ArcSegments = 8;
 
         private OmsiJunctionLayout()
@@ -354,6 +357,15 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True for two arms facing away from each other: a transition between cross-sections, without ways to choose.</summary>
         public bool IsTransition { get; private set; }
+
+        /// <summary>
+        /// How far out along each arm its lanes start or end their turns: at the nose of its median island (ADR 051), else
+        /// at the arm's end.
+        /// </summary>
+        private double[] turnsAt;
+
+        /// <summary>The nose of the median island of each arm, metres out along it; NaN for an arm without one.</summary>
+        public double[] IslandNoses { get; private set; } = new double[0];
 
         /// <param name="roadTexture">
         /// A plain asphalt texture relative to the installation, or null. It replaces the carriageway texture of the first
@@ -416,6 +428,7 @@ namespace OmsiMapEditor.OMSI
 
             layout.BuildCarriageway(sections, corners, roadTexture);
             layout.BuildPavements(sections, corners);
+            layout.BuildIslands(sections);
             layout.BuildLanes(sections);
             layout.BuildRails(sections);
             layout.BuildFootpaths(sections, corners);
@@ -852,10 +865,212 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// The median of an arm ends as a raised island with a rounded nose at the mouth, where the kerbs turn off and stop
+        /// lines lie, instead of becoming carriageway (ADR 051): from the arm's end the median runs on as its profile lays
+        /// it, kerbs included, and the nose takes the surface of its middle with a kerb round it. A median with a track in
+        /// it stays carriageway, so trams run on through.
+        /// </summary>
+        private void BuildIslands(List<OmsiProfileSections> sections)
+        {
+            turnsAt = new double[Arms.Count];
+            IslandNoses = new double[Arms.Count];
+            for (var index = 0; index < Arms.Count; index++)
+            {
+                var arm = Arms[index];
+                var section = sections[index];
+                turnsAt[index] = arm.Length;
+                IslandNoses[index] = double.NaN;
+                if (!section.HasMedian || arm.Profile.Lanes.Exists(lane => lane.Kind == OmsiSplineCategories.RailLane &&
+                                                                           lane.X > section.MedianLeft && lane.X < section.MedianRight))
+                    continue;
+                var median = arm.Profile.Clipped(section.MedianLeft, section.MedianRight);
+                var middle = (section.MedianLeft + section.MedianRight) / 2.0;
+                var middleTop = TopAcross(median, middle);
+                if (middleTop == null || TopAt(middleTop, middle).Height <= section.RoadHeight + 0.03)
+                    continue;
+
+                var nose = Math.Max(0.0, arm.Length - ArmExtension);
+                var width = section.MedianRight - section.MedianLeft;
+                var radius = Math.Min(width / 2.0, NoseRadius);
+                var start = nose + radius;
+                turnsAt[index] = nose;
+                IslandNoses[index] = nose;
+                if (arm.Length - start > 0.01)
+                {
+                    var origin = Point.Along(arm, start, 0.0);
+                    var spline = new OmsiSplineRecord { LocalX = origin.X, LocalY = origin.Y, HeadingDegrees = arm.HeadingDegrees, LengthMeters = arm.Length - start };
+                    foreach (var surface in OmsiSplineSurface.Build(spline, median, true))
+                    {
+                        var mesh = MeshFor(median.Textures[surface.TextureIndex].Path, "island");
+                        var offset = mesh.Positions.Count / 3;
+                        mesh.Positions.AddRange(surface.Positions);
+                        mesh.Uvs.AddRange(surface.Uvs);
+                        foreach (var vertex in surface.Triangles)
+                            mesh.Triangles.Add(offset + vertex);
+                    }
+                }
+
+                // The nose in rings from its edge inwards: each ring has the surface the median has as far in from its kerb,
+                // its left half the left side's and its right half the right side's, so what runs along the edges, such
+                // as kerb stones, runs round the nose. Rings lie where the median's surfaces change.
+                var insets = new List<double> { 0.0, radius };
+                foreach (var strip in median.Strips)
+                    foreach (var point in strip.Points)
+                        foreach (var inset in new[] { point.X - section.MedianLeft, section.MedianRight - point.X })
+                            if (inset > 0.005 && inset < radius - 0.005)
+                                insets.Add(inset);
+                insets.Sort();
+                // Along the nose the texture follows its edge, from each side's start, so stones go on round it without
+                // a seam where it meets the straight part; rings inside take the v of the edge beside them.
+                var edgeOutline = NoseOutline(section, start, radius, 0.0);
+                var edgeDistances = new double[edgeOutline.Count];
+                for (var point = 1; point < edgeOutline.Count; point++)
+                    edgeDistances[point] = edgeDistances[point - 1] + Math.Sqrt(Math.Pow(edgeOutline[point][0] - edgeOutline[point - 1][0], 2) +
+                                                                                Math.Pow(edgeOutline[point][1] - edgeOutline[point - 1][1], 2));
+                var edgeLength = edgeDistances[edgeOutline.Count - 1];
+                for (var band = 0; band + 1 < insets.Count; band++)
+                {
+                    var outer = insets[band];
+                    var inner = insets[band + 1];
+                    if (inner - outer < 0.005)
+                        continue;
+                    var leftStrip = TopAcross(median, section.MedianLeft + (outer + inner) / 2.0);
+                    var rightStrip = TopAcross(median, section.MedianRight - (outer + inner) / 2.0);
+                    if (leftStrip == null || rightStrip == null)
+                        continue;
+                    var outerRing = NoseOutline(section, start, radius, outer);
+                    var innerRing = NoseOutline(section, start, radius, inner);
+                    for (var point = 0; point + 1 < outerRing.Count; point++)
+                    {
+                        // Points of the left half and the flat end take the left side's surface, the right half the right's.
+                        var right = point >= ArcSegments + 1;
+                        var strip = right ? rightStrip : leftStrip;
+                        var mesh = MeshFor(median.Textures[strip.TextureIndex].Path, "island");
+                        var first = mesh.Positions.Count / 3;
+                        var corners = new[] { outerRing[point], outerRing[point + 1], innerRing[point], innerRing[point + 1] };
+                        for (var corner = 0; corner < corners.Length; corner++)
+                        {
+                            var inset = corner < 2 ? outer : inner;
+                            var edgePoint = point + corner % 2;
+                            var top = TopAt(strip, right ? section.MedianRight - inset : section.MedianLeft + inset);
+                            var fromStart = right ? edgeLength - edgeDistances[edgePoint] : edgeDistances[edgePoint];
+                            Add(mesh, Point.Along(arm, corners[corner][0], corners[corner][1]), top.Height, top.U, -fromStart * top.VPerMeter);
+                        }
+                        AddUpward(mesh, first, first + 1, first + 2);
+                        AddUpward(mesh, first + 1, first + 3, first + 2);
+                    }
+                }
+                var ring = NoseOutline(section, start, radius, 0.0).ConvertAll(point => Point.Along(arm, point[0], point[1]));
+                var edgeHeight = TopAt(TopAcross(median, section.MedianLeft + 0.005) ?? middleTop, section.MedianLeft).Height;
+
+                // Its kerb, in the median's kerb texture, else the road's.
+                var kerbStrip = median.Strips.Find(strip => Math.Abs(strip.Points[1].X - strip.Points[0].X) < OmsiSplineSurface.MinimumWidth &&
+                                                            Math.Abs(strip.Points[1].Height - strip.Points[0].Height) >= OmsiSplineSurface.MinimumWidth);
+                double kerbTop, kerbBottom, kerbVPerMeter;
+                OmsiGeneratedMesh kerb;
+                if (kerbStrip != null)
+                {
+                    var upper = kerbStrip.Points[0].Height >= kerbStrip.Points[1].Height ? kerbStrip.Points[0] : kerbStrip.Points[1];
+                    var lower = kerbStrip.Points[0].Height >= kerbStrip.Points[1].Height ? kerbStrip.Points[1] : kerbStrip.Points[0];
+                    kerb = MeshFor(median.Textures[kerbStrip.TextureIndex].Path, "island kerb");
+                    kerbTop = upper.U;
+                    kerbBottom = lower.U;
+                    kerbVPerMeter = upper.VPerMeter;
+                }
+                else if (section.KerbTexture >= 0)
+                {
+                    kerb = MeshFor(arm.Profile.Textures[section.KerbTexture].Path, "island kerb");
+                    kerbTop = section.KerbU0;
+                    kerbBottom = section.KerbU1;
+                    kerbVPerMeter = section.KerbVPerMeter;
+                }
+                else
+                    continue;
+                // The kerb's texture runs from both sides' starts to the middle of the nose, so it meets both straight kerbs.
+                var centre = Point.Along(arm, start, middle);
+                for (var point = 0; point < ring.Count; point++)
+                {
+                    var v = -Math.Min(edgeDistances[point], edgeLength - edgeDistances[point]) * kerbVPerMeter;
+                    var kerbStart = kerb.Positions.Count / 3;
+                    Add(kerb, ring[point], edgeHeight, kerbTop, v);
+                    Add(kerb, ring[point], section.RoadHeight, kerbBottom, v);
+                    if (point > 0)
+                    {
+                        var towards = ring[point].Minus(centre);
+                        AddFacing(kerb, kerbStart - 2, kerbStart - 1, kerbStart, towards);
+                        AddFacing(kerb, kerbStart - 1, kerbStart + 1, kerbStart, towards);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The edge of a median's nose moved in by <paramref name="inset"/>, metres out along the arm and right of it: from
+        /// the left side at the nose's start round its left corner, across its end and round its right corner, with
+        /// <see cref="ArcSegments"/> + 1 points on each corner. Moved in as far as the corners' radius, a corner is a point.
+        /// </summary>
+        private static List<double[]> NoseOutline(OmsiProfileSections section, double start, double radius, double inset)
+        {
+            var round = Math.Max(0.0, radius - inset);
+            var outline = new List<double[]>();
+            for (var step = 0; step <= ArcSegments; step++)
+            {
+                var angle = Math.PI / 2.0 * step / ArcSegments;
+                outline.Add(new[] { start - round * Math.Sin(angle), section.MedianLeft + radius - round * Math.Cos(angle) });
+            }
+            for (var step = ArcSegments; step >= 0; step--)
+            {
+                var angle = Math.PI / 2.0 * step / ArcSegments;
+                outline.Add(new[] { start - round * Math.Sin(angle), section.MedianRight - radius + round * Math.Cos(angle) });
+            }
+            return outline;
+        }
+
+        /// <summary>The highest level strip of a profile across a point, metres right of the spline; null where it has none.</summary>
+        private static OmsiProfileStrip TopAcross(OmsiSplineProfile profile, double x)
+        {
+            OmsiProfileStrip best = null;
+            foreach (var strip in profile.Strips)
+            {
+                var a = strip.Points[0];
+                var b = strip.Points[strip.Points.Count - 1];
+                if (Math.Abs(b.X - a.X) < OmsiSplineSurface.MinimumWidth || Math.Min(a.X, b.X) > x || Math.Max(a.X, b.X) < x)
+                    continue;
+                if (best == null || TopAt(strip, x).Height > TopAt(best, x).Height)
+                    best = strip;
+            }
+            return best;
+        }
+
+        /// <summary>A level strip's height and texture coordinates at a point across it, in proportion between its ends.</summary>
+        private static OmsiProfilePoint TopAt(OmsiProfileStrip strip, double x)
+        {
+            var a = strip.Points[0];
+            var b = strip.Points[strip.Points.Count - 1];
+            var share = Math.Abs(b.X - a.X) > 1e-9 ? (x - a.X) / (b.X - a.X) : 0.0;
+            return new OmsiProfilePoint
+            {
+                X = x, Height = a.Height + (b.Height - a.Height) * share, U = a.U + (b.U - a.U) * share, VPerMeter = a.VPerMeter + (b.VPerMeter - a.VPerMeter) * share
+            };
+        }
+
+        /// <summary>
         /// A lane for every way through, or for the chosen ones: from each lane into the junction to each lane out of it on
-        /// another arm, as one or two arcs meeting without a kink, with the blinker for the turn.
+        /// another arm, as one or two arcs meeting without a kink, with the blinker for the turn. Beside a median island
+        /// each lane in use runs straight between the arm's end and the island's nose, once, so its turns start there.
         /// </summary>
         private void BuildLanes(List<OmsiProfileSections> sections)
+        {
+            var leadIns = new HashSet<KeyValuePair<int, OmsiSplineLane>>();
+            var leadOuts = new HashSet<KeyValuePair<int, OmsiSplineLane>>();
+            BuildTurns(sections, leadIns, leadOuts);
+            foreach (var lane in leadIns)
+                AddStraight(Arms[lane.Key], Arms[lane.Key].Length, turnsAt[lane.Key], lane.Value);
+            foreach (var lane in leadOuts)
+                AddStraight(Arms[lane.Key], turnsAt[lane.Key], Arms[lane.Key].Length, lane.Value);
+        }
+
+        private void BuildTurns(List<OmsiProfileSections> sections, HashSet<KeyValuePair<int, OmsiSplineLane>> leadIns, HashSet<KeyValuePair<int, OmsiSplineLane>> leadOuts)
         {
             for (var from = 0; from < Arms.Count; from++)
                 for (var to = 0; to < Arms.Count; to++)
@@ -874,12 +1089,14 @@ namespace OmsiMapEditor.OMSI
                                 continue;
                             if (connections != null && !connections.Contains(OmsiLaneConnections.Key(from, inboundIndex, to, outboundIndex)))
                                 continue;
-                            var start = Point.Along(Arms[from], Arms[from].Length, inbound.X);
-                            var end = Point.Along(Arms[to], Arms[to].Length, outbound.X);
+                            var start = Point.Along(Arms[from], turnsAt[from], inbound.X);
+                            var end = Point.Along(Arms[to], turnsAt[to], outbound.X);
                             var startHeading = Arms[from].HeadingDegrees + 180.0;
                             var turn = OmsiRoadPlanner.Normalize(Arms[to].HeadingDegrees - startHeading);
                             var blinker = Math.Abs(turn) < 30.0 ? 0 : turn > 0 ? 3 : 2;
                             AddArcs(start, startHeading, end, Arms[to].HeadingDegrees, inbound.Height, inbound.Kind, inbound.Width, 0, blinker);
+                            leadIns.Add(new KeyValuePair<int, OmsiSplineLane>(from, inbound));
+                            leadOuts.Add(new KeyValuePair<int, OmsiSplineLane>(to, outbound));
                         }
                     }
                 }
@@ -1038,6 +1255,19 @@ namespace OmsiMapEditor.OMSI
             var left = outer ? section.OuterLeft : section.RoadLeft;
             var right = outer ? section.OuterRight : section.RoadRight;
             return lane.X >= -left - 0.01 && lane.X <= right + 0.01;
+        }
+
+        /// <summary>A lane straight along an arm from one distance out to another, as one path; none when they are the same.</summary>
+        private void AddStraight(OmsiJunctionArm arm, double from, double to, OmsiSplineLane lane)
+        {
+            if (Math.Abs(to - from) < 0.01)
+                return;
+            var start = Point.Along(arm, from, lane.X);
+            Paths.Add(new OmsiJunctionPath
+            {
+                X = start.X, Y = start.Y, Height = lane.Height, HeadingDegrees = Normalize360(arm.HeadingDegrees + (to < from ? 180.0 : 0.0)), RadiusMeters = 0.0,
+                LengthMeters = Math.Abs(to - from), Kind = lane.Kind, Width = lane.Width
+            });
         }
 
         private void AddArcs(Point start, double startHeading, Point end, double endHeading, double height, int kind, double width, int direction, int blinker)

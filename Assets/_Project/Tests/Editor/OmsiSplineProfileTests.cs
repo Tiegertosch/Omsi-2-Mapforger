@@ -67,6 +67,14 @@ namespace OmsiMapEditor.Tests
             var withUpright = OmsiSplineSurface.Build(spline, profile, true).Single(mesh => mesh.TextureIndex == 0);
             Assert.AreEqual(8, withUpright.VertexCount);
             Assert.AreEqual(30.1, withUpright.Positions[4 * 3 + 4], 1e-9);
+
+            // Cut down to the sidewalk, the kerb face at its edge stays whole, from 0.25 m down to 0.1 m.
+            var clipped = profile.Clipped(-3.0, -2.0);
+            var kerb = clipped.Strips.Single(strip => strip.Points[0].X == -2.0 && strip.Points[1].X == -2.0 && strip.TextureIndex == 0);
+            Assert.AreEqual(0.25, kerb.Points[0].Height, 1e-9);
+            Assert.AreEqual(0.1, kerb.Points[1].Height, 1e-9);
+            Assert.AreEqual(0.95, kerb.Points[1].U, 1e-9);
+            Assert.AreEqual(8, OmsiSplineSurface.Build(spline, clipped, true).Single(mesh => mesh.TextureIndex == 0).VertexCount);
         }
 
         [Test]
