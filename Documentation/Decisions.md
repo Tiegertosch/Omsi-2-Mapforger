@@ -593,12 +593,18 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
   - Der Fahrstreifen sind die beiden Anker der Einmündung links und rechts davon (`LaneAt`); zwischen den Kanten eines Mittelstreifens liegt keiner.
   - Auf einem Fahrstreifen, der in die Kreuzung führt, zeigt der Pfeil hinein. Auf einem, der hinausführt, zeigt er hinaus (`RunsIn`, nach dem Profil wie bei „Auto markings“).
   - Ein Klick auf einen Pfeil wählt ihn, in jedem Modus. Dann ändern die Pfeilknöpfe seine Art und „Arrow distance“ seinen Abstand von der Einmündung; Entf löscht ihn.
-- **Form**, angenähert wie bei den anderen Maßen: 5 m lang wie innerorts, Schaft 0,18 m, Spitze 0,65 m breit und 1,5 m lang. Abbiegepfeile biegen in einem Viertelkreis von 0,5 m Radius ab und enden in einer 0,9 m langen Spitze quer zur Fahrt; mit Geradeaus-Pfeil zweigen sie tiefer ab. So bleibt ein Pfeil innerhalb von 1,4 m neben der Mitte des Streifens.
+- **Form**, angenähert wie bei den anderen Maßen: 5 m lang wie innerorts, Schaft 0,18 m, Spitze 0,65 m breit und 1,5 m lang. Abbiegepfeile biegen in einem Viertelkreis von 0,5 m Radius ab und enden in einer 0,9 m langen Spitze quer zur Fahrt; mit Geradeaus-Pfeil zweigen sie tiefer ab. So bleibt ein Pfeil innerhalb von 1,4 m neben der Mitte des Streifens. Seit dem 30. Oktober 2026 ersetzt durch die Form unten.
 - **Lage:** Pfeile liegen meist ganz auf der anschließenden Straße, weil die Arme nur 2 m über die Einmündung hinausreichen. Sie liegen auf der Höhe der Kreuzung; steigt die Straße, gilt dieselbe Einschränkung wie beim Zebrastreifen.
 - **Gespeichert** als Zeile `MapWorks marking arrows: 1.1.0~1.1.1 straightleft 1; 1.1.1~1.1.2 straight 1 out` (Anker des Streifens, Art, Abstand, `out` für hinausführende Streifen). Arm-Drehen und „Auto markings“ behalten die Pfeile.
 - **Panel:** Das Werkzeug wählt immer genau eins aus Linienart, Füllung und Pfeilart; das bestimmt, was ein Klick auf die Kreuzung macht. Damit das Panel die Ansichtsknöpfe frei lässt, zeigt es nur die Felder der gewählten Art („Apply to“, „Hide piece“ und „Curvature“ bei Linien, „Stripe angle“ bei Flächen, „Arrow distance“ bei Pfeilen). Füllungen und Pfeile stehen je in einer Zeile.
 
 **Offen:** Pfeile, Zebrastreifen und Flächen auf der anschließenden Straße folgen nicht deren Steigung.
+
+**Ergänzung vom 30. Oktober 2026 (Pfeilform):** Der Nutzer fand die Pfeile „überhaupt nicht passend“ und gab als Vorbild ein Bild deutscher Richtungspfeile. Amtliche Maße (RMS Teil 1) waren frei nicht zu finden; die Seite, die der Nutzer nannte (routetogermany.com), beschreibt nur die Bedeutung. Die Form ist deshalb aus dem Bild vermessen, in Pfeillängen, und bleibt bei 5 m Länge:
+- **Geradeaus:** Der Schaft verjüngt sich von 0,37 m am Ende auf 0,2 m unter der Spitze; die Spitze ist 0,77 m breit und 1,85 m lang.
+- **Abbiegen allein** (links, rechts, links oder rechts): Der Schaft biegt mit zwei Viertelkreisen (außen weiter als innen) in einen Haken, dessen Spitze längs der Fahrt 2,1 m hoch und quer 0,59 m lang ist und bis 1 m neben die Mitte reicht – gestreckt, wie Pfeile für den flachen Blick des Fahrers gemalt werden.
+- **Abbiegen neben geradeaus:** Ein gebogener Ast zweigt etwa auf halber Länge rechts oder links vom Schaft ab, mit kleinerer Spitze (1,34 m hoch, 0,44 m lang).
+- **Umsetzung:** `OmsiJunctionMarkings.ArrowShape` liefert je Art wenige Polygone (Schaft mit Spitze, Äste, Haken), die sich am Ansatz überdecken; jedes wird trianguliert (`OmsiJunctionLayout.Triangulate`), die Überdeckung sieht man auf der deckenden Farbe nicht. Umrisse in der Karte zeigen nur den Rand des ganzen Pfeils (`Border`), die Knöpfe des Menüs füllen dieselben Polygone. Gespeicherte Pfeile bekommen die neue Form beim nächsten Erzeugen der Kreuzung. Am 30. Oktober 2026 vom Nutzer bestätigt.
 
 ## ADR 045: Markierungsmenü wie das Straßenmenü
 

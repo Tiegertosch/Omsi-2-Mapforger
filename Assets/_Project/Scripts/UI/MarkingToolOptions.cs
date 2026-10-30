@@ -660,37 +660,20 @@ namespace OmsiMapEditor.UI
 
             private static void DrawArrow(Painter2D painter, Vector2 size, OmsiMarkingArrowKind kind)
             {
-                OmsiJunctionMarkings.ArrowParts(kind, out var shafts, out var heads);
-                // 4 m across and the arrow's length fill a box as high as the preview.
+                // 3 m across and the arrow's length fill a box as high as the preview.
                 var box = size.y - 6f;
-                var across = box / 4f;
+                var across = box / 3f;
                 var along = box / (float)OmsiJunctionMarkings.ArrowLength;
                 Vector2 Map(double[] point) => new Vector2(size.x / 2f + (float)point[0] * across, size.y - 3f - (float)point[1] * along);
-                painter.strokeColor = White;
                 painter.fillColor = White;
-                painter.lineWidth = 2.5f;
-                painter.lineJoin = LineJoin.Round;
-                foreach (var shaft in shafts)
+                foreach (var part in OmsiJunctionMarkings.ArrowShape(kind))
                 {
                     painter.BeginPath();
-                    painter.MoveTo(Map(shaft[0]));
-                    for (var index = 1; index < shaft.Count; index++)
-                        painter.LineTo(Map(shaft[index]));
-                    painter.Stroke();
-                }
-                foreach (var head in heads)
-                {
-                    // Heads drawn half as wide again about their base, so they read at this size.
-                    var baseX = (head[0][0] + head[1][0]) / 2.0;
-                    var baseY = (head[0][1] + head[1][1]) / 2.0;
-                    Vector2 Corner(double[] point) => Map(new[] { baseX + (point[0] - baseX) * 1.5, baseY + (point[1] - baseY) * 1.5 });
-                    painter.BeginPath();
-                    painter.MoveTo(Corner(head[0]));
-                    painter.LineTo(Corner(head[1]));
-                    painter.LineTo(Map(head[2]));
+                    painter.MoveTo(Map(part[0]));
+                    for (var index = 1; index < part.Count; index++)
+                        painter.LineTo(Map(part[index]));
                     painter.ClosePath();
                     painter.Fill();
-                    painter.Stroke();
                 }
             }
 

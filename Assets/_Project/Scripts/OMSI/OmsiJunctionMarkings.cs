@@ -445,11 +445,25 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Direction arrows are 5 m long, as in towns.</summary>
         public const double ArrowLength = 5.0;
 
-        private const double ArrowShaft = 0.18;
-        private const double ArrowHeadWidth = 0.65;
-        private const double ArrowHeadLength = 1.5;
-        private const double ArrowTurnRadius = 0.5;
-        private const double ArrowTurnHead = 0.9;
+        // German direction arrows in arrow lengths, measured from the drawings of sign 297: the shaft narrows from the tail
+        // to the head; a turn alone bends the shaft into a hook with a tall head, a turn beside straight on branches off lower.
+        private const double ArrowTail = 0.037;
+        private const double ArrowNeck = 0.020;
+        private const double ArrowHeadBase = 0.631;
+        private const double ArrowHeadHalf = 0.077;
+        private const double HookBase = 0.083;
+        private const double HookInner = 0.637;
+        private const double HookOuter = 0.712;
+        private const double HookHeadHalf = 0.211;
+        private const double HookHeadLength = 0.117;
+        private const double BranchBase = 0.124;
+        private const double BranchMiddle = 0.410;
+        private const double BranchHeadHalf = 0.134;
+        private const double BranchHeadLength = 0.087;
+        private const double BranchLowCentre = 0.277;
+        private const double BranchLowRadius = 0.106;
+        private const double BranchHighCentre = 0.305;
+        private const double BranchHighRadius = 0.135;
 
         /// <summary>
         /// The anchors of a junction's arms, in the order of its connection points: on each arm its carriageway edges, the
@@ -792,26 +806,21 @@ namespace OmsiMapEditor.OMSI
                     if (!ArrowFrame(all, arrow, out var tail, out var direction, out var height))
                         continue;
                     var mesh = MeshFor(false);
-                    ArrowParts(arrow.Kind, out var shafts, out var heads);
-                    foreach (var shaft in shafts)
+                    // The parts overlap where they join; the paint is opaque, so that does not show.
+                    foreach (var part in ArrowShape(arrow.Kind))
                     {
-                        var path = shaft.ConvertAll(point => ArrowPoint(tail, direction, height, point));
-                        var distances = Distances(path);
-                        Strip(mesh, path, distances, 0.0, distances[path.Count - 1], 0.0, ArrowShaft);
-                    }
-                    foreach (var head in heads)
-                    {
+                        var ring = part.ConvertAll(point => ArrowPoint(tail, direction, height, point));
                         var first = mesh.Positions.Count / 3;
-                        foreach (var corner in head)
+                        foreach (var point in ring)
                         {
-                            var point = ArrowPoint(tail, direction, height, corner);
                             mesh.Positions.Add(point[0]);
                             mesh.Positions.Add(height + Lift);
                             mesh.Positions.Add(point[1]);
                             mesh.Uvs.Add(0.0);
                             mesh.Uvs.Add(0.0);
                         }
-                        OmsiJunctionLayout.AddUpward(mesh, first, first + 1, first + 2);
+                        foreach (var triangle in OmsiJunctionLayout.Triangulate(ring))
+                            OmsiJunctionLayout.AddUpward(mesh, first + triangle[0], first + triangle[1], first + triangle[2]);
                     }
                 }
             if (white != null && white.Triangles.Count > 0)
@@ -866,37 +875,191 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// The shape of an arrow in its own frame, metres across to the right and forward from its tail: the centre lines of
-        /// its shafts, 0.18 m wide, and the corners of its heads, one for each way it points. Turns bend off the shaft through
-        /// a quarter circle; with a way straight on they leave it lower down.
+        /// The shape of an arrow in its own frame, metres across to the right and forward from its tail, as polygons that
+        /// overlap where they join: the shaft with its head straight on and a branch for each turn beside it, or for turns
+        /// alone the shaft bent into a hook to each side.
         /// </summary>
-        public static void ArrowParts(OmsiMarkingArrowKind kind, out List<List<double[]>> shafts, out List<double[][]> heads)
+        public static List<List<double[]>> ArrowShape(OmsiMarkingArrowKind kind)
         {
             var info = OmsiMarkingArrowInfo.Of(kind);
-            shafts = new List<List<double[]>>();
-            heads = new List<double[][]>();
-            var neck = ArrowLength - ArrowHeadLength;
+            var parts = new List<List<double[]>>();
             if (info.Straight)
-            {
-                shafts.Add(new List<double[]> { new[] { 0.0, 0.0 }, new[] { 0.0, neck } });
-                heads.Add(new[] { new[] { -ArrowHeadWidth / 2.0, neck }, new[] { ArrowHeadWidth / 2.0, neck }, new[] { 0.0, ArrowLength } });
-            }
-            var bend = info.Straight ? 2.2 : 3.4;
+                parts.Add(new List<double[]>
+                {
+                    new[] { -ArrowTail, 0.0 }, new[] { ArrowTail, 0.0 }, new[] { ArrowNeck, ArrowHeadBase }, new[] { ArrowHeadHalf, ArrowHeadBase },
+                    new[] { 0.0, 1.0 }, new[] { -ArrowHeadHalf, ArrowHeadBase }, new[] { -ArrowNeck, ArrowHeadBase }
+                });
             foreach (var side in new[] { info.Left ? -1.0 : 0.0, info.Right ? 1.0 : 0.0 })
             {
                 if (side == 0.0)
                     continue;
-                var shaft = new List<double[]> { new[] { 0.0, 0.0 } };
-                for (var step = 0; step <= 8; step++)
+                var part = info.Straight ? ArrowBranch() : ArrowHook();
+                if (side < 0.0)
                 {
-                    var angle = Math.PI / 2.0 * step / 8.0;
-                    shaft.Add(new[] { side * ArrowTurnRadius * (1.0 - Math.Cos(angle)), bend + ArrowTurnRadius * Math.Sin(angle) });
+                    part = part.ConvertAll(point => new[] { -point[0], point[1] });
+                    part.Reverse();
                 }
-                shafts.Add(shaft);
-                var endX = side * ArrowTurnRadius;
-                var endY = bend + ArrowTurnRadius;
-                heads.Add(new[] { new[] { endX, endY - ArrowHeadWidth / 2.0 }, new[] { endX, endY + ArrowHeadWidth / 2.0 }, new[] { endX + side * ArrowTurnHead, endY } });
+                parts.Add(part);
             }
+            foreach (var part in parts)
+                foreach (var point in part)
+                {
+                    point[0] *= ArrowLength;
+                    point[1] *= ArrowLength;
+                }
+            return parts;
+        }
+
+        /// <summary>Half the width of an arrow's shaft a distance from its tail, in arrow lengths.</summary>
+        private static double ArrowHalfShaft(double along)
+        {
+            return ArrowTail + (ArrowNeck - ArrowTail) * along / ArrowHeadBase;
+        }
+
+        /// <summary>A turn to the right alone: the shaft bends through two quarter circles into a head as tall as a fifth of the arrow.</summary>
+        private static List<double[]> ArrowHook()
+        {
+            var inner = HookBase - ArrowHalfShaft(HookInner);
+            var outer = HookBase + ArrowHalfShaft(HookOuter);
+            var middle = (HookInner + inner + HookOuter + outer) / 2.0;
+            var points = new List<double[]> { new[] { -ArrowTail, 0.0 }, new[] { ArrowTail, 0.0 } };
+            AddArc(points, HookBase, HookInner, inner, Math.PI, Math.PI / 2.0);
+            points.Add(new[] { HookBase, middle - HookHeadHalf });
+            points.Add(new[] { HookBase + HookHeadLength, middle });
+            points.Add(new[] { HookBase, middle + HookHeadHalf });
+            AddArc(points, HookBase, HookOuter, outer, Math.PI / 2.0, Math.PI);
+            return points;
+        }
+
+        /// <summary>A turn to the right beside straight on: a curved branch from inside the shaft out to its head.</summary>
+        private static List<double[]> ArrowBranch()
+        {
+            var points = new List<double[]>();
+            AddArc(points, BranchBase, BranchLowCentre, BranchLowRadius, Math.PI / 2.0 + BranchRoot(BranchLowCentre, BranchLowRadius), Math.PI / 2.0);
+            points.Add(new[] { BranchBase, BranchMiddle - BranchHeadHalf });
+            points.Add(new[] { BranchBase + BranchHeadLength, BranchMiddle });
+            points.Add(new[] { BranchBase, BranchMiddle + BranchHeadHalf });
+            AddArc(points, BranchBase, BranchHighCentre, BranchHighRadius, Math.PI / 2.0, Math.PI / 2.0 + BranchRoot(BranchHighCentre, BranchHighRadius));
+            return points;
+        }
+
+        /// <summary>How far past the top of its circle an edge of a branch starts: inside the shaft, halfway to its middle.</summary>
+        private static double BranchRoot(double centre, double radius)
+        {
+            var low = 0.0;
+            var high = Math.PI / 2.0;
+            for (var step = 0; step < 40; step++)
+            {
+                var middle = (low + high) / 2.0;
+                if (BranchBase - radius * Math.Sin(middle) > ArrowHalfShaft(centre + radius * Math.Cos(middle)) / 2.0)
+                    low = middle;
+                else
+                    high = middle;
+            }
+            return low;
+        }
+
+        /// <summary>Adds the points of a circular arc from one angle to another, counter-clockwise from east.</summary>
+        private static void AddArc(List<double[]> points, double x, double y, double radius, double from, double to)
+        {
+            const int steps = 10;
+            for (var step = 0; step <= steps; step++)
+            {
+                var angle = from + (to - from) * step / steps;
+                points.Add(new[] { x + radius * Math.Cos(angle), y + radius * Math.Sin(angle) });
+            }
+        }
+
+        /// <summary>
+        /// The border of polygons that overlap, as lines: each edge cut where the others cross or touch it, keeping the pieces
+        /// with none of the others just outside them. An edge two polygons share comes once from each.
+        /// </summary>
+        private static List<List<double[]>> Border(List<List<double[]>> polygons)
+        {
+            var rings = polygons.ConvertAll(polygon => SignedArea(polygon) < 0.0 ? Enumerable.Reverse(polygon).ToList() : polygon);
+            var border = new List<List<double[]>>();
+            for (var index = 0; index < rings.Count; index++)
+            {
+                var ring = rings[index];
+                List<double[]> line = null;
+                for (var corner = 0; corner < ring.Count; corner++)
+                {
+                    var a = ring[corner];
+                    var b = ring[(corner + 1) % ring.Count];
+                    var length = Math.Sqrt(Square(b[0] - a[0]) + Square(b[1] - a[1]));
+                    if (length < 1e-9)
+                        continue;
+                    var cuts = new List<double> { 0.0, 1.0 };
+                    for (var other = 0; other < rings.Count; other++)
+                    {
+                        if (other == index)
+                            continue;
+                        var otherRing = rings[other];
+                        for (var next = 0; next < otherRing.Count; next++)
+                        {
+                            var c = otherRing[next];
+                            if (SegmentsCross(a, b, c, otherRing[(next + 1) % otherRing.Count], out var s, out _))
+                                cuts.Add(s);
+                            // A corner of the other lying on this edge, where their edges run together.
+                            var t = ((c[0] - a[0]) * (b[0] - a[0]) + (c[1] - a[1]) * (b[1] - a[1])) / (length * length);
+                            var off = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / length;
+                            if (t > 0.0 && t < 1.0 && Math.Abs(off) < 1e-6)
+                                cuts.Add(t);
+                        }
+                    }
+                    cuts.Sort();
+                    for (var cut = 0; cut + 1 < cuts.Count; cut++)
+                    {
+                        if (cuts[cut + 1] - cuts[cut] < 1e-9)
+                            continue;
+                        double[] Point(double t) => new[] { a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t };
+                        var middle = Point((cuts[cut] + cuts[cut + 1]) / 2.0);
+                        // Just outside: to the right of an edge of a counter-clockwise ring.
+                        var probe = new[] { middle[0] + (b[1] - a[1]) / length * 1e-4, middle[1] - (b[0] - a[0]) / length * 1e-4 };
+                        var covered = false;
+                        for (var other = 0; other < rings.Count && !covered; other++)
+                            covered = other != index && Contains(rings[other], probe);
+                        if (covered)
+                        {
+                            line = null;
+                            continue;
+                        }
+                        var from = Point(cuts[cut]);
+                        if (line == null)
+                        {
+                            line = new List<double[]> { from };
+                            border.Add(line);
+                        }
+                        line.Add(Point(cuts[cut + 1]));
+                    }
+                }
+            }
+            return border;
+        }
+
+        private static double SignedArea(List<double[]> ring)
+        {
+            var area = 0.0;
+            for (var index = 0; index < ring.Count; index++)
+            {
+                var a = ring[index];
+                var b = ring[(index + 1) % ring.Count];
+                area += a[0] * b[1] - b[0] * a[1];
+            }
+            return area / 2.0;
+        }
+
+        private static bool Contains(List<double[]> ring, double[] point)
+        {
+            var inside = false;
+            for (int index = 0, previous = ring.Count - 1; index < ring.Count; previous = index++)
+            {
+                var a = ring[index];
+                var b = ring[previous];
+                if (a[1] > point[1] != b[1] > point[1] && point[0] < (b[0] - a[0]) * (point[1] - a[1]) / (b[1] - a[1]) + a[0])
+                    inside = !inside;
+            }
+            return inside;
         }
 
         /// <summary>
@@ -940,24 +1103,12 @@ namespace OmsiMapEditor.OMSI
             };
         }
 
-        /// <summary>An arrow as lines in the object frame to show it by: its shafts and its heads closed; null when it cannot lie.</summary>
+        /// <summary>An arrow as lines in the object frame to show it by, its border; null when it cannot lie.</summary>
         public static List<List<double[]>> ArrowOutlines(IReadOnlyList<OmsiMarkingAnchor> anchors, OmsiMarkingArrow arrow)
         {
             if (!ArrowFrame(anchors, arrow, out var tail, out var direction, out var height))
                 return null;
-            ArrowParts(arrow.Kind, out var shafts, out var heads);
-            var outlines = new List<List<double[]>>();
-            foreach (var shaft in shafts)
-                outlines.Add(shaft.ConvertAll(point => ArrowPoint(tail, direction, height, point)));
-            foreach (var head in heads)
-            {
-                var outline = new List<double[]>();
-                foreach (var corner in head)
-                    outline.Add(ArrowPoint(tail, direction, height, corner));
-                outline.Add(outline[0]);
-                outlines.Add(outline);
-            }
-            return outlines;
+            return Border(ArrowShape(arrow.Kind)).ConvertAll(line => line.ConvertAll(point => ArrowPoint(tail, direction, height, point)));
         }
 
         /// <summary>

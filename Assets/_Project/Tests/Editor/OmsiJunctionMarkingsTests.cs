@@ -349,8 +349,8 @@ namespace OmsiMapEditor.Tests
             var ys = Enumerable.Range(0, mesh.Positions.Count / 3).Select(index => mesh.Positions[index * 3 + 2]).ToList();
             Assert.AreEqual(16.0, xs.Max(), 1e-6);
             Assert.Greater(xs.Min(), 11.0 - 1e-6);
-            Assert.AreEqual(2.0 - 1.4, ys.Min(), 1e-6);
-            Assert.Less(ys.Max(), 2.0 + 0.4);
+            Assert.AreEqual(2.0 - 1.0, ys.Min(), 1e-6);
+            Assert.AreEqual(2.0 + 0.185, ys.Max(), 1e-6);
             for (var index = 0; index < mesh.Positions.Count; index += 3)
                 Assert.AreEqual(0.1 + OmsiJunctionMarkings.Lift, mesh.Positions[index + 1], 1e-9);
             for (var index = 0; index < mesh.Triangles.Count; index += 3)
@@ -363,10 +363,74 @@ namespace OmsiMapEditor.Tests
             // Straight on, out of the junction: from 1 m behind the mouth away from it, the tip at x = 16.
             var straight = new OmsiMarkingArrow { From = "1.1.1", To = "1.1.2", Kind = OmsiMarkingArrowKind.Straight, Outward = true };
             var outline = OmsiJunctionMarkings.ArrowOutlines(anchors, straight);
-            Assert.AreEqual(2, outline.Count);
-            Assert.AreEqual(16.0, outline[1].Max(point => point[0]), 1e-6);
+            Assert.AreEqual(1, outline.Count);
+            Assert.AreEqual(16.0, outline[0].Max(point => point[0]), 1e-6);
             Assert.AreEqual(11.0, outline[0][0][0], 1e-6);
-            Assert.AreEqual(-2.0, outline[0][0][1], 1e-6);
+            Assert.AreEqual(-2.0 + 0.185, outline[0][0][1], 1e-6);
+            Assert.AreEqual(outline[0][0][1], outline[0][outline[0].Count - 1][1], 1e-9);
+        }
+
+        [Test]
+        public void ArrowsAreShapedLikeGermanDirectionArrows()
+        {
+            // Straight on: the shaft narrows from 0.37 m at the tail to 0.2 m under a head 0.77 m wide, the tip at 5 m.
+            var straight = OmsiJunctionMarkings.ArrowShape(OmsiMarkingArrowKind.Straight).Single();
+            Assert.AreEqual(0.37, straight[1][0] - straight[0][0], 1e-6);
+            Assert.AreEqual(0.77, straight.Max(point => point[0]) - straight.Min(point => point[0]), 1e-6);
+            Assert.AreEqual(5.0, straight.Max(point => point[1]), 1e-6);
+
+            // A turn alone is the shaft bent into a hook, its tall head a metre out; to the left it is the mirror image.
+            var right = OmsiJunctionMarkings.ArrowShape(OmsiMarkingArrowKind.Right).Single();
+            var left = OmsiJunctionMarkings.ArrowShape(OmsiMarkingArrowKind.Left).Single();
+            Assert.AreEqual(1.0, right.Max(point => point[0]), 1e-6);
+            Assert.AreEqual(-1.0, left.Min(point => point[0]), 1e-6);
+            Assert.Less(right.Max(point => point[1]), 5.0);
+            Assert.Greater(right.Max(point => point[1]) - right.Where(point => point[0] > 0.41).Min(point => point[1]), 2.0);
+
+            // Beside straight on, the turn branches off lower with a smaller head.
+            var parts = OmsiJunctionMarkings.ArrowShape(OmsiMarkingArrowKind.StraightRight);
+            Assert.AreEqual(2, parts.Count);
+            var tip = parts[1].OrderByDescending(point => point[0]).First();
+            Assert.AreEqual(1.055, tip[0], 1e-6);
+            Assert.AreEqual(2.05, tip[1], 1e-6);
+
+            // The lines shown are the border of the whole arrow: on each a centimetre one way is paint, the other way road.
+            var anchors = OmsiJunctionMarkings.Anchors(OmsiJunctionLayout.Build(Tee(), null));
+            foreach (var kind in new[] { OmsiMarkingArrowKind.StraightRight, OmsiMarkingArrowKind.LeftRight, OmsiMarkingArrowKind.All })
+            {
+                var shape = OmsiJunctionMarkings.ArrowShape(kind);
+                // Coming in on the east arm, 1 m behind its mouth: the tail at x = 16, pointing west, its right to the north.
+                var lines = OmsiJunctionMarkings.ArrowOutlines(anchors, new OmsiMarkingArrow { From = "1.1.0", To = "1.1.1", Kind = kind });
+                Assert.IsNotEmpty(lines);
+                bool PaintedAt(double x, double y) => Painted(shape, y - 2.0, 16.0 - x);
+                foreach (var line in lines)
+                    for (var index = 0; index + 1 < line.Count; index++)
+                    {
+                        var a = line[index];
+                        var b = line[index + 1];
+                        var length = Math.Sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+                        var x = (a[0] + b[0]) / 2.0;
+                        var y = (a[1] + b[1]) / 2.0;
+                        var sideX = (b[1] - a[1]) / length * 0.01;
+                        var sideY = -(b[0] - a[0]) / length * 0.01;
+                        Assert.AreNotEqual(PaintedAt(x + sideX, y + sideY), PaintedAt(x - sideX, y - sideY), kind + " at " + x + ", " + y);
+                    }
+            }
+        }
+
+        private static bool Painted(List<List<double[]>> parts, double x, double y)
+        {
+            foreach (var ring in parts)
+            {
+                var inside = false;
+                for (int index = 0, previous = ring.Count - 1; index < ring.Count; previous = index++)
+                    if (ring[index][1] > y != ring[previous][1] > y &&
+                        x < (ring[previous][0] - ring[index][0]) * (y - ring[index][1]) / (ring[previous][1] - ring[index][1]) + ring[index][0])
+                        inside = !inside;
+                if (inside)
+                    return true;
+            }
+            return false;
         }
 
         [Test]

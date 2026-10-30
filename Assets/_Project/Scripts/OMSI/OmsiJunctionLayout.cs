@@ -1104,6 +1104,15 @@ namespace OmsiMapEditor.OMSI
             mesh.Triangles.AddRange(facing >= 0 ? new[] { a, b, c } : new[] { a, c, b });
         }
 
+        /// <summary>Ear clipping of a simple polygon of plan points (x, y); returns index triples into the ring.</summary>
+        internal static List<int[]> Triangulate(IReadOnlyList<double[]> ring)
+        {
+            var points = new List<Point>();
+            foreach (var point in ring)
+                points.Add(new Point(point[0], point[1]));
+            return Triangulate(points);
+        }
+
         /// <summary>Ear clipping of a simple polygon; returns index triples into the ring.</summary>
         private static List<int[]> Triangulate(List<Point> ring)
         {
