@@ -62,13 +62,34 @@ namespace OmsiMapEditor.OMSI
 
         private static readonly int[,] MildYear = { { 3, 0, 75 }, { 1, 76, 134 }, { 2, 260, 323 }, { 3, 324, 370 } };
 
+        /// <summary>
+        /// Marker file of a map folder made by OMSI MapWorks. Such a map is the user's own: its project may be made without
+        /// asking and its export may replace the folder itself (ADR 052).
+        /// </summary>
+        public const string MadeMarkerFileName = "mapworks-map.txt";
+
+        /// <summary>What every map made here has said in its signalroutes.cfg, also before the marker file.</summary>
+        private const string SignalRoutesMark = "Created with OMSI MapWorks";
+
+        /// <summary>True for a map folder OMSI MapWorks made: with its marker file, or the mark it writes into signalroutes.cfg.</summary>
+        public static bool IsMadeHere(string mapFolder)
+        {
+            if (string.IsNullOrWhiteSpace(mapFolder) || !Directory.Exists(mapFolder))
+                return false;
+            if (File.Exists(Path.Combine(mapFolder, MadeMarkerFileName)))
+                return true;
+            var signalRoutes = Path.Combine(mapFolder, "signalroutes.cfg");
+            return File.Exists(signalRoutes) && OmsiTextFile.Decode(File.ReadAllBytes(signalRoutes)).IndexOf(SignalRoutesMark, StringComparison.Ordinal) >= 0;
+        }
+
         /// <summary>True when a helper file of the template map folder is taken over.</summary>
         public static bool IsHelperFile(string fileName)
         {
             var name = fileName.ToLowerInvariant();
             return !(name == "global.cfg" || name.EndsWith(".dsc", StringComparison.Ordinal) || name.StartsWith("tile_", StringComparison.Ordinal) ||
                      name.StartsWith("laststn.", StringComparison.Ordinal) || name.StartsWith("signalroutes", StringComparison.Ordinal) ||
-                     name.StartsWith("old_", StringComparison.Ordinal) || name == "picture.jpg" || name == OmsiMapExporter.MarkerFileName);
+                     name.StartsWith("old_", StringComparison.Ordinal) || name == "picture.jpg" || name == OmsiMapExporter.MarkerFileName ||
+                     name == MadeMarkerFileName);
         }
 
         /// <summary>The problem with a folder name for a new map, or null when it can be used.</summary>
@@ -158,8 +179,12 @@ namespace OmsiMapEditor.OMSI
                     File.WriteAllBytes(Path.Combine(temporary, file + ".terrain"), CreateFlatTerrain(options.GroundHeight));
                 }
                 File.WriteAllBytes(Path.Combine(temporary, "signalroutes.cfg"), OmsiTextFile.Encode(
-                    "-----------------------\r\nSignal Routes File\r\n-----------------------\r\n\r\nCreated with OMSI MapWorks\r\nDate: " +
+                    "-----------------------\r\nSignal Routes File\r\n-----------------------\r\n\r\n" + SignalRoutesMark + "\r\nDate: " +
                     createdAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) + "\r\n\r\n", OmsiTextEncoding.Windows1252));
+                File.WriteAllText(Path.Combine(temporary, MadeMarkerFileName),
+                    "Made by OMSI MapWorks on " + createdAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + Environment.NewLine +
+                    "Template: " + templateFolder + Environment.NewLine +
+                    "MapWorks exports this map into this folder." + Environment.NewLine);
 
                 Directory.Move(temporary, target);
             }

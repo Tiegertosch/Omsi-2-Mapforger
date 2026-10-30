@@ -22,7 +22,7 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 - **Shape the ground:** Raise, lower, smooth, flatten or roughen the terrain with a brush, or lay an even ramp between two points, the way openMapper does; level the ground under houses; dig lakes and rivers and give tiles water; export the ground as a 16-bit height map and lay a height map back over the map. Roads fitted to the terrain stay fitted.
 - **See the real place:** Place the map on the Earth and lay pictures from the air over its tiles, from Esri World Imagery or official orthophotos, without any API key, as openMapper does, or from Mapbox, MapTiler or your own tile server with your own key. Take the terrain heights from open elevation data too, or lay your own scan or old plan over the tiles and line it up by eye. The OpenStreetMap map, drawn from its data with the names of streets and stops, can lie on the tiles too. The pictures stay in the project and are not exported.
 - **Work with map tiles:** Create a map from an installed map template, then add or remove tiles as the layout grows.
-- **Export safely:** Save edits in a `.omproj` project and export them into a separate OMSI map folder. The original map remains unchanged.
+- **Export safely:** Save edits in a `.omproj` project and export them into a separate OMSI map folder. The original map remains unchanged. Maps you made with MapWorks are your own: they open ready to edit and export back into their own folder.
 
 ## Current limitations
 
@@ -55,7 +55,7 @@ To build a standalone Windows player, open **File > Build Profiles**, select Win
 2. Choose **File > Save map project as...** to create an editable project. Mapforge stores changes in a workspace beside the `.omproj` file.
 3. When you're ready, choose **File > Export to OMSI...** and select a destination for the separate exported map.
 
-You can also create a new map from the welcome screen or the **File** menu. It uses an installed map as a template for the required supporting files and settings.
+You can also create a new map from the welcome screen or the **File** menu. It uses an installed map as a template for the required supporting files and settings. A map made this way opens ready to edit, with a project MapWorks keeps under `Documents\OMSI MapWorks\Projects`, and **Export to OMSI...** writes your edits back into its own folder.
 
 ## Project layout
 

@@ -95,6 +95,45 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AMapMadeWithMapWorksIsExportedIntoItsOwnFolderAndOthersAreNot()
+        {
+            // A map of the installation stays untouched: its own folder is no export target.
+            var foreignWorkspace = new OmsiMapWorkspace(original, workspaceFolder);
+            Assert.IsFalse(OmsiNewMap.IsMadeHere(original));
+            Assert.AreEqual(Path.Combine(mapsFolder, "Testmap (MapWorks)"), OmsiMapExporter.SuggestTargetFolder(foreignWorkspace));
+            Assert.IsFalse(OmsiMapExporter.CanWriteTo(foreignWorkspace, original, out var reason));
+            StringAssert.Contains("Only maps made with MapWorks", reason);
+
+            // A map made here is the user's own: it carries the marker, and its export goes into its folder.
+            var made = OmsiNewMap.Create(Path.Combine(original, "global.cfg"), "Own map", "Own Map", new DateTime(2026, 10, 30));
+            Assert.IsTrue(File.Exists(Path.Combine(made.MapFolder, OmsiNewMap.MadeMarkerFileName)));
+            Assert.IsTrue(OmsiNewMap.IsMadeHere(made.MapFolder));
+            var workspace = new OmsiMapWorkspace(made.MapFolder, Path.Combine(testRoot, "Projects", "Own map.workspace"));
+            Assert.AreEqual(made.MapFolder, OmsiMapExporter.SuggestTargetFolder(workspace));
+            Assert.IsTrue(OmsiMapExporter.CanWriteTo(workspace, made.MapFolder, out reason), reason);
+            var tile = OmsiRecordFile.Parse(workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
+            OmsiTileRecords.Of<OmsiObjectView>(tile).First().HeadingDegrees = 90.0;
+            workspace.Save("tile_0_0.map", tile);
+            workspace.Save(@"Mapforge\geo.txt", new byte[] { 7 });
+
+            var report = OmsiMapExporter.Export(workspace, made.MapFolder, "Own Map");
+
+            Assert.IsTrue(report.InPlace);
+            Assert.AreEqual("Own Map", OmsiMapReader.Read(made.GlobalConfigPath).FriendlyName);
+            Assert.AreEqual(90.0, OmsiMapReader.Read(made.GlobalConfigPath).Tiles[0].Objects[0].HeadingDegrees, 1e-12);
+            Assert.IsFalse(File.Exists(Path.Combine(made.MapFolder, OmsiMapExporter.MarkerFileName)));
+            Assert.IsTrue(OmsiNewMap.IsMadeHere(made.MapFolder));
+            Assert.IsFalse(Directory.Exists(made.MapFolder + ".mapforge-export-tmp") || Directory.Exists(made.MapFolder + ".mapforge-export-old"));
+            // The map holds the edits now; the workspace keeps only the project's own data.
+            CollectionAssert.AreEqual(new[] { Path.Combine("Mapforge", "geo.txt") }, workspace.ModifiedFiles());
+            Assert.AreEqual(90.0, OmsiMapReader.Read(workspace).Tiles[0].Objects[0].HeadingDegrees, 1e-12);
+
+            // A map made before the marker file is known by the mark in its signalroutes.cfg.
+            File.Delete(Path.Combine(made.MapFolder, OmsiNewMap.MadeMarkerFileName));
+            Assert.IsTrue(OmsiNewMap.IsMadeHere(made.MapFolder));
+        }
+
+        [Test]
         public void ReplacesOnlyEarlierExports()
         {
             var workspace = new OmsiMapWorkspace(original, workspaceFolder);

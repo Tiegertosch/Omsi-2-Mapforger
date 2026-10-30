@@ -891,6 +891,14 @@ namespace OmsiMapEditor.UI
                 if (string.IsNullOrEmpty(path))
                     return;
 
+                // A map made with MapWorks opens with its project, ready to edit (ADR 052).
+                var folder = Path.GetDirectoryName(Path.GetFullPath(path));
+                if (OmsiNewMap.IsMadeHere(folder))
+                {
+                    if (OpenOwnMap(path, Path.GetFileName(folder)))
+                        SetStatus("Opened " + folder + ", a map made with MapWorks, with its project; edit it right away.");
+                    return;
+                }
                 LoadMap(path, string.Empty, null, false);
                 RememberCurrent();
             }
@@ -931,7 +939,14 @@ namespace OmsiMapEditor.UI
             var mapPath = Argument("-openMap", 1);
             var projectPath = Argument("-openProject", 1);
             var quit = Array.IndexOf(args, "-quit") >= 0;
-            if (mapPath == null && projectPath == null)
+            // -createMap <template global.cfg> <folder> <name> makes a new map as the dialog does, and opens it (ADR 052).
+            var createTemplate = mapPath == null && projectPath == null ? Argument("-createMap", 1) : null;
+            if (createTemplate != null)
+            {
+                CreateNewMap(createTemplate, Argument("-createMap", 2), Argument("-createMap", 3), OmsiNewMapOptions.FromTemplate(createTemplate));
+                Debug.Log("Create map: " + statusLabel?.text);
+            }
+            else if (mapPath == null && projectPath == null)
             {
                 if (Array.IndexOf(args, "-newMap") >= 0)
                     OpenNewMapDialog(Argument("-newMap", 1) is string template && !template.StartsWith("-", StringComparison.Ordinal) ? template : null);
@@ -950,11 +965,16 @@ namespace OmsiMapEditor.UI
 
             if (projectPath != null)
                 OpenProjectFile(projectPath, false);
-            else
+            else if (mapPath != null)
             {
                 try
                 {
-                    LoadMap(mapPath, string.Empty, null, false);
+                    // A map made with MapWorks opens with its project, as from the File menu.
+                    var mapFolder = Path.GetDirectoryName(Path.GetFullPath(mapPath));
+                    if (OmsiNewMap.IsMadeHere(mapFolder))
+                        OpenOwnMap(mapPath, Path.GetFileName(mapFolder));
+                    else
+                        LoadMap(mapPath, string.Empty, null, false);
                 }
                 catch (Exception exception)
                 {
@@ -1092,6 +1112,15 @@ namespace OmsiMapEditor.UI
                 for (var index = turnLaneAt + 1; index < args.Length && !args[index].StartsWith("-", StringComparison.Ordinal); index++)
                     words.Add(args[index]);
                 RunTurnLaneArgument(words);
+            }
+
+            // -exportMap exports the map as the export dialog suggests (ADR 052); the status goes to the log as "Export:".
+            if (Array.IndexOf(args, "-exportMap") >= 0)
+            {
+                OpenExportDialog();
+                if (session != null && session.CanEdit)
+                    ExportMap();
+                Debug.Log("Export: " + statusLabel?.text);
             }
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
@@ -6512,8 +6541,9 @@ namespace OmsiMapEditor.UI
                 return;
 
             var displayName = string.IsNullOrWhiteSpace(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
+            // A map made with MapWorks goes back into its own folder under its own name (ADR 052).
             exportFolderField.SetValueWithoutNotify(Path.GetFileName(OmsiMapExporter.SuggestTargetFolder(session.Workspace)));
-            exportNameField.SetValueWithoutNotify(displayName + " (MapWorks)");
+            exportNameField.SetValueWithoutNotify(ExportsInPlace() ? displayName : displayName + " (MapWorks)");
             UpdateExportTarget();
             exportDialog.style.display = DisplayStyle.Flex;
             if (chronoDate != null)
@@ -6554,7 +6584,10 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>Creates the map, saves a project for it where the user says, and opens it for editing.</summary>
+        /// <summary>
+        /// Creates the map and opens it for editing with the project MapWorks keeps for its own maps (ADR 052), without
+        /// asking where to save one.
+        /// </summary>
         private void CreateNewMap(string templatePath, string folderName, string friendlyName, OmsiNewMapOptions options)
         {
             OmsiNewMapReport report;
@@ -6572,26 +6605,10 @@ namespace OmsiMapEditor.UI
 
             try
             {
-                var projectPath = WindowsFileDialog.SaveFile("Save the project of the new map", WindowsFileDialog.ProjectFilter,
-                    WindowsFileDialog.ProjectExtension, SanitizeFileName(folderName) + "." + WindowsFileDialog.ProjectExtension);
-                if (string.IsNullOrEmpty(projectPath))
-                {
-                    LoadMap(report.GlobalConfigPath, string.Empty, null, false);
-                    RememberCurrent();
-                    SetStatus("Created " + report.MapFolder + ". Save it as a project to edit it.");
+                if (!OpenOwnMap(report.GlobalConfigPath, folderName))
                     return;
-                }
-                var fullProjectPath = Path.GetFullPath(projectPath);
-                var project = new MapforgeProject
-                {
-                    projectName = Path.GetFileNameWithoutExtension(fullProjectPath),
-                    globalConfigPath = report.GlobalConfigPath
-                };
-                File.WriteAllText(fullProjectPath, JsonUtility.ToJson(project, true), new System.Text.UTF8Encoding(false));
-                LoadMap(report.GlobalConfigPath, project.projectName, fullProjectPath, false);
-                RememberCurrent();
-                SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template, and the project " +
-                          fullProjectPath + ". Select '" + friendlyName + "' in OMSI to try it.");
+                SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template; edit it right away. " +
+                          "Export to OMSI... writes your edits into this folder; then select '" + friendlyName + "' in OMSI to try it.");
             }
             catch (Exception exception)
             {
@@ -6625,7 +6642,9 @@ namespace OmsiMapEditor.UI
                 problem = reason;
             var editedCount = session.ModifiedFiles().Count;
             exportTargetLabel.text = problem ??
-                                     (Directory.Exists(target) ? "Replaces the earlier MapWorks export in:\n" : "Creates the map folder:\n") +
+                                     (OmsiMapExporter.IsInPlace(session.Workspace, target)
+                                         ? "Writes your edits into the map's own folder, as it was made with MapWorks:\n"
+                                         : Directory.Exists(target) ? "Replaces the earlier MapWorks export in:\n" : "Creates the map folder:\n") +
                                      target + "\nEdited files included: " + editedCount;
             exportTargetLabel.EnableInClassList("export-problem", problem != null);
             exportConfirmButton?.SetEnabled(problem == null);
@@ -6644,6 +6663,14 @@ namespace OmsiMapEditor.UI
             {
                 var report = OmsiMapExporter.Export(session.Workspace, target, exportNameField.value);
                 HidePopup(exportDialog);
+                if (report.InPlace)
+                {
+                    // The map holds the edits now and the workspace is empty again; what the view shows stays the same.
+                    RefreshAfterChange(null);
+                    SetStatus("Wrote " + report.EditedFiles.Count + " edited file(s) into " + report.TargetFolder + ". Select '" +
+                              exportNameField.value.Trim() + "' in OMSI.");
+                    return;
+                }
                 SetStatus("Exported to " + report.TargetFolder + ": " + report.CopiedFileCount + " files, " +
                           report.EditedFiles.Count + " edited. Select '" + exportNameField.value.Trim() + "' in OMSI.");
             }
