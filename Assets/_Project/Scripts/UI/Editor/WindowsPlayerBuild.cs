@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using OmsiMapEditor.OMSI.Editor;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -18,6 +20,11 @@ namespace OmsiMapEditor.Editor
     {
         private const string StartupScenePath = "Assets/_Project/Scenes/EditorStartup.unity";
         private const string OutputPath = "Builds/Windows/OMSIMapWorks.exe";
+        private const string UninstallerName = "Uninstall OMSI MapWorks.exe";
+        private const string InstallerFolder = "Tools/Installer";
+        private const string FontsFolder = "Assets/_Project/UI/Resources/Fonts";
+        private const string LogoPath = "Assets/_Project/UI/Branding/Logo.png";
+        private const string SetupIconPath = "Tools/Icon/MapWorks.ico";
 
         [MenuItem("OMSI MapWorks/Build/Windows Player")]
         public static void Build()
@@ -121,6 +128,97 @@ namespace OmsiMapEditor.Editor
             }
 
             Debug.Log((release ? "Windows release player built: " : "Windows player built: ") + Path.GetFullPath(OutputPath));
+            if (release)
+                PackRelease();
+        }
+
+        /// <summary>
+        /// Packs the release player as Builds/OMSI-MapWorks-&lt;version&gt;-win64.zip, the file a GitHub release carries
+        /// for Help > Check for updates (ADR 054), with the program in a folder "OMSI MapWorks" and without Unity's folders
+        /// that must not ship; the uninstaller goes into the program first, so updates bring it along. Then wraps the zip
+        /// into Builds/OMSI-MapWorks-&lt;version&gt;-Setup.exe, the installer in the editor's design (ADR 055).
+        /// </summary>
+        private static void PackRelease()
+        {
+            var version = PlayerSettings.bundleVersion.Trim();
+            var playerFolder = Path.GetDirectoryName(Path.GetFullPath(OutputPath));
+            CompileSetup(Path.Combine(playerFolder, UninstallerName), null, version);
+            var zip = Path.GetFullPath(Path.Combine("Builds", "OMSI-MapWorks-" + version + "-win64.zip"));
+            if (File.Exists(zip))
+                File.Delete(zip);
+            using (var archive = ZipFile.Open(zip, ZipArchiveMode.Create))
+                foreach (var file in Directory.GetFiles(playerFolder, "*", SearchOption.AllDirectories))
+                {
+                    var relative = file.Substring(playerFolder.Length + 1);
+                    var top = relative.Split(Path.DirectorySeparatorChar)[0];
+                    if (top.EndsWith("_DoNotShip", StringComparison.Ordinal) || top.EndsWith("_ButDontShipItWithYourGame", StringComparison.Ordinal))
+                        continue;
+                    archive.CreateEntryFromFile(file, "OMSI MapWorks/" + relative.Replace(Path.DirectorySeparatorChar, '/'), System.IO.Compression.CompressionLevel.Optimal);
+                }
+            string sha256;
+            using (var hash = SHA256.Create())
+            using (var stream = File.OpenRead(zip))
+                sha256 = BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
+            Debug.Log("Release zip: " + zip + " (" + new FileInfo(zip).Length + " bytes, SHA-256 " + sha256 + "). Publish it on GitHub as a release with the tag v" +
+                      version + "; older versions of MapWorks then offer it under Help > Check for updates.");
+
+            var setup = Path.GetFullPath(Path.Combine("Builds", "OMSI-MapWorks-" + version + "-Setup.exe"));
+            CompileSetup(setup, zip, version);
+            Debug.Log("Release setup: " + setup + " (" + new FileInfo(setup).Length + " bytes). Attach it to the same release for people who install MapWorks for the first time.");
+        }
+
+        /// <summary>
+        /// Compiles Tools/Installer with the C# compiler Unity brings along (Data/DotNetSdk) against the .NET Framework 4
+        /// of Windows: with <paramref name="payload"/> the setup carrying that zip, without it the uninstaller.
+        /// </summary>
+        private static void CompileSetup(string output, string payload, string version)
+        {
+            var sdk = Path.Combine(EditorApplication.applicationContentsPath, "DotNetSdk");
+            var dotnet = Path.Combine(sdk, "dotnet.exe");
+            var csc = Directory.Exists(Path.Combine(sdk, "sdk"))
+                ? Directory.GetFiles(Path.Combine(sdk, "sdk"), "csc.dll", SearchOption.AllDirectories).FirstOrDefault(path => path.Replace('\\', '/').Contains("/Roslyn/bincore/"))
+                : null;
+            if (!File.Exists(dotnet) || csc == null)
+                throw new InvalidOperationException("Release build blocked: Unity's C# compiler was not found under " + sdk + ", so the setup cannot be built.");
+            var framework = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Microsoft.NET", "Framework64", "v4.0.30319");
+            if (!File.Exists(Path.Combine(framework, "System.Windows.Forms.dll")))
+                throw new InvalidOperationException("Release build blocked: the .NET Framework 4 of Windows was not found under " + framework + ".");
+
+            var versionFile = Path.GetFullPath(Path.Combine("Temp", "MapWorksSetupVersion.txt"));
+            Directory.CreateDirectory(Path.GetDirectoryName(versionFile));
+            File.WriteAllText(versionFile, version);
+            string Quote(string text) => "\"" + text + "\"";
+            var arguments = new List<string>
+            {
+                "exec", Quote(csc), "-nologo", "-noconfig", "-nostdlib", "-target:winexe", "-optimize+", "-platform:anycpu", "-langversion:7.3",
+                "-out:" + Quote(output), "-win32manifest:" + Quote(Path.GetFullPath(Path.Combine(InstallerFolder, "app.manifest"))),
+                "-win32icon:" + Quote(Path.GetFullPath(SetupIconPath)),
+                "-resource:" + Quote(Path.GetFullPath(Path.Combine(FontsFolder, "Inter-Regular.ttf")) + ",Inter-Regular.ttf"),
+                "-resource:" + Quote(Path.GetFullPath(Path.Combine(FontsFolder, "Inter-SemiBold.ttf")) + ",Inter-SemiBold.ttf"),
+                "-resource:" + Quote(Path.GetFullPath(LogoPath) + ",Logo.png"),
+                "-resource:" + Quote(versionFile + ",Version.txt")
+            };
+            foreach (var assembly in new[] { "mscorlib", "System", "System.Core", "System.Drawing", "System.Windows.Forms", "System.IO.Compression", "System.IO.Compression.FileSystem" })
+                arguments.Add("-r:" + Quote(Path.Combine(framework, assembly + ".dll")));
+            if (payload != null)
+                arguments.Add("-resource:" + Quote(payload + ",Payload.zip"));
+            foreach (var source in Directory.GetFiles(InstallerFolder, "*.cs"))
+                arguments.Add(Quote(Path.GetFullPath(source)));
+
+            var start = new System.Diagnostics.ProcessStartInfo(dotnet, string.Join(" ", arguments))
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                // The compiler writes its errors to the standard output.
+                RedirectStandardOutput = true
+            };
+            using (var process = System.Diagnostics.Process.Start(start))
+            {
+                var messages = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+                if (process.ExitCode != 0)
+                    throw new InvalidOperationException("Release build blocked: the setup did not compile:\n" + messages);
+            }
         }
     }
 }
