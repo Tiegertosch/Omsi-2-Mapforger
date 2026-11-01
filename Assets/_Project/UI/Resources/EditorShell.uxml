@@ -92,6 +92,8 @@
             <ui:Label text="Ctrl+click adds objects to the selection or removes them; Ctrl+drag on empty space selects all objects in a box. Dragging one selected object moves all of them. An object moved over a tile border moves into that tile." class="popup-description" />
             <ui:Label text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
             <ui:Label text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
+            <ui:Label class="menu-divider" />
+            <ui:Button name="report-bug-menu-item" text="Report a bug..." class="menu-popup-item" tooltip="Describe a problem and open it as a new issue on GitHub, with the log attached" />
             <ui:Button name="help-menu-close-button" text="Close" class="menu-popup-item popup-close" />
         </ui:VisualElement>
         <ui:VisualElement name="export-dialog" class="dialog-overlay" style="display: none;">
@@ -119,6 +121,7 @@
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="new-map-dialog" class="dialog-overlay" style="display: none;" />
+        <ui:VisualElement name="bug-report-dialog" class="dialog-overlay" style="display: none;" />
         <ui:VisualElement class="status-bar">
             <ui:Label name="pointer-info" class="status-pointer" />
             <ui:Label name="selection-info" class="status-selection" />

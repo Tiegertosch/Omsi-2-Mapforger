@@ -388,6 +388,16 @@
 .new-map-swatch-image { width: 64px; height: 64px; align-items: center; justify-content: center; border-radius: var(--mf-radius-sm); -unity-background-scale-mode: scale-and-crop; }
 .new-map-swatch-image > .spinner { width: 20px; height: 20px; color: var(--mf-color-accent); }
 .new-map-swatch-name { max-width: 70px; margin-top: 2px; font-size: 10px; color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bug-report-dialog { width: 640px; max-height: 94%; }
+.bug-report-row { flex-direction: row; align-items: center; min-height: 30px; margin: 2px 8px; }
+.bug-report-row-tall { align-items: flex-start; }
+.bug-report-row-tall > .bug-report-label { margin-top: 6px; }
+.bug-report-label { width: 110px; min-width: 110px; color: var(--mf-color-text-secondary); }
+.bug-report-field { flex-grow: 1; flex-shrink: 1; width: auto; margin: 0; }
+.bug-report-text { height: 72px; }
+.bug-report-text .unity-base-text-field__input { height: 72px; padding: 4px 6px; -unity-text-align: upper-left; white-space: normal; }
+.bug-report-toggle { margin: 0; color: var(--mf-color-text-primary); }
+.bug-report-hint { margin: 2px 8px 0 126px; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
 .satellite-frame { left: 290px; bottom: auto; width: 880px; max-height: 98%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }
 .satellite-columns { flex-direction: row; }

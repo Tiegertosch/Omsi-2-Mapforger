@@ -723,6 +723,7 @@ namespace OmsiMapEditor.UI
                 helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu, viewMenu);
             if (helpCloseButton != null)
                 helpCloseButton.clicked += () => HidePopup(helpMenu);
+            InitializeBugReport(root, helpMenu);
 
             // Shortcuts work anywhere except inside a text field, which keeps its own text undo and Delete key.
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
@@ -939,6 +940,21 @@ namespace OmsiMapEditor.UI
             var mapPath = Argument("-openMap", 1);
             var projectPath = Argument("-openProject", 1);
             var quit = Array.IndexOf(args, "-quit") >= 0;
+            // A session that ended without quitting asks for a bug report (ADR 053); -bugReport [crash] opens the form for a
+            // check, with -bugReportTitle and -bugReportSend, which then only writes the files and logs the address.
+            var crashed = BeginSession(quit);
+            var bugReportArgument = Argument("-bugReport", 1);
+            if (crashed || Array.IndexOf(args, "-bugReport") >= 0)
+            {
+                OpenBugReport(crashed || bugReportArgument == "crash");
+                if (Argument("-bugReportTitle", 1) is string bugTitle)
+                    bugReportForm?.SetTitle(bugTitle);
+                if (Array.IndexOf(args, "-bugReportSend") >= 0)
+                {
+                    bugReportDryRun = quit || Argument("-screenshot", 1) != null;
+                    SendBugReport();
+                }
+            }
             // -createMap <template global.cfg> <folder> <name> makes a new map as the dialog does, and opens it (ADR 052).
             var createTemplate = mapPath == null && projectPath == null ? Argument("-createMap", 1) : null;
             if (createTemplate != null)
