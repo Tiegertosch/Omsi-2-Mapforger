@@ -826,7 +826,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 **Grund:** Releases auf GitHub sind der Ort, an dem der Nutzer veröffentlicht; ihre API braucht keinen Schlüssel. Ein Tausch per Umbenennen nach dem Beenden ist der einzige Weg, die laufende Exe und ihre Dateien zu ersetzen, und lässt sich bei einem Fehler vollständig zurücknehmen. Die Prüfsumme schützt vor kaputten Downloads.
 
-**Veröffentlichen:** Version unter **Player Settings > Version** erhöhen, Freigabeliste neu schreiben, **Windows Player (Release)** bauen, auf GitHub ein Release mit dem Tag `v<Version>` anlegen und die Zip aus `Builds\` anhängen.
+**Veröffentlichen:** Version unter **Edit > Project Settings... > Player > Version** erhöhen, Freigabeliste neu schreiben, **Windows Player (Release)** bauen, auf GitHub ein Release mit dem Tag `v<Version>` anlegen und Setup und Zip aus `Builds\` anhängen (Schritte in DevelopmentSetup, „Release veröffentlichen“). Erstes Release: `v1.0` am 1. November 2026.
 
 ## ADR 055: Installer im Editor-Design
 
