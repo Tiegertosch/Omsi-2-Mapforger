@@ -724,6 +724,7 @@ namespace OmsiMapEditor.UI
             if (helpCloseButton != null)
                 helpCloseButton.clicked += () => HidePopup(helpMenu);
             InitializeBugReport(root, helpMenu);
+            InitializeUpdates(root, helpMenu);
 
             // Shortcuts work anywhere except inside a text field, which keeps its own text undo and Delete key.
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
@@ -955,6 +956,8 @@ namespace OmsiMapEditor.UI
                     SendBugReport();
                 }
             }
+            // Updates from GitHub's releases (ADR 054); after a crash the report comes first.
+            StartUpdates(args, quit, crashed);
             // -createMap <template global.cfg> <folder> <name> makes a new map as the dialog does, and opens it (ADR 052).
             var createTemplate = mapPath == null && projectPath == null ? Argument("-createMap", 1) : null;
             if (createTemplate != null)
@@ -970,6 +973,10 @@ namespace OmsiMapEditor.UI
                 var welcomeShot = Argument("-screenshot", 1);
                 if (welcomeShot == null)
                     yield break;
+                // A check for updates answers first, so the shot shows its outcome.
+                var welcomeStarted = Time.realtimeSinceStartup;
+                while (updateCancellation != null && Time.realtimeSinceStartup - welcomeStarted < 30f)
+                    yield return null;
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
                 yield return new WaitForEndOfFrame();
@@ -1557,7 +1564,7 @@ namespace OmsiMapEditor.UI
                 var started = Time.realtimeSinceStartup;
                 // Paths read again after an edit come in after the 300 ms the rebuild waits.
                 while ((groundRenderer.IsLoading || objectRenderer.IsLoading || objectRenderer.PreviewsPending && Array.IndexOf(args, "-noPreviewWait") < 0 || outlinesBuilding || checkTask != null ||
-                        (installationScan != null && !installationScan.IsCompleted) || pathsShown && (routesRebuild != null || pathsTask != null)) &&
+                        (installationScan != null && !installationScan.IsCompleted) || pathsShown && (routesRebuild != null || pathsTask != null) || updateCancellation != null) &&
                        Time.realtimeSinceStartup - started < 300f)
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)

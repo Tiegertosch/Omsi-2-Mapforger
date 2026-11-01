@@ -398,6 +398,18 @@
 .bug-report-text .unity-base-text-field__input { height: 72px; padding: 4px 6px; -unity-text-align: upper-left; white-space: normal; }
 .bug-report-toggle { margin: 0; color: var(--mf-color-text-primary); }
 .bug-report-hint { margin: 2px 8px 0 126px; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
+.update-dialog { width: 560px; max-height: 90%; }
+.update-message-row { flex-direction: row; align-items: center; }
+.update-spinner { width: 18px; height: 18px; margin-left: 8px; flex-shrink: 0; color: var(--mf-color-accent); }
+.update-message { flex-grow: 1; flex-shrink: 1; }
+.update-error { color: var(--mf-color-error); }
+.update-notes { flex-shrink: 1; max-height: 260px; margin: 6px 8px; padding: var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-md); }
+.update-notes-text { margin: 0; white-space: normal; color: var(--mf-color-text-primary); }
+.update-progress { height: 6px; margin: 8px 8px 4px; background-color: var(--mf-color-field); border-radius: 3px; overflow: hidden; }
+.update-progress-fill { height: 100%; width: 0; background-color: var(--mf-color-accent); border-radius: 3px; }
+.update-hint { margin: 4px 8px; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
+.update-toggle { margin: 8px 8px 0; color: var(--mf-color-text-secondary); }
+.update-skip { margin-right: auto; }
 .satellite-frame { left: 290px; bottom: auto; width: 880px; max-height: 98%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }
 .satellite-columns { flex-direction: row; }
