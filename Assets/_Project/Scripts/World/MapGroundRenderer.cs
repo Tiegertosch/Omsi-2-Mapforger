@@ -306,12 +306,17 @@ namespace OmsiMapEditor.World
             var placements = new List<OmsiHolePlacement>();
             foreach (var tile in summary.Tiles)
                 foreach (var item in tile.Objects)
-                    placements.Add(new OmsiHolePlacement
-                    {
-                        TileX = tile.X, TileY = tile.Y, AssetPath = item.AssetPath, LocalX = item.LocalX, LocalY = item.LocalY,
-                        HeadingDegrees = item.HeadingDegrees, PitchDegrees = item.PitchDegrees, BankDegrees = item.BankDegrees
-                    });
+                    placements.Add(Placement(tile, item));
             return placements;
+        }
+
+        private static OmsiHolePlacement Placement(OmsiTileSummary tile, OmsiObjectRecord item)
+        {
+            return new OmsiHolePlacement
+            {
+                TileX = tile.X, TileY = tile.Y, AssetPath = item.AssetPath, LocalX = item.LocalX, LocalY = item.LocalY,
+                HeadingDegrees = item.HeadingDegrees, PitchDegrees = item.PitchDegrees, BankDegrees = item.BankDegrees
+            };
         }
 
         /// <summary>
@@ -322,19 +327,26 @@ namespace OmsiMapEditor.World
         {
             if (holes == null || summary == null || loading != null || pending != null)
                 return;
-            var placements = Placements(summary);
+            // Only objects with a hole cut the ground; the others are left out before the signature, as Build skips them.
+            // Each path text is asked once: the catalog compares paths without case, which costs much in Mono.
+            var placements = new List<OmsiHolePlacement>();
+            var hasHole = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var tile in summary.Tiles)
+                foreach (var item in tile.Objects)
+                {
+                    if (item.AssetPath == null)
+                        continue;
+                    if (!hasHole.TryGetValue(item.AssetPath, out var cuts))
+                        hasHole[item.AssetPath] = cuts = holes.Catalog.ObjectHole(item.AssetPath) != null;
+                    if (cuts)
+                        placements.Add(Placement(tile, item));
+                }
             // Splines built since loading, such as rail cuttings, cut the ground as well.
             var splines = new List<KeyValuePair<long, OmsiSplineRecord>>();
-            var ids = new System.Text.StringBuilder();
             foreach (var tile in summary.Tiles)
                 foreach (var spline in tile.Splines)
-                {
                     splines.Add(new KeyValuePair<long, OmsiSplineRecord>(OmsiTerrainHoleCatalog.TileKey(tile.X, tile.Y), spline));
-                    var profile = holes.Profiles.Get(spline.AssetPath);
-                    if (profile != null && (profile.TerrainHoles.Count > 0 || spline.AlignsTerrain))
-                        ids.Append(spline.Id).Append(',');
-                }
-            var signature = HoleSignature(holes.Catalog, placements) + "|" + ids;
+            var signature = HoleSignature(holes.Catalog, placements, splines, holes.Profiles);
             if (signature == holes.Signature)
                 return;
             holes.Signature = signature;
@@ -349,8 +361,12 @@ namespace OmsiMapEditor.World
             }
         }
 
-        /// <summary>Where the objects with terrain holes stand, as text; equal text means equal holes.</summary>
-        private static string HoleSignature(OmsiTerrainHoleCatalog catalog, List<OmsiHolePlacement> placements)
+        /// <summary>
+        /// Where the objects with terrain holes stand and which splines cut or align the ground, as text; equal text means
+        /// equal holes. Loading and refreshing use the same text, so the first edit does not cut every hole anew.
+        /// </summary>
+        private static string HoleSignature(OmsiTerrainHoleCatalog catalog, List<OmsiHolePlacement> placements,
+            List<KeyValuePair<long, OmsiSplineRecord>> splines, OmsiSplineProfileCatalog profiles)
         {
             var text = new System.Text.StringBuilder();
             foreach (var placement in placements)
@@ -361,6 +377,13 @@ namespace OmsiMapEditor.World
                     .Append(placement.LocalX.ToString("R")).Append(',').Append(placement.LocalY.ToString("R")).Append(',')
                     .Append(placement.HeadingDegrees.ToString("R")).Append(',').Append(placement.PitchDegrees.ToString("R")).Append(',')
                     .Append(placement.BankDegrees.ToString("R")).Append(';');
+            }
+            text.Append('|');
+            foreach (var pair in splines)
+            {
+                var profile = profiles.Get(pair.Value.AssetPath);
+                if (profile != null && (profile.TerrainHoles.Count > 0 || pair.Value.AlignsTerrain))
+                    text.Append(pair.Value.Id).Append(',');
             }
             return text.ToString();
         }
@@ -1019,7 +1042,7 @@ namespace OmsiMapEditor.World
             data.Problems.AddRange(holes.Problems);
             data.Holes = new HoleSources
             {
-                Catalog = holes, Profiles = profiles, Splines = splines, Tiles = available, Signature = HoleSignature(holes, placements)
+                Catalog = holes, Profiles = profiles, Splines = splines, Tiles = available, Signature = HoleSignature(holes, placements, splines, profiles)
             };
         }
 

@@ -77,9 +77,10 @@ You can also create a new map from the welcome screen or the **File** menu. It u
 - [Roadmap](Documentation/Roadmap.md)
 - [Design decisions](Documentation/Decisions.md)
 - [Corporate design](Documentation/CorporateDesign.md)
+- [Refactoring audit](Documentation/RefactoringAudit.md), [performance baseline](Documentation/PerformanceBaseline.md) and [refactoring summary](Documentation/RefactoringSummary.md) of the post-1.0 stabilization (in German)
 - [OMSI format research](Documentation/GrundorfFormatInventory.md), including [tile records](Documentation/TileRecordInventory.md), [scenery objects](Documentation/SceneryObjectInventory.md), [timetables and chrono variants](Documentation/TimetableChronoInventory.md)
 
-Run the EditMode suite from Unity's **Window > General > Test Runner**. Detailed validation notes and command-line workflows are in the development setup guide.
+Run the EditMode suite from Unity's **Window > General > Test Runner**. Detailed validation notes and command-line workflows are in the development setup guide. The built player measures itself with `-benchmark report.txt` next to `-openMap` or `-openProject`.
 
 ## License
 

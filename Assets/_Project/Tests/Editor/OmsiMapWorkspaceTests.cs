@@ -538,6 +538,53 @@ namespace OmsiMapEditor.Tests
                 "[object]", "0", "c.sco", "7", "50", "60", "0", "0", "0", "0", "0", "");
         }
 
+        [Test]
+        public void ReferenceIndexOfASessionFollowsEveryChangeOfItsFiles()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            AssertSameReferences(session);
+
+            Assert.AreEqual("entry point", session.DeleteObject(summary, tile, tile.Objects[1]).Blockers.Single().Kind);
+            var placed = session.PlaceObject(summary, tile, @"Sceneryobjects\new.sco", 1, 2, 0, 0);
+            AssertSameReferences(session);
+            session.Undo(summary, placed);
+            AssertSameReferences(session);
+
+            // Two saves of the same length with the same file time, as on file systems with coarse times: only the
+            // workspace's count of saves tells them apart.
+            var head = "[version]\r\n14\r\n\r\n[object]\r\n0\r\na.sco\r\n5\r\n10\r\n20\r\n0\r\n0\r\n0\r\n0\r\n0\r\n\r\n[varparent]\r\n";
+            var edited = Path.Combine(workspaceFolder, "tile_0_0.map");
+            session.Workspace.Save("tile_0_0.map", OmsiTextFile.Encode(head + "5\r\n", OmsiTextEncoding.Utf16LittleEndian));
+            var savedAt = File.GetLastWriteTimeUtc(edited);
+            Assert.AreEqual("variable parent", session.BuildReferenceIndex().To(5).Single().Kind);
+            session.Workspace.Save("tile_0_0.map", OmsiTextFile.Encode(head + "6\r\n", OmsiTextEncoding.Utf16LittleEndian));
+            File.SetLastWriteTimeUtc(edited, savedAt);
+            var index = session.BuildReferenceIndex();
+            CollectionAssert.IsEmpty(index.To(5));
+            Assert.That(index.To(6).Select(reference => reference.Kind), Has.Member("variable parent"));
+            AssertSameReferences(session);
+
+            // A file changed outside the editor is read again as well.
+            session.Workspace.Revert("tile_0_0.map");
+            Write(original, "tile_0_0.map", "[version]", "14", "", "[object]", "0", "a.sco", "5", "10", "20", "0", "0", "0", "0", "0", "",
+                "[varparent]", "5", "");
+            Assert.AreEqual("variable parent", session.BuildReferenceIndex().To(5).Single().Kind);
+            AssertSameReferences(session);
+        }
+
+        /// <summary>The session's index, built from what it kept, equals an index read anew from every file.</summary>
+        private static void AssertSameReferences(OmsiMapSession session)
+        {
+            var kept = session.BuildReferenceIndex();
+            var fresh = OmsiReferenceIndex.Build(session.Workspace, "global.cfg");
+            Assert.AreEqual(fresh.ReferenceCount, kept.ReferenceCount);
+            for (var id = 0; id <= 20; id++)
+                CollectionAssert.AreEqual(fresh.To(id).Select(reference => reference.ToString()), kept.To(id).Select(reference => reference.ToString()), "ID " + id);
+        }
+
         /// <summary>Objects 5 (with a rule) and 6; an entry point names object 6 by index 1 and by ID.</summary>
         private void UseMapWithEntryPoint()
         {

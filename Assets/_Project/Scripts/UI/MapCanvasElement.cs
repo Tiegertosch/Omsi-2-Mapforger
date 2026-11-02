@@ -289,6 +289,10 @@ namespace OmsiMapEditor.UI
         private bool isFitted;
         private float slowestDrawMilliseconds;
 
+        // Kept between redraws, so drawing markers allocates nothing while the view pans.
+        private readonly List<Vector2> markerCenters = new List<Vector2>();
+        private bool[] occupiedCells = new bool[0];
+
         private OmsiTileSummary selectedTile;
 
         // The selection; the primary object is the last one, the one the inspector and a single rotation handle show.
@@ -563,6 +567,11 @@ namespace OmsiMapEditor.UI
         private bool CanRotate => AllowEditing && tool == EditorTool.Rotate;
 
         public float MetersPerPixel => metersPerPixel;
+
+        /// <summary>How long the last redraw from above took, and how many there were; read by the benchmark run.</summary>
+        public float LastDrawMilliseconds { get; private set; }
+
+        public int DrawCount { get; private set; }
 
         /// <summary>
         /// True in the 3D view: the right button turns the camera around <see cref="OrbitTarget"/> and the middle one
@@ -1028,6 +1037,8 @@ namespace OmsiMapEditor.UI
             objectsByTile.Clear();
             if (summary == null)
                 return objectsByTile;
+            // Outlines are kept by path without case, which costs much in Mono; each path text is looked up once.
+            var footprintOf = new Dictionary<string, Footprint>(StringComparer.Ordinal);
             foreach (var tile in summary.Tiles)
             {
                 if (tile.Objects.Count == 0)
@@ -1040,7 +1051,13 @@ namespace OmsiMapEditor.UI
                 float minimumX = float.MaxValue, minimumY = float.MaxValue, maximumX = float.MinValue, maximumY = float.MinValue;
                 for (var index = 0; index < group.Records.Length; index++)
                 {
-                    footprints.TryGetValue(group.Records[index].AssetPath, out var footprint);
+                    var assetPath = group.Records[index].AssetPath;
+                    Footprint footprint = null;
+                    if (assetPath != null && !footprintOf.TryGetValue(assetPath, out footprint))
+                    {
+                        footprints.TryGetValue(assetPath, out footprint);
+                        footprintOf[assetPath] = footprint;
+                    }
                     group.Footprints[index] = footprint;
                     var position = ToMap(tile, group.Records[index].LocalX, group.Records[index].LocalY);
                     var radius = footprint?.Radius ?? 0f;
@@ -1322,6 +1339,8 @@ namespace OmsiMapEditor.UI
 
             // Report slow redraws once per new maximum, so large maps can be diagnosed from the player log.
             var milliseconds = (float)watch.Elapsed.TotalMilliseconds;
+            LastDrawMilliseconds = milliseconds;
+            DrawCount++;
             if (milliseconds > 50f && milliseconds > slowestDrawMilliseconds * 1.5f)
             {
                 slowestDrawMilliseconds = milliseconds;
@@ -2091,11 +2110,20 @@ namespace OmsiMapEditor.UI
         {
             var half = metersPerPixel < 0.2f ? 3f : metersPerPixel < 1f ? 2f : 1.5f;
             var showHeading = metersPerPixel < 0.6f;
-            var markers = new List<Vector2>();
+            var markers = markerCenters;
+            markers.Clear();
             // Far out many markers share a pixel; one each per 2 × 2 pixel cell looks the same and draws much less.
             var cellsAcross = (int)(layout.width / 2f) + 1;
             var cellsDown = (int)(layout.height / 2f) + 1;
-            var occupied = metersPerPixel > 2f && cellsAcross > 0 && cellsDown > 0 ? new bool[cellsAcross * cellsDown] : null;
+            bool[] occupied = null;
+            if (metersPerPixel > 2f && cellsAcross > 0 && cellsDown > 0)
+            {
+                if (occupiedCells.Length < cellsAcross * cellsDown)
+                    occupiedCells = new bool[cellsAcross * cellsDown];
+                else
+                    Array.Clear(occupiedCells, 0, cellsAcross * cellsDown);
+                occupied = occupiedCells;
+            }
             if (showHeading)
             {
                 painter.strokeColor = headingColor;
@@ -3695,14 +3723,20 @@ namespace OmsiMapEditor.UI
             if (pickedItem != null || footprints.Count == 0 || metersPerPixel > OutlineMetersPerPixel)
                 return pickedItem != null;
 
-            // No marker nearby: take the smallest outline that contains the point.
+            // No marker nearby: take the smallest outline that contains the point. The objects by tile hold each one's
+            // outline and the bounds of its tile's outlines, so tiles far from the point are passed over.
             var smallest = float.MaxValue;
-            foreach (var tile in summary.Tiles)
+            foreach (var group in ObjectsByTile())
             {
-                foreach (var item in tile.Objects)
+                if (map.x < group.Bounds.xMin || map.x > group.Bounds.xMax || map.y < group.Bounds.yMin || map.y > group.Bounds.yMax)
+                    continue;
+                var tile = group.Tile;
+                for (var index = 0; index < group.Records.Length; index++)
                 {
-                    if (!footprints.TryGetValue(item.AssetPath, out var footprint) || footprint.Area >= smallest)
+                    var footprint = group.Footprints[index];
+                    if (footprint == null || footprint.Area >= smallest)
                         continue;
+                    var item = group.Records[index];
                     var position = ToMap(tile, item.LocalX, item.LocalY);
                     if (Mathf.Abs(position.x - map.x) > footprint.Radius || Mathf.Abs(position.y - map.y) > footprint.Radius)
                         continue;

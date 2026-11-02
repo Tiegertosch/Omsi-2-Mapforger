@@ -10,6 +10,10 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public sealed class OmsiMapWorkspace : IOmsiFileSource
     {
+        // Counts the saves and reverts of each file, as file times may not tell two quick saves apart.
+        private readonly Dictionary<string, long> versions = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        private long lastVersion;
+
         public OmsiMapWorkspace(string sourceMapFolder, string workspaceFolder)
         {
             if (string.IsNullOrWhiteSpace(sourceMapFolder) || !Directory.Exists(sourceMapFolder))
@@ -64,6 +68,25 @@ namespace OmsiMapEditor.OMSI
             return File.Exists(original) ? File.ReadAllBytes(original) : null;
         }
 
+        /// <summary>
+        /// Text that changes whenever the file read for a path changes: by a save or revert through this workspace, or on
+        /// disk in size or time. Null when there is no such file. Lets readers keep what they read from unchanged files.
+        /// </summary>
+        public string Stamp(string relativePath)
+        {
+            var edited = WorkspaceFile(relativePath);
+            var inWorkspace = File.Exists(edited);
+            var file = new FileInfo(inWorkspace ? edited : OmsiRelativePath.Resolve(RootPath, relativePath));
+            if (!file.Exists)
+                return null;
+            long version;
+            lock (versions)
+                versions.TryGetValue(edited, out version);
+            return (inWorkspace ? "w" : "o") + version.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" +
+                   file.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" +
+                   file.LastWriteTimeUtc.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         public bool IsModified(string relativePath)
         {
             return File.Exists(WorkspaceFile(relativePath));
@@ -108,6 +131,7 @@ namespace OmsiMapEditor.OMSI
             // Write next to the target first so an interrupted save never leaves a half-written file.
             var temporary = target + ".mapforge-tmp";
             File.WriteAllBytes(temporary, bytes);
+            Count(target);
             if (File.Exists(target))
                 File.Delete(target);
             File.Move(temporary, target);
@@ -124,8 +148,15 @@ namespace OmsiMapEditor.OMSI
         public void Revert(string relativePath)
         {
             var edited = WorkspaceFile(relativePath);
+            Count(edited);
             if (File.Exists(edited))
                 File.Delete(edited);
+        }
+
+        private void Count(string workspaceFile)
+        {
+            lock (versions)
+                versions[workspaceFile] = ++lastVersion;
         }
 
         private static bool SameBytes(byte[] first, byte[] second)

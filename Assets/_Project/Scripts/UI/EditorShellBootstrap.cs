@@ -986,6 +986,7 @@ namespace OmsiMapEditor.UI
                 yield break;
             }
 
+            benchmarkOpenStartedAt = Time.realtimeSinceStartup;
             if (projectPath != null)
                 OpenProjectFile(projectPath, false);
             else if (mapPath != null)
@@ -1004,6 +1005,7 @@ namespace OmsiMapEditor.UI
                     Debug.LogException(exception);
                 }
             }
+            benchmarkOpenFinishedAt = Time.realtimeSinceStartup;
             // Two frames for the layout, so the view has its size.
             yield return null;
             yield return null;
@@ -1557,6 +1559,10 @@ namespace OmsiMapEditor.UI
             }
 
             yield return RunSatelliteArguments(args);
+
+            // -benchmark <report.txt> measures loading, redraws, frames, picking and refreshes (PerformanceBaseline.md).
+            if (Argument("-benchmark", 1) is string benchmarkReport)
+                yield return RunBenchmark(benchmarkReport);
 
             var screenshot = Argument("-screenshot", 1);
             if (screenshot != null)

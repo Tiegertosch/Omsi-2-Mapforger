@@ -169,6 +169,13 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Installer im Editor-Design (ADR 055): `OMSI-MapWorks-<Version>-Setup.exe` aus `BuildRelease`, Installation pro Benutzer ohne Admin-Rechte, Startmenü/Desktop, Eintrag unter Windows „Apps“, Deinstaller im Programmordner, der auch über Updates kommt
 - [x] Programm-Icon aus dem Logo (ADR 056): Monogramm „MW“ mit dem Streifen des Logos für Player, Setup und Deinstaller, erzeugt von `Tools/Icon/MakeIcon.ps1`
 - [x] Erstes Release `v1.0` auf GitHub veröffentlicht (1. November 2026) mit Setup und Zip
+- Stabilisierung nach 1.0 (Zweig `refactor/post-1.0-stabilization`; RefactoringAudit.md, PerformanceBaseline.md, RefactoringSummary.md)
+  - [x] Audit der Module, Messlauf `-benchmark` im Player, Messungen auf Grundorf und Berlin-Spandau vorher und nachher
+  - [x] Verweis-Index mit Zwischenspeicher je Datei (ADR 057): Löschen und Kachelwechsel auf Spandau ab dem zweiten Mal ~0,1 statt ~0,6 s
+  - [x] Geländelöcher: erste Bearbeitung schneidet nicht mehr alle Löcher neu (Fehler der Signatur), Auffrischen nur über Objekte mit Loch
+  - [x] Objekt-Platzierungen nach Bearbeitungen etwa doppelt so schnell (Pfade einmal je Text ohne Groß-/Kleinschreibung nachgeschlagen); weniger Müll beim Zeichnen
+  - [ ] Nutzertest im Player und in openOMSI, dann Commit (ab 2. November 2026)
+  - [ ] Offen mit Zustimmung (Audit, Stufe 5): Platzierungen je Kachel neu bauen, Sichtprüfung beim Instancing, Kachelliste nur für geänderte Kacheln, Shell-Dienste für Undo und Auswahl, IL2CPP prüfen
 - [x] Updates (ADR 054): neues Release auf GitHub beim Start (höchstens alle 20 Stunden, abschaltbar, Version überspringbar) und unter **Help > Check for updates...** finden, herunterladen, prüfen, Programmdateien nach dem Beenden tauschen und mit dem offenen Projekt neu starten, bei Fehlern zurückrollen; `BuildRelease` packt die Zip fürs Release
 - [x] Fehler melden (ADR 053): **Help > Report a bug...** öffnet eine vorausgefüllte GitHub-Issue im Browser mit Systemangaben und dem Ende des Logs, das ganze Log liegt als Datei bereit; nach einem Absturz oder einem beendeten Hänger öffnet sich das Formular beim nächsten Start mit dem Log jener Sitzung und Unitys Absturzbericht
 - KI-Pfade nach dem Vorbild der Mod „Traffic“ für Cities: Skylines II (github.com/krzychu124/Traffic, ohne Lizenz: nur das Konzept, kein Code; Plan des Nutzers vom 27. Oktober 2026). Grundlage aus openOMSI: Vorfahrt kommt nur aus `[rule] <Pfad> priority <Wert>` hinter dem Element in der Kachel (ohne Regel 128, Originalkarten 192 auf der Hauptstraße und 64 aus der Nebenstraße), `[blockpath]` wirkt nicht, Pfade verbinden sich über nahe Enden mit passender Richtung:

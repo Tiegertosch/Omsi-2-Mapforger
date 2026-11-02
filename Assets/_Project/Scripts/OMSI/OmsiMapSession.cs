@@ -142,6 +142,9 @@ namespace OmsiMapEditor.OMSI
         // Read once on the first placement; it remembers every ID handed out since, also of undone placements.
         private OmsiIdAllocator ids;
 
+        // What each file contributed to the last reference index; deletions and moves read only files changed since.
+        private readonly OmsiReferenceCache referenceCache = new OmsiReferenceCache();
+
         private OmsiMapSession(string globalConfigPath, IOmsiFileSource source, OmsiMapWorkspace workspace, string projectFilePath)
         {
             GlobalConfigPath = globalConfigPath;
@@ -571,7 +574,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Every reference to an ID in the current files; build it once for a group of deletions or transfers.</summary>
         public OmsiReferenceIndex BuildReferenceIndex()
         {
-            return OmsiReferenceIndex.Build(RequireWorkspace(), GlobalConfigFileName);
+            return OmsiReferenceIndex.Build(RequireWorkspace(), GlobalConfigFileName, referenceCache);
         }
 
         /// <summary>

@@ -855,3 +855,18 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Motiv:** ein Monogramm „MW“ aus den Original-Buchstaben des Logos – das weiße M aus „Map“ und das orange W aus „Works“ mit ihren dunklen Konturen, auf derselben Grundlinie –, darunter der orange Streifen mit den zwei Schrägstrichen aus dem Logo, auf einer abgerundeten Kachel in `--mf-color-bg` mit leichtem Verlauf von `--mf-color-panel-raised` und einem Rand in `--mf-color-border`. So erkennt man das Logo wieder, und es bleibt auch in 16 Pixeln lesbar.
 - **Herstellung:** `Tools/Icon/MakeIcon.ps1` (Windows PowerShell mit `System.Drawing`, keine zusätzliche Abhängigkeit) schneidet die Buchstaben aus `Logo.png` aus: ihre Fläche durch Füllen von einem Punkt im Buchstaben, dazu die Kontur bis 12 Pixel, wobei jeder Konturpixel dem nächstgelegenen Buchstaben gehört, damit „a“, „o“ und das kleine „OMSI“ draußen bleiben. Den Streifen zeichnet es als Form im Orange des Logos nach. Es schreibt `Assets/_Project/UI/Branding/Icon.png` (1024 Pixel) und `Tools/Icon/MapWorks.ico` (16 bis 256 Pixel als PNG). Ändert sich das Logo, das Skript erneut ausführen.
 - **Verwendung:** `Icon.png` ist das Standard-Icon unter *Player Settings* (Exe, Fenster, Taskleiste, Verknüpfungen, Eintrag unter Windows „Apps“); `MapWorks.ico` bekommen Setup und Deinstaller beim Übersetzen (`-win32icon`). `Icon.png` ist eine neue Player-Datei: vor dem Release die Freigabeliste neu schreiben.
+
+## ADR 057: Verweis-Index mit Zwischenspeicher je Datei
+
+**Status:** Angenommen, 1. November 2026, im Meilenstein „Stabilisierung nach 1.0“ (RefactoringAudit.md, Befund D1).
+
+**Ausgangslage:** Löschen und Verschieben über Kachelgrenzen prüfen vorher alle Verweise der Karte (ADR 011, 012) mit einem frisch gebauten `OmsiReferenceIndex`. Der liest und zerlegt jedes Mal alle Kacheln, Chrono-Dateien und Fahrplandaten: auf Berlin-Spandau 0,63 s ohne Unity und 0,7 s im Player, bei jedem Löschen.
+
+**Entscheidung:**
+- Die Sitzung hält einen `OmsiReferenceCache`: je Datei die Verweise, die sie beim letzten Aufbau beitrug, mit einem Stempel. Beim nächsten Aufbau werden nur Dateien mit anderem Stempel neu gelesen; Reihenfolge und Inhalt des Index bleiben genau wie bei einem frischen Aufbau.
+- Den Stempel gibt `OmsiMapWorkspace.Stamp(path)`: woher die Datei gelesen wird (Arbeitskopie oder Original), ein Zähler der Speichervorgänge und Rücknahmen dieser Datei durch die Arbeitskopie sowie Größe und Änderungszeit auf der Platte. Der Zähler erkennt zwei schnelle Speichervorgänge gleicher Länge auch auf Dateisystemen mit grober Zeit (FAT, exFAT), Größe und Zeit erkennen Änderungen außerhalb des Editors.
+- Andere Quellen als eine Arbeitskopie (`OmsiFolderSource`) haben keinen Stempel und werden immer ganz gelesen; `OmsiReferenceIndex.Build(source, config)` ohne Zwischenspeicher verhält sich wie zuvor.
+
+**Regel:** Dateien der Arbeitskopie nur über `OmsiMapWorkspace.Save` und `Revert` schreiben; dann zählt der Stempel jede Änderung mit. Wer an der Arbeitskopie vorbei schreibt, verlässt sich auf Größe und Zeit.
+
+**Grund:** Der Index ist die Sicherung gegen kaputte Verweise; ein schneller Index darf nie anders sein als ein frischer. Der Test `ReferenceIndexOfASessionFollowsEveryChangeOfItsFiles` vergleicht nach jeder Art von Änderung mit einem frisch gebauten Index; ohne Zähler schlägt er fehl. Auf Spandau braucht der Aufbau danach 0,08 s statt 0,63 s, der erste Aufbau einer Sitzung bleibt so lang wie bisher.

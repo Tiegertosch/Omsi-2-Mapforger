@@ -82,6 +82,9 @@ namespace OmsiMapEditor.World
             /// <summary>For trees in the 3D view: crossed upright planes standing on the ground, like OMSI draws them.</summary>
             public Material CrossMaterial;
 
+            /// <summary><see cref="CrossMaterial"/> as the one material of the crossed planes, kept so drawing allocates nothing.</summary>
+            public Material[] CrossMaterials;
+
             public Matrix4x4[] CrossInstances = new Matrix4x4[0];
         }
 
@@ -394,7 +397,7 @@ namespace OmsiMapEditor.World
             var crossed = ThreeDimensional && kind.CrossMaterial != null;
             var mesh = crossed ? treeCross : kind.Mesh;
             var drawn = crossed ? crossInstances : instances;
-            Draw(mesh, crossed ? new[] { kind.CrossMaterial } : kind.Materials, drawn, count);
+            Draw(mesh, crossed ? kind.CrossMaterials : kind.Materials, drawn, count);
             if (!crossed && kind.BlendedMaterials != null)
                 Draw(mesh, kind.BlendedMaterials, drawn, count);
         }
@@ -604,6 +607,7 @@ namespace OmsiMapEditor.World
                     // The planes are seen from both sides.
                     kind.CrossMaterial = NewMaterial(TextureFor(kind.TreeTexturePath), Color.white, 0.5f, false);
                     kind.CrossMaterial.SetFloat("_Cull", (float)CullMode.Off);
+                    kind.CrossMaterials = new[] { kind.CrossMaterial };
                 }
                 else
                 {
@@ -830,14 +834,13 @@ namespace OmsiMapEditor.World
                     }
             }
 
-            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var missing = new List<string>();
+            // Paths are counted by their exact text first: comparing them without case costs much more in Mono, and a
+            // map writes most paths the same way each time. Each distinct text is then looked up once without case.
+            var exactCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             void Count(string assetPath)
             {
-                counts.TryGetValue(assetPath, out var count);
-                counts[assetPath] = count + 1;
-                if (count == 0 && !kinds.ContainsKey(assetPath) && !requestedKinds.Contains(assetPath))
-                    missing.Add(assetPath);
+                exactCounts.TryGetValue(assetPath, out var count);
+                exactCounts[assetPath] = count + 1;
             }
             foreach (var tile in summary.Tiles)
             {
@@ -848,6 +851,15 @@ namespace OmsiMapEditor.World
             }
             foreach (var row in splineRows)
                 Count(row.Key);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var missing = new List<string>();
+            foreach (var pair in exactCounts)
+            {
+                counts.TryGetValue(pair.Key, out var count);
+                counts[pair.Key] = count + pair.Value;
+                if (count == 0 && !kinds.ContainsKey(pair.Key) && !requestedKinds.Contains(pair.Key))
+                    missing.Add(pair.Key);
+            }
             if (missing.Count > 0 && loading == null)
             {
                 requestedKinds.UnionWith(missing);
@@ -871,6 +883,16 @@ namespace OmsiMapEditor.World
                     kind.CrossInstances = new Matrix4x4[count];
                 kind.InstanceCount = 0;
             }
+            var kindOf = new Dictionary<string, KindData>(StringComparer.Ordinal);
+            KindData KindOf(string assetPath)
+            {
+                if (!kindOf.TryGetValue(assetPath, out var found))
+                {
+                    kinds.TryGetValue(assetPath, out found);
+                    kindOf[assetPath] = found;
+                }
+                return found;
+            }
             instanceOf.Clear();
             attachParents.Clear();
             attachParentAssets.Clear();
@@ -880,7 +902,8 @@ namespace OmsiMapEditor.World
                 frames.Clear();
                 foreach (var item in tile.Objects)
                 {
-                    if (!kinds.TryGetValue(item.AssetPath, out var kind) || kind.Mesh == null)
+                    var kind = KindOf(item.AssetPath);
+                    if (kind == null || kind.Mesh == null)
                         continue;
                     var frame = PlacementFrame(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees,
                         item.PitchDegrees, item.BankDegrees);
@@ -894,7 +917,8 @@ namespace OmsiMapEditor.World
                 if (rowFirsts != null && rowFirsts.TryGetValue(tile, out var firstsOfTile))
                     foreach (var first in firstsOfTile)
                     {
-                        if (!kinds.TryGetValue(first.Value.Key, out var rowKind) || rowKind.Mesh == null)
+                        var rowKind = KindOf(first.Value.Key);
+                        if (rowKind == null || rowKind.Mesh == null)
                             continue;
                         var placed = first.Value.Value;
                         var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
@@ -909,7 +933,7 @@ namespace OmsiMapEditor.World
                 {
                     if (!frames.TryGetValue(attached.ParentId, out var parent) || attached.AttachPointIndex < 0 ||
                         attached.AttachPointIndex >= parent.Value.AttachPoints.Count ||
-                        !kinds.TryGetValue(attached.AssetPath, out var kind) || kind.Mesh == null)
+                        !(KindOf(attached.AssetPath) is KindData kind) || kind.Mesh == null)
                         continue;
                     var frame = parent.Key * AttachMatrix(parent.Value.AttachPoints[attached.AttachPointIndex]) *
                                 Matrix4x4.Rotate(Orientation(attached.HeadingDegrees, attached.PitchDegrees, attached.BankDegrees));
@@ -921,7 +945,8 @@ namespace OmsiMapEditor.World
 
             foreach (var row in splineRows)
             {
-                if (!kinds.TryGetValue(row.Key, out var kind) || kind.Mesh == null)
+                var kind = KindOf(row.Key);
+                if (kind == null || kind.Mesh == null)
                     continue;
                 var placed = row.Value;
                 var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
