@@ -2098,11 +2098,14 @@ namespace OmsiMapEditor.UI
 
             var generation = ++outlineBuildGeneration;
             outlinesBuilding = true;
+            // In folder order, so a hard disk reads the files with shorter seeks.
+            var paths = new List<string>(missing);
+            paths.Sort(StringComparer.OrdinalIgnoreCase);
             var task = Task.Run(() =>
             {
                 var catalog = new OmsiObjectOutlineCatalog(root);
                 var result = new Dictionary<string, OmsiObjectOutline>(StringComparer.OrdinalIgnoreCase);
-                foreach (var assetPath in missing)
+                foreach (var assetPath in paths)
                     result[assetPath] = catalog.Get(assetPath);
                 return result;
             });

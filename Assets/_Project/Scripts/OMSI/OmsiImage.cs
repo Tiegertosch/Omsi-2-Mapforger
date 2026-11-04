@@ -62,26 +62,45 @@ namespace OmsiMapEditor.OMSI
 
     /// <summary>
     /// A block-compressed DDS surface kept compressed, so a graphics card can use it directly: the mip levels from the
-    /// largest down, each stored rows from top to bottom in 4 × 4 blocks.
+    /// largest down, each stored rows from top to bottom in 4 × 4 blocks. The levels stay in the bytes of the file,
+    /// which are not copied.
     /// </summary>
     public sealed class OmsiCompressedImage
     {
-        internal OmsiCompressedImage(OmsiBlockFormat format, int width, int height, List<byte[]> levels)
+        private readonly List<int> offsets;
+        private readonly List<int> sizes;
+
+        internal OmsiCompressedImage(OmsiBlockFormat format, int width, int height, byte[] data, List<int> offsets, List<int> sizes)
         {
             Format = format;
             Width = width;
             Height = height;
-            Levels = levels;
+            Data = data;
+            this.offsets = offsets;
+            this.sizes = sizes;
         }
 
         public OmsiBlockFormat Format { get; }
 
-        /// <summary>Size of the first level in <see cref="Levels"/>.</summary>
+        /// <summary>Size of the first level kept.</summary>
         public int Width { get; }
 
         public int Height { get; }
 
-        public IReadOnlyList<byte[]> Levels { get; }
+        /// <summary>The bytes of the file; each level lies at <see cref="LevelOffset"/>.</summary>
+        public byte[] Data { get; }
+
+        public int LevelCount => offsets.Count;
+
+        public int LevelOffset(int level)
+        {
+            return offsets[level];
+        }
+
+        public int LevelSize(int level)
+        {
+            return sizes[level];
+        }
 
         public static int BlockBytes(OmsiBlockFormat format)
         {
@@ -137,7 +156,8 @@ namespace OmsiMapEditor.OMSI
             // DDSD_MIPMAPCOUNT; without it the file holds one level.
             var mipCount = (Int32(bytes, 8) & 0x20000) != 0 ? Math.Max(1, Int32(bytes, 28)) : 1;
 
-            var levels = new List<byte[]>();
+            var offsets = new List<int>();
+            var sizes = new List<int>();
             var offset = 128;
             int keptWidth = 0, keptHeight = 0;
             for (var level = 0; level < mipCount && width > 0 && height > 0; level++)
@@ -147,22 +167,21 @@ namespace OmsiMapEditor.OMSI
                     break;
                 if (width <= maximumSize && height <= maximumSize)
                 {
-                    if (levels.Count == 0)
+                    if (offsets.Count == 0)
                     {
                         keptWidth = width;
                         keptHeight = height;
                     }
-                    var data = new byte[size];
-                    Array.Copy(bytes, offset, data, 0, size);
-                    levels.Add(data);
+                    offsets.Add(offset);
+                    sizes.Add(size);
                 }
                 offset += size;
                 width /= 2;
                 height /= 2;
             }
-            if (levels.Count == 0)
+            if (offsets.Count == 0)
                 return false;
-            image = new OmsiCompressedImage(format, keptWidth, keptHeight, levels);
+            image = new OmsiCompressedImage(format, keptWidth, keptHeight, bytes, offsets, sizes);
             return true;
         }
 
@@ -332,15 +351,19 @@ namespace OmsiMapEditor.OMSI
 
             var bytesPerPixel = depth / 8;
             var count = width * height;
-            var raw = new byte[count * bytesPerPixel];
             var position = 18 + idLength;
+            // Uncompressed pixels are read where they lie in the file; run-length packets are unpacked first.
+            byte[] raw;
+            var rawStart = 0;
             if (type == 2 || type == 3)
             {
-                Need(bytes, position + (long)raw.Length);
-                Array.Copy(bytes, position, raw, 0, raw.Length);
+                Need(bytes, position + (long)count * bytesPerPixel);
+                raw = bytes;
+                rawStart = position;
             }
             else
             {
+                raw = new byte[count * bytesPerPixel];
                 // Run-length packets: a header byte, then one repeated pixel or a run of literal pixels.
                 var written = 0;
                 while (written < raw.Length)
@@ -375,7 +398,7 @@ namespace OmsiMapEditor.OMSI
                 var sourceRow = topDown ? row : height - 1 - row;
                 for (var x = 0; x < width; x++)
                 {
-                    var source = (sourceRow * width + x) * bytesPerPixel;
+                    var source = rawStart + (sourceRow * width + x) * bytesPerPixel;
                     var target = (row * width + x) * channels;
                     if (channels == 1)
                     {

@@ -413,11 +413,15 @@ namespace OmsiMapEditor.Tests
             Assert.IsTrue(OmsiImageReader.TryReadCompressed(bytes, 1024, out var full));
             Assert.IsTrue(OmsiImageReader.TryReadCompressed(bytes, 4, out var reduced));
 
-            Assert.AreEqual(2, full.Levels.Count);
+            Assert.AreEqual(2, full.LevelCount);
             Assert.AreEqual(8, full.Width);
-            Assert.AreEqual(1, reduced.Levels.Count);
+            Assert.AreEqual(128, full.LevelOffset(0));
+            Assert.AreEqual(32, full.LevelSize(0));
+            Assert.AreEqual(1, reduced.LevelCount);
             Assert.AreEqual(4, reduced.Width);
-            Assert.AreEqual(7, reduced.Levels[0][0]);
+            Assert.AreEqual(128 + 32, reduced.LevelOffset(0));
+            Assert.AreEqual(8, reduced.LevelSize(0));
+            Assert.AreEqual(7, reduced.Data[reduced.LevelOffset(0)]);
             var image = new OmsiImage(2, 2, 1, new byte[] { 0, 10, 20, 30 }).Reduce(1);
             Assert.AreEqual(1, image.Width);
             Assert.AreEqual(15, image.Pixels[0]);

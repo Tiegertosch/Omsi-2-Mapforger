@@ -777,9 +777,9 @@ namespace OmsiMapEditor.World
             {
                 var compressed = data.Compressed;
                 texture = new Texture2D(compressed.Width, compressed.Height,
-                    compressed.Format == OmsiBlockFormat.Dxt1 ? TextureFormat.DXT1 : TextureFormat.DXT5, compressed.Levels.Count, false);
-                for (var level = 0; level < compressed.Levels.Count; level++)
-                    texture.SetPixelData(compressed.Levels[level], level);
+                    compressed.Format == OmsiBlockFormat.Dxt1 ? TextureFormat.DXT1 : TextureFormat.DXT5, compressed.LevelCount, false);
+                for (var level = 0; level < compressed.LevelCount; level++)
+                    texture.SetPixelData(compressed.Data, level, compressed.LevelOffset(level));
                 texture.Apply(false, true);
             }
             else if (data.Image != null)

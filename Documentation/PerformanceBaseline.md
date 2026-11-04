@@ -225,6 +225,22 @@ Gleichzeitig mit dem Boden verzögerten die Arbeiter dessen Lesen, und jedes Bil
 
 Nutzertest nach einem Neustart des Rechners (kalter Cache, Festplatten): Spandau lädt in 19,5 statt knapp 30 s (Stoppuhr), Texturen und Objekte erscheinen spürbar früher.
 
+### Schritt 3: weniger Müll beim Laden
+
+Speicher, den die Ladeschritte auf Spandau anlegen (Messprogramm ohne Unity wie oben, je zwei Läufe, gleich):
+
+| Schritt | vorher | nachher | Änderung |
+|---|---|---|---|
+| Meshes zerlegen | 157 MB | 109 MB | `OmsiO3dMesh` legt Eckpunkte und Dreiecke in Endgröße an |
+| Modellkatalog gesamt | 363 MB, 0,72–0,81 s | 148 MB, 0,50 s | dazu keine Arrays je Eckpunkt, kein `AddRange` mit Zwischenkopie |
+| Texturen | 918 MB, 0,61–0,64 s | 679 MB, 0,56–0,59 s | DDS-Stufen bleiben in den Bytes der Datei (`SetPixelData` mit Versatz), unkomprimierte TGA ohne Zwischenpuffer |
+| Umrisskatalog | 409 MB | 361 MB | über das schlankere Zerlegen der Meshes |
+| Zusammenfassung | 202 MB | 202 MB | unverändert (verlustfreies Dateimodell, ADR 008) |
+
+Im Player gegen `b267d43` (Spandau warm, je zwei Läufe mit und ohne Projekt): Objekte nach 6,9–7,1 statt 7,3–8,1 s, Umrisse nach 4,3–4,4 statt 4,5–5,1 s, Boden gleich (3,8–4,0 s), längstes Bild beim Laden 751–765 statt 751–862 ms, Bilder über 100 ms 6–7 statt 7–9. Sechs Ansichten und acht Bearbeitungsfälle pixelgleich mit `b267d43` (bis auf Ladezeiten in der Statuszeile und den Gelände-Fall).
+
+Danach acht statt vier Arbeiter, die Umrisse in Ordnerreihenfolge: warm kein Unterschied (Boden 3,7–4,0 s, Objekte 6,8–7,2 s, längstes Bild 737–765 ms, beide je zwei Läufe), kalt lesen acht die Objektdateien in 13,5 statt 15,5 s (Messprogramm am Cache vorbei, siehe oben).
+
 Weiter offen: `ShowMap` blockiert beim Öffnen von Spandau einmal ~425 ms (Ansichten, Projektbrowser, Umriss-Vorbereitung), die Zusammenfassung erzeugt beim Lesen ein Bild von ~460 ms Garbage Collection.
 
 ## Verbleibende Engpässe

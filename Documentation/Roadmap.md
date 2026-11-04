@@ -179,8 +179,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Nutzertest im Player, Commit und Übernahme nach `main` (4. November 2026)
   - Laden großer Karten (PerformanceBaseline.md, „Laden großer Karten“)
     - [x] Karte im Hintergrund öffnen (ADR 058): kein „Not Responding“ mehr beim Lesen der Kacheln; Messlauf meldet das längste Bild beim Öffnen und Laden
-    - [x] Objekte nahe dem Ausschnitt zuerst und sofort zeigen, mit vier Arbeitern nach dem Boden (ADR 059); Objektdateien von der Festplatte ~15,5 statt ~20 s
-    - [ ] Weniger Müll beim Laden: Texturen (918 MB auf Spandau, davon 135 MB Kopien der DDS-Stufen), Modelle (363 MB), Umrisse (409 MB, lesen alle Modelle ein zweites Mal), Zusammenfassung (202 MB); danach mehr Arbeiter prüfen
+    - [x] Objekte nahe dem Ausschnitt zuerst und sofort zeigen, mit Arbeitern nach dem Boden (ADR 059); Spandau kalt 19,5 statt knapp 30 s
+    - [x] Weniger Müll beim Laden: Modelle 363 → 148 MB, Texturen 918 → 679 MB (DDS-Stufen ohne Kopie), Umrisse 409 → 361 MB; danach acht statt vier Arbeiter (Objektdateien kalt 13,5 statt 15,5 s), Umrisse in Ordnerreihenfolge
+    - [ ] Zurückgestellt: Umrisse und Modelle aus denselben zerlegten Meshes (~150 MB, Cache über zwei Threads, Umrisse nehmen alle LOD-Stufen); Zusammenfassung (202 MB, verlustfreies Dateimodell)
     - [ ] `ShowMap` beim Öffnen großer Karten kürzer (~425 ms auf Spandau)
   - [ ] Offen mit Zustimmung (Audit, Stufe 5): Kachelliste nur für geänderte Kacheln, Shell-Dienste für Undo und Auswahl, IL2CPP prüfen
 - [x] Updates (ADR 054): neues Release auf GitHub beim Start (höchstens alle 20 Stunden, abschaltbar, Version überspringbar) und unter **Help > Check for updates...** finden, herunterladen, prüfen, Programmdateien nach dem Beenden tauschen und mit dem offenen Projekt neu starten, bei Fehlern zurückrollen; `BuildRelease` packt die Zip fürs Release

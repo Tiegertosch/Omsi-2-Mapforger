@@ -14,13 +14,13 @@ namespace OmsiMapEditor.World
     /// then the kinds it uses, always the kind standing nearest to the view next, and hand each kind over as soon as it is
     /// read; uploading waits until the ground is built. So the ground shows first, then the objects in view while the
     /// rest is still read. From a hard disk most of the time goes to finding the files; with several reads
-    /// waiting the disk takes them in a shorter order (Spandau after a restart: 15.5 instead of 20 s for its object
-    /// files with four workers, 13.5 s with eight). More workers make more garbage at once, and Mono's collector stops
-    /// every thread, the ground's and the main thread's too.
+    /// waiting the disk takes them in a shorter order (Spandau after a restart: 13.5 instead of 20 s for its object
+    /// files with eight workers, 15.5 s with four). Read while the ground was read, they slowed it down: their garbage
+    /// makes Mono's collector stop every thread; after the ground, eight load as smoothly as four.
     /// </summary>
     public sealed partial class MapObjectRenderer
     {
-        private const int ReadWorkers = 4;
+        private const int ReadWorkers = 8;
 
         /// <summary>Placements are updated at most this often while kinds arrive.</summary>
         private const float StreamPlacementSeconds = 0.5f;

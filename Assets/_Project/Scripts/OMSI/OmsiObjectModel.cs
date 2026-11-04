@@ -203,11 +203,17 @@ namespace OmsiMapEditor.OMSI
         private void AddO3d(OmsiObjectModel model, string objectFolder, OmsiSceneryMesh sceneryMesh, OmsiO3dMesh mesh)
         {
             var first = model.VertexCount;
+            Reserve(model, mesh.Vertices.Count);
             foreach (var vertex in mesh.Vertices)
             {
-                model.Positions.AddRange(new[] { vertex.X, vertex.Y, vertex.Z });
-                model.Normals.AddRange(new[] { vertex.NormalX, vertex.NormalY, vertex.NormalZ });
-                model.Uvs.AddRange(new[] { vertex.U, vertex.V });
+                model.Positions.Add(vertex.X);
+                model.Positions.Add(vertex.Y);
+                model.Positions.Add(vertex.Z);
+                model.Normals.Add(vertex.NormalX);
+                model.Normals.Add(vertex.NormalY);
+                model.Normals.Add(vertex.NormalZ);
+                model.Uvs.Add(vertex.U);
+                model.Uvs.Add(vertex.V);
             }
 
             // Materials of this mesh, then their triangles; a mesh without materials is grey.
@@ -250,11 +256,20 @@ namespace OmsiMapEditor.OMSI
                 for (var corner = 0; corner < 3; corner++)
                     normals[mesh.TriangleIndices[index + corner]] = normals[mesh.TriangleIndices[index + corner]] ?? face;
             }
+            Reserve(model, mesh.Positions.Count);
             for (var index = 0; index < mesh.Positions.Count; index++)
             {
-                model.Positions.AddRange(mesh.Positions[index]);
-                model.Normals.AddRange(normals[index] ?? new[] { 0f, 1f, 0f });
-                model.Uvs.AddRange(mesh.Uvs[index]);
+                var position = mesh.Positions[index];
+                model.Positions.Add(position[0]);
+                model.Positions.Add(position[1]);
+                model.Positions.Add(position[2]);
+                var normal = normals[index];
+                model.Normals.Add(normal != null ? normal[0] : 0f);
+                model.Normals.Add(normal != null ? normal[1] : 1f);
+                model.Normals.Add(normal != null ? normal[2] : 0f);
+                var uv = mesh.Uvs[index];
+                model.Uvs.Add(uv[0]);
+                model.Uvs.Add(uv[1]);
             }
 
             var slots = MaterialSlots(model, objectFolder, sceneryMesh, mesh.Materials);
@@ -270,6 +285,21 @@ namespace OmsiMapEditor.OMSI
                 for (var corner = 0; corner < 3; corner++)
                     model.Triangles[slot].Add(first + mesh.TriangleIndices[triangle * 3 + corner]);
             }
+        }
+
+        /// <summary>Makes room for more vertices at once, so the lists do not grow step by step.</summary>
+        private static void Reserve(OmsiObjectModel model, int vertices)
+        {
+            Reserve(model.Positions, 3 * vertices);
+            Reserve(model.Normals, 3 * vertices);
+            Reserve(model.Uvs, 2 * vertices);
+        }
+
+        private static void Reserve(List<float> values, int more)
+        {
+            var needed = values.Count + more;
+            if (needed > values.Capacity)
+                values.Capacity = Math.Max(needed, values.Capacity * 2);
         }
 
         /// <summary>

@@ -95,6 +95,7 @@ namespace OmsiMapEditor.OMSI
                         reader.Need((long)count * 32);
                         var count16 = (uint)Mod(count, 0xFDE8);
                         uint mixing = 0;
+                        mesh.Vertices.Capacity = mesh.Vertices.Count + count;
                         for (var index = 0; index < count; index++)
                         {
                             var vertex = new OmsiMeshVertex
@@ -121,6 +122,8 @@ namespace OmsiMapEditor.OMSI
                         var count = wideCount ? (int)reader.U32() : reader.U16();
                         var indexSize = longIndices ? 4 : 2;
                         reader.Need((long)count * (3 * indexSize + 2));
+                        mesh.TriangleIndices.Capacity = mesh.TriangleIndices.Count + 3 * count;
+                        mesh.TriangleMaterials.Capacity = mesh.TriangleMaterials.Count + count;
                         for (var index = 0; index < count; index++)
                         {
                             var a = longIndices ? (int)reader.U32() : reader.U16();
