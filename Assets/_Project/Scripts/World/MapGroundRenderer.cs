@@ -235,6 +235,12 @@ namespace OmsiMapEditor.World
         /// </summary>
         public bool IsLoading => loading != null || pending != null || maskTask != null || decodedMasks.Count > 0 || MasksWanted();
 
+        /// <summary>True while the files of a map are read in the background.</summary>
+        public bool IsReading => loading != null;
+
+        /// <summary>True while the tiles read are being built, a few each frame.</summary>
+        public bool IsBuilding => pending != null;
+
         /// <summary>The camera looking down on the map view; other renderers draw into it too.</summary>
         public Camera ViewCamera => groundCamera;
 

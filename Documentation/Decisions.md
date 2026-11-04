@@ -870,3 +870,32 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Regel:** Dateien der Arbeitskopie nur über `OmsiMapWorkspace.Save` und `Revert` schreiben; dann zählt der Stempel jede Änderung mit. Wer an der Arbeitskopie vorbei schreibt, verlässt sich auf Größe und Zeit.
 
 **Grund:** Der Index ist die Sicherung gegen kaputte Verweise; ein schneller Index darf nie anders sein als ein frischer. Der Test `ReferenceIndexOfASessionFollowsEveryChangeOfItsFiles` vergleicht nach jeder Art von Änderung mit einem frisch gebauten Index; ohne Zähler schlägt er fehl. Auf Spandau braucht der Aufbau danach 0,08 s statt 0,63 s, der erste Aufbau einer Sitzung bleibt so lang wie bisher.
+
+## ADR 058: Karten im Hintergrund öffnen
+
+**Status:** Angenommen, 4. November 2026 (PerformanceBaseline.md, „Laden großer Karten“).
+
+**Ausgangslage:** `LoadMap` las beim Öffnen die ganze Karte im Hauptthread: Sitzung, Zusammenfassung aller Kacheln, Chrono-Varianten. Auf Berlin-Spandau sind das ~1 s mit warmem Dateicache; von einer Festplatte mit kaltem Cache viele Sekunden, in denen Windows das Fenster als „Not Responding“ markiert.
+
+**Entscheidung:**
+- Öffnen (Dialog, Zuletzt geöffnet, Projekt, eigene und neue Karten, `-openMap`/`-openProject`/`-createMap`) liest die Karte mit `ReadMap` auf einem Hintergrund-Thread; `ReadMap` berührt keine Unity-Objekte. Ist sie gelesen, zeigt `ShowMap` sie im Hauptthread, danach läuft eine Fortsetzung (zuletzt geöffnet merken, Statusmeldung).
+- Während des Lesens zeigt die Statuszeile „Opening …“, der Willkommensbildschirm ist gesperrt. Eine schon offene Karte bleibt bedienbar. Wird inzwischen eine andere Karte geöffnet, gewinnt die neuere (Generationszähler).
+- Erneutes Lesen der offenen Karte (`ReloadMap` nach Rückgängig, Kachel hinzufügen oder löschen, Verwerfen; Projekt speichern unter) bleibt synchron: Die Aufrufer arbeiten sofort mit der neuen Zusammenfassung weiter, und die Dateien liegen gerade im Cache.
+- Der Schlüssel der gespeicherten Luftbilder bleibt der übergebene Pfad samt Projekt, wie bisher.
+
+**Grund:** Das Fenster muss beim Öffnen großer Karten bedienbar bleiben. Bearbeitungen bleiben nacheinander im Hauptthread; parallel laufen nur Lesen und Rechnen auf eigenen Daten.
+
+## ADR 059: Objekte nahe dem Ausschnitt zuerst lesen
+
+**Status:** Angenommen, 4. November 2026 (PerformanceBaseline.md, „Laden großer Karten“, Schritt 2).
+
+**Ausgangslage:** Ein einzelner Hintergrund-Thread las alle Objektarten einer Karte in der zufälligen Reihenfolge eines `HashSet`, gezeigt wurde erst, wenn alle gelesen waren. Von einer Festplatte mit kaltem Cache dauerte das auf Berlin-Spandau allein für die Objektdateien rund 20 s, fast nur Suchzeit des Lesekopfs.
+
+**Entscheidung:**
+- `MapObjectRenderer` liest mit vier Arbeitern (`MapObjectRendererLoading.cs`): erst die Geländehöhen der Kacheln, dann die Arten, jeweils die Art mit der Kachel, die dem Punkt am nächsten liegt, auf den die Kamera gerade schaut. Jede gelesene Art wird sofort hochgeladen, im bisherigen Zeitbudget je Bild; die Platzierungen werden nachgeführt, höchstens alle 0,5 s und mindestens im Vierfachen ihrer letzten Dauer.
+- Die Arbeiter beginnen erst, wenn der Boden gelesen ist, und hochgeladen wird erst nach seinem Aufbau: der Boden zuerst, dann die Objekte vom Ausschnitt aus.
+- Eine Textur, die mehrere Arten nutzen, wird einmal gelesen; wer sie gleichzeitig braucht, wartet auf den ersten Leser.
+- Gezeichnet wird in der Reihenfolge, in der die Arten zuerst auf der Karte stehen. Unity ordnet Objekte gleicher Entfernung nach ihren Materialien, also danach, wann diese angelegt wurden; deshalb werden die Materialien nach dem Lesen einmal in dieser Reihenfolge neu angelegt, wenn sie durcheinander entstanden sind. So sieht die Karte gleich aus, wie auch immer ihre Dateien gelesen wurden.
+- Eine Kachel, an deren erstem Reihenobjekt Objekte hängen, wartet auch auf dessen Art (vorher nur auf die Arten ihrer Objekte und angehängten Objekte).
+
+**Grund:** Mehrere wartende Leseanfragen lassen die Platte eine kürzere Reihenfolge wählen (15,5 statt 20 s für die Objektdateien von Spandau), und was im Bild ist, steht früher. Mehr Arbeiter lesen noch etwas schneller (13,5 s mit acht), erzeugen aber mehr Müll gleichzeitig; Monos Garbage Collector hält dann jeden Thread an, auch den Hauptthread.

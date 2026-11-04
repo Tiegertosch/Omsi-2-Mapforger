@@ -24,6 +24,11 @@ namespace OmsiMapEditor.UI
         private float benchmarkOpenStartedAt;
         private float benchmarkOpenFinishedAt;
 
+        // Every frame from opening the map until it is loaded; a long one leaves the window unanswered. The frame the
+        // map was opened in also holds Unity's start, so counting begins with the next.
+        private List<double> benchmarkFrames;
+        private int benchmarkOpenFrame;
+
         private sealed class BenchmarkPhase
         {
             public string Name;
@@ -53,7 +58,7 @@ namespace OmsiMapEditor.UI
 
             // Loading: the summary first, then ground, objects and outlines in the background.
             Line("Startup until the map was opened: " + BenchmarkSeconds(benchmarkOpenStartedAt) + " (Unity start included)");
-            Line("Open map (read the summary, set up the views): " + BenchmarkSeconds(benchmarkOpenFinishedAt - benchmarkOpenStartedAt));
+            Line("Open map (read the summary in the background, set up the views): " + BenchmarkSeconds(benchmarkOpenFinishedAt - benchmarkOpenStartedAt));
             float groundAt = 0f, objectsAt = 0f, outlinesAt = 0f;
             while (Time.realtimeSinceStartup - benchmarkOpenStartedAt < 600f)
             {
@@ -70,6 +75,13 @@ namespace OmsiMapEditor.UI
             }
             Line("Loaded after opening: ground " + BenchmarkSeconds(groundAt - benchmarkOpenStartedAt) + ", objects " + BenchmarkSeconds(objectsAt - benchmarkOpenStartedAt) +
                  ", outlines " + BenchmarkSeconds(outlinesAt - benchmarkOpenStartedAt));
+            if (benchmarkFrames != null && benchmarkFrames.Count > 0)
+            {
+                Line("Frames while opening and loading: " + benchmarkFrames.Count + ", longest " +
+                     BenchmarkPercentile(benchmarkFrames, 1.0).ToString("0", CultureInfo.InvariantCulture) + " ms, " +
+                     benchmarkFrames.FindAll(frame => frame > 100.0).Count + " over 100 ms, " + benchmarkFrames.FindAll(frame => frame > 1000.0).Count + " over 1 s");
+                benchmarkFrames = null;
+            }
             for (var frame = 0; frame < 10; frame++)
                 yield return null;
             Line(BenchmarkMemory());

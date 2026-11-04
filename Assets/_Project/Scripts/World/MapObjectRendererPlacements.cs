@@ -430,11 +430,12 @@ namespace OmsiMapEditor.World
                 placements.Placed.Add(item);
             }
 
-            // The first object of a row can carry objects too.
+            // The first object of a row can carry objects too; until its kind is read the tile waits for it, as the
+            // objects hanging on it are left out meanwhile.
             if (firsts != null)
                 foreach (var first in firsts)
                 {
-                    var rowKind = KindOf(first.Value.Key, null);
+                    var rowKind = KindOf(first.Value.Key, placements.MissingKinds);
                     if (rowKind == null || rowKind.Mesh == null)
                         continue;
                     var placed = first.Value.Value;

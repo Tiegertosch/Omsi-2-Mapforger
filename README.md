@@ -8,7 +8,7 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 
 ## What you can do
 
-- **Explore maps:** View textured terrain, roads, tracks and scenery in a continuous 2D map or a navigable 3D view. Large maps that use OMSI world coordinates are supported.
+- **Explore maps:** View textured terrain, roads, tracks and scenery in a continuous 2D map or a navigable 3D view. Large maps that use OMSI world coordinates are supported; they open in the background, so the window keeps responding, and the scenery nearest the view appears first.
 - **Inspect and validate:** Review map contents, object and spline references, IDs, junction connections, timetable data, chrono variants and DLC usage in a report that links findings to their tiles.
 - **See routes:** Display timetable lines, stops and the lanes their trips follow. Preview chrono variants for a selected date.
 - **See AI paths:** Show the paths AI traffic and people use, from above or in 3D, by kind and direction, with their right of way, and find the path ends nothing joins.

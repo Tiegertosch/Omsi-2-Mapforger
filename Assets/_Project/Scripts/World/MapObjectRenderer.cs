@@ -64,6 +64,12 @@ namespace OmsiMapEditor.World
             public string AssetPath;
             public OmsiObjectModel Model;
 
+            /// <summary>Its place in <see cref="drawOrder"/>: where it first stands on the map, kinds read later after them.</summary>
+            public int Rank;
+
+            /// <summary>When its materials were made, counted over the kinds of the map.</summary>
+            public int MadeAs;
+
             /// <summary>Average colour of a tree's opaque texels; white for other objects.</summary>
             public Color TreeColour = Color.white;
 
@@ -108,7 +114,6 @@ namespace OmsiMapEditor.World
 
         private sealed class LoadData
         {
-            public readonly Dictionary<long, OmsiTerrain> Terrains = new Dictionary<long, OmsiTerrain>();
             public readonly List<KindData> Kinds = new List<KindData>();
             public readonly Dictionary<string, TextureData> Textures = new Dictionary<string, TextureData>(StringComparer.OrdinalIgnoreCase);
             public readonly List<string> Problems = new List<string>();
@@ -120,6 +125,7 @@ namespace OmsiMapEditor.World
         private Mesh treeCrown;
         private Mesh treeCross;
         private Camera targetCamera;
+        private MapGroundRenderer ground;
         private OmsiMapSummary summary;
         private string installationRoot;
         private double tileSize;
@@ -135,8 +141,6 @@ namespace OmsiMapEditor.World
         // Kinds requested once; a kind whose files are missing is not read again and again.
         private readonly HashSet<string> requestedKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Only the read of a whole map reports; reading a newly placed kind stays quiet.
-        private bool reportWhenUploaded;
         private bool objectsVisible = true;
         private readonly Dictionary<long, OmsiTerrain> terrains = new Dictionary<long, OmsiTerrain>();
 
@@ -166,6 +170,13 @@ namespace OmsiMapEditor.World
         /// <summary>Where each placement's matrix lives, so a drag can move single instances.</summary>
         private readonly Dictionary<OmsiObjectRecord, Placement> instanceOf = new Dictionary<OmsiObjectRecord, Placement>();
         private readonly Dictionary<string, KindData> kinds = new Dictionary<string, KindData>(StringComparer.OrdinalIgnoreCase);
+
+        // Kinds draw in the order they first stand on the map, whenever they were read, so faces lying on each other
+        // always cover each other alike.
+        private readonly List<KindData> drawOrder = new List<KindData>();
+        private readonly Dictionary<string, int> mapOrder = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private int laterKinds;
+        private int kindsMade;
         private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
         private readonly List<UnityEngine.Object> owned = new List<UnityEngine.Object>();
 
@@ -182,7 +193,7 @@ namespace OmsiMapEditor.World
         public event Action ModelsChanged;
 
         /// <summary>True while models are read or uploaded, placements wait to be updated or a placement preview waits to be read.</summary>
-        public bool IsLoading => loading != null || pending != null || placementsDirty ||
+        public bool IsLoading => stream != null || loading != null || pending != null || placementsDirty ||
                                  (previewAsset != null && summary != null && !requestedKinds.Contains(previewAsset)) ||
                                  (rowPreviewAsset != null && summary != null && !requestedKinds.Contains(rowPreviewAsset));
 
@@ -211,9 +222,16 @@ namespace OmsiMapEditor.World
             targetCamera = camera;
         }
 
+        /// <summary>The ground of the same map: objects are read once its files are read and uploaded once it is built, so it shows first.</summary>
+        public void SetGround(MapGroundRenderer mapGround)
+        {
+            ground = mapGround;
+        }
+
         /// <summary>
-        /// Reads terrain heights, object models and their textures in the background; the objects appear once their
-        /// kinds are uploaded. Terrain comes through <paramref name="source"/>, models and textures from the installation.
+        /// Reads terrain heights, object models and their textures in the background, the kinds nearest to the view first;
+        /// each kind appears once it is uploaded. Terrain comes through <paramref name="source"/>, models and textures
+        /// from the installation.
         /// </summary>
         public void Load(OmsiMapSummary map, IOmsiFileSource source, string installationRootPath, double mapOriginX, double mapOriginY)
         {
@@ -227,19 +245,30 @@ namespace OmsiMapEditor.World
             originX = mapOriginX;
             originY = mapOriginY;
             var tiles = new List<KeyValuePair<long, string>>();
-            var assetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var kindTiles = new Dictionary<string, List<OmsiTileSummary>>(StringComparer.OrdinalIgnoreCase);
             foreach (var tile in map.Tiles)
             {
                 if (!tile.IsAvailable)
                     continue;
                 tiles.Add(new KeyValuePair<long, string>(TileKey(tile.X, tile.Y), tile.FileName));
+                string previous = null;
                 foreach (var item in tile.Objects)
-                    assetPaths.Add(item.AssetPath);
+                {
+                    // Objects of one kind often follow each other; each text is looked up once in a row.
+                    if (ReferenceEquals(item.AssetPath, previous))
+                        continue;
+                    previous = item.AssetPath;
+                    if (!kindTiles.TryGetValue(item.AssetPath, out var standing))
+                    {
+                        mapOrder[item.AssetPath] = kindTiles.Count;
+                        kindTiles[item.AssetPath] = standing = new List<OmsiTileSummary>();
+                    }
+                    if (standing.Count == 0 || standing[standing.Count - 1] != tile)
+                        standing.Add(tile);
+                }
             }
-            requestedKinds.UnionWith(assetPaths);
-            reportWhenUploaded = true;
-            loadingGeneration = generation;
-            loading = Task.Run(() => Read(tiles, new List<string>(assetPaths), source, installationRootPath));
+            requestedKinds.UnionWith(kindTiles.Keys);
+            StartStream(tiles, kindTiles, source, installationRootPath);
         }
 
         /// <summary>
@@ -277,6 +306,7 @@ namespace OmsiMapEditor.World
         public void Clear()
         {
             generation++;
+            StopStream();
             loading = null;
             pending = null;
             pendingKind = 0;
@@ -285,6 +315,10 @@ namespace OmsiMapEditor.World
             terrains.Clear();
             ClearPlacements();
             kinds.Clear();
+            drawOrder.Clear();
+            mapOrder.Clear();
+            laterKinds = 0;
+            kindsMade = 0;
             textures.Clear();
             foreach (var item in owned)
                 Destroy(item);
@@ -312,12 +346,12 @@ namespace OmsiMapEditor.World
                 }
                 pending = task.Result;
                 pendingKind = 0;
-                foreach (var pair in pending.Terrains)
-                    terrains[pair.Key] = pair.Value;
             }
 
             if (pending != null)
                 ContinueUpload();
+            if (stream != null)
+                ContinueStream();
 
             // A placement or row preview of a kind the map does not use yet; read like a newly placed kind.
             var previewed = previewAsset != null && !requestedKinds.Contains(previewAsset) ? previewAsset : rowPreviewAsset;
@@ -334,10 +368,12 @@ namespace OmsiMapEditor.World
                 });
             }
 
-            if (placementsDirty && pending == null && loading == null && summary != null)
+            if (placementsDirty && pending == null && loading == null && summary != null && (stream == null || stream.TerrainsTaken))
             {
                 placementsDirty = false;
+                var started = Time.realtimeSinceStartup;
                 UpdatePlacements();
+                lastPlacementSeconds = Time.realtimeSinceStartup - started;
             }
             UpdatePreviews();
         }
@@ -347,7 +383,7 @@ namespace OmsiMapEditor.World
             if (!objectsVisible || targetCamera == null || !targetCamera.enabled)
                 return;
             UpdateVisibility();
-            foreach (var kind in kinds.Values)
+            foreach (var kind in drawOrder)
             {
                 if (kind.Mesh == null)
                     continue;
@@ -428,54 +464,41 @@ namespace OmsiMapEditor.World
             }
         }
 
-        private static LoadData Read(List<KeyValuePair<long, string>> tiles, List<string> assetPaths, IOmsiFileSource source,
-            string installationRoot)
-        {
-            var data = new LoadData();
-            foreach (var tile in tiles)
-            {
-                var path = OmsiRelativePath.Normalize(tile.Value) + ".terrain";
-                try
-                {
-                    if (source.FileExists(path))
-                        data.Terrains[tile.Key] = OmsiTerrain.Parse(source.ReadAllBytes(path));
-                }
-                catch (InvalidDataException exception)
-                {
-                    data.Problems.Add(path + ": " + exception.Message);
-                }
-            }
-            ReadKinds(assetPaths, installationRoot, data);
-            return data;
-        }
-
         private static void ReadKinds(List<string> assetPaths, string installationRoot, LoadData data)
         {
             var catalog = new OmsiObjectModelCatalog(installationRoot);
             foreach (var assetPath in assetPaths)
             {
-                var model = catalog.Get(assetPath);
-                if (model == null)
-                    continue;
-                var kind = new KindData { AssetPath = assetPath, Model = model };
-                if (model.IsTree)
-                {
-                    var tree = ReadTexture(installationRoot, model.TreeTexturePath, data);
-                    kind.TreeColour = AverageOpaqueColour(tree?.Image);
-                    kind.CrownArea = CrownArea(tree?.Image);
-                    kind.TreeTexturePath = model.TreeTexturePath;
-                }
-                else
-                {
-                    foreach (var material in model.Materials)
-                    {
-                        ReadTexture(installationRoot, material.TexturePath, data);
-                        ReadTexture(installationRoot, material.TransparencyTexturePath, data);
-                    }
-                }
-                data.Kinds.Add(kind);
+                var kind = ReadKind(catalog, assetPath, path => ReadTexture(installationRoot, path, data));
+                if (kind != null)
+                    data.Kinds.Add(kind);
             }
             data.Problems.AddRange(catalog.Problems);
+        }
+
+        /// <summary>A kind with its model and what its tree texture tells, or null without a model; its textures come from <paramref name="texture"/>.</summary>
+        private static KindData ReadKind(OmsiObjectModelCatalog catalog, string assetPath, Func<string, TextureData> texture)
+        {
+            var model = catalog.Get(assetPath);
+            if (model == null)
+                return null;
+            var kind = new KindData { AssetPath = assetPath, Model = model };
+            if (model.IsTree)
+            {
+                var tree = model.TreeTexturePath != null ? texture(model.TreeTexturePath) : null;
+                kind.TreeColour = AverageOpaqueColour(tree?.Image);
+                kind.CrownArea = CrownArea(tree?.Image);
+                kind.TreeTexturePath = model.TreeTexturePath;
+                return kind;
+            }
+            foreach (var material in model.Materials)
+            {
+                if (material.TexturePath != null)
+                    texture(material.TexturePath);
+                if (material.TransparencyTexturePath != null)
+                    texture(material.TransparencyTexturePath);
+            }
+            return kind;
         }
 
         private static TextureData ReadTexture(string installationRoot, string relativePath, LoadData data)
@@ -485,6 +508,17 @@ namespace OmsiMapEditor.World
             if (data.Textures.TryGetValue(relativePath, out var existing))
                 return existing;
 
+            var texture = ReadTextureFile(installationRoot, relativePath, out var problem);
+            if (problem != null)
+                data.Problems.Add(problem);
+            data.Textures[relativePath] = texture;
+            return texture;
+        }
+
+        /// <summary>A texture as it goes to the graphics card; empty with a problem when the file cannot be read.</summary>
+        private static TextureData ReadTextureFile(string installationRoot, string relativePath, out string problem)
+        {
+            problem = null;
             var texture = new TextureData();
             try
             {
@@ -501,9 +535,8 @@ namespace OmsiMapEditor.World
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
                                               exception is UnauthorizedAccessException || exception is ArgumentException)
             {
-                data.Problems.Add(relativePath + ": " + exception.Message);
+                problem = relativePath + ": " + exception.Message;
             }
-            data.Textures[relativePath] = texture;
             return texture;
         }
 
@@ -575,8 +608,7 @@ namespace OmsiMapEditor.World
             {
                 var kind = pending.Kinds[pendingKind++];
                 BuildKind(kind);
-                kinds[kind.AssetPath] = kind;
-                addedKinds.Add(kind.AssetPath);
+                AddKind(kind);
             }
             if (pendingKind < pending.Kinds.Count)
                 return;
@@ -587,11 +619,27 @@ namespace OmsiMapEditor.World
             ModelsChanged?.Invoke();
             if (data.Problems.Count > 0)
                 Debug.LogWarning("Object models: " + data.Problems.Count + " problem(s)\n" + string.Join("\n", data.Problems));
-            if (!reportWhenUploaded)
-                return;
-            reportWhenUploaded = false;
-            Loaded?.Invoke("Object models ready: " + data.Kinds.Count + " kinds, " + textures.Count + " textures" +
-                           (data.Problems.Count > 0 ? "; " + data.Problems.Count + " problem(s), first: " + data.Problems[0] : string.Empty) + ".");
+        }
+
+        /// <summary>Takes an uploaded kind into <see cref="kinds"/> and <see cref="drawOrder"/>; tiles waiting for it are built again.</summary>
+        private void AddKind(KindData kind)
+        {
+            if (kinds.TryGetValue(kind.AssetPath, out var replaced))
+                drawOrder.Remove(replaced);
+            kinds[kind.AssetPath] = kind;
+            kind.Rank = mapOrder.TryGetValue(kind.AssetPath, out var rank) ? rank : mapOrder.Count + laterKinds++;
+            kind.MadeAs = ++kindsMade;
+            int low = 0, high = drawOrder.Count;
+            while (low < high)
+            {
+                var middle = (low + high) / 2;
+                if (drawOrder[middle].Rank <= kind.Rank)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+            drawOrder.Insert(low, kind);
+            addedKinds.Add(kind.AssetPath);
         }
 
         private void BuildKind(KindData kind)
@@ -718,7 +766,10 @@ namespace OmsiMapEditor.World
                 return Texture2D.whiteTexture;
             if (textures.TryGetValue(relativePath, out var existing))
                 return existing;
-            if (pending == null || !pending.Textures.TryGetValue(relativePath, out var data))
+            TextureData data = null;
+            if (pending == null || !pending.Textures.TryGetValue(relativePath, out data))
+                data = StreamTexture(relativePath);
+            if (data == null)
                 return Texture2D.whiteTexture;
 
             Texture2D texture = null;

@@ -177,7 +177,11 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Commit der Stufen 1–4 (`62a16b4`, 2. November 2026)
   - [x] Stufe 5, Teil 1: Platzierungen je Kachel neu bauen (Bild nach einer Bearbeitung auf Spandau ~8 statt ~70 ms), Sichtprüfung je Kachel beim Instancing (Spandau von oben bei 0,4 m/px ~2,5 statt ~7,5 ms je Bild, in 3D ~9 statt ~12 ms)
   - [x] Nutzertest im Player, Commit und Übernahme nach `main` (4. November 2026)
-  - [ ] Laden großer Karten: Karte im Hintergrund öffnen (kein „Not Responding“ bei kaltem Cache auf Festplatten), weniger Müll beim Modell-Lesen, Objekte nahe dem Ausschnitt zuerst und Modelle nur einmal lesen
+  - Laden großer Karten (PerformanceBaseline.md, „Laden großer Karten“)
+    - [x] Karte im Hintergrund öffnen (ADR 058): kein „Not Responding“ mehr beim Lesen der Kacheln; Messlauf meldet das längste Bild beim Öffnen und Laden
+    - [x] Objekte nahe dem Ausschnitt zuerst und sofort zeigen, mit vier Arbeitern nach dem Boden (ADR 059); Objektdateien von der Festplatte ~15,5 statt ~20 s
+    - [ ] Weniger Müll beim Laden: Texturen (918 MB auf Spandau, davon 135 MB Kopien der DDS-Stufen), Modelle (363 MB), Umrisse (409 MB, lesen alle Modelle ein zweites Mal), Zusammenfassung (202 MB); danach mehr Arbeiter prüfen
+    - [ ] `ShowMap` beim Öffnen großer Karten kürzer (~425 ms auf Spandau)
   - [ ] Offen mit Zustimmung (Audit, Stufe 5): Kachelliste nur für geänderte Kacheln, Shell-Dienste für Undo und Auswahl, IL2CPP prüfen
 - [x] Updates (ADR 054): neues Release auf GitHub beim Start (höchstens alle 20 Stunden, abschaltbar, Version überspringbar) und unter **Help > Check for updates...** finden, herunterladen, prüfen, Programmdateien nach dem Beenden tauschen und mit dem offenen Projekt neu starten, bei Fehlern zurückrollen; `BuildRelease` packt die Zip fürs Release
 - [x] Fehler melden (ADR 053): **Help > Report a bug...** öffnet eine vorausgefüllte GitHub-Issue im Browser mit Systemangaben und dem Ende des Logs, das ganze Log liegt als Datei bereit; nach einem Absturz oder einem beendeten Hänger öffnet sich das Formular beim nächsten Start mit dem Log jener Sitzung und Unitys Absturzbericht

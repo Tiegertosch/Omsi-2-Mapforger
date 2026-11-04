@@ -87,7 +87,7 @@ namespace OmsiMapEditor.World
         {
             if (previewQueue.Count == 0 || installationRoot == null || template == null)
                 return;
-            var idle = loading == null && pending == null;
+            var idle = loading == null && pending == null && stream == null;
             var drawn = 0;
             List<string> missing = null;
             for (var index = 0; index < previewQueue.Count && drawn < PreviewsPerFrame; index++)

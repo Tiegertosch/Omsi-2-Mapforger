@@ -49,8 +49,12 @@ namespace OmsiMapEditor.UI
             return path;
         }
 
-        /// <summary>Opens a map made with MapWorks with its project, ready to edit; false with the reason shown when it cannot.</summary>
-        private bool OpenOwnMap(string globalConfigPath, string name)
+        /// <summary>
+        /// Opens a map made with MapWorks with its project, ready to edit, and calls <paramref name="opened"/> once it shows;
+        /// the status gives the reason when its project cannot be made.
+        /// </summary>
+        /// <param name="failure">The start of the status when the map cannot be read.</param>
+        private void OpenOwnMap(string globalConfigPath, string name, string failure, Action opened)
         {
             string projectPath;
             try
@@ -61,11 +65,13 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 SetStatus("The project of this map could not be made in " + OwnProjectsFolder() + ": " + exception.Message);
-                return false;
+                return;
             }
-            LoadMap(globalConfigPath, Path.GetFileNameWithoutExtension(projectPath), projectPath, false);
-            RememberCurrent();
-            return true;
+            OpenMapInBackground(globalConfigPath, Path.GetFileNameWithoutExtension(projectPath), projectPath, failure, () =>
+            {
+                RememberCurrent();
+                opened?.Invoke();
+            });
         }
 
         /// <summary>True when the open map was made with MapWorks, so its export goes into its own folder.</summary>

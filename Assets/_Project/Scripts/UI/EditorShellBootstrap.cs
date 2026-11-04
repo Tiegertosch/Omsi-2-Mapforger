@@ -452,12 +452,12 @@ namespace OmsiMapEditor.UI
             emptyState = root.Q<VisualElement>("empty-state");
             if (emptyState != null)
             {
-                var welcome = new WelcomeScreen();
-                welcome.OpenProjectRequested += OpenProject;
-                welcome.OpenMapRequested += OpenMap;
-                welcome.NewMapRequested += () => OpenNewMapDialog(null);
-                welcome.RecentChosen += OpenRecent;
-                emptyState.Add(welcome);
+                welcomeScreen = new WelcomeScreen();
+                welcomeScreen.OpenProjectRequested += OpenProject;
+                welcomeScreen.OpenMapRequested += OpenMap;
+                welcomeScreen.NewMapRequested += () => OpenNewMapDialog(null);
+                welcomeScreen.RecentChosen += OpenRecent;
+                emptyState.Add(welcomeScreen);
             }
             workspaceElement = root.Q<VisualElement>("workspace");
             projectFrame = root.Q<VisualElement>("project-frame");
@@ -738,6 +738,7 @@ namespace OmsiMapEditor.UI
             };
             objectRenderer = groundRenderer.gameObject.AddComponent<MapObjectRenderer>();
             objectRenderer.SetCamera(groundRenderer.ViewCamera);
+            objectRenderer.SetGround(groundRenderer);
             objectRenderer.Loaded += SetStatus;
             objectRenderer.ModelsChanged += () => mapCanvas?.UpdateModelFlags();
             if (mapCanvas != null)
@@ -797,6 +798,8 @@ namespace OmsiMapEditor.UI
         /// <summary>Keeps the ground camera on the screen rectangle and view of the map view.</summary>
         private void LateUpdate()
         {
+            if (benchmarkFrames != null && Time.frameCount > benchmarkOpenFrame)
+                benchmarkFrames.Add(Time.unscaledDeltaTime * 1000.0);
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
             PumpAerial();
@@ -897,12 +900,11 @@ namespace OmsiMapEditor.UI
                 var folder = Path.GetDirectoryName(Path.GetFullPath(path));
                 if (OmsiNewMap.IsMadeHere(folder))
                 {
-                    if (OpenOwnMap(path, Path.GetFileName(folder)))
-                        SetStatus("Opened " + folder + ", a map made with MapWorks, with its project; edit it right away.");
+                    OpenOwnMap(path, Path.GetFileName(folder), "Could not read map: ",
+                        () => SetStatus("Opened " + folder + ", a map made with MapWorks, with its project; edit it right away."));
                     return;
                 }
-                LoadMap(path, string.Empty, null, false);
-                RememberCurrent();
+                OpenMapInBackground(path, string.Empty, null, "Could not read map: ", RememberCurrent);
             }
             catch (Exception exception)
             {
@@ -963,6 +965,8 @@ namespace OmsiMapEditor.UI
             if (createTemplate != null)
             {
                 CreateNewMap(createTemplate, Argument("-createMap", 2), Argument("-createMap", 3), OmsiNewMapOptions.FromTemplate(createTemplate));
+                while (OpeningMap)
+                    yield return null;
                 Debug.Log("Create map: " + statusLabel?.text);
             }
             else if (mapPath == null && projectPath == null)
@@ -987,6 +991,11 @@ namespace OmsiMapEditor.UI
             }
 
             benchmarkOpenStartedAt = Time.realtimeSinceStartup;
+            if (Array.IndexOf(args, "-benchmark") >= 0)
+            {
+                benchmarkFrames = new List<double>();
+                benchmarkOpenFrame = Time.frameCount;
+            }
             if (projectPath != null)
                 OpenProjectFile(projectPath, false);
             else if (mapPath != null)
@@ -996,15 +1005,17 @@ namespace OmsiMapEditor.UI
                     // A map made with MapWorks opens with its project, as from the File menu.
                     var mapFolder = Path.GetDirectoryName(Path.GetFullPath(mapPath));
                     if (OmsiNewMap.IsMadeHere(mapFolder))
-                        OpenOwnMap(mapPath, Path.GetFileName(mapFolder));
+                        OpenOwnMap(mapPath, Path.GetFileName(mapFolder), "Could not read map: ", null);
                     else
-                        LoadMap(mapPath, string.Empty, null, false);
+                        OpenMapInBackground(mapPath, string.Empty, null, "Could not read map: ", null);
                 }
                 catch (Exception exception)
                 {
                     Debug.LogException(exception);
                 }
             }
+            while (OpeningMap)
+                yield return null;
             benchmarkOpenFinishedAt = Time.realtimeSinceStartup;
             // Two frames for the layout, so the view has its size.
             yield return null;
@@ -1638,9 +1649,7 @@ namespace OmsiMapEditor.UI
                 var projectName = string.IsNullOrWhiteSpace(project.projectName)
                     ? Path.GetFileNameWithoutExtension(fullProjectPath)
                     : project.projectName;
-                LoadMap(project.globalConfigPath, projectName, fullProjectPath, false);
-                if (remember)
-                    RememberCurrent();
+                OpenMapInBackground(project.globalConfigPath, projectName, fullProjectPath, "Could not open project: ", remember ? (Action)RememberCurrent : null);
             }
             catch (Exception exception)
             {
@@ -1659,8 +1668,7 @@ namespace OmsiMapEditor.UI
             }
             try
             {
-                LoadMap(entry.Path, string.Empty, null, false);
-                RememberCurrent();
+                OpenMapInBackground(entry.Path, string.Empty, null, "Could not open map: ", RememberCurrent);
             }
             catch (Exception exception)
             {
@@ -1722,12 +1730,14 @@ namespace OmsiMapEditor.UI
         /// <param name="keepView">Keeps the view, selected tile and selected object, for example after reverting a tile.</param>
         private void LoadMap(string globalConfigPath, string projectName, string projectFilePath, bool keepView)
         {
-            var newSession = string.IsNullOrEmpty(projectFilePath)
-                ? OmsiMapSession.OpenReadOnly(globalConfigPath)
-                : OmsiMapSession.OpenProject(globalConfigPath, projectFilePath);
-            var summary = newSession.Read();
+            ShowMap(ReadMap(globalConfigPath, projectFilePath), projectName, keepView);
+        }
 
-            session = newSession;
+        /// <summary>Shows a map read by <see cref="ReadMap"/> in the views, with a new history.</summary>
+        private void ShowMap(MapReading reading, string projectName, bool keepView)
+        {
+            var summary = reading.Summary;
+            session = reading.Session;
             junctionTerrainState = null;
             baseSummary = summary;
             chronoDate = null;
@@ -1736,7 +1746,7 @@ namespace OmsiMapEditor.UI
             editedVariant = null;
             newVariantFormOpen = false;
             variantToDelete = null;
-            chronoVariants = ReadChronoVariants(newSession.Source);
+            chronoVariants = reading.ChronoVariants;
             currentProjectName = projectName ?? string.Empty;
             undoSteps.Clear();
             redoSteps.Clear();
@@ -1746,7 +1756,7 @@ namespace OmsiMapEditor.UI
             highlightedLine = null;
             routesToggleButton?.SetEnabled(false);
             PresentSummary(summary, keepView);
-            LoadStoredImagery(globalConfigPath + "|" + projectFilePath);
+            LoadStoredImagery(reading.ImageryKey);
             StartRoutesBuild(summary);
             ResetPaths(summary);
             UpdateMapHeader();
@@ -6632,17 +6642,17 @@ namespace OmsiMapEditor.UI
             }
             HidePopup(newMapDialog);
 
+            var failure = "The map was created in " + report.MapFolder + ", but it could not be opened: ";
             try
             {
-                if (!OpenOwnMap(report.GlobalConfigPath, folderName))
-                    return;
-                SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template; edit it right away. " +
-                          "Export to OMSI... writes your edits into this folder; then select '" + friendlyName + "' in OMSI to try it.");
+                OpenOwnMap(report.GlobalConfigPath, folderName, failure, () =>
+                    SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template; edit it right away. " +
+                              "Export to OMSI... writes your edits into this folder; then select '" + friendlyName + "' in OMSI to try it."));
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("The map was created in " + report.MapFolder + ", but it could not be opened: " + exception.Message);
+                SetStatus(failure + exception.Message);
             }
         }
 

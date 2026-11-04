@@ -169,6 +169,64 @@ Anlass: Beim Nutzertest stand das Fenster beim Öffnen von Berlin-Spandau teils 
 
 Sonst kein Bild über 200 ms. Der lange Stillstand beim Nutzer passt zu kaltem Dateicache: Die OMSI-Installation liegt auf D:, einem Datenträger aus zwei Festplatten (Seagate 2 TB, Hitachi 1 TB). Die Zusammenfassung allein liest 329 Kacheldateien im Hauptthread; Objekte und Umrisse lesen dieselben Modelldateien gleichzeitig in zwei Threads. Der kalte Fall selbst ist nicht gemessen (den Dateicache von Windows zu leeren braucht Administratorrechte); belegt sind die Laufwerke und die warmen Zeiten.
 
+Speicher, den die Ladeschritte auf Spandau anlegen (Messprogramm ohne Unity mit `Editor.OMSI.dll`, `AppDomain.MonitoringTotalAllocatedMemorySize`; die Textur-Zeile bildet nach, was `MapObjectRenderer.ReadTexture` tut):
+
+| Schritt | Zeit | angelegt | Garbage-Collections | gelesene Dateien |
+|---|---|---|---|---|
+| Zusammenfassung lesen | 0,56 s | 202 MB | 36 | 12 MB Kacheln |
+| `.sco` lesen und zerlegen (872 Arten) | 0,22 s | 48 MB | 7 | 2 MB |
+| Meshes lesen und zerlegen | 0,51 s | 157 MB | 24 | 23 MB |
+| Modellkatalog gesamt (`.sco`, Meshes, Zusammenführen; 631.369 Eckpunkte) | 0,76 s | 363 MB | 55 | 25 MB |
+| Texturen lesen und dekodieren (678; 411 DXT unverändert, 267 dekodiert) | 0,67 s | 918 MB | 29 | 338 MB |
+| Umrisskatalog (liest alle Modelle noch einmal) | 1,88 s | 409 MB | 49 | 25 MB |
+
+Zusammen fast 1,9 GB kurzlebiger Speicher für eine Karte, deren Dateien rund 400 MB groß sind; dazu kommt der Boden.
+
+### Schritt 1: Karte im Hintergrund öffnen (ADR 058)
+
+Der Messlauf zählt seither jedes Bild vom Öffnen bis zum Ende des Ladens („Frames while opening and loading“); das erste Bild mit Unitys Start zählt nicht mit.
+
+| Wert (Spandau ohne Projekt, warm, je zwei Läufe) | vorher | nachher |
+|---|---|---|
+| Öffnen bis zur Ansicht | 1,04–1,05 s, in einem einzigen Bild | 1,10–1,14 s, im Hintergrund |
+| Längstes Bild beim Öffnen und Laden | mindestens 1,05 s (das Öffnen allein) | 723–737 ms (das Bild mit den Garbage-Collections) |
+| Bilder über 1 s | mindestens 1 | 0 |
+| Boden / Objekte / Umrisse geladen nach | 3,5 / 7,2–7,3 / 4,1–4,2 s | 3,5 / 7,2–7,3 / 4,0–4,3 s |
+| Auffrischen nach Bearbeitung (mit Projekt) | 85 ms | 79–82 ms |
+
+Nutzertest nach einem Neustart des Rechners (kalter Cache, Installation auf Festplatten): kein „Not Responding“ mehr, das Fenster lässt sich beim Öffnen verschieben; das erste Laden von Spandau dauert knapp 30 s.
+
+### Lesen von der Festplatte (kalter Cache)
+
+Ein Messprogramm liest die Dateien, die der Objekt-Renderer für Spandau braucht (872 `.sco`, ihre Meshes und 678 Texturen: 1.633 Dateien, 342 MB), am Windows-Cache vorbei (`FILE_FLAG_NO_BUFFERING`), also wie nach einem Neustart:
+
+| Lesen | Zeit |
+|---|---|
+| wie bis Schritt 1: Reihenfolge eines `HashSet`, 1 Thread | 20,2–20,6 s |
+| nach Pfad sortiert, 1 Thread | 18,5 s |
+| sortiert, 4 Threads | 15,5 s |
+| 8 Threads (sortiert / ungeordnet) | 13,3 / 13,9–14,4 s |
+| 16 bzw. 32 Threads | 12,7–13,7 s |
+
+Rund 12 ms je Datei, fast nur Suchzeit des Lesekopfs; die 342 MB selbst wären in etwa 3 s übertragen. Mehrere wartende Anfragen lassen die Platte eine kürzere Reihenfolge wählen (NCQ). Nur gebrauchte DDS-Mipmap-Stufen zu lesen spart kaum etwas (135 statt 139 MB); 200 MB der Texturen sind unkomprimierte BMP/TGA.
+
+### Schritt 2: Objekte nahe dem Ausschnitt zuerst (ADR 059)
+
+Spandau, warmer Cache, je zwei Läufe gegen den Player von Schritt 1:
+
+| Wert | Schritt 1 | 8 Arbeiter, gleichzeitig mit dem Boden | 4 Arbeiter nach dem Boden (umgesetzt) |
+|---|---|---|---|
+| Boden fertig | 3,5–4,2 s | 5,9–6,4 s | 3,6–4,0 s |
+| Objekte fertig | 7,2–8,3 s | 6,3–7,0 s | 6,9–7,3 s |
+| Bilder beim Öffnen und Laden | 330–370 | 130–135 | 170–265 |
+| Längstes Bild (ohne den ersten Lauf nach einem Build) | 709–862 ms | 1,1–2,0 s | 737 ms |
+
+Gleichzeitig mit dem Boden verzögerten die Arbeiter dessen Lesen, und jedes Bild wurde teurer. Sonden zeigten warum: Garbage Collections halten alle Threads an, die Platzierungen wurden alle 0,5 s für fast jede Kachel neu gebaut (150–230 ms), und eine einzelne Art kann beim Hochladen 30–130 ms kosten (Komprimieren von BMP/TGA-Texturen auf dem Hauptthread). Seither lesen die Arbeiter erst nach dem Boden, laden erst nach seinem Aufbau hoch, und der Abstand zwischen zwei Neubauten der Platzierungen ist mindestens das Vierfache ihrer Dauer. Grundorf: Objekte nach 1,8–1,9 statt 2,0–2,2 s, Boden unverändert.
+
+Nutzertest nach einem Neustart des Rechners (kalter Cache, Festplatten): Spandau lädt in 19,5 statt knapp 30 s (Stoppuhr), Texturen und Objekte erscheinen spürbar früher.
+
+Weiter offen: `ShowMap` blockiert beim Öffnen von Spandau einmal ~425 ms (Ansichten, Projektbrowser, Umriss-Vorbereitung), die Zusammenfassung erzeugt beim Lesen ein Bild von ~460 ms Garbage Collection.
+
 ## Verbleibende Engpässe
 
 1. ~~`UpdatePlacements` baut nach jeder Bearbeitung alle Platzierungen neu~~ – seit Stufe 5 nur die geänderten Kacheln (Bild danach ~8 ms). Das Auffrischen selbst kostet auf Spandau weiter ~85 ms (Kachelliste, Umrisse, Geländelöcher, Auswahl).
