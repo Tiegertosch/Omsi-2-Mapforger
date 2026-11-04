@@ -86,6 +86,18 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The [rule] and [kill_rule] records after it in its tile, for its [path]s.</summary>
         public List<OmsiPathRule> Rules { get; } = new List<OmsiPathRule>();
+
+        /// <summary>
+        /// The object's labels, which fill its string variables in order (sign texts, line numbers, a tree's texture and
+        /// size, the seven lines of a bus stop). Empty labels are kept; none when the object has none.
+        /// </summary>
+        public IReadOnlyList<string> Labels { get; internal set; } = OmsiLabels.None;
+    }
+
+    /// <summary>The label list shared by every element without labels, so the many objects that have none cost nothing.</summary>
+    internal static class OmsiLabels
+    {
+        public static readonly string[] None = new string[0];
     }
 
     /// <summary>
@@ -140,6 +152,9 @@ namespace OmsiMapEditor.OMSI
         public double PitchDegrees { get; internal set; }
 
         public double BankDegrees { get; internal set; }
+
+        /// <summary>The labels as for <see cref="OmsiObjectRecord.Labels"/>, such as the line number on a bus stop's plate.</summary>
+        public IReadOnlyList<string> Labels { get; internal set; } = OmsiLabels.None;
     }
 
     /// <summary>A row of objects along a spline chain: lamps, posts, signs or a single bus stop.</summary>

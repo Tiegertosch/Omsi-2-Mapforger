@@ -143,11 +143,13 @@ Eine Chrono-Kachel ersetzt die Basiskachel nicht. Sie enthält eine Änderungsli
 | `[selspline]` | ID | wählt einen Spline aus |
 | `[delete]` | keine | löscht das ausgewählte Element |
 | `[typ]` | Pfad | ersetzt die `.sco`-Datei des ausgewählten Objekts |
-| `[relabel]` | Index, Text | ersetzt einen Beschriftungstext, zum Beispiel Index 1 mit `13N` |
+| `[relabel]` | Anzahl, dann so viele Zeilen | ersetzt **alle** Beschriftungen des Objekts, zum Beispiel `1` und `13N` (die Anzahl, nicht ein Index; berichtigt am 4. November 2026) |
 | `[rule]` | Pfad, Name, Wert, Zusatz | setzt eine Regel wie `trafficdensity` oder `priority` für einen Pfad |
 | `[kill_rule]` | wie `[rule]` | entfernt diese Regel |
 
 `[rule]` und `[kill_rule]` beziehen sich auf das zuletzt ausgewählte oder zuletzt neu angelegte Element.
+
+Nachtrag vom 4. November 2026 zu `[typ]` und `[relabel]`, aus openOMSIs `Tile::apply_chrono` und den Zahlen aus Spandau: Beide wirken auf Objekte, angehängte Objekte (`[attachObj]`) und Objekte in Reihen (`[splineAttachement]`), `[typ]` auch auf Splines; `[typ]` lässt die Beschriftungen stehen. Das erste Feld von `[relabel]` ist die Anzahl der Zeilen (Werte in Spandau: 1, 2 und 7, nie 0); leere Zeilen zählen mit. Von den 404 Typwechseln gehen 325 an angehängte Objekte (Linienschilder an Haltestellen), 54 an Objekte und 25 an Elemente anderer Ordner; von den 666 Neubeschriftungen 452, 186 und 28.
 
 | Zählung in Berlin-Spandau | Anzahl |
 |---|---|

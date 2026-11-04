@@ -78,6 +78,9 @@ namespace OmsiMapEditor.OMSI
         public int DeletedElements { get; internal set; }
         public int ChangedTypes { get; internal set; }
 
+        /// <summary>Objects and attached objects whose labels a variant replaces ([relabel]).</summary>
+        public int ChangedLabels { get; internal set; }
+
         /// <summary>Selections of elements that neither the tile nor an earlier variant has.</summary>
         public int UnresolvedSelections { get; internal set; }
     }
@@ -85,8 +88,9 @@ namespace OmsiMapEditor.OMSI
     /// <summary>
     /// Reads the chrono variants of a map and lays the ones active on a date over a copy of the map, as OMSI does when it
     /// loads the map for that day: in name order, each change list adds elements to its tile, deletes selected ones and
-    /// swaps the object file of selected objects. The base map's summary is left unchanged; the copy shares its
-    /// unchanged records. Rules, labels and terrain marks of the change lists do not affect the overview and are skipped.
+    /// swaps the object file ([typ]) and replaces the labels ([relabel]) of selected objects, attached objects and rows
+    /// along splines. The base map's summary is left unchanged; the copy shares its unchanged records. Rules and terrain
+    /// marks of the change lists do not affect the overview and are skipped.
     /// </summary>
     public static class OmsiChrono
     {
@@ -273,7 +277,7 @@ namespace OmsiMapEditor.OMSI
             return map;
         }
 
-        /// <summary>Selections, deletions and type changes of one change list; new elements are added afterwards.</summary>
+        /// <summary>Selections, deletions, type changes and new labels of one change list; new elements are added afterwards.</summary>
         private static void ApplyChanges(IOmsiFileSource source, string file, OmsiTileSummary tile, List<OmsiSplineRecord> splineSlots,
             OmsiChronoOverlayReport report)
         {
@@ -301,28 +305,70 @@ namespace OmsiMapEditor.OMSI
                         var values = record.AllValues();
                         if (values.Count == 0 || values[0].Length == 0)
                             break;
-                        if (selected is OmsiObjectRecord original)
+                        // The object file of an object, an attached object, a row along a spline or a spline; its labels stay.
+                        switch (selected)
                         {
-                            var changed = Copy(original);
-                            changed.AssetPath = values[0];
-                            tile.Objects[tile.Objects.IndexOf(original)] = changed;
-                            if (report.Origins.TryGetValue(original, out var origin))
-                                report.Origins[changed] = origin;
-                            selected = changed;
-                            report.ChangedTypes++;
-                        }
-                        else if (selected is OmsiSplineRecord spline)
-                        {
-                            var changed = Copy(spline);
-                            changed.AssetPath = values[0];
-                            tile.Splines[tile.Splines.IndexOf(spline)] = changed;
-                            splineSlots[splineSlots.IndexOf(spline)] = changed;
-                            if (report.Origins.TryGetValue(spline, out var splineOrigin))
-                                report.Origins[changed] = splineOrigin;
-                            selected = changed;
-                            report.ChangedTypes++;
+                            case OmsiObjectRecord original:
+                            {
+                                var changed = Copy(original);
+                                changed.AssetPath = values[0];
+                                tile.Objects[tile.Objects.IndexOf(original)] = changed;
+                                selected = Renamed(report, original, changed);
+                                report.ChangedTypes++;
+                                break;
+                            }
+                            case OmsiAttachedObjectRecord attached:
+                            {
+                                var changed = Copy(attached);
+                                changed.AssetPath = values[0];
+                                tile.AttachedObjects[tile.AttachedObjects.IndexOf(attached)] = changed;
+                                selected = Renamed(report, attached, changed);
+                                report.ChangedTypes++;
+                                break;
+                            }
+                            case OmsiSplineAttachmentRecord row:
+                            {
+                                var changed = Copy(row);
+                                changed.AssetPath = values[0];
+                                tile.SplineAttachments[tile.SplineAttachments.IndexOf(row)] = changed;
+                                selected = Renamed(report, row, changed);
+                                report.ChangedTypes++;
+                                break;
+                            }
+                            case OmsiSplineRecord spline:
+                            {
+                                var changed = Copy(spline);
+                                changed.AssetPath = values[0];
+                                tile.Splines[tile.Splines.IndexOf(spline)] = changed;
+                                splineSlots[splineSlots.IndexOf(spline)] = changed;
+                                selected = Renamed(report, spline, changed);
+                                report.ChangedTypes++;
+                                break;
+                            }
                         }
                         break;
+                    case "relabel":
+                    {
+                        // [relabel] <count> <the labels, one per line>: all labels of the object anew.
+                        var labels = RelabelTexts(record);
+                        if (selected is OmsiObjectRecord labelled)
+                        {
+                            var changed = Copy(labelled);
+                            changed.Labels = labels;
+                            tile.Objects[tile.Objects.IndexOf(labelled)] = changed;
+                            selected = Renamed(report, labelled, changed);
+                            report.ChangedLabels++;
+                        }
+                        else if (selected is OmsiAttachedObjectRecord labelledAttached)
+                        {
+                            var changed = Copy(labelledAttached);
+                            changed.Labels = labels;
+                            tile.AttachedObjects[tile.AttachedObjects.IndexOf(labelledAttached)] = changed;
+                            selected = Renamed(report, labelledAttached, changed);
+                            report.ChangedLabels++;
+                        }
+                        break;
+                    }
                     case "object":
                     case "spline":
                     case "spline_h":
@@ -402,11 +448,59 @@ namespace OmsiMapEditor.OMSI
 
         private static OmsiObjectRecord Copy(OmsiObjectRecord record)
         {
-            return new OmsiObjectRecord
+            var copy = new OmsiObjectRecord
             {
                 AssetPath = record.AssetPath, Id = record.Id, LocalX = record.LocalX, LocalY = record.LocalY, Height = record.Height,
-                HeadingDegrees = record.HeadingDegrees, PitchDegrees = record.PitchDegrees, BankDegrees = record.BankDegrees
+                HeadingDegrees = record.HeadingDegrees, PitchDegrees = record.PitchDegrees, BankDegrees = record.BankDegrees,
+                Labels = record.Labels
             };
+            copy.Rules.AddRange(record.Rules);
+            return copy;
+        }
+
+        private static OmsiAttachedObjectRecord Copy(OmsiAttachedObjectRecord record)
+        {
+            return new OmsiAttachedObjectRecord
+            {
+                AssetPath = record.AssetPath, Id = record.Id, ParentId = record.ParentId, AttachPointIndex = record.AttachPointIndex,
+                HeadingDegrees = record.HeadingDegrees, PitchDegrees = record.PitchDegrees, BankDegrees = record.BankDegrees,
+                Labels = record.Labels
+            };
+        }
+
+        private static OmsiSplineAttachmentRecord Copy(OmsiSplineAttachmentRecord record)
+        {
+            return new OmsiSplineAttachmentRecord
+            {
+                AssetPath = record.AssetPath, Id = record.Id, SplineIndex = record.SplineIndex, LateralOffset = record.LateralOffset,
+                Height = record.Height, StartDistance = record.StartDistance, HeadingDegrees = record.HeadingDegrees, Interval = record.Interval,
+                Range = record.Range, IsRepeater = record.IsRepeater
+            };
+        }
+
+        /// <summary>Hands the origin of a replaced element on to its copy, and returns the copy as the new selection.</summary>
+        private static object Renamed(OmsiChronoOverlayReport report, object original, object changed)
+        {
+            if (report.Origins.TryGetValue(original, out var origin))
+                report.Origins[changed] = origin;
+            return changed;
+        }
+
+        /// <summary>The labels of a [relabel]: its count says how many lines follow; lines missing at the end count as empty.</summary>
+        internal static IReadOnlyList<string> RelabelTexts(OmsiRecord record)
+        {
+            var lines = new List<string>(record.Fields.Count + record.Trailer.Count);
+            foreach (var line in record.Fields)
+                lines.Add(line.Text);
+            foreach (var line in record.Trailer)
+                lines.Add(line.Text);
+            if (lines.Count == 0 || !int.TryParse(lines[0].Trim(), System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var count) || count <= 0)
+                return OmsiLabels.None;
+            var labels = new string[Math.Min(count, 4096)];
+            for (var index = 0; index < labels.Length; index++)
+                labels[index] = index + 1 < lines.Count ? lines[index + 1] : string.Empty;
+            return labels;
         }
 
         private static OmsiSplineRecord Copy(OmsiSplineRecord record)

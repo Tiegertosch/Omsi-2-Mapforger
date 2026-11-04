@@ -115,6 +115,7 @@ namespace OmsiMapEditor.OMSI
                                          summary.HighestBaseTileId + "; new IDs must start at " + (summary.HighestBaseTileId + 1) + ".");
             }
 
+            sharedLabelTexts = null;
             return summary;
         }
 
@@ -130,6 +131,7 @@ namespace OmsiMapEditor.OMSI
         {
             var added = new OmsiTileSummary { X = tile.X, Y = tile.Y, FileName = tile.FileName, IsAvailable = true };
             ReadTileRecords(source, path, added, new OmsiMapSummary());
+            sharedLabelTexts = null;
             return added;
         }
 
@@ -264,9 +266,35 @@ namespace OmsiMapEditor.OMSI
             record = new OmsiAttachedObjectRecord
             {
                 AssetPath = values[1], Id = id, ParentId = parent, AttachPointIndex = point, HeadingDegrees = heading,
-                PitchDegrees = pitch, BankDegrees = bank
+                PitchDegrees = pitch, BankDegrees = bank, Labels = ReadLabels(section, 9)
             };
             return true;
+        }
+
+        // Equal label texts are kept once: a map has thousands of trees with the same texture line.
+        [ThreadStatic]
+        private static Dictionary<string, string> sharedLabelTexts;
+
+        /// <summary>
+        /// The labels of a record whose line <paramref name="countIndex"/> holds their count: that many lines after it,
+        /// as written. None when the layout is not verified or the count does not fit the record.
+        /// </summary>
+        private static IReadOnlyList<string> ReadLabels(Section section, int countIndex)
+        {
+            if (section.FieldCount <= countIndex || countIndex >= section.Lines.Count ||
+                !int.TryParse(section.Lines[countIndex].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) || count <= 0 ||
+                countIndex + 1 + count > section.FieldCount)
+                return OmsiLabels.None;
+            var shared = sharedLabelTexts ?? (sharedLabelTexts = new Dictionary<string, string>(StringComparer.Ordinal));
+            var labels = new string[count];
+            for (var index = 0; index < count; index++)
+            {
+                var text = section.Lines[countIndex + 1 + index];
+                if (!shared.TryGetValue(text, out var kept))
+                    shared[text] = kept = text;
+                labels[index] = kept;
+            }
+            return labels;
         }
 
         /// <summary>A repeater has two more leading fields: the master's tile index and the number of its first object.</summary>
@@ -310,7 +338,8 @@ namespace OmsiMapEditor.OMSI
                 Height = height,
                 HeadingDegrees = heading,
                 PitchDegrees = pitch,
-                BankDegrees = bank
+                BankDegrees = bank,
+                Labels = ReadLabels(section, 9)
             };
             return true;
         }

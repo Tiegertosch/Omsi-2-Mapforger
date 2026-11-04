@@ -75,6 +75,7 @@ namespace OmsiMapEditor.UI
         private readonly VisualElement placingOptions;
         private VisualElement shownOptions;
         private string otherChosenHint;
+        private string otherIdleHint;
 
         public ObjectLibraryPanel()
         {
@@ -199,9 +200,10 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Shows another tool's options beside the picker, such as the row tool's, with what to do with a chosen object;
-        /// null brings back the options for placing objects.
+        /// null brings back the options for placing objects. <paramref name="idleHint"/> ends the line above the list while nothing is
+        /// chosen, in place of the one about placing.
         /// </summary>
-        public void UseOptions(VisualElement options, string chosenHint)
+        public void UseOptions(VisualElement options, string chosenHint, string idleHint = null)
         {
             var wanted = options ?? placingOptions;
             if (!ReferenceEquals(wanted, shownOptions))
@@ -211,6 +213,7 @@ namespace OmsiMapEditor.UI
                 shownOptions = wanted;
             }
             otherChosenHint = options == null ? null : chosenHint;
+            otherIdleHint = options == null ? null : idleHint;
             UpdateInfo();
         }
 
@@ -724,7 +727,7 @@ namespace OmsiMapEditor.UI
                             "; players without that DLC miss them.";
             else
                 info.text = (folderCount > 0 ? Count(folderCount, "folder") + ", " : string.Empty) + Count(objectCount, "object") +
-                            ". Click an object, then click into the map to place it.";
+                            (otherIdleHint != null ? ". " + otherIdleHint : ". Click an object, then click into the map to place it.");
             info.tooltip = info.text;
             emptyLabel.text = library == null && tab != Tab.InMap ? "Listing the scenery objects of the OMSI installation..."
                 : tab == Tab.Favorites && favorites.Count == 0 ? "Mark objects with the star to find them here."

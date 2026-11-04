@@ -22,7 +22,16 @@ namespace OmsiMapEditor.OMSI
         Copy,
 
         /// <summary>The [rule] records after the object changed, such as the right of way of its paths (ADR 047).</summary>
-        Rules
+        Rules,
+
+        /// <summary>
+        /// An object or attached object got another object file, keeping its ID, place and labels; in a chrono variant that is
+        /// a [typ] after a [selobject] unless the variant added the element itself (ADR 060).
+        /// </summary>
+        Retype,
+
+        /// <summary>The labels of an object or attached object changed; in a chrono variant a [relabel] (ADR 060).</summary>
+        Labels
     }
 
     /// <summary>
@@ -63,10 +72,43 @@ namespace OmsiMapEditor.OMSI
         public bool ObjectExists => Kind == OmsiObjectChangeKind.Deletion
             ? !IsApplied
             : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || Kind == OmsiObjectChangeKind.Copy ||
-              Kind == OmsiObjectChangeKind.Rules || IsApplied;
+              Kind == OmsiObjectChangeKind.Rules || Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels || IsApplied;
 
-        /// <summary>The object in the summary in the current state of the change: for an undone copy the original.</summary>
-        public OmsiObjectRecord CurrentRecord => Kind == OmsiObjectChangeKind.Copy && !IsApplied ? ReplacedRecord : Record;
+        /// <summary>
+        /// The object in the summary in the current state of the change: for an undone copy the original; for a new type or
+        /// new labels of an object the record that stands in the tile now, for an attached object the object it hangs on.
+        /// </summary>
+        public OmsiObjectRecord CurrentRecord
+        {
+            get
+            {
+                if (Kind == OmsiObjectChangeKind.Copy && !IsApplied)
+                    return ReplacedRecord;
+                if ((Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels) && ElementAfter is OmsiObjectRecord after &&
+                    ElementBefore is OmsiObjectRecord before)
+                    return IsApplied ? after : before;
+                return Record;
+            }
+        }
+
+        /// <summary>The ID of the object or attached object a new type or new labels concern; 0 for other changes.</summary>
+        public int ElementId { get; internal set; }
+
+        /// <summary>True when the element is an attached object, whose parent is <see cref="Record"/>.</summary>
+        public bool ElementIsAttached => ElementBefore is OmsiAttachedObjectRecord;
+
+        /// <summary>
+        /// The element before and after a new type or new labels. The same record when it was changed in place; two records
+        /// when the overlay of a chrono variant shares the original with the base map, so a copy takes its place.
+        /// </summary>
+        internal object ElementBefore { get; set; }
+
+        internal object ElementAfter { get; set; }
+
+        /// <summary>The labels before and after a change of labels; null for other changes.</summary>
+        internal IReadOnlyList<string> LabelsBefore { get; set; }
+
+        internal IReadOnlyList<string> LabelsAfter { get; set; }
 
         /// <summary>For a copy the object it replaces; null for other changes.</summary>
         public OmsiObjectRecord ReplacedRecord { get; internal set; }
@@ -598,6 +640,8 @@ namespace OmsiMapEditor.OMSI
                 SetRules(change.Record, change.RulesBefore);
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, false);
+            else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels)
+                ApplyElementChange(change, false);
             else
                 MoveInSummary(change, false);
             change.IsApplied = false;
@@ -621,6 +665,8 @@ namespace OmsiMapEditor.OMSI
                 SetRules(change.Record, change.RulesAfter);
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, true);
+            else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels)
+                ApplyElementChange(change, true);
             else
                 MoveInSummary(change, true);
             change.IsApplied = true;

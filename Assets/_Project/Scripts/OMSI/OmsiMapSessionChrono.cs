@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace OmsiMapEditor.OMSI
@@ -178,21 +179,33 @@ namespace OmsiMapEditor.OMSI
                     objectView.HeadingDegrees = headingDegrees;
                     objectView.PitchDegrees = pitchDegrees;
                     objectView.BankDegrees = bankDegrees;
+                    // The copy is made from the file that holds the original; what variants changed since, as the overlay shows it, goes along.
+                    if (record.Labels.Count > 0 && !record.Labels.SequenceEqual(objectView.Labels))
+                        objectView.SetLabels(record.Labels.ToList());
                     copy = new OmsiObjectRecord
                     {
                         AssetPath = objectView.AssetPath, Id = objectView.Id, LocalX = objectView.X, LocalY = objectView.Y, Height = objectView.Z,
-                        HeadingDegrees = objectView.HeadingDegrees, PitchDegrees = objectView.PitchDegrees, BankDegrees = objectView.BankDegrees
+                        HeadingDegrees = objectView.HeadingDegrees, PitchDegrees = objectView.PitchDegrees, BankDegrees = objectView.BankDegrees,
+                        Labels = record.Labels
                     };
                 }
                 else if (created is OmsiAttachedObjectView attachedView)
                 {
                     var oldId = attachedView.Id;
+                    var shown = tile.AttachedObjects.Find(item => item.Id == oldId);
+                    if (shown != null)
+                    {
+                        attachedView.AssetPath = shown.AssetPath;
+                        if (shown.Labels.Count > 0 && !shown.Labels.SequenceEqual(attachedView.Labels))
+                            attachedView.SetLabels(shown.Labels.ToList());
+                    }
                     attachedView.Id = newIds[oldId] = ids.Allocate();
                     attachedView.ParentId = newIds[attachedView.ParentId];
                     attachedCopies.Add(new OmsiAttachedObjectRecord
                     {
                         AssetPath = attachedView.AssetPath, Id = attachedView.Id, ParentId = attachedView.ParentId, AttachPointIndex = attachedView.AttachPointIndex,
-                        HeadingDegrees = attachedView.HeadingDegrees, PitchDegrees = attachedView.PitchDegrees, BankDegrees = attachedView.BankDegrees
+                        HeadingDegrees = attachedView.HeadingDegrees, PitchDegrees = attachedView.PitchDegrees, BankDegrees = attachedView.BankDegrees,
+                        Labels = shown?.Labels ?? OmsiLabels.None
                     });
                 }
             }

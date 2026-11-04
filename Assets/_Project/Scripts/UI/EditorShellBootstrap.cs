@@ -387,7 +387,9 @@ namespace OmsiMapEditor.UI
                 objectsPanel = new ObjectLibraryPanel();
                 objectsPanel.ObjectChosen += path =>
                 {
-                    if (pickingRowObject)
+                    if (PickingElementType)
+                        EndElementTypePick(path);
+                    else if (pickingRowObject)
                         EndRowObjectPick(path);
                     else if (activeTool == EditorTool.Rows)
                         ChooseRowObject(path);
@@ -407,7 +409,9 @@ namespace OmsiMapEditor.UI
                 };
                 objectsPanel.CloseRequested += () =>
                 {
-                    if (pickingRowObject)
+                    if (PickingElementType)
+                        EndElementTypePick(null);
+                    else if (pickingRowObject)
                         EndRowObjectPick(null);
                     else
                         ShowObjectsPanel(false);
@@ -1114,6 +1118,13 @@ namespace OmsiMapEditor.UI
                 DeleteSelectedObjects();
                 Debug.Log("Delete selection: " + statusLabel?.text);
             }
+
+            // -retype <file.sco> and -relabel <line|line|...> change the selected object, or with -elementId <ID> the attached
+            // object with that ID in its tile (ADR 060); -pickType opens the library for it, -elementUndo and -elementRedo step through the
+            // history; the status goes to the log as "Retype:", "Relabel:", "Pick type:", "Undo:" and "Redo:".
+            if (Array.IndexOf(args, "-retype") >= 0 || Array.IndexOf(args, "-relabel") >= 0 || Array.IndexOf(args, "-pickType") >= 0 ||
+                Array.IndexOf(args, "-elementUndo") >= 0 || Array.IndexOf(args, "-elementRedo") >= 0)
+                RunElementArguments(args);
 
             // -markings show|<from-to:style,...> opens the markings tool on the selected junction and draws the lines (ADR 044).
             var markingArgument = Argument("-markings", 1);
@@ -2039,7 +2050,7 @@ namespace OmsiMapEditor.UI
                 }
                 PresentChrono(task.Result, active);
                 SetStatus(dateText + ": " + active.Count + " chrono variant(s) active, " + report.AddedObjects + " objects and " + report.AddedSplines +
-                          " splines added, " + report.DeletedElements + " element(s) removed, " + report.ChangedTypes + " object(s) swapped" +
+                          " splines added, " + report.DeletedElements + " element(s) removed, " + report.ChangedTypes + " object(s) swapped, " + report.ChangedLabels + " relabelled" +
                           (report.UnresolvedSelections > 0 ? ", " + report.UnresolvedSelections + " selection(s) without element" : string.Empty) +
                           ". The chrono view is read-only.");
             }).Every(100);
@@ -5607,7 +5618,9 @@ namespace OmsiMapEditor.UI
             // Esc in the object search still stops placing first, then closes the panel.
             if (evt.keyCode == KeyCode.Escape && objectsPanel != null && focused != null && objectsPanel.Contains(focused))
             {
-                if (placementAsset != null)
+                if (PickingElementType)
+                    EndElementTypePick(null);
+                else if (placementAsset != null)
                     StopPlacement();
                 else
                     ShowObjectsPanel(false);
@@ -5616,6 +5629,13 @@ namespace OmsiMapEditor.UI
             }
             if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog))
                 return;
+
+            if (evt.keyCode == KeyCode.Escape && PickingElementType && !(evt.ctrlKey || evt.commandKey))
+            {
+                EndElementTypePick(null);
+                evt.StopPropagation();
+                return;
+            }
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
@@ -5988,6 +6008,8 @@ namespace OmsiMapEditor.UI
 
         private static void Touch(List<MapSelectionItem> touched, OmsiTileSummary tile, OmsiObjectRecord item)
         {
+            if (item == null)
+                return;
             if (!touched.Exists(entry => ReferenceEquals(entry.Record, item)))
                 touched.Add(new MapSelectionItem { Tile = tile, Record = item });
         }
@@ -6044,7 +6066,7 @@ namespace OmsiMapEditor.UI
             else if (step.SplineChange != null)
                 ids.UnionWith(step.SplineChange.SplineIds);
             else
-                ids.Add(step.Change?.Record.Id ?? step.ObjectId);
+                ids.Add(step.Change?.Record?.Id ?? step.ObjectId);
         }
 
         private void PushHistory(ObjectEditStep step)
@@ -7972,6 +7994,13 @@ namespace OmsiMapEditor.UI
                 label.style.flexGrow = 1f;
                 label.style.flexShrink = 1f;
                 row.Add(label);
+                if (CanEditObjects)
+                {
+                    var typed = attached;
+                    var retype = new Button(() => PickElementType(tile, typed)) { text = "Type...", tooltip = "Choose another object file for it in the library; its place and labels stay" };
+                    retype.AddToClassList("map-control-button");
+                    row.Add(retype);
+                }
                 if (canEdit)
                 {
                     var captured = attached;
@@ -7981,6 +8010,7 @@ namespace OmsiMapEditor.UI
                     row.Add(off);
                 }
                 editor.Add(row);
+                AddTypeAndLabels(editor, tile, attached, true);
             }
             if (canEdit)
             {
@@ -8003,6 +8033,7 @@ namespace OmsiMapEditor.UI
             name.AddToClassList("inspector-edit-name");
             editor.Add(name);
             AddChronoOrigin(editor, item);
+            AddTypeAndLabels(editor, TileHolding(new MapSelectionItem { Tile = selectedTile, Record = item }) ?? selectedTile, item, false);
             AddJunctionDetails(editor, item);
 
             var xField = AddEditField(editor, "X (m)", item.LocalX);
