@@ -113,11 +113,67 @@ Lesart: Bild-, Lade- und Neuzeichenzeiten liegen bei beiden Playern innerhalb de
 | je Bild still: Objekte zeichnen (`LateUpdate`) | 2,1–2,2 ms | unverändert |
 | je Bild still: Boden `Update` / Shell `LateUpdate` | < 0,2 ms | unverändert |
 
+## Stufe 5: Platzierungen je Kachel und Sichtprüfung (2. November 2026)
+
+Vergleich: **alt** = Player von `62a16b4` (Stufen 1–4), **neu** = Zweig `perf/placements-and-culling`. Gleiches Verfahren wie oben, je zwei Läufe abwechselnd nach einem Aufwärmlauf; Bildzeit Mittel / p95 in ms. Die Werte von „alt“ liegen etwas unter denen der Tabellen oben (anderer Tag, gleicher Rechner); verglichen wird nur innerhalb dieses Abschnitts.
+
+### Berlin-Spandau mit Projekt
+
+| Wert | alt Lauf 1 | alt Lauf 2 | neu Lauf 1 | neu Lauf 2 |
+|---|---|---|---|---|
+| Auffrischen nach Bearbeitung, Mittel / max | 535 / 5.010 ms¹ | 86 / 534 ms | 83 / 526 ms | 84 / 546 ms |
+| **Zweites Bild danach, Mittel / max** | 73 / 83 ms | 70 / 76 ms | 8 / 15 ms | 7 / 9 ms |
+| Verweis-Index, Mittel / max | 977 / 2.739 ms¹ | 316 / 762 ms | 334 / 805 ms | 323 / 771 ms |
+| **still, 0,4 m/px** | 141 / 8,3¹ | 7,0 / 8,2 | 2,5 / 3,2 | 2,8 / 3,5 |
+| **verschieben, 0,1 m/px** | 7,8 / 8,9 | 8,0 / 9,2 | 2,5 / 2,8 | 2,7 / 3,2 |
+| **verschieben, 0,4 m/px** | 8,8 / 10,0 | 8,8 / 9,9 | 4,3 / 4,9 | 4,3 / 5,0 |
+| verschieben, 2 m/px | 12,9 / 15,9 | 12,3 / 14,3 | 10,3 / 13,6 | 9,8 / 11,7 |
+| verschieben, 8 m/px | 469 / 18,6¹ | 17,6 / 18,3 | 15,8 / 18,9 | 15,5 / 19,3 |
+| **3D, 300 m** | 12,5 / 14,1 | 13,8 / 18,6 | 9,6 / 11,8 | 9,5 / 10,8 |
+| 3D, 1.500 m | 10,9 / 12,6 | 11,2 / 12,7 | 9,6 / 11,3 | 10,0 / 11,4 |
+| 3D-Picking je Strahl, Mittel / max | 3,2 / 5,5 ms | 3,4 / 5,9 ms | 3,2 / 4,2 ms | 3,4 / 4,7 ms |
+
+¹ Einzelne Ausreißer im ersten Lauf (ein Bild bzw. ein Aufbau von mehreren Sekunden, kalter Dateicache); der zweite Lauf ist der Vergleichswert.
+
+### Berlin-Spandau ohne Projekt
+
+| Wert | alt Lauf 1 | alt Lauf 2 | neu Lauf 1 | neu Lauf 2 |
+|---|---|---|---|---|
+| Boden / Objekte / Umrisse geladen nach | 3,5 / 7,3 / 4,1 s | 3,4 / 7,2 / 4,1 s | 3,5 / 7,2 / 4,2 s | 3,5 / 7,7 / 4,2 s |
+| **still, 0,4 m/px** | 7,6 / 9,0 | 7,3 / 8,5 | 2,5 / 3,1 | 2,7 / 3,6 |
+| **verschieben, 0,1 m/px** | 7,5 / 9,0 | 7,6 / 8,9 | 2,3 / 2,8 | 2,4 / 3,1 |
+| **verschieben, 0,4 m/px** | 9,6 / 11,9 | 8,5 / 9,5 | 4,1 / 4,6 | 4,3 / 5,0 |
+| verschieben, 2 m/px | 15,0 / 24,9 | 12,1 / 13,5 | 10,1 / 12,5 | 10,6 / 12,9 |
+| verschieben, 8 m/px (Neuzeichnen) | 15,5 / 18,6 (5,2 ms) | 14,7 / 17,0 (5,0 ms) | 14,7 / 16,5 (5,1 ms) | 14,9 / 18,0 (5,2 ms) |
+| **3D, 300 m** | 11,8 / 13,5 | 11,7 / 13,2 | 8,4 / 9,7 | 8,8 / 10,1 |
+| 3D, 1.500 m | 10,2 / 11,8 | 10,2 / 11,6 | 8,6 / 10,0 | 9,2 / 11,0 |
+| Speicher zuletzt: verwaltet / Heap / Unity | 148 / 566 / 807 MB | 158 / 566 / 791 MB | 142 / 567 / 812 MB | 144 / 567 / 772 MB |
+
+Grundorf: alle Werte innerhalb der Streuung (still 0,4 m/px 1,1–1,4 ms, 3D aus 300 m 2,9–3,3 ms bei beiden).
+
+Lesart: Je weniger Kacheln im Bild sind, desto mehr spart die Sichtprüfung; bei 8 m/px ist ganz Spandau im Bild, dort bleibt alles gleich. Das Auffrischen selbst ändert sich nicht, weil der Renderer die Platzierungen erst im nächsten Bild baut; dieses Bild sinkt von ~70 auf ~8 ms, weil nur noch die bearbeitete Kachel neu gebaut wird.
+
+## Laden großer Karten (4. November 2026)
+
+Anlass: Beim Nutzertest stand das Fenster beim Öffnen von Berlin-Spandau teils ~10 s still („Not Responding“), und die Objekte erschienen 5–10 s nach dem Boden. Gemessen mit Sonden nur in der Projektkopie (Bilder über 200 ms mit den gemessenen Schritten, Zeitmarken ab dem Öffnen), Spandau je zweimal mit und ohne Projekt, warmer Dateicache:
+
+| Zeit ab Öffnen | Ereignis |
+|---|---|
+| 0 s | `LoadMap` liest die Zusammenfassung im Hauptthread (~1 s, „Open map“ im Messlauf) |
+| 2,3–2,7 s | ein Bild von 800–870 ms mit 33–34 Garbage-Collections und keinem gemessenen Schritt: die Hintergrund-Threads (Boden, Objekte, Umrisse) erzeugen so viel Müll, dass der Hauptthread auf den Garbage Collector wartet |
+| 3,5–3,8 s | Boden fertig |
+| 4,1–4,2 s | Umrisse gelesen |
+| 4,3–4,5 s | Objekte gelesen: 872 Arten, 678 Texturen |
+| 6,9–7,0 s | Objekte hochgeladen (in Schritten von wenigen ms je Bild) |
+| 7,2–7,4 s | 42 weitere Arten (Reihen und Anhängsel) gelesen und hochgeladen |
+
+Sonst kein Bild über 200 ms. Der lange Stillstand beim Nutzer passt zu kaltem Dateicache: Die OMSI-Installation liegt auf D:, einem Datenträger aus zwei Festplatten (Seagate 2 TB, Hitachi 1 TB). Die Zusammenfassung allein liest 329 Kacheldateien im Hauptthread; Objekte und Umrisse lesen dieselben Modelldateien gleichzeitig in zwei Threads. Der kalte Fall selbst ist nicht gemessen (den Dateicache von Windows zu leeren braucht Administratorrechte); belegt sind die Laufwerke und die warmen Zeiten.
+
 ## Verbleibende Engpässe
 
-1. `UpdatePlacements` baut nach jeder Bearbeitung alle Platzierungen neu (~60 ms auf Spandau). Nächster Schritt: je Kachel zwischenspeichern (Audit, Stufe 5).
+1. ~~`UpdatePlacements` baut nach jeder Bearbeitung alle Platzierungen neu~~ – seit Stufe 5 nur die geänderten Kacheln (Bild danach ~8 ms). Das Auffrischen selbst kostet auf Spandau weiter ~85 ms (Kachelliste, Umrisse, Geländelöcher, Auswahl).
 2. Erster Verweis-Index einer Sitzung (~0,8 s) und einmalige Kataloge beim ersten Platzieren, ersten Pinselstrich und ersten Auffrischen (je ~0,5 s auf Spandau).
-3. Ruhebild Spandau ~8,5 ms Hauptthread, davon ~2,2 ms Instancing-Aufrufe für alle Instanzen der Karte, der Rest Unitys Rendering und UI Toolkit.
+3. Ruhebild Spandau ~8,5 ms Hauptthread, davon ~2,2 ms Instancing-Aufrufe für alle Instanzen der Karte, der Rest Unitys Rendering und UI Toolkit. Seit Stufe 5 werden nur Instanzen sichtbarer Kacheln abgeschickt: bei 0,4 m/px ~2,5 ms je Bild.
 4. Verschieben bei 8 m/px auf Spandau 15–16 ms je Bild, davon ~5,5 ms Neuzeichnen der Vektorebene.
 5. Laden erzeugt ~450 MB kurzlebigen verwalteten Speicher; der Mono-Heap bleibt danach bei ~570–600 MB.
 

@@ -174,8 +174,11 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Verweis-Index mit Zwischenspeicher je Datei (ADR 057): Löschen und Kachelwechsel auf Spandau ab dem zweiten Mal ~0,1 statt ~0,6 s
   - [x] Geländelöcher: erste Bearbeitung schneidet nicht mehr alle Löcher neu (Fehler der Signatur), Auffrischen nur über Objekte mit Loch
   - [x] Objekt-Platzierungen nach Bearbeitungen etwa doppelt so schnell (Pfade einmal je Text ohne Groß-/Kleinschreibung nachgeschlagen); weniger Müll beim Zeichnen
-  - [ ] Nutzertest im Player und in openOMSI, dann Commit (ab 2. November 2026)
-  - [ ] Offen mit Zustimmung (Audit, Stufe 5): Platzierungen je Kachel neu bauen, Sichtprüfung beim Instancing, Kachelliste nur für geänderte Kacheln, Shell-Dienste für Undo und Auswahl, IL2CPP prüfen
+  - [x] Commit der Stufen 1–4 (`62a16b4`, 2. November 2026)
+  - [x] Stufe 5, Teil 1: Platzierungen je Kachel neu bauen (Bild nach einer Bearbeitung auf Spandau ~8 statt ~70 ms), Sichtprüfung je Kachel beim Instancing (Spandau von oben bei 0,4 m/px ~2,5 statt ~7,5 ms je Bild, in 3D ~9 statt ~12 ms)
+  - [x] Nutzertest im Player, Commit und Übernahme nach `main` (4. November 2026)
+  - [ ] Laden großer Karten: Karte im Hintergrund öffnen (kein „Not Responding“ bei kaltem Cache auf Festplatten), weniger Müll beim Modell-Lesen, Objekte nahe dem Ausschnitt zuerst und Modelle nur einmal lesen
+  - [ ] Offen mit Zustimmung (Audit, Stufe 5): Kachelliste nur für geänderte Kacheln, Shell-Dienste für Undo und Auswahl, IL2CPP prüfen
 - [x] Updates (ADR 054): neues Release auf GitHub beim Start (höchstens alle 20 Stunden, abschaltbar, Version überspringbar) und unter **Help > Check for updates...** finden, herunterladen, prüfen, Programmdateien nach dem Beenden tauschen und mit dem offenen Projekt neu starten, bei Fehlern zurückrollen; `BuildRelease` packt die Zip fürs Release
 - [x] Fehler melden (ADR 053): **Help > Report a bug...** öffnet eine vorausgefüllte GitHub-Issue im Browser mit Systemangaben und dem Ende des Logs, das ganze Log liegt als Datei bereit; nach einem Absturz oder einem beendeten Hänger öffnet sich das Formular beim nächsten Start mit dem Log jener Sitzung und Unitys Absturzbericht
 - KI-Pfade nach dem Vorbild der Mod „Traffic“ für Cities: Skylines II (github.com/krzychu124/Traffic, ohne Lizenz: nur das Konzept, kein Code; Plan des Nutzers vom 27. Oktober 2026). Grundlage aus openOMSI: Vorfahrt kommt nur aus `[rule] <Pfad> priority <Wert>` hinter dem Element in der Kachel (ohne Regel 128, Originalkarten 192 auf der Hauptstraße und 64 aus der Nebenstraße), `[blockpath]` wirkt nicht, Pfade verbinden sich über nahe Enden mit passender Richtung:

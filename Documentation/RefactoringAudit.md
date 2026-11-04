@@ -83,8 +83,8 @@ Nicht auffällig (gemessen): Lesen der Karte (Spandau 0,53 s), 2D-Caches der Spl
 3. **Unnötiges Auffrischen:** D9 (Klick über Kachelgruppen) – umgesetzt. D5 (Kachelliste) – offen: eine Auflistung der Arbeitskopie ist bei vielen Luftbildern nicht sicher schneller; besser wäre, nur die von einer Änderung betroffenen Kacheln aufzufrischen (Änderungen kennen ihre Kacheln).
 4. **Allokationen:** D7, D8 – umgesetzt.
 5. **Zuständigkeiten (braucht Zustimmung):**
-   - `UpdatePlacements` inkrementell je Kachel: Frames je Kachel zwischenspeichern und nur geänderte Kacheln neu rechnen, Arrays in gleicher Reihenfolge zusammensetzen. Reduziert die verbleibenden ~50 ms auf Spandau weiter, ändert aber den Kern des Objekt-Renderers.
-   - Sichtprüfung je Kachel oder Art beim Instancing (D6): Instanzen nach Kacheln gruppieren und nur sichtbare abschicken. Ändert die Zeichenstruktur.
+   - `UpdatePlacements` inkrementell je Kachel: Frames je Kachel zwischenspeichern und nur geänderte Kacheln neu rechnen, Arrays in gleicher Reihenfolge zusammensetzen. Reduziert die verbleibenden ~50 ms auf Spandau weiter, ändert aber den Kern des Objekt-Renderers. – Umgesetzt am 2. November (`MapObjectRendererPlacements.cs`, RefactoringSummary „Stufe 5“).
+   - Sichtprüfung je Kachel oder Art beim Instancing (D6): Instanzen nach Kacheln gruppieren und nur sichtbare abschicken. Ändert die Zeichenstruktur. – Umgesetzt am 2. November, je Kachel.
    - Shell: Undo-Verlauf und Auswahl als eigene Dienste; `Start()` in eine eigene `partial`-Datei.
    - IL2CPP statt Mono: würde alle Zahlen oben verbessern, ist aber eine Build-Änderung (C++-Werkzeugkette, längere Builds) und braucht Prüfung des ganzen Players.
 6. **Benennung und Doku:** reservierte Assemblies in Architecture.md als solche kennzeichnen.

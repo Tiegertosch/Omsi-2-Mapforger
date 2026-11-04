@@ -29,8 +29,10 @@ namespace OmsiMapEditor.World
     /// <summary>
     /// Draws the scenery objects of a map with their models and textures, seen from above by the ground camera. Every
     /// object kind becomes one mesh with a material per texture; its placements are drawn with GPU instancing. Objects
-    /// stand on the terrain unless their height is absolute. Trees are drawn as a disc of their crown.
+    /// stand on the terrain unless their height is absolute. Trees are drawn as a disc of their crown. Runs after the
+    /// shell, which places the camera in its LateUpdate, so tiles out of view are left out with this frame's view.
     /// </summary>
+    [DefaultExecutionOrder(100)]
     public sealed partial class MapObjectRenderer : MonoBehaviour
     {
         /// <summary>Textures are reduced to this edge length; the view from above never needs more.</summary>
@@ -76,8 +78,14 @@ namespace OmsiMapEditor.World
             /// <summary>Per submesh, the blended pass of a see-through material, or null.</summary>
             public Material[] BlendedMaterials;
 
+            /// <summary>The instances of its visible tiles, gathered from <see cref="Segments"/> when <see cref="Dirty"/>.</summary>
             public Matrix4x4[] Instances = new Matrix4x4[0];
             public int InstanceCount;
+            public readonly List<Segment> Segments = new List<Segment>();
+            public bool Dirty;
+
+            /// <summary>The box around the model in its placement frame, once asked for.</summary>
+            public Bounds? Extent;
 
             /// <summary>For trees in the 3D view: crossed upright planes standing on the ground, like OMSI draws them.</summary>
             public Material CrossMaterial;
@@ -92,6 +100,7 @@ namespace OmsiMapEditor.World
         private sealed class Placement
         {
             public KindData Kind;
+            public Segment Segment;
             public int Index;
             public OmsiTileSummary Tile;
             public Matrix4x4 Frame;
@@ -144,19 +153,11 @@ namespace OmsiMapEditor.World
         private double previewFrameX;
         private double previewFrameY;
 
-        // Every placed object that has attachment points, with its frame, for snapping onto free points.
-        private readonly List<KeyValuePair<KeyValuePair<OmsiTileSummary, int>, KeyValuePair<Matrix4x4, OmsiObjectModel>>> attachParents =
-            new List<KeyValuePair<KeyValuePair<OmsiTileSummary, int>, KeyValuePair<Matrix4x4, OmsiObjectModel>>>();
-        private readonly Dictionary<int, string> attachParentAssets = new Dictionary<int, string>();
-
         // A row about to be laid along a road, drawn as extra instances where its objects would stand.
         private string rowPreviewAsset;
         private readonly List<OmsiPlacedAttachment> rowPreview = new List<OmsiPlacedAttachment>();
         private Matrix4x4[] rowPreviewInstances = new Matrix4x4[0];
         private Matrix4x4[] rowPreviewCrossInstances = new Matrix4x4[0];
-
-        // Objects along splines, laid out again after edits (RefreshPlacements).
-        private List<KeyValuePair<string, OmsiPlacedAttachment>> splineRows;
 
         // The first object of each row along a road by tile, with the row's ID and object: an object can hang on it
         // ([attachObj] naming the row, instance 0), as openOMSI and Omsi.exe read it.
@@ -244,11 +245,10 @@ namespace OmsiMapEditor.World
         /// <summary>
         /// Takes object edits into account: moved, added and removed objects, and rows along splines laid, deleted or
         /// moved with their roads. Kinds not loaded yet, such as a newly placed object, are read in the background.
+        /// Tiles whose records did not change keep their placements; rows are laid out again when splines or rows changed.
         /// </summary>
         public void RefreshPlacements()
         {
-            // Rows along splines are laid out again: rows may have been laid or deleted, or the roads they follow moved.
-            splineRows = null;
             placementsDirty = true;
         }
 
@@ -269,6 +269,7 @@ namespace OmsiMapEditor.World
                 {
                     Debug.LogWarning(path + ": " + exception.Message);
                 }
+                changedGround.Add(TileKey(tile.X, tile.Y));
             }
             placementsDirty = true;
         }
@@ -282,8 +283,7 @@ namespace OmsiMapEditor.World
             summary = null;
             requestedKinds.Clear();
             terrains.Clear();
-            instanceOf.Clear();
-            splineRows = null;
+            ClearPlacements();
             kinds.Clear();
             textures.Clear();
             foreach (var item in owned)
@@ -346,11 +346,15 @@ namespace OmsiMapEditor.World
         {
             if (!objectsVisible || targetCamera == null || !targetCamera.enabled)
                 return;
+            UpdateVisibility();
             foreach (var kind in kinds.Values)
             {
-                if (kind.Mesh == null || kind.InstanceCount == 0)
+                if (kind.Mesh == null)
                     continue;
-                DrawKind(kind, kind.Instances, kind.CrossInstances, kind.InstanceCount);
+                if (kind.Dirty)
+                    Gather(kind);
+                if (kind.InstanceCount > 0)
+                    DrawKind(kind, kind.Instances, kind.CrossInstances, kind.InstanceCount);
             }
 
             if (previewAsset != null && previewPosition.HasValue && kinds.TryGetValue(previewAsset, out var preview) && preview.Mesh != null)
@@ -572,6 +576,7 @@ namespace OmsiMapEditor.World
                 var kind = pending.Kinds[pendingKind++];
                 BuildKind(kind);
                 kinds[kind.AssetPath] = kind;
+                addedKinds.Add(kind.AssetPath);
             }
             if (pendingKind < pending.Kinds.Count)
                 return;
@@ -808,162 +813,6 @@ namespace OmsiMapEditor.World
         }
 
         /// <summary>
-        /// Instance matrices for every placement: position on the map, standing on the terrain unless absolute, turned
-        /// clockwise by the heading as OMSI does. Unknown kinds, such as newly placed ones, are read first.
-        /// </summary>
-        private void UpdatePlacements()
-        {
-            if (splineRows == null)
-            {
-                splineRows = new List<KeyValuePair<string, OmsiPlacedAttachment>>();
-                rowFirsts = new Dictionary<OmsiTileSummary, List<KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>>>();
-                var layout = new OmsiSplineAttachmentLayout(summary);
-                foreach (var tile in summary.Tiles)
-                    foreach (var row in tile.SplineAttachments)
-                    {
-                        var placedRow = layout.Place(tile, row);
-                        foreach (var placed in placedRow)
-                            splineRows.Add(new KeyValuePair<string, OmsiPlacedAttachment>(row.AssetPath, placed));
-                        // A continuation shares its row's ID: only the row's own record carries objects.
-                        if (row.IsRepeater || placedRow.Count == 0)
-                            continue;
-                        if (!rowFirsts.TryGetValue(tile, out var firsts))
-                            rowFirsts[tile] = firsts = new List<KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>>();
-                        firsts.Add(new KeyValuePair<int, KeyValuePair<string, OmsiPlacedAttachment>>(row.Id,
-                            new KeyValuePair<string, OmsiPlacedAttachment>(row.AssetPath, placedRow[0])));
-                    }
-            }
-
-            // Paths are counted by their exact text first: comparing them without case costs much more in Mono, and a
-            // map writes most paths the same way each time. Each distinct text is then looked up once without case.
-            var exactCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-            void Count(string assetPath)
-            {
-                exactCounts.TryGetValue(assetPath, out var count);
-                exactCounts[assetPath] = count + 1;
-            }
-            foreach (var tile in summary.Tiles)
-            {
-                foreach (var item in tile.Objects)
-                    Count(item.AssetPath);
-                foreach (var attached in tile.AttachedObjects)
-                    Count(attached.AssetPath);
-            }
-            foreach (var row in splineRows)
-                Count(row.Key);
-            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var missing = new List<string>();
-            foreach (var pair in exactCounts)
-            {
-                counts.TryGetValue(pair.Key, out var count);
-                counts[pair.Key] = count + pair.Value;
-                if (count == 0 && !kinds.ContainsKey(pair.Key) && !requestedKinds.Contains(pair.Key))
-                    missing.Add(pair.Key);
-            }
-            if (missing.Count > 0 && loading == null)
-            {
-                requestedKinds.UnionWith(missing);
-                loadingGeneration = generation;
-                var root = installationRoot;
-                loading = Task.Run(() =>
-                {
-                    var data = new LoadData();
-                    ReadKinds(missing, root, data);
-                    return data;
-                });
-                placementsDirty = true;
-            }
-
-            foreach (var kind in kinds.Values)
-            {
-                counts.TryGetValue(kind.AssetPath, out var count);
-                if (kind.Instances.Length < count)
-                    kind.Instances = new Matrix4x4[count];
-                if (kind.CrossMaterial != null && kind.CrossInstances.Length < count)
-                    kind.CrossInstances = new Matrix4x4[count];
-                kind.InstanceCount = 0;
-            }
-            var kindOf = new Dictionary<string, KindData>(StringComparer.Ordinal);
-            KindData KindOf(string assetPath)
-            {
-                if (!kindOf.TryGetValue(assetPath, out var found))
-                {
-                    kinds.TryGetValue(assetPath, out found);
-                    kindOf[assetPath] = found;
-                }
-                return found;
-            }
-            instanceOf.Clear();
-            attachParents.Clear();
-            attachParentAssets.Clear();
-            var frames = new Dictionary<int, KeyValuePair<Matrix4x4, OmsiObjectModel>>();
-            foreach (var tile in summary.Tiles)
-            {
-                frames.Clear();
-                foreach (var item in tile.Objects)
-                {
-                    var kind = KindOf(item.AssetPath);
-                    if (kind == null || kind.Mesh == null)
-                        continue;
-                    var frame = PlacementFrame(kind.Model, tile, item.LocalX, item.LocalY, item.Height, item.HeadingDegrees,
-                        item.PitchDegrees, item.BankDegrees);
-                    frames[item.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
-                    RememberAttachParent(tile, item.Id, item.AssetPath, frames[item.Id]);
-                    instanceOf[item] = new Placement { Kind = kind, Index = kind.InstanceCount, Tile = tile, Frame = frame };
-                    SetFromFrame(kind, kind.InstanceCount++, frame);
-                }
-
-                // The first object of a row can carry objects too.
-                if (rowFirsts != null && rowFirsts.TryGetValue(tile, out var firstsOfTile))
-                    foreach (var first in firstsOfTile)
-                    {
-                        var rowKind = KindOf(first.Value.Key);
-                        if (rowKind == null || rowKind.Mesh == null)
-                            continue;
-                        var placed = first.Value.Value;
-                        var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
-                        frames[first.Key] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(
-                            Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one), rowKind.Model);
-                        RememberAttachParent(tile, first.Key, first.Value.Key, frames[first.Key]);
-                    }
-
-                // Attached objects hang at a point of their parent, which comes earlier in the tile; in file order an
-                // attached parent is placed before its children.
-                foreach (var attached in tile.AttachedObjects)
-                {
-                    if (!frames.TryGetValue(attached.ParentId, out var parent) || attached.AttachPointIndex < 0 ||
-                        attached.AttachPointIndex >= parent.Value.AttachPoints.Count ||
-                        !(KindOf(attached.AssetPath) is KindData kind) || kind.Mesh == null)
-                        continue;
-                    var frame = parent.Key * AttachMatrix(parent.Value.AttachPoints[attached.AttachPointIndex]) *
-                                Matrix4x4.Rotate(Orientation(attached.HeadingDegrees, attached.PitchDegrees, attached.BankDegrees));
-                    frames[attached.Id] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, kind.Model);
-                    RememberAttachParent(tile, attached.Id, attached.AssetPath, frames[attached.Id]);
-                    SetFromFrame(kind, kind.InstanceCount++, frame);
-                }
-            }
-
-            foreach (var row in splineRows)
-            {
-                var kind = KindOf(row.Key);
-                if (kind == null || kind.Mesh == null)
-                    continue;
-                var placed = row.Value;
-                var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
-                SetFromFrame(kind, kind.InstanceCount++, Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one));
-            }
-        }
-
-        private void RememberAttachParent(OmsiTileSummary tile, int id, string assetPath, KeyValuePair<Matrix4x4, OmsiObjectModel> frame)
-        {
-            if (frame.Value.AttachPoints.Count == 0)
-                return;
-            attachParents.Add(new KeyValuePair<KeyValuePair<OmsiTileSummary, int>, KeyValuePair<Matrix4x4, OmsiObjectModel>>(
-                new KeyValuePair<OmsiTileSummary, int>(tile, id), frame));
-            attachParentAssets[id] = assetPath;
-        }
-
-        /// <summary>
         /// The free attachment point nearest to a world position, seen from above, within the reach: a point of a placed
         /// object, attached object or first object of a row on which nothing hangs yet. False where there is none.
         /// </summary>
@@ -971,30 +820,36 @@ namespace OmsiMapEditor.World
         {
             spot = null;
             var best = reachMeters * reachMeters;
-            foreach (var parent in attachParents)
+            if (summary == null)
+                return false;
+            foreach (var mapTile in summary.Tiles)
             {
-                var tile = parent.Key.Key;
-                var id = parent.Key.Value;
-                var points = parent.Value.Value.AttachPoints;
-                for (var index = 0; index < points.Count; index++)
+                if (!tilePlacements.TryGetValue(mapTile, out var placements))
+                    continue;
+                foreach (var parent in placements.AttachParents)
                 {
-                    var pointIndex = index;
-                    if (tile.AttachedObjects.Exists(item => item.ParentId == id && item.AttachPointIndex == pointIndex))
-                        continue;
-                    var frame = parent.Value.Key * AttachMatrix(points[index]);
-                    var position = frame.GetColumn(3);
-                    var dx = position.x + originX - worldX;
-                    var dy = position.z + originY - worldY;
-                    if (dx * dx + dy * dy > best)
-                        continue;
-                    best = dx * dx + dy * dy;
-                    var forward = frame.MultiplyVector(Vector3.forward);
-                    attachParentAssets.TryGetValue(id, out var asset);
-                    spot = new MapAttachSpot
+                    var tile = parent.Tile;
+                    var id = parent.Id;
+                    var points = parent.Model.AttachPoints;
+                    for (var index = 0; index < points.Count; index++)
                     {
-                        Tile = tile, ParentId = id, ParentAsset = asset, PointIndex = index, WorldX = position.x + originX, WorldY = position.z + originY,
-                        Height = position.y, HeadingDegrees = (Math.Atan2(forward.x, forward.z) * 180.0 / Math.PI + 360.0) % 360.0, Frame = frame
-                    };
+                        var pointIndex = index;
+                        if (tile.AttachedObjects.Exists(item => item.ParentId == id && item.AttachPointIndex == pointIndex))
+                            continue;
+                        var frame = parent.Frame * AttachMatrix(points[index]);
+                        var position = frame.GetColumn(3);
+                        var dx = position.x + originX - worldX;
+                        var dy = position.z + originY - worldY;
+                        if (dx * dx + dy * dy > best)
+                            continue;
+                        best = dx * dx + dy * dy;
+                        var forward = frame.MultiplyVector(Vector3.forward);
+                        spot = new MapAttachSpot
+                        {
+                            Tile = tile, ParentId = id, ParentAsset = parent.AssetPath, PointIndex = index, WorldX = position.x + originX, WorldY = position.z + originY,
+                            Height = position.y, HeadingDegrees = (Math.Atan2(forward.x, forward.z) * 180.0 / Math.PI + 360.0) % 360.0, Frame = frame
+                        };
+                    }
                 }
             }
             return spot != null;
@@ -1095,7 +950,11 @@ namespace OmsiMapEditor.World
             if (tile == null || item == null || !instanceOf.TryGetValue(item, out var place))
                 return;
             place.Frame = PlacementFrame(place.Kind.Model, tile, localX, localY, height, headingDegrees, pitchDegrees, bankDegrees);
-            SetFromFrame(place.Kind, place.Index, place.Frame);
+            SetFromFrame(place.Segment, place.Index, place.Frame);
+            // The tile stays in view while the object is, and is built from its records again once the drag ends.
+            Grow(place.Segment, place.Frame);
+            place.Segment.Owner.Stale = true;
+            place.Kind.Dirty = true;
         }
 
         /// <summary>
@@ -1212,16 +1071,10 @@ namespace OmsiMapEditor.World
         }
 
         /// <summary>
-        /// The instance matrices of an object standing in this frame. A tree's crown sits at its mean height, above the
-        /// roads it may overhang; its crossed planes stand in the frame, as tall as the tree and as wide as its crown.
+        /// The instance matrix of an object standing in this frame. A tree's crown sits at its mean height, above the
+        /// roads it may overhang; its crossed planes (<see cref="CrossMatrix"/>) stand in the frame, as tall as the tree
+        /// and as wide as its crown.
         /// </summary>
-        private static void SetFromFrame(KindData kind, int index, Matrix4x4 frame)
-        {
-            kind.Instances[index] = InstanceMatrix(kind.Model, frame);
-            if (kind.CrossMaterial != null)
-                kind.CrossInstances[index] = CrossMatrix(kind.Model, frame);
-        }
-
         private static Matrix4x4 InstanceMatrix(OmsiObjectModel model, Matrix4x4 frame)
         {
             if (!model.IsTree)

@@ -131,13 +131,16 @@ namespace OmsiMapEditor.UI
             }
             ToggleThreeDimensional();
 
-            // The refresh after an object edit, without changing a file, and the reference index a deletion builds.
+            // The refresh after an object edit, without changing a file, and the reference index a deletion builds. The
+            // object renderer builds the edited tile again, as after a real edit.
             if (CanEdit)
             {
                 var refreshes = new List<double>();
                 var after = new BenchmarkPhase { Name = "Frames after a refresh" };
+                var edited = BenchmarkTile();
                 for (var repeat = 0; repeat < 10; repeat++)
                 {
+                    objectRenderer?.InvalidateTile(edited);
                     var watch = System.Diagnostics.Stopwatch.StartNew();
                     RefreshAfterChange(null);
                     refreshes.Add(watch.Elapsed.TotalMilliseconds);
