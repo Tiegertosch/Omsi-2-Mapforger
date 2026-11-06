@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1 (unreleased)
+## 1.1
 
 Place any map exactly on the Earth, a much calmer Satellite and terrain window, smooth zooming into aerial pictures, and faster, lighter loading of large maps.
 
