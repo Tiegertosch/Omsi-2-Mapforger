@@ -411,6 +411,36 @@ namespace OmsiMapEditor.OMSI
                 workspace.Revert(ImageryViewPath(tile));
         }
 
+        /// <summary>
+        /// Names the picture file a cache was made from: its size and time, which a new picture changes (the workspace's
+        /// per-session counter is left out, so the name holds from one session to the next). Null when the tile has no picture.
+        /// </summary>
+        public string ImageryFileStamp(OmsiTileSummary tile)
+        {
+            var stamp = tile == null ? null : Workspace?.Stamp(ImageryPath(tile));
+            var colon = stamp == null ? -1 : stamp.IndexOf(':');
+            return colon < 0 ? null : stamp.Substring(colon + 1);
+        }
+
+        /// <summary>
+        /// Takes out the compressed full pictures (.sharp) that a development version kept in the project: they live in the
+        /// cache folder now (<see cref="OmsiSharpStore"/>). Returns how many went.
+        /// </summary>
+        public int RemoveLegacySharpCopies()
+        {
+            var workspace = Workspace;
+            if (workspace == null)
+                return 0;
+            var count = 0;
+            foreach (var path in workspace.ModifiedFiles())
+                if (path.EndsWith(".sharp", StringComparison.OrdinalIgnoreCase))
+                {
+                    workspace.Revert(path);
+                    count++;
+                }
+            return count;
+        }
+
         /// <summary>A tile's picture for the view: its smaller copy when it has one, else the picture; null when it has none.</summary>
         public byte[] ReadImageryForView(OmsiTileSummary tile, out OmsiImageryMeta meta, out bool sharper)
         {
