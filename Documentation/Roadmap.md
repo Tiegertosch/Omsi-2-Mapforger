@@ -149,6 +149,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Etappe 2b: OpenStreetMap-Karte als Unterlage, aus den OSM-Daten gezeichnet wie openMapper, mit Straßen- und Haltestellennamen (Quelle „OpenStreetMap map (vector)“)
   - [x] Etappe 3: Mapbox und MapTiler mit eigenem Schlüssel, eigene Kachelserver (XYZ/WMTS, WMS), beides nur auf diesem Rechner; Kanten nicht geladener Nachbarkacheln an geladene Höhen anpassen („Fit their edges“); Bildgröße bis 4.096 px, beim Hineinzoomen volle Bilder der Kacheln im Blick
   - [x] Reste: Deckkraft und Sichtbarkeit je Kachel, schärfere eigene Bilder beim Hineinzoomen
+  - [ ] Fenster „Satellite and terrain“ in vier Reitern nach Aufgabe: Place, Pictures, Terrain, More (ADR 063)
+  - [ ] Volle Luftbilder beim Zoomen ohne Ruckeln (ADR 062): komprimierte Kopie im Zwischenspeicher mit 2-GB-Grenze (beim Laden der Bilder auf Arbeitsfäden berechnet, `OmsiDxt`), Texturen länger behalten
+  - [ ] Genaue Verortung klassischer Karten (ADR 061, Wunsch aus der Rückmeldung zu 1.0): Bezugspunkt, Koordinaten einfügen, Maßstab, Verschieben, Zwei-Punkt-Passung, geladene Bilder folgen sofort; wartet auf den Nutzertest. Offen: neue Karten mit Koordinaten im Dialog „New map“ anlegen (`[worldcoordinates]`)
   - Später: Google (nur für Konten außerhalb des EWR), eigene Höhenquellen, Höhenkarten als TIFF schreiben
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
 - [x] Haltestellen und Linienverläufe in der Kartenübersicht darstellen: „Routes“ in der Ansichtsleiste, Linienliste im Projekt-Panel zum Hervorheben, Linienwege auf der befahrenen Spur von Splines und Kreuzungsobjekten (`OmsiTimetableRoutes`), Haltestellennamen beim Hineinzoomen; nur in der Draufsicht
