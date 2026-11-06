@@ -410,9 +410,12 @@
 .update-hint { margin: 4px 8px; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
 .update-toggle { margin: 8px 8px 0; color: var(--mf-color-text-secondary); }
 .update-skip { margin-right: auto; }
-.satellite-frame { left: 290px; bottom: auto; width: 880px; max-height: 98%; }
+.satellite-frame { left: 290px; bottom: auto; width: 480px; max-height: 98%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }
 .satellite-columns { flex-direction: row; }
+.satellite-tab { margin: 0 var(--mf-space-2); }
+.satellite-tabs { margin: 0 var(--mf-space-2) var(--mf-space-2); }
+.satellite-footer { margin: 0 var(--mf-space-2) var(--mf-space-2); }
 .satellite-column { flex-grow: 1; flex-basis: 0; min-width: 0; margin: 0 var(--mf-space-2); }
 .satellite-row { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-1); }
 .satellite-wrap { flex-wrap: wrap; }

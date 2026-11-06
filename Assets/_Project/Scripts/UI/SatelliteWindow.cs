@@ -25,6 +25,16 @@ namespace OmsiMapEditor.UI
         private readonly Button placeButton;
         private readonly TextField rotationField = new TextField();
         private readonly Label anchorLabel = new Label();
+        private readonly Label sharpLabel = new Label();
+        private readonly TextField positionField = new TextField();
+        private readonly TextField scaleField = new TextField();
+        private readonly TextField stepField = new TextField { value = "1" };
+        private readonly Label referenceLabel = new Label();
+        private readonly Button[] pickButtons = new Button[3];
+        private readonly string[] pickTexts = { "Pick on the map", "Pick point 1", "Pick point 2" };
+        private readonly TextField[] fitFields = { new TextField(), new TextField() };
+        private readonly Label[] fitLabels = { new Label(), new Label() };
+        private readonly Toggle fitScaleToggle = new Toggle { text = "Fit the scale too" };
         private readonly DropdownField sourceField = new DropdownField();
         private readonly Label detailLabel = new Label();
         private readonly Toggle heightsToggle = new Toggle();
@@ -71,6 +81,18 @@ namespace OmsiMapEditor.UI
         private static readonly string[] PictureSizeNames = { "Every pixel (up to 4096)", "1024 × 1024", "2048 × 2048", "4096 × 4096" };
         private static readonly int[] PictureSizes = { 0, 1024, 2048, 4096 };
 
+        private static readonly string[] TabNames = { "Place", "Pictures", "Terrain", "More" };
+
+        private static readonly string[] TabTips =
+        {
+            "Where the map lies on the Earth: find the place, put the map there, set it exactly",
+            "Pictures from the air: the source, loading them, how opaque they lie",
+            "Terrain heights from the world",
+            "Your own pictures, keys and tile servers, disk space"
+        };
+
+        private readonly VisualElement[] tabs = new VisualElement[4];
+        private readonly Button[] tabButtons = new Button[4];
         private bool placing;
         private bool busy;
         private bool placed;
@@ -99,15 +121,31 @@ namespace OmsiMapEditor.UI
             body.AddToClassList("floating-panel-content");
             body.AddToClassList("satellite-body");
             Add(body);
-            var columns = new VisualElement();
-            columns.AddToClassList("satellite-columns");
-            body.Add(columns);
-            var left = new VisualElement();
-            left.AddToClassList("satellite-column");
-            columns.Add(left);
-            var right = new VisualElement();
-            right.AddToClassList("satellite-column");
-            columns.Add(right);
+
+            // One column, four tabs by task: what to do first is on the first tab and the rest is one click away.
+            var tabBar = new VisualElement();
+            tabBar.AddToClassList("panel-tabs");
+            tabBar.AddToClassList("satellite-tabs");
+            Insert(IndexOf(body), tabBar);
+            for (var index = 0; index < TabNames.Length; index++)
+            {
+                var chosen = index;
+                tabButtons[index] = new Button(() => ShowTab(chosen)) { text = TabNames[index], tooltip = TabTips[index] };
+                tabButtons[index].AddToClassList("panel-tab");
+                tabBar.Add(tabButtons[index]);
+                tabs[index] = new VisualElement();
+                tabs[index].AddToClassList("satellite-tab");
+                body.Add(tabs[index]);
+            }
+            var placeTab = tabs[0];
+            var picturesTab = tabs[1];
+            var terrainTab = tabs[2];
+            var moreTab = tabs[3];
+
+            // Loading goes on whichever tab is open, so its progress stays in view below the tabs.
+            var footer = new VisualElement();
+            footer.AddToClassList("satellite-footer");
+            Add(footer);
 
             // Find a place and see it from the air.
             var searchRow = new VisualElement();
@@ -123,9 +161,9 @@ namespace OmsiMapEditor.UI
             }, TrickleDown.TrickleDown);
             searchRow.Add(searchField);
             searchRow.Add(Button("Find", Search, "Looks the place up with OpenStreetMap's Nominatim", "search"));
-            left.Add(searchRow);
+            placeTab.Add(searchRow);
             results.AddToClassList("satellite-results");
-            left.Add(results);
+            placeTab.Add(results);
             WorldMap = new WorldMapElement();
             WorldMap.Clicked += mercator =>
             {
@@ -135,17 +173,17 @@ namespace OmsiMapEditor.UI
                     PlaceRequested?.Invoke(mercator);
                 }
             };
-            left.Add(WorldMap);
+            placeTab.Add(WorldMap);
             attributionLabel.AddToClassList("satellite-attribution");
-            left.Add(attributionLabel);
+            placeTab.Add(attributionLabel);
 
             // Where the map lies.
-            Section(left, "Place on the Earth");
+            Section(placeTab, "Place on the Earth");
             worldLabel.AddToClassList("satellite-note");
             worldLabel.text = "This map has world coordinates ([worldcoordinates]): it lies on the Earth by itself, its tiles are Web Mercator tiles.";
-            left.Add(worldLabel);
+            placeTab.Add(worldLabel);
             placeSection.AddToClassList("satellite-place");
-            left.Add(placeSection);
+            placeTab.Add(placeSection);
             var placeRow = new VisualElement();
             placeRow.AddToClassList("satellite-row");
             placeButton = Button("Place the map here", () => SetPlacing(!placing), "Then click on the map of the world: the middle of the orange tile goes there", "crosshair");
@@ -162,12 +200,13 @@ namespace OmsiMapEditor.UI
             }, TrickleDown.TrickleDown);
             anchorLabel.AddToClassList("satellite-note");
             placeSection.Add(anchorLabel);
+            BuildExactPlace();
 
             // The user's own pictures.
-            Section(left, "Own pictures");
+            Section(moreTab, "Own pictures");
             var ownNote = new Label("A scan, a screenshot, an old plan: laid on tiles and lined up by eye. No place on the Earth needed.");
             ownNote.AddToClassList("satellite-note");
-            left.Add(ownNote);
+            moreTab.Add(ownNote);
             var tilesRow = new VisualElement();
             tilesRow.AddToClassList("satellite-row");
             var from = new Label("Tiles from");
@@ -185,15 +224,16 @@ namespace OmsiMapEditor.UI
                 pictureTiles[index].tooltip = index < 2 ? "The tile at the picture's south-west corner" : "The tile at the picture's north-east corner";
                 tilesRow.Add(pictureTiles[index]);
             }
-            left.Add(tilesRow);
-            left.Add(Button("Load image file over these tiles...", () => PictureLoadRequested?.Invoke(pictureTiles[0].value, pictureTiles[1].value, pictureTiles[2].value,
+            moreTab.Add(tilesRow);
+            moreTab.Add(Button("Load image file over these tiles...", () => PictureLoadRequested?.Invoke(pictureTiles[0].value, pictureTiles[1].value, pictureTiles[2].value,
                 pictureTiles[3].value), "A JPEG, PNG, BMP or TGA picture stretched over these tiles; the copy stays in the project", "layers"));
             pictureList.AddToClassList("satellite-results");
-            left.Add(pictureList);
+            moreTab.Add(pictureList);
+            moreTab.Add(fitSection);
 
             // Pictures from the air and heights for the tiles.
-            Section(right, "Imagery");
-            var sourceRow = Row(right, "Source");
+            Section(picturesTab, "Imagery");
+            var sourceRow = Row(picturesTab, "Source");
             sourceField.AddToClassList("new-map-dropdown");
             sourceField.tooltip = "Where the pictures come from; none of them needs a key. The sharpest is chosen at the map's middle. " +
                                   "\"OpenStreetMap map\" draws the map as openstreetmap.org shows it, with streets' names, houses and stops, to build over by eye.";
@@ -201,45 +241,55 @@ namespace OmsiMapEditor.UI
             sourceField.SetValueWithoutNotify(SharpestChoice);
             sourceField.RegisterValueChangedCallback(evt => SourceChanged?.Invoke(evt.newValue == SharpestChoice ? null : evt.newValue));
             sourceRow.Add(sourceField);
-            var sizeRow = Row(right, "Picture of a tile");
+            var sizeRow = Row(picturesTab, "Picture of a tile");
             pictureSizeField.AddToClassList("new-map-dropdown");
             pictureSizeField.choices = new List<string>(PictureSizeNames);
             pictureSizeField.SetValueWithoutNotify(PictureSizeNames[0]);
             pictureSizeField.tooltip = "How many pixels each tile's picture keeps. The map shows 1024 a tile and the full picture of the tiles in view when you zoom in.";
             pictureSizeField.RegisterValueChangedCallback(evt => PictureSizeChanged?.Invoke(PictureSizes[Math.Max(0, Array.IndexOf(PictureSizeNames, evt.newValue))]));
             sizeRow.Add(pictureSizeField);
+            var copiesHolder = new VisualElement();
+            var copiesRow = Row(copiesHolder, "Zoom copies");
+            copiesRow.tooltip = "Compressed copies of the full pictures that make zooming in smooth. They are kept on this computer, not in the project, " +
+                                "up to the limit shown; the ones used longest ago go first. Deleting them is safe: they are made again when needed.";
+            sharpLabel.AddToClassList("satellite-note");
+            sharpLabel.AddToClassList("satellite-grow");
+            copiesRow.Add(sharpLabel);
+            copiesRow.Add(Button("Clear", () => ClearSharpRequested?.Invoke(), "Deletes the compressed copies; they are made again when a tile comes near the view"));
             detailLabel.AddToClassList("satellite-note");
-            right.Add(detailLabel);
+            picturesTab.Add(detailLabel);
             heightsToggle.text = "Also load terrain heights";
             heightsToggle.AddToClassList("picker-option-toggle");
             heightsToggle.AddToClassList("panel-toggle");
             heightsToggle.tooltip = "Takes the ground's heights from the AWS terrain tiles too; the shaped ground of those tiles is replaced, in one step Ctrl+Z takes back";
             heightsToggle.RegisterValueChangedCallback(evt => TicksChanged?.Invoke(evt.newValue, autoToggle.value));
-            right.Add(heightsToggle);
+            picturesTab.Add(heightsToggle);
             var loadRow = new VisualElement();
             loadRow.AddToClassList("satellite-row");
             loadRow.AddToClassList("satellite-wrap");
             loadAllButton = Button("Load for all tiles", () => LoadRequested?.Invoke(false, true, heightsToggle.value), "Pictures (and heights) for every tile of the map");
             loadAllButton.AddToClassList("dialog-primary");
             loadTileButton = Button("For the selected tile", () => LoadRequested?.Invoke(true, true, heightsToggle.value), "Pictures (and heights) for the tile selected in the map");
-            heightsOnlyButton = Button("Heights only", () => LoadRequested?.Invoke(false, false, true), "Terrain heights for every tile, without pictures");
+            heightsOnlyButton = Button("Load heights only", () => LoadRequested?.Invoke(false, false, true), "Terrain heights for every tile, without pictures");
             loadRow.Add(loadAllButton);
             loadRow.Add(loadTileButton);
-            loadRow.Add(heightsOnlyButton);
-            right.Add(loadRow);
+            picturesTab.Add(loadRow);
+            // The heights button belongs to the terrain tab, at its top.
+            Section(terrainTab, "Terrain heights");
+            terrainTab.Add(heightsOnlyButton);
             autoToggle.text = "New tiles get pictures by themselves";
             autoToggle.AddToClassList("picker-option-toggle");
             autoToggle.AddToClassList("panel-toggle");
             autoToggle.tooltip = "A tile added to the map gets its picture from the air at once, and its terrain heights too when \"Also load terrain heights\" is ticked";
             autoToggle.RegisterValueChangedCallback(evt => TicksChanged?.Invoke(heightsToggle.value, evt.newValue));
-            right.Add(autoToggle);
+            picturesTab.Add(autoToggle);
             var progressRow = new VisualElement();
             progressRow.AddToClassList("satellite-row");
             progressLabel.AddToClassList("satellite-progress");
             progressRow.Add(progressLabel);
             cancelButton = Button("Cancel", () => CancelRequested?.Invoke(), "Stops loading; tiles done so far stay");
             progressRow.Add(cancelButton);
-            right.Add(progressRow);
+            footer.Add(progressRow);
             edgesRow.AddToClassList("satellite-row");
             edgesRow.AddToClassList("satellite-wrap");
             edgesLabel.AddToClassList("satellite-note");
@@ -249,17 +299,17 @@ namespace OmsiMapEditor.UI
             edgesRow.Add(Button("Fit their edges", () => EdgesFitRequested?.Invoke(), "Their edge takes the loaded heights, fading out 60 m into the tile; Ctrl+Z takes it back"));
             edgesRow.Add(Button("Leave them", () => EdgesLeft?.Invoke(), "Keeps the step at their edge"));
             edgesRow.style.display = DisplayStyle.None;
-            right.Add(edgesRow);
+            footer.Add(edgesRow);
 
-            Section(right, "Terrain heights");
+            Section(terrainTab, "Height options");
             relativeToggle.text = "Relative: the middle tile's mean height is 0 m";
             relativeToggle.AddToClassList("picker-option-toggle");
             relativeToggle.AddToClassList("panel-toggle");
             relativeToggle.tooltip = "Takes the middle tile's mean height off all heights, as most OMSI maps lie near 0 m; off keeps the height above the sea";
             relativeToggle.RegisterValueChangedCallback(_ => HeightOptionsChanged?.Invoke());
-            right.Add(relativeToggle);
-            Field(Row(right, "Raise all by (m)"), offsetField, "Added to every height");
-            Field(Row(right, "Smoothing (m)"), smoothingField, "How far each height is smoothed with its neighbours; 0 for none");
+            terrainTab.Add(relativeToggle);
+            Field(Row(terrainTab, "Raise all by (m)"), offsetField, "Added to every height");
+            Field(Row(terrainTab, "Smoothing (m)"), smoothingField, "How far each height is smoothed with its neighbours; 0 for none");
             offsetField.RegisterCallback<FocusOutEvent>(_ => HeightOptionsChanged?.Invoke());
             smoothingField.RegisterCallback<FocusOutEvent>(_ => HeightOptionsChanged?.Invoke());
             var baseRow = new VisualElement();
@@ -269,12 +319,12 @@ namespace OmsiMapEditor.UI
             baseRow.Add(baseLabel);
             measureButton = Button("Measure again", () => MeasureAgainRequested?.Invoke(), "The next load measures the middle tile's mean height again; tiles loaded before may then step at their edges");
             baseRow.Add(measureButton);
-            right.Add(baseRow);
+            terrainTab.Add(baseRow);
             var terrainNote = new Label("Terrain: Mapzen Terrain Tiles on AWS Open Data (SRTM, USGS 3DEP, GMTED2010, ETOPO1, Copernicus EU-DEM and others).");
             terrainNote.AddToClassList("satellite-attribution");
-            right.Add(terrainNote);
+            terrainTab.Add(terrainNote);
 
-            Section(right, "Overlay on the ground");
+            Section(picturesTab, "Overlay on the ground");
             var showRow = new VisualElement();
             showRow.AddToClassList("satellite-row");
             showToggle.text = "Show";
@@ -293,13 +343,12 @@ namespace OmsiMapEditor.UI
             showRow.Add(opacitySlider);
             opacityLabel.AddToClassList("new-map-factor");
             showRow.Add(opacityLabel);
-            right.Add(showRow);
+            picturesTab.Add(showRow);
             var note = new Label("The pictures stay in the project and are not exported. Check a source's terms before you share pictures made from it.");
             note.AddToClassList("satellite-note");
-            right.Add(note);
+            picturesTab.Add(note);
 
-            // Lining up the own picture chosen in the list.
-            right.Add(fitSection);
+            // Lining up the own picture chosen in the list (shown below the list of own pictures).
             fitTitle.AddToClassList("inspector-section-heading");
             fitSection.Add(fitTitle);
             var turnRow = new VisualElement();
@@ -354,14 +403,14 @@ namespace OmsiMapEditor.UI
             fitSection.style.display = DisplayStyle.None;
 
             // Sources with the user's own key, and the user's own tile servers; both stay on this computer.
-            var keys = new Foldout { text = "Keys for more sources (optional)", value = false };
+            var keys = new Foldout { text = "Keys for more sources (optional)", value = false, name = "keys" };
             keys.AddToClassList("satellite-foldout");
             var keysNote = new Label("Everything works without a key. With your own free key these may be sharper in some places; the key stays on this computer.");
             keysNote.AddToClassList("satellite-note");
             keys.Add(keysNote);
             keys.Add(keyRows);
-            right.Add(keys);
-            var own = new Foldout { text = "Your own tile server", value = false };
+            moreTab.Add(keys);
+            var own = new Foldout { text = "Your own tile server", value = false, name = "server" };
             own.AddToClassList("satellite-foldout");
             Field(Row(own, "Name"), ownNameField, "How the server is called in the source list");
             Field(Row(own, "URL"), ownUrlField, "{z} {x} {y} are filled in; a WMS gets {bbox} (EPSG:3857) and {width} {height}; {key} is your key");
@@ -389,7 +438,10 @@ namespace OmsiMapEditor.UI
                 OwnSourceAdded?.Invoke(ownNameField.value, ownUrlField.value, ownAttributionField.value, ownZoomField.value, ownWmsToggle.value);
             }, "Adds the server to the source list", "plus"));
             own.Add(ownSourceRows);
-            right.Add(own);
+            moreTab.Add(own);
+            Section(moreTab, "Disk space");
+            moreTab.Add(copiesHolder);
+            ShowTab(0);
             UpdateButtons();
         }
 
@@ -404,6 +456,24 @@ namespace OmsiMapEditor.UI
 
         public event Action<double> RotationChanged;
 
+        /// <summary>A point of the map is to be picked with a click: 0 for the reference point, 1 and 2 for the two points of a fit.</summary>
+        public event Action<int> PickRequested;
+
+        /// <summary>The reference point should be the middle of its tile again.</summary>
+        public event Action ReferenceCentred;
+
+        /// <summary>Text typed or pasted for where the reference point lies on the Earth.</summary>
+        public event Action<string> PositionEntered;
+
+        /// <summary>How many metres of ground one metre of the map covers.</summary>
+        public event Action<double> ScaleChanged;
+
+        /// <summary>The map is to move east and north on the Earth by these metres.</summary>
+        public event Action<double, double> MoveRequested;
+
+        /// <summary>The two points of a fit with the text of their positions, and whether the scale is fitted too.</summary>
+        public event Action<string, string, bool> FitRequested;
+
         /// <summary>The source chosen by name, or null for the sharpest.</summary>
         public event Action<string> SourceChanged;
 
@@ -414,6 +484,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>"Picture of a tile" changed: the edge in pixels, 0 for every pixel of the source.</summary>
         public event Action<int> PictureSizeChanged;
+
+        /// <summary>The compressed copies for fast zooming are to be deleted.</summary>
+        public event Action ClearSharpRequested;
 
         public event Action EdgesFitRequested;
         public event Action EdgesLeft;
@@ -602,7 +675,7 @@ namespace OmsiMapEditor.UI
             return (wrapped < 0 ? wrapped + 360.0 : wrapped) - 180.0;
         }
 
-        /// <summary>Where the anchor tile lies, or null while the map is not placed.</summary>
+        /// <summary>Where the map's reference point lies, or null while the map is not placed.</summary>
         public void ShowAnchor(OmsiGeoAnchor anchor, bool worldCoordinates)
         {
             placed = worldCoordinates || anchor != null;
@@ -610,7 +683,65 @@ namespace OmsiMapEditor.UI
                 ? "1. Find the place.  2. Press \"Place the map here\" and click on the map of the world: the orange tile, the map's middle, goes there."
                 : "Orange tile " + anchor.TileX + ", " + anchor.TileY + ": " + anchor.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°, " +
                   anchor.Longitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°";
+            referenceLabel.text = anchor == null
+                ? "Place the map first; then the point that stays put while you turn and scale it can be chosen here."
+                : "Tile " + anchor.TileX + ", " + anchor.TileY + ", " + Direction(anchor.OffsetX, "east", "west") + " and " + Direction(anchor.OffsetY, "north", "south") +
+                  " of its middle";
+            positionField.SetValueWithoutNotify(anchor == null
+                ? string.Empty
+                : anchor.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + ", " + anchor.Longitude.ToString("0.000000", CultureInfo.InvariantCulture));
+            scaleField.SetValueWithoutNotify((anchor?.Scale ?? 1.0).ToString("0.######", CultureInfo.InvariantCulture));
             UpdateButtons();
+        }
+
+        private static string Direction(double meters, string positive, string negative)
+        {
+            return Math.Abs(meters).ToString("0.##", CultureInfo.InvariantCulture) + " m " + (meters >= 0.0 ? positive : negative);
+        }
+
+        /// <summary>Which pick is waiting for a click: 0 reference point, 1 and 2 the fit's points, -1 none.</summary>
+        public void ShowPicking(int which)
+        {
+            for (var index = 0; index < pickButtons.Length; index++)
+            {
+                pickButtons[index].EnableInClassList("dialog-primary", index == which);
+                pickButtons[index].Q<Label>().text = index == which ? "Click on the map..." : pickTexts[index];
+            }
+        }
+
+        /// <summary>How much room the compressed copies take on this computer, against their limit.</summary>
+        public void ShowSharpUsage(long bytes, long cap)
+        {
+            sharpLabel.text = Megabytes(bytes) + " of " + Megabytes(cap);
+        }
+
+        private static string Megabytes(long bytes)
+        {
+            return bytes >= 1024L * 1024 * 1024
+                ? (bytes / (1024.0 * 1024 * 1024)).ToString("0.0", CultureInfo.InvariantCulture) + " GB"
+                : Math.Round(bytes / (1024.0 * 1024)).ToString("0", CultureInfo.InvariantCulture) + " MB";
+        }
+
+        /// <summary>Shows where one of the fit's two map points lies, or that it is not picked yet.</summary>
+        public void ShowFitPoint(int index, string text)
+        {
+            fitLabels[index].text = text ?? "Not picked yet.";
+        }
+
+        /// <summary>The text of the position typed for one of the fit's two points.</summary>
+        public string FitPositionText(int index)
+        {
+            return fitFields[index].value;
+        }
+
+        public void SetFitScale(bool on)
+        {
+            fitScaleToggle.SetValueWithoutNotify(on);
+        }
+
+        public void SetFitPositionText(int index, string text)
+        {
+            fitFields[index].SetValueWithoutNotify(text ?? string.Empty);
         }
 
         public void ShowAttribution(string text)
@@ -710,6 +841,38 @@ namespace OmsiMapEditor.UI
             style.top = y;
         }
 
+        /// <summary>Shows one tab: 0 Place, 1 Pictures, 2 Terrain, 3 More.</summary>
+        public void ShowTab(int index)
+        {
+            index = Math.Max(0, Math.Min(tabs.Length - 1, index));
+            for (var tab = 0; tab < tabs.Length; tab++)
+            {
+                tabs[tab].style.display = tab == index ? DisplayStyle.Flex : DisplayStyle.None;
+                tabButtons[tab].EnableInClassList("panel-tab-active", tab == index);
+            }
+        }
+
+        /// <summary>Opens the folded parts of the window, all or one by its name (exact, fit, keys, server); for checks by screenshot.</summary>
+        public void Unfold(string which)
+        {
+            var all = string.IsNullOrEmpty(which) || string.Equals(which, "all", StringComparison.OrdinalIgnoreCase);
+            this.Query<Foldout>().ForEach(foldout =>
+            {
+                if (all || string.Equals(foldout.name, which, StringComparison.OrdinalIgnoreCase))
+                    foldout.value = true;
+            });
+        }
+
+        /// <summary>The tab by its name (case does not matter); false when there is none.</summary>
+        public bool ShowTab(string name)
+        {
+            var index = Array.FindIndex(TabNames, tab => string.Equals(tab, name, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+                return false;
+            ShowTab(index);
+            return true;
+        }
+
         private void UpdateButtons()
         {
             loadAllButton.SetEnabled(placed && !busy);
@@ -731,6 +894,101 @@ namespace OmsiMapEditor.UI
             var text = searchField.value?.Trim();
             if (!string.IsNullOrEmpty(text))
                 SearchRequested?.Invoke(text);
+        }
+
+        /// <summary>Exact placement for a map without world coordinates: reference point, position, scale, moving, fit by two points.</summary>
+        private void BuildExactPlace()
+        {
+            var exact = new Foldout { text = "Exact place: reference point, scale, moving", value = false };
+            exact.name = "exact";
+            exact.AddToClassList("satellite-foldout");
+            placeSection.Add(exact);
+            var note = new Label("The reference point stays where it is while the map is turned and scaled. Pick a crossing of the map, then paste where it lies on the Earth (on a web map: right click, copy the coordinates).");
+            note.AddToClassList("satellite-note");
+            exact.Add(note);
+
+            referenceLabel.AddToClassList("satellite-note");
+            exact.Add(referenceLabel);
+            var referenceRow = new VisualElement();
+            referenceRow.AddToClassList("satellite-row");
+            pickButtons[0] = Button(pickTexts[0], () => PickRequested?.Invoke(0), "Then click the map: that point becomes the reference point and stays where it is on the Earth", "crosshair");
+            referenceRow.Add(pickButtons[0]);
+            referenceRow.Add(Button("Middle of its tile", () => ReferenceCentred?.Invoke(), "Makes the middle of the reference point's tile the reference point"));
+            exact.Add(referenceRow);
+
+            var positionRow = Row(exact, "Lies at");
+            Field(positionRow, positionField, "Latitude and longitude, as web maps copy them: 52.5200, 13.4050. Enter or leaving the field moves the map there");
+            positionField.textEdition.placeholder = "52.5200, 13.4050";
+            positionField.style.width = 190;
+            OnCommit(positionField, () => PositionEntered?.Invoke(positionField.value));
+
+            var scaleRow = Row(exact, "Scale");
+            Field(scaleRow, scaleField, "Metres of ground one metre of the map covers: 1 for a map drawn true to scale, 1.2 if it is drawn 20 % too small");
+            OnCommit(scaleField, () =>
+            {
+                var value = Number(scaleField.value);
+                if (value.HasValue && value.Value > 0.01 && value.Value < 100.0)
+                    ScaleChanged?.Invoke(value.Value);
+            });
+
+            var moveRow = Row(exact, "Move the map");
+            Field(moveRow, stepField, "How many metres a press moves the map on the Earth; the pictures follow at once");
+            stepField.style.width = 44;
+            foreach (var move in new[] { ("West", -1, 0), ("East", 1, 0), ("North", 0, 1), ("South", 0, -1) })
+            {
+                var east = move.Item2;
+                var north = move.Item3;
+                moveRow.Add(Button(move.Item1, () =>
+                {
+                    var step = Number(stepField.value);
+                    if (step.HasValue && step.Value > 0.0)
+                        MoveRequested?.Invoke(east * step.Value, north * step.Value);
+                }, "Moves the map " + move.Item1.ToLowerInvariant() + " on the Earth by the step"));
+            }
+
+            var fitFold = new Foldout { text = "Fit by two points", value = false };
+            fitFold.name = "fit";
+            fitFold.AddToClassList("satellite-foldout");
+            placeSection.Add(fitFold);
+            var fitNote = new Label("Pick two crossings in the map and paste where each lies on the Earth: the map is moved, turned and, if ticked, scaled to meet both.");
+            fitNote.AddToClassList("satellite-note");
+            fitFold.Add(fitNote);
+            for (var index = 0; index < 2; index++)
+            {
+                var number = index + 1;
+                var row = new VisualElement();
+                row.AddToClassList("satellite-row");
+                pickButtons[number] = Button(pickTexts[number], () => PickRequested?.Invoke(number), "Then click the map: the point in the map to fit", "crosshair");
+                row.Add(pickButtons[number]);
+                fitFold.Add(row);
+                fitLabels[index].AddToClassList("satellite-note");
+                fitLabels[index].text = "Not picked yet.";
+                fitFold.Add(fitLabels[index]);
+                var field = fitFields[index];
+                var fieldRow = Row(fitFold, "Lies at");
+                Field(fieldRow, field, "Latitude and longitude of this point on the Earth: 52.5200, 13.4050");
+                field.textEdition.placeholder = "52.5200, 13.4050";
+                field.style.width = 190;
+            }
+            var fitRow = new VisualElement();
+            fitRow.AddToClassList("satellite-row");
+            // Like the other ticks of the window, not the bare toggle (which draws a white box).
+            fitScaleToggle.AddToClassList("picker-option-toggle");
+            fitScaleToggle.AddToClassList("panel-toggle");
+            fitScaleToggle.tooltip = "Also takes the scale from the distance between the two points; without it the map keeps its scale";
+            fitRow.Add(fitScaleToggle);
+            fitRow.Add(Button("Fit the map", () => FitRequested?.Invoke(fitFields[0].value, fitFields[1].value, fitScaleToggle.value), "Moves and turns the map so that both points meet their positions"));
+            fitFold.Add(fitRow);
+        }
+
+        private static void OnCommit(TextField field, Action action)
+        {
+            field.RegisterCallback<FocusOutEvent>(_ => action());
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == UnityEngine.KeyCode.Return || evt.keyCode == UnityEngine.KeyCode.KeypadEnter)
+                    action();
+            }, TrickleDown.TrickleDown);
         }
 
         private void ApplyRotation()

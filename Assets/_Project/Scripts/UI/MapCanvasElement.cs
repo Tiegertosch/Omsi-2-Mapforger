@@ -113,6 +113,7 @@ namespace OmsiMapEditor.UI
         private Color treeFillColor = Hex(0x55B887, 0.3f);
         private Color treeStrokeColor = Hex(0x55B887, 0.7f);
         private Color placementColor = Hex(0x55B887);
+        private Color placementPointColor = Hex(0xF08A32);
         private Color placementFillColor = Hex(0x55B887, 0.25f);
         private Color boxFillColor = Hex(0xE06464, 0.12f);
         private Color handleFillColor = Hex(0x29313D);
@@ -750,6 +751,84 @@ namespace OmsiMapEditor.UI
 
         public bool IsBuildingRoad => roadMode;
 
+        private bool pickingPoint;
+        private readonly List<OmsiMapPoint> placementPoints = new List<OmsiMapPoint>();
+
+        /// <summary>A point of the map was picked for the map's place on the Earth (world metres), after <see cref="BeginPointPick"/>.</summary>
+        public event Action<double, double> PointPicked;
+
+        public bool IsPickingPoint => pickingPoint;
+
+        /// <summary>The next click with the left button picks a point of the map instead of selecting or editing.</summary>
+        public void BeginPointPick()
+        {
+            CancelDrag();
+            pickingPoint = true;
+            MarkDirtyRepaint();
+        }
+
+        public void EndPointPick()
+        {
+            pickingPoint = false;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>The points that place the map on the Earth, marked on the ground.</summary>
+        public void SetPlacementPoints(IEnumerable<OmsiMapPoint> points)
+        {
+            placementPoints.Clear();
+            if (points != null)
+                placementPoints.AddRange(points);
+            MarkDirtyRepaint();
+        }
+
+        private void DrawPlacementPoints(Painter2D painter)
+        {
+            if (placementPoints.Count == 0)
+                return;
+            for (var pass = 0; pass < 2; pass++)
+            {
+                painter.strokeColor = pass == 0 ? handleFillColor : placementPointColor;
+                painter.lineWidth = pass == 0 ? 5f : 2.5f;
+                painter.BeginPath();
+                foreach (var point in placementPoints)
+                    AddPlacementMark(painter, MapToScreen(WorldToMap(point)));
+                painter.Stroke();
+            }
+        }
+
+        private void DrawPlacementPoints3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            if (placementPoints.Count == 0)
+                return;
+            var screens = new List<Vector2>();
+            foreach (var point in placementPoints)
+            {
+                var map = WorldToMap(point);
+                if (camera.TryProject(new Vector3(map.x, GroundAt(map) + 0.3f, map.y), out var screen))
+                    screens.Add(screen);
+            }
+            for (var pass = 0; pass < 2; pass++)
+            {
+                painter.strokeColor = pass == 0 ? handleFillColor : placementPointColor;
+                painter.lineWidth = pass == 0 ? 5f : 2.5f;
+                painter.BeginPath();
+                foreach (var screen in screens)
+                    AddPlacementMark(painter, screen);
+                painter.Stroke();
+            }
+        }
+
+        /// <summary>A ring with a cross through it.</summary>
+        private static void AddPlacementMark(Painter2D painter, Vector2 screen)
+        {
+            AddCircle(painter, screen, 9f);
+            painter.MoveTo(screen + new Vector2(-16f, 0f));
+            painter.LineTo(screen + new Vector2(16f, 0f));
+            painter.MoveTo(screen + new Vector2(0f, -16f));
+            painter.LineTo(screen + new Vector2(0f, 16f));
+        }
+
         /// <summary>Starts road mode: clicks and pointer moves go to the road tool instead of selecting or panning with the left button.</summary>
         public void BeginRoad()
         {
@@ -1328,6 +1407,7 @@ namespace OmsiMapEditor.UI
             DrawRoutes(context, painter, visible);
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
+            DrawPlacementPoints(painter);
             DrawJunctionMarkers(painter, visible);
             DrawArmHandles(painter);
             DrawTileAdders(painter);
@@ -2457,6 +2537,12 @@ namespace OmsiMapEditor.UI
                 // Right button turns the camera, the middle one moves it; the left one edits.
                 if (evt.button == 1 || evt.button == 2)
                     BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                else if (evt.button == 0 && pickingPoint)
+                {
+                    var ground = GroundPoint(OrbitCamera().RayThrough(position));
+                    if (ground.HasValue)
+                        PointPicked?.Invoke(ground.Value.x + originX, ground.Value.z + originY);
+                }
                 else if (evt.button == 0 && roadMode)
                 {
                     var ground = GroundPoint(OrbitCamera().RayThrough(position));
@@ -2476,6 +2562,14 @@ namespace OmsiMapEditor.UI
             }
             if (evt.button != 0)
                 return;
+
+            if (pickingPoint)
+            {
+                var picked = ScreenToMap(position);
+                PointPicked?.Invoke(picked.x + originX, picked.y + originY);
+                evt.StopPropagation();
+                return;
+            }
 
             if (placementAsset != null)
             {
@@ -3230,6 +3324,7 @@ namespace OmsiMapEditor.UI
         {
             DrawPlacement3D(painter, camera);
             DrawRoad3D(painter, camera);
+            DrawPlacementPoints3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
             DrawPriorityHandles(painter, camera);
             DrawLaneEnds(painter, camera);

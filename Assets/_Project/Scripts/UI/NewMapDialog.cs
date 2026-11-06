@@ -517,7 +517,7 @@ namespace OmsiMapEditor.UI
         private void UpdateTarget()
         {
             var problem = Problem(out var target);
-            targetLabel.text = problem ?? "Creates " + target + ", then asks where to save its project.";
+            targetLabel.text = problem ?? "Creates " + target + " and opens it ready to edit; its project is made for you.";
             targetLabel.EnableInClassList("export-problem", problem != null);
             createButton.SetEnabled(problem == null);
         }

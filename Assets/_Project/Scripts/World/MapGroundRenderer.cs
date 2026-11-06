@@ -161,6 +161,13 @@ namespace OmsiMapEditor.World
         private readonly Dictionary<long, Texture2D> imageryTextures = new Dictionary<long, Texture2D>();
         private readonly Dictionary<long, MeshRenderer> imagerySurfaces = new Dictionary<long, MeshRenderer>();
 
+        // Where a tile's picture lies after the map's place on the Earth changed since it was cut: scale, turn (counter-clockwise,
+        // degrees) and move of the map's metres, so the picture shows the ground it was cut from at the new place.
+        private readonly Dictionary<long, double[]> imageryPlacements = new Dictionary<long, double[]>();
+
+        // The grid a moved picture lies on: its points moved by the placement, each at the terrain's height where it lands.
+        private readonly Dictionary<long, Mesh> imageryPlacedMeshes = new Dictionary<long, Mesh>();
+
         // Tiles whose picture lies less opaque than the others or is hidden (0), as a factor on the opacity.
         private readonly Dictionary<long, float> imageryTileOpacity = new Dictionary<long, float>();
 
@@ -1322,6 +1329,7 @@ namespace OmsiMapEditor.World
             var key = TileKey(tileX, tileY);
             RemoveImagerySurface(key);
             DropSharp(key);
+            imageryPlacements.Remove(key);
             if (imageryTextures.TryGetValue(key, out var old) && old != picture)
                 Destroy(old);
             imageryTextures.Remove(key);
@@ -1340,8 +1348,115 @@ namespace OmsiMapEditor.World
             foreach (var texture in imageryTextures.Values)
                 Destroy(texture);
             imageryTextures.Clear();
+            imageryPlacements.Clear();
             foreach (var key in new List<long>(sharpTextures.Keys))
                 DropSharp(key);
+        }
+
+        /// <summary>
+        /// Lays a tile's picture where its ground belongs under a new place of the map: a map point m goes to
+        /// <c>scale · R(turn) · m + (moveX, moveY)</c>, R turning counter-clockwise. A preview of an edited placement; the picture is
+        /// cut anew when it is loaded again, which takes this away.
+        /// </summary>
+        public void SetImageryPlacement(int tileX, int tileY, double scale, double turnDegrees, double moveX, double moveY)
+        {
+            var key = TileKey(tileX, tileY);
+            imageryPlacements[key] = new[] { scale, turnDegrees, moveX, moveY };
+            ApplyImageryPlacement(key);
+        }
+
+        /// <summary>Puts a tile's picture back on its tile.</summary>
+        public void ClearImageryPlacement(int tileX, int tileY)
+        {
+            var key = TileKey(tileX, tileY);
+            if (imageryPlacements.Remove(key))
+                ApplyImageryPlacement(key);
+        }
+
+        /// <summary>How many tiles show their picture moved from the tile (see <see cref="SetImageryPlacement"/>).</summary>
+        public int ImageryPlacementCount => imageryPlacements.Count;
+
+        private void ApplyImageryPlacement(long key)
+        {
+            if (imagerySurfaces.TryGetValue(key, out var surface) && surface != null && tileStates.TryGetValue(key, out var state))
+                PlaceImagerySurface(surface.transform, state);
+        }
+
+        private void PlaceImagerySurface(Transform surface, TileState state)
+        {
+            var filter = surface.GetComponent<MeshFilter>();
+            if (!imageryPlacements.TryGetValue(state.Key, out var placement))
+            {
+                surface.localPosition = state.Position;
+                surface.localRotation = Quaternion.identity;
+                surface.localScale = Vector3.one;
+                if (filter != null)
+                    filter.sharedMesh = state.Mesh;
+                DropPlacedMesh(state.Key);
+                return;
+            }
+            // The tile's grid, moved: every point lands where the placement puts it and takes the terrain's height there, so a
+            // picture moved over a slope still lies on the ground (the shared mesh would keep the heights of the old place).
+            const int points = OmsiTerrain.Resolution;
+            var step = tileSize / (points - 1);
+            var scale = placement[0];
+            var turn = placement[1] * Math.PI / 180.0;
+            var cos = Math.Cos(turn);
+            var sin = Math.Sin(turn);
+            var vertices = new Vector3[points * points];
+            var uvs = new Vector2[points * points];
+            var normals = new Vector3[points * points];
+            for (var row = 0; row < points; row++)
+            {
+                for (var column = 0; column < points; column++)
+                {
+                    var mapX = state.X * tileSize + column * step;
+                    var mapY = state.Y * tileSize + row * step;
+                    var x = scale * (mapX * cos - mapY * sin) + placement[2] - originX;
+                    var y = scale * (mapX * sin + mapY * cos) + placement[3] - originY;
+                    var index = row * points + column;
+                    vertices[index] = new Vector3((float)x, HeightAt(new Vector2((float)x, (float)y)) + PlacedImageryLift, (float)y);
+                    uvs[index] = new Vector2((float)column / (points - 1), (float)row / (points - 1));
+                    normals[index] = Vector3.up;
+                }
+            }
+            var triangles = new int[(points - 1) * (points - 1) * 6];
+            var next = 0;
+            for (var row = 0; row + 1 < points; row++)
+            {
+                for (var column = 0; column + 1 < points; column++)
+                {
+                    var corner = row * points + column;
+                    triangles[next++] = corner;
+                    triangles[next++] = corner + points + 1;
+                    triangles[next++] = corner + 1;
+                    triangles[next++] = corner;
+                    triangles[next++] = corner + points;
+                    triangles[next++] = corner + points + 1;
+                }
+            }
+            DropPlacedMesh(state.Key);
+            var mesh = new Mesh { name = "Moved picture " + state.X + ", " + state.Y, vertices = vertices, normals = normals, uv = uvs, triangles = triangles };
+            mesh.RecalculateBounds();
+            imageryPlacedMeshes[state.Key] = mesh;
+            surface.localPosition = Vector3.zero;
+            surface.localRotation = Quaternion.identity;
+            surface.localScale = Vector3.one;
+            if (filter != null)
+                filter.sharedMesh = mesh;
+        }
+
+        /// <summary>How far above the terrain a moved picture lies, so it does not flicker with the ground where the two grids differ.</summary>
+        private const float PlacedImageryLift = 0.08f;
+
+        private void DropPlacedMesh(long key)
+        {
+            if (imageryPlacedMeshes.TryGetValue(key, out var mesh))
+            {
+                imageryPlacedMeshes.Remove(key);
+                if (mesh != null)
+                    Destroy(mesh);
+            }
         }
 
         /// <summary>
@@ -1469,7 +1584,7 @@ namespace OmsiMapEditor.World
             overlay.SetFloat("_Opacity", imageryOpacity);
             var surface = new GameObject(overlay.name) { layer = GroundLayer };
             surface.transform.SetParent(imageryRoot, false);
-            surface.transform.localPosition = state.Position;
+            PlaceImagerySurface(surface.transform, state);
             surface.AddComponent<MeshFilter>().sharedMesh = state.Mesh;
             var meshRenderer = surface.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterial = overlay;
@@ -1486,6 +1601,7 @@ namespace OmsiMapEditor.World
             if (!imagerySurfaces.TryGetValue(key, out var surface))
                 return;
             imagerySurfaces.Remove(key);
+            DropPlacedMesh(key);
             if (surface == null)
                 return;
             Destroy(surface.sharedMaterial);

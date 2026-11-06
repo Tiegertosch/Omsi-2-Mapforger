@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -16,6 +17,40 @@ namespace OmsiMapEditor.OMSI
 
         public double Latitude;
         public double Longitude;
+
+        private static readonly Regex Number = new Regex(@"[-+]?\d+(?:[.,]\d+)?", RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Reads a latitude and a longitude as web maps copy them: "52.5200, 13.4050", "52.52 13.405", "52,52; 13,405" or
+        /// "52.52° N, 13.405° E" (S and W make a number negative). Exactly two numbers, the latitude first and within ±90°, the
+        /// longitude within ±180°; anything else is not a position.
+        /// </summary>
+        public static bool TryParse(string text, out OmsiLatLon position)
+        {
+            position = default(OmsiLatLon);
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            var matches = Number.Matches(text);
+            if (matches.Count != 2)
+                return false;
+            var values = new double[2];
+            for (var index = 0; index < 2; index++)
+                if (!double.TryParse(matches[index].Value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out values[index]))
+                    return false;
+            // A letter after a number names its direction: S and W lie on the other side of the equator and of Greenwich.
+            for (var index = 0; index < 2; index++)
+            {
+                var end = matches[index].Index + matches[index].Length;
+                var next = index == 0 ? matches[1].Index : text.Length;
+                var between = text.Substring(end, next - end).ToUpperInvariant();
+                if (between.IndexOf('S') >= 0 || between.IndexOf('W') >= 0)
+                    values[index] = -Math.Abs(values[index]);
+            }
+            if (Math.Abs(values[0]) > 90.0 || Math.Abs(values[1]) > 180.0)
+                return false;
+            position = new OmsiLatLon(values[0], values[1]);
+            return true;
+        }
     }
 
     /// <summary>
@@ -39,8 +74,9 @@ namespace OmsiMapEditor.OMSI
         private readonly double latitude;
         private readonly double longitude;
         private readonly double rotation;
+        private readonly double scale;
 
-        private OmsiGeoreference(bool world, double tileSize, double anchorX, double anchorY, double latitude, double longitude, double rotation)
+        private OmsiGeoreference(bool world, double tileSize, double anchorX, double anchorY, double latitude, double longitude, double rotation, double scale)
         {
             this.world = world;
             this.tileSize = tileSize;
@@ -49,19 +85,24 @@ namespace OmsiMapEditor.OMSI
             this.latitude = latitude;
             this.longitude = longitude;
             this.rotation = rotation;
+            this.scale = scale;
         }
 
         /// <summary>A [worldcoordinates] map: its tiles are Web Mercator tiles of zoom 16 (ADR 019).</summary>
         public static OmsiGeoreference ForWorldCoordinates(double tileSize)
         {
-            return new OmsiGeoreference(true, tileSize, 0, 0, 0, 0, 0);
+            return new OmsiGeoreference(true, tileSize, 0, 0, 0, 0, 0, 1);
         }
 
-        /// <summary>A map placed by hand: the middle of the anchor tile lies at the latitude and longitude, its north turned by the rotation.</summary>
+        /// <summary>
+        /// A map placed by hand: the reference point (the anchor tile's middle, moved by the anchor's offset) lies at the latitude
+        /// and longitude, the map's north turned by the rotation, and one metre of the map is <see cref="OmsiGeoAnchor.Scale"/> metres of ground.
+        /// </summary>
         public static OmsiGeoreference Placed(OmsiGeoAnchor anchor, double tileSize)
         {
-            return new OmsiGeoreference(false, tileSize, (anchor.TileX + 0.5) * tileSize, (anchor.TileY + 0.5) * tileSize, anchor.Latitude, anchor.Longitude,
-                anchor.RotationDegrees);
+            var scale = anchor.Scale > 0.0 && !double.IsNaN(anchor.Scale) && !double.IsInfinity(anchor.Scale) ? anchor.Scale : 1.0;
+            return new OmsiGeoreference(false, tileSize, (anchor.TileX + 0.5) * tileSize + anchor.OffsetX, (anchor.TileY + 0.5) * tileSize + anchor.OffsetY,
+                anchor.Latitude, anchor.Longitude, anchor.RotationDegrees, scale);
         }
 
         /// <summary>The placement of a map: by its world coordinates, or by its anchor; null when it is not placed.</summary>
@@ -87,8 +128,8 @@ namespace OmsiMapEditor.OMSI
             var dx = x - anchorX;
             var dy = y - anchorY;
             var radians = rotation * Math.PI / 180.0;
-            var east = dx * Math.Cos(radians) + dy * Math.Sin(radians);
-            var north = -dx * Math.Sin(radians) + dy * Math.Cos(radians);
+            var east = (dx * Math.Cos(radians) + dy * Math.Sin(radians)) * scale;
+            var north = (-dx * Math.Sin(radians) + dy * Math.Cos(radians)) * scale;
             var phi0 = latitude * Math.PI / 180.0;
             // The meridian arc over a few kilometres: its radius at the middle latitude.
             var phi = phi0 + north / MeridianRadius(phi0);
@@ -96,6 +137,66 @@ namespace OmsiMapEditor.OMSI
                 phi = phi0 + north / MeridianRadius((phi0 + phi) * 0.5);
             var lambda = east / (PrimeRadius(phi) * Math.Cos(phi));
             return new OmsiLatLon(phi * 180.0 / Math.PI, longitude + lambda * 180.0 / Math.PI);
+        }
+
+        /// <summary>A position moved by metres east and north on the ground (a few kilometres at most, WGS 84).</summary>
+        public static OmsiLatLon Moved(OmsiLatLon position, double eastMeters, double northMeters)
+        {
+            var phi = position.Latitude * Math.PI / 180.0;
+            var north = northMeters / MeridianRadius(phi);
+            var after = phi + north;
+            var east = eastMeters / (PrimeRadius(after) * Math.Cos(after));
+            return new OmsiLatLon(after * 180.0 / Math.PI, position.Longitude + east * 180.0 / Math.PI);
+        }
+
+        /// <summary>
+        /// The placement a stamp of pictures names (<see cref="Stamp"/>), so a picture made for an earlier place can be laid
+        /// where it belongs under the present one; null for a stamp that is not a placement by hand.
+        /// </summary>
+        public static OmsiGeoreference FromStamp(string stamp, double tileSize)
+        {
+            if (string.IsNullOrWhiteSpace(stamp) || stamp.StartsWith("world", StringComparison.Ordinal))
+                return null;
+            var parts = stamp.Trim().Split(' ');
+            if (parts.Length != 5 && parts.Length != 6)
+                return null;
+            var values = new double[parts.Length];
+            for (var index = 0; index < parts.Length; index++)
+                if (!double.TryParse(parts[index], NumberStyles.Float, CultureInfo.InvariantCulture, out values[index]) || double.IsNaN(values[index]) || double.IsInfinity(values[index]))
+                    return null;
+            var scale = parts.Length == 6 ? values[5] : 1.0;
+            return scale > 0.0 ? new OmsiGeoreference(false, tileSize, values[0], values[1], values[2], values[3], values[4], scale) : null;
+        }
+
+        /// <summary>
+        /// How a picture cut for one placement of a map has to be turned, scaled and moved to lie right under another:
+        /// a map point m goes to <c>scale · R(rotation) · m + (moveX, moveY)</c>, R turning counter-clockwise. The two places
+        /// differ only by a similarity (to within decimetres over a few kilometres), found from two points. False when either
+        /// is a [worldcoordinates] map.
+        /// </summary>
+        public static bool Transition(OmsiGeoreference from, OmsiGeoreference to, out double scale, out double rotationDegrees, out double moveX, out double moveY)
+        {
+            scale = 1.0;
+            rotationDegrees = 0.0;
+            moveX = 0.0;
+            moveY = 0.0;
+            if (from == null || to == null || from.world || to.world)
+                return false;
+            const double Reach = 1000.0;
+            var origin = from.LatLon(from.anchorX, from.anchorY);
+            var a = to.World(origin.Latitude, origin.Longitude);
+            var onward = from.LatLon(from.anchorX + Reach, from.anchorY);
+            var b = to.World(onward.Latitude, onward.Longitude);
+            var dx = (b.X - a.X) / Reach;
+            var dy = (b.Y - a.Y) / Reach;
+            scale = Math.Sqrt(dx * dx + dy * dy);
+            if (scale < 1e-9)
+                return false;
+            rotationDegrees = Math.Atan2(dy, dx) * 180.0 / Math.PI;
+            var radians = rotationDegrees * Math.PI / 180.0;
+            moveX = a.X - scale * (from.anchorX * Math.Cos(radians) - from.anchorY * Math.Sin(radians));
+            moveY = a.Y - scale * (from.anchorX * Math.Sin(radians) + from.anchorY * Math.Cos(radians));
+            return true;
         }
 
         /// <summary>The Web Mercator position of a world point: x east and y south, 0 to 1 over the whole world.</summary>
@@ -121,8 +222,60 @@ namespace OmsiMapEditor.OMSI
             var phi = lat * Math.PI / 180.0;
             var north = (phi - phi0) * MeridianRadius((phi0 + phi) * 0.5);
             var east = (lon - longitude) * Math.PI / 180.0 * PrimeRadius(phi) * Math.Cos(phi);
+            east /= scale;
+            north /= scale;
             var radians = rotation * Math.PI / 180.0;
             return new OmsiMapPoint(anchorX + east * Math.Cos(radians) - north * Math.Sin(radians), anchorY + east * Math.Sin(radians) + north * Math.Cos(radians));
+        }
+
+        /// <summary>
+        /// The same placement with the reference point moved to a map point: the anchor takes that point's tile and offset and the
+        /// latitude and longitude it has now, so choosing a reference point never moves the map. Null for a [worldcoordinates] map.
+        /// </summary>
+        public OmsiGeoAnchor AnchorAt(double x, double y)
+        {
+            if (world)
+                return null;
+            var position = LatLon(x, y);
+            var tileX = (int)Math.Floor(x / tileSize);
+            var tileY = (int)Math.Floor(y / tileSize);
+            return new OmsiGeoAnchor
+            {
+                TileX = tileX, TileY = tileY, OffsetX = x - (tileX + 0.5) * tileSize, OffsetY = y - (tileY + 0.5) * tileSize,
+                Latitude = position.Latitude, Longitude = position.Longitude, RotationDegrees = rotation, Scale = scale
+            };
+        }
+
+        /// <summary>
+        /// The placement that puts two map points at two latitudes and longitudes: the first point becomes the reference point; the
+        /// turn comes from the direction between the points and, with <paramref name="fitScale"/>, the scale from their distance
+        /// (otherwise the scale stays 1 and the map is turned about the first point). Null when the two map points or the two
+        /// positions coincide.
+        /// </summary>
+        public static OmsiGeoAnchor FitTwoPoints(double tileSize, OmsiMapPoint firstMap, OmsiLatLon firstGround, OmsiMapPoint secondMap, OmsiLatLon secondGround, bool fitScale)
+        {
+            var mx = secondMap.X - firstMap.X;
+            var my = secondMap.Y - firstMap.Y;
+            // The second position in metres east and north of the first, with the same ellipsoid arithmetic the placement uses.
+            var phi1 = firstGround.Latitude * Math.PI / 180.0;
+            var phi2 = secondGround.Latitude * Math.PI / 180.0;
+            var middle = (phi1 + phi2) * 0.5;
+            var east = (secondGround.Longitude - firstGround.Longitude) * Math.PI / 180.0 * PrimeRadius(middle) * Math.Cos(middle);
+            var north = (phi2 - phi1) * MeridianRadius(middle);
+            var mapLength = Math.Sqrt(mx * mx + my * my);
+            var groundLength = Math.Sqrt(east * east + north * north);
+            if (mapLength < 1e-6 || groundLength < 1e-6)
+                return null;
+            // east + i north = scale * e^(-i rotation) * (mx + i my): the turn is the angle from the ground vector to the map's.
+            var rotation = (Math.Atan2(my, mx) - Math.Atan2(north, east)) * 180.0 / Math.PI;
+            rotation = ((rotation + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
+            var tileX = (int)Math.Floor(firstMap.X / tileSize);
+            var tileY = (int)Math.Floor(firstMap.Y / tileSize);
+            return new OmsiGeoAnchor
+            {
+                TileX = tileX, TileY = tileY, OffsetX = firstMap.X - (tileX + 0.5) * tileSize, OffsetY = firstMap.Y - (tileY + 0.5) * tileSize,
+                Latitude = firstGround.Latitude, Longitude = firstGround.Longitude, RotationDegrees = rotation, Scale = fitScale ? groundLength / mapLength : 1.0
+            };
         }
 
         /// <summary>A latitude and longitude in metres east and north of a tile's south-west corner, for either kind of map.</summary>
@@ -142,7 +295,9 @@ namespace OmsiMapEditor.OMSI
         public string Stamp =>
             world ? "world " + tileSize.ToString("R", CultureInfo.InvariantCulture)
                 : string.Join(" ", anchorX.ToString("R", CultureInfo.InvariantCulture), anchorY.ToString("R", CultureInfo.InvariantCulture),
-                    latitude.ToString("R", CultureInfo.InvariantCulture), longitude.ToString("R", CultureInfo.InvariantCulture), rotation.ToString("R", CultureInfo.InvariantCulture));
+                    latitude.ToString("R", CultureInfo.InvariantCulture), longitude.ToString("R", CultureInfo.InvariantCulture), rotation.ToString("R", CultureInfo.InvariantCulture)) +
+                  // A scale other than 1 is added last, so the stamps of pictures made before there was a scale stay valid.
+                  (scale == 1.0 ? string.Empty : " " + scale.ToString("R", CultureInfo.InvariantCulture));
 
         /// <summary>Web Mercator of a latitude and longitude: x east and y south, 0 to 1 over the whole world.</summary>
         public static OmsiMapPoint MercatorOf(double lat, double lon)
@@ -176,11 +331,23 @@ namespace OmsiMapEditor.OMSI
         }
     }
 
-    /// <summary>Where a map without world coordinates lies: the middle of one tile at a latitude and longitude, its north turned.</summary>
+    /// <summary>
+    /// Where a map without world coordinates lies: a reference point at a latitude and longitude, the map's north turned and its
+    /// metres scaled. The reference point is the middle of one tile, moved by an offset in metres.
+    /// </summary>
     public sealed class OmsiGeoAnchor
     {
         public int TileX { get; set; }
         public int TileY { get; set; }
+
+        /// <summary>Metres east of the anchor tile's middle: the reference point's place in the tile.</summary>
+        public double OffsetX { get; set; }
+
+        /// <summary>Metres north of the anchor tile's middle.</summary>
+        public double OffsetY { get; set; }
+
+        /// <summary>Metres of ground one metre of the map covers; 1 for a map drawn true to scale.</summary>
+        public double Scale { get; set; } = 1.0;
         public double Latitude { get; set; }
         public double Longitude { get; set; }
 
@@ -282,7 +449,7 @@ namespace OmsiMapEditor.OMSI
                 settings.Anchor = new OmsiGeoAnchor
                 {
                     TileX = (int)Number("tilex", 0), TileY = (int)Number("tiley", 0), Latitude = Number("latitude", 0), Longitude = Number("longitude", 0),
-                    RotationDegrees = Number("rotation", 0)
+                    RotationDegrees = Number("rotation", 0), OffsetX = Number("offsetx", 0), OffsetY = Number("offsety", 0), Scale = Number("scale", 1)
                 };
             settings.Heights.Relative = !values.TryGetValue("relative", out var relative) || relative != "0";
             settings.Heights.Offset = Number("offset", 0);
@@ -322,6 +489,13 @@ namespace OmsiMapEditor.OMSI
                 Line("latitude", Anchor.Latitude);
                 Line("longitude", Anchor.Longitude);
                 Line("rotation", Anchor.RotationDegrees);
+                // Written only when they differ from the defaults, so a project keeps its old file until the reference point or scale is used.
+                if (Anchor.OffsetX != 0.0)
+                    Line("offsetx", Anchor.OffsetX);
+                if (Anchor.OffsetY != 0.0)
+                    Line("offsety", Anchor.OffsetY);
+                if (Anchor.Scale != 1.0)
+                    Line("scale", Anchor.Scale);
             }
             Line("relative", Heights.Relative ? 1 : 0);
             Line("offset", Heights.Offset);

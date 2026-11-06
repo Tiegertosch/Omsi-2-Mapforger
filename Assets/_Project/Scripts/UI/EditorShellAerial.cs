@@ -26,10 +26,19 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private const int ImageryPictureSize = 1024;
 
-        /// <summary>Tiles shown with their full picture at most, the nearest to the middle of the view.</summary>
+        /// <summary>Tiles that get their full picture at a time, the nearest to the middle of the view.</summary>
         private const int SharpTileLimit = 9;
 
+        /// <summary>
+        /// Tiles that keep their full picture at most (about 8 MB each, compressed). One that leaves the view keeps it while there
+        /// is room, so moving back and forth over a tile border does not load it again.
+        /// </summary>
+        private const int SharpKeepLimit = 16;
+
         private readonly OmsiTileFetcher tileFetcher = new OmsiTileFetcher(OmsiTileFetcher.DefaultCacheRoot);
+
+        // The compressed full pictures of tiles, on this computer and below a limit, not in the project (ADR 062).
+        private readonly OmsiSharpStore sharpStore = new OmsiSharpStore(OmsiSharpStore.DefaultRoot, OmsiSharpStore.DefaultCapBytes);
         private readonly ConcurrentQueue<Action> aerialMainThread = new ConcurrentQueue<Action>();
         private readonly Queue<OmsiTileSummary> storedImagery = new Queue<OmsiTileSummary>();
         private readonly Dictionary<long, string> imagerySources = new Dictionary<long, string>();
@@ -52,10 +61,29 @@ namespace OmsiMapEditor.UI
         {
             ReadImageryPreferences();
             tileFetcher.Keys = name => imageryPreferences.Key(name);
+            // A folder over its limit (the limit was lowered, or it was filled by another run) is brought down in the background.
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (sharpStore.TotalBytes() > sharpStore.CapBytes)
+                        sharpStore.Prune();
+                }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("The compressed pictures could not be trimmed: " + exception.Message);
+                }
+            });
             satelliteWindow = new SatelliteWindow();
             satelliteWindow.style.display = DisplayStyle.None;
             workspaceElement?.Add(satelliteWindow);
-            satelliteWindow.Closed += () => HidePopup(satelliteWindow);
+            satelliteWindow.Closed += () =>
+            {
+                HidePopup(satelliteWindow);
+                EndPlacementPick();
+                UpdatePlacementMarks();
+            };
+            InitializePlacement();
             satelliteWindow.SearchRequested += SearchPlace;
             satelliteWindow.PlaceChosen += place =>
             {
@@ -117,6 +145,19 @@ namespace OmsiMapEditor.UI
                     return;
                 geoSettings.PictureSize = size;
                 SaveGeo();
+            };
+            satelliteWindow.ClearSharpRequested += () =>
+            {
+                try
+                {
+                    sharpStore.Clear();
+                }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("The compressed pictures could not all be deleted: " + exception.Message);
+                }
+                satelliteWindow.ShowSharpUsage(sharpStore.TotalBytes(), sharpStore.CapBytes);
+                SetStatus("The compressed pictures for fast zooming are deleted; they are made again when a tile comes near the view.");
             };
             satelliteWindow.EdgesFitRequested += FitSteppedEdges;
             satelliteWindow.EdgesLeft += () =>
@@ -221,7 +262,14 @@ namespace OmsiMapEditor.UI
             }
             geoSettings = geoSettings ?? session.ReadGeoSettings();
             satelliteWindow.style.display = DisplayStyle.Flex;
+            // The first time for a map: the Place tab while it has no place, the Pictures tab once it has one. Later the tab stays as it was left.
+            if (!satelliteTabChosen)
+            {
+                satelliteTabChosen = true;
+                satelliteWindow.ShowTab(currentSummary.UsesWorldCoordinates || geoSettings.Anchor != null ? 1 : 0);
+            }
             ShowImagerySources();
+            satelliteWindow.ShowSharpUsage(sharpStore.TotalBytes(), sharpStore.CapBytes);
             satelliteWindow.WorldMap.SetSource(tileFetcher, OmsiImagerySource.Imagery[0]);
             satelliteWindow.ShowAttribution(OmsiImagerySource.Imagery[0].Attribution + "  ·  Search © OpenStreetMap contributors");
             ShowGeo();
@@ -254,12 +302,14 @@ namespace OmsiMapEditor.UI
             if (geo != null)
             {
                 var size = currentSummary.TileSizeMeters;
+                // The tile the reference point lies in is outlined orange; before the map is placed, the middle one.
+                var anchor = world ? null : geoSettings.Anchor;
                 var middle = MiddleTile();
                 foreach (var tile in currentSummary.Tiles)
                 {
                     if (!tile.IsAvailable)
                         continue;
-                    if (tile == middle)
+                    if (anchor != null ? tile.X == anchor.TileX && tile.Y == anchor.TileY : tile == middle)
                         map.AnchorOutline = map.Outlines.Count;
                     map.Outlines.Add(new[]
                     {
@@ -269,6 +319,8 @@ namespace OmsiMapEditor.UI
                 }
             }
             map.RefreshOutlines();
+            RefreshImageryPlacements();
+            UpdatePlacementMarks();
         }
 
         private OmsiGeoreference Georeference()
@@ -317,16 +369,17 @@ namespace OmsiMapEditor.UI
             if (middle == null)
                 return;
             var position = OmsiGeoreference.LatLonOfMercator(mercator.X, mercator.Y);
-            geoSettings.Anchor = new OmsiGeoAnchor
+            // A map placed before keeps its reference point, turn and scale; only the place on the Earth changes.
+            var anchor = geoSettings.Anchor;
+            if (anchor == null)
+                geoSettings.Anchor = new OmsiGeoAnchor { TileX = middle.X, TileY = middle.Y, Latitude = position.Latitude, Longitude = position.Longitude };
+            else
             {
-                TileX = middle.X, TileY = middle.Y, Latitude = position.Latitude, Longitude = position.Longitude,
-                RotationDegrees = geoSettings.Anchor?.RotationDegrees ?? 0.0
-            };
-            SaveGeo();
-            ShowGeo();
-            SetStatus("The map lies at " + position.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°, " +
-                      position.Longitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°." +
-                      (groundRenderer != null && groundRenderer.ImageryTileCount > 0 ? " Pictures loaded before show the old place: load them again." : string.Empty));
+                anchor.Latitude = position.Latitude;
+                anchor.Longitude = position.Longitude;
+            }
+            PlacementChanged("The map lies at " + position.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°, " +
+                             position.Longitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°.");
         }
 
         private void SaveGeo()
@@ -452,7 +505,7 @@ namespace OmsiMapEditor.UI
             job.ImageReady = (tile, picture, meta) =>
             {
                 // Made smaller and written as JPEG here, off the main thread.
-                var prepared = PreparePicture(picture);
+                var prepared = PreparePicture(picture, sharpStore.HasRoom);
                 aerialMainThread.Enqueue(() =>
                 {
                     if (generation != aerialGeneration)
@@ -581,6 +634,13 @@ namespace OmsiMapEditor.UI
             public byte[] ViewJpeg;
             public bool Larger;
 
+            // The full picture compressed for the card with its mip levels, made here off the main thread (ADR 062); null when the
+            // picture is not larger than its copy for the view.
+            public byte[] SharpData;
+            public int SharpWidth;
+            public int SharpHeight;
+            public int SharpMips;
+
             // The full picture's rows, kept only when it has to be written as JPEG on the main thread.
             public byte[] FullRows;
             public int FullWidth;
@@ -599,13 +659,20 @@ namespace OmsiMapEditor.UI
             return rows;
         }
 
-        private static PreparedPicture PreparePicture(OmsiRgbImage picture)
+        private static PreparedPicture PreparePicture(OmsiRgbImage picture, Func<long, bool> hasRoom)
         {
             if (picture == null)
                 return null;
             var view = picture.Reduced(ImageryPictureSize);
             var prepared = new PreparedPicture { ViewRows = BottomUp(view), ViewWidth = view.Width, ViewHeight = view.Height, Larger = view != picture };
             var fullRows = prepared.Larger ? BottomUp(picture) : prepared.ViewRows;
+            // While the folder for them has room: what Unity would otherwise compress on the main thread when the tile first comes close.
+            if (prepared.Larger && hasRoom(OmsiDxt.TotalSize(picture.Width, picture.Height, OmsiDxt.MipCount(picture.Width, picture.Height))))
+            {
+                prepared.SharpData = OmsiDxt.EncodeWithMips(fullRows, picture.Width, picture.Height, out prepared.SharpMips);
+                prepared.SharpWidth = picture.Width;
+                prepared.SharpHeight = picture.Height;
+            }
             try
             {
                 prepared.FullJpeg = ImageConversion.EncodeArrayToJPG(fullRows, GraphicsFormat.R8G8B8_SRGB, (uint)picture.Width, (uint)picture.Height, 0, 90);
@@ -652,6 +719,11 @@ namespace OmsiMapEditor.UI
                         prepared.ViewJpeg = EncodeJpeg(prepared.ViewRows, prepared.ViewWidth, prepared.ViewHeight);
                 }
                 session.SaveImagery(tile, prepared.FullJpeg, meta, prepared.Larger ? prepared.ViewJpeg : null);
+                // Beside the picture, so its full size is ready for the graphics card as soon as the tile comes near the view.
+                var stamp = prepared.SharpData == null ? null : session.ImageryFileStamp(tile);
+                if (stamp != null)
+                    sharpStore.Write(SharpFile(tile), OmsiSharpCache.Write(prepared.SharpWidth, prepared.SharpHeight, prepared.SharpMips, OmsiDxt.Dxt1Format, stamp, prepared.SharpData));
+                prepared.SharpData = null;
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException)
             {
@@ -825,9 +897,24 @@ namespace OmsiMapEditor.UI
             wanted.Sort((a, b) => a.Key.CompareTo(b.Key));
             if (wanted.Count > SharpTileLimit)
                 wanted.RemoveRange(SharpTileLimit, wanted.Count - SharpTileLimit);
+            // A full picture whose tile left the view stays while there is room, the farthest going first; zoomed out, all go.
+            var leftView = new List<KeyValuePair<double, KeyValuePair<int, int>>>();
             foreach (var sharp in groundRenderer.SharpTiles())
-                if (!wanted.Exists(pair => pair.Value.X == sharp.Key && pair.Value.Y == sharp.Value))
+            {
+                if (wanted.Exists(pair => pair.Value.X == sharp.Key && pair.Value.Y == sharp.Value))
+                    continue;
+                if (wanted.Count == 0)
+                {
                     groundRenderer.SetSharpImagery(sharp.Key, sharp.Value, null);
+                    continue;
+                }
+                var dx = (sharp.Key + 0.5) * tileSize - centreX;
+                var dy = (sharp.Value + 0.5) * tileSize - centreY;
+                leftView.Add(new KeyValuePair<double, KeyValuePair<int, int>>(Math.Sqrt(dx * dx + dy * dy), sharp));
+            }
+            leftView.Sort((a, b) => a.Key.CompareTo(b.Key));
+            for (var index = Math.Max(0, SharpKeepLimit - wanted.Count); index < leftView.Count; index++)
+                groundRenderer.SetSharpImagery(leftView[index].Value.Key, leftView[index].Value.Value, null);
             var next = wanted.Find(pair => !groundRenderer.HasSharpImagery(pair.Value.X, pair.Value.Y) &&
                                            !ownSharpCutting.Contains(((long)pair.Value.X << 32) | (uint)pair.Value.Y)).Value;
             if (next == null)
@@ -837,7 +924,17 @@ namespace OmsiMapEditor.UI
                 CutSharpOwnPiece(next);
                 return;
             }
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var stamp = session.ImageryFileStamp(next);
+            var cached = stamp == null ? null : SharpTextureFromCache(next, stamp);
+            if (cached != null)
+            {
+                groundRenderer.SetSharpImagery(next.X, next.Y, cached);
+                LogSlowSharp(next, watch.Elapsed.TotalMilliseconds, "from the kept copy");
+                return;
+            }
             var bytes = session.ReadImagery(next, out _);
+            var readMs = watch.Elapsed.TotalMilliseconds;
             var texture = new Texture2D(2, 2, TextureFormat.RGB24, true)
             {
                 wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = "Sharp imagery " + next.X + ", " + next.Y
@@ -847,9 +944,81 @@ namespace OmsiMapEditor.UI
                 Destroy(texture);
                 return;
             }
+            var decodedMs = watch.Elapsed.TotalMilliseconds;
             texture.Compress(false);
+            var compressedMs = watch.Elapsed.TotalMilliseconds;
+            // The compressed picture is kept in the project: the next time this tile is near the view it takes milliseconds, not half a second.
+            if (stamp != null)
+            {
+                try
+                {
+                    sharpStore.Write(SharpFile(next), OmsiSharpCache.Write(texture.width, texture.height, texture.mipmapCount, (int)texture.format, stamp, texture.GetRawTextureData()));
+                }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning("The compressed picture of tile " + next.X + ", " + next.Y + " could not be kept: " + exception.Message);
+                }
+            }
+            var keptMs = watch.Elapsed.TotalMilliseconds;
             texture.Apply(false, true);
             groundRenderer.SetSharpImagery(next.X, next.Y, texture);
+            LogSlowSharp(next, watch.Elapsed.TotalMilliseconds, "read " + readMs.ToString("0") + ", decode " + (decodedMs - readMs).ToString("0") + ", compress " +
+                                                                (compressedMs - decodedMs).ToString("0") + ", keep " + (keptMs - compressedMs).ToString("0") + ", upload " +
+                                                                (watch.Elapsed.TotalMilliseconds - keptMs).ToString("0") + " ms");
+        }
+
+        /// <summary>Where a tile's compressed full picture is kept: the cache folder, under a name of this project.</summary>
+        private string SharpFile(OmsiTileSummary tile)
+        {
+            return sharpStore.FileFor(OmsiSharpStore.ProjectKey(session.Workspace.WorkspacePath), tile.FileName);
+        }
+
+        /// <summary>The full picture of a tile from its kept compressed copy, or null when there is none or it is out of date.</summary>
+        private Texture2D SharpTextureFromCache(OmsiTileSummary tile, string stamp)
+        {
+            byte[] bytes;
+            try
+            {
+                bytes = sharpStore.Read(SharpFile(tile));
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                Debug.LogWarning("The compressed picture of tile " + tile.X + ", " + tile.Y + " could not be read: " + exception.Message);
+                return null;
+            }
+            if (!OmsiSharpCache.TryRead(bytes, stamp, out var width, out var height, out var mips, out var format, out var offset, out var length))
+                return null;
+            var texture = new Texture2D(width, height, (TextureFormat)format, mips > 1)
+            {
+                wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, name = "Sharp imagery " + tile.X + ", " + tile.Y
+            };
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(bytes, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                if (texture.mipmapCount != mips)
+                    throw new UnityException("The kept copy has " + mips + " levels, the texture " + texture.mipmapCount + ".");
+                texture.LoadRawTextureData(handle.AddrOfPinnedObject() + offset, length);
+            }
+            catch (UnityException exception)
+            {
+                // Not usable here (another format, a cut file): the picture is made from its JPEG again.
+                Debug.LogWarning("The compressed picture of tile " + tile.X + ", " + tile.Y + " was not used: " + exception.Message);
+                Destroy(texture);
+                return null;
+            }
+            finally
+            {
+                handle.Free();
+            }
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        /// <summary>Like the vector layer, says when a step held up a frame: reading, decoding, compressing and uploading run on the main thread.</summary>
+        private static void LogSlowSharp(OmsiTileSummary tile, double milliseconds, string detail)
+        {
+            if (milliseconds > 50.0)
+                Debug.Log("Sharp imagery " + tile.X + ", " + tile.Y + " took " + milliseconds.ToString("0") + " ms: " + detail + ".");
         }
 
         private void LayPicture(OmsiTileSummary tile, Texture2D texture, OmsiImageryMeta meta)
@@ -864,6 +1033,12 @@ namespace OmsiMapEditor.UI
             texture.Apply(false, true);
             groundRenderer.SetImagery(tile.X, tile.Y, texture);
             imagerySources[MapTileKey(tile)] = meta?.Source;
+            if (meta?.Stamp != null)
+                imageryStamps[MapTileKey(tile)] = meta.Stamp;
+            else
+                imageryStamps.Remove(MapTileKey(tile));
+            // A picture cut for another place of the map is laid where its ground belongs now.
+            RefreshImageryPlacement(tile.X, tile.Y);
             UpdateImageryAttribution();
         }
 
@@ -1006,6 +1181,7 @@ namespace OmsiMapEditor.UI
                     {
                         groundRenderer?.SetImagery((int)(key >> 32), (int)(key & 0xffffffffL), null);
                         imagerySources.Remove(key);
+                        imageryStamps.Remove(key);
                     }
                 UpdateImageryAttribution();
                 if (satelliteWindow != null && IsShown(satelliteWindow))
@@ -1013,6 +1189,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             aerialMapKey = mapKey;
+            satelliteTabChosen = false;
             autoTiles.Clear();
             steppedEdges = new List<OmsiTerrainEdge>();
             satelliteWindow?.ShowSteppedEdges(0);
@@ -1022,8 +1199,20 @@ namespace OmsiMapEditor.UI
             aerialTask = null;
             storedImagery.Clear();
             imagerySources.Clear();
+            imageryStamps.Clear();
+            for (var index = 0; index < fitPoints.Length; index++)
+                fitPoints[index] = null;
             groundRenderer?.ClearImagery();
             geoSettings = session?.Workspace != null ? session.ReadGeoSettings() : null;
+            // Compressed pictures that an earlier version kept in the project go; they are kept in the cache folder now.
+            try
+            {
+                session?.RemoveLegacySharpCopies();
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                Debug.LogWarning("Old compressed pictures could not be taken out of the project: " + exception.Message);
+            }
             if (groundRenderer != null)
             {
                 groundRenderer.ImageryVisible = geoSettings?.ShowImagery ?? true;
@@ -1118,7 +1307,8 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// -satellite opens the window; -satelliteSearch &lt;text&gt; finds a place; -satellitePlace &lt;latitude&gt; &lt;longitude&gt;
-        /// [rotation] lays the map's middle there; -satelliteSource &lt;name&gt; chooses a source; -satelliteTile &lt;x&gt; &lt;y&gt; selects
+        /// [rotation] lays the map's middle there (-satelliteRef, -satelliteAt, -satelliteScale, -satelliteMove and -satelliteFit
+        /// place it exactly, see <see cref="ApplyPlacementArguments"/>); -satelliteSource &lt;name&gt; chooses a source; -satelliteTile &lt;x&gt; &lt;y&gt; selects
         /// a tile; -satelliteLoad all|tile|heights [-satelliteHeights] loads and waits for the end; -satelliteFitEdges fits the
         /// edges beside loaded heights; -satelliteSize 0|1024|2048|4096 sets the picture size; -satelliteOpacity &lt;0..1&gt;.
         /// Statuses go to the log as "Satellite:".
@@ -1182,12 +1372,17 @@ namespace OmsiMapEditor.UI
             if (double.TryParse(Argument("-satellitePlace", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var latitude) &&
                 double.TryParse(Argument("-satellitePlace", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var longitude))
             {
-                if (double.TryParse(Argument("-satellitePlace", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var rotation) && geoSettings != null)
-                    geoSettings.Anchor = new OmsiGeoAnchor { RotationDegrees = rotation };
                 PlaceMapAt(OmsiGeoreference.MercatorOf(latitude, longitude));
+                if (double.TryParse(Argument("-satellitePlace", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var rotation) && geoSettings?.Anchor != null)
+                {
+                    geoSettings.Anchor.RotationDegrees = rotation;
+                    SaveGeo();
+                    ShowGeo();
+                }
                 OpenSatelliteWindow();
                 LogSatellite();
             }
+            ApplyPlacementArguments(args);
             if (int.TryParse(Argument("-satelliteSize", 1), out var pictureSize) && geoSettings != null)
             {
                 geoSettings.PictureSize = pictureSize;

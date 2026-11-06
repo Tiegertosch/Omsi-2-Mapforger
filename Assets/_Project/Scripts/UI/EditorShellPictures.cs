@@ -372,6 +372,7 @@ namespace OmsiMapEditor.UI
             ownPictureTiles.Add(key);
             // The pictures' terms are the user's own: no attribution line for them.
             imagerySources.Remove(key);
+            imageryStamps.Remove(key);
             UpdateImageryAttribution();
         }
 
