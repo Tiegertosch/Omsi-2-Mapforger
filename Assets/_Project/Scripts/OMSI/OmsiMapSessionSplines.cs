@@ -94,7 +94,13 @@ namespace OmsiMapEditor.OMSI
         ChainOffsets,
 
         /// <summary>The [rule] records of splines' paths changed, such as speed limits or a lane kept for buses.</summary>
-        Rules
+        Rules,
+
+        /// <summary>Splines got another profile in an edited chrono variant: a [typ] command (ADR 065).</summary>
+        Retype,
+
+        /// <summary>A spline was taken away in an edited chrono variant: a [delete] command, the neighbours untouched (ADR 065).</summary>
+        VariantDeletion
     }
 
     /// <summary>A spline whose stored chain offset is not where its chain puts it.</summary>
@@ -139,6 +145,24 @@ namespace OmsiMapEditor.OMSI
         /// the base map's tile again (ADR 064). Empty for other changes.
         /// </summary>
         internal List<OmsiSplineSwap> Swaps { get; } = new List<OmsiSplineSwap>();
+
+        /// <summary>Spline and row lists of tiles from which a spline was taken in an edited variant, for undo and redo.</summary>
+        internal List<OmsiSplineListSwap> ListSwaps { get; } = new List<OmsiSplineListSwap>();
+
+        /// <summary>
+        /// True for a change made in an edited chrono variant: undo and redo then swap the records in the tiles and do not read the
+        /// base map's tile again or fit the terrain.
+        /// </summary>
+        internal bool InVariant { get; set; }
+
+        /// <summary>For a deletion in a variant: how many rows of objects along the spline went with it.</summary>
+        public int RemovedRowCount { get; internal set; }
+
+        /// <summary>For a deletion in a variant: what else names the spline, such as timetables and later variants' selections.</summary>
+        public List<OmsiReference> References { get; } = new List<OmsiReference>();
+
+        /// <summary>Things to tell the user after the change, such as rules that name paths of the old profile.</summary>
+        public List<string> Notes { get; } = new List<string>();
     }
 
     /// <summary>Outcome of deleting a spline: the change, or the references that prevented it.</summary>
@@ -771,11 +795,12 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
                 throw new InvalidOperationException("The change has already been undone.");
-            if (change.Swaps.Count > 0)
+            if (change.InVariant)
             {
                 ApplyFiles(change.Files, true);
                 change.IsApplied = false;
                 SwapSplines(change, false);
+                ApplySplineLists(summary, change, false);
                 return;
             }
             WriteFiles(change.Files, true);
@@ -791,11 +816,12 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
                 throw new InvalidOperationException("The change is already applied.");
-            if (change.Swaps.Count > 0)
+            if (change.InVariant)
             {
                 ApplyFiles(change.Files, false);
                 change.IsApplied = true;
                 SwapSplines(change, true);
+                ApplySplineLists(summary, change, true);
                 return;
             }
             WriteFiles(change.Files, false);

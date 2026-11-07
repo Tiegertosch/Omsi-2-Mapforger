@@ -82,6 +82,7 @@ namespace OmsiMapEditor.UI
             var optionsTitle = new Label("Options");
             optionsTitle.AddToClassList("picker-options-title");
             options.Add(optionsTitle);
+            optionsColumn = options;
 
             // How the road runs to the click (ADR 043), as the building modes of Cities: Skylines.
             var shapes = new VisualElement();
@@ -241,6 +242,7 @@ namespace OmsiMapEditor.UI
             {
                 tooltip = "Opens the road builder: put lanes together into a road type of your own (ADR 049)"
             };
+            newTypeButton = newType;
             newType.AddToClassList("map-control-button");
             newType.AddToClassList("road-picker-new");
             newType.Add(new IconElement("plus"));
@@ -295,8 +297,71 @@ namespace OmsiMapEditor.UI
             schedule.Execute(TakePreviews).Every(100);
         }
 
-        /// <summary>The panel wants to close the road tool.</summary>
+        /// <summary>The panel wants to close the road tool, or to end choosing a profile.</summary>
         public event Action CloseRequested;
+
+        private VisualElement optionsColumn;
+        private Button newTypeButton;
+        private string pickedTitle;
+        private string pickedHint;
+
+        /// <summary>A click on a profile while the panel only chooses one (<see cref="BeginPick"/>): its path, relative to the installation.</summary>
+        public event Action<string> ProfilePicked;
+
+        /// <summary>True while the panel chooses a profile for something else, such as a spline of a chrono variant, and not for the road tool.</summary>
+        public bool Picking { get; private set; }
+
+        /// <summary>
+        /// Lets a click on a profile choose it for something else: the road tool's options are hidden, the road tool's own
+        /// profile stays as it is, and <see cref="ProfilePicked"/> carries the click.
+        /// </summary>
+        public void BeginPick(string title, string hint)
+        {
+            if (!Picking)
+            {
+                pickedTitle = profileLabel.text;
+                pickedHint = planLabel.text;
+            }
+            Picking = true;
+            optionsColumn.style.display = DisplayStyle.None;
+            newTypeButton.style.display = DisplayStyle.None;
+            profileLabel.text = title;
+            planLabel.text = hint;
+            planLabel.tooltip = hint;
+            planLabel.RemoveFromClassList("panel-info-warning");
+        }
+
+        private static readonly string[] BaseMapOnlyOptions = { "Corner radius (m)", "Parallel", "Distance (m)", "Opposite way", "Fit terrain", "Make junctions" };
+
+        /// <summary>
+        /// Greys the options that only the base map has while the road tool builds in a chrono variant, where a road stands alone:
+        /// rounded corners, parallel roads, fitting the terrain and junctions (ADR 066).
+        /// </summary>
+        public void SetStandalone(bool standalone)
+        {
+            foreach (var row in optionsColumn.Children())
+            {
+                var label = row.Q<Label>();
+                if (label != null && Array.IndexOf(BaseMapOnlyOptions, label.text) >= 0)
+                {
+                    row.SetEnabled(!standalone);
+                    row.tooltip = standalone ? "A road in a chrono variant stands alone: this applies to the base map only" : string.Empty;
+                }
+            }
+        }
+
+        /// <summary>Ends choosing a profile for something else; the road tool's options and title come back.</summary>
+        public void EndPick()
+        {
+            if (!Picking)
+                return;
+            Picking = false;
+            optionsColumn.style.display = DisplayStyle.Flex;
+            newTypeButton.style.display = DisplayStyle.Flex;
+            profileLabel.text = pickedTitle;
+            planLabel.text = pickedHint;
+            planLabel.tooltip = pickedHint;
+        }
 
         /// <summary>New road type... was clicked: the road builder should open.</summary>
         public event Action NewRoadTypeRequested;
@@ -699,6 +764,11 @@ namespace OmsiMapEditor.UI
             {
                 if (evt.target is VisualElement target && (target == star || star.Contains(target) || edit != null && (target == edit || edit.Contains(target))))
                     return;
+                if (Picking)
+                {
+                    ProfilePicked?.Invoke(path);
+                    return;
+                }
                 SetProfile(path);
             });
             tileByPath[path] = tile;

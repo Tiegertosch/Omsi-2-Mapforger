@@ -431,7 +431,14 @@ namespace OmsiMapEditor.UI
                 objectsPanelHost.Add(objectsPanel);
                 roadPanel = new RoadToolPanel();
                 roadPanel.style.display = DisplayStyle.None;
-                roadPanel.CloseRequested += () => SetTool(EditorTool.Drag);
+                roadPanel.CloseRequested += () =>
+                {
+                    if (PickingSplineType)
+                        EndSplineTypePick(null);
+                    else
+                        SetTool(EditorTool.Drag);
+                };
+                roadPanel.ProfilePicked += path => EndSplineTypePick(path);
                 roadPanel.SettingsChanged += UpdateRoadPreview;
                 // Another mode starts the next part anew; a control point belongs to Curved.
                 roadPanel.ShapeChanged += () => roadControl = null;
@@ -1377,6 +1384,14 @@ namespace OmsiMapEditor.UI
                     SetSplineHeights(startHeight, endHeight);
             }
 
+            // -splineType, -splinePick, -splineDelete, -splineUndo and -splineRedo work on the spline chosen above in a variant being edited (ADR 065).
+            if (EditingVariant && (Array.IndexOf(args, "-splineType") >= 0 || Array.IndexOf(args, "-splinePick") >= 0 || Array.IndexOf(args, "-splineDelete") >= 0 ||
+                                   Array.IndexOf(args, "-splineUndo") >= 0 || Array.IndexOf(args, "-splineRedo") >= 0))
+                RunSplineVariantArguments(args);
+            // -linesOff A|B|C makes the variant being edited switch off these lines, "-" none (ADR 067).
+            if (EditingVariant && Array.IndexOf(args, "-linesOff") >= 0)
+                RunLinesArgument(args);
+
             if (int.TryParse(Argument("-moveSplineEnd", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var moveId) &&
                 int.TryParse(Argument("-moveSplineEnd", 3), out var moveTileX) && int.TryParse(Argument("-moveSplineEnd", 4), out var moveTileY) &&
                 double.TryParse(Argument("-moveSplineEnd", 5), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveX) &&
@@ -1837,7 +1852,8 @@ namespace OmsiMapEditor.UI
                 mapCanvas.AllowSplineEditing = CanEdit;
                 // A map without a project or a chrono view can only be looked at; selecting is the only tool then. A
                 // variant being edited keeps the object tools.
-                if (!CanEditObjects || !CanEdit && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate && activeTool != EditorTool.Priorities)
+                if (!CanEditObjects || !CanEdit && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate && activeTool != EditorTool.Priorities &&
+                    activeTool != EditorTool.Road)
                     activeTool = EditorTool.Drag;
                 mapCanvas.Tool = activeTool;
                 mapCanvas.SetMap(summary, keepView);
@@ -1871,7 +1887,7 @@ namespace OmsiMapEditor.UI
             if (session != null && session.CanEdit && (chronoDate == null || EditingVariant) && ReadingMapInBackground)
                 return "The map is being read for the map check or a chrono date; " + action + " again in a moment.";
             if (EditingVariant)
-                return "The chrono variant " + editedVariant.Title + " is being edited; it takes objects, their types and labels, and traffic rules and the right of way only. Choose Base map in the project browser to " +
+                return "The chrono variant " + editedVariant.Title + " is being edited; it takes objects, their types and labels, traffic rules and the right of way, the road types, new roads and deletion of splines, and the lines it switches off only. Choose Base map in the project browser to " +
                        action + ".";
             return chronoDate != null
                 ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
@@ -1971,6 +1987,9 @@ namespace OmsiMapEditor.UI
         {
             if (editedVariant == null)
                 return;
+            // A road type being chosen for a spline of the variant ends with it.
+            EndSplineTypePick(null);
+            lineCandidates = null;
             editedVariant = null;
             session?.EditChronoVariant(null, null);
             undoSteps.Clear();
@@ -2278,6 +2297,11 @@ namespace OmsiMapEditor.UI
         {
             if (selectedSpline == null || selectedSplineTile == null)
                 return;
+            if (EditingVariant)
+            {
+                DeleteSelectedSplineInVariant();
+                return;
+            }
             if (!CanEdit)
             {
                 SetStatus(ReadOnlyMessage("delete splines"));
@@ -2829,6 +2853,7 @@ namespace OmsiMapEditor.UI
                 return;
             StartInstallationScan();
             UpdateRoadProfiles();
+            roadPanel.SetStandalone(EditingVariant);
             roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
             objectsPanel.style.display = DisplayStyle.None;
             roadPanel.style.display = DisplayStyle.Flex;
@@ -2837,8 +2862,11 @@ namespace OmsiMapEditor.UI
             mapCanvas.BeginRoad();
             roadPorts = null;
             UpdateRoadPorts();
-            SetStatus("Road: click to start a road, on a free spline end to continue it or on a free connection point of a junction; " +
-                      "click again for each bend, Esc ends the road.");
+            SetStatus(EditingVariant
+                ? "Road in " + editedVariant.Title + ": click to start a road, on a free spline end to meet it; click again for each bend, Esc ends the road. " +
+                  "It stands alone: no junction, parallel road or terrain fitting."
+                : "Road: click to start a road, on a free spline end to continue it or on a free connection point of a junction; " +
+                  "click again for each bend, Esc ends the road.");
         }
 
         private void EndRoadTool()
@@ -3144,7 +3172,8 @@ namespace OmsiMapEditor.UI
             var shape = roadPanel.Shape == OmsiRoadShape.Straight ? OmsiRoadShape.Straight : fromStart ? roadPanel.Shape : OmsiRoadShape.Free;
             var control = fromStart && shape == OmsiRoadShape.Curved ? roadControl : null;
             // A Straight road rounds the corner where it turns off a straight road built here, which is cut back for it.
-            var cornerSpline = fromStart && roundCorners && shape == OmsiRoadShape.Straight && roadStartJoin != null &&
+            // In a chrono variant a road stands alone, so no corner is rounded: that would cut the road before back (ADR 066).
+            var cornerSpline = fromStart && roundCorners && !EditingVariant && shape == OmsiRoadShape.Straight && roadStartJoin != null &&
                                roadStartJoin.Spline.RadiusMeters == 0.0 && session.IsBuiltHere(roadStartJoin.Spline)
                 ? roadStartJoin.Spline
                 : null;
@@ -3965,7 +3994,7 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null || roadPanel == null)
                 return;
-            if (!CanEdit)
+            if (!CanEdit && !CanEditSplinesInVariant)
             {
                 SetStatus(ReadOnlyMessage("build roads"));
                 return;
@@ -4018,6 +4047,12 @@ namespace OmsiMapEditor.UI
             if (plan.HasErrors)
             {
                 SetStatus("This road cannot be built: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                return;
+            }
+            // In a variant the road stands alone: no junction objects, corners, parallel roads or terrain fitting (ADR 066).
+            if (EditingVariant)
+            {
+                BuildRoadInVariant(plan, endJoin, endPort);
                 return;
             }
             FindJunction(plan, end, endJoin, endPort, out var tee, out var crossings);
@@ -5653,6 +5688,12 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
+            if (evt.keyCode == KeyCode.Escape && PickingSplineType && !(evt.ctrlKey || evt.commandKey))
+            {
+                EndSplineTypePick(null);
+                evt.StopPropagation();
+                return;
+            }
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
@@ -6819,7 +6860,7 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null)
                 return;
-            var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate || tool == EditorTool.Priorities;
+            var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate || tool == EditorTool.Priorities || tool == EditorTool.Road;
             if (tool != EditorTool.Drag && !(objectTool ? CanEditObjects : CanEdit))
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"
@@ -6828,6 +6869,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             // Another tool ends placing and closes the object library.
+            EndSplineTypePick(null);
             ShowObjectsPanel(false);
             var wasRoad = activeTool == EditorTool.Road;
             var wasRows = activeTool == EditorTool.Rows;
@@ -7671,6 +7713,8 @@ namespace OmsiMapEditor.UI
                 list.Add(line);
             }
             section.Add(list);
+            if (EditingVariant)
+                section.Add(VariantLinesEditor());
             if (canEditVariants)
                 section.Add(NewVariantForm());
             return section;
@@ -8260,6 +8304,8 @@ namespace OmsiMapEditor.UI
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);
             }
+            else if (CanEditSplinesInVariant)
+                AddSplineVariantButtons(editor);
             container.Add(editor);
         }
 

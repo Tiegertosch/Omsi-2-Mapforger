@@ -135,6 +135,7 @@ namespace OmsiMapEditor.OMSI
             }
             if (change.Files.Count == 0)
                 return null;
+            change.InVariant = true;
             ApplyFiles(change.Files, false);
             SwapSplines(change, true);
             foreach (var state in change.Files)

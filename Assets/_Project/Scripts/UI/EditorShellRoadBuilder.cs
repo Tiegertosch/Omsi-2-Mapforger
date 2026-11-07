@@ -107,7 +107,10 @@ namespace OmsiMapEditor.UI
             if (touched.Count == 0 || currentSummary == null)
                 return;
             var failed = new List<string>();
-            var changes = RelayRows(touched, null, null, failed, out var objects);
+            // A road in a chrono variant gets no rows: they would go into the base map's tile files. Its bus lanes keep their rules,
+            // written into the variant's change list (ADR 066).
+            var objects = 0;
+            var changes = EditingVariant ? new List<OmsiAttachmentChange>() : RelayRows(touched, null, null, failed, out objects);
             var busRules = KeepBusLanes(touched, null, null);
             if (changes.Count > 0 || busRules != null)
             {

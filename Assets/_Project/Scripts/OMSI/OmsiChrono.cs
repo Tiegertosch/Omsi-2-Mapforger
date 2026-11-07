@@ -86,6 +86,9 @@ namespace OmsiMapEditor.OMSI
 
         public int KilledRules { get; internal set; }
 
+        /// <summary>IDs of splines a variant deleted; the splines next to them have a free end there.</summary>
+        internal HashSet<int> DeletedSplineIds { get; } = new HashSet<int>();
+
         /// <summary>The overlay's own copies of base map records, which a later command may change in place.</summary>
         internal HashSet<object> Copies { get; } = new HashSet<object>();
 
@@ -244,7 +247,7 @@ namespace OmsiMapEditor.OMSI
                     // A change list undone in a project may still be listed.
                     if (!tilesByFile.TryGetValue(Path.GetFileName(file), out var tile) || !source.FileExists(file))
                         continue;
-                    ApplyChanges(source, file, tile, splineSlots[tile], report);
+                    // As openOMSI's apply_chrono: the change list's own elements first, then its selections, which may name them.
                     var added = OmsiMapReader.ReadAddedElements(source, file, tile);
                     var origin = new OmsiChronoOrigin(variant, file);
                     foreach (var item in added.Objects)
@@ -262,8 +265,25 @@ namespace OmsiMapEditor.OMSI
                     tile.SplineAttachments.AddRange(added.SplineAttachments);
                     report.AddedObjects += added.Objects.Count + added.AttachedObjects.Count;
                     report.AddedSplines += added.Splines.Count;
+                    ApplyChanges(source, file, tile, splineSlots[tile], report);
                 }
             }
+
+            // The splines next to a deleted one keep its ID in the files, as in the stock variants, and openOMSI skips deleted
+            // splines when it looks them up: the end is free. The overlay says so, so a road can be joined there.
+            if (report.DeletedSplineIds.Count > 0)
+                foreach (var tile in map.Tiles)
+                    for (var index = 0; index < tile.Splines.Count; index++)
+                    {
+                        var next = tile.Splines[index];
+                        if (!report.DeletedSplineIds.Contains(next.PreviousId) && !report.DeletedSplineIds.Contains(next.NextId))
+                            continue;
+                        var writable = Writable(tile, splineSlots[tile], next, report);
+                        if (report.DeletedSplineIds.Contains(writable.PreviousId))
+                            writable.PreviousId = 0;
+                        if (report.DeletedSplineIds.Contains(writable.NextId))
+                            writable.NextId = 0;
+                    }
 
             foreach (var tile in map.Tiles)
                 ResolveSplineNumbers(tile, splineSlots[tile], report);
@@ -286,7 +306,7 @@ namespace OmsiMapEditor.OMSI
             return map;
         }
 
-        /// <summary>Selections, deletions, type changes and new labels of one change list; new elements are added afterwards.</summary>
+        /// <summary>Selections, deletions, type changes, new labels and rules of one change list, applied after its own elements were added.</summary>
         private static void ApplyChanges(IOmsiFileSource source, string file, OmsiTileSummary tile, List<OmsiSplineRecord> splineSlots,
             OmsiChronoOverlayReport report)
         {
@@ -307,7 +327,11 @@ namespace OmsiMapEditor.OMSI
                         break;
                     case "delete":
                         if (Remove(tile, selected))
+                        {
                             report.DeletedElements++;
+                            if (selected is OmsiSplineRecord deletedSpline)
+                                report.DeletedSplineIds.Add(deletedSpline.Id);
+                        }
                         selected = null;
                         break;
                     case "typ":
@@ -442,7 +466,7 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        private static OmsiSplineAttachmentRecord Copy(OmsiSplineAttachmentRecord record, int splineIndex)
+        internal static OmsiSplineAttachmentRecord Copy(OmsiSplineAttachmentRecord record, int splineIndex)
         {
             return new OmsiSplineAttachmentRecord
             {
