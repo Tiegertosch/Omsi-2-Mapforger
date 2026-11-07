@@ -27,7 +27,7 @@
   "newmap.cars.tooltip": "Wie belebt die Straßen im Tagesverlauf sind, als Faktor auf die Tageskurve der Vorlage",
   "newmap.passengers": "Fahrgäste",
   "newmap.passengers.tooltip": "Wie viele Fahrgäste an den Haltestellen warten, als Faktor auf die Tageskurve der Vorlage",
-  "newmap.real_rail": "Realistischer Gleisbetrieb",
+  "newmap.real_rail": "Realer Gleisbetrieb",
   "newmap.real_rail.tooltip": "Straßenbahnen und Züge folgen den Weichen ihrer Gleise: OMSIs [realrail]",
   "newmap.section.era": "Zeit und Tarife",
   "newmap.years": "Jahre",

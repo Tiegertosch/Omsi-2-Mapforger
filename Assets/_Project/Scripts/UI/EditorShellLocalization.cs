@@ -119,6 +119,10 @@ namespace OmsiMapEditor.UI
         {
             LocBindings.Refresh(rootElement);
             RefreshStatusText();
+            if (currentSummary == null && mapStateLabel != null)
+                mapStateLabel.text = Loc.T("status.no_map");
+            else
+                UpdateMapStateLabel();
             welcomeScreen?.Refresh();
             newMapForm?.RefreshTexts();
             markingOptions?.RefreshTexts();

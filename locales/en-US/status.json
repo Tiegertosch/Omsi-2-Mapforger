@@ -83,5 +83,7 @@
   "terrain.all.failed": "The terrain could not be fitted: {reason}",
   "@terrain.all.failed": "{reason} is a message from the system, in English",
   "terrain.all.fits": "The terrain already fits all roads built here.",
-  "terrain.all.fitted": "Terrain fitted again on {count, plural, one {# tile} other {# tiles}}."
+  "terrain.all.fitted": "Terrain fitted again on {count, plural, one {# tile} other {# tiles}}.",
+  "status.ready": "Ready",
+  "status.no_map": "No map loaded"
 }

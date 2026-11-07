@@ -1,7 +1,7 @@
 {
   "name": "Editor.Tests",
   "rootNamespace": "OmsiMapEditor.Tests",
-  "references": ["Editor.Core", "Editor.OMSI", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "references": ["Editor.Core", "Editor.OMSI", "Editor.UI", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

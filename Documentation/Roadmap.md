@@ -52,8 +52,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 
 - [x] Meilenstein 1: Grundsystem in `Editor.Core` (JSON-Dateien, ICU-Teilmenge, CLDR-Pluralregeln, Fallback, Sprachwahl und Speicherung), Validator mit Werkzeug und GitHub-Workflow, Anbindung der Shell, Menüleiste als erste Texte, Tests
 - [x] Meilenstein 2: Migration aller Texte Datei für Datei (Shell, Werkzeugleiste, Panels, Dialoge, Inspector, Projektbrowser, Meldungen); Texte aus `Editor.OMSI` (Kartenprüfung u. a.) folgen später
-- [ ] Meilenstein 3: Einstellungsdialog „Settings → General → Language“, Layout für längere Texte, Deutsch und Englisch vollständig
-- [ ] Meilenstein 4: Doku für Übersetzer (`locales/README.md` steht), weitere Tests, Prüfung in den Workflows
+- [x] Meilenstein 3: Einstellungsdialog „Einstellungen > Allgemein > Sprache“, Layout für längere deutsche Texte geprüft, Deutsch und Englisch vollständig, Live-Wechsel in allen Fenstern
+- [x] Meilenstein 4: Doku für Übersetzer (`locales/README.md`), Abschlussdokument `Documentation/Internationalisierung.md`, Tests für den Wechsel in der Oberfläche, Prüfung im Build und im Workflow-Quelltext
 
 ## Später
 

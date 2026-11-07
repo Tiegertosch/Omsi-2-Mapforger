@@ -468,6 +468,9 @@ namespace OmsiMapEditor.UI
             }
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
+            SetStatusT("status.ready");
+            if (mapStateLabel != null)
+                mapStateLabel.text = Loc.T("status.no_map");
             mapTitleLabel = root.Q<Label>("map-title");
             mapHintLabel = root.Q<Label>("map-hint");
             mapControls = root.Q<VisualElement>("map-controls");

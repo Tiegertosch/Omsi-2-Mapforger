@@ -60,5 +60,7 @@
   "junction.test.created": "{path} in deiner OMSI-Installation erzeugt. Klicke auf eine Straße, um sie einzusetzen, exportiere dann die Karte und probiere sie in OMSI aus.",
   "terrain.all.failed": "Das Gelände konnte nicht angepasst werden: {reason}",
   "terrain.all.fits": "Das Gelände passt schon zu allen hier gebauten Straßen.",
-  "terrain.all.fitted": "Gelände auf {count, plural, one {# Kachel} other {# Kacheln}} neu angepasst."
+  "terrain.all.fitted": "Gelände auf {count, plural, one {# Kachel} other {# Kacheln}} neu angepasst.",
+  "status.ready": "Bereit",
+  "status.no_map": "Keine Karte geladen"
 }
