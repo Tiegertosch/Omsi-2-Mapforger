@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI.Editor;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -113,6 +114,8 @@ namespace OmsiMapEditor.Editor
                 throw new InvalidOperationException("EditorShell.uxml was not imported as a UI Toolkit resource.");
             }
 
+            CheckLanguageFiles(release);
+
             Directory.CreateDirectory(Path.GetDirectoryName(OutputPath));
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
@@ -127,9 +130,49 @@ namespace OmsiMapEditor.Editor
                 throw new InvalidOperationException("Windows player build failed: " + report.summary.result);
             }
 
+            CopyLanguageFiles();
             Debug.Log((release ? "Windows release player built: " : "Windows player built: ") + Path.GetFullPath(OutputPath));
             if (release)
                 PackRelease();
+        }
+
+        private const string LanguageSourceFolder = "locales";
+
+        /// <summary>
+        /// The language files are checked as a pull request is: a damaged or incomplete released language stops a release build and is
+        /// a warning in any other (ADR 068). Without the English reference the program would show keys instead of texts, so that
+        /// stops every build.
+        /// </summary>
+        private static void CheckLanguageFiles(bool release)
+        {
+            var report = LocaleValidator.Validate(LanguageSourceFolder);
+            foreach (var issue in report.Issues.Where(item => item.Severity == LocaleIssueSeverity.Warning))
+                Debug.LogWarning("Language files: " + issue);
+            var errors = report.Issues.Where(item => item.Severity == LocaleIssueSeverity.Error).ToList();
+            foreach (var issue in errors)
+                Debug.LogError("Language files: " + issue);
+            if (!Directory.Exists(Path.Combine(LanguageSourceFolder, TranslationManager.ReferenceLanguage)))
+                throw new InvalidOperationException("Player build blocked: the folder locales/" + TranslationManager.ReferenceLanguage + " with the English texts is missing.");
+            if (errors.Count > 0 && release)
+                throw new InvalidOperationException("Release build blocked: " + errors.Count + " error(s) in the language files; run Tools/LocaleCheck to see them.");
+        }
+
+        /// <summary>
+        /// Puts the language files into the player's StreamingAssets, next to the data every installation and update carries. They are
+        /// plain files, so a translation can be added or changed there without a build.
+        /// </summary>
+        private static void CopyLanguageFiles()
+        {
+            var playerFolder = Path.GetDirectoryName(Path.GetFullPath(OutputPath));
+            var target = Path.Combine(playerFolder, Path.GetFileNameWithoutExtension(OutputPath) + "_Data", "StreamingAssets", LanguageSourceFolder);
+            if (Directory.Exists(target))
+                Directory.Delete(target, true);
+            foreach (var file in Directory.GetFiles(LanguageSourceFolder, "*.json", SearchOption.AllDirectories))
+            {
+                var destination = Path.Combine(target, Path.GetRelativePath(LanguageSourceFolder, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination));
+                File.Copy(file, destination, true);
+            }
         }
 
         /// <summary>

@@ -1303,6 +1303,7 @@ namespace OmsiMapEditor.UI
         {
             aerialCancel?.Cancel();
             satelliteWindow?.WorldMap.Shutdown();
+            ReleaseLocalization();
         }
 
         /// <summary>

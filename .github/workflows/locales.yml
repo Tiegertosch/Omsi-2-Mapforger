@@ -1,0 +1,27 @@
+name: Language files
+
+# Checks the translations whenever they or the code that reads them change. The same check runs locally:
+#   dotnet run --project Tools/LocaleCheck -- locales
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'locales/**'
+      - 'Tools/LocaleCheck/**'
+      - 'Assets/_Project/Scripts/Core/Localization/**'
+  pull_request:
+    paths:
+      - 'locales/**'
+      - 'Tools/LocaleCheck/**'
+      - 'Assets/_Project/Scripts/Core/Localization/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check the language files
+        run: dotnet run --project Tools/LocaleCheck -- locales

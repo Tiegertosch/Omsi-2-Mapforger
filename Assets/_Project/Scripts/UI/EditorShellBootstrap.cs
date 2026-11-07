@@ -315,6 +315,8 @@ namespace OmsiMapEditor.UI
 
         private void Awake()
         {
+            // The interface language comes first: everything built after this asks it for its texts.
+            LocalizationService.Initialize(Environment.GetCommandLineArgs());
             var uiObject = new GameObject("Editor UI");
             uiObject.SetActive(false);
             var document = uiObject.AddComponent<UIDocument>();
@@ -335,6 +337,7 @@ namespace OmsiMapEditor.UI
 
             var root = document.rootVisualElement;
             rootElement = root;
+            SetUpLocalization(root);
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
             root.style.height = Length.Percent(100f);
@@ -960,6 +963,7 @@ namespace OmsiMapEditor.UI
             var mapPath = Argument("-openMap", 1);
             var projectPath = Argument("-openProject", 1);
             var quit = Array.IndexOf(args, "-quit") >= 0;
+            RunLocalizationArguments(args);
             // A session that ended without quitting asks for a bug report (ADR 053); -bugReport [crash] opens the form for a
             // check, with -bugReportTitle and -bugReportSend, which then only writes the files and logs the address.
             var crashed = BeginSession(quit);

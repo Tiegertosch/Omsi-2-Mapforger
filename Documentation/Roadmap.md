@@ -48,6 +48,13 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Markierungsmenü wie das Straßenmenü (ADR 045): Optionen links mit nur den Feldern des gewählten Elements, Bibliothek mit Reitern Lines, Areas, Arrows, Favorites und gezeichneten Vorschauen jeder Markierung
 - [x] Farben der Vektorebene an das Corporate Design anpassen: Auswahl rot, gewählte Kachel gold, Splines orange, Objekte blau, Bäume und Platzieren grün; die Farben kommen aus den Design-Tokens
 
+## Mehrsprachige Oberfläche (ADR 068, Entwicklungsauftrag 1.2)
+
+- [x] Meilenstein 1: Grundsystem in `Editor.Core` (JSON-Dateien, ICU-Teilmenge, CLDR-Pluralregeln, Fallback, Sprachwahl und Speicherung), Validator mit Werkzeug und GitHub-Workflow, Anbindung der Shell, Menüleiste als erste Texte, Tests
+- [ ] Meilenstein 2: Migration aller Texte Datei für Datei (Shell, Werkzeugleiste, Panels, Dialoge, Inspector, Projektbrowser, Meldungen)
+- [ ] Meilenstein 3: Einstellungsdialog „Settings → General → Language“, Layout für längere Texte, Deutsch und Englisch vollständig
+- [ ] Meilenstein 4: Doku für Übersetzer (`locales/README.md` steht), weitere Tests, Prüfung in den Workflows
+
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen
