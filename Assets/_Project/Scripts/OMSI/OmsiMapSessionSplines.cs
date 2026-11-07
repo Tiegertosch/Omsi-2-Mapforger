@@ -133,6 +133,12 @@ namespace OmsiMapEditor.OMSI
         public List<OmsiTileSummary> TerrainTiles { get; } = new List<OmsiTileSummary>();
 
         internal List<OmsiObjectChange.FileState> Files { get; } = new List<OmsiObjectChange.FileState>();
+
+        /// <summary>
+        /// In an edited chrono variant, the records a change replaced by copies; undo and redo swap them instead of reading
+        /// the base map's tile again (ADR 064). Empty for other changes.
+        /// </summary>
+        internal List<OmsiSplineSwap> Swaps { get; } = new List<OmsiSplineSwap>();
     }
 
     /// <summary>Outcome of deleting a spline: the change, or the references that prevented it.</summary>
@@ -765,6 +771,13 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
                 throw new InvalidOperationException("The change has already been undone.");
+            if (change.Swaps.Count > 0)
+            {
+                ApplyFiles(change.Files, true);
+                change.IsApplied = false;
+                SwapSplines(change, false);
+                return;
+            }
             WriteFiles(change.Files, true);
             change.IsApplied = false;
             RefreshSplines(summary, change);
@@ -778,6 +791,13 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
                 throw new InvalidOperationException("The change is already applied.");
+            if (change.Swaps.Count > 0)
+            {
+                ApplyFiles(change.Files, false);
+                change.IsApplied = true;
+                SwapSplines(change, true);
+                return;
+            }
             WriteFiles(change.Files, false);
             change.IsApplied = true;
             RefreshSplines(summary, change);

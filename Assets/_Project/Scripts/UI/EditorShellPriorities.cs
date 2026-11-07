@@ -185,6 +185,14 @@ namespace OmsiMapEditor.UI
         {
             if (priorityJunction == null || priorityTile == null)
                 return;
+            if (!priorityTile.Objects.Contains(priorityJunction))
+            {
+                // In a chrono variant a copy with the new rules takes the junction's place; the ID finds it.
+                var id = priorityJunction.Id;
+                var current = priorityTile.Objects.Find(candidate => candidate.Id == id);
+                if (current != null)
+                    priorityJunction = current;
+            }
             if (!priorityTile.Objects.Contains(priorityJunction) || !TargetPriorityJunction(priorityTile, priorityJunction))
                 ClearPriorityTarget();
         }
@@ -266,7 +274,7 @@ namespace OmsiMapEditor.UI
                 return;
             var point = new OmsiMapPoint(x, y);
             roadPointer = point;
-            if (!CanEdit)
+            if (!CanEditRules)
             {
                 SetStatus(ReadOnlyMessage("set the right of way"));
                 return;
@@ -310,7 +318,7 @@ namespace OmsiMapEditor.UI
 
         private void WritePriorities(Dictionary<int, double?> priorities, string done)
         {
-            if (!CanEdit)
+            if (!CanEditRules)
             {
                 SetStatus(ReadOnlyMessage("set the right of way"));
                 return;

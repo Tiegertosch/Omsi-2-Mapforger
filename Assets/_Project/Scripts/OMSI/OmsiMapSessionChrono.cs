@@ -182,12 +182,14 @@ namespace OmsiMapEditor.OMSI
                     // The copy is made from the file that holds the original; what variants changed since, as the overlay shows it, goes along.
                     if (record.Labels.Count > 0 && !record.Labels.SequenceEqual(objectView.Labels))
                         objectView.SetLabels(record.Labels.ToList());
+                    var effectiveRules = SetEffectiveRules(file, objectView.Record, record.Rules);
                     copy = new OmsiObjectRecord
                     {
                         AssetPath = objectView.AssetPath, Id = objectView.Id, LocalX = objectView.X, LocalY = objectView.Y, Height = objectView.Z,
                         HeadingDegrees = objectView.HeadingDegrees, PitchDegrees = objectView.PitchDegrees, BankDegrees = objectView.BankDegrees,
                         Labels = record.Labels
                     };
+                    copy.Rules.AddRange(effectiveRules);
                 }
                 else if (created is OmsiAttachedObjectView attachedView)
                 {

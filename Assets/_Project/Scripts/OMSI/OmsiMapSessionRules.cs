@@ -43,8 +43,18 @@ namespace OmsiMapEditor.OMSI
             if (priorities == null)
                 throw new ArgumentNullException(nameof(priorities));
 
+            if (RulesViaSelection(record))
+            {
+                var wanted = record.Rules.Where(rule => !rule.Kills && !(string.Equals(rule.Name, "priority", StringComparison.OrdinalIgnoreCase) &&
+                                                                         priorities.ContainsKey(rule.PathIndex))).Select(CloneRule).ToList();
+                foreach (var pair in priorities.OrderBy(pair => pair.Key))
+                    if (pair.Value.HasValue)
+                        wanted.Add(new OmsiPathRule(pair.Key, "priority", pair.Value.Value));
+                return SetObjectRulesInVariant(tile, record, wanted);
+            }
+
             var workspace = RequireWorkspace();
-            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var tilePath = RulesFilePath(tile, record);
             var before = workspace.ReadAllBytes(tilePath);
             var file = OmsiRecordFile.Parse(before, OmsiTileRecordLayouts.Instance);
             var at = file.Records.IndexOf(FindObject(file, record.Id, tile.FileName).Record);
@@ -99,8 +109,15 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(tile));
             if (record == null)
                 throw new ArgumentNullException(nameof(record));
+            if (RulesViaSelection(record))
+            {
+                var wanted = record.Rules.Where(rule => !rule.Kills && !Replaced(rule.PathIndex, rule.Name, rule.Extra, false, paths, names)).Select(CloneRule).ToList();
+                wanted.AddRange((rules ?? Enumerable.Empty<OmsiPathRule>()).Select(CloneRule));
+                return SetObjectRulesInVariant(tile, record, wanted);
+            }
+
             var workspace = RequireWorkspace();
-            var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+            var tilePath = RulesFilePath(tile, record);
             var before = workspace.ReadAllBytes(tilePath);
             var file = OmsiRecordFile.Parse(before, OmsiTileRecordLayouts.Instance);
             var added = ReplaceRules(file, FindObject(file, record.Id, tile.FileName).Record, paths, names, rules);
@@ -129,6 +146,8 @@ namespace OmsiMapEditor.OMSI
         {
             if (edits == null)
                 throw new ArgumentNullException(nameof(edits));
+            if (EditedVariant != null)
+                return SetSplineRulesInVariant(edits);
             var files = new EditedFiles(RequireWorkspace());
             var change = new OmsiSplineChange(OmsiSplineChangeKind.Rules);
             foreach (var edit in edits)

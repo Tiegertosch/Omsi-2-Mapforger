@@ -240,6 +240,12 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private bool CanEditObjects => CanEdit || EditingVariant && !ReadingMapInBackground;
 
+        /// <summary>
+        /// The rules of objects and splines can be changed: in the base map, or in a chrono variant being edited, where they
+        /// become [rule] and [kill_rule] commands of the variant (ADR 064). The lanes tool and the road builder stay with the base map.
+        /// </summary>
+        private bool CanEditRules => CanEdit || EditingVariant && !ReadingMapInBackground;
+
         private bool EditingVariant => editedVariant != null && chronoDate != null && session != null && session.EditedVariant != null;
 
         private bool ReadingMapInBackground => chronoTask != null || checkTask != null;
@@ -1831,7 +1837,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.AllowSplineEditing = CanEdit;
                 // A map without a project or a chrono view can only be looked at; selecting is the only tool then. A
                 // variant being edited keeps the object tools.
-                if (!CanEditObjects || !CanEdit && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate)
+                if (!CanEditObjects || !CanEdit && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate && activeTool != EditorTool.Priorities)
                     activeTool = EditorTool.Drag;
                 mapCanvas.Tool = activeTool;
                 mapCanvas.SetMap(summary, keepView);
@@ -1865,7 +1871,7 @@ namespace OmsiMapEditor.UI
             if (session != null && session.CanEdit && (chronoDate == null || EditingVariant) && ReadingMapInBackground)
                 return "The map is being read for the map check or a chrono date; " + action + " again in a moment.";
             if (EditingVariant)
-                return "The chrono variant " + editedVariant.Title + " is being edited; it takes objects only. Choose Base map in the project browser to " +
+                return "The chrono variant " + editedVariant.Title + " is being edited; it takes objects, their types and labels, and traffic rules and the right of way only. Choose Base map in the project browser to " +
                        action + ".";
             return chronoDate != null
                 ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
@@ -4609,6 +4615,17 @@ namespace OmsiMapEditor.UI
             for (var index = selection.Count - 1; index >= 0; index--)
             {
                 var tile = TileHolding(selection[index]);
+                if (tile == null && selection[index].Tile != null)
+                {
+                    // A chrono variant's overlay puts a copy in place of an object whose rules, type or labels changed; the ID finds it.
+                    var id = selection[index].Record.Id;
+                    var current = selection[index].Tile.Objects.Find(candidate => candidate.Id == id);
+                    if (current != null)
+                    {
+                        selection[index].Record = current;
+                        tile = selection[index].Tile;
+                    }
+                }
                 if (tile == null)
                     selection.RemoveAt(index);
                 else
@@ -6802,7 +6819,7 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null)
                 return;
-            var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate;
+            var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate || tool == EditorTool.Priorities;
             if (tool != EditorTool.Drag && !(objectTool ? CanEditObjects : CanEdit))
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"

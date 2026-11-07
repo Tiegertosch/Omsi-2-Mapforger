@@ -238,7 +238,7 @@ namespace OmsiMapEditor.UI
         private void AddPathDetails(VisualElement container, OmsiTileSummary tile, int elementId, bool onSpline)
         {
             var paths = mapPaths.FindAll(path => path.TileX == tile.X && path.TileY == tile.Y && path.ElementId == elementId && path.OnSpline == onSpline);
-            if (CanEdit && paths.Exists(path => path.Kind == 0))
+            if (CanEditRules && paths.Exists(path => path.Kind == 0))
                 AddPathRuleEditor(container, tile, elementId, onSpline, paths);
             var heading = new Label("AI PATHS  " + paths.Count);
             heading.AddToClassList("inspector-section-heading");
@@ -494,7 +494,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Writes the traffic rules of road lanes of an object or spline as one undo step.</summary>
         private void ApplyPathRules(OmsiTileSummary tile, int elementId, bool onSpline, List<int> lanes, double? limit, double? density, bool cars, bool buses, bool trucks)
         {
-            if (!CanEdit)
+            if (!CanEditRules)
             {
                 SetStatus(ReadOnlyMessage("change traffic rules"));
                 return;

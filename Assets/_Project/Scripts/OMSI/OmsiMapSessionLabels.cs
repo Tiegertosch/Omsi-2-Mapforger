@@ -140,23 +140,7 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         private static void WriteSelection(OmsiRecordFile file, int id, string assetPath, IReadOnlyList<string> labels)
         {
-            var idText = id.ToString(CultureInfo.InvariantCulture);
-            var selectAt = -1;
-            for (var index = file.Records.Count - 1; index >= 0 && selectAt < 0; index--)
-                if (string.Equals(file.Records[index].Name, "selobject", StringComparison.OrdinalIgnoreCase) && file.Records[index].Fields.Count > 0 &&
-                    file.Records[index].Fields[0].Text.Trim() == idText)
-                    selectAt = index;
-            var blockEnd = selectAt + 1;
-            var deleted = false;
-            if (selectAt >= 0)
-                for (; blockEnd < file.Records.Count && SelectionCommands.Contains(file.Records[blockEnd].Name); blockEnd++)
-                    deleted |= string.Equals(file.Records[blockEnd].Name, "delete", StringComparison.OrdinalIgnoreCase);
-            if (selectAt < 0 || deleted)
-            {
-                selectAt = file.Records.Count;
-                file.InsertRecord(selectAt, file.CreateRecord("selobject", new[] { idText }));
-                blockEnd = selectAt + 1;
-            }
+            OpenSelectionBlock(file, "selobject", id, out var selectAt, out var blockEnd);
 
             for (var index = blockEnd - 1; index > selectAt; index--)
             {
@@ -173,6 +157,32 @@ namespace OmsiMapEditor.OMSI
                 var lines = new List<string> { labels.Count.ToString(CultureInfo.InvariantCulture) };
                 lines.AddRange(labels);
                 file.InsertRecord(insertAt, file.CreateRecord("relabel", lines));
+            }
+        }
+
+        /// <summary>
+        /// Finds the last block of a change list that selects an element ([selobject] or [selspline] with its ID and the
+        /// commands after it), or starts a new one at the end when there is none or the block deletes the element.
+        /// <paramref name="blockEnd"/> is the index after the block's last command.
+        /// </summary>
+        private static void OpenSelectionBlock(OmsiRecordFile file, string selector, int id, out int selectAt, out int blockEnd)
+        {
+            var idText = id.ToString(CultureInfo.InvariantCulture);
+            selectAt = -1;
+            for (var index = file.Records.Count - 1; index >= 0 && selectAt < 0; index--)
+                if (string.Equals(file.Records[index].Name, selector, StringComparison.OrdinalIgnoreCase) && file.Records[index].Fields.Count > 0 &&
+                    file.Records[index].Fields[0].Text.Trim() == idText)
+                    selectAt = index;
+            blockEnd = selectAt + 1;
+            var deleted = false;
+            if (selectAt >= 0)
+                for (; blockEnd < file.Records.Count && SelectionCommands.Contains(file.Records[blockEnd].Name); blockEnd++)
+                    deleted |= string.Equals(file.Records[blockEnd].Name, "delete", StringComparison.OrdinalIgnoreCase);
+            if (selectAt < 0 || deleted)
+            {
+                selectAt = file.Records.Count;
+                file.InsertRecord(selectAt, file.CreateRecord(selector, new[] { idText }));
+                blockEnd = selectAt + 1;
             }
         }
 

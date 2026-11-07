@@ -84,7 +84,8 @@ namespace OmsiMapEditor.OMSI
             {
                 if (Kind == OmsiObjectChangeKind.Copy && !IsApplied)
                     return ReplacedRecord;
-                if ((Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels) && ElementAfter is OmsiObjectRecord after &&
+                if ((Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels || Kind == OmsiObjectChangeKind.Rules) &&
+                    ElementAfter is OmsiObjectRecord after &&
                     ElementBefore is OmsiObjectRecord before)
                     return IsApplied ? after : before;
                 return Record;
@@ -637,7 +638,13 @@ namespace OmsiMapEditor.OMSI
             else if (change.Kind == OmsiObjectChangeKind.Replacement)
                 change.Record.AssetPath = change.AssetBefore;
             else if (change.Kind == OmsiObjectChangeKind.Rules)
-                SetRules(change.Record, change.RulesBefore);
+            {
+                // In a chrono variant the base map's record stays and a copy with the other rules takes its place.
+                if (change.ElementAfter != null)
+                    ApplyElementChange(change, false);
+                else
+                    SetRules(change.Record, change.RulesBefore);
+            }
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, false);
             else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels)
@@ -662,7 +669,12 @@ namespace OmsiMapEditor.OMSI
             else if (change.Kind == OmsiObjectChangeKind.Replacement)
                 change.Record.AssetPath = change.AssetAfter;
             else if (change.Kind == OmsiObjectChangeKind.Rules)
-                SetRules(change.Record, change.RulesAfter);
+            {
+                if (change.ElementAfter != null)
+                    ApplyElementChange(change, true);
+                else
+                    SetRules(change.Record, change.RulesAfter);
+            }
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, true);
             else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels)

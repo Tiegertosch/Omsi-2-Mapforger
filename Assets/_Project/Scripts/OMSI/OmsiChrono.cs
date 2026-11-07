@@ -81,6 +81,14 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Objects and attached objects whose labels a variant replaces ([relabel]).</summary>
         public int ChangedLabels { get; internal set; }
 
+        /// <summary>Rules the variants add to objects and splines ([rule]) and the ones they take away ([kill_rule]).</summary>
+        public int AddedRules { get; internal set; }
+
+        public int KilledRules { get; internal set; }
+
+        /// <summary>The overlay's own copies of base map records, which a later command may change in place.</summary>
+        internal HashSet<object> Copies { get; } = new HashSet<object>();
+
         /// <summary>Selections of elements that neither the tile nor an earlier variant has.</summary>
         public int UnresolvedSelections { get; internal set; }
     }
@@ -89,8 +97,9 @@ namespace OmsiMapEditor.OMSI
     /// Reads the chrono variants of a map and lays the ones active on a date over a copy of the map, as OMSI does when it
     /// loads the map for that day: in name order, each change list adds elements to its tile, deletes selected ones and
     /// swaps the object file ([typ]) and replaces the labels ([relabel]) of selected objects, attached objects and rows
-    /// along splines. The base map's summary is left unchanged; the copy shares its unchanged records. Rules and terrain
-    /// marks of the change lists do not affect the overview and are skipped.
+    /// along splines. They also add rules to selected objects and splines ([rule]) and take them away ([kill_rule]: the rule of
+    /// the same path, name and extra number, whatever its value), as openOMSI does. The base map's summary is left unchanged;
+    /// the copy shares its unchanged records. Terrain marks of the change lists do not affect the overview and are skipped.
     /// </summary>
     public static class OmsiChrono
     {
@@ -310,10 +319,9 @@ namespace OmsiMapEditor.OMSI
                         {
                             case OmsiObjectRecord original:
                             {
-                                var changed = Copy(original);
+                                var changed = Writable(tile, original, report);
                                 changed.AssetPath = values[0];
-                                tile.Objects[tile.Objects.IndexOf(original)] = changed;
-                                selected = Renamed(report, original, changed);
+                                selected = changed;
                                 report.ChangedTypes++;
                                 break;
                             }
@@ -337,11 +345,9 @@ namespace OmsiMapEditor.OMSI
                             }
                             case OmsiSplineRecord spline:
                             {
-                                var changed = Copy(spline);
+                                var changed = Writable(tile, splineSlots, spline, report);
                                 changed.AssetPath = values[0];
-                                tile.Splines[tile.Splines.IndexOf(spline)] = changed;
-                                splineSlots[splineSlots.IndexOf(spline)] = changed;
-                                selected = Renamed(report, spline, changed);
+                                selected = changed;
                                 report.ChangedTypes++;
                                 break;
                             }
@@ -353,10 +359,9 @@ namespace OmsiMapEditor.OMSI
                         var labels = RelabelTexts(record);
                         if (selected is OmsiObjectRecord labelled)
                         {
-                            var changed = Copy(labelled);
+                            var changed = Writable(tile, labelled, report);
                             changed.Labels = labels;
-                            tile.Objects[tile.Objects.IndexOf(labelled)] = changed;
-                            selected = Renamed(report, labelled, changed);
+                            selected = changed;
                             report.ChangedLabels++;
                         }
                         else if (selected is OmsiAttachedObjectRecord labelledAttached)
@@ -367,6 +372,30 @@ namespace OmsiMapEditor.OMSI
                             selected = Renamed(report, labelledAttached, changed);
                             report.ChangedLabels++;
                         }
+                        break;
+                    }
+                    case "rule":
+                    case "kill_rule":
+                    {
+                        // Only objects and splines carry rules; rows and attached objects have no paths.
+                        if (!TryReadRule(record, out var change))
+                            break;
+                        List<OmsiPathRule> rules;
+                        if (selected is OmsiObjectRecord ruled)
+                        {
+                            var changed = Writable(tile, ruled, report);
+                            selected = changed;
+                            rules = changed.Rules;
+                        }
+                        else if (selected is OmsiSplineRecord ruledSpline)
+                        {
+                            var changed = Writable(tile, splineSlots, ruledSpline, report);
+                            selected = changed;
+                            rules = changed.Rules;
+                        }
+                        else
+                            break;
+                        ApplyRule(rules, change, report);
                         break;
                     }
                     case "object":
@@ -446,7 +475,7 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
-        private static OmsiObjectRecord Copy(OmsiObjectRecord record)
+        internal static OmsiObjectRecord Copy(OmsiObjectRecord record)
         {
             var copy = new OmsiObjectRecord
             {
@@ -479,6 +508,77 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>Hands the origin of a replaced element on to its copy, and returns the copy as the new selection.</summary>
+        /// <summary>
+        /// The overlay's own copy of a base map object to change: made once, so the many commands of a variant on one
+        /// element share it, and the base map's record stays as it was.
+        /// </summary>
+        private static OmsiObjectRecord Writable(OmsiTileSummary tile, OmsiObjectRecord original, OmsiChronoOverlayReport report)
+        {
+            if (report.Copies.Contains(original))
+                return original;
+            var changed = Copy(original);
+            tile.Objects[tile.Objects.IndexOf(original)] = changed;
+            Renamed(report, original, changed);
+            report.Copies.Add(changed);
+            return changed;
+        }
+
+        private static OmsiSplineRecord Writable(OmsiTileSummary tile, List<OmsiSplineRecord> splineSlots, OmsiSplineRecord original,
+            OmsiChronoOverlayReport report)
+        {
+            if (report.Copies.Contains(original))
+                return original;
+            var changed = Copy(original);
+            tile.Splines[tile.Splines.IndexOf(original)] = changed;
+            splineSlots[splineSlots.IndexOf(original)] = changed;
+            Renamed(report, original, changed);
+            report.Copies.Add(changed);
+            return changed;
+        }
+
+        /// <summary>A [rule] or [kill_rule] record: path index, name, value and the extra number.</summary>
+        internal static bool TryReadRule(OmsiRecord record, out OmsiPathRule rule)
+        {
+            rule = null;
+            var values = record.AllValues();
+            if (values.Count < 3 || !int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var path) ||
+                !double.TryParse(values[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                return false;
+            var extra = 0.0;
+            if (values.Count > 3)
+                double.TryParse(values[3], NumberStyles.Float, CultureInfo.InvariantCulture, out extra);
+            rule = new OmsiPathRule
+            {
+                PathIndex = path, Name = values[1], Value = value, Extra = extra,
+                Kills = string.Equals(record.Name, "kill_rule", StringComparison.OrdinalIgnoreCase)
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// A change list's rule on top of an element's own, as openOMSI's apply_rules does: [kill_rule] takes away the
+        /// rules of the same path, name and extra number (not its value) and is not kept itself; [rule] adds one.
+        /// </summary>
+        internal static void ApplyRule(List<OmsiPathRule> rules, OmsiPathRule change, OmsiChronoOverlayReport report)
+        {
+            if (!change.Kills)
+            {
+                rules.Add(new OmsiPathRule(change.PathIndex, change.Name, change.Value, change.Extra));
+                if (report != null)
+                    report.AddedRules++;
+                return;
+            }
+            rules.RemoveAll(rule => !rule.Kills && SameRuleKey(rule, change));
+            if (report != null)
+                report.KilledRules++;
+        }
+
+        /// <summary>Whether a [kill_rule] aims at a rule: the same path, name (any case) and extra number.</summary>
+        internal static bool SameRuleKey(OmsiPathRule a, OmsiPathRule b)
+        {
+            return a.PathIndex == b.PathIndex && string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase) && a.Extra == b.Extra;
+        }
+
         private static object Renamed(OmsiChronoOverlayReport report, object original, object changed)
         {
             if (report.Origins.TryGetValue(original, out var origin))
@@ -503,16 +603,18 @@ namespace OmsiMapEditor.OMSI
             return labels;
         }
 
-        private static OmsiSplineRecord Copy(OmsiSplineRecord record)
+        internal static OmsiSplineRecord Copy(OmsiSplineRecord record)
         {
-            return new OmsiSplineRecord
+            var copy = new OmsiSplineRecord
             {
                 AssetPath = record.AssetPath, Id = record.Id, PreviousId = record.PreviousId, NextId = record.NextId, LocalX = record.LocalX,
                 LocalY = record.LocalY, Height = record.Height, EndHeight = record.EndHeight, HeadingDegrees = record.HeadingDegrees,
                 GradientStartPercent = record.GradientStartPercent, GradientEndPercent = record.GradientEndPercent,
                 LengthMeters = record.LengthMeters, RadiusMeters = record.RadiusMeters, IsSplineH = record.IsSplineH, IsMirrored = record.IsMirrored,
-                AlignsTerrain = record.AlignsTerrain
+                AlignsTerrain = record.AlignsTerrain, ChainOffset = record.ChainOffset
             };
+            copy.Rules.AddRange(record.Rules);
+            return copy;
         }
 
         /// <summary>The map with its own tile summaries and element lists; the element records are shared.</summary>

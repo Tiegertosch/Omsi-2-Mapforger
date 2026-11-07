@@ -66,7 +66,7 @@ namespace OmsiMapEditor.UI
             {
                 pair.Value.EnableInClassList("tool-button-active", !placing && pair.Key == tool);
                 pair.Value.SetEnabled(canEdit || pair.Key == EditorTool.Drag ||
-                                      canEditObjects && (pair.Key == EditorTool.Move || pair.Key == EditorTool.Rotate));
+                                      canEditObjects && (pair.Key == EditorTool.Move || pair.Key == EditorTool.Rotate || pair.Key == EditorTool.Priorities));
             }
             objectsButton.EnableInClassList("tool-button-active", placing);
             objectsButton.SetEnabled(canEditObjects);
