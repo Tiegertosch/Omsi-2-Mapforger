@@ -1,18 +1,20 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using OmsiMapEditor.Core.Localization;
 
 namespace OmsiMapEditor.UI
 {
     /// <summary>Native Windows open and save file pickers for the desktop player and the Windows editor.</summary>
     internal static class WindowsFileDialog
     {
-        public const string GlobalConfigFilter = "OMSI map configuration (global.cfg)\0global.cfg\0All files\0*.*\0";
-        public const string ProjectFilter = "MapWorks project (*.omproj)\0*.omproj\0";
+        /// <summary>The descriptions of the file types come from the language files; the patterns after them are fixed.</summary>
+        public static string GlobalConfigFilter => Loc.T("filedialog.config") + "\0global.cfg\0" + Loc.T("filedialog.all") + "\0*.*\0";
+        public static string ProjectFilter => Loc.T("filedialog.project") + "\0*.omproj\0";
         public const string ProjectExtension = "omproj";
-        public const string PngFilter = "PNG picture (*.png)\0*.png\0All files\0*.*\0";
-        public const string HeightMapFilter = "Height maps (*.png, *.tif, *.tiff)\0*.png;*.tif;*.tiff\0All files\0*.*\0";
-        public const string PictureFilter = "Pictures (*.jpg, *.jpeg, *.png, *.bmp, *.tga)\0*.jpg;*.jpeg;*.png;*.bmp;*.tga\0All files\0*.*\0";
+        public static string PngFilter => Loc.T("filedialog.png") + "\0*.png\0" + Loc.T("filedialog.all") + "\0*.*\0";
+        public static string HeightMapFilter => Loc.T("filedialog.heightmaps") + "\0*.png;*.tif;*.tiff\0" + Loc.T("filedialog.all") + "\0*.*\0";
+        public static string PictureFilter => Loc.T("filedialog.pictures") + "\0*.jpg;*.jpeg;*.png;*.bmp;*.tga\0" + Loc.T("filedialog.all") + "\0*.*\0";
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         private const int OverwritePrompt = 0x00000002;

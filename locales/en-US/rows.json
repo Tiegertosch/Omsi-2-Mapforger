@@ -1,0 +1,20 @@
+{
+  "rows.title": "Rows along roads",
+  "rows.selected": "Selected row",
+  "rows.choose": "Choose an object in the library.",
+  "rows.object": "Object: {name}",
+  "@rows.object": "{name} is a file name without extension, shown unchanged",
+  "rows.interval": "Every (m)",
+  "rows.interval.tooltip": "Distance between the objects of a row along the road",
+  "rows.offset": "From centre (m)",
+  "rows.offset.tooltip": "Distance of the objects from the road's centre line; empty puts them 0.5 m inside the edge of the road's profile, on the pavement",
+  "rows.height": "Height (m)",
+  "rows.height.tooltip": "Height of the objects above the road",
+  "rows.heading": "Heading (°)",
+  "rows.heading.tooltip": "Turn of each object against the road's direction; on the other side the object faces the road the other way round",
+  "rows.both": "Both sides",
+  "rows.both.tooltip": "Lays a row on both sides of the road at once",
+  "rows.whole": "Whole road",
+  "rows.whole.tooltip": "A click lays the row along the whole road, from junction or free end to junction or free end, evenly spaced. Switch off to click where the row starts and where it ends.",
+  "rows.hint": "Point at a road: the row lies on the side of the pointer. Click to lay it; R turns the objects by 15°, Shift+R back. Click an object of a row to select the row: change its values and press Enter, or choose another object in the library; Del deletes it. Esc ends the tool."
+}

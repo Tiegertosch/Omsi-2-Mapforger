@@ -15,6 +15,7 @@ namespace OmsiMapEditor.UI
         private sealed class Binding
         {
             public string TextKey;
+            public bool Upper;
             public (string Name, object Value)[] TextArguments;
             public string TooltipKey;
             public (string Name, object Value)[] TooltipArguments;
@@ -22,6 +23,22 @@ namespace OmsiMapEditor.UI
         }
 
         private static readonly ConditionalWeakTable<VisualElement, Binding> Table = new ConditionalWeakTable<VisualElement, Binding>();
+
+        /// <summary>A label whose text is the key's, now and after every language change.</summary>
+        public static Label NewLabel(string key, params (string Name, object Value)[] arguments)
+        {
+            var label = new Label();
+            Text(label, key, arguments);
+            return label;
+        }
+
+        /// <summary>A button whose text is the key's, now and after every language change.</summary>
+        public static Button NewButton(string key, System.Action clicked, params (string Name, object Value)[] arguments)
+        {
+            var button = new Button(clicked);
+            Text(button, key, arguments);
+            return button;
+        }
 
         /// <summary>Sets the element's text from a key now and after every language change.</summary>
         public static void Text(VisualElement element, string key, params (string Name, object Value)[] arguments)
@@ -32,6 +49,33 @@ namespace OmsiMapEditor.UI
             binding.TextKey = key;
             binding.TextArguments = arguments;
             Apply(element, binding);
+        }
+
+        /// <summary>Like <see cref="Text"/>, written in capitals as the language writes them: for the headings of a section.</summary>
+        public static void TextUpper(VisualElement element, string key, params (string Name, object Value)[] arguments)
+        {
+            if (element == null)
+                return;
+            BindingOf(element).Upper = true;
+            Text(element, key, arguments);
+        }
+
+        /// <summary>Binds the tooltip and returns the element, so it can stand inside an expression.</summary>
+        public static T WithTooltip<T>(T element, string key, params (string Name, object Value)[] arguments) where T : VisualElement
+        {
+            Tooltip(element, key, arguments);
+            return element;
+        }
+
+        /// <summary>Takes the element's tooltip binding away and clears the tooltip.</summary>
+        public static void ClearTooltip(VisualElement element)
+        {
+            if (element == null)
+                return;
+            var binding = BindingOf(element);
+            binding.TooltipKey = null;
+            binding.TooltipArguments = null;
+            element.tooltip = string.Empty;
         }
 
         /// <summary>Sets the element's tooltip from a key now and after every language change.</summary>
@@ -77,13 +121,25 @@ namespace OmsiMapEditor.UI
             if (binding.TextKey != null)
             {
                 var text = binding.TextArguments == null || binding.TextArguments.Length == 0 ? Loc.T(binding.TextKey) : Loc.T(binding.TextKey, binding.TextArguments);
+                if (binding.Upper && Loc.Manager != null)
+                    text = text.ToUpper(Loc.Manager.Culture);
                 switch (element)
                 {
                     case Toggle toggle:
-                        toggle.label = text;
+                        // The text beside the box, as before: not the label at the left of the field.
+                        toggle.text = text;
+                        break;
+                    case FloatField floatField:
+                        floatField.label = text;
+                        break;
+                    case IntegerField integerField:
+                        integerField.label = text;
                         break;
                     case TextField field:
                         field.label = text;
+                        break;
+                    case DropdownField dropdown:
+                        dropdown.label = text;
                         break;
                     case Foldout foldout:
                         foldout.text = text;

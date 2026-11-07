@@ -1,0 +1,19 @@
+{
+  "canvas.outside": "outside the map",
+  "canvas.position": "Tile {tileX}, {tileY}   x {x, number, 0.0}   y {y, number, 0.0}",
+  "canvas.turned": "{count, plural, one {# object} other {# objects}}   turned {degrees, number, +0.0;-0.0;0.0}° around {pivot}",
+  "@canvas.turned": "{pivot} is a position written like canvas.position",
+  "canvas.view3d": "3D view   distance {distance, number, 0} m   heading {heading, number, 0}°   tilt {tilt, number, 0}°",
+  "canvas.object_turn": "#{id}   heading {heading, number, 0.0}°   pitch {pitch, number, 0.0}°   bank {bank, number, 0.0}°",
+  "@canvas.object_turn": "{id} is the number of the object, shown unchanged",
+  "canvas.moved_group": "{count, plural, one {# object} other {# objects}}   moved x {dx, number, +0.00;-0.00}   y {dy, number, +0.00;-0.00}",
+  "canvas.moved_group_height": "{count, plural, one {# object} other {# objects}}   moved x {dx, number, +0.00;-0.00}   y {dy, number, +0.00;-0.00}   height {dh, number, +0.00;-0.00}",
+  "canvas.moved_one_height": "#{id}   moved x {dx, number, +0.00;-0.00}   y {dy, number, +0.00;-0.00}   height {dh, number, +0.00;-0.00}",
+  "canvas.dragging_one": "#{id}   x {x, number, 0.00}   y {y, number, 0.00}   heading {heading, number, 0.0}°",
+  "canvas.scale": "1 px = {meters, number, 0.###} m",
+  "canvas.angle.turn": "Turn {degrees, number, +0.0;-0.0;0.0}°",
+  "canvas.angle.pitch": "Pitch {degrees, number, 0.0}°",
+  "canvas.angle.bank": "Bank {degrees, number, 0.0}°",
+  "canvas.angle.heading": "Heading {degrees, number, 0.0}°",
+  "canvas.arrow.height": "Height"
+}

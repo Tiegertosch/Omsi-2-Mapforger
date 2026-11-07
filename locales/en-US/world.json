@@ -1,0 +1,10 @@
+{
+  "world.ground.failed": "Ground textures could not be read: {reason}",
+  "@world.ground.failed": "{reason} is a message from the system, in English",
+  "world.ground.ready": "Ground textures ready: {layers, plural, one {# texture} other {# textures}}, {masks, plural, one {# tile mask} other {# tile masks}} read as their tiles come into view, {drawn} of {splines} splines with surfaces{lines, plural, =0 {} one {, # overhead line and fences} other {, # overhead lines and fences}}{holes, plural, =0 {} one {, terrain holes in # tile} other {, terrain holes in # tiles}}{problems, plural, =0 {} one {; # problem, first: {first}} other {; # problems, first: {first}}}.",
+  "@world.ground.ready": "{first} is a message of MapWorks in English",
+  "world.objects.failed": "Objects could not be read: {reason}",
+  "@world.objects.failed": "{reason} is a message from the system, in English",
+  "world.objects.ready": "Object models ready: {kinds, plural, one {# kind} other {# kinds}}, {textures, plural, one {# texture} other {# textures}}{problems, plural, =0 {} one {; # problem, first: {first}} other {; # problems, first: {first}}}.",
+  "@world.objects.ready": "{first} is a message of MapWorks in English"
+}

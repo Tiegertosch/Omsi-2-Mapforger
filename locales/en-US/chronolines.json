@@ -1,0 +1,15 @@
+{
+  "chronolines.foldout": "Lines switched off by this variant ({count})",
+  "chronolines.none": "The timetable has no lines before this variant.",
+  "chronolines.line": "Line {name}",
+  "@chronolines.line": "{name} is the name of a bus line, shown unchanged",
+  "chronolines.line.tooltip": "Checked: this variant switches line {name} off from its first day on; unchecked: it keeps running",
+  "chronolines.status.off": "Line {name} is switched off by {variant} now.",
+  "@chronolines.status.off": "{variant} is the name of the chrono variant, shown unchanged",
+  "chronolines.status.on": "Line {name} runs again in {variant}.",
+  "chronolines.status.none": "{variant} switches off no line now.",
+  "chronolines.status.some": "{variant} switches off {names} now.",
+  "@chronolines.status.some": "{names} is a list of line names separated by commas",
+  "chronolines.status.failed": "The lines could not be changed: {reason}",
+  "@chronolines.status.failed": "{reason} is a message from the system, in English"
+}

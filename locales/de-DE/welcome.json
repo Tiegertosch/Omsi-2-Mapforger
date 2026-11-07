@@ -1,0 +1,16 @@
+{
+  "welcome.tagline": "Welten bauen. Straßen formen. Die eigene Vision fahren.",
+  "welcome.card.open_project.title": "Projekt öffnen",
+  "welcome.card.open_project.text": "Ein MapWorks-Projekt (.omproj) weiterbearbeiten.",
+  "welcome.card.open_map.title": "OMSI-Karte öffnen",
+  "welcome.card.open_map.text": "Eine Karte der OMSI-Installation ansehen. Zum Bearbeiten als Projekt speichern.",
+  "welcome.card.new_map.title": "Neue Karte",
+  "welcome.card.new_map.text": "Eine leere Karte mit ihrer ersten Kachel beginnen, auf Grundlage einer Karte der Installation.",
+  "welcome.recent": "Zuletzt geöffnet",
+  "welcome.recent.empty": "Hier erscheinen die Projekte und Karten, die geöffnet wurden.",
+  "welcome.recent.not_found.tooltip": "Nicht gefunden: {path}",
+  "welcome.recent.kind.not_found": "Nicht gefunden",
+  "welcome.recent.kind.project": "Projekt",
+  "welcome.recent.kind.map": "Karte, schreibgeschützt",
+  "welcome.card.planned.tooltip": "{title} ist geplant und noch nicht verfügbar."
+}

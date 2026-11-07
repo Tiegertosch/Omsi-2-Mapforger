@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -93,7 +94,7 @@ namespace OmsiMapEditor.UI
             header.Add(badge);
             var titles = new VisualElement();
             titles.AddToClassList("tool-panel-titles");
-            titleLabel = new Label("New road type");
+            titleLabel = new Label(Loc.T("roadbuilder.panel.new"));
             titleLabel.AddToClassList("tool-panel-title");
             titles.Add(titleLabel);
             summaryLabel = new Label();
@@ -101,33 +102,30 @@ namespace OmsiMapEditor.UI
             summaryLabel.AddToClassList("picker-subtitle");
             titles.Add(summaryLabel);
             header.Add(titles);
-            nameField = new TextField { tooltip = "The name of the road type, also its file name under Splines\\Mapforge in your OMSI installation" };
+            nameField = new TextField { tooltip = Loc.T("roadbuilder.panel.name.tooltip_new") };
             nameField.AddToClassList("panel-search-field");
             nameField.AddToClassList("road-builder-name");
-            nameField.textEdition.placeholder = "Name";
+            nameField.textEdition.placeholder = Loc.T("roadbuilder.panel.name.placeholder");
             nameField.RegisterValueChangedCallback(_ => nameTyped = true);
             header.Add(nameField);
-            deleteButton = new Button(() => DeleteRequested?.Invoke()) { text = "Delete" };
+            deleteButton = LocBindings.NewButton("roadbuilder.panel.delete", () => DeleteRequested?.Invoke());
             deleteButton.AddToClassList("map-control-button");
             deleteButton.AddToClassList("road-builder-remove");
             header.Add(deleteButton);
-            saveAsNewButton = new Button(() => SaveRequested?.Invoke(RoadName, type.Copy()))
-            {
-                text = "Save as new type", tooltip = "Makes a road type of its own under the name typed; the one edited stays as it was"
-            };
+            saveAsNewButton = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.save_as_new", () => SaveRequested?.Invoke(RoadName, type.Copy())), "roadbuilder.panel.save_as_new.tooltip");
             saveAsNewButton.AddToClassList("map-control-button");
             header.Add(saveAsNewButton);
-            saveButton = new Button(() =>
+            saveButton = LocBindings.NewButton("roadbuilder.panel.save", () =>
             {
                 if (EditingPath != null)
                     ReplaceRequested?.Invoke(type.Copy());
                 else
                     SaveRequested?.Invoke(RoadName, type.Copy());
-            }) { text = "Save" };
+            });
             saveButton.AddToClassList("map-control-button");
             saveButton.AddToClassList("dialog-primary");
             header.Add(saveButton);
-            var close = new Button(() => CloseRequested?.Invoke()) { tooltip = "Back to the road picker without saving (Esc)" };
+            var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "roadbuilder.panel.close.tooltip");
             close.AddToClassList("panel-icon-button");
             close.Add(new IconElement("x"));
             header.Add(close);
@@ -152,28 +150,31 @@ namespace OmsiMapEditor.UI
             bottom.AddToClassList("road-builder-bottom");
             var add = new VisualElement();
             add.AddToClassList("road-builder-column");
-            add.Add(SectionLabel("Add a lane right of the one picked"));
+            add.Add(SectionLabelKey("roadbuilder.panel.add_title"));
             var addRow = new VisualElement();
             addRow.AddToClassList("road-builder-buttons");
             foreach (OmsiRoadLaneKind kind in Enum.GetValues(typeof(OmsiRoadLaneKind)))
             {
                 var each = kind;
-                var button = new Button(() => AddLane(each)) { text = OmsiRoadLane.Name(kind), tooltip = "Adds a " + OmsiRoadLane.Name(kind).ToLowerInvariant() + " right of the lane picked" };
+                var button = LocBindings.NewButton(LaneKeys[(int)kind], () => AddLane(each)); // i18n:keys
+                addButtons.Add(new KeyValuePair<Button, OmsiRoadLaneKind>(button, kind));
+                LocBindings.Tooltip(button, "roadbuilder.panel.add_tooltip", ("lane", LaneName(kind)));
                 button.AddToClassList("map-control-button");
                 addRow.Add(button);
             }
             add.Add(addRow);
-            add.Add(SectionLabel("Start from a template"));
+            add.Add(SectionLabelKey("roadbuilder.panel.templates"));
             var templateRow = new VisualElement();
             templateRow.AddToClassList("road-builder-buttons");
             foreach (var template in OmsiRoadType.Templates)
             {
                 var description = template.Value;
-                var button = new Button(() => SetType(OmsiRoadType.Parse(description))) { text = template.Key, tooltip = description };
+                var button = new Button(() => SetType(OmsiRoadType.Parse(description))) { tooltip = description };
+                LocBindings.Text(button, TemplateKey(template.Key)); // i18n:keys
                 button.AddToClassList("map-control-button");
                 templateRow.Add(button);
             }
-            fromChosenButton = new Button(() => FromChosenRequested?.Invoke()) { text = "From the chosen road" };
+            fromChosenButton = LocBindings.NewButton("roadbuilder.panel.from_chosen", () => FromChosenRequested?.Invoke());
             fromChosenButton.AddToClassList("map-control-button");
             templateRow.Add(fromChosenButton);
             add.Add(templateRow);
@@ -182,7 +183,7 @@ namespace OmsiMapEditor.UI
             var picked = new VisualElement();
             picked.AddToClassList("road-builder-column");
             picked.AddToClassList("road-builder-lane-options");
-            selectedTitle = SectionLabel("Pick a lane or the line between two in the bar above");
+            selectedTitle = SectionLabel(Loc.T("roadbuilder.panel.pick_title"));
             picked.Add(selectedTitle);
 
             laneOptions = new VisualElement();
@@ -192,53 +193,51 @@ namespace OmsiMapEditor.UI
             foreach (OmsiRoadLaneKind kind in Enum.GetValues(typeof(OmsiRoadLaneKind)))
             {
                 var each = kind;
-                var button = new Button(() => ChangeSelected(chosen => chosen.Kind = each)) { text = Short(kind), tooltip = OmsiRoadLane.Name(kind) };
+                var button = LocBindings.NewButton(LaneShortKeys[(int)kind], () => ChangeSelected(chosen => chosen.Kind = each)); // i18n:keys
+                LocBindings.Tooltip(button, LaneKeys[(int)kind]); // i18n:keys
                 button.AddToClassList("panel-tab");
                 kinds.Add(button);
                 kindButtons[kind] = button;
             }
             laneOptions.Add(kinds);
-            widthField = new TextField { tooltip = "The lane's width in metres" };
+            widthField = new TextField();
+            LocBindings.Tooltip(widthField, "roadbuilder.panel.width.tooltip");
             widthField.AddToClassList("picker-field");
             widthField.RegisterValueChangedCallback(evt =>
             {
                 if (double.TryParse(evt.newValue.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var width) && width > 0.0)
                     ChangeSelected(chosen => chosen.Width = width, false);
             });
-            Row(laneOptions, "Width (m)").Add(widthField);
+            Row(laneOptions, "roadbuilder.panel.width").Add(widthField);
             var directions = new VisualElement();
             directions.AddToClassList("panel-tabs");
             directions.AddToClassList("picker-segmented");
-            forwardButton = new Button(() => ChangeSelected(chosen => chosen.Direction = OmsiRoadLaneDirection.Forward))
-            {
-                text = "With the road", tooltip = "Traffic runs the way the road is drawn"
-            };
-            backwardButton = new Button(() => ChangeSelected(chosen => chosen.Direction = OmsiRoadLaneDirection.Backward))
-            {
-                text = "Against it", tooltip = "Traffic runs against the way the road is drawn"
-            };
+            forwardButton = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.forward", () => ChangeSelected(chosen => chosen.Direction = OmsiRoadLaneDirection.Forward)),
+                "roadbuilder.panel.forward.tooltip");
+            backwardButton = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.backward", () => ChangeSelected(chosen => chosen.Direction = OmsiRoadLaneDirection.Backward)),
+                "roadbuilder.panel.backward.tooltip");
             foreach (var button in new[] { forwardButton, backwardButton })
             {
                 button.AddToClassList("panel-tab");
                 directions.Add(button);
             }
-            Row(laneOptions, "Direction").Add(directions);
-            var surfaceRow = Row(laneOptions, "Surface");
-            surfaceButton = new Button(ShowSurfaces) { tooltip = "Choose a texture of your installation's spline profiles for the lane" };
+            Row(laneOptions, "roadbuilder.panel.direction").Add(directions);
+            var surfaceRow = Row(laneOptions, "roadbuilder.panel.surface");
+            surfaceButton = new Button(ShowSurfaces) { tooltip = Loc.T("roadbuilder.panel.surface.tooltip") };
             surfaceButton.AddToClassList("map-control-button");
             surfaceButton.AddToClassList("road-builder-surface");
             surfaceRow.Add(surfaceButton);
-            var standard = new Button(() => ChangeSelected(chosen => chosen.Texture = null)) { text = "Standard", tooltip = "The base game's texture for this kind of lane" };
+            var standard = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.standard", () => ChangeSelected(chosen => chosen.Texture = null)), "roadbuilder.panel.standard.tooltip");
             standard.AddToClassList("map-control-button");
             surfaceRow.Add(standard);
 
             // A tram lane's track, for trams alone or shared with cars.
-            trafficRow = Row(laneOptions, "Traffic");
+            trafficRow = Row(laneOptions, "roadbuilder.panel.traffic");
             var traffic = new VisualElement();
             traffic.AddToClassList("panel-tabs");
             traffic.AddToClassList("picker-segmented");
-            tramOnlyButton = new Button(() => ChangeSelected(chosen => chosen.Shared = false)) { text = "Tram only", tooltip = "A track of its own, kept apart from cars with a solid line" };
-            carsTooButton = new Button(() => ChangeSelected(chosen => chosen.Shared = true)) { text = "Cars too", tooltip = "Tracks laid in the street: cars and buses drive on them too" };
+            tramOnlyButton = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.tram_only", () => ChangeSelected(chosen => chosen.Shared = false)), "roadbuilder.panel.tram_only.tooltip");
+            carsTooButton = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.cars_too", () => ChangeSelected(chosen => chosen.Shared = true)), "roadbuilder.panel.cars_too.tooltip");
             foreach (var button in new[] { tramOnlyButton, carsTooButton })
             {
                 button.AddToClassList("panel-tab");
@@ -247,16 +246,17 @@ namespace OmsiMapEditor.UI
             trafficRow.Add(traffic);
 
             // A row of objects along the lane, laid whenever the road is built.
-            objectRow = Row(laneOptions, "Objects");
-            rowObjectButton = new Button(() => RowObjectRequested?.Invoke()) { tooltip = "Choose a tree, a street light or any object in the library; a row of it is laid along the lane whenever the road is built" };
+            objectRow = Row(laneOptions, "roadbuilder.panel.objects");
+            rowObjectButton = new Button(() => RowObjectRequested?.Invoke()) { tooltip = Loc.T("roadbuilder.panel.objects.tooltip") };
             rowObjectButton.AddToClassList("map-control-button");
             rowObjectButton.AddToClassList("road-builder-surface");
             objectRow.Add(rowObjectButton);
-            var noObjects = new Button(() => ChangeSelected(chosen => chosen.RowObject = null)) { text = "None", tooltip = "No objects along this lane" };
+            var noObjects = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.none", () => ChangeSelected(chosen => chosen.RowObject = null)), "roadbuilder.panel.none.tooltip");
             noObjects.AddToClassList("map-control-button");
             objectRow.Add(noObjects);
-            placedRow = Row(laneOptions, "Every (m)");
-            rowIntervalField = new TextField { tooltip = "Metres between the objects" };
+            placedRow = Row(laneOptions, "roadbuilder.panel.every");
+            rowIntervalField = new TextField();
+            LocBindings.Tooltip(rowIntervalField, "roadbuilder.panel.every.tooltip");
             rowIntervalField.AddToClassList("picker-field");
             rowIntervalField.AddToClassList("road-builder-every");
             rowIntervalField.RegisterValueChangedCallback(evt =>
@@ -271,14 +271,16 @@ namespace OmsiMapEditor.UI
             foreach (OmsiRoadRowPlace place in Enum.GetValues(typeof(OmsiRoadRowPlace)))
             {
                 var each = place;
-                var button = new Button(() => ChangeSelected(chosen => chosen.RowPlace = each)) { text = PlaceName(place), tooltip = PlaceTooltip(place) };
+                var button = LocBindings.NewButton(PlaceKey(place), () => ChangeSelected(chosen => chosen.RowPlace = each)); // i18n:keys
+                LocBindings.Tooltip(button, PlaceKey(place) + ".tooltip"); // i18n:keys
                 button.AddToClassList("panel-tab");
                 places.Add(button);
                 placeButtons[place] = button;
             }
             placedRow.Add(places);
-            turnRow = Row(laneOptions, "Turn (°)");
-            rowTurnField = new TextField { tooltip = "Degrees the objects are turned by, clockwise; 90 lays a hedge modelled across along the road" };
+            turnRow = Row(laneOptions, "roadbuilder.panel.turn");
+            rowTurnField = new TextField();
+            LocBindings.Tooltip(rowTurnField, "roadbuilder.panel.turn.tooltip");
             rowTurnField.AddToClassList("picker-field");
             rowTurnField.AddToClassList("road-builder-every");
             rowTurnField.RegisterValueChangedCallback(evt =>
@@ -289,11 +291,11 @@ namespace OmsiMapEditor.UI
             turnRow.Add(rowTurnField);
             var actions = new VisualElement();
             actions.AddToClassList("road-builder-buttons");
-            var left = new Button(() => MoveSelected(-1)) { text = "Move left", tooltip = "Moves the lane one place left; you can also drag it in the bar" };
+            var left = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.move_left", () => MoveSelected(-1)), "roadbuilder.panel.move_left.tooltip");
             left.AddToClassList("map-control-button");
-            var right = new Button(() => MoveSelected(1)) { text = "Move right", tooltip = "Moves the lane one place right; you can also drag it in the bar" };
+            var right = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.move_right", () => MoveSelected(1)), "roadbuilder.panel.move_right.tooltip");
             right.AddToClassList("map-control-button");
-            var remove = new Button(RemoveSelected) { text = "Remove", tooltip = "Takes the lane away" };
+            var remove = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.remove", RemoveSelected), "roadbuilder.panel.remove.tooltip");
             remove.AddToClassList("map-control-button");
             remove.AddToClassList("road-builder-remove");
             foreach (var button in new[] { left, right, remove })
@@ -305,11 +307,11 @@ namespace OmsiMapEditor.UI
             var lines = new VisualElement();
             lines.AddToClassList("panel-tabs");
             lines.AddToClassList("road-builder-choices");
-            AddLineButton(lines, null, "Auto", "The line the editor chooses, as on German roads");
+            AddLineButton(lines, null, "roadbuilder.panel.auto", "roadbuilder.panel.auto.tooltip");
             foreach (OmsiRoadMarking marking in Enum.GetValues(typeof(OmsiRoadMarking)))
-                AddLineButton(lines, marking, OmsiRoadLane.Name(marking), LineTooltip(marking));
+                AddLineButton(lines, marking, MarkingKey(marking), MarkingKey(marking) + ".tooltip");
             lineOptions.Add(lines);
-            var lineHint = new Label("A line at a kerb lies 0.2 m out on the carriageway, as an edge line.");
+            var lineHint = LocBindings.NewLabel("roadbuilder.panel.line_hint");
             lineHint.AddToClassList("panel-info");
             lineOptions.Add(lineHint);
             picked.Add(lineOptions);
@@ -322,16 +324,16 @@ namespace OmsiMapEditor.UI
             surfaces.style.display = DisplayStyle.None;
             var surfaceHeader = new VisualElement();
             surfaceHeader.AddToClassList("road-builder-surface-header");
-            surfaceTitle = SectionLabel("Surface");
+            surfaceTitle = SectionLabel(Loc.T("roadbuilder.panel.surface"));
             surfaceTitle.AddToClassList("road-builder-grow");
             surfaceHeader.Add(surfaceTitle);
             surfaceSearch = new TextField();
             surfaceSearch.AddToClassList("panel-search-field");
             surfaceSearch.AddToClassList("road-builder-name");
-            surfaceSearch.textEdition.placeholder = "Search textures...";
+            surfaceSearch.textEdition.placeholder = Loc.T("roadbuilder.panel.search");
             surfaceSearch.RegisterValueChangedCallback(_ => FillSurfaces());
             surfaceHeader.Add(surfaceSearch);
-            var back = new Button(HideSurfaces) { text = "Back", tooltip = "Back to the lane without changing its surface" };
+            var back = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.panel.back", HideSurfaces), "roadbuilder.panel.back.tooltip");
             back.AddToClassList("map-control-button");
             surfaceHeader.Add(back);
             surfaces.Add(surfaceHeader);
@@ -453,27 +455,21 @@ namespace OmsiMapEditor.UI
         {
             fromChosenButton.SetEnabled(path != null);
             fromChosenButton.tooltip = path != null
-                ? "Takes " + Path.GetFileNameWithoutExtension(path) + ", the road chosen in the road tool, apart into lanes to start from"
-                : "Choose a road in the road tool first; its lanes are taken to start from";
+                ? Loc.T("roadbuilder.panel.from_chosen.tooltip_on", ("name", Path.GetFileNameWithoutExtension(path)))
+                : Loc.T("roadbuilder.panel.from_chosen.tooltip_off");
         }
 
         private void ShowEditing()
         {
             var editing = EditingPath != null;
             var name = editing ? Path.GetFileNameWithoutExtension(EditingPath) : null;
-            titleLabel.text = editing ? "Edit " + name : "New road type";
-            nameField.tooltip = editing
-                ? "The name for Save as new type; Save keeps the road type under its name"
-                : "The name of the road type, also its file name under Splines\\Mapforge in your OMSI installation";
-            saveButton.tooltip = editing
-                ? "Changes " + name + ": " + (editingUses == 1 ? "the spline" : "all " + editingUses + " splines") + " of it in this map and the junctions made with it change too; Ctrl+Z undoes it"
-                : "Makes the road type and chooses it in the road tool, ready to build";
+            titleLabel.text = editing ? Loc.T("roadbuilder.panel.edit", ("name", name)) : Loc.T("roadbuilder.panel.new");
+            nameField.tooltip = Loc.T(editing ? "roadbuilder.panel.name.tooltip_edit" : "roadbuilder.panel.name.tooltip_new"); // i18n:keys
+            LocBindings.Tooltip(saveButton, editing ? "roadbuilder.panel.save.tooltip_edit" : "roadbuilder.panel.save.tooltip_new", ("name", name ?? string.Empty), ("uses", editingUses)); // i18n:keys
             saveAsNewButton.style.display = editing ? DisplayStyle.Flex : DisplayStyle.None;
             deleteButton.style.display = editing ? DisplayStyle.Flex : DisplayStyle.None;
             deleteButton.SetEnabled(editing && editingUses == 0);
-            deleteButton.tooltip = editingUses == 0
-                ? "Deletes " + name + " from your OMSI installation, unless another map or a made junction still uses it; Ctrl+Z brings it back"
-                : "No spline of this map may use " + name + " to delete it; " + editingUses + " still do";
+            LocBindings.Tooltip(deleteButton, editingUses == 0 ? "roadbuilder.panel.delete.tooltip_free" : "roadbuilder.panel.delete.tooltip_used", ("name", name ?? string.Empty), ("uses", editingUses)); // i18n:keys
         }
 
         /// <summary>Sets the name as if typed; for command-line checks.</summary>
@@ -509,7 +505,7 @@ namespace OmsiMapEditor.UI
                 return;
             bottom.style.display = DisplayStyle.None;
             surfaces.style.display = DisplayStyle.Flex;
-            surfaceTitle.text = "Surface for lane " + (selected + 1) + ": " + OmsiRoadLane.Name(type.Lanes[selected].Kind);
+            surfaceTitle.text = Loc.T("roadbuilder.panel.surface_title", ("n", selected + 1), ("lane", LaneName(type.Lanes[selected].Kind)));
             if (surfaceList == null && installationRoot != null)
             {
                 var root = installationRoot;
@@ -543,7 +539,7 @@ namespace OmsiMapEditor.UI
             surfaceTiles.Clear();
             if (surfaceList == null || !surfaceList.IsCompleted)
             {
-                surfaceEmpty.text = installationRoot == null ? "Open a map to choose from its installation's textures." : "Reading the textures of the installation's spline profiles...";
+                surfaceEmpty.text = Loc.T(installationRoot == null ? "roadbuilder.panel.surface.open_map" : "roadbuilder.panel.surface.reading"); // i18n:keys
                 return;
             }
             var text = surfaceSearch.value?.Trim() ?? string.Empty;
@@ -556,7 +552,7 @@ namespace OmsiMapEditor.UI
                     break;
                 surfaceTiles.Add(SurfaceTile(path));
             }
-            surfaceEmpty.text = shown == 0 ? text.Length > 0 ? "No texture matches \"" + text + "\"." : "The installation's spline profiles use no textures." : string.Empty;
+            surfaceEmpty.text = shown == 0 ? text.Length > 0 ? Loc.T("roadbuilder.panel.surface.no_match", ("text", text)) : Loc.T("roadbuilder.panel.surface.none") : string.Empty;
         }
 
         private VisualElement SurfaceTile(string path)
@@ -649,28 +645,15 @@ namespace OmsiMapEditor.UI
             Refresh(false);
         }
 
-        private void AddLineButton(VisualElement parent, OmsiRoadMarking? marking, string text, string tooltip)
+        private void AddLineButton(VisualElement parent, OmsiRoadMarking? marking, string textKey, string tooltipKey)
         {
-            var button = new Button(() => ChangeLine(marking)) { text = text, tooltip = tooltip };
+            var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => ChangeLine(marking)), tooltipKey); // i18n:keys
+            // "Auto" is written with the name of the line the editor chooses, so Refresh sets its text.
+            if (!marking.HasValue)
+                LocBindings.Text(button, "roadbuilder.panel.auto");
             button.AddToClassList("panel-tab");
             parent.Add(button);
             lineButtons[button] = marking;
-        }
-
-        private static string LineTooltip(OmsiRoadMarking marking)
-        {
-            switch (marking)
-            {
-                case OmsiRoadMarking.Dashed: return "Guide line, 3 m dashes with 6 m gaps, as in towns";
-                case OmsiRoadMarking.LongDashed: return "Guide line, 6 m dashes with 12 m gaps, as on country roads";
-                case OmsiRoadMarking.Solid: return "Lane line traffic must not cross";
-                case OmsiRoadMarking.Double: return "Two solid lines";
-                case OmsiRoadMarking.SolidDashed: return "Solid on the left, dashed on the right: traffic on the right may cross";
-                case OmsiRoadMarking.DashedSolid: return "Dashed on the left, solid on the right: traffic on the left may cross";
-                case OmsiRoadMarking.Broad: return "Broad solid line, as beside bus and bike lanes";
-                case OmsiRoadMarking.BroadDashed: return "Broad dashed line, 3 m dashes with 3 m gaps, as where traffic may cross into a bus lane";
-                default: return "No line";
-            }
         }
 
         private void ChangeLine(OmsiRoadMarking? marking)
@@ -845,8 +828,7 @@ namespace OmsiMapEditor.UI
             }
 
             var problems = type.Problems();
-            summaryLabel.text = problems.Count > 0 ? problems[0]
-                : type.Lanes.Count + " lanes, " + type.Width.ToString("0.00", CultureInfo.InvariantCulture) + " m wide";
+            summaryLabel.text = problems.Count > 0 ? problems[0] : Loc.T("roadbuilder.panel.summary", ("count", type.Lanes.Count), ("width", type.Width));
             summaryLabel.EnableInClassList("panel-info-warning", problems.Count > 0);
             saveButton.SetEnabled(problems.Count == 0);
             saveAsNewButton.SetEnabled(problems.Count == 0);
@@ -859,16 +841,16 @@ namespace OmsiMapEditor.UI
             if (selectedLine >= 0)
             {
                 var chosen = type.Lanes[selectedLine].RightMarking;
-                selectedTitle.text = "Line between lane " + (selectedLine + 1) + " and " + (selectedLine + 2);
+                selectedTitle.text = Loc.T("roadbuilder.panel.line_title", ("a", selectedLine + 1), ("b", selectedLine + 2));
                 foreach (var pair in lineButtons)
                 {
                     pair.Key.EnableInClassList("panel-tab-active", pair.Value == chosen);
                     if (!pair.Value.HasValue)
-                        pair.Key.text = "Auto: " + OmsiRoadLane.Name(type.AutoMarking(selectedLine));
+                        pair.Key.text = Loc.T("roadbuilder.panel.auto_named", ("marking", MarkingName(type.AutoMarking(selectedLine))));
                 }
             }
             else
-                selectedTitle.text = lane == null ? "Pick a lane or the line between two in the bar above" : "Lane " + (selected + 1) + ": " + OmsiRoadLane.Name(lane.Kind);
+                selectedTitle.text = lane == null ? Loc.T("roadbuilder.panel.pick_title") : Loc.T("roadbuilder.panel.lane_title", ("n", selected + 1), ("lane", LaneName(lane.Kind)));
             laneOptions.SetEnabled(lane != null);
             foreach (var pair in kindButtons)
                 pair.Value.EnableInClassList("panel-tab-active", lane != null && lane.Kind == pair.Key);
@@ -878,14 +860,14 @@ namespace OmsiMapEditor.UI
             forwardButton.parent.parent.SetEnabled(directed);
             forwardButton.EnableInClassList("panel-tab-active", directed && lane.Direction == OmsiRoadLaneDirection.Forward);
             backwardButton.EnableInClassList("panel-tab-active", directed && lane.Direction == OmsiRoadLaneDirection.Backward);
-            surfaceButton.text = lane?.Texture != null ? Path.GetFileNameWithoutExtension(lane.Texture) : "Standard";
-            surfaceButton.tooltip = lane?.Texture ?? "The base game's texture for this kind of lane; click to choose another";
+            surfaceButton.text = lane?.Texture != null ? Path.GetFileNameWithoutExtension(lane.Texture) : Loc.T("roadbuilder.panel.standard");
+            surfaceButton.tooltip = lane?.Texture ?? Loc.T("roadbuilder.panel.standard.tooltip_click");
             var tram = lane != null && lane.Kind == OmsiRoadLaneKind.Tram;
             trafficRow.style.display = tram ? DisplayStyle.Flex : DisplayStyle.None;
             tramOnlyButton.EnableInClassList("panel-tab-active", tram && !lane.Shared);
             carsTooButton.EnableInClassList("panel-tab-active", tram && lane.Shared);
-            rowObjectButton.text = lane?.RowObject != null ? Path.GetFileNameWithoutExtension(lane.RowObject) : "Choose...";
-            rowObjectButton.tooltip = lane?.RowObject ?? "Choose a tree, a street light or any object in the library; a row of it is laid along the lane whenever the road is built";
+            rowObjectButton.text = lane?.RowObject != null ? Path.GetFileNameWithoutExtension(lane.RowObject) : Loc.T("roadbuilder.panel.choose");
+            rowObjectButton.tooltip = lane?.RowObject ?? Loc.T("roadbuilder.panel.objects.tooltip");
             // Objects stand only beside the traffic; a row given to another lane before shows, so it can be taken away.
             objectRow.style.display = lane != null && (OmsiRoadLane.CanHoldRow(lane.Kind) || lane.RowObject != null) ? DisplayStyle.Flex : DisplayStyle.None;
             rowObjectButton.SetEnabled(lane != null && OmsiRoadLane.CanHoldRow(lane.Kind));
@@ -939,7 +921,7 @@ namespace OmsiMapEditor.UI
                 row.AddToClassList("road-builder-lane-row-icon");
                 chip.Add(row);
             }
-            var kind = new Label(Short(lane.Kind) + (lane.Kind == OmsiRoadLaneKind.Tram && lane.Shared ? " + cars" : string.Empty)) { pickingMode = PickingMode.Ignore };
+            var kind = new Label(ShortName(lane.Kind) + (lane.Kind == OmsiRoadLaneKind.Tram && lane.Shared ? Loc.T("roadbuilder.panel.cars_suffix") : string.Empty)) { pickingMode = PickingMode.Ignore };
             kind.AddToClassList("road-builder-lane-kind");
             chip.Add(kind);
             var width = new Label(lane.Width.ToString("0.00", CultureInfo.InvariantCulture) + " m") { pickingMode = PickingMode.Ignore };
@@ -949,39 +931,93 @@ namespace OmsiMapEditor.UI
             return chip;
         }
 
-        private static string Short(OmsiRoadLaneKind kind)
+        // In the order of the enums.
+        private static readonly string[] LaneKeys =
         {
-            switch (kind)
+            "roadbuilder.panel.lane.driving", "roadbuilder.panel.lane.sidewalk", "roadbuilder.panel.lane.median", "roadbuilder.panel.lane.shoulder",
+            "roadbuilder.panel.lane.bus", "roadbuilder.panel.lane.bike", "roadbuilder.panel.lane.parking", "roadbuilder.panel.lane.tram"
+        };
+
+        private static readonly string[] LaneShortKeys =
+        {
+            "roadbuilder.panel.lane.driving.short", "roadbuilder.panel.lane.sidewalk.short", "roadbuilder.panel.lane.median.short", "roadbuilder.panel.lane.shoulder.short",
+            "roadbuilder.panel.lane.bus.short", "roadbuilder.panel.lane.bike.short", "roadbuilder.panel.lane.parking.short", "roadbuilder.panel.lane.tram.short"
+        };
+
+        private static readonly string[] MarkingKeys =
+        {
+            "roadbuilder.panel.marking.none", "roadbuilder.panel.marking.dashed", "roadbuilder.panel.marking.solid", "roadbuilder.panel.marking.longdashed",
+            "roadbuilder.panel.marking.double", "roadbuilder.panel.marking.soliddashed", "roadbuilder.panel.marking.dashedsolid", "roadbuilder.panel.marking.broad",
+            "roadbuilder.panel.marking.broaddashed"
+        };
+
+        private static readonly string[] PlaceKeys = { "roadbuilder.panel.place.kerb", "roadbuilder.panel.place.middle", "roadbuilder.panel.place.outer" };
+
+        private readonly List<KeyValuePair<Button, OmsiRoadLaneKind>> addButtons = new List<KeyValuePair<Button, OmsiRoadLaneKind>>();
+
+        private static string LaneName(OmsiRoadLaneKind kind)
+        {
+            return Loc.T(LaneKeys[(int)kind]); // i18n:keys
+        }
+
+        private static string ShortName(OmsiRoadLaneKind kind)
+        {
+            return Loc.T(LaneShortKeys[(int)kind]); // i18n:keys
+        }
+
+        private static string MarkingKey(OmsiRoadMarking marking)
+        {
+            return MarkingKeys[(int)marking];
+        }
+
+        private static string MarkingName(OmsiRoadMarking marking)
+        {
+            return Loc.T(MarkingKeys[(int)marking]); // i18n:keys
+        }
+
+        private static string PlaceKey(OmsiRoadRowPlace place)
+        {
+            return PlaceKeys[(int)place];
+        }
+
+        /// <summary>The key of a template's name; the templates come from the model with their English names.</summary>
+        private static string TemplateKey(string englishName)
+        {
+            switch (englishName)
             {
-                case OmsiRoadLaneKind.Sidewalk: return "Walk";
-                case OmsiRoadLaneKind.Median: return "Median";
-                case OmsiRoadLaneKind.Shoulder: return "Shoulder";
-                case OmsiRoadLaneKind.Bus: return "Bus";
-                case OmsiRoadLaneKind.Bike: return "Bike";
-                case OmsiRoadLaneKind.Parking: return "Parking";
-                case OmsiRoadLaneKind.Tram: return "Tram";
-                default: return "Lane";
+                case "2 lanes": return "roadbuilder.panel.template.lanes2";
+                case "4 lanes": return "roadbuilder.panel.template.lanes4";
+                case "2+2 with median": return "roadbuilder.panel.template.median";
+                case "One-way": return "roadbuilder.panel.template.oneway";
+                case "Bus lanes": return "roadbuilder.panel.template.bus";
+                case "Parking and bikes": return "roadbuilder.panel.template.parking";
+                case "Country road": return "roadbuilder.panel.template.country";
+                case "Tram in the street": return "roadbuilder.panel.template.tramstreet";
+                case "Tram in the middle": return "roadbuilder.panel.template.trammiddle";
+                case "Footpath": return "roadbuilder.panel.template.footpath";
+                default: return "roadbuilder.panel.template.lanes2";
             }
         }
 
-        private static string PlaceName(OmsiRoadRowPlace place)
+        private static Label SectionLabelKey(string key)
         {
-            switch (place)
-            {
-                case OmsiRoadRowPlace.Middle: return "Middle";
-                case OmsiRoadRowPlace.Outer: return "Far side";
-                default: return "Kerb";
-            }
+            var label = new Label();
+            LocBindings.Text(label, key); // i18n:keys
+            label.AddToClassList("picker-options-title");
+            return label;
         }
 
-        private static string PlaceTooltip(OmsiRoadRowPlace place)
+        /// <summary>The language changed: what the panel wrote from the language files is written again.</summary>
+        public void RefreshTexts()
         {
-            switch (place)
-            {
-                case OmsiRoadRowPlace.Middle: return "In the middle of the lane";
-                case OmsiRoadRowPlace.Outer: return "At the side away from the road, 0.75 m in";
-                default: return "By the kerb, or the side towards the road, 0.75 m in";
-            }
+            nameField.textEdition.placeholder = Loc.T("roadbuilder.panel.name.placeholder");
+            surfaceSearch.textEdition.placeholder = Loc.T("roadbuilder.panel.search");
+            foreach (var pair in addButtons)
+                LocBindings.Tooltip(pair.Key, "roadbuilder.panel.add_tooltip", ("lane", LaneName(pair.Value)));
+            ShowEditing();
+            if (surfaces.style.display == DisplayStyle.Flex)
+                FillSurfaces();
+            Refresh();
         }
 
         private static Label SectionLabel(string text)
@@ -991,11 +1027,11 @@ namespace OmsiMapEditor.UI
             return label;
         }
 
-        private static VisualElement Row(VisualElement parent, string label)
+        private static VisualElement Row(VisualElement parent, string labelKey)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            var text = new Label(label);
+            var text = LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             row.Add(text);
             parent.Add(row);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -341,7 +342,7 @@ namespace OmsiMapEditor.World
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
-                    Loaded?.Invoke("Objects could not be read: " + task.Exception?.GetBaseException().Message);
+                    Loaded?.Invoke(Loc.T("world.objects.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty)));
                     return;
                 }
                 pending = task.Result;

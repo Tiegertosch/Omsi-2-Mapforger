@@ -1,0 +1,22 @@
+{
+  "bugreport.title": "Fehler melden",
+  "bugreport.title.crash": "MapWorks hat sich unerwartet beendet",
+  "bugreport.intro": "Beschreibe das Problem, dann öffnet dein Browser ein neues Issue auf GitHub mit deinem Text, Angaben zu deinem Computer und zur geöffneten Karte sowie dem Log. Zum Absenden brauchst du ein GitHub-Konto.",
+  "bugreport.intro.crash": "Die letzte Sitzung endete, ohne dass MapWorks normal geschlossen wurde, durch einen Absturz oder weil es beendet werden musste. Ein Bericht hilft herauszufinden, warum: Schreibe, was du gerade getan hast, dann öffnet dein Browser GitHub mit dem Bericht und dem Log dieser Sitzung.",
+  "bugreport.field.title": "Titel",
+  "bugreport.field.title.tooltip": "Eine Zeile, die das Problem nennt, zum Beispiel „Kreuzungsarme springen beim Drehen“",
+  "bugreport.field.what": "Was passiert ist",
+  "bugreport.field.what.tooltip": "Was du gesehen hast und welche Meldung MapWorks gezeigt hat",
+  "bugreport.field.steps": "Schritte",
+  "bugreport.field.steps.tooltip": "Was du vorher getan hast, Schritt für Schritt, und auf welcher Karte; je genauer, desto schneller lässt es sich beheben",
+  "bugreport.field.expected": "Erwartet",
+  "bugreport.field.expected.tooltip": "Was du stattdessen erwartet hast",
+  "bugreport.log": "Log",
+  "bugreport.log.attach": "Log anhängen",
+  "bugreport.log.attach.tooltip": "Das Ende des MapWorks-Logs kommt in den Bericht; das ganze Log liegt in einem Ordner bereit und lässt sich ins Issue ziehen",
+  "bugreport.cancel": "Abbrechen",
+  "bugreport.send": "Auf GitHub öffnen",
+  "bugreport.send.tooltip": "Öffnet das GitHub-Formular für ein neues Issue im Browser, ausgefüllt; gesendet wird erst, wenn du dort auf „Submit“ drückst",
+  "bugreport.included": "Mitgeschickt wird: die Version von MapWorks, Windows, Grafikkarte, Prozessor und Arbeitsspeicher{what, select, crashlog {, das Ende des Logs der abgestürzten Sitzung und Unitys Absturzbericht, falls es einen gibt} crash {} maplog {, die geöffnete Karte und das Ende des Logs} other {, die geöffnete Karte}}. {log, select, yes {Das ganze Log liegt in einem Ordner bereit, der sich öffnet, und lässt sich ins Issue ziehen. } other {}}Dein Windows-Benutzerordner erscheint als %USERPROFILE%, Schlüssel von Bildquellen bleiben weg. Du siehst alles auf GitHub, bevor du es absendest.",
+  "bugreport.status": "Fehler melden: GitHub öffnet sich im Browser mit dem ausgefüllten Bericht{clipboard, select, no {, der ganze Bericht liegt zum Einfügen in der Zwischenablage} other {}}{hasfile, select, yes {; ziehe {file} aus dem geöffneten Ordner ins Issue} other {}}, dann auf „Submit“ drücken."
+}

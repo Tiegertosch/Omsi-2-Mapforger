@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine.UIElements;
 
@@ -40,66 +41,63 @@ namespace OmsiMapEditor.UI
         {
             AddToClassList("tool-panel");
             AddToClassList("picker-options");
-            var title = new Label("Terrain");
+            var title = LocBindings.NewLabel("terrain.title");
             title.AddToClassList("picker-options-title");
             Add(title);
 
-            AddModes(Row("Brush"), new[]
+            AddModes(Row("terrain.brush"), new[]
             {
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Raise", OmsiTerrainBrushMode.Raise),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Lower", OmsiTerrainBrushMode.Lower),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Smooth", OmsiTerrainBrushMode.Smooth)
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.raise", OmsiTerrainBrushMode.Raise),
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.lower", OmsiTerrainBrushMode.Lower),
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.smooth", OmsiTerrainBrushMode.Smooth)
             });
             AddModes(Row(string.Empty), new[]
             {
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Flatten", OmsiTerrainBrushMode.Flatten),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Roughen", OmsiTerrainBrushMode.Roughen),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Ramp", null)
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.flatten", OmsiTerrainBrushMode.Flatten),
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.roughen", OmsiTerrainBrushMode.Roughen),
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.ramp", null)
             });
             AddModes(Row(string.Empty), new[]
             {
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("Lake / river", OmsiTerrainBrushMode.Water)
+                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.water", OmsiTerrainBrushMode.Water)
             });
 
-            radiusSlider = new Slider(0f, 1f) { tooltip = "How far the brush reaches, 3 to 150 m; it works fully in the middle and softly towards its rim" };
+            radiusSlider = new Slider(0f, 1f);
+            LocBindings.Tooltip(radiusSlider, "terrain.radius.tooltip");
             radiusLabel = new Label();
-            AddSlider(Row("Radius"), radiusSlider, radiusLabel);
-            strengthSlider = new Slider(0.05f, 1f) { tooltip = "How fast the brush works while the button is held" };
+            AddSlider(Row("terrain.radius"), radiusSlider, radiusLabel, "terrain.radius.tooltip");
+            strengthSlider = new Slider(0.05f, 1f);
+            LocBindings.Tooltip(strengthSlider, "terrain.strength.tooltip");
             strengthLabel = new Label();
-            AddSlider(Row("Strength"), strengthSlider, strengthLabel);
-            flattenField = new TextField { tooltip = "The height Flatten works towards; empty uses the height where each stroke starts" };
+            AddSlider(Row("terrain.strength"), strengthSlider, strengthLabel, "terrain.strength.tooltip");
+            flattenField = new TextField();
+            LocBindings.Tooltip(flattenField, "terrain.flatten.tooltip");
             flattenField.AddToClassList("picker-field");
             flattenField.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
-            Row("Flatten to (m)").Add(flattenField);
-            depthField = new TextField { value = "1.5", tooltip = "How deep Lake / river digs under the water's surface" };
+            Row("terrain.flatten").Add(flattenField);
+            depthField = new TextField { value = "1.5" };
+            LocBindings.Tooltip(depthField, "terrain.depth.tooltip");
             depthField.AddToClassList("picker-field");
-            Row("Water depth (m)").Add(depthField);
+            Row("terrain.depth").Add(depthField);
 
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
             Add(planLabel);
-            var hint = new Label("Hold the left button over the ground to shape it; the ground never rises through a road beside it. " +
-                                 "Ramp: click where it starts and where it ends. Roads fitted to the terrain stay fitted. Esc ends the tool.");
+            var hint = LocBindings.NewLabel("terrain.hint");
             hint.AddToClassList("panel-info");
             Add(hint);
 
-            var heightMapTitle = new Label("Height map");
+            var heightMapTitle = LocBindings.NewLabel("terrain.heightmap");
             heightMapTitle.AddToClassList("picker-options-title");
             Add(heightMapTitle);
-            var heightMapHint = new Label("The ground as a grey picture, to shape in another program and bring back; openMapper reads and writes the same.");
+            var heightMapHint = LocBindings.NewLabel("terrain.heightmap.hint");
             heightMapHint.AddToClassList("panel-info");
             Add(heightMapHint);
             var buttons = new VisualElement();
             buttons.AddToClassList("panel-tabs");
             buttons.AddToClassList("picker-segmented");
-            var exportButton = new Button(() => ExportRequested?.Invoke())
-            {
-                text = "Export...", tooltip = "Writes the ground of all tiles as a 16-bit grey PNG, a pixel per terrain point, with its lowest and highest height in a .txt beside it"
-            };
-            var importButton = new Button(() => ImportRequested?.Invoke())
-            {
-                text = "Import...", tooltip = "Lays a grey picture (PNG of 8 or 16 bits, or TIFF; a TIFF of real heights brings its metres) over all tiles, stretched to the map's outer edges"
-            };
+            var exportButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.export", () => ExportRequested?.Invoke()), "terrain.export.tooltip");
+            var importButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.import", () => ImportRequested?.Invoke()), "terrain.import.tooltip");
             foreach (var button in new[] { exportButton, importButton })
             {
                 button.AddToClassList("panel-tab");
@@ -117,43 +115,46 @@ namespace OmsiMapEditor.UI
             importInfo.AddToClassList("panel-info");
             importBox.Add(importInfo);
             var lowestRow = Row(importBox, string.Empty, out lowestLabel);
-            lowestField = new TextField { tooltip = "The height black stands for" };
+            lowestField = new TextField();
+            LocBindings.Tooltip(lowestField, "terrain.black.tooltip");
             lowestField.AddToClassList("picker-field");
             lowestRow.Add(lowestField);
             var highestRow = Row(importBox, string.Empty, out highestLabel);
-            highestField = new TextField { tooltip = "The height white stands for" };
+            highestField = new TextField();
+            LocBindings.Tooltip(highestField, "terrain.white.tooltip");
             highestField.AddToClassList("picker-field");
             highestRow.Add(highestField);
-            smoothingSlider = new SliderInt(0, 6) { tooltip = "Passes of averaging each pixel with its neighbours, which hides the steps of an 8-bit picture" };
+            smoothingSlider = new SliderInt(0, 6);
+            LocBindings.Tooltip(smoothingSlider, "terrain.smoothing.tooltip");
             smoothingLabel = new Label();
             smoothingSlider.AddToClassList("new-map-slider");
             smoothingSlider.RegisterValueChangedCallback(_ => smoothingLabel.text = smoothingSlider.value.ToString(CultureInfo.InvariantCulture));
-            var smoothingRow = Row(importBox, "Smoothing", out _);
+            var smoothingRow = Row(importBox, "terrain.smoothing", out _);
             smoothingRow.Add(smoothingSlider);
             smoothingLabel.AddToClassList("new-map-factor");
             smoothingRow.Add(smoothingLabel);
             var how = new VisualElement();
             how.AddToClassList("panel-tabs");
             how.AddToClassList("picker-segmented");
-            replaceButton = new Button(() => SetAdd(false)) { text = "Replace the ground", tooltip = "The picture's heights take the ground's place" };
-            addButton = new Button(() => SetAdd(true)) { text = "Add to it", tooltip = "The picture's heights are added to the ground as it is, as hills on a slope" };
+            replaceButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.replace", () => SetAdd(false)), "terrain.replace.tooltip");
+            addButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.add", () => SetAdd(true)), "terrain.add.tooltip");
             foreach (var button in new[] { replaceButton, addButton })
             {
                 button.AddToClassList("panel-tab");
                 how.Add(button);
             }
             importBox.Add(how);
-            var keep = new Label("Roads and objects keep their heights: best done before building. Roads fitted to the terrain are fitted again.");
+            var keep = LocBindings.NewLabel("terrain.keep");
             keep.AddToClassList("panel-info");
             importBox.Add(keep);
-            coarseLabel = new Label("An 8-bit picture has only 256 steps of height: smoothing hides them.");
+            coarseLabel = LocBindings.NewLabel("terrain.coarse");
             coarseLabel.AddToClassList("panel-info");
             importBox.Add(coarseLabel);
             var actions = new VisualElement();
             actions.AddToClassList("panel-tabs");
             actions.AddToClassList("picker-segmented");
-            var lay = new Button(() => ImportConfirmed?.Invoke()) { text = "Lay it on the map" };
-            var cancel = new Button(HideImport) { text = "Cancel" };
+            var lay = LocBindings.NewButton("terrain.lay", () => ImportConfirmed?.Invoke());
+            var cancel = LocBindings.NewButton("terrain.cancel", HideImport);
             foreach (var button in new[] { lay, cancel })
             {
                 button.AddToClassList("panel-tab");
@@ -210,6 +211,12 @@ namespace OmsiMapEditor.UI
             importBox.style.display = DisplayStyle.Flex;
         }
 
+        /// <summary>The language changed: what the panel wrote from the language files is written again.</summary>
+        public void RefreshTexts()
+        {
+            SetAdd(ImportAdds);
+        }
+
         public void HideImport()
         {
             importBox.style.display = DisplayStyle.None;
@@ -228,8 +235,8 @@ namespace OmsiMapEditor.UI
             ImportAdds = add;
             replaceButton.EnableInClassList("panel-tab-active", !add);
             addButton.EnableInClassList("panel-tab-active", add);
-            lowestLabel.text = add ? "Black adds (m)" : "Black is (m)";
-            highestLabel.text = add ? "White adds (m)" : "White is (m)";
+            lowestLabel.text = Loc.T(add ? "terrain.black_adds" : "terrain.black_is"); // i18n:keys
+            highestLabel.text = Loc.T(add ? "terrain.white_adds" : "terrain.white_is"); // i18n:keys
         }
 
         /// <summary>The brush chosen, or null for the ramp.</summary>
@@ -289,7 +296,8 @@ namespace OmsiMapEditor.UI
             foreach (var pair in modes)
             {
                 var mode = pair.Value;
-                var button = new Button(() => SetMode(mode)) { text = pair.Key, tooltip = Describe(mode) };
+                var button = LocBindings.NewButton(pair.Key, () => SetMode(mode)); // i18n:keys
+                LocBindings.Tooltip(button, Describe(mode)); // i18n:keys
                 button.AddToClassList("panel-tab");
                 group.Add(button);
                 modeButtons[button] = mode;
@@ -297,32 +305,32 @@ namespace OmsiMapEditor.UI
             row.Add(group);
         }
 
+        /// <summary>The key of the tooltip of a brush.</summary>
         private static string Describe(OmsiTerrainBrushMode? mode)
         {
             switch (mode)
             {
                 case OmsiTerrainBrushMode.Raise:
-                    return "Raises the ground under the brush while the button is held";
+                    return "terrain.mode.raise.tooltip";
                 case OmsiTerrainBrushMode.Lower:
-                    return "Lowers the ground under the brush while the button is held";
+                    return "terrain.mode.lower.tooltip";
                 case OmsiTerrainBrushMode.Smooth:
-                    return "Evens the ground out towards the average around each point";
+                    return "terrain.mode.smooth.tooltip";
                 case OmsiTerrainBrushMode.Flatten:
-                    return "Brings the ground to one height: where the stroke starts, or the height typed below";
+                    return "terrain.mode.flatten.tooltip";
                 case OmsiTerrainBrushMode.Roughen:
-                    return "Adds the gentle rolls and dips of a natural field";
+                    return "terrain.mode.roughen.tooltip";
                 case OmsiTerrainBrushMode.Water:
-                    return "Digs a lake or a river bed under the water of the tile, or 0.3 m under the ground where the stroke starts, " +
-                           "and lays water on the tiles it reaches; it never fills";
+                    return "terrain.mode.water.tooltip";
                 default:
-                    return "Click where it starts and where it ends: the ground between becomes one even slope as wide as the brush";
+                    return "terrain.mode.ramp.tooltip";
             }
         }
 
-        private void AddSlider(VisualElement row, Slider slider, Label value)
+        private void AddSlider(VisualElement row, Slider slider, Label value, string tooltipKey)
         {
             slider.AddToClassList("new-map-slider");
-            row.tooltip = slider.tooltip;
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             slider.RegisterValueChangedCallback(_ =>
             {
                 ShowValues();
@@ -344,16 +352,16 @@ namespace OmsiMapEditor.UI
             return (float)(Math.Log(Math.Max(3.0, Math.Min(150.0, metres)) / 3.0) / Math.Log(50.0));
         }
 
-        private VisualElement Row(string label)
+        private VisualElement Row(string labelKey)
         {
-            return Row(this, label, out _);
+            return Row(this, labelKey, out _);
         }
 
-        private static VisualElement Row(VisualElement parent, string label, out Label text)
+        private static VisualElement Row(VisualElement parent, string labelKey, out Label text)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            text = new Label(label);
+            text = labelKey.Length == 0 ? new Label() : LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             row.Add(text);
             parent.Add(row);

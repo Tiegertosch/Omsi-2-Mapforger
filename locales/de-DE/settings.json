@@ -1,0 +1,8 @@
+{
+  "settings.title": "Einstellungen",
+  "settings.section.general": "Allgemein",
+  "settings.language.label": "Sprache",
+  "settings.language.hint": "Die Sprache der Programmoberfläche. Karten, Projekte und Exporte hängen nicht von ihr ab; die Wahl wird für den nächsten Start gemerkt.",
+  "settings.language.changed": "Die Oberflächensprache ist jetzt {language}.",
+  "settings.close": "Schließen"
+}

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -30,7 +31,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEditSplinesInVariant)
             {
-                SetStatus(ReadOnlyMessage("change the type of splines"));
+                SetStatus(ReadOnlyMessage("readonly.action.spline_type"));
                 return;
             }
             if (PickingElementType)
@@ -40,12 +41,11 @@ namespace OmsiMapEditor.UI
             UpdateRoadProfiles();
             splinePickTile = selectedSplineTile;
             splinePickId = selectedSpline.Id;
-            roadPanel.BeginPick("New type for spline #" + splinePickId, "Click the road type spline #" + splinePickId + " becomes in " + editedVariant.Title +
-                                                                       "; it keeps its place. Esc leaves it as it is.");
+            roadPanel.BeginPick(Loc.T("splinevar.pick.title", ("id", splinePickId)), Loc.T("splinevar.pick.hint", ("id", splinePickId), ("variant", editedVariant.Title)));
             objectsPanel.style.display = DisplayStyle.None;
             roadPanel.style.display = DisplayStyle.Flex;
             objectsPanelHost.style.display = DisplayStyle.Flex;
-            SetStatus("Click the new road type for spline #" + splinePickId + " in the panel.");
+            SetStatus(Loc.T("splinevar.status.pick", ("id", splinePickId)));
         }
 
         /// <summary>Closes the chooser, and gives the spline the profile that was clicked; null leaves it as it is.</summary>
@@ -63,13 +63,13 @@ namespace OmsiMapEditor.UI
                 objectsPanelHost.style.display = DisplayStyle.None;
             if (assetPath == null)
             {
-                SetStatus("The road type stays as it is.");
+                SetStatusT("splinevar.status.stays");
                 return;
             }
             var spline = tile.Splines.Find(candidate => candidate.Id == id);
             if (spline == null)
             {
-                SetStatus("Spline #" + id + " is no longer there.");
+                SetStatusT("splinevar.status.gone", ("id", id));
                 return;
             }
             ApplySplineType(tile, spline, assetPath);
@@ -79,7 +79,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEditSplinesInVariant)
             {
-                SetStatus(ReadOnlyMessage("change the type of splines"));
+                SetStatus(ReadOnlyMessage("readonly.action.spline_type"));
                 return;
             }
             OmsiSplineChange change;
@@ -91,22 +91,22 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The type of spline #" + spline.Id + " could not be changed: " + exception.Message);
+                SetStatusT("splinevar.status.type_failed", ("id", spline.Id), ("reason", exception.Message));
                 return;
             }
             var name = Path.GetFileNameWithoutExtension(assetPath);
             if (change == null)
             {
-                SetStatus("Spline #" + spline.Id + " already is " + name + ".");
+                SetStatusT("splinevar.status.already", ("id", spline.Id), ("name", name));
                 return;
             }
             var id = spline.Id;
-            PushHistory(new ObjectEditStep { SplineChange = change, Description = "the new road type of spline #" + id });
+            PushHistory(new ObjectEditStep { SplineChange = change, Description = Loc.T("splinevar.step.type", ("id", id)) });
             RefreshSplineViews(change);
             ResetPaths(currentSummary);
             RenderInspector();
-            SetStatus("Spline #" + id + " is " + name + " now in " + editedVariant.Title + ". Ctrl+Z undoes it." +
-                      (change.Notes.Count > 0 ? " " + string.Join(" ", change.Notes) : string.Empty));
+            SetStatusT("splinevar.status.changed", ("id", id), ("name", name), ("variant", editedVariant.Title), ("hasNotes", change.Notes.Count > 0 ? "yes" : "no"),
+                ("notes", string.Join(" ", change.Notes)));
         }
 
         /// <summary>
@@ -117,12 +117,12 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEditSplinesInVariant)
             {
-                SetStatus(ReadOnlyMessage("build roads"));
+                SetStatus(ReadOnlyMessage("readonly.action.build_roads"));
                 return;
             }
             if (plan.StartTrimMeters > 0.0)
             {
-                SetStatus("In a variant a road cannot round a corner at the road before it: set the corner radius to 0 or start the road away from the end.");
+                SetStatusT("splinevar.status.corner");
                 return;
             }
             OmsiSplineChange change;
@@ -133,23 +133,22 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The road could not be built: " + exception.Message);
+                SetStatusT("splinevar.status.build_failed", ("reason", exception.Message));
                 return;
             }
-            PushHistory(new ObjectEditStep { SplineChange = change, Description = "the road in the variant" });
+            PushHistory(new ObjectEditStep { SplineChange = change, Description = Loc.T("splinevar.step.road") });
             RefreshSplineViews(change);
             ResetPaths(currentSummary);
             var warnings = plan.Issues.FindAll(issue => issue.Severity != OmsiRoadIssueSeverity.Note).Count;
-            var built = "Built " + plan.LengthMeters.ToString("F1", CultureInfo.InvariantCulture) + " m of road in " + change.SplineIds.Count + " spline(s) in " +
-                        editedVariant.Title + (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty);
+            var built = Loc.T("splinevar.built", ("meters", plan.LengthMeters), ("count", change.SplineIds.Count), ("variant", editedVariant.Title), ("warnings", warnings));
             if (endJoin != null || endPort != null)
             {
                 EndRoad();
-                SetStatus(built + ", meeting " + (endJoin != null ? "spline #" + endJoin.Spline.Id : DescribePort(endPort)) + ". Click to start the next road.");
+                SetStatus(Loc.T("splinevar.built.meeting", ("built", built), ("target", endJoin != null ? Loc.T("splinevar.spline", ("id", endJoin.Spline.Id)) : DescribePort(endPort))));
                 return;
             }
             ContinueRoadFrom(change);
-            SetStatus(built + (roadStarted ? ". Click to go on, Esc ends the road, Ctrl+Z takes it back." : "."));
+            SetStatus(Loc.T(roadStarted ? "splinevar.built.going" : "splinevar.built.done", ("built", built))); // i18n:keys
         }
 
         /// <summary>Takes the selected spline away in the variant being edited; what else names it is told but does not stop it.</summary>
@@ -159,7 +158,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEditSplinesInVariant)
             {
-                SetStatus(ReadOnlyMessage("delete splines"));
+                SetStatus(ReadOnlyMessage("readonly.action.delete_splines"));
                 return;
             }
             OmsiSplineChange change;
@@ -172,38 +171,30 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not delete spline #" + id + ": " + exception.Message);
+                SetStatusT("splinevar.status.delete_failed", ("id", id), ("reason", exception.Message));
                 return;
             }
-            PushHistory(new ObjectEditStep { SplineChange = change, Description = "the deletion of spline #" + id + " in the variant" });
+            PushHistory(new ObjectEditStep { SplineChange = change, Description = Loc.T("splinevar.step.delete", ("id", id)) });
             ClearSelectedSpline();
             RefreshSplineViews(change);
             ResetPaths(currentSummary);
             RenderInspector();
             var rest = new List<string>();
             if (change.RemovedRowCount > 0)
-                rest.Add(change.RemovedRowCount + " row(s) of objects along it go with it");
+                rest.Add(Loc.T("splinevar.rest.rows", ("count", change.RemovedRowCount)));
             if (change.References.Count > 0)
-                rest.Add("it is still named by " + string.Join(", ", change.References.GroupBy(reference => reference.Kind).Select(group => group.Key + " (" + group.Count() + ")")));
-            SetStatus("Deleted spline #" + id + " in " + editedVariant.Title + (rest.Count > 0 ? ": " + string.Join("; ", rest) : string.Empty) + ". Ctrl+Z brings it back.");
+                rest.Add(Loc.T("splinevar.rest.named", ("names", string.Join(", ", change.References.GroupBy(reference => reference.Kind).Select(group => group.Key + " (" + group.Count() + ")")))));
+            SetStatus(Loc.T("splinevar.status.deleted", ("id", id), ("variant", editedVariant.Title), ("hasRest", rest.Count > 0 ? "yes" : "no"), ("rest", string.Join("; ", rest))));
         }
 
         /// <summary>The inspector's buttons for a spline in a variant being edited.</summary>
         private void AddSplineVariantButtons(VisualElement editor)
         {
-            var change = new Button(PickSplineType)
-            {
-                text = "Change type...",
-                tooltip = "Choose another road type for this spline in the variant ([typ] in its change list); the base map stays as it is"
-            };
+            var change = LocBindings.WithTooltip(LocBindings.NewButton("splinevar.change_type", PickSplineType), "splinevar.change_type.tooltip");
             change.AddToClassList("map-control-button");
             change.AddToClassList("inspector-edit-apply");
             editor.Add(change);
-            var delete = new Button(DeleteSelectedSplineInVariant)
-            {
-                text = "Delete in variant",
-                tooltip = "Takes this spline away from the date the variant starts ([delete] in its change list); the base map stays as it is"
-            };
+            var delete = LocBindings.WithTooltip(LocBindings.NewButton("splinevar.delete", DeleteSelectedSplineInVariant), "splinevar.delete.tooltip");
             delete.AddToClassList("map-control-button");
             delete.AddToClassList("inspector-edit-delete");
             editor.Add(delete);

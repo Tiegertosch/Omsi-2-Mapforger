@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using OmsiMapEditor.Core.Localization;
 using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
@@ -19,21 +20,21 @@ namespace OmsiMapEditor.UI
             var title = new Label("OMSI MapWorks");
             title.AddToClassList("welcome-title");
             Add(title);
-            var tagline = new Label("Build worlds. Shape roads. Drive your vision.");
+            var tagline = LocBindings.NewLabel("welcome.tagline");
             tagline.AddToClassList("welcome-tagline");
             Add(tagline);
 
             var cards = new VisualElement();
             cards.AddToClassList("welcome-cards");
-            cards.Add(Card("folder", "Open project", "Continue editing a MapWorks project (.omproj).",
+            cards.Add(Card("folder", "welcome.card.open_project.title", "welcome.card.open_project.text",
                 () => OpenProjectRequested?.Invoke(), null));
-            cards.Add(Card("map", "Open OMSI map", "Look at a map of your OMSI installation. Save it as a project to edit it.",
+            cards.Add(Card("map", "welcome.card.open_map.title", "welcome.card.open_map.text",
                 () => OpenMapRequested?.Invoke(), null));
-            cards.Add(Card("plus", "New map", "Start an empty map with its first tile, based on a map of your installation.",
+            cards.Add(Card("plus", "welcome.card.new_map.title", "welcome.card.new_map.text",
                 () => NewMapRequested?.Invoke(), null));
             Add(cards);
 
-            var recentHeading = new Label("Recent");
+            var recentHeading = LocBindings.NewLabel("welcome.recent");
             recentHeading.AddToClassList("welcome-section");
             Add(recentHeading);
             recentList = new VisualElement();
@@ -54,7 +55,7 @@ namespace OmsiMapEditor.UI
             var entries = RecentFiles.Load();
             if (entries.Count == 0)
             {
-                var empty = new Label("Projects and maps you open appear here.");
+                var empty = LocBindings.NewLabel("welcome.recent.empty");
                 empty.AddToClassList("welcome-empty");
                 recentList.Add(empty);
                 return;
@@ -65,7 +66,7 @@ namespace OmsiMapEditor.UI
                 var exists = File.Exists(entry.Path);
                 var row = new Button(() => RecentChosen?.Invoke(captured))
                 {
-                    tooltip = exists ? entry.Path : "Not found: " + entry.Path
+                    tooltip = exists ? entry.Path : Loc.T("welcome.recent.not_found.tooltip", ("path", entry.Path))
                 };
                 row.AddToClassList("welcome-recent-row");
                 var icon = new IconElement(entry.IsProject ? "folder" : "map");
@@ -80,7 +81,7 @@ namespace OmsiMapEditor.UI
                 location.AddToClassList("welcome-recent-path");
                 texts.Add(location);
                 row.Add(texts);
-                var kind = new Label(!exists ? "Not found" : entry.IsProject ? "Project" : "Map, read-only");
+                var kind = LocBindings.NewLabel(!exists ? "welcome.recent.kind.not_found" : entry.IsProject ? "welcome.recent.kind.project" : "welcome.recent.kind.map"); // i18n:keys
                 kind.AddToClassList("welcome-recent-kind");
                 row.Add(kind);
                 row.SetEnabled(exists);
@@ -88,8 +89,9 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <param name="titleKey">The keys of the card's title and text.</param>
         /// <param name="badge">A label such as "Planned" for a card that cannot be used yet; null for a usable card.</param>
-        private static Button Card(string icon, string title, string description, Action clicked, string badge)
+        private static Button Card(string icon, string titleKey, string textKey, Action clicked, string badge)
         {
             var card = new Button(clicked);
             card.AddToClassList("welcome-card");
@@ -97,10 +99,10 @@ namespace OmsiMapEditor.UI
             iconBox.AddToClassList("welcome-card-icon");
             iconBox.Add(new IconElement(icon));
             card.Add(iconBox);
-            var heading = new Label(title);
+            var heading = LocBindings.NewLabel(titleKey); // i18n:keys
             heading.AddToClassList("welcome-card-title");
             card.Add(heading);
-            var text = new Label(description);
+            var text = LocBindings.NewLabel(textKey); // i18n:keys
             text.AddToClassList("welcome-card-text");
             card.Add(text);
             if (badge != null)
@@ -108,7 +110,7 @@ namespace OmsiMapEditor.UI
                 var tag = new Label(badge);
                 tag.AddToClassList("welcome-card-badge");
                 card.Add(tag);
-                card.tooltip = title + " is planned and not available yet.";
+                card.tooltip = Loc.T("welcome.card.planned.tooltip", ("title", Loc.T(titleKey))); // i18n:keys
                 card.SetEnabled(false);
             }
             return card;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -30,7 +31,13 @@ namespace OmsiMapEditor.UI
 
         private static string DescribeElement(object element)
         {
-            return (element is OmsiObjectRecord ? "object #" : "attached object #") + ElementIdOf(element);
+            return Loc.T("labels.element", ("kind", element is OmsiObjectRecord ? "object" : "attached"), ("id", ElementIdOf(element)));
+        }
+
+        /// <summary>The text with a capital first letter, for a description that starts a sentence.</summary>
+        private static string Capital(string text)
+        {
+            return string.IsNullOrEmpty(text) ? text : char.ToUpperInvariant(text[0]) + text.Substring(1);
         }
 
         /// <summary>The button to choose another object file, and the labels as text fields with a button that writes them together.</summary>
@@ -41,11 +48,7 @@ namespace OmsiMapEditor.UI
             var labels = element is OmsiObjectRecord item ? item.Labels : ((OmsiAttachedObjectRecord)element).Labels;
             if (canEdit && !nested)
             {
-                var change = new Button(() => PickElementType(tile, element))
-                {
-                    text = "Change type...",
-                    tooltip = "Choose another object file for it in the library; its place and labels stay"
-                };
+                var change = LocBindings.WithTooltip(LocBindings.NewButton("labels.change_type", () => PickElementType(tile, element)), "labels.change_type.tooltip");
                 change.AddToClassList("map-control-button");
                 change.AddToClassList("inspector-edit-apply");
                 editor.Add(change);
@@ -55,7 +58,11 @@ namespace OmsiMapEditor.UI
             if (labels.Count == 0)
                 return;
 
-            var heading = new Label(nested ? "Labels" : "LABELS");
+            var heading = new Label();
+            if (nested)
+                LocBindings.Text(heading, "labels.heading");
+            else
+                LocBindings.TextUpper(heading, "labels.heading");
             heading.AddToClassList(nested ? "muted" : "inspector-section-heading");
             if (nested)
                 heading.style.marginLeft = 12;
@@ -63,7 +70,8 @@ namespace OmsiMapEditor.UI
             var fields = new List<TextField>();
             for (var index = 0; index < labels.Count; index++)
             {
-                var field = new TextField("Line " + (index + 1)) { value = labels[index] };
+                var field = new TextField { value = labels[index] };
+                LocBindings.Text(field, "labels.line", ("n", index + 1));
                 field.AddToClassList("inspector-edit-field");
                 if (nested)
                     field.style.marginLeft = 12;
@@ -73,11 +81,8 @@ namespace OmsiMapEditor.UI
             }
             if (!canEdit)
                 return;
-            var apply = new Button(() => ApplyElementLabels(tile, element, fields.ConvertAll(field => field.value)))
-            {
-                text = "Apply labels",
-                tooltip = "Writes all lines; they fill the object's string variables in order, such as a sign's text or the line number on a plate"
-            };
+            var apply = LocBindings.WithTooltip(LocBindings.NewButton("labels.apply", () => ApplyElementLabels(tile, element, fields.ConvertAll(field => field.value))),
+                "labels.apply.tooltip");
             apply.AddToClassList("map-control-button");
             apply.AddToClassList("inspector-edit-apply");
             if (nested)
@@ -92,9 +97,8 @@ namespace OmsiMapEditor.UI
                 return;
             var own = session.IsInEditedVariant(element);
             var note = new Label(own
-                ? "Added by " + editedVariant.Title + ": its own record changes."
-                : "A new type or new labels are written into " + editedVariant.Title + " ([selobject] with [typ] or [relabel]); the " +
-                  (session.OriginOf(element) != null ? "variant that adds it" : "base map") + " keeps its own.");
+                ? Loc.T("labels.note.own", ("variant", editedVariant.Title))
+                : Loc.T("labels.note.other", ("variant", editedVariant.Title), ("origin", session.OriginOf(element) != null ? "variant" : "base")));
             note.AddToClassList("muted");
             note.AddToClassList("inspector-edit-hint");
             editor.Add(note);
@@ -107,7 +111,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("change object types"));
+                SetStatus(ReadOnlyMessage("readonly.action.object_types"));
                 return;
             }
             if (PickingElementType)
@@ -120,27 +124,27 @@ namespace OmsiMapEditor.UI
                 typePickOptions = new VisualElement();
                 typePickOptions.AddToClassList("tool-panel");
                 typePickOptions.AddToClassList("picker-options");
-                var title = new Label("New object file");
+                var title = LocBindings.NewLabel("labels.pick.title");
                 title.AddToClassList("picker-options-title");
                 typePickOptions.Add(title);
                 typePickHint = new Label();
                 typePickHint.AddToClassList("panel-info");
                 typePickOptions.Add(typePickHint);
-                var cancel = new Button(() => EndElementTypePick(null)) { text = "Cancel", tooltip = "Leave the type as it is (Esc)" };
+                var cancel = LocBindings.WithTooltip(LocBindings.NewButton("labels.pick.cancel", () => EndElementTypePick(null)), "labels.pick.cancel.tooltip");
                 cancel.AddToClassList("map-control-button");
                 typePickOptions.Add(cancel);
             }
-            typePickHint.text = "Choose the object that " + DescribeElement(element) + " becomes. It keeps its place, orientation and labels.";
+            typePickHint.text = Loc.T("labels.pick.hint", ("element", DescribeElement(element)));
             UpdateObjectsCatalog();
             StartInstallationScan();
             typePickTile = tile;
             typePickElement = element;
-            objectsPanel.UseOptions(typePickOptions, "Click the new object for " + DescribeElement(element) + "; Esc leaves it as it is.",
-                "Click the object that " + DescribeElement(element) + " becomes.");
+            objectsPanel.UseOptions(typePickOptions, Loc.T("labels.pick.panel", ("element", DescribeElement(element))),
+                Loc.T("labels.pick.panel_hint", ("element", DescribeElement(element))));
             objectsPanelHost.style.display = DisplayStyle.Flex;
             objectsPanel.style.display = DisplayStyle.Flex;
             objectsPanel.FocusSearch();
-            SetStatus("Click the new object for " + DescribeElement(element) + " in the library.");
+            SetStatus(Loc.T("labels.status.pick", ("element", DescribeElement(element))));
         }
 
         /// <summary>Closes the library again, and gives the element the object file that was clicked; null leaves it as it is.</summary>
@@ -162,14 +166,14 @@ namespace OmsiMapEditor.UI
             if (assetPath != null)
                 ApplyElementType(tile, element, assetPath);
             else
-                SetStatus("The type stays as it is.");
+                SetStatusT("labels.status.stays");
         }
 
         private void ApplyElementType(OmsiTileSummary tile, object element, string assetPath)
         {
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("change object types"));
+                SetStatus(ReadOnlyMessage("readonly.action.object_types"));
                 return;
             }
             OmsiObjectChange change;
@@ -181,14 +185,14 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The type of " + DescribeElement(element) + " could not be changed: " + exception.Message);
+                SetStatus(Loc.T("labels.status.type_failed", ("element", DescribeElement(element)), ("reason", exception.Message)));
                 return;
             }
             if (change != null)
                 EnsureOutline(assetPath);
-            FinishElementChange(tile, change, "the new type of " + DescribeElement(element),
-                DescribeElement(element) + " is " + Path.GetFileNameWithoutExtension(assetPath) + " now", DescribeElement(element) + " already is " +
-                Path.GetFileNameWithoutExtension(assetPath) + ".");
+            FinishElementChange(tile, change, Loc.T("labels.step.type", ("element", DescribeElement(element))),
+                Loc.T("labels.done.type", ("element", Capital(DescribeElement(element))), ("name", Path.GetFileNameWithoutExtension(assetPath))),
+                Loc.T("labels.same.type", ("element", Capital(DescribeElement(element))), ("name", Path.GetFileNameWithoutExtension(assetPath))));
         }
 
         /// <summary>
@@ -210,7 +214,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("change labels"));
+                SetStatus(ReadOnlyMessage("readonly.action.labels"));
                 return;
             }
             OmsiObjectChange change;
@@ -222,11 +226,11 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The labels of " + DescribeElement(element) + " could not be changed: " + exception.Message);
+                SetStatus(Loc.T("labels.status.labels_failed", ("element", DescribeElement(element)), ("reason", exception.Message)));
                 return;
             }
-            FinishElementChange(tile, change, "the labels of " + DescribeElement(element), "The labels of " + DescribeElement(element) + " are written",
-                "The labels of " + DescribeElement(element) + " are the same.");
+            FinishElementChange(tile, change, Loc.T("labels.step.labels", ("element", DescribeElement(element))),
+                Loc.T("labels.done.labels", ("element", DescribeElement(element))), Loc.T("labels.same.labels", ("element", DescribeElement(element))));
         }
 
         /// <summary>One undo step for a change, the views refreshed, and the object it concerns selected, such as the parent of an attached object.</summary>
@@ -240,7 +244,7 @@ namespace OmsiMapEditor.UI
             PushHistory(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = change.ElementId, Change = change, Description = description });
             var shown = change.CurrentRecord;
             RefreshAfterChange(shown != null ? new[] { new MapSelectionItem { Tile = tile, Record = shown } } : null);
-            SetStatus(done + (EditingVariant ? " in " + editedVariant.Title : string.Empty) + ". Ctrl+Z undoes it.");
+            SetStatus(Loc.T("labels.done", ("done", done), ("inVariant", EditingVariant ? "yes" : "no"), ("variant", EditingVariant ? editedVariant.Title : string.Empty)));
         }
 
         /// <summary>

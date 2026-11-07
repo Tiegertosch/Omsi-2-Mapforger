@@ -1,0 +1,13 @@
+{
+  "filedialog.all": "All files",
+  "filedialog.config": "OMSI map configuration (global.cfg)",
+  "filedialog.project": "MapWorks project (*.omproj)",
+  "filedialog.png": "PNG picture (*.png)",
+  "filedialog.heightmaps": "Height maps (*.png, *.tif, *.tiff)",
+  "filedialog.pictures": "Pictures (*.jpg, *.jpeg, *.png, *.bmp, *.tga)",
+  "filedialog.open_config": "Open an OMSI map configuration",
+  "filedialog.open_project": "Open a MapWorks project",
+  "filedialog.save_project": "Save MapWorks project",
+  "filedialog.export_heights": "Export the height map",
+  "filedialog.open_heights": "A height map for the whole map"
+}

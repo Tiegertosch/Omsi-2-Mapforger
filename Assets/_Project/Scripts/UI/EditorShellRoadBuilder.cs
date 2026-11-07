@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -45,13 +46,13 @@ namespace OmsiMapEditor.UI
             rowPickOptions = new VisualElement();
             rowPickOptions.AddToClassList("tool-panel");
             rowPickOptions.AddToClassList("picker-options");
-            var title = new Label("Row of objects");
+            var title = LocBindings.NewLabel("roadbuilder.row.title");
             title.AddToClassList("picker-options-title");
             rowPickOptions.Add(title);
-            var hint = new Label("Choose the object that stands in a row along the lane, such as a tree or a street light. It is laid whenever the road type is built.");
+            var hint = LocBindings.NewLabel("roadbuilder.row.hint");
             hint.AddToClassList("panel-info");
             rowPickOptions.Add(hint);
-            var back = new Button(() => EndRowObjectPick(null)) { text = "Back to the road builder", tooltip = "Back without choosing an object (Esc)" };
+            var back = LocBindings.WithTooltip(LocBindings.NewButton("roadbuilder.row.back", () => EndRowObjectPick(null)), "roadbuilder.row.back.tooltip");
             back.AddToClassList("map-control-button");
             rowPickOptions.Add(back);
         }
@@ -64,11 +65,11 @@ namespace OmsiMapEditor.UI
             UpdateObjectsCatalog();
             StartInstallationScan();
             pickingRowObject = true;
-            objectsPanel.UseOptions(rowPickOptions, "Click the object for lane " + (roadBuilder.SelectedLane + 1) + "; Esc goes back to the road builder.");
+            objectsPanel.UseOptions(rowPickOptions, Loc.T("roadbuilder.row.panel", ("lane", roadBuilder.SelectedLane + 1)));
             objectsPanel.ShowState(OmsiObjectCategories.Name(OmsiObjectCategory.Trees), null, null);
             roadBuilder.style.display = DisplayStyle.None;
             objectsPanel.style.display = DisplayStyle.Flex;
-            SetStatus("Road builder: click the object for lane " + (roadBuilder.SelectedLane + 1) + " in the library, such as a tree or, under Lights, a street light.");
+            SetStatusT("roadbuilder.status.pick_row", ("lane", roadBuilder.SelectedLane + 1));
         }
 
         /// <summary>Back from the object library to the road builder, with the object chosen for the lane's row, or none.</summary>
@@ -85,12 +86,11 @@ namespace OmsiMapEditor.UI
                 var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
                 var turn = OmsiRoadLane.SuggestedRowTurn(new OmsiObjectOutlineCatalog(root).Get(assetPath));
                 roadBuilder.SetRowObject(assetPath, turn);
-                SetStatus("Road builder: a row of " + Path.GetFileNameWithoutExtension(assetPath) + " stands along lane " + (roadBuilder.SelectedLane + 1) +
-                          " whenever the road type is built" + (turn != 0.0 ? ", turned by " + turn.ToString("0", System.Globalization.CultureInfo.InvariantCulture) +
-                                                                               "° so it runs along the road" : string.Empty) + "; set how far apart and where across the lane.");
+                SetStatusT("roadbuilder.status.row_set", ("name", Path.GetFileNameWithoutExtension(assetPath)), ("lane", roadBuilder.SelectedLane + 1),
+                    ("turned", turn != 0.0 ? "yes" : "no"), ("degrees", turn));
             }
             else
-                SetStatus("Road builder: no object chosen.");
+                SetStatusT("roadbuilder.status.no_object");
         }
 
         /// <summary>
@@ -121,15 +121,15 @@ namespace OmsiMapEditor.UI
                     parts.Add(new ObjectEditStep { SplineChange = busRules });
                 undoSteps[undoSteps.Count - 1] = new ObjectEditStep
                 {
-                    Group = parts, Description = DescribeStep(step) + (changes.Count > 0 ? " with its rows of objects" : " with its bus lanes")
+                    Group = parts, Description = Loc.T(changes.Count > 0 ? "roadbuilder.step.with_rows" : "roadbuilder.step.with_bus", ("step", DescribeStep(step))) // i18n:keys
                 };
                 rowLayout = null;
                 rowObjects = null;
                 RefreshAfterChange(null);
             }
             if (objects > 0 || failed.Count > 0)
-                SetStatus((statusLabel?.text ?? string.Empty) + (objects > 0 ? " " + objects + " objects stand in rows along it." : string.Empty) +
-                          (failed.Count > 0 ? " Not laid: " + string.Join(", ", failed) + "." : string.Empty));
+                SetStatus((statusLabel?.text ?? string.Empty) + (objects > 0 ? " " + Loc.T("roadbuilder.rows_laid", ("count", objects)) : string.Empty) +
+                          (failed.Count > 0 ? " " + Loc.T("roadbuilder.rows_failed", ("list", string.Join(", ", failed))) : string.Empty));
         }
 
         /// <summary>
@@ -191,7 +191,7 @@ namespace OmsiMapEditor.UI
                 {
                     if (kept.Contains(row.AssetPath + "|" + row.X))
                     {
-                        failed.Add(Path.GetFileNameWithoutExtension(row.AssetPath) + " (a row of it there is still needed)");
+                        failed.Add(Loc.T("roadbuilder.rows_kept", ("name", Path.GetFileNameWithoutExtension(row.AssetPath))));
                         continue;
                     }
                     var length = stretch.To - stretch.From;
@@ -329,7 +329,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus((statusLabel?.text ?? string.Empty) + " The bus lanes could not be kept for buses: " + exception.Message);
+                SetStatus((statusLabel?.text ?? string.Empty) + " " + Loc.T("roadbuilder.bus_failed", ("reason", exception.Message)));
                 return null;
             }
         }
@@ -378,7 +378,7 @@ namespace OmsiMapEditor.UI
             roadBuilder.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
             roadPanel.style.display = !show && activeTool == EditorTool.Road ? DisplayStyle.Flex : DisplayStyle.None;
             if (show)
-                SetStatus("Road builder: pick a lane in the bar to change it, add lanes or start from a template, then save the road type.");
+                SetStatusT("roadbuilder.status.start");
         }
 
         /// <summary>The spline profiles to offer: the installation's and the road types made since it was listed, without those deleted since.</summary>
@@ -401,7 +401,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("make road types"));
+                SetStatus(ReadOnlyMessage("readonly.action.make_road_types"));
                 return;
             }
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
@@ -413,7 +413,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("Road builder: the road type could not be made: " + exception.Message);
+                SetStatusT("roadbuilder.status.make_failed", ("reason", exception.Message));
                 return;
             }
             madeRoadTypes.Add(path);
@@ -421,8 +421,7 @@ namespace OmsiMapEditor.UI
             UpdateRoadProfiles();
             roadPanel.ChooseProfile(path);
             roadPanel.ShowTab("My roads");
-            SetStatus("Road builder: made " + Path.GetFileNameWithoutExtension(path) + " (" + type.Width.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) +
-                      " m) as " + path + " in your OMSI installation; it is chosen in the road tool, click on the map to build it.");
+            SetStatusT("roadbuilder.status.made", ("name", Path.GetFileNameWithoutExtension(path)), ("width", type.Width), ("path", path));
         }
 
         /// <summary>Opens a road type the builder made, as the pencil on its tile in My roads does.</summary>
@@ -439,19 +438,18 @@ namespace OmsiMapEditor.UI
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
-                SetStatus("Road builder: " + name + " cannot be read: " + exception.Message);
+                SetStatusT("roadbuilder.status.unreadable", ("name", name), ("reason", exception.Message));
                 return;
             }
             if (type == null)
             {
-                SetStatus("Road builder: " + name + " holds no lanes the road builder can read; it was not made with it.");
+                SetStatusT("roadbuilder.status.no_lanes", ("name", name));
                 return;
             }
             ShowRoadBuilder(true);
             var uses = SplinesUsing(path);
             roadBuilder.Edit(path, type, uses);
-            SetStatus("Road builder: change " + name + " and save it; " + (uses == 0 ? "no spline of this map uses it yet." :
-                uses == 1 ? "the spline of it in this map changes with it." : "all " + uses + " splines of it in this map change with it."));
+            SetStatusT("roadbuilder.status.edit", ("name", name), ("uses", uses));
         }
 
         /// <summary>How many splines of the map use a profile.</summary>
@@ -483,7 +481,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("change road types"));
+                SetStatus(ReadOnlyMessage("readonly.action.change_road_types"));
                 return;
             }
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
@@ -513,7 +511,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("Road builder: " + name + " could not be changed: " + exception.Message);
+                SetStatusT("roadbuilder.status.change_failed", ("name", name), ("reason", exception.Message));
                 return;
             }
             var parts = new List<ObjectEditStep> { new ObjectEditStep { RoadTypeChange = change } };
@@ -567,20 +565,16 @@ namespace OmsiMapEditor.UI
                 parts.Add(new ObjectEditStep { SplineChange = busRules });
             rowLayout = null;
             rowObjects = null;
-            PushHistory(new ObjectEditStep { Group = parts, Description = "the change of road type " + name });
+            PushHistory(new ObjectEditStep { Group = parts, Description = Loc.T("roadbuilder.step.change", ("name", name)) });
             StartInstallationScan(true);
             RefreshAfterChange(null);
             ShowRoadBuilder(false);
             roadPanel.ChooseProfile(path);
             var uses = SplinesUsing(path);
             var remade = junctions.Count - stayed.Count;
-            SetStatus("Road builder: changed " + name + " (" + type.Width.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " m)" +
-                      (uses > 0 ? "; " + uses + (uses == 1 ? " spline" : " splines") + " of it changed with it" : string.Empty) +
-                      (remade > 0 ? ", " + remade + (remade == 1 ? " junction was" : " junctions were") + " made again" +
-                                    (keepConnections ? string.Empty : " with every way through, as the lanes changed") : string.Empty) +
-                      (stayed.Count > 0 ? "; these junctions stay as they were: " + string.Join(", ", stayed) : string.Empty) +
-                      (rowObjectCount > 0 ? "; " + rowObjectCount + " objects stand in its rows" : string.Empty) +
-                      (rowsFailed.Count > 0 ? "; not laid: " + string.Join(", ", rowsFailed) : string.Empty) + ". Ctrl+Z undoes it.");
+            SetStatus(Loc.T("roadbuilder.status.changed", ("name", name), ("width", type.Width), ("uses", uses), ("remade", remade), ("every", keepConnections ? "no" : "yes"),
+                ("hasStayed", stayed.Count > 0 ? "yes" : "no"), ("stayed", string.Join(", ", stayed)), ("rows", rowObjectCount),
+                ("hasFailed", rowsFailed.Count > 0 ? "yes" : "no"), ("failed", string.Join(", ", rowsFailed))));
         }
 
         /// <summary>The junctions on the map the editor made with a profile on one of their arms, by tile.</summary>
@@ -627,20 +621,20 @@ namespace OmsiMapEditor.UI
             var made = OmsiGeneratedJunction.Read(root, record.AssetPath, RoadProfiles().Get);
             if (made == null)
             {
-                problem = "its file cannot be read";
+                problem = Loc.T("roadbuilder.problem.unreadable");
                 return null;
             }
             var rebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, tile, record);
             if (rebuild == null)
             {
-                problem = "its connection points do not match its file";
+                problem = Loc.T("roadbuilder.problem.mismatch");
                 return null;
             }
             var plain = PlainRoadTexture();
             var turn = rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, plain);
             if (turn.HasErrors)
             {
-                problem = turn.Problem ?? "the roads at it cannot be kept as they are";
+                problem = turn.Problem ?? Loc.T("roadbuilder.problem.keep");
                 return null;
             }
             string assetPath;
@@ -668,7 +662,7 @@ namespace OmsiMapEditor.UI
             }
             if (!result.Succeeded)
             {
-                problem = DescribeReferences(result.Blockers) + " still need it as it is";
+                problem = Loc.T("roadbuilder.problem.references", ("references", DescribeReferences(result.Blockers)));
                 return null;
             }
             return new List<object>(result.Steps);
@@ -709,14 +703,14 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("delete road types"));
+                SetStatus(ReadOnlyMessage("readonly.action.delete_road_types"));
                 return;
             }
             var name = Path.GetFileNameWithoutExtension(path);
             var uses = SplinesUsing(path);
             if (uses > 0)
             {
-                SetStatus("Road builder: " + name + " stays; " + uses + (uses == 1 ? " spline" : " splines") + " of this map use it.");
+                SetStatusT("roadbuilder.status.stays_splines", ("name", name), ("uses", uses));
                 return;
             }
             if (roadTypeUsers != null && !roadTypeUsers.IsCompleted)
@@ -725,7 +719,7 @@ namespace OmsiMapEditor.UI
             var workspace = session?.Workspace?.WorkspacePath;
             var task = Task.Run(() => OmsiRoadTypeStore.UsedBy(root, workspace, path));
             roadTypeUsers = task;
-            SetStatus("Road builder: looking whether any map or made junction still uses " + name + "...");
+            SetStatusT("roadbuilder.status.looking", ("name", name));
             IVisualElementScheduledItem poll = null;
             poll = roadBuilder.schedule.Execute(() =>
             {
@@ -738,13 +732,13 @@ namespace OmsiMapEditor.UI
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
-                    SetStatus("Road builder: " + name + " stays; looking for what uses it failed: " + task.Exception?.GetBaseException().Message);
+                    SetStatusT("roadbuilder.status.look_failed", ("name", name), ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
                 if (task.Result != null)
                 {
-                    SetStatus("Road builder: " + name + " stays; " + task.Result + " still names it." +
-                              (task.Result.EndsWith(".sco", StringComparison.OrdinalIgnoreCase) ? " Delete unused made objects in the map check first." : string.Empty));
+                    SetStatusT("roadbuilder.status.stays_named", ("name", name), ("users", task.Result),
+                        ("made", task.Result.EndsWith(".sco", StringComparison.OrdinalIgnoreCase) ? "yes" : "no"));
                     return;
                 }
                 if (!string.Equals(roadBuilder.EditingPath, path, StringComparison.OrdinalIgnoreCase))
@@ -757,13 +751,13 @@ namespace OmsiMapEditor.UI
                 catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
                 {
                     Debug.LogException(exception);
-                    SetStatus("Road builder: " + name + " could not be deleted: " + exception.Message);
+                    SetStatusT("roadbuilder.status.delete_failed", ("name", name), ("reason", exception.Message));
                     return;
                 }
-                PushHistory(new ObjectEditStep { RoadTypeChange = change, Description = "the deletion of road type " + name });
+                PushHistory(new ObjectEditStep { RoadTypeChange = change, Description = Loc.T("roadbuilder.step.delete", ("name", name)) });
                 AfterRoadTypeChange(path);
                 ShowRoadBuilder(false);
-                SetStatus("Road builder: deleted " + name + " from your OMSI installation; its textures stay for the other road types. Ctrl+Z brings it back.");
+                SetStatusT("roadbuilder.status.deleted", ("name", name));
             }).Every(100);
         }
 
@@ -794,13 +788,12 @@ namespace OmsiMapEditor.UI
             }
             if (type == null)
             {
-                SetStatus("Road builder: " + name + " has no carriageway or footpath to take apart into lanes.");
+                SetStatusT("roadbuilder.status.nothing_to_split", ("name", name));
                 return;
             }
             roadBuilder.SetType(type);
-            SetStatus("Road builder: took " + name + " apart into " + type.Lanes.Count + " lanes, " +
-                      type.Width.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " m wide, with lines and surfaces of the builder" +
-                      (notes.Count > 0 ? ". " + string.Join(" ", notes) : "."));
+            SetStatusT("roadbuilder.status.split", ("name", name), ("count", type.Lanes.Count), ("width", type.Width), ("hasNotes", notes.Count > 0 ? "yes" : "no"),
+                ("notes", string.Join(" ", notes)));
         }
 
         /// <summary>

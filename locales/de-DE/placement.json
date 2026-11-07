@@ -1,0 +1,21 @@
+{
+  "placement.scaled": "Die Karte ist auf {scale} skaliert.",
+  "placement.north_turned": "Der Norden der Karte ist um {degrees, number, 0.##}° gedreht.",
+  "placement.moved": "Die Karte ist um {meters, number, 0.##} m nach {direction, select, east {Osten} west {Westen} north {Norden} other {Süden}} verschoben.",
+  "placement.fitted": "Die Karte ist angepasst: Norden um {degrees, number, 0.##}° gedreht{scaled, select, yes {, Maßstab {scale, number, 0.#####}} other {}}.",
+  "placement.reference_at": "Der Bezugspunkt ist {where}.",
+  "placement.reference_middle": "Der Bezugspunkt ist die Mitte der Kachel {x}, {y}.",
+  "placement.reference_lies": "Der Bezugspunkt liegt bei {latitude}°, {longitude}°.",
+  "placement.describe": "Kachel {x}, {y}, {east, number, 0.#} m östlich und {north, number, 0.#} m nördlich ihrer Südwestecke",
+  "placement.follow": "Die gezeigten Bilder folgen vorerst; lade sie neu, um sie neu zuzuschneiden.",
+  "placement.own": "Diese Karte liegt von sich aus auf der Erde.",
+  "placement.first": "Platziere die Karte zuerst: Suche den Ort und klicke auf die Weltkarte.",
+  "placement.pick_stopped": "Die Auswahl wurde beendet.",
+  "placement.pick_reference": "Klicke in die Karte dorthin, wo der Bezugspunkt liegt: Er bleibt, wo er auf der Erde ist.",
+  "placement.pick_point": "Klicke in die Karte dorthin, wo Punkt {n} liegt.",
+  "placement.point": "Punkt {n} ist {where}. Füge ein, wo er auf der Erde liegt.",
+  "placement.not_position": "Das ist keine Position: Schreibe Breite und Länge, etwa 52.5200, 13.4050.",
+  "placement.pick_both": "Wähle zuerst beide Punkte in der Karte.",
+  "placement.paste_both": "Füge die Position beider Punkte ein: Breite und Länge, etwa 52.5200, 13.4050.",
+  "placement.too_close": "Die beiden Punkte liegen in der Karte oder auf der Erde zu nah beieinander, um die Karte anzupassen."
+}

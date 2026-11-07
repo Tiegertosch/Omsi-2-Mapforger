@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,7 +43,8 @@ namespace OmsiMapEditor.UI
             public OmsiMarkingArrowKind Arrow;
 
             public string Name =>
-                Kind == Kind.Line ? OmsiMarkingStyleInfo.Of(Style).Name : Kind == Kind.Area ? OmsiMarkingFillInfo.Of(Fill).Name : OmsiMarkingArrowInfo.Of(Arrow).Name + " arrow";
+                Kind == Kind.Line ? MarkingTexts.StyleName(Style) : Kind == Kind.Area ? MarkingTexts.FillName(Fill)
+                : Loc.T("markings.arrow.title", ("arrow", MarkingTexts.ArrowName(Arrow)));
 
             /// <summary>A name short enough for a tile; the full one heads the library and shows as the tile's tooltip.</summary>
             public string TileName
@@ -50,22 +52,22 @@ namespace OmsiMapEditor.UI
                 get
                 {
                     if (Kind == Kind.Area)
-                        return OmsiMarkingFillInfo.Of(Fill).Yellow ? "Yellow area" : "Restricted area";
+                        return Loc.T(OmsiMarkingFillInfo.Of(Fill).Yellow ? "markings.tile.yellow_area" : "markings.tile.restricted_area"); // i18n:keys
                     if (Kind == Kind.Line)
-                        return OmsiMarkingStyleInfo.Of(Style).Name;
+                        return MarkingTexts.StyleName(Style);
                     var info = OmsiMarkingArrowInfo.Of(Arrow);
-                    return info.Straight && info.Left && info.Right ? "All ways"
-                        : info.Straight && info.Left ? "Straight, left"
-                        : info.Straight && info.Right ? "Straight, right"
-                        : info.Left && info.Right ? "Left, right"
-                        : info.Left ? "Left" : info.Right ? "Right" : "Straight";
+                    return Loc.T(info.Straight && info.Left && info.Right ? "markings.tile.all" // i18n:keys
+                        : info.Straight && info.Left ? "markings.tile.straight_left"
+                        : info.Straight && info.Right ? "markings.tile.straight_right"
+                        : info.Left && info.Right ? "markings.tile.left_right"
+                        : info.Left ? "markings.tile.left" : info.Right ? "markings.tile.right" : "markings.tile.straight");
                 }
             }
 
             public string Description =>
-                Kind == Kind.Line ? OmsiMarkingStyleInfo.Of(Style).Description
-                : Kind == Kind.Area ? OmsiMarkingFillInfo.Of(Fill).Description
-                : "Direction arrow (sign 297), 5 m long: " + OmsiMarkingArrowInfo.Of(Arrow).Name.ToLowerInvariant();
+                Kind == Kind.Line ? MarkingTexts.StyleDescription(Style)
+                : Kind == Kind.Area ? MarkingTexts.FillDescription(Fill)
+                : Loc.T("markings.arrow.description", ("arrow", MarkingTexts.ArrowInlineName(Arrow)));
 
             /// <summary>How the favourites keep it; line styles by their bare key, as before areas and arrows came.</summary>
             public string Key =>
@@ -123,20 +125,14 @@ namespace OmsiMapEditor.UI
             var options = new VisualElement();
             options.AddToClassList("tool-panel");
             options.AddToClassList("picker-options");
-            optionsTitle = new Label("Options");
+            optionsTitle = LocBindings.NewLabel("markings.options");
             optionsTitle.AddToClassList("picker-options-title");
             options.Add(optionsTitle);
-            junctionLabel = new Label("Click a junction made in this project.");
+            junctionLabel = new Label(Loc.T("markings.click_junction"));
             junctionLabel.AddToClassList("panel-info");
             junctionLabel.style.marginTop = 0f;
             options.Add(junctionLabel);
-            var auto = new Button(() => AutoRequested?.Invoke())
-            {
-                text = "Auto markings",
-                tooltip = "Puts in a suggestion after the right of way in place of the junction's lines: lane lines along the main road, a broken " +
-                          "edge line across each side road and give-way lines on the side roads; stop lines on every arm without a main road. Areas and " +
-                          "arrows stay. Ctrl+Z brings the lines back."
-            };
+            var auto = LocBindings.WithTooltip(LocBindings.NewButton("markings.auto", () => AutoRequested?.Invoke()), "markings.auto.tooltip");
             auto.AddToClassList("map-control-button");
             options.Add(auto);
 
@@ -148,45 +144,33 @@ namespace OmsiMapEditor.UI
             var scope = new VisualElement();
             scope.AddToClassList("panel-tabs");
             scope.AddToClassList("picker-segmented");
-            wholeLineButton = new Button(() => SetPieceScope(false)) { text = "Whole line", tooltip = "Styles and curvature change the whole selected line" };
-            pieceButton = new Button(() => SetPieceScope(true))
-            {
-                text = "This piece", tooltip = "A style changes only the piece of the line between crossings that was clicked"
-            };
+            wholeLineButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.whole_line", () => SetPieceScope(false)), "markings.whole_line.tooltip");
+            pieceButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.this_piece", () => SetPieceScope(true)), "markings.this_piece.tooltip");
             foreach (var button in new[] { wholeLineButton, pieceButton })
             {
                 button.AddToClassList("panel-tab");
                 scope.Add(button);
             }
-            scopeRow = Row(options, "Apply to");
+            scopeRow = Row(options, "markings.apply_to");
             scopeRow.Add(scope);
 
-            hideButton = new Button(() => PieceVisibilityToggled?.Invoke())
-            {
-                text = "Hide piece", tooltip = "Hides the clicked piece of the line between crossings, such as where a median crosses a turning lane; shows a hidden one again"
-            };
+            hideButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.piece.hide", () => PieceVisibilityToggled?.Invoke()), "markings.piece.tooltip");
             hideButton.AddToClassList("map-control-button");
             options.Add(hideButton);
 
-            curvatureRow = Row(options, "Curvature (%)");
-            curvatureField = Field(curvatureRow, string.Empty,
-                "How far the curve bulges between two arms, 0 to 80; empty bends it like a circle. Lines across one arm or from a crossing stay straight.",
-                () => CurvatureCommitted?.Invoke());
-            angleRow = Row(options, "Stripe angle (°)");
-            angleField = Field(angleRow, OmsiMarkingArea.DefaultAngle.ToString(CultureInfo.InvariantCulture),
-                "The angle of an area's stripes from its longest side, counter-clockwise; 45 as the StVO has it, -45 leans them the other way.",
-                () => AngleCommitted?.Invoke());
-            distanceRow = Row(options, "Distance (m)");
-            distanceField = Field(distanceRow, OmsiMarkingArrow.DefaultDistance.ToString(CultureInfo.InvariantCulture),
-                "How far behind the mouth of its arm the selected arrow ends, in metres; a new arrow lies where its lane is clicked.",
-                () => DistanceCommitted?.Invoke());
+            curvatureRow = Row(options, "markings.curvature");
+            curvatureField = Field(curvatureRow, string.Empty, "markings.curvature.tooltip", () => CurvatureCommitted?.Invoke());
+            angleRow = Row(options, "markings.angle");
+            angleField = Field(angleRow, OmsiMarkingArea.DefaultAngle.ToString(CultureInfo.InvariantCulture), "markings.angle.tooltip", () => AngleCommitted?.Invoke());
+            distanceRow = Row(options, "markings.distance");
+            distanceField = Field(distanceRow, OmsiMarkingArrow.DefaultDistance.ToString(CultureInfo.InvariantCulture), "markings.distance.tooltip", () => DistanceCommitted?.Invoke());
 
-            deleteButton = new Button(() => DeleteRequested?.Invoke()) { text = "Delete", tooltip = "Deletes the selected marking (Del); a line takes the lines and areas drawn from its crossings along" };
+            deleteButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.delete.line", () => DeleteRequested?.Invoke()), "markings.delete.tooltip");
             deleteButton.AddToClassList("map-control-button");
             deleteButton.AddToClassList("inspector-edit-delete");
             options.Add(deleteButton);
 
-            var hint = new Label("Y: next in its tab, Del: delete, Esc: let go.");
+            var hint = LocBindings.NewLabel("markings.keys");
             hint.AddToClassList("panel-info");
             options.Add(hint);
             Add(options);
@@ -216,7 +200,7 @@ namespace OmsiMapEditor.UI
             planLabel.AddToClassList("picker-subtitle");
             titles.Add(planLabel);
             header.Add(titles);
-            var close = new Button(() => CloseRequested?.Invoke()) { tooltip = "Close the markings tool (M)" };
+            var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "markings.close.tooltip");
             close.AddToClassList("panel-icon-button");
             close.Add(new IconElement("x"));
             header.Add(close);
@@ -225,17 +209,17 @@ namespace OmsiMapEditor.UI
             var tabRow = new VisualElement();
             tabRow.AddToClassList("panel-tabs");
             tabRow.AddToClassList("picker-tabs");
-            AddTab(tabRow, Tab.Lines, "Lines", "Lines between two anchors: click one anchor, then another");
-            AddTab(tabRow, Tab.Areas, "Areas", "Restricted areas (sign 298): click the anchors round one, then the first again");
-            AddTab(tabRow, Tab.Arrows, "Arrows", "Direction arrows (sign 297): click a lane of an arm");
-            AddTab(tabRow, Tab.Favorites, "Favorites", "Markings you marked with the star");
+            AddTab(tabRow, Tab.Lines, "markings.tab.lines", "markings.tab.lines.tooltip");
+            AddTab(tabRow, Tab.Areas, "markings.tab.areas", "markings.tab.areas.tooltip");
+            AddTab(tabRow, Tab.Arrows, "markings.tab.arrows", "markings.tab.arrows.tooltip");
+            AddTab(tabRow, Tab.Favorites, "markings.tab.favorites", "markings.tab.favorites.tooltip");
             picker.Add(tabRow);
 
             tiles = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             tiles.AddToClassList("picker-tiles");
             tiles.contentContainer.AddToClassList("picker-tiles-content");
             picker.Add(tiles);
-            emptyLabel = new Label("Mark markings with the star to find them here.");
+            emptyLabel = LocBindings.NewLabel("markings.favorites_empty");
             emptyLabel.AddToClassList("panel-info");
             emptyLabel.AddToClassList("picker-empty");
             emptyLabel.style.top = 110f;
@@ -364,7 +348,7 @@ namespace OmsiMapEditor.UI
             selected = line != null ? Kind.Line : (Kind?)null;
             pieceSelected = piece != null;
             hideButton.SetEnabled(piece != null);
-            hideButton.text = piece != null && piece.Hidden ? "Show piece" : "Hide piece";
+            LocBindings.Text(hideButton, piece != null && piece.Hidden ? "markings.piece.show" : "markings.piece.hide"); // i18n:keys
             pieceButton.SetEnabled(piece != null);
             if (line != null)
             {
@@ -391,6 +375,12 @@ namespace OmsiMapEditor.UI
             pieceSelected = false;
             distanceField.SetValueWithoutNotify(arrow.Distance.ToString("0.##", CultureInfo.InvariantCulture));
             ShowChoice(new Item { Kind = Kind.Arrow, Arrow = arrow.Kind });
+        }
+
+        /// <summary>The language changed: what the options wrote from the language files is written again.</summary>
+        public void RefreshTexts()
+        {
+            ShowChoice(choice);
         }
 
         public void ShowJunction(string text)
@@ -437,8 +427,13 @@ namespace OmsiMapEditor.UI
         private void ShowContext()
         {
             var kind = selected ?? choice.Kind;
-            var noun = kind == Kind.Line ? (pieceSelected && PieceScope ? "piece" : "line") : kind == Kind.Area ? "area" : "arrow";
-            contextTitle.text = (selected.HasValue ? "Selected " : "Next ") + noun;
+            var pieceNoun = kind == Kind.Line && pieceSelected && PieceScope;
+            if (selected.HasValue)
+                contextTitle.text = Loc.T(pieceNoun ? "markings.context.selected.piece" : kind == Kind.Line ? "markings.context.selected.line" // i18n:keys
+                    : kind == Kind.Area ? "markings.context.selected.area" : "markings.context.selected.arrow"); // i18n:keys
+            else
+                contextTitle.text = Loc.T(pieceNoun ? "markings.context.next.piece" : kind == Kind.Line ? "markings.context.next.line" // i18n:keys
+                    : kind == Kind.Area ? "markings.context.next.area" : "markings.context.next.arrow"); // i18n:keys
             DisplayStyle Shown(bool shown) => shown ? DisplayStyle.Flex : DisplayStyle.None;
             scopeRow.style.display = hideButton.style.display = Shown(selected == Kind.Line);
             curvatureRow.style.display = Shown(kind == Kind.Line);
@@ -446,7 +441,7 @@ namespace OmsiMapEditor.UI
             // A new arrow lies where its lane is clicked; only a selected one has a distance to change.
             distanceRow.style.display = Shown(selected == Kind.Arrow);
             deleteButton.style.display = Shown(selected.HasValue);
-            deleteButton.text = "Delete " + noun.Replace("piece", "line");
+            LocBindings.Text(deleteButton, kind == Kind.Line ? "markings.delete.line" : kind == Kind.Area ? "markings.delete.area" : "markings.delete.arrow"); // i18n:keys
         }
 
         private void SetPieceScope(bool piece)
@@ -458,16 +453,13 @@ namespace OmsiMapEditor.UI
                 ShowContext();
         }
 
-        private void AddTab(VisualElement row, Tab kind, string text, string tooltip)
+        private void AddTab(VisualElement row, Tab kind, string textKey, string tooltipKey)
         {
-            var button = new Button(() =>
+            var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => // i18n:keys
             {
                 tab = kind;
                 Refresh();
-            })
-            {
-                text = text, tooltip = tooltip
-            };
+            }), tooltipKey); // i18n:keys
             button.AddToClassList("panel-tab");
             button.AddToClassList("picker-tab");
             tabButtons.Add(button, kind);
@@ -510,7 +502,7 @@ namespace OmsiMapEditor.UI
             var name = new Label(item.TileName);
             name.AddToClassList("picker-tile-name");
             tile.Add(name);
-            var star = new Button { tooltip = favorites.Contains(item.Key) ? "Remove from favorites" : "Add to favorites" };
+            var star = new Button { tooltip = Loc.T(favorites.Contains(item.Key) ? "markings.favorite.remove" : "markings.favorite.add") }; // i18n:keys
             star.AddToClassList("panel-icon-button");
             star.AddToClassList("favorite-button");
             star.AddToClassList("picker-tile-star");
@@ -533,11 +525,11 @@ namespace OmsiMapEditor.UI
             return tile;
         }
 
-        private static VisualElement Row(VisualElement parent, string label)
+        private static VisualElement Row(VisualElement parent, string labelKey)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            var text = new Label(label);
+            var text = LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             row.Add(text);
             parent.Add(row);
@@ -545,9 +537,10 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>A number field in a row that reports Enter and leaving it.</summary>
-        private static TextField Field(VisualElement row, string value, string tooltip, Action committed)
+        private static TextField Field(VisualElement row, string value, string tooltipKey, Action committed)
         {
-            var field = new TextField { value = value, tooltip = tooltip };
+            var field = new TextField { value = value };
+            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
             field.AddToClassList("picker-field");
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
@@ -555,7 +548,7 @@ namespace OmsiMapEditor.UI
                     committed();
             }, TrickleDown.TrickleDown);
             field.RegisterCallback<FocusOutEvent>(_ => committed());
-            row.tooltip = tooltip;
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             row.Add(field);
             return field;
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -15,7 +16,8 @@ namespace OmsiMapEditor.UI
     internal sealed class SatelliteWindow : VisualElement
     {
         /// <summary>The choice of source that takes the sharpest at the map's place.</summary>
-        public const string SharpestChoice = "The sharpest here";
+        /// <summary>The first choice of the source list, in the language in use.</summary>
+        public static string SharpestChoice => Loc.T("satellite.sharpest");
 
         private readonly TextField searchField = new TextField();
         private readonly VisualElement results = new VisualElement();
@@ -31,10 +33,10 @@ namespace OmsiMapEditor.UI
         private readonly TextField stepField = new TextField { value = "1" };
         private readonly Label referenceLabel = new Label();
         private readonly Button[] pickButtons = new Button[3];
-        private readonly string[] pickTexts = { "Pick on the map", "Pick point 1", "Pick point 2" };
+        private static readonly string[] PickKeys = { "satellite.pick.map", "satellite.pick.point1", "satellite.pick.point2" };
         private readonly TextField[] fitFields = { new TextField(), new TextField() };
         private readonly Label[] fitLabels = { new Label(), new Label() };
-        private readonly Toggle fitScaleToggle = new Toggle { text = "Fit the scale too" };
+        private readonly Toggle fitScaleToggle = new Toggle();
         private readonly DropdownField sourceField = new DropdownField();
         private readonly Label detailLabel = new Label();
         private readonly Toggle heightsToggle = new Toggle();
@@ -57,12 +59,12 @@ namespace OmsiMapEditor.UI
         private readonly VisualElement pictureList = new VisualElement();
         private readonly VisualElement fitSection = new VisualElement();
         private readonly Label fitTitle = new Label();
-        private readonly FloatField rotationValue = new FloatField("Turn (°)") { isDelayed = true };
-        private readonly Toggle mirrorXToggle = new Toggle { text = "Mirror left-right" };
-        private readonly Toggle mirrorYToggle = new Toggle { text = "Mirror top-bottom" };
-        private readonly FloatField offsetXValue = new FloatField("East (m)") { isDelayed = true };
-        private readonly FloatField offsetYValue = new FloatField("North (m)") { isDelayed = true };
-        private readonly FloatField scaleValue = new FloatField("Size") { isDelayed = true };
+        private readonly FloatField rotationValue = new FloatField { isDelayed = true };
+        private readonly Toggle mirrorXToggle = new Toggle();
+        private readonly Toggle mirrorYToggle = new Toggle();
+        private readonly FloatField offsetXValue = new FloatField { isDelayed = true };
+        private readonly FloatField offsetYValue = new FloatField { isDelayed = true };
+        private readonly FloatField scaleValue = new FloatField { isDelayed = true };
         private readonly Label sizeLabel = new Label();
         private OmsiOwnPicture fitShown;
         private readonly DropdownField pictureSizeField = new DropdownField();
@@ -73,23 +75,22 @@ namespace OmsiMapEditor.UI
         private readonly TextField ownNameField = new TextField();
         private readonly TextField ownUrlField = new TextField();
         private readonly TextField ownAttributionField = new TextField();
-        private readonly IntegerField ownZoomField = new IntegerField("Finest zoom") { value = 19 };
-        private readonly Toggle ownWmsToggle = new Toggle { text = "WMS: each tile asked by its {bbox}" };
+        private readonly IntegerField ownZoomField = new IntegerField { value = 19 };
+        private readonly Toggle ownWmsToggle = new Toggle();
         private readonly Label ownProblem = new Label();
 
         /// <summary>The choices of "Picture of a tile" and the edges they stand for; 0 for every pixel of the source.</summary>
-        private static readonly string[] PictureSizeNames = { "Every pixel (up to 4096)", "1024 × 1024", "2048 × 2048", "4096 × 4096" };
+        private static string[] PictureSizeNames => new[] { Loc.T("satellite.size.every"), "1024 × 1024", "2048 × 2048", "4096 × 4096" };
         private static readonly int[] PictureSizes = { 0, 1024, 2048, 4096 };
 
+        /// <summary>The names the command line knows the tabs by.</summary>
         private static readonly string[] TabNames = { "Place", "Pictures", "Terrain", "More" };
 
-        private static readonly string[] TabTips =
-        {
-            "Where the map lies on the Earth: find the place, put the map there, set it exactly",
-            "Pictures from the air: the source, loading them, how opaque they lie",
-            "Terrain heights from the world",
-            "Your own pictures, keys and tile servers, disk space"
-        };
+        private static readonly string[] TabKeys = { "satellite.tab.place", "satellite.tab.pictures", "satellite.tab.terrain", "satellite.tab.more" };
+
+        private static readonly string[] TabTipKeys = { "satellite.tab.place.tooltip", "satellite.tab.pictures.tooltip", "satellite.tab.terrain.tooltip", "satellite.tab.more.tooltip" };
+
+        private IReadOnlyList<OmsiImagerySource> shownSources = new List<OmsiImagerySource>();
 
         private readonly VisualElement[] tabs = new VisualElement[4];
         private readonly Button[] tabButtons = new Button[4];
@@ -107,10 +108,10 @@ namespace OmsiMapEditor.UI
             var badge = new IconElement("map");
             badge.AddToClassList("floating-panel-icon");
             header.Add(badge);
-            var title = new Label("Satellite and terrain");
+            var title = LocBindings.NewLabel("satellite.title");
             title.AddToClassList("floating-panel-title");
             header.Add(title);
-            var close = new Button(() => Closed?.Invoke()) { tooltip = "Close; loading goes on" };
+            var close = LocBindings.WithTooltip(new Button(() => Closed?.Invoke()), "satellite.close.tooltip");
             close.AddToClassList("panel-collapse-button");
             close.Add(new IconElement("x"));
             header.Add(close);
@@ -130,7 +131,7 @@ namespace OmsiMapEditor.UI
             for (var index = 0; index < TabNames.Length; index++)
             {
                 var chosen = index;
-                tabButtons[index] = new Button(() => ShowTab(chosen)) { text = TabNames[index], tooltip = TabTips[index] };
+                tabButtons[index] = LocBindings.WithTooltip(LocBindings.NewButton(TabKeys[index], () => ShowTab(chosen)), TabTipKeys[index]); // i18n:keys
                 tabButtons[index].AddToClassList("panel-tab");
                 tabBar.Add(tabButtons[index]);
                 tabs[index] = new VisualElement();
@@ -152,15 +153,15 @@ namespace OmsiMapEditor.UI
             searchRow.AddToClassList("satellite-row");
             searchField.AddToClassList("picker-field");
             searchField.AddToClassList("satellite-search");
-            searchField.textEdition.placeholder = "Find a place: a town, a street, an address";
-            searchField.tooltip = "Looks the place up with OpenStreetMap's Nominatim; Enter searches too";
+            searchField.textEdition.placeholder = Loc.T("satellite.search.placeholder");
+            LocBindings.Tooltip(searchField, "satellite.search.tooltip");
             searchField.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode == UnityEngine.KeyCode.Return || evt.keyCode == UnityEngine.KeyCode.KeypadEnter)
                     Search();
             }, TrickleDown.TrickleDown);
             searchRow.Add(searchField);
-            searchRow.Add(Button("Find", Search, "Looks the place up with OpenStreetMap's Nominatim", "search"));
+            searchRow.Add(Button("satellite.find", Search, "satellite.find.tooltip", "search"));
             placeTab.Add(searchRow);
             results.AddToClassList("satellite-results");
             placeTab.Add(results);
@@ -178,20 +179,20 @@ namespace OmsiMapEditor.UI
             placeTab.Add(attributionLabel);
 
             // Where the map lies.
-            Section(placeTab, "Place on the Earth");
+            Section(placeTab, "satellite.section.place");
             worldLabel.AddToClassList("satellite-note");
-            worldLabel.text = "This map has world coordinates ([worldcoordinates]): it lies on the Earth by itself, its tiles are Web Mercator tiles.";
+            LocBindings.Text(worldLabel, "satellite.world");
             placeTab.Add(worldLabel);
             placeSection.AddToClassList("satellite-place");
             placeTab.Add(placeSection);
             var placeRow = new VisualElement();
             placeRow.AddToClassList("satellite-row");
-            placeButton = Button("Place the map here", () => SetPlacing(!placing), "Then click on the map of the world: the middle of the orange tile goes there", "crosshair");
+            placeButton = Button("satellite.place_here", () => SetPlacing(!placing), "satellite.place_here.tooltip", "crosshair");
             placeRow.Add(placeButton);
-            placeRow.Add(Button("At the middle", () => PlaceRequested?.Invoke(WorldMap.Centre), "Lays the orange tile's middle on the middle of the map of the world"));
+            placeRow.Add(Button("satellite.at_middle", () => PlaceRequested?.Invoke(WorldMap.Centre), "satellite.at_middle.tooltip"));
             placeSection.Add(placeRow);
-            var rotationRow = Row(placeSection, "North turned (°)");
-            Field(rotationRow, rotationField, "How far the map's north is turned from true north, clockwise");
+            var rotationRow = Row(placeSection, "satellite.rotation");
+            Field(rotationRow, rotationField, "satellite.rotation.tooltip");
             rotationField.RegisterCallback<FocusOutEvent>(_ => ApplyRotation());
             rotationField.RegisterCallback<KeyDownEvent>(evt =>
             {
@@ -203,91 +204,89 @@ namespace OmsiMapEditor.UI
             BuildExactPlace();
 
             // The user's own pictures.
-            Section(moreTab, "Own pictures");
-            var ownNote = new Label("A scan, a screenshot, an old plan: laid on tiles and lined up by eye. No place on the Earth needed.");
+            Section(moreTab, "satellite.section.own");
+            var ownNote = LocBindings.NewLabel("satellite.own.note");
             ownNote.AddToClassList("satellite-note");
             moreTab.Add(ownNote);
             var tilesRow = new VisualElement();
             tilesRow.AddToClassList("satellite-row");
-            var from = new Label("Tiles from");
+            var from = LocBindings.NewLabel("satellite.tiles_from");
             from.AddToClassList("satellite-inline-label");
             tilesRow.Add(from);
             for (var index = 0; index < pictureTiles.Length; index++)
             {
                 if (index == 2)
                 {
-                    var to = new Label("to");
+                    var to = LocBindings.NewLabel("satellite.tiles_to");
                     to.AddToClassList("satellite-inline-label");
                     tilesRow.Add(to);
                 }
                 pictureTiles[index].AddToClassList("satellite-number");
-                pictureTiles[index].tooltip = index < 2 ? "The tile at the picture's south-west corner" : "The tile at the picture's north-east corner";
+                LocBindings.Tooltip(pictureTiles[index], index < 2 ? "satellite.tile.sw" : "satellite.tile.ne"); // i18n:keys
                 tilesRow.Add(pictureTiles[index]);
             }
             moreTab.Add(tilesRow);
-            moreTab.Add(Button("Load image file over these tiles...", () => PictureLoadRequested?.Invoke(pictureTiles[0].value, pictureTiles[1].value, pictureTiles[2].value,
-                pictureTiles[3].value), "A JPEG, PNG, BMP or TGA picture stretched over these tiles; the copy stays in the project", "layers"));
+            moreTab.Add(Button("satellite.load_file", () => PictureLoadRequested?.Invoke(pictureTiles[0].value, pictureTiles[1].value, pictureTiles[2].value,
+                pictureTiles[3].value), "satellite.load_file.tooltip", "layers"));
             pictureList.AddToClassList("satellite-results");
             moreTab.Add(pictureList);
             moreTab.Add(fitSection);
 
             // Pictures from the air and heights for the tiles.
-            Section(picturesTab, "Imagery");
-            var sourceRow = Row(picturesTab, "Source");
+            Section(picturesTab, "satellite.section.imagery");
+            var sourceRow = Row(picturesTab, "satellite.source");
             sourceField.AddToClassList("new-map-dropdown");
-            sourceField.tooltip = "Where the pictures come from; none of them needs a key. The sharpest is chosen at the map's middle. " +
-                                  "\"OpenStreetMap map\" draws the map as openstreetmap.org shows it, with streets' names, houses and stops, to build over by eye.";
+            LocBindings.Tooltip(sourceField, "satellite.source.tooltip");
             SetSources(OmsiImagerySource.Imagery);
             sourceField.SetValueWithoutNotify(SharpestChoice);
             sourceField.RegisterValueChangedCallback(evt => SourceChanged?.Invoke(evt.newValue == SharpestChoice ? null : evt.newValue));
             sourceRow.Add(sourceField);
-            var sizeRow = Row(picturesTab, "Picture of a tile");
+            var sizeRow = Row(picturesTab, "satellite.tile_picture");
             pictureSizeField.AddToClassList("new-map-dropdown");
             pictureSizeField.choices = new List<string>(PictureSizeNames);
             pictureSizeField.SetValueWithoutNotify(PictureSizeNames[0]);
-            pictureSizeField.tooltip = "How many pixels each tile's picture keeps. The map shows 1024 a tile and the full picture of the tiles in view when you zoom in.";
+            LocBindings.Tooltip(pictureSizeField, "satellite.tile_picture.tooltip");
             pictureSizeField.RegisterValueChangedCallback(evt => PictureSizeChanged?.Invoke(PictureSizes[Math.Max(0, Array.IndexOf(PictureSizeNames, evt.newValue))]));
             sizeRow.Add(pictureSizeField);
             var copiesHolder = new VisualElement();
-            var copiesRow = Row(copiesHolder, "Zoom copies");
-            copiesRow.tooltip = "Compressed copies of the full pictures that make zooming in smooth. They are kept on this computer, not in the project, " +
-                                "up to the limit shown; the ones used longest ago go first. Deleting them is safe: they are made again when needed.";
+            var copiesRow = Row(copiesHolder, "satellite.copies");
+            LocBindings.Tooltip(copiesRow, "satellite.copies.tooltip");
             sharpLabel.AddToClassList("satellite-note");
             sharpLabel.AddToClassList("satellite-grow");
             copiesRow.Add(sharpLabel);
-            copiesRow.Add(Button("Clear", () => ClearSharpRequested?.Invoke(), "Deletes the compressed copies; they are made again when a tile comes near the view"));
+            copiesRow.Add(Button("satellite.copies.clear", () => ClearSharpRequested?.Invoke(), "satellite.copies.clear.tooltip"));
             detailLabel.AddToClassList("satellite-note");
             picturesTab.Add(detailLabel);
-            heightsToggle.text = "Also load terrain heights";
+            LocBindings.Text(heightsToggle, "satellite.with_heights");
             heightsToggle.AddToClassList("picker-option-toggle");
             heightsToggle.AddToClassList("panel-toggle");
-            heightsToggle.tooltip = "Takes the ground's heights from the AWS terrain tiles too; the shaped ground of those tiles is replaced, in one step Ctrl+Z takes back";
+            LocBindings.Tooltip(heightsToggle, "satellite.with_heights.tooltip");
             heightsToggle.RegisterValueChangedCallback(evt => TicksChanged?.Invoke(evt.newValue, autoToggle.value));
             picturesTab.Add(heightsToggle);
             var loadRow = new VisualElement();
             loadRow.AddToClassList("satellite-row");
             loadRow.AddToClassList("satellite-wrap");
-            loadAllButton = Button("Load for all tiles", () => LoadRequested?.Invoke(false, true, heightsToggle.value), "Pictures (and heights) for every tile of the map");
+            loadAllButton = Button("satellite.load_all", () => LoadRequested?.Invoke(false, true, heightsToggle.value), "satellite.load_all.tooltip");
             loadAllButton.AddToClassList("dialog-primary");
-            loadTileButton = Button("For the selected tile", () => LoadRequested?.Invoke(true, true, heightsToggle.value), "Pictures (and heights) for the tile selected in the map");
-            heightsOnlyButton = Button("Load heights only", () => LoadRequested?.Invoke(false, false, true), "Terrain heights for every tile, without pictures");
+            loadTileButton = Button("satellite.load_tile", () => LoadRequested?.Invoke(true, true, heightsToggle.value), "satellite.load_tile.tooltip");
+            heightsOnlyButton = Button("satellite.heights_only", () => LoadRequested?.Invoke(false, false, true), "satellite.heights_only.tooltip");
             loadRow.Add(loadAllButton);
             loadRow.Add(loadTileButton);
             picturesTab.Add(loadRow);
             // The heights button belongs to the terrain tab, at its top.
-            Section(terrainTab, "Terrain heights");
+            Section(terrainTab, "satellite.section.terrain");
             terrainTab.Add(heightsOnlyButton);
-            autoToggle.text = "New tiles get pictures by themselves";
+            LocBindings.Text(autoToggle, "satellite.auto");
             autoToggle.AddToClassList("picker-option-toggle");
             autoToggle.AddToClassList("panel-toggle");
-            autoToggle.tooltip = "A tile added to the map gets its picture from the air at once, and its terrain heights too when \"Also load terrain heights\" is ticked";
+            LocBindings.Tooltip(autoToggle, "satellite.auto.tooltip");
             autoToggle.RegisterValueChangedCallback(evt => TicksChanged?.Invoke(heightsToggle.value, evt.newValue));
             picturesTab.Add(autoToggle);
             var progressRow = new VisualElement();
             progressRow.AddToClassList("satellite-row");
             progressLabel.AddToClassList("satellite-progress");
             progressRow.Add(progressLabel);
-            cancelButton = Button("Cancel", () => CancelRequested?.Invoke(), "Stops loading; tiles done so far stay");
+            cancelButton = Button("satellite.cancel", () => CancelRequested?.Invoke(), "satellite.cancel.tooltip");
             progressRow.Add(cancelButton);
             footer.Add(progressRow);
             edgesRow.AddToClassList("satellite-row");
@@ -296,20 +295,20 @@ namespace OmsiMapEditor.UI
             edgesLabel.AddToClassList("satellite-warning");
             edgesLabel.AddToClassList("satellite-grow");
             edgesRow.Add(edgesLabel);
-            edgesRow.Add(Button("Fit their edges", () => EdgesFitRequested?.Invoke(), "Their edge takes the loaded heights, fading out 60 m into the tile; Ctrl+Z takes it back"));
-            edgesRow.Add(Button("Leave them", () => EdgesLeft?.Invoke(), "Keeps the step at their edge"));
+            edgesRow.Add(Button("satellite.edges.fit", () => EdgesFitRequested?.Invoke(), "satellite.edges.fit.tooltip"));
+            edgesRow.Add(Button("satellite.edges.leave", () => EdgesLeft?.Invoke(), "satellite.edges.leave.tooltip"));
             edgesRow.style.display = DisplayStyle.None;
             footer.Add(edgesRow);
 
-            Section(terrainTab, "Height options");
-            relativeToggle.text = "Relative: the middle tile's mean height is 0 m";
+            Section(terrainTab, "satellite.section.height_options");
+            LocBindings.Text(relativeToggle, "satellite.relative");
             relativeToggle.AddToClassList("picker-option-toggle");
             relativeToggle.AddToClassList("panel-toggle");
-            relativeToggle.tooltip = "Takes the middle tile's mean height off all heights, as most OMSI maps lie near 0 m; off keeps the height above the sea";
+            LocBindings.Tooltip(relativeToggle, "satellite.relative.tooltip");
             relativeToggle.RegisterValueChangedCallback(_ => HeightOptionsChanged?.Invoke());
             terrainTab.Add(relativeToggle);
-            Field(Row(terrainTab, "Raise all by (m)"), offsetField, "Added to every height");
-            Field(Row(terrainTab, "Smoothing (m)"), smoothingField, "How far each height is smoothed with its neighbours; 0 for none");
+            Field(Row(terrainTab, "satellite.raise"), offsetField, "satellite.raise.tooltip");
+            Field(Row(terrainTab, "satellite.smoothing"), smoothingField, "satellite.smoothing.tooltip");
             offsetField.RegisterCallback<FocusOutEvent>(_ => HeightOptionsChanged?.Invoke());
             smoothingField.RegisterCallback<FocusOutEvent>(_ => HeightOptionsChanged?.Invoke());
             var baseRow = new VisualElement();
@@ -317,24 +316,24 @@ namespace OmsiMapEditor.UI
             baseLabel.AddToClassList("satellite-note");
             baseLabel.AddToClassList("satellite-grow");
             baseRow.Add(baseLabel);
-            measureButton = Button("Measure again", () => MeasureAgainRequested?.Invoke(), "The next load measures the middle tile's mean height again; tiles loaded before may then step at their edges");
+            measureButton = Button("satellite.measure", () => MeasureAgainRequested?.Invoke(), "satellite.measure.tooltip");
             baseRow.Add(measureButton);
             terrainTab.Add(baseRow);
-            var terrainNote = new Label("Terrain: Mapzen Terrain Tiles on AWS Open Data (SRTM, USGS 3DEP, GMTED2010, ETOPO1, Copernicus EU-DEM and others).");
+            var terrainNote = LocBindings.NewLabel("satellite.terrain_note");
             terrainNote.AddToClassList("satellite-attribution");
             terrainTab.Add(terrainNote);
 
-            Section(picturesTab, "Overlay on the ground");
+            Section(picturesTab, "satellite.section.overlay");
             var showRow = new VisualElement();
             showRow.AddToClassList("satellite-row");
-            showToggle.text = "Show";
+            LocBindings.Text(showToggle, "satellite.show");
             showToggle.AddToClassList("picker-option-toggle");
             showToggle.AddToClassList("panel-toggle");
             showToggle.RegisterValueChangedCallback(evt => OverlayChanged?.Invoke(evt.newValue, opacitySlider.value));
             showRow.Add(showToggle);
             opacitySlider.AddToClassList("new-map-slider");
             opacitySlider.AddToClassList("satellite-grow");
-            opacitySlider.tooltip = "How opaque the pictures lie on the ground";
+            LocBindings.Tooltip(opacitySlider, "satellite.opacity.tooltip");
             opacitySlider.RegisterValueChangedCallback(evt =>
             {
                 ShowOpacity(evt.newValue);
@@ -344,7 +343,7 @@ namespace OmsiMapEditor.UI
             opacityLabel.AddToClassList("new-map-factor");
             showRow.Add(opacityLabel);
             picturesTab.Add(showRow);
-            var note = new Label("The pictures stay in the project and are not exported. Check a source's terms before you share pictures made from it.");
+            var note = LocBindings.NewLabel("satellite.overlay_note");
             note.AddToClassList("satellite-note");
             picturesTab.Add(note);
 
@@ -353,10 +352,13 @@ namespace OmsiMapEditor.UI
             fitSection.Add(fitTitle);
             var turnRow = new VisualElement();
             turnRow.AddToClassList("satellite-row");
-            turnRow.Add(Button("Turn left 90°", () => ChangeFit(fit => fit.Rotation = Wrap(fit.Rotation - 90.0)), "Turns the picture a quarter anticlockwise"));
-            turnRow.Add(Button("Turn right 90°", () => ChangeFit(fit => fit.Rotation = Wrap(fit.Rotation + 90.0)), "Turns the picture a quarter clockwise"));
+            turnRow.Add(Button("satellite.turn_left", () => ChangeFit(fit => fit.Rotation = Wrap(fit.Rotation - 90.0)), "satellite.turn_left.tooltip"));
+            turnRow.Add(Button("satellite.turn_right", () => ChangeFit(fit => fit.Rotation = Wrap(fit.Rotation + 90.0)), "satellite.turn_right.tooltip"));
             rotationValue.AddToClassList("satellite-number");
-            rotationValue.tooltip = "Turned clockwise in degrees; drag the label or type a value";
+            LocBindings.Text(rotationValue, "satellite.turn");
+            LocBindings.Tooltip(rotationValue, "satellite.turn.tooltip");
+            LocBindings.Text(mirrorXToggle, "satellite.mirror_x");
+            LocBindings.Text(mirrorYToggle, "satellite.mirror_y");
             rotationValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.Rotation = Wrap(evt.newValue)));
             turnRow.Add(rotationValue);
             fitSection.Add(turnRow);
@@ -379,9 +381,12 @@ namespace OmsiMapEditor.UI
                 field.AddToClassList("satellite-number");
                 moveRow.Add(field);
             }
-            offsetXValue.tooltip = "Moved east in metres; drag the label or type a value";
-            offsetYValue.tooltip = "Moved north in metres; drag the label or type a value";
-            scaleValue.tooltip = "Size against the tiles, 1 for stretched over them; drag the label or type a value";
+            LocBindings.Text(offsetXValue, "satellite.east");
+            LocBindings.Tooltip(offsetXValue, "satellite.east.tooltip");
+            LocBindings.Text(offsetYValue, "satellite.north");
+            LocBindings.Tooltip(offsetYValue, "satellite.north.tooltip");
+            LocBindings.Text(scaleValue, "satellite.size");
+            LocBindings.Tooltip(scaleValue, "satellite.size.tooltip");
             offsetXValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.OffsetX = evt.newValue));
             offsetYValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.OffsetY = evt.newValue));
             scaleValue.RegisterValueChangedCallback(evt => ChangeFit(fit => fit.Scale = Math.Max(0.05, Math.Min(20.0, evt.newValue))));
@@ -391,55 +396,60 @@ namespace OmsiMapEditor.UI
             sizeLabel.AddToClassList("satellite-note");
             sizeLabel.AddToClassList("satellite-grow");
             fitButtons.Add(sizeLabel);
-            fitButtons.Add(Button("Reset", () => ChangeFit(fit => fit.ResetFit()), "Stretched over its tiles again, unturned and unmirrored"));
-            var remove = Button("Remove", () =>
+            fitButtons.Add(Button("satellite.reset", () => ChangeFit(fit => fit.ResetFit()), "satellite.reset.tooltip"));
+            var remove = Button("satellite.remove", () =>
             {
                 if (fitShown != null)
                     PictureRemoved?.Invoke(fitShown.Id);
-            }, "Takes the picture off its tiles and out of the project");
+            }, "satellite.remove.tooltip");
             remove.AddToClassList("inspector-edit-delete");
             fitButtons.Add(remove);
             fitSection.Add(fitButtons);
             fitSection.style.display = DisplayStyle.None;
 
             // Sources with the user's own key, and the user's own tile servers; both stay on this computer.
-            var keys = new Foldout { text = "Keys for more sources (optional)", value = false, name = "keys" };
+            var keys = new Foldout { value = false, name = "keys" };
+            LocBindings.Text(keys, "satellite.keys.fold");
             keys.AddToClassList("satellite-foldout");
-            var keysNote = new Label("Everything works without a key. With your own free key these may be sharper in some places; the key stays on this computer.");
+            var keysNote = LocBindings.NewLabel("satellite.keys.note");
             keysNote.AddToClassList("satellite-note");
             keys.Add(keysNote);
             keys.Add(keyRows);
             moreTab.Add(keys);
-            var own = new Foldout { text = "Your own tile server", value = false, name = "server" };
+            var own = new Foldout { value = false, name = "server" };
+            LocBindings.Text(own, "satellite.own.fold");
             own.AddToClassList("satellite-foldout");
-            Field(Row(own, "Name"), ownNameField, "How the server is called in the source list");
-            Field(Row(own, "URL"), ownUrlField, "{z} {x} {y} are filled in; a WMS gets {bbox} (EPSG:3857) and {width} {height}; {key} is your key");
-            Field(Row(own, "Attribution"), ownAttributionField, "Shown under the map while its pictures show");
+            Field(Row(own, "satellite.own.name"), ownNameField, "satellite.own.name.tooltip");
+            Field(Row(own, "satellite.own.url"), ownUrlField, "satellite.own.url.tooltip", UrlPlaceholders);
+            Field(Row(own, "satellite.own.attribution"), ownAttributionField, "satellite.own.attribution.tooltip");
             foreach (var field in new[] { ownNameField, ownUrlField, ownAttributionField })
                 field.AddToClassList("satellite-wide-field");
             var zoomRow = new VisualElement();
             zoomRow.AddToClassList("satellite-row");
             ownZoomField.AddToClassList("satellite-number");
-            ownZoomField.tooltip = "The finest zoom the server has";
+            LocBindings.Text(ownZoomField, "satellite.own.zoom");
+            LocBindings.Tooltip(ownZoomField, "satellite.own.zoom.tooltip");
+            LocBindings.Text(ownWmsToggle, "satellite.own.wms", ("bbox", "{bbox}"));
             zoomRow.Add(ownZoomField);
             ownWmsToggle.AddToClassList("picker-option-toggle");
             ownWmsToggle.AddToClassList("panel-toggle");
             zoomRow.Add(ownWmsToggle);
             own.Add(zoomRow);
-            var serverNote = new Label("{z} {x} {y} are filled in; a WMS gets {bbox} (EPSG:3857) and {width} {height}; {key} is your key.");
+            var serverNote = new Label();
+            LocBindings.Text(serverNote, "satellite.own.url_note", ("zxy", "{z} {x} {y}"), ("bbox", "{bbox}"), ("widthHeight", "{width} {height}"), ("key", "{key}"));
             serverNote.AddToClassList("satellite-note");
             own.Add(serverNote);
             ownProblem.AddToClassList("satellite-note");
             ownProblem.AddToClassList("export-problem");
             own.Add(ownProblem);
-            own.Add(Button("Add", () =>
+            own.Add(Button("satellite.own.add", () =>
             {
                 ownProblem.text = string.Empty;
                 OwnSourceAdded?.Invoke(ownNameField.value, ownUrlField.value, ownAttributionField.value, ownZoomField.value, ownWmsToggle.value);
-            }, "Adds the server to the source list", "plus"));
+            }, "satellite.own.add.tooltip", "plus"));
             own.Add(ownSourceRows);
             moreTab.Add(own);
-            Section(moreTab, "Disk space");
+            Section(moreTab, "satellite.section.disk");
             moreTab.Add(copiesHolder);
             ShowTab(0);
             UpdateButtons();
@@ -536,8 +546,8 @@ namespace OmsiMapEditor.UI
             offsetField.SetValueWithoutNotify(settings.Heights.Offset.ToString("0.##", CultureInfo.InvariantCulture));
             smoothingField.SetValueWithoutNotify(settings.Heights.Smoothing.ToString("0.##", CultureInfo.InvariantCulture));
             baseLabel.text = settings.Heights.Relative && settings.Heights.Base.HasValue
-                ? "Taken off: " + settings.Heights.Base.Value.ToString("0.00", CultureInfo.InvariantCulture) + " m"
-                : settings.Heights.Relative ? "Measured at the middle tile on the first load." : string.Empty;
+                ? Loc.T("satellite.base.taken", ("base", settings.Heights.Base.Value))
+                : settings.Heights.Relative ? Loc.T("satellite.base.measured") : string.Empty;
             measureButton.style.display = settings.Heights.Relative && settings.Heights.Base.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
             showToggle.SetValueWithoutNotify(settings.ShowImagery);
             opacitySlider.SetValueWithoutNotify((float)settings.ImageryOpacity);
@@ -549,10 +559,27 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>The sources to choose from: the sharpest, these, and the drawn OpenStreetMap map.</summary>
+        /// <summary>The language changed: what the window wrote from the language files is written again.</summary>
+        public void RefreshTexts()
+        {
+            searchField.textEdition.placeholder = Loc.T("satellite.search.placeholder");
+            var chosenName = sourceField.index <= 0 ? null : sourceField.value;
+            var sizeIndex = Math.Max(0, pictureSizeField.index);
+            SetSources(shownSources);
+            sourceField.SetValueWithoutNotify(chosenName != null && sourceField.choices.Contains(chosenName) ? chosenName : SharpestChoice);
+            pictureSizeField.choices = new List<string>(PictureSizeNames);
+            pictureSizeField.SetValueWithoutNotify(PictureSizeNames[Math.Min(sizeIndex, PictureSizeNames.Length - 1)]);
+            if (placing)
+                SetPlacing(true);
+            UpdateButtons();
+        }
+
         public void SetSources(IEnumerable<OmsiImagerySource> sources)
         {
             var choices = new List<string> { SharpestChoice };
-            foreach (var source in sources)
+            var list = new List<OmsiImagerySource>(sources);
+            shownSources = list;
+            foreach (var source in list)
                 choices.Add(source.Name);
             // The map as OpenStreetMap draws it, made from its data with streets' names, in place of a picture from the air.
             choices.Add(OmsiImagerySource.OsmMap.Name);
@@ -571,16 +598,16 @@ namespace OmsiMapEditor.UI
                 if (source.NeedsKey)
                 {
                     var name = source.Name;
-                    var row = Row(keyRows, name);
+                    var row = RowText(keyRows, name);
                     var field = new TextField { isPasswordField = true, value = key(name) ?? string.Empty };
-                    field.textEdition.placeholder = "key";
-                    Field(row, field, "Your key for " + name + "; it stays on this computer");
+                    field.textEdition.placeholder = Loc.T("satellite.key.placeholder");
+                    Field(row, field, "satellite.key.tooltip", new (string Name, object Value)[] { ("name", name) });
                     field.AddToClassList("satellite-wide-field");
                     field.RegisterCallback<FocusOutEvent>(_ => KeyChanged?.Invoke(name, field.value));
                     if (!string.IsNullOrEmpty(source.Terms))
                     {
                         var link = source.Terms;
-                        row.Add(Button("Get a key", () => Application.OpenURL(link), "Opens " + link + " in your browser"));
+                        row.Add(Button("satellite.key.get", () => Application.OpenURL(link), "satellite.key.get.tooltip", null, ("link", link)));
                     }
                 }
                 if (source.IsOwn)
@@ -588,11 +615,11 @@ namespace OmsiMapEditor.UI
                     var name = source.Name;
                     var row = new VisualElement();
                     row.AddToClassList("satellite-row");
-                    var label = new Label(name + (source.Kind == OmsiImageryKind.Wms ? " (WMS)" : string.Empty) + ", zoom " + source.MaxZoom);
+                    var label = new Label(Loc.T("satellite.own.source", ("name", name), ("wms", source.Kind == OmsiImageryKind.Wms ? "yes" : "no"), ("zoom", source.MaxZoom)));
                     label.AddToClassList("satellite-note");
                     label.AddToClassList("satellite-grow");
                     row.Add(label);
-                    var remove = Button("Remove", () => OwnSourceRemoved?.Invoke(name), "Takes the server out of the source list");
+                    var remove = Button("satellite.own.remove", () => OwnSourceRemoved?.Invoke(name), "satellite.own.remove.tooltip");
                     remove.AddToClassList("inspector-edit-delete");
                     row.Add(remove);
                     ownSourceRows.Add(row);
@@ -616,7 +643,7 @@ namespace OmsiMapEditor.UI
         public void ShowSteppedEdges(int tiles)
         {
             edgesRow.style.display = tiles > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            edgesLabel.text = tiles + " tile(s) beside the loaded heights were not loaded: the ground steps at their edge.";
+            edgesLabel.text = Loc.T("satellite.edges.stepped", ("tiles", tiles));
         }
 
         /// <summary>The rectangle of tiles a new picture goes over.</summary>
@@ -638,7 +665,7 @@ namespace OmsiMapEditor.UI
                 var count = (picture.East - picture.West + 1) * (picture.North - picture.South + 1);
                 var item = new Button(() => PictureSelected?.Invoke(captured))
                 {
-                    text = picture.File + " (" + count + " tile" + (count == 1 ? "" : "s") + " from " + picture.West + ", " + picture.South + ")"
+                    text = Loc.T("satellite.picture.item", ("file", picture.File), ("count", count), ("west", picture.West), ("south", picture.South))
                 };
                 item.AddToClassList("satellite-result");
                 item.EnableInClassList("satellite-result-chosen", chosen != null && chosen.Id == picture.Id);
@@ -648,7 +675,7 @@ namespace OmsiMapEditor.UI
             fitSection.style.display = chosen != null ? DisplayStyle.Flex : DisplayStyle.None;
             if (chosen == null)
                 return;
-            fitTitle.text = ("Line up " + chosen.File).ToUpperInvariant();
+            LocBindings.TextUpper(fitTitle, "satellite.fit.title", ("file", chosen.File));
             rotationValue.SetValueWithoutNotify((float)chosen.Rotation);
             mirrorXToggle.SetValueWithoutNotify(chosen.MirrorX);
             mirrorYToggle.SetValueWithoutNotify(chosen.MirrorY);
@@ -656,8 +683,7 @@ namespace OmsiMapEditor.UI
             offsetYValue.SetValueWithoutNotify((float)chosen.OffsetY);
             scaleValue.SetValueWithoutNotify((float)chosen.Scale);
             chosen.Frame(tileSize, out _, out _, out var width, out var height, out _);
-            sizeLabel.text = width.ToString("0.0", CultureInfo.InvariantCulture) + " × " + height.ToString("0.0", CultureInfo.InvariantCulture) + " m" +
-                             (image != null ? ", " + (width / image.Width).ToString("0.00", CultureInfo.InvariantCulture) + " m a pixel" : string.Empty);
+            sizeLabel.text = Loc.T("satellite.size_info", ("width", width), ("height", height), ("hasPixel", image != null ? "yes" : "no"), ("pixel", image != null ? width / image.Width : 0.0));
         }
 
         private void ChangeFit(Action<OmsiOwnPicture> change)
@@ -680,13 +706,12 @@ namespace OmsiMapEditor.UI
         {
             placed = worldCoordinates || anchor != null;
             anchorLabel.text = anchor == null
-                ? "1. Find the place.  2. Press \"Place the map here\" and click on the map of the world: the orange tile, the map's middle, goes there."
-                : "Orange tile " + anchor.TileX + ", " + anchor.TileY + ": " + anchor.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°, " +
-                  anchor.Longitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°";
+                ? Loc.T("satellite.anchor.none")
+                : Loc.T("satellite.anchor.set", ("x", anchor.TileX), ("y", anchor.TileY), ("latitude", anchor.Latitude.ToString("0.000000", CultureInfo.InvariantCulture)),
+                    ("longitude", anchor.Longitude.ToString("0.000000", CultureInfo.InvariantCulture)));
             referenceLabel.text = anchor == null
-                ? "Place the map first; then the point that stays put while you turn and scale it can be chosen here."
-                : "Tile " + anchor.TileX + ", " + anchor.TileY + ", " + Direction(anchor.OffsetX, "east", "west") + " and " + Direction(anchor.OffsetY, "north", "south") +
-                  " of its middle";
+                ? Loc.T("satellite.reference.none")
+                : Loc.T("satellite.reference.set", ("x", anchor.TileX), ("y", anchor.TileY), ("first", Direction(anchor.OffsetX, "east", "west")), ("second", Direction(anchor.OffsetY, "north", "south")));
             positionField.SetValueWithoutNotify(anchor == null
                 ? string.Empty
                 : anchor.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + ", " + anchor.Longitude.ToString("0.000000", CultureInfo.InvariantCulture));
@@ -696,7 +721,7 @@ namespace OmsiMapEditor.UI
 
         private static string Direction(double meters, string positive, string negative)
         {
-            return Math.Abs(meters).ToString("0.##", CultureInfo.InvariantCulture) + " m " + (meters >= 0.0 ? positive : negative);
+            return Loc.T("satellite.direction", ("meters", Math.Abs(meters)), ("direction", meters >= 0.0 ? positive : negative));
         }
 
         /// <summary>Which pick is waiting for a click: 0 reference point, 1 and 2 the fit's points, -1 none.</summary>
@@ -705,14 +730,14 @@ namespace OmsiMapEditor.UI
             for (var index = 0; index < pickButtons.Length; index++)
             {
                 pickButtons[index].EnableInClassList("dialog-primary", index == which);
-                pickButtons[index].Q<Label>().text = index == which ? "Click on the map..." : pickTexts[index];
+                LocBindings.Text(pickButtons[index].Q<Label>(), index == which ? "satellite.pick.clicking" : PickKeys[index]); // i18n:keys
             }
         }
 
         /// <summary>How much room the compressed copies take on this computer, against their limit.</summary>
         public void ShowSharpUsage(long bytes, long cap)
         {
-            sharpLabel.text = Megabytes(bytes) + " of " + Megabytes(cap);
+            sharpLabel.text = Loc.T("satellite.usage", ("used", Megabytes(bytes)), ("cap", Megabytes(cap)));
         }
 
         private static string Megabytes(long bytes)
@@ -725,7 +750,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Shows where one of the fit's two map points lies, or that it is not picked yet.</summary>
         public void ShowFitPoint(int index, string text)
         {
-            fitLabels[index].text = text ?? "Not picked yet.";
+            fitLabels[index].text = text ?? Loc.T("satellite.fit.not_picked");
         }
 
         /// <summary>The text of the position typed for one of the fit's two points.</summary>
@@ -879,14 +904,14 @@ namespace OmsiMapEditor.UI
             loadTileButton.SetEnabled(placed && !busy && tileChosen);
             heightsOnlyButton.SetEnabled(placed && !busy);
             cancelButton.style.display = busy ? DisplayStyle.Flex : DisplayStyle.None;
-            loadTileButton.tooltip = tileChosen ? "Pictures (and heights) for the tile selected in the map" : "Select a tile in the map first";
+            LocBindings.Tooltip(loadTileButton, tileChosen ? "satellite.load_tile.tooltip" : "satellite.load_tile.tooltip_none"); // i18n:keys
         }
 
         private void SetPlacing(bool on)
         {
             placing = on;
             placeButton.EnableInClassList("dialog-primary", on);
-            placeButton.Q<Label>().text = on ? "Click on the map of the world..." : "Place the map here";
+            LocBindings.Text(placeButton.Q<Label>(), on ? "satellite.placing" : "satellite.place_here"); // i18n:keys
         }
 
         private void Search()
@@ -899,11 +924,12 @@ namespace OmsiMapEditor.UI
         /// <summary>Exact placement for a map without world coordinates: reference point, position, scale, moving, fit by two points.</summary>
         private void BuildExactPlace()
         {
-            var exact = new Foldout { text = "Exact place: reference point, scale, moving", value = false };
+            var exact = new Foldout { value = false };
+            LocBindings.Text(exact, "satellite.exact.fold");
             exact.name = "exact";
             exact.AddToClassList("satellite-foldout");
             placeSection.Add(exact);
-            var note = new Label("The reference point stays where it is while the map is turned and scaled. Pick a crossing of the map, then paste where it lies on the Earth (on a web map: right click, copy the coordinates).");
+            var note = LocBindings.NewLabel("satellite.exact.note");
             note.AddToClassList("satellite-note");
             exact.Add(note);
 
@@ -911,19 +937,19 @@ namespace OmsiMapEditor.UI
             exact.Add(referenceLabel);
             var referenceRow = new VisualElement();
             referenceRow.AddToClassList("satellite-row");
-            pickButtons[0] = Button(pickTexts[0], () => PickRequested?.Invoke(0), "Then click the map: that point becomes the reference point and stays where it is on the Earth", "crosshair");
+            pickButtons[0] = Button(PickKeys[0], () => PickRequested?.Invoke(0), "satellite.pick.tooltip", "crosshair");
             referenceRow.Add(pickButtons[0]);
-            referenceRow.Add(Button("Middle of its tile", () => ReferenceCentred?.Invoke(), "Makes the middle of the reference point's tile the reference point"));
+            referenceRow.Add(Button("satellite.middle_of_tile", () => ReferenceCentred?.Invoke(), "satellite.middle_of_tile.tooltip"));
             exact.Add(referenceRow);
 
-            var positionRow = Row(exact, "Lies at");
-            Field(positionRow, positionField, "Latitude and longitude, as web maps copy them: 52.5200, 13.4050. Enter or leaving the field moves the map there");
+            var positionRow = Row(exact, "satellite.lies_at");
+            Field(positionRow, positionField, "satellite.lies_at.tooltip");
             positionField.textEdition.placeholder = "52.5200, 13.4050";
             positionField.style.width = 190;
             OnCommit(positionField, () => PositionEntered?.Invoke(positionField.value));
 
-            var scaleRow = Row(exact, "Scale");
-            Field(scaleRow, scaleField, "Metres of ground one metre of the map covers: 1 for a map drawn true to scale, 1.2 if it is drawn 20 % too small");
+            var scaleRow = Row(exact, "satellite.scale");
+            Field(scaleRow, scaleField, "satellite.scale.tooltip");
             OnCommit(scaleField, () =>
             {
                 var value = Number(scaleField.value);
@@ -931,10 +957,10 @@ namespace OmsiMapEditor.UI
                     ScaleChanged?.Invoke(value.Value);
             });
 
-            var moveRow = Row(exact, "Move the map");
-            Field(moveRow, stepField, "How many metres a press moves the map on the Earth; the pictures follow at once");
+            var moveRow = Row(exact, "satellite.move");
+            Field(moveRow, stepField, "satellite.move.tooltip");
             stepField.style.width = 44;
-            foreach (var move in new[] { ("West", -1, 0), ("East", 1, 0), ("North", 0, 1), ("South", 0, -1) })
+            foreach (var move in new[] { ("satellite.move.west", -1, 0), ("satellite.move.east", 1, 0), ("satellite.move.north", 0, 1), ("satellite.move.south", 0, -1) })
             {
                 var east = move.Item2;
                 var north = move.Item3;
@@ -943,14 +969,15 @@ namespace OmsiMapEditor.UI
                     var step = Number(stepField.value);
                     if (step.HasValue && step.Value > 0.0)
                         MoveRequested?.Invoke(east * step.Value, north * step.Value);
-                }, "Moves the map " + move.Item1.ToLowerInvariant() + " on the Earth by the step"));
+                }, move.Item1 + ".tooltip")); // i18n:keys
             }
 
-            var fitFold = new Foldout { text = "Fit by two points", value = false };
+            var fitFold = new Foldout { value = false };
+            LocBindings.Text(fitFold, "satellite.fit.fold");
             fitFold.name = "fit";
             fitFold.AddToClassList("satellite-foldout");
             placeSection.Add(fitFold);
-            var fitNote = new Label("Pick two crossings in the map and paste where each lies on the Earth: the map is moved, turned and, if ticked, scaled to meet both.");
+            var fitNote = LocBindings.NewLabel("satellite.fit.note");
             fitNote.AddToClassList("satellite-note");
             fitFold.Add(fitNote);
             for (var index = 0; index < 2; index++)
@@ -958,15 +985,15 @@ namespace OmsiMapEditor.UI
                 var number = index + 1;
                 var row = new VisualElement();
                 row.AddToClassList("satellite-row");
-                pickButtons[number] = Button(pickTexts[number], () => PickRequested?.Invoke(number), "Then click the map: the point in the map to fit", "crosshair");
+                pickButtons[number] = Button(PickKeys[number], () => PickRequested?.Invoke(number), "satellite.fit.pick.tooltip", "crosshair");
                 row.Add(pickButtons[number]);
                 fitFold.Add(row);
                 fitLabels[index].AddToClassList("satellite-note");
-                fitLabels[index].text = "Not picked yet.";
+                fitLabels[index].text = Loc.T("satellite.fit.not_picked");
                 fitFold.Add(fitLabels[index]);
                 var field = fitFields[index];
-                var fieldRow = Row(fitFold, "Lies at");
-                Field(fieldRow, field, "Latitude and longitude of this point on the Earth: 52.5200, 13.4050");
+                var fieldRow = Row(fitFold, "satellite.lies_at");
+                Field(fieldRow, field, "satellite.fit.lies_at.tooltip");
                 field.textEdition.placeholder = "52.5200, 13.4050";
                 field.style.width = 190;
             }
@@ -975,9 +1002,10 @@ namespace OmsiMapEditor.UI
             // Like the other ticks of the window, not the bare toggle (which draws a white box).
             fitScaleToggle.AddToClassList("picker-option-toggle");
             fitScaleToggle.AddToClassList("panel-toggle");
-            fitScaleToggle.tooltip = "Also takes the scale from the distance between the two points; without it the map keeps its scale";
+            LocBindings.Text(fitScaleToggle, "satellite.fit.scale");
+            LocBindings.Tooltip(fitScaleToggle, "satellite.fit.scale.tooltip");
             fitRow.Add(fitScaleToggle);
-            fitRow.Add(Button("Fit the map", () => FitRequested?.Invoke(fitFields[0].value, fitFields[1].value, fitScaleToggle.value), "Moves and turns the map so that both points meet their positions"));
+            fitRow.Add(Button("satellite.fit.button", () => FitRequested?.Invoke(fitFields[0].value, fitFields[1].value, fitScaleToggle.value), "satellite.fit.button.tooltip"));
             fitFold.Add(fitRow);
         }
 
@@ -1000,7 +1028,7 @@ namespace OmsiMapEditor.UI
 
         private void ShowOpacity(float value)
         {
-            opacityLabel.text = Math.Round(value * 100f).ToString(CultureInfo.InvariantCulture) + " %";
+            opacityLabel.text = Loc.T("satellite.percent", ("percent", (int)Math.Round(value * 100f)));
         }
 
         private static double? Number(string text)
@@ -1008,31 +1036,49 @@ namespace OmsiMapEditor.UI
             return double.TryParse((text ?? string.Empty).Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : (double?)null;
         }
 
-        private static Button Button(string text, Action action, string tooltip, string icon = null)
+        private static Button Button(string textKey, Action action, string tooltipKey, string icon = null, params (string Name, object Value)[] tooltipArguments)
         {
-            var button = new Button(action) { text = icon == null ? text : string.Empty, tooltip = tooltip };
+            var button = new Button(action);
+            LocBindings.Tooltip(button, tooltipKey, tooltipArguments); // i18n:keys
             button.AddToClassList("map-control-button");
             button.AddToClassList("satellite-button");
-            if (icon != null)
+            if (icon == null)
+                LocBindings.Text(button, textKey); // i18n:keys
+            else
             {
                 button.Add(new IconElement(icon));
-                button.Add(new Label(text) { pickingMode = PickingMode.Ignore });
+                var label = LocBindings.NewLabel(textKey); // i18n:keys
+                label.pickingMode = PickingMode.Ignore;
+                button.Add(label);
             }
             return button;
         }
 
-        private static void Section(VisualElement parent, string text)
+        private static void Section(VisualElement parent, string titleKey)
         {
-            var label = new Label(text.ToUpperInvariant());
+            var label = new Label();
+            LocBindings.TextUpper(label, titleKey); // i18n:keys
             label.AddToClassList("inspector-section-heading");
             parent.Add(label);
         }
 
-        private static VisualElement Row(VisualElement parent, string label)
+        private static VisualElement Row(VisualElement parent, string labelKey)
+        {
+            return Row(parent, new Label(), labelKey);
+        }
+
+        /// <summary>A row whose label is a text of the data, such as the name of a source, not of the language files.</summary>
+        private static VisualElement RowText(VisualElement parent, string label)
+        {
+            return Row(parent, new Label(label), null);
+        }
+
+        private static VisualElement Row(VisualElement parent, Label text, string labelKey)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            var text = new Label(label);
+            if (labelKey != null)
+                LocBindings.Text(text, labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             text.AddToClassList("satellite-label");
             row.Add(text);
@@ -1040,11 +1086,16 @@ namespace OmsiMapEditor.UI
             return row;
         }
 
-        private static void Field(VisualElement row, TextField field, string tooltip)
+        private static readonly (string Name, object Value)[] UrlPlaceholders =
+        {
+            ("zxy", "{z} {x} {y}"), ("bbox", "{bbox}"), ("widthHeight", "{width} {height}"), ("key", "{key}")
+        };
+
+        private static void Field(VisualElement row, TextField field, string tooltipKey, params (string Name, object Value)[] arguments)
         {
             field.AddToClassList("picker-field");
-            field.tooltip = tooltip;
-            row.tooltip = tooltip;
+            LocBindings.Tooltip(field, tooltipKey, arguments); // i18n:keys
+            LocBindings.Tooltip(row, tooltipKey, arguments); // i18n:keys
             row.Add(field);
         }
     }

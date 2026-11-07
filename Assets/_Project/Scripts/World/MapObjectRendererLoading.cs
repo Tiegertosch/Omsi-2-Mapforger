@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 
@@ -220,13 +221,13 @@ namespace OmsiMapEditor.World
             if (reading.Workers.IsFaulted)
             {
                 Debug.LogException(reading.Workers.Exception);
-                Loaded?.Invoke("Objects could not be read: " + reading.Workers.Exception?.GetBaseException().Message);
+                Loaded?.Invoke(Loc.T("world.objects.failed", ("reason", reading.Workers.Exception?.GetBaseException().Message ?? string.Empty)));
                 return;
             }
             if (reading.Problems.Count > 0)
                 Debug.LogWarning("Object models: " + reading.Problems.Count + " problem(s)\n" + string.Join("\n", reading.Problems));
-            Loaded?.Invoke("Object models ready: " + reading.Kinds + " kinds, " + textures.Count + " textures" +
-                           (reading.Problems.Count > 0 ? "; " + reading.Problems.Count + " problem(s), first: " + reading.Problems[0] : string.Empty) + ".");
+            Loaded?.Invoke(Loc.T("world.objects.ready", ("kinds", reading.Kinds), ("textures", textures.Count), ("problems", reading.Problems.Count),
+                ("first", reading.Problems.Count > 0 ? reading.Problems[0] : string.Empty)));
         }
 
         /// <summary>A texture the workers read, for uploading; null when it is not theirs or not read yet.</summary>

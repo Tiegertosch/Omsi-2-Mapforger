@@ -1,0 +1,19 @@
+{
+  "rows.title": "Reihen entlang von Straßen",
+  "rows.selected": "Gewählte Reihe",
+  "rows.choose": "Wähle ein Objekt in der Bibliothek.",
+  "rows.object": "Objekt: {name}",
+  "rows.interval": "Alle (m)",
+  "rows.interval.tooltip": "Abstand zwischen den Objekten einer Reihe entlang der Straße",
+  "rows.offset": "Von der Mitte (m)",
+  "rows.offset.tooltip": "Abstand der Objekte von der Mittellinie der Straße; leer setzt sie 0,5 m innerhalb des Rands des Straßenprofils auf den Gehweg",
+  "rows.height": "Höhe (m)",
+  "rows.height.tooltip": "Höhe der Objekte über der Straße",
+  "rows.heading": "Ausrichtung (°)",
+  "rows.heading.tooltip": "Drehung jedes Objekts gegen die Richtung der Straße; auf der anderen Seite schaut das Objekt andersherum zur Straße",
+  "rows.both": "Beide Seiten",
+  "rows.both.tooltip": "Legt eine Reihe auf beiden Seiten der Straße zugleich",
+  "rows.whole": "Ganze Straße",
+  "rows.whole.tooltip": "Ein Klick legt die Reihe entlang der ganzen Straße, von Kreuzung oder freiem Ende bis Kreuzung oder freiem Ende, gleichmäßig verteilt. Ausschalten, um Anfang und Ende der Reihe selbst anzuklicken.",
+  "rows.hint": "Zeige auf eine Straße: Die Reihe liegt auf der Seite des Mauszeigers. Klicke, um sie zu legen; R dreht die Objekte um 15°, Umschalt+R zurück. Klicke ein Objekt einer Reihe an, um die Reihe zu wählen: Ändere ihre Werte und drücke Enter oder wähle ein anderes Objekt in der Bibliothek; Entf löscht sie. Esc beendet das Werkzeug."
+}

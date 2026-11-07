@@ -172,10 +172,8 @@ namespace OmsiMapEditor.UI
             if (!complete)
                 GUIUtility.systemCopyBuffer = report.Body();
             HidePopup(bugReportDialog);
-            SetStatus("Report a bug: GitHub opens in your browser with the report filled in" +
-                      (complete ? string.Empty : ", the whole report is on the clipboard to paste") +
-                      (logFile != null ? "; drag " + Path.GetFileName(logFile) + " from the folder that opened into the issue" : string.Empty) +
-                      ", then press Submit.");
+            SetStatusT("bugreport.status", ("clipboard", complete ? "yes" : "no"), ("hasfile", logFile != null ? "yes" : "no"),
+                ("file", logFile != null ? Path.GetFileName(logFile) : string.Empty));
             Debug.Log("Bug report: " + statusLabel?.text + " Address " + url.Length + " characters" + (folder != null ? ", files in " + folder : string.Empty) + ".");
             if (bugReportDryRun)
             {

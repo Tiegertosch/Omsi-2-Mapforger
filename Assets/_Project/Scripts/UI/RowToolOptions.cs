@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using OmsiMapEditor.Core.Localization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -30,40 +31,35 @@ namespace OmsiMapEditor.UI
         {
             AddToClassList("tool-panel");
             AddToClassList("picker-options");
-            title = new Label("Rows along roads");
+            title = LocBindings.NewLabel("rows.title");
             title.AddToClassList("picker-options-title");
             Add(title);
 
-            objectLabel = new Label("Choose an object in the library.");
+            objectLabel = LocBindings.NewLabel("rows.choose");
             objectLabel.AddToClassList("panel-info");
             Add(objectLabel);
 
-            intervalField = Field(Row("Every (m)"), "25", "Distance between the objects of a row along the road");
-            offsetField = Field(Row("From centre (m)"), string.Empty,
-                "Distance of the objects from the road's centre line; empty puts them 0.5 m inside the edge of the road's profile, on the pavement");
-            heightField = Field(Row("Height (m)"), "0", "Height of the objects above the road");
-            headingField = Field(Row("Heading (°)"), "0", "Turn of each object against the road's direction; on the other side the object faces the road the other way round");
+            intervalField = Field(Row("rows.interval"), "25", "rows.interval.tooltip");
+            offsetField = Field(Row("rows.offset"), string.Empty, "rows.offset.tooltip");
+            heightField = Field(Row("rows.height"), "0", "rows.height.tooltip");
+            headingField = Field(Row("rows.heading"), "0", "rows.heading.tooltip");
 
-            bothSidesToggle = new Toggle { tooltip = "Lays a row on both sides of the road at once" };
+            bothSidesToggle = new Toggle();
+            LocBindings.Tooltip(bothSidesToggle, "rows.both.tooltip");
             bothSidesToggle.AddToClassList("picker-option-toggle");
             bothSidesToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
-            Row("Both sides").Add(bothSidesToggle);
+            Row("rows.both").Add(bothSidesToggle);
 
-            wholeRoadToggle = new Toggle
-            {
-                value = true,
-                tooltip = "A click lays the row along the whole road, from junction or free end to junction or free end, evenly spaced. " +
-                          "Switch off to click where the row starts and where it ends."
-            };
+            wholeRoadToggle = new Toggle { value = true };
+            LocBindings.Tooltip(wholeRoadToggle, "rows.whole.tooltip");
             wholeRoadToggle.AddToClassList("picker-option-toggle");
             wholeRoadToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
-            Row("Whole road").Add(wholeRoadToggle);
+            Row("rows.whole").Add(wholeRoadToggle);
 
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
             Add(planLabel);
-            var hint = new Label("Point at a road: the row lies on the side of the pointer. Click to lay it; R turns the objects by 15°, Shift+R back. " +
-                                 "Click an object of a row to select the row: change its values and press Enter, or choose another object in the library; Del deletes it. Esc ends the tool.");
+            var hint = LocBindings.NewLabel("rows.hint");
             hint.AddToClassList("panel-info");
             Add(hint);
         }
@@ -108,7 +104,7 @@ namespace OmsiMapEditor.UI
         public void BeginEditing(double interval, double offset, double height, double heading)
         {
             laying = laying ?? new[] { intervalField.value, offsetField.value, heightField.value, headingField.value };
-            title.text = "Selected row";
+            LocBindings.Text(title, "rows.selected");
             intervalField.SetValueWithoutNotify(Format(interval));
             offsetField.SetValueWithoutNotify(Format(offset));
             heightField.SetValueWithoutNotify(Format(height));
@@ -126,14 +122,17 @@ namespace OmsiMapEditor.UI
             heightField.SetValueWithoutNotify(laying[2]);
             headingField.SetValueWithoutNotify(laying[3]);
             laying = null;
-            title.text = "Rows along roads";
+            LocBindings.Text(title, "rows.title");
             bothSidesToggle.SetEnabled(true);
             wholeRoadToggle.SetEnabled(true);
         }
 
         public void ShowObject(string assetPath)
         {
-            objectLabel.text = string.IsNullOrEmpty(assetPath) ? "Choose an object in the library." : "Object: " + System.IO.Path.GetFileNameWithoutExtension(assetPath);
+            if (string.IsNullOrEmpty(assetPath))
+                LocBindings.Text(objectLabel, "rows.choose");
+            else
+                LocBindings.Text(objectLabel, "rows.object", ("name", System.IO.Path.GetFileNameWithoutExtension(assetPath)));
             objectLabel.tooltip = assetPath ?? string.Empty;
         }
 
@@ -144,20 +143,21 @@ namespace OmsiMapEditor.UI
             planLabel.EnableInClassList("panel-info-warning", problem);
         }
 
-        private VisualElement Row(string label)
+        private VisualElement Row(string labelKey)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            var text = new Label(label);
+            var text = LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             row.Add(text);
             Add(row);
             return row;
         }
 
-        private TextField Field(VisualElement row, string value, string tooltip)
+        private TextField Field(VisualElement row, string value, string tooltipKey)
         {
-            var field = new TextField { value = value, tooltip = tooltip };
+            var field = new TextField { value = value };
+            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
             field.AddToClassList("picker-field");
             field.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             field.RegisterCallback<KeyDownEvent>(evt =>

@@ -1,0 +1,11 @@
+{
+  "pictures.dialog_title": "Ein Bild für die Kacheln",
+  "pictures.formats": "Bilder können JPEG-, PNG-, BMP- oder TGA-Dateien sein.",
+  "pictures.unreadable": "Das Bild konnte nicht gelesen werden: {reason}",
+  "pictures.not_kept": "Das Bild konnte nicht im Projekt behalten werden: {reason}",
+  "pictures.added": "Das Bild {file} liegt auf {count, plural, one {# Kachel} other {# Kacheln}}: Richte es unter „Bild ausrichten“ aus.",
+  "pictures.not_removed": "Das Bild konnte nicht aus dem Projekt genommen werden: {reason}",
+  "pictures.removed": "Das Bild {file} wurde entfernt.",
+  "pictures.fit_not_saved": "Die Ausrichtung des Bildes konnte nicht gespeichert werden: {reason}",
+  "pictures.not_cut": "Das Bild konnte nicht auf seine Kacheln zugeschnitten werden: {reason}"
+}

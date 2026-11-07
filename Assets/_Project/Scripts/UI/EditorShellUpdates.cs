@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -95,13 +96,16 @@ namespace OmsiMapEditor.UI
 
             if (Argument("-updatedFrom") is string from)
             {
-                SetStatus("MapWorks was updated from " + from + " to " + Application.version + ".");
+                SetStatusT("updates.status.updated", ("previous", from), ("current", Application.version));
                 Debug.Log("Update: " + statusLabel?.text);
             }
             if (Argument("-updateFailed") is string log)
             {
                 var reason = LastLine(log);
-                SetStatus("The update could not be installed" + (reason != null ? ": " + reason : ".") + " MapWorks " + Application.version + " is still in place.");
+                if (reason != null)
+                    SetStatusT("updates.status.failed_reason", ("reason", reason), ("version", Application.version));
+                else
+                    SetStatusT("updates.status.failed", ("version", Application.version));
                 Debug.LogWarning("Update: " + statusLabel?.text);
             }
 
@@ -144,7 +148,7 @@ namespace OmsiMapEditor.UI
                     Debug.LogWarning(task.Exception);
                     Debug.LogWarning("Update: the check failed: " + message);
                     if (manual)
-                        updateForm.ShowFailed("Check for updates", "GitHub could not be asked for a new version: " + message, false);
+                        updateForm.ShowFailed(Loc.T("updates.title.check"), Loc.T("updates.check_failed", ("reason", message)), false);
                     return;
                 }
                 PlayerPrefs.SetString(UpdatesLastCheckKey, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
@@ -185,9 +189,9 @@ namespace OmsiMapEditor.UI
         private static string InstallProblem(MapWorksRelease release)
         {
             if (Application.isEditor)
-                return "Updates install only into a built MapWorks, not into the Unity editor.";
+                return Loc.T("updates.problem.editor");
             if (release.AssetUrl == null)
-                return "The release has no " + MapWorksUpdates.AssetSuffix.TrimStart('-') + " to install.";
+                return Loc.T("updates.problem.no_asset", ("asset", MapWorksUpdates.AssetSuffix.TrimStart('-')));
             try
             {
                 var probe = Path.Combine(ProgramFolder, ".mapworks-write-test");
@@ -197,7 +201,7 @@ namespace OmsiMapEditor.UI
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
-                return "MapWorks may not write into its folder " + ProgramFolder + ".";
+                return Loc.T("updates.problem.not_writable", ("folder", ProgramFolder));
             }
         }
 
@@ -252,7 +256,7 @@ namespace OmsiMapEditor.UI
                     var message = Cause(task.Exception);
                     Debug.LogWarning(task.Exception);
                     Debug.LogWarning("Update: the download failed: " + message);
-                    updateForm.ShowFailed("MapWorks " + version + " could not be installed", message + " MapWorks stays as it is.", true);
+                    updateForm.ShowFailed(Loc.T("updates.install_failed.title", ("version", version)), Loc.T("updates.install_failed.stays", ("reason", message)), true);
                     return;
                 }
                 StartInstallScript(release, staging, task.Result);
@@ -288,7 +292,7 @@ namespace OmsiMapEditor.UI
             {
                 DeleteFolder(staging);
                 Debug.LogWarning("Update: the installer could not be started: " + exception.Message);
-                updateForm.ShowFailed("MapWorks " + release.Version + " could not be installed", "The installer could not be started: " + exception.Message, true);
+                updateForm.ShowFailed(Loc.T("updates.install_failed.title", ("version", release.Version)), Loc.T("updates.installer_failed", ("reason", exception.Message)), true);
                 return;
             }
             updateForm.ShowInstalling(release.Version);
@@ -367,7 +371,7 @@ namespace OmsiMapEditor.UI
         private static string Cause(Exception exception)
         {
             if (exception == null)
-                return "unknown error";
+                return Loc.T("updates.unknown_error");
             while (exception.InnerException != null)
                 exception = exception.InnerException;
             return exception.Message;

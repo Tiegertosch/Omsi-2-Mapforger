@@ -1,0 +1,17 @@
+{
+  "welcome.tagline": "Build worlds. Shape roads. Drive your vision.",
+  "welcome.card.open_project.title": "Open project",
+  "welcome.card.open_project.text": "Continue editing a MapWorks project (.omproj).",
+  "welcome.card.open_map.title": "Open OMSI map",
+  "welcome.card.open_map.text": "Look at a map of your OMSI installation. Save it as a project to edit it.",
+  "welcome.card.new_map.title": "New map",
+  "welcome.card.new_map.text": "Start an empty map with its first tile, based on a map of your installation.",
+  "welcome.recent": "Recent",
+  "welcome.recent.empty": "Projects and maps you open appear here.",
+  "welcome.recent.not_found.tooltip": "Not found: {path}",
+  "@welcome.recent.not_found.tooltip": "{path} is the file path of the project or map; it is shown unchanged",
+  "welcome.recent.kind.not_found": "Not found",
+  "welcome.recent.kind.project": "Project",
+  "welcome.recent.kind.map": "Map, read-only",
+  "welcome.card.planned.tooltip": "{title} is planned and not available yet."
+}

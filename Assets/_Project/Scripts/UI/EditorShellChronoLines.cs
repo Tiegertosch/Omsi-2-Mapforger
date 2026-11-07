@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -49,7 +50,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The project browser's checkboxes for the lines the edited variant switches off.</summary>
         private VisualElement VariantLinesEditor()
         {
-            var foldout = new Foldout { text = "Lines switched off by this variant (" + editedVariant.DeactivatedLines.Count + ")", value = variantLinesOpen };
+            var foldout = new Foldout { text = Loc.T("chronolines.foldout", ("count", editedVariant.DeactivatedLines.Count)), value = variantLinesOpen };
             foldout.AddToClassList("browser-lines");
             foldout.RegisterValueChangedCallback(evt =>
             {
@@ -61,7 +62,7 @@ namespace OmsiMapEditor.UI
             var candidates = LineCandidates();
             if (candidates.Count == 0)
             {
-                foldout.Add(new Label("The timetable has no lines before this variant."));
+                foldout.Add(new Label(Loc.T("chronolines.none")));
                 return foldout;
             }
             var list = new ScrollView(ScrollViewMode.Vertical);
@@ -69,10 +70,10 @@ namespace OmsiMapEditor.UI
             foreach (var name in candidates)
             {
                 var captured = name;
-                var toggle = new Toggle("Line " + name)
+                var toggle = new Toggle(Loc.T("chronolines.line", ("name", name)))
                 {
                     value = editedVariant.DeactivatedLines.Exists(known => string.Equals(known, captured, StringComparison.OrdinalIgnoreCase)),
-                    tooltip = "Checked: this variant switches line " + name + " off from its first day on; unchecked: it keeps running"
+                    tooltip = Loc.T("chronolines.line.tooltip", ("name", name))
                 };
                 toggle.RegisterValueChangedCallback(evt => SetLineOff(captured, evt.newValue));
                 list.Add(toggle);
@@ -90,15 +91,15 @@ namespace OmsiMapEditor.UI
             names.RemoveAll(known => string.Equals(known, name, StringComparison.OrdinalIgnoreCase));
             if (off)
                 names.Add(name);
-            ApplyDeactivatedLines(names, off ? "Line " + name + " is switched off by " + editedVariant.Title + " now."
-                : "Line " + name + " runs again in " + editedVariant.Title + ".");
+            ApplyDeactivatedLines(names, off ? Loc.T("chronolines.status.off", ("name", name), ("variant", editedVariant.Title))
+                : Loc.T("chronolines.status.on", ("name", name), ("variant", editedVariant.Title)));
         }
 
         private void ApplyDeactivatedLines(List<string> names, string done)
         {
             if (!CanEditRules)
             {
-                SetStatus(ReadOnlyMessage("change the lines of a variant"));
+                SetStatus(ReadOnlyMessage("readonly.action.variant_lines"));
                 return;
             }
             try
@@ -109,7 +110,7 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The lines could not be changed: " + exception.Message);
+                SetStatusT("chronolines.status.failed", ("reason", exception.Message));
                 return;
             }
             // The list of variants the map shows and the routes of this day follow what the file says now.
@@ -137,8 +138,8 @@ namespace OmsiMapEditor.UI
                 return;
             var text = args[index + 1];
             var names = text == "-" ? new List<string>() : text.Split('|').ToList();
-            ApplyDeactivatedLines(names, names.Count == 0 ? editedVariant.Title + " switches off no line now."
-                : editedVariant.Title + " switches off " + string.Join(", ", names) + " now.");
+            ApplyDeactivatedLines(names, names.Count == 0 ? Loc.T("chronolines.status.none", ("variant", editedVariant.Title))
+                : Loc.T("chronolines.status.some", ("variant", editedVariant.Title), ("names", string.Join(", ", names))));
             Debug.Log("Lines off: " + statusLabel?.text);
         }
     }

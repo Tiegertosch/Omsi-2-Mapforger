@@ -6,5 +6,7 @@
   "menu.help": "Help",
   "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",
   "menu.tools.tooltip": "Check the loaded map: import, spline connections, IDs, entry points, attachments, files, timetable, chrono variants and DLC objects.",
-  "@menu.tools.tooltip": "Tooltip of the Tools menu button. Keep the list of what the map check covers in the same order"
+  "@menu.tools.tooltip": "Tooltip of the Tools menu button. Keep the list of what the map check covers in the same order",
+  "menu.file.settings": "Settings...",
+  "@menu.file.settings": "Item of the File menu that opens the settings dialog"
 }

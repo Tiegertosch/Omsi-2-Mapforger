@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine.UIElements;
 
@@ -20,7 +21,7 @@ namespace OmsiMapEditor.UI
         private readonly VisualElement progressTrack = new VisualElement();
         private readonly VisualElement progressFill = new VisualElement();
         private readonly Label hintLabel = new Label();
-        private readonly Toggle atStartToggle = new Toggle { text = "Check for updates when MapWorks starts" };
+        private readonly Toggle atStartToggle = new Toggle();
         private readonly Button skipButton;
         private readonly Button closeButton;
         private readonly Button primaryButton;
@@ -51,16 +52,17 @@ namespace OmsiMapEditor.UI
             hintLabel.AddToClassList("update-hint");
             Add(hintLabel);
             atStartToggle.AddToClassList("update-toggle");
-            atStartToggle.tooltip = "Once a day at most, MapWorks asks GitHub for a new release when it starts, and only says something when there is one";
+            LocBindings.Text(atStartToggle, "updates.at_start");
+            LocBindings.Tooltip(atStartToggle, "updates.at_start.tooltip");
             atStartToggle.RegisterValueChangedCallback(evt => CheckAtStartChanged?.Invoke(evt.newValue));
             Add(atStartToggle);
 
             var buttons = new VisualElement();
             buttons.AddToClassList("dialog-buttons");
-            skipButton = new Button(() => SkipRequested?.Invoke()) { text = "Skip this version", tooltip = "Do not mention this version again when MapWorks starts" };
+            skipButton = LocBindings.WithTooltip(LocBindings.NewButton("updates.skip", () => SkipRequested?.Invoke()), "updates.skip.tooltip");
             skipButton.AddToClassList("map-control-button");
             skipButton.AddToClassList("update-skip");
-            closeButton = new Button(() => CloseRequested?.Invoke()) { text = "Close" };
+            closeButton = new Button(() => CloseRequested?.Invoke());
             closeButton.AddToClassList("map-control-button");
             primaryButton = new Button(() => primaryAction?.Invoke());
             primaryButton.AddToClassList("map-control-button");
@@ -87,58 +89,57 @@ namespace OmsiMapEditor.UI
 
         public void ShowChecking()
         {
-            Show("Check for updates", "Looking for a new version on GitHub...", true);
-            Buttons("Close", null, null, false);
+            Show(Loc.T("updates.title.check"), Loc.T("updates.checking"), true);
+            Buttons(Loc.T("updates.button.close"), null, null, false);
         }
 
         public void ShowCurrent(string version)
         {
-            Show("Check for updates", "You have the newest version, " + version + ".", false);
-            Buttons("Close", null, null, false);
+            Show(Loc.T("updates.title.check"), Loc.T("updates.current", ("version", version)), false);
+            Buttons(Loc.T("updates.button.close"), null, null, false);
         }
 
         public void ShowNoRelease()
         {
-            Show("Check for updates", "There is no release on GitHub yet.", false);
-            Buttons("Close", null, null, false);
+            Show(Loc.T("updates.title.check"), Loc.T("updates.no_release"), false);
+            Buttons(Loc.T("updates.button.close"), null, null, false);
         }
 
         /// <summary>A newer release; without <paramref name="installProblem"/> MapWorks can install it itself.</summary>
         public void ShowAvailable(MapWorksRelease release, string currentVersion, string installProblem)
         {
             var published = release.Published.HasValue
-                ? " It was published on " + release.Published.Value.ToLocalTime().ToString("d MMMM yyyy", CultureInfo.InvariantCulture) + "."
+                ? " " + Loc.T("updates.available.published", ("published", release.Published.Value.ToLocalTime()))
                 : string.Empty;
-            Show("MapWorks " + release.Version + " is available", "You have " + currentVersion + "." + published, false);
-            notesLabel.text = string.IsNullOrWhiteSpace(release.Notes) ? "The release has no notes." : MapWorksUpdates.NotesAsText(release.Notes);
+            Show(Loc.T("updates.available.title", ("version", release.Version)), Loc.T("updates.available.current", ("version", currentVersion)) + published, false);
+            notesLabel.text = string.IsNullOrWhiteSpace(release.Notes) ? Loc.T("updates.notes.none") : MapWorksUpdates.NotesAsText(release.Notes);
             notes.style.display = DisplayStyle.Flex;
             if (installProblem == null)
             {
-                hintLabel.text = "Install downloads " + release.AssetName + " (" + Megabytes(release.AssetSize) + "), checks it, closes MapWorks and starts the new " +
-                                 "version with the open project. Projects, maps and settings stay as they are.";
-                Buttons("Later", "Install and restart", () => InstallRequested?.Invoke(), true);
+                hintLabel.text = Loc.T("updates.install.hint", ("asset", release.AssetName), ("size", Megabytes(release.AssetSize)));
+                Buttons(Loc.T("updates.button.later"), Loc.T("updates.button.install"), () => InstallRequested?.Invoke(), true);
             }
             else
             {
-                hintLabel.text = installProblem + " The release page has the download.";
-                Buttons("Later", "Open release page", () => OpenPageRequested?.Invoke(), true);
+                hintLabel.text = Loc.T("updates.install.problem", ("problem", installProblem));
+                Buttons(Loc.T("updates.button.later"), Loc.T("updates.button.open_page"), () => OpenPageRequested?.Invoke(), true);
             }
             hintLabel.style.display = DisplayStyle.Flex;
         }
 
         public void ShowDownloading(string version, long done, long total)
         {
-            Show("Installing MapWorks " + version, total > 0
-                ? "Downloading " + Megabytes(done) + " of " + Megabytes(total) + "..."
-                : "Downloading " + Megabytes(done) + "...", true);
+            Show(Loc.T("updates.installing.title", ("version", version)), total > 0
+                ? Loc.T("updates.downloading.progress", ("done", Megabytes(done)), ("total", Megabytes(total)))
+                : Loc.T("updates.downloading", ("done", Megabytes(done))), true);
             progressTrack.style.display = DisplayStyle.Flex;
             progressFill.style.width = Length.Percent(total > 0 ? Math.Min(100f, 100f * done / total) : 0f);
-            Buttons("Cancel", null, null, false);
+            Buttons(Loc.T("updates.button.cancel"), null, null, false);
         }
 
         public void ShowInstalling(string version)
         {
-            Show("Installing MapWorks " + version, "MapWorks closes now and starts again with the new version.", true);
+            Show(Loc.T("updates.installing.title", ("version", version)), Loc.T("updates.installing.message"), true);
             Buttons(null, null, null, false);
         }
 
@@ -147,7 +148,7 @@ namespace OmsiMapEditor.UI
         {
             Show(title, message, false);
             messageLabel.AddToClassList("update-error");
-            Buttons("Close", withPage ? "Open release page" : null, withPage ? () => OpenPageRequested?.Invoke() : (Action)null, false);
+            Buttons(Loc.T("updates.button.close"), withPage ? Loc.T("updates.button.open_page") : null, withPage ? () => OpenPageRequested?.Invoke() : (Action)null, false);
         }
 
         private void Show(string title, string message, bool busy)
@@ -173,7 +174,7 @@ namespace OmsiMapEditor.UI
 
         private static string Megabytes(long bytes)
         {
-            return (bytes / (1024.0 * 1024.0)).ToString("0.0", CultureInfo.InvariantCulture) + " MB";
+            return Loc.T("updates.megabytes", ("size", bytes / (1024.0 * 1024.0)));
         }
     }
 }

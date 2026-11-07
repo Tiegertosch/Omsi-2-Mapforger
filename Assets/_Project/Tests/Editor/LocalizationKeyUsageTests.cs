@@ -12,10 +12,18 @@ namespace OmsiMapEditor.Tests
     /// Checks the code against the English texts (ADR 068): every key the interface code asks for exists in locales/en-US, the
     /// arguments a call gives are exactly the placeholders of that text, and keys are written out in full, never built from pieces, so
     /// they can be found. A mistake here would show only as "[key]" on screen.
+    /// <para>
+    /// A key passed on to a helper or chosen by a condition is still found: any text in the code that looks like a key of an area the
+    /// English files have (<c>menu.file</c>) must be one. A call whose key is a variable needs <c>i18n:keys</c> in a comment on its line.
+    /// </para>
     /// </summary>
     public sealed class LocalizationKeyUsageTests
     {
-        private static readonly Regex Call = new Regex(@"(?<![A-Za-z0-9_])(?:Loc\.T|Manager\.T|manager\.T|LocBindings\.Text|LocBindings\.Tooltip)\(", RegexOptions.CultureInvariant);
+        private static readonly Regex Call = new Regex(
+            @"(?<![A-Za-z0-9_])(?:Loc\.T|SetStatusT|UpperLabel|Manager\.T|manager\.T|LocBindings\.Text|LocBindings\.Tooltip|LocBindings\.NewLabel|LocBindings\.NewButton|LocBindings\.TextUpper|LocBindings\.WithTooltip)\(",
+            RegexOptions.CultureInvariant);
+
+        private static readonly Regex StringLiteral = new Regex("\"([a-z][a-z0-9]*(?:\\.[a-z0-9_]+)+)\"", RegexOptions.CultureInvariant);
 
         private sealed class Use
         {
@@ -24,6 +32,9 @@ namespace OmsiMapEditor.Tests
             public string Key;
             public List<string> ArgumentNames = new List<string>();
             public bool Literal;
+
+            /// <summary>The key was found as a text in the code, not in a call, so the arguments are not known.</summary>
+            public bool ArgumentsUnknown;
         }
 
         [Test]
@@ -31,15 +42,17 @@ namespace OmsiMapEditor.Tests
         {
             var english = LocaleLoader.Load(English());
             var parsed = english.Messages.ToDictionary(pair => pair.Key, pair => MessageFormat.Parse(pair.Value));
+            var areas = new HashSet<string>(english.Messages.Keys.Select(key => key.Substring(0, key.IndexOf('.'))), StringComparer.Ordinal);
             var problems = new List<string>();
             var used = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (var use in FindUses())
+            foreach (var use in FindUses(areas))
             {
                 var where = use.File + "(" + use.Line + ")";
                 if (!use.Literal)
                 {
-                    problems.Add(where + ": the key is not written out as a text in quotes; keys built from pieces cannot be checked or found");
+                    problems.Add(where + ": the key is not written out as a text in quotes; keys built from pieces cannot be checked or found" +
+                                 " (a variable key needs i18n:keys in a comment on the line)");
                     continue;
                 }
                 used.Add(use.Key);
@@ -48,6 +61,8 @@ namespace OmsiMapEditor.Tests
                     problems.Add(where + ": the key \"" + use.Key + "\" is not in locales/en-US");
                     continue;
                 }
+                if (use.ArgumentsUnknown)
+                    continue;
                 var wanted = message.Arguments.Select(argument => argument.Name).Distinct().OrderBy(name => name, StringComparer.Ordinal).ToList();
                 var given = use.ArgumentNames.Distinct().OrderBy(name => name, StringComparer.Ordinal).ToList();
                 if (!wanted.SequenceEqual(given))
@@ -71,6 +86,45 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEqual(new[] { "count", "name" }, uses[1].ArgumentNames);
             Assert.AreEqual("e.f", uses[2].Key);
             Assert.IsFalse(uses[3].Literal);
+        }
+
+        [Test]
+        public void ADeclaredVariableKeyIsAllowedAndKeyLikeTextsAreFoundWherever()
+        {
+            var text = "var l = LocBindings.NewLabel(key); // i18n:keys\nvar t = Card(\"welcome.card\", cond ? \"menu.file\" : \"global.cfg\");";
+            var areas = new HashSet<string> { "menu", "welcome" };
+
+            Assert.AreEqual(0, Scan("x.cs", text).Count);
+            var found = LiteralKeys("x.cs", text, areas).Select(use => use.Key).ToList();
+            CollectionAssert.AreEquivalent(new[] { "welcome.card", "menu.file" }, found);
+        }
+
+        [Test]
+        public void TextsThatChooseTheirPartsReadRightInBothLanguages()
+        {
+            foreach (var code in new[] { "en-US", "de-DE" })
+            {
+                var info = LocaleLoader.ReadInfo(Path.Combine(RepositoryRoot(), "locales", code), null);
+                var messages = LocaleLoader.Load(info).Messages;
+                var culture = System.Globalization.CultureInfo.InvariantCulture;
+                string Format(string key, params (string Name, object Value)[] arguments)
+                {
+                    return MessageFormat.Parse(messages[key]).Format(culture, code, arguments);
+                }
+
+                var plain = Format("bugreport.status", ("clipboard", "yes"), ("hasfile", "no"), ("file", string.Empty));
+                var full = Format("bugreport.status", ("clipboard", "no"), ("hasfile", "yes"), ("file", "MapWorks-log-1.txt"));
+                Assert.IsFalse(plain.Contains("{") || plain.Contains("}"), code + ": " + plain);
+                StringAssert.DoesNotContain("MapWorks-log-1.txt", plain);
+                StringAssert.Contains("MapWorks-log-1.txt", full);
+                Assert.Greater(full.Length, plain.Length, code);
+
+                var crashLog = Format("bugreport.included", ("what", "crashlog"), ("log", "yes"));
+                var mapOnly = Format("bugreport.included", ("what", "map"), ("log", "no"));
+                Assert.IsFalse(crashLog.Contains("{") || mapOnly.Contains("}"), code);
+                Assert.Greater(crashLog.Length, mapOnly.Length, code);
+                StringAssert.Contains("%USERPROFILE%", mapOnly);
+            }
         }
 
         [Test]
@@ -123,15 +177,10 @@ namespace OmsiMapEditor.Tests
 
         private static LocaleInfo English()
         {
-            var folder = Path.Combine(LocalesRoot(), TranslationManager.ReferenceLanguage);
+            var folder = Path.Combine(RepositoryRoot(), "locales", TranslationManager.ReferenceLanguage);
             var info = LocaleLoader.ReadInfo(folder, null);
             Assert.IsNotNull(info, "locales/en-US/locale.json must be usable");
             return info;
-        }
-
-        private static string LocalesRoot()
-        {
-            return Path.Combine(RepositoryRoot(), "locales");
         }
 
         private static string RepositoryRoot()
@@ -144,7 +193,7 @@ namespace OmsiMapEditor.Tests
             return null;
         }
 
-        private static List<Use> FindUses()
+        private static List<Use> FindUses(HashSet<string> areas)
         {
             var uses = new List<Use>();
             var scripts = Path.Combine(RepositoryRoot(), "Assets", "_Project", "Scripts");
@@ -154,7 +203,31 @@ namespace OmsiMapEditor.Tests
                 // The system itself and its helpers name no keys of their own.
                 if (relative.StartsWith("Core/Localization/", StringComparison.Ordinal) || relative == "UI/LocBindings.cs")
                     continue;
-                uses.AddRange(Scan(relative, File.ReadAllText(file)));
+                var text = File.ReadAllText(file);
+                uses.AddRange(Scan(relative, text));
+                uses.AddRange(LiteralKeys(relative, text, areas));
+            }
+            return uses;
+        }
+
+        private static int LineOf(string text, int index)
+        {
+            var line = 1;
+            for (var at = 0; at < index; at++)
+                if (text[at] == '\n')
+                    line++;
+            return line;
+        }
+
+        /// <summary>Every text that looks like a key of a known area (menu.file, welcome.tagline): it must be one.</summary>
+        private static List<Use> LiteralKeys(string file, string text, HashSet<string> areas)
+        {
+            var uses = new List<Use>();
+            foreach (Match match in StringLiteral.Matches(text))
+            {
+                var key = match.Groups[1].Value;
+                if (areas.Contains(key.Substring(0, key.IndexOf('.'))))
+                    uses.Add(new Use { File = file, Line = LineOf(text, match.Index), Key = key, Literal = true, ArgumentsUnknown = true });
             }
             return uses;
         }
@@ -164,10 +237,16 @@ namespace OmsiMapEditor.Tests
             var uses = new List<Use>();
             foreach (Match match in Call.Matches(text))
             {
+                // A call whose key is a variable says so in a comment on its line.
+                var lineStart = text.LastIndexOf('\n', match.Index) + 1;
+                var lineEnd = text.IndexOf('\n', match.Index);
+                if ((lineEnd < 0 ? text.Substring(lineStart) : text.Substring(lineStart, lineEnd - lineStart)).Contains("i18n:keys"))
+                    continue;
                 var open = match.Index + match.Length;
                 var arguments = Split(text, open);
-                var keyIndex = match.Value.StartsWith("LocBindings", StringComparison.Ordinal) ? 1 : 0;
-                var use = new Use { File = file, Line = text.Substring(0, match.Index).Count(c => c == '\n') + 1 };
+                var keyIndex = match.Value.StartsWith("LocBindings.Text(", StringComparison.Ordinal) || match.Value.StartsWith("LocBindings.TextUpper", StringComparison.Ordinal) ||
+                               match.Value.StartsWith("LocBindings.Tooltip", StringComparison.Ordinal) || match.Value.StartsWith("LocBindings.WithTooltip", StringComparison.Ordinal) ? 1 : 0;
+                var use = new Use { File = file, Line = LineOf(text, match.Index) };
                 if (arguments.Count > keyIndex)
                 {
                     var key = arguments[keyIndex].Trim();

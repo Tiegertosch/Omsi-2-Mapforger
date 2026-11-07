@@ -1,0 +1,17 @@
+{
+  "pictures.dialog_title": "A picture for the tiles",
+  "pictures.formats": "Pictures can be JPEG, PNG, BMP or TGA files.",
+  "pictures.unreadable": "The picture could not be read: {reason}",
+  "@pictures.unreadable": "{reason} is a message from the system in English, or a file name",
+  "pictures.not_kept": "The picture could not be kept in the project: {reason}",
+  "@pictures.not_kept": "{reason} is a message from the system, in English",
+  "pictures.added": "The picture {file} lies on {count, plural, one {# tile} other {# tiles}}: line it up under Line up the picture.",
+  "@pictures.added": "\"Line up the picture\" is the name of a section in the Satellite window: use the same words as there",
+  "pictures.not_removed": "The picture could not be taken out of the project: {reason}",
+  "@pictures.not_removed": "{reason} is a message from the system, in English",
+  "pictures.removed": "Took the picture {file} away.",
+  "pictures.fit_not_saved": "The picture's fit could not be saved: {reason}",
+  "@pictures.fit_not_saved": "{reason} is a message from the system, in English",
+  "pictures.not_cut": "The picture could not be cut onto its tiles: {reason}",
+  "@pictures.not_cut": "{reason} is a message from the system, in English"
+}

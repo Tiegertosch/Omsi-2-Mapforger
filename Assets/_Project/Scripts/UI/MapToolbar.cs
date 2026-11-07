@@ -25,32 +25,20 @@ namespace OmsiMapEditor.UI
             AddToClassList("tool-bar");
 
             var selection = AddGroup();
-            AddTool(selection, EditorTool.Drag, "mouse-pointer-2", "Drag", "Q",
-                "Click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.");
-            AddTool(selection, EditorTool.Move, "move", "Move", "W",
-                "Move the selection along axis arrows: east, north and in 3D up. Shift moves in whole metres.");
-            AddTool(selection, EditorTool.Rotate, "rotate-cw", "Rotate", "E",
-                "Turn the selected object: the round handle from above, the rings in 3D. Shift snaps to 15°.");
-            deleteButton = AddButton(selection, "trash-2", "Delete", "Del",
-                "Delete the selection. Objects that other parts of the map refer to stay.", () => DeleteRequested?.Invoke());
+            AddTool(selection, EditorTool.Drag, "mouse-pointer-2", "toolbar.drag", "Q", "toolbar.drag.tooltip");
+            AddTool(selection, EditorTool.Move, "move", "toolbar.move", "W", "toolbar.move.tooltip");
+            AddTool(selection, EditorTool.Rotate, "rotate-cw", "toolbar.rotate", "E", "toolbar.rotate.tooltip");
+            deleteButton = AddButton(selection, "trash-2", "toolbar.delete", "Del", "toolbar.delete.tooltip", () => DeleteRequested?.Invoke());
 
             AddSeparator();
             var world = AddGroup();
-            AddTool(world, EditorTool.Road, "spline", "Road", "R",
-                "Build roads from the view from above: click to start, click for each bend, Esc ends. Roads join free spline ends.");
-            AddTool(world, EditorTool.Rows, "fence", "Rows", "T",
-                "Lay rows of objects along roads, such as lamps or posts: choose an object, point at a road and click.");
-            AddTool(world, EditorTool.Terrain, "mountain", "Terrain", "G",
-                "Shape the ground with a brush held over it, raising, lowering, smoothing, flattening or roughening it, or lay a ramp between two clicks.");
-            AddTool(world, EditorTool.Markings, "brush", "Markings", "M",
-                "Draw road markings on junctions made in this project: click an anchor, then another; click a line to change or delete it.");
-            AddTool(world, EditorTool.Priorities, "diamond", "Priority", "V",
-                "Set the right of way at junctions: click a junction, then the sign of an arm to switch it between normal, main road and give way.");
-            AddTool(world, EditorTool.Lanes, "split", "Lanes", "L",
-                "Choose which lane leads to which through a junction made in this project: click a lane in, then a lane out to add or remove the way between them.");
-            objectsButton = AddButton(world, "box", "Objects", "3",
-                "Place scenery objects: choose one, then click into the map. Shift+click keeps placing, R turns it, Esc stops.",
-                () => ObjectsRequested?.Invoke());
+            AddTool(world, EditorTool.Road, "spline", "toolbar.road", "R", "toolbar.road.tooltip");
+            AddTool(world, EditorTool.Rows, "fence", "toolbar.rows", "T", "toolbar.rows.tooltip");
+            AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain", "G", "toolbar.terrain.tooltip");
+            AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "M", "toolbar.markings.tooltip");
+            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "V", "toolbar.priority.tooltip");
+            AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes", "L", "toolbar.lanes.tooltip");
+            objectsButton = AddButton(world, "box", "toolbar.objects", "3", "toolbar.objects.tooltip", () => ObjectsRequested?.Invoke());
         }
 
         public event Action<EditorTool> ToolChosen;
@@ -93,14 +81,15 @@ namespace OmsiMapEditor.UI
             toolButtons[tool] = AddButton(group, icon, name, key, description, () => ToolChosen?.Invoke(tool));
         }
 
-        private static Button AddButton(VisualElement group, string icon, string name, string key, string description, Action clicked)
+        private static Button AddButton(VisualElement group, string icon, string nameKey, string key, string tooltipKey, Action clicked)
         {
-            var button = new Button(clicked) { tooltip = name + " (" + key + "): " + description };
+            var button = new Button(clicked);
+            LocBindings.Tooltip(button, tooltipKey); // i18n:keys
             button.AddToClassList("tool-button");
             var iconElement = new IconElement(icon);
             iconElement.AddToClassList("tool-icon");
             button.Add(iconElement);
-            var label = new Label(name);
+            var label = LocBindings.NewLabel(nameKey); // i18n:keys
             label.AddToClassList("tool-label");
             button.Add(label);
             var keycap = new Label(key);

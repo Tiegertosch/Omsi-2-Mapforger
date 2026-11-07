@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -157,7 +158,7 @@ namespace OmsiMapEditor.UI
                     Debug.LogWarning("The compressed pictures could not all be deleted: " + exception.Message);
                 }
                 satelliteWindow.ShowSharpUsage(sharpStore.TotalBytes(), sharpStore.CapBytes);
-                SetStatus("The compressed pictures for fast zooming are deleted; they are made again when a tile comes near the view.");
+                SetStatusT("aerial.copies_deleted");
             };
             satelliteWindow.EdgesFitRequested += FitSteppedEdges;
             satelliteWindow.EdgesLeft += () =>
@@ -174,7 +175,7 @@ namespace OmsiMapEditor.UI
                 else
                     imageryPreferences.Keys[name] = key.Trim();
                 SaveImageryPreferences();
-                SetStatus(string.IsNullOrWhiteSpace(key) ? "The key for " + name + " is taken away." : "The key for " + name + " is kept on this computer.");
+                SetStatusT(string.IsNullOrWhiteSpace(key) ? "aerial.key.removed" : "aerial.key.kept", ("name", name)); // i18n:keys
             };
             satelliteWindow.OwnSourceAdded += (name, url, attribution, zoom, wms) =>
             {
@@ -190,12 +191,12 @@ namespace OmsiMapEditor.UI
                 }
                 if (imageryPreferences.All().Exists(item => item.Name == source.Name) || source.Name == OmsiImagerySource.OsmMap.Name)
                 {
-                    satelliteWindow.ShowOwnSourceProblem("A source of that name is there already.");
+                    satelliteWindow.ShowOwnSourceProblem(Loc.T("aerial.own.exists"));
                     return;
                 }
                 if (!wms && !(url.Contains("{z}") && url.Contains("{x}") && url.Contains("{y}")) || wms && !url.Contains("{bbox}"))
                 {
-                    satelliteWindow.ShowOwnSourceProblem(wms ? "A WMS URL needs {bbox}." : "A tile URL needs {z}, {x} and {y}.");
+                    satelliteWindow.ShowOwnSourceProblem(wms ? Loc.T("aerial.own.wms_needs", ("bbox", "{bbox}")) : Loc.T("aerial.own.tile_needs", ("z", "{z}"), ("x", "{x}"), ("y", "{y}")));
                     return;
                 }
                 imageryPreferences.Sources.Add(source);
@@ -252,12 +253,12 @@ namespace OmsiMapEditor.UI
         {
             if (satelliteWindow == null || currentSummary == null)
             {
-                SetStatus("Open a map first.");
+                SetStatusT("aerial.open_map");
                 return;
             }
             if (session?.Workspace == null)
             {
-                SetStatus("Save the map as a project first (File > Save map project as...): the pictures and the map's place stay in the project.");
+                SetStatusT("aerial.save_first");
                 return;
             }
             geoSettings = geoSettings ?? session.ReadGeoSettings();
@@ -271,7 +272,7 @@ namespace OmsiMapEditor.UI
             ShowImagerySources();
             satelliteWindow.ShowSharpUsage(sharpStore.TotalBytes(), sharpStore.CapBytes);
             satelliteWindow.WorldMap.SetSource(tileFetcher, OmsiImagerySource.Imagery[0]);
-            satelliteWindow.ShowAttribution(OmsiImagerySource.Imagery[0].Attribution + "  ·  Search © OpenStreetMap contributors");
+            satelliteWindow.ShowAttribution(Loc.T("aerial.search_credit", ("attribution", OmsiImagerySource.Imagery[0].Attribution)));
             ShowGeo();
             var geo = Georeference();
             var middle = MiddleTile();
@@ -282,7 +283,7 @@ namespace OmsiMapEditor.UI
             }
             if (aerialTask == null)
                 satelliteWindow.ShowProgress(groundRenderer != null && groundRenderer.ImageryTileCount > 0
-                    ? groundRenderer.ImageryTileCount + " tile(s) have pictures from the air."
+                    ? Loc.T("aerial.tiles_with_pictures", ("count", groundRenderer.ImageryTileCount))
                     : string.Empty, false);
         }
 
@@ -378,8 +379,8 @@ namespace OmsiMapEditor.UI
                 anchor.Latitude = position.Latitude;
                 anchor.Longitude = position.Longitude;
             }
-            PlacementChanged("The map lies at " + position.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°, " +
-                             position.Longitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°.");
+            PlacementChanged(Loc.T("aerial.map_lies", ("latitude", position.Latitude.ToString("0.000000", CultureInfo.InvariantCulture)),
+                ("longitude", position.Longitude.ToString("0.000000", CultureInfo.InvariantCulture))));
         }
 
         private void SaveGeo()
@@ -393,7 +394,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The map's place could not be saved: " + exception.Message);
+                SetStatusT("aerial.place_not_saved", ("reason", exception.Message));
             }
         }
 
@@ -407,12 +408,12 @@ namespace OmsiMapEditor.UI
                     return;
                 if (task.IsFaulted)
                 {
-                    satelliteWindow.ShowPlaces(null, "The search did not answer: " + task.Exception?.GetBaseException().Message);
+                    satelliteWindow.ShowPlaces(null, Loc.T("aerial.search_failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty)));
                     return;
                 }
                 if (task.Result.Count == 0)
                 {
-                    satelliteWindow.ShowPlaces(null, "Nothing found by that name.");
+                    satelliteWindow.ShowPlaces(null, Loc.T("aerial.nothing_found"));
                     return;
                 }
                 satelliteWindow.ShowPlaces(task.Result, null);
@@ -433,12 +434,12 @@ namespace OmsiMapEditor.UI
             var geo = Georeference();
             if (geo == null)
             {
-                satelliteWindow?.ShowProgress("Place the map on the Earth first.", false, true);
+                satelliteWindow?.ShowProgress(Loc.T("aerial.place_first"), false, true);
                 return;
             }
             if (heights && !CanEdit)
             {
-                satelliteWindow?.ShowProgress(ReadOnlyMessage("load terrain heights"), false, true);
+                satelliteWindow?.ShowProgress(ReadOnlyMessage("readonly.action.load_heights"), false, true);
                 return;
             }
             var middle = MiddleTile();
@@ -449,7 +450,7 @@ namespace OmsiMapEditor.UI
             {
                 if (selectedTile == null || !selectedTile.IsAvailable)
                 {
-                    satelliteWindow?.ShowProgress("Select a tile in the map first.", false, true);
+                    satelliteWindow?.ShowProgress(Loc.T("aerial.select_tile"), false, true);
                     return;
                 }
                 tiles.Add(selectedTile);
@@ -500,7 +501,7 @@ namespace OmsiMapEditor.UI
                 satelliteWindow?.ShowProgress(text, true);
                 if (job.ChosenSource != null && text.StartsWith(job.ChosenSource.Name, StringComparison.Ordinal))
                     satelliteWindow?.ShowDetail(text);
-                SetStatus("Satellite: " + text);
+                SetStatus(Loc.T("aerial.status", ("text", text)));
             });
             job.ImageReady = (tile, picture, meta) =>
             {
@@ -522,9 +523,9 @@ namespace OmsiMapEditor.UI
             job.TileFailed = (tile, message) =>
             {
                 lock (failed)
-                    failed.Add("Tile " + tile.X + ", " + tile.Y + ": " + message);
+                    failed.Add(Loc.T("aerial.tile_failed", ("x", tile.X), ("y", tile.Y), ("message", message)));
             };
-            satelliteWindow?.ShowProgress("Starting...", true);
+            satelliteWindow?.ShowProgress(Loc.T("aerial.starting"), true);
             aerialTask = Task.Run(() => job.Run(cancel.Token), cancel.Token);
             aerialTask.ContinueWith(task => aerialMainThread.Enqueue(() =>
             {
@@ -573,12 +574,12 @@ namespace OmsiMapEditor.UI
                 var message = task.Exception?.GetBaseException().Message;
                 Debug.LogWarning("Satellite: " + message);
                 satelliteWindow?.ShowProgress(message, false, true);
-                SetStatus("Satellite: " + message);
+                SetStatus(Loc.T("aerial.status", ("text", message)));
                 return;
             }
             var report = new List<string>();
             if (pictured > 0)
-                report.Add(pictured + " of " + total + " tile(s) with pictures" + (job.ChosenSource != null ? " from " + job.ChosenSource.Name : string.Empty));
+                report.Add(Loc.T("aerial.report.pictures", ("pictured", pictured), ("total", total), ("hasSource", job.ChosenSource != null ? "yes" : "no"), ("source", job.ChosenSource?.Name ?? string.Empty)));
             List<KeyValuePair<OmsiTileSummary, float[]>> heights;
             lock (laid)
                 heights = new List<KeyValuePair<OmsiTileSummary, float[]>>(laid);
@@ -590,9 +591,9 @@ namespace OmsiMapEditor.UI
                     var change = session.ImportTerrainHeights(currentSummary, heights, stepped);
                     if (change != null)
                     {
-                        PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the terrain heights from the world" });
+                        PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("aerial.step.heights") });
                         RefreshGround(change.Tiles);
-                        report.Add("heights on " + change.Tiles.Count + " tile(s), Ctrl+Z takes them back");
+                        report.Add(Loc.T("aerial.report.heights", ("count", change.Tiles.Count)));
                     }
                     steppedEdges = stepped;
                     var steppedTiles = new HashSet<long>();
@@ -609,19 +610,19 @@ namespace OmsiMapEditor.UI
                 catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
                 {
                     Debug.LogException(exception);
-                    report.Add("the heights could not be laid on the map: " + exception.Message);
+                    report.Add(Loc.T("aerial.report.heights_failed", ("reason", exception.Message)));
                 }
             }
             if (job.PassedOver.Count > 0)
-                report.Add("passed over: " + string.Join(" ", job.PassedOver));
+                report.Add(Loc.T("aerial.report.passed", ("list", string.Join(" ", job.PassedOver))));
             if (failed.Count > 0)
             {
                 Debug.LogWarning("Satellite problems:\n" + string.Join("\n", failed));
-                report.Add(failed.Count + " tile(s) with problems, first: " + failed[0]);
+                report.Add(Loc.T("aerial.report.problems", ("count", failed.Count), ("first", failed[0])));
             }
-            var text = (cancelled ? "Cancelled: " : "Done: ") + (report.Count > 0 ? string.Join("; ", report) : "nothing loaded") + ".";
+            var text = Loc.T("aerial.done", ("state", cancelled ? "cancelled" : "done"), ("report", report.Count > 0 ? string.Join("; ", report) : Loc.T("aerial.report.nothing")));
             satelliteWindow?.ShowProgress(text, false, failed.Count > 0);
-            SetStatus("Satellite: " + text);
+            SetStatus(Loc.T("aerial.status", ("text", text)));
         }
 
         /// <summary>A tile's picture made ready off the main thread: its copy for the view, and both as JPEG where Unity allows it.</summary>
@@ -728,7 +729,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException)
             {
                 Debug.LogException(exception);
-                SetStatus("The picture of tile " + tile.X + ", " + tile.Y + " could not be kept: " + exception.Message);
+                SetStatusT("aerial.picture_not_kept", ("x", tile.X), ("y", tile.Y), ("reason", exception.Message));
             }
             var texture = new Texture2D(prepared.ViewWidth, prepared.ViewHeight, TextureFormat.RGB24, true)
             {
@@ -749,17 +750,21 @@ namespace OmsiMapEditor.UI
             if (tile == null || session?.Workspace == null || geoSettings == null ||
                 !session.Workspace.IsModified(OmsiMapSession.ImageryPath(tile)) && !HasOwnPicture(tile))
                 return;
-            var heading = new Label("PICTURE ON THE GROUND");
+            var heading = new Label();
+            LocBindings.TextUpper(heading, "aerial.tile.heading");
             heading.AddToClassList("inspector-section-heading");
             container.Add(heading);
             var factor = (float)geoSettings.OpacityOf(tile.X, tile.Y);
             var row = new VisualElement();
             row.AddToClassList("satellite-row");
-            var show = new Toggle { text = "Show", value = factor > 0f, tooltip = "Shows this tile's picture from the air or own picture" };
+            var show = new Toggle { value = factor > 0f };
+            LocBindings.Text(show, "aerial.tile.show");
+            LocBindings.Tooltip(show, "aerial.tile.show.tooltip");
             show.AddToClassList("picker-option-toggle");
             show.AddToClassList("panel-toggle");
             row.Add(show);
-            var slider = new Slider(0f, 1f) { value = factor > 0f ? factor : 1f, tooltip = "How opaque this tile's picture lies, against the opacity of all pictures" };
+            var slider = new Slider(0f, 1f) { value = factor > 0f ? factor : 1f };
+            LocBindings.Tooltip(slider, "aerial.tile.opacity.tooltip");
             slider.AddToClassList("new-map-slider");
             slider.AddToClassList("satellite-grow");
             row.Add(slider);
@@ -788,7 +793,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("fit tile edges"));
+                SetStatus(ReadOnlyMessage("readonly.action.fit_edges"));
                 return;
             }
             OmsiTerrainChange change;
@@ -799,19 +804,19 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The tile edges could not be fitted: " + exception.Message);
+                SetStatusT("aerial.edges.not_fitted", ("reason", exception.Message));
                 return;
             }
             steppedEdges = new List<OmsiTerrainEdge>();
             satelliteWindow?.ShowSteppedEdges(0);
             if (change == null)
             {
-                SetStatus("The tile edges meet already.");
+                SetStatusT("aerial.edges.met");
                 return;
             }
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the fitted tile edges" });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("aerial.step.edges") });
             RefreshGround(change.Tiles);
-            SetStatus("Fitted the edges of " + change.Tiles.Count + " tile(s) to the loaded heights. Ctrl+Z takes it back.");
+            SetStatusT("aerial.edges.fitted", ("count", change.Tiles.Count));
         }
 
         private void ReadImageryPreferences()
@@ -839,7 +844,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The imagery keys and servers could not be saved: " + exception.Message);
+                SetStatusT("aerial.prefs_not_saved", ("reason", exception.Message));
             }
         }
 

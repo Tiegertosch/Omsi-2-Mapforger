@@ -1,5 +1,6 @@
 using System;
 using OmsiMapEditor.Core;
+using OmsiMapEditor.Core.Localization;
 using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
@@ -29,20 +30,20 @@ namespace OmsiMapEditor.UI
             introLabel.AddToClassList("popup-description");
             Add(introLabel);
 
-            AddField("Title", titleField, "One line that names the problem, such as \"Junction arms jump when turned\"", false);
+            AddField("bugreport.field.title", titleField, "bugreport.field.title.tooltip", false);
             titleField.textSelection.selectAllOnFocus = false;
             titleField.RegisterValueChangedCallback(_ => UpdateSend());
-            AddField("What happened", whatField, "What you saw, and any message MapWorks showed", true);
-            AddField("Steps", stepsField, "What you did before, step by step, and which map; the more exact, the faster it can be fixed", true);
-            AddField("Expected", expectedField, "What you expected to happen instead", true);
+            AddField("bugreport.field.what", whatField, "bugreport.field.what.tooltip", true);
+            AddField("bugreport.field.steps", stepsField, "bugreport.field.steps.tooltip", true);
+            AddField("bugreport.field.expected", expectedField, "bugreport.field.expected.tooltip", true);
 
             var logRow = new VisualElement();
             logRow.AddToClassList("bug-report-row");
-            var logLabel = new Label("Log");
+            var logLabel = LocBindings.NewLabel("bugreport.log");
             logLabel.AddToClassList("bug-report-label");
             logRow.Add(logLabel);
-            logToggle.text = "Attach the log";
-            logToggle.tooltip = "The end of MapWorks' log goes into the report; the whole log lies ready in a folder to drag into the issue";
+            LocBindings.Text(logToggle, "bugreport.log.attach");
+            LocBindings.Tooltip(logToggle, "bugreport.log.attach.tooltip");
             logToggle.AddToClassList("bug-report-toggle");
             logToggle.RegisterValueChangedCallback(_ => UpdateIncluded());
             logRow.Add(logToggle);
@@ -52,9 +53,9 @@ namespace OmsiMapEditor.UI
 
             var buttons = new VisualElement();
             buttons.AddToClassList("dialog-buttons");
-            var cancel = new Button(() => Cancelled?.Invoke()) { text = "Cancel" };
+            var cancel = LocBindings.NewButton("bugreport.cancel", () => Cancelled?.Invoke());
             cancel.AddToClassList("map-control-button");
-            sendButton = new Button(() => SendRequested?.Invoke()) { text = "Open on GitHub", tooltip = "Opens GitHub's form for a new issue in your browser, filled in; nothing is sent before you press Submit there" };
+            sendButton = LocBindings.WithTooltip(LocBindings.NewButton("bugreport.send", () => SendRequested?.Invoke()), "bugreport.send.tooltip");
             sendButton.AddToClassList("map-control-button");
             sendButton.AddToClassList("dialog-primary");
             buttons.Add(cancel);
@@ -75,12 +76,8 @@ namespace OmsiMapEditor.UI
         public void Open(bool crashed)
         {
             Crashed = crashed;
-            titleLabel.text = crashed ? "MapWorks closed unexpectedly" : "Report a bug";
-            introLabel.text = crashed
-                ? "The last session ended without MapWorks closing normally, by a crash or because it had to be ended. A report helps to find out why: " +
-                  "say what you were doing, and your browser opens GitHub with the report and the log of that session filled in."
-                : "Describe the problem, and your browser opens a new issue on GitHub with your text, facts about your computer and the open map, " +
-                  "and the log filled in. You need a GitHub account to send it.";
+            LocBindings.Text(titleLabel, crashed ? "bugreport.title.crash" : "bugreport.title"); // i18n:keys
+            LocBindings.Text(introLabel, crashed ? "bugreport.intro.crash" : "bugreport.intro"); // i18n:keys
             titleField.SetValueWithoutNotify(crashed ? "Crash: " : string.Empty);
             whatField.SetValueWithoutNotify(string.Empty);
             stepsField.SetValueWithoutNotify(string.Empty);
@@ -112,33 +109,29 @@ namespace OmsiMapEditor.UI
             report.Crashed = Crashed;
         }
 
-        private void AddField(string label, TextField field, string tooltip, bool tall)
+        private void AddField(string labelKey, TextField field, string tooltipKey, bool tall)
         {
             var row = new VisualElement();
             row.AddToClassList("bug-report-row");
             if (tall)
                 row.AddToClassList("bug-report-row-tall");
-            var text = new Label(label);
+            var text = LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("bug-report-label");
             row.Add(text);
             field.AddToClassList("picker-field");
             field.AddToClassList("bug-report-field");
             if (tall)
                 field.AddToClassList("bug-report-text");
-            field.tooltip = tooltip;
-            row.tooltip = tooltip;
+            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             row.Add(field);
             Add(row);
         }
 
         private void UpdateIncluded()
         {
-            var log = !IncludeLog ? string.Empty
-                : Crashed ? ", the end of the crashed session's log and Unity's crash report if there is one"
-                : " and the end of the log";
-            includedLabel.text = "Goes along: MapWorks' version, Windows, graphics card, processor and memory" + (Crashed ? string.Empty : ", the open map") + log + ". " +
-                                 (IncludeLog ? "The whole log lies ready in a folder that opens, to drag into the issue. " : string.Empty) +
-                                 "Your Windows user folder shows as %USERPROFILE%, keys of picture sources are left out. You see everything on GitHub before you submit it.";
+            var what = Crashed ? (IncludeLog ? "crashlog" : "crash") : (IncludeLog ? "maplog" : "map");
+            LocBindings.Text(includedLabel, "bugreport.included", ("what", what), ("log", IncludeLog ? "yes" : "no"));
         }
 
         private void UpdateSend()

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,60 +43,53 @@ namespace OmsiMapEditor.UI
             laneOptions.AddToClassList("tool-panel");
             laneOptions.AddToClassList("picker-options");
             laneOptions.style.display = DisplayStyle.None;
-            var title = new Label("Lane connections");
+            var title = LocBindings.NewLabel("lanes.title");
             title.AddToClassList("picker-options-title");
             laneOptions.Add(title);
             laneJunctionLabel = new Label();
             laneJunctionLabel.AddToClassList("panel-info");
             laneJunctionLabel.style.marginTop = 0f;
             laneOptions.Add(laneJunctionLabel);
-            var legend = new Label("Dots are lanes leading in, rings lanes leading out. Click a lane in, then a lane out to add the way between them or take it away.");
+            var legend = LocBindings.NewLabel("lanes.legend");
             legend.AddToClassList("panel-info");
             laneOptions.Add(legend);
-            var reset = new Button(() => ApplyLaneConnections(null, "Every lane in leads to every lane out again"))
-            {
-                text = "Every way through", tooltip = "Gives the junction a lane for every way through again, as it was made"
-            };
+            var reset = LocBindings.WithTooltip(LocBindings.NewButton("lanes.every", () => ApplyLaneConnections(null, Loc.T("lanes.done.every"))), "lanes.every.tooltip");
             reset.AddToClassList("map-control-button");
             laneOptions.Add(reset);
-            var none = new Button(() => ApplyLaneConnections(new HashSet<string>(StringComparer.Ordinal), "Took away every way through"))
-            {
-                text = "No ways through",
-                tooltip = "Takes every way through the junction away, so you can connect the lanes anew; until you do, AI traffic cannot pass it. Ctrl+Z brings them back."
-            };
+            var none = LocBindings.WithTooltip(LocBindings.NewButton("lanes.none", () => ApplyLaneConnections(new HashSet<string>(StringComparer.Ordinal), Loc.T("lanes.done.none"))),
+                "lanes.none.tooltip");
             none.AddToClassList("map-control-button");
             laneOptions.Add(none);
 
             // Left-turn lanes out of the median of an arm (ADR 051, stage 2).
-            var turnTitle = new Label("Left-turn lanes");
+            var turnTitle = LocBindings.NewLabel("lanes.turn.title");
             turnTitle.AddToClassList("picker-options-title");
             turnTitle.style.marginTop = 8f;
             laneOptions.Add(turnTitle);
-            laneTaperField = LaneNumberRow("Taper (m)", OmsiTurnLane.DefaultTaperMeters,
-                "How long the median's kerb takes to lead back to its full width beyond the storage");
-            laneStorageField = LaneNumberRow("Storage (m)", OmsiTurnLane.DefaultStorageMeters,
-                "How long the turn lane runs at its full width before the stop line, for the cars waiting to turn");
+            laneTaperField = LaneNumberRow("lanes.taper", OmsiTurnLane.DefaultTaperMeters, "lanes.taper.tooltip");
+            laneStorageField = LaneNumberRow("lanes.storage", OmsiTurnLane.DefaultStorageMeters, "lanes.storage.tooltip");
             laneTurnRows = new VisualElement();
             laneOptions.Add(laneTurnRows);
 
             lanePlanLabel = new Label();
             lanePlanLabel.AddToClassList("panel-info");
             laneOptions.Add(lanePlanLabel);
-            var hint = new Label("Esc: let go of the lane, then leave.");
+            var hint = LocBindings.NewLabel("lanes.hint");
             hint.AddToClassList("panel-info");
             laneOptions.Add(hint);
             objectsPanelHost.Add(laneOptions);
         }
 
-        private TextField LaneNumberRow(string label, double value, string tooltip)
+        private TextField LaneNumberRow(string labelKey, double value, string tooltipKey)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
-            row.tooltip = tooltip;
-            var text = new Label(label);
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
+            var text = LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             row.Add(text);
-            var field = new TextField { value = value.ToString("0.#", CultureInfo.InvariantCulture), tooltip = tooltip };
+            var field = new TextField { value = value.ToString("0.#", CultureInfo.InvariantCulture) };
+            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
             field.AddToClassList("picker-field");
             row.Add(field);
             laneOptions.Add(row);
@@ -127,26 +121,26 @@ namespace OmsiMapEditor.UI
                 if (lane == null && (arm >= layout.IslandNoses.Length || double.IsNaN(layout.IslandNoses[arm])))
                     continue;
                 var each = arm;
-                var name = "arm " + (arm + 1) + " (" + LaneArmDirection(layout.Arms[arm]) + ")";
-                var toggle = new Button(() => ApplyTurnLane(each, lane == null ? LaneTurnLengths() : null))
+                var direction = LaneArmDirection(layout.Arms[arm]);
+                var toggle = new Button(() => ApplyTurnLane(each, lane == null ? LaneTurnLengths() : null));
+                if (lane == null)
                 {
-                    text = lane == null
-                        ? "Add on " + name
-                        : "Remove from " + name + ", " + lane.TaperMeters.ToString("0.#", CultureInfo.InvariantCulture) + " + " +
-                          lane.StorageMeters.ToString("0.#", CultureInfo.InvariantCulture) + " m",
-                    tooltip = lane == null
-                        ? "Takes a left-turn lane out of this arm's median, with the taper and storage above; the road joined to it is cut back to make room"
-                        : "Gives the median back its full width up to the mouth"
-                };
+                    LocBindings.Text(toggle, "lanes.turn.add", ("n", arm + 1), ("direction", direction));
+                    LocBindings.Tooltip(toggle, "lanes.turn.add.tooltip");
+                }
+                else
+                {
+                    LocBindings.Text(toggle, "lanes.turn.remove", ("n", arm + 1), ("direction", direction), ("taper", lane.TaperMeters), ("storage", lane.StorageMeters));
+                    LocBindings.Tooltip(toggle, "lanes.turn.remove.tooltip");
+                }
                 toggle.AddToClassList("map-control-button");
                 toggle.style.whiteSpace = WhiteSpace.Normal;
                 laneTurnRows.Add(toggle);
                 if (lane == null)
                     continue;
-                var lengths = new Button(() => ApplyTurnLane(each, LaneTurnLengths()))
-                {
-                    text = "Lengths above for " + name, tooltip = "Makes this arm's left-turn lane as long as the taper and storage above"
-                };
+                var lengths = new Button(() => ApplyTurnLane(each, LaneTurnLengths()));
+                LocBindings.Text(lengths, "lanes.turn.lengths", ("n", arm + 1), ("direction", direction));
+                LocBindings.Tooltip(lengths, "lanes.turn.lengths.tooltip");
                 lengths.AddToClassList("map-control-button");
                 lengths.style.whiteSpace = WhiteSpace.Normal;
                 laneTurnRows.Add(lengths);
@@ -160,8 +154,8 @@ namespace OmsiMapEditor.UI
             var centre = ObjectToWorld(laneTile, laneJunction, 0.0, 0.0);
             var end = ObjectToWorld(laneTile, laneJunction, Math.Sin(radians) * 10.0, Math.Cos(radians) * 10.0);
             var bearing = (Math.Atan2(end.X - centre.X, end.Y - centre.Y) * 180.0 / Math.PI + 360.0) % 360.0;
-            var names = new[] { "north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west" };
-            return names[(int)Math.Round(bearing / 45.0) % 8];
+            var names = new[] { "lanes.dir.n", "lanes.dir.ne", "lanes.dir.e", "lanes.dir.se", "lanes.dir.s", "lanes.dir.sw", "lanes.dir.w", "lanes.dir.nw" };
+            return Loc.T(names[(int)Math.Round(bearing / 45.0) % 8]); // i18n:keys
         }
 
         /// <summary>
@@ -173,12 +167,12 @@ namespace OmsiMapEditor.UI
         {
             if (laneJunction == null || laneMade == null || arm < 0 || arm >= laneMade.Arms.Count)
             {
-                SetStatus("Lanes: click a junction made in this project first.");
+                SetStatusT("lanes.status.first");
                 return;
             }
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("change the lanes of junctions"));
+                SetStatus(ReadOnlyMessage("readonly.action.change_lanes"));
                 return;
             }
             var made = laneMade;
@@ -190,7 +184,7 @@ namespace OmsiMapEditor.UI
                 var rebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, laneTile, laneJunction);
                 if (rebuild == null)
                 {
-                    SetStatus("Junction #" + laneJunction.Id + " cannot be made again: its connection points do not match its file.");
+                    SetStatusT("lanes.status.mismatch", ("id", laneJunction.Id));
                     return;
                 }
                 OmsiJunctionLayout layout;
@@ -200,12 +194,12 @@ namespace OmsiMapEditor.UI
                 }
                 catch (ArgumentException exception)
                 {
-                    SetStatus("Junction #" + laneJunction.Id + " cannot be laid out: " + exception.Message);
+                    SetStatusT("lanes.status.layout_failed", ("id", laneJunction.Id), ("reason", exception.Message));
                     return;
                 }
                 if (lane != null && arm < layout.TurnLaneProblems.Length && layout.TurnLaneProblems[arm] != null)
                 {
-                    SetStatus("No left-turn lane: " + layout.TurnLaneProblems[arm]);
+                    SetStatusT("lanes.status.no_turn", ("reason", layout.TurnLaneProblems[arm]));
                     return;
                 }
                 HashSet<string> connections = null;
@@ -221,10 +215,9 @@ namespace OmsiMapEditor.UI
                             connections.Add(way);
                 }
                 ApplyLaneConnections(connections, lane == null
-                    ? "Took the left-turn lane of arm " + (arm + 1) + " away"
-                    : (before == null ? "Added a left-turn lane to arm " : "Gave the left-turn lane of arm ") + (arm + 1) +
-                      (before == null ? " with " : " ") + lane.TaperMeters.ToString("0.#", CultureInfo.InvariantCulture) + " m of taper and " +
-                      lane.StorageMeters.ToString("0.#", CultureInfo.InvariantCulture) + " m of storage", layout.WaysThrough);
+                    ? Loc.T("lanes.done.turn_removed", ("n", arm + 1))
+                    : Loc.T(before == null ? "lanes.done.turn_added" : "lanes.done.turn_changed", ("n", arm + 1), ("taper", lane.TaperMeters), ("storage", lane.StorageMeters)), // i18n:keys
+                    layout.WaysThrough);
             }
             finally
             {
@@ -249,7 +242,7 @@ namespace OmsiMapEditor.UI
             ClearLaneTarget();
             var item = selection.Count == 1 ? selection[0] : null;
             if (item?.Tile == null || !TargetLaneJunction(item.Tile, item.Record))
-                SetStatus("Lanes: click a junction made in this project to choose its ways through; Esc leaves the tool.");
+                SetStatusT("lanes.status.start");
         }
 
         private void EndLaneTool()
@@ -280,7 +273,7 @@ namespace OmsiMapEditor.UI
             laneSource = -1;
             laneHover = -1;
             if (laneJunctionLabel != null)
-                laneJunctionLabel.text = "Click a junction made in this project.";
+                LocBindings.Text(laneJunctionLabel, "lanes.click_junction");
             if (lanePlanLabel != null)
                 lanePlanLabel.text = string.Empty;
             mapCanvas?.SetLaneEnds(null, null, -1);
@@ -295,7 +288,7 @@ namespace OmsiMapEditor.UI
             var rebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, tile, record);
             if (rebuild == null)
             {
-                SetStatus("Junction #" + record.Id + " cannot be made again: its connection points do not match its file.");
+                SetStatusT("lanes.status.mismatch", ("id", record.Id));
                 return null;
             }
             try
@@ -304,7 +297,7 @@ namespace OmsiMapEditor.UI
             }
             catch (ArgumentException exception)
             {
-                SetStatus("Junction #" + record.Id + " cannot be laid out: " + exception.Message);
+                SetStatusT("lanes.status.layout_failed", ("id", record.Id), ("reason", exception.Message));
                 return null;
             }
         }
@@ -321,7 +314,7 @@ namespace OmsiMapEditor.UI
             var defaults = made.Connections == null ? layout : LaneLayout(tile, record, made, null);
             if (layout.IsTransition)
             {
-                SetStatus("Object #" + record.Id + " joins two cross-sections; it has no ways through to choose.");
+                SetStatusT("lanes.status.transition", ("id", record.Id));
                 return false;
             }
             var keepSource = ReferenceEquals(record, laneJunction) ? laneSource : -1;
@@ -339,8 +332,8 @@ namespace OmsiMapEditor.UI
                 laneEndHeights.Add(record.Height + end.Height);
             }
             laneSource = keepSource >= 0 && keepSource < laneEnds.Count && laneEnds[keepSource].Inbound ? keepSource : -1;
-            laneJunctionLabel.text = "Junction #" + record.Id + ": " + made.Arms.Count + " arms, " + laneConnections.Count + " of " +
-                                     OmsiLaneConnections.All(laneEnds).Count + " ways through.";
+            LocBindings.Text(laneJunctionLabel, "lanes.junction", ("id", record.Id), ("arms", made.Arms.Count), ("count", laneConnections.Count),
+                ("total", OmsiLaneConnections.All(laneEnds).Count));
             RefreshLaneTurnRows(layout);
             if (selection.Count != 1 || !ReferenceEquals(selection[0].Record, record))
             {
@@ -349,7 +342,7 @@ namespace OmsiMapEditor.UI
                 ApplySelection(tile);
             }
             UpdateLanePreview();
-            SetStatus("Lanes of junction #" + record.Id + ": click a lane in (dot), then a lane out (ring) to add or take away the way between them.");
+            SetStatusT("lanes.status.target", ("id", record.Id));
             return true;
         }
 
@@ -434,7 +427,7 @@ namespace OmsiMapEditor.UI
                     }
             string plan;
             if (laneSource < 0)
-                plan = laneHover >= 0 && laneEnds[laneHover].Inbound ? "Click to choose this lane in." : "Click a lane in (dot) to see where it leads.";
+                plan = Loc.T(laneHover >= 0 && laneEnds[laneHover].Inbound ? "lanes.plan.choose" : "lanes.plan.pick_in"); // i18n:keys
             else if (laneHover >= 0 && !laneEnds[laneHover].Inbound)
             {
                 var key = OmsiLaneConnections.Key(laneEnds[laneSource], laneEnds[laneHover]);
@@ -445,11 +438,10 @@ namespace OmsiMapEditor.UI
                     shown.Add(curve);
                     shownHeights.Add(LaneCurveHeights(laneEnds[laneSource], laneEnds[laneHover], curve.Length));
                 }
-                plan = laneEnds[laneHover].Arm == laneEnds[laneSource].Arm ? "A lane cannot lead back into its own arm."
-                    : has ? "Click to take this way away." : "Click to add this way.";
+                plan = Loc.T(laneEnds[laneHover].Arm == laneEnds[laneSource].Arm ? "lanes.plan.same_arm" : has ? "lanes.plan.remove" : "lanes.plan.add"); // i18n:keys
             }
             else
-                plan = "Click a lane out (ring) to add or take away the way to it; Esc lets go of the lane.";
+                plan = Loc.T("lanes.plan.pick_out");
             mapCanvas.SetLaneEnds(laneEndPoints, states, laneHover, laneEndHeights);
             mapCanvas.SetRoadGuides(guides, false, guideHeights);
             mapCanvas.SetRoadPreview(shown, true, null, null, null, shownHeights);
@@ -466,7 +458,7 @@ namespace OmsiMapEditor.UI
             RefreshLaneTarget();
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("choose the lanes of junctions"));
+                SetStatus(ReadOnlyMessage("readonly.action.choose_lanes"));
                 return;
             }
             var end = laneJunction != null ? LaneEndAt(point) : -1;
@@ -474,19 +466,19 @@ namespace OmsiMapEditor.UI
             {
                 laneSource = laneSource == end ? -1 : end;
                 UpdateLanePreview();
-                SetStatus(laneSource >= 0 ? "Lane in chosen: click a lane out to add or take away the way to it." : "Let go of the lane.");
+                SetStatusT(laneSource >= 0 ? "lanes.status.chosen" : "lanes.status.let_go"); // i18n:keys
                 return;
             }
             if (end >= 0)
             {
                 if (laneSource < 0)
                 {
-                    SetStatus("Lanes: click a lane in (dot) first, then this lane out.");
+                    SetStatusT("lanes.status.in_first");
                     return;
                 }
                 if (laneEnds[end].Arm == laneEnds[laneSource].Arm)
                 {
-                    SetStatus("Lanes: a lane cannot lead back into its own arm.");
+                    SetStatusT("lanes.status.own_arm");
                     return;
                 }
                 ToggleLaneConnection(laneSource, end);
@@ -500,7 +492,7 @@ namespace OmsiMapEditor.UI
             laneSource = -1;
             UpdateLanePreview();
             if (laneJunction == null)
-                SetStatus("Lanes: click a junction made in this project; only those can have their ways through chosen.");
+                SetStatusT("lanes.status.only_made");
         }
 
         private void ToggleLaneConnection(int from, int to)
@@ -510,7 +502,7 @@ namespace OmsiMapEditor.UI
             var added = connections.Add(key);
             if (!added)
                 connections.Remove(key);
-            ApplyLaneConnections(connections, (added ? "Added the way " : "Took away the way ") + "from arm " + (laneEnds[from].Arm + 1) + " to arm " + (laneEnds[to].Arm + 1));
+            ApplyLaneConnections(connections, Loc.T(added ? "lanes.done.way_added" : "lanes.done.way_removed", ("from", laneEnds[from].Arm + 1), ("to", laneEnds[to].Arm + 1))); // i18n:keys
         }
 
         /// <summary>
@@ -523,12 +515,12 @@ namespace OmsiMapEditor.UI
         {
             if (laneJunction == null || laneMade == null)
             {
-                SetStatus("Lanes: click a junction made in this project first.");
+                SetStatusT("lanes.status.first");
                 return false;
             }
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("choose the lanes of junctions"));
+                SetStatus(ReadOnlyMessage("readonly.action.choose_lanes"));
                 return false;
             }
             if (connections != null && connections.SetEquals(defaults ?? laneDefaultWays))
@@ -539,14 +531,14 @@ namespace OmsiMapEditor.UI
             var rebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, tile, record);
             if (rebuild == null)
             {
-                SetStatus("Junction #" + record.Id + " cannot be made again: its connection points do not match its file.");
+                SetStatusT("lanes.status.mismatch", ("id", record.Id));
                 return false;
             }
             var plain = PlainRoadTexture();
             var turn = rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, plain);
             if (turn.HasErrors)
             {
-                SetStatus("Junction #" + record.Id + " stays: " + (turn.Problem ?? "the roads at it cannot be kept as they are."));
+                SetStatusT("lanes.status.stays", ("id", record.Id), ("reason", turn.Problem ?? Loc.T("lanes.stays.default")));
                 return false;
             }
             // The right of way of the arms as the old paths have it, to put on the new ones.
@@ -562,7 +554,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The junction could not be made again: " + exception.Message);
+                SetStatusT("lanes.status.rebuild_failed", ("reason", exception.Message));
                 return false;
             }
             OmsiJunctionInsertionResult result;
@@ -574,13 +566,13 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 RefreshAfterChange(null);
-                SetStatus("Junction #" + record.Id + " could not be made again: " + exception.Message);
+                SetStatusT("lanes.status.rebuild_failed_id", ("id", record.Id), ("reason", exception.Message));
                 return false;
             }
             if (!result.Succeeded)
             {
                 RefreshAfterChange(null);
-                SetStatus("Junction #" + record.Id + " stays: " + DescribeReferences(result.Blockers) + " still need it as it is.");
+                SetStatus(Loc.T("lanes.status.stays_refs", ("id", record.Id), ("references", DescribeReferences(result.Blockers))));
                 return false;
             }
             var steps = new List<object>(result.Steps);
@@ -589,11 +581,10 @@ namespace OmsiMapEditor.UI
                     RefreshSplineViews(change);
             roadPorts = null;
             CarryPriorities(tile, record, oldObject, oldArms, turn.Arms, assetPath, steps);
-            PushSteps(steps, "the lanes of junction #" + record.Id);
+            PushSteps(steps, Loc.T("lanes.step", ("id", record.Id)));
             laneSource = -1;
             TargetLaneJunction(tile, record);
-            SetStatus(done + " on junction #" + record.Id + ", now " + laneConnections.Count + " way(s) through, made again as " +
-                      Path.GetFileNameWithoutExtension(assetPath) + ". Ctrl+Z takes it back.");
+            SetStatus(Loc.T("lanes.status.done", ("done", done), ("id", record.Id), ("count", laneConnections.Count), ("name", Path.GetFileNameWithoutExtension(assetPath))));
             return true;
         }
 
@@ -657,7 +648,7 @@ namespace OmsiMapEditor.UI
             {
                 laneSource = -1;
                 UpdateLanePreview();
-                SetStatus("Lanes: click a lane in to see where it leads; Esc leaves the tool.");
+                SetStatusT("lanes.status.follow");
             }
             else
                 SetTool(EditorTool.Drag);
@@ -705,18 +696,18 @@ namespace OmsiMapEditor.UI
                     break;
                 if (way == "every")
                 {
-                    ApplyLaneConnections(null, "Every lane in leads to every lane out again");
+                    ApplyLaneConnections(null, Loc.T("lanes.done.every"));
                     continue;
                 }
                 if (way == "none")
                 {
-                    ApplyLaneConnections(new HashSet<string>(StringComparer.Ordinal), "Took away every way through");
+                    ApplyLaneConnections(new HashSet<string>(StringComparer.Ordinal), Loc.T("lanes.done.none"));
                     continue;
                 }
                 var connections = new HashSet<string>(laneConnections, StringComparer.Ordinal);
                 if (!connections.Add(way))
                     connections.Remove(way);
-                ApplyLaneConnections(connections, "Changed the way " + way);
+                ApplyLaneConnections(connections, Loc.T("lanes.done.changed", ("way", way)));
             }
             Debug.Log("Lanes: " + statusLabel?.text);
         }

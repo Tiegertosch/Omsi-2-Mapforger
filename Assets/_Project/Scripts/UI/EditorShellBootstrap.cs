@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using OmsiMapEditor.Core;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using OmsiMapEditor.World;
 using UnityEngine;
@@ -67,6 +68,8 @@ namespace OmsiMapEditor.UI
         private readonly List<ObjectEditStep> undoSteps = new List<ObjectEditStep>();
         private readonly List<ObjectEditStep> redoSteps = new List<ObjectEditStep>();
         private Label statusLabel;
+        private string statusKey;
+        private (string Name, object Value)[] statusArguments;
         private Label mapStateLabel;
         private Label mapTitleLabel;
         private Label pointerInfoLabel;
@@ -338,6 +341,7 @@ namespace OmsiMapEditor.UI
             var root = document.rootVisualElement;
             rootElement = root;
             SetUpLocalization(root);
+            SetUpSettings(root);
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
             root.style.height = Length.Percent(100f);
@@ -363,7 +367,7 @@ namespace OmsiMapEditor.UI
                     if (lastCheck == null || currentSummary == null)
                         return;
                     GUIUtility.systemCopyBuffer = lastCheck.ToText(currentSummary.Name);
-                    SetStatus("Map check report copied.");
+                    SetStatusT("mapcheck.copied");
                 };
             if (checkCloseButton != null)
                 checkCloseButton.clicked += () => HidePopup(checkDialog);
@@ -565,7 +569,7 @@ namespace OmsiMapEditor.UI
                 {
                     draggedSplineEnd = null;
                     mapCanvas.ClearRoadPreview();
-                    SetStatus((bendingSpline ? "Bending the spline" : "Moving the spline end") + " cancelled.");
+                    SetStatusT(bendingSpline ? "spline.cancel_bend" : "spline.cancel_move") /* i18n:keys */;
                 };
                 mapCanvas.ArmDragStarted += StartArmTurn;
                 mapCanvas.ArmDragged += (x, y, alt) => PreviewArmTurn(x, y, false, alt);
@@ -574,7 +578,7 @@ namespace OmsiMapEditor.UI
                 {
                     armRebuild = null;
                     mapCanvas.ClearRoadPreview();
-                    SetStatus("Turning the arm cancelled.");
+                    SetStatusT("junction.turn_cancelled");
                 };
                 mapCanvas.PointerInfoChanged += text =>
                 {
@@ -599,9 +603,9 @@ namespace OmsiMapEditor.UI
             DecorateButton(zoomOutButton, "minus", null);
             DecorateButton(zoomInButton, "plus", null);
             DecorateButton(centerSelectionButton, "crosshair", null);
-            DecorateButton(groundToggleButton, "layers", "Textures");
-            DecorateButton(view3DButton, "rotate-3d", "3D");
-            DecorateButton(routesToggleButton, "route", "Routes");
+            DecorateButton(groundToggleButton, "layers", "view.textures");
+            DecorateButton(view3DButton, "rotate-3d", "view.3d");
+            DecorateButton(routesToggleButton, "route", "view.routes");
             CreatePathsButton();
             DecorateButton(projectCollapseButton, "chevron-left", null);
             DecorateButton(inspectorCollapseButton, "chevron-right", null);
@@ -882,12 +886,7 @@ namespace OmsiMapEditor.UI
             view3DButton?.EnableInClassList("view-control-active", mapCanvas.ThreeDimensional);
             UpdateMapHeader();
             UpdateZoomLabel();
-            SetStatus(mapCanvas.ThreeDimensional
-                ? "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it" +
-                  (CanEdit
-                      ? " and drag it; the move tool (W) moves it along arrows, also up, the rotate tool (E) turns it on rings: green heading, red pitch, blue bank."
-                      : ".")
-                : "Back to the map from above.");
+            SetStatusT(mapCanvas.ThreeDimensional ? (CanEdit ? "view.status.3d_edit" : "view.status.3d") : "view.status.top") /* i18n:keys */;
         }
 
         private void ToggleGround()
@@ -895,7 +894,7 @@ namespace OmsiMapEditor.UI
             if (groundRenderer == null || mapCanvas == null || mapCanvas.ThreeDimensional)
                 return;
             SetTextures(!groundRenderer.GroundVisible);
-            SetStatus(groundRenderer.GroundVisible ? "Ground textures shown." : "Ground textures hidden; tiles are drawn plain.");
+            SetStatusT(groundRenderer.GroundVisible ? "view.status.ground_shown" : "view.status.ground_hidden") /* i18n:keys */;
         }
 
         private void SetTextures(bool visible)
@@ -912,7 +911,7 @@ namespace OmsiMapEditor.UI
         {
             try
             {
-                var path = WindowsFileDialog.OpenFile("Open an OMSI map configuration", WindowsFileDialog.GlobalConfigFilter);
+                var path = WindowsFileDialog.OpenFile(Loc.T("filedialog.open_config"), WindowsFileDialog.GlobalConfigFilter);
                 if (string.IsNullOrEmpty(path))
                     return;
 
@@ -921,7 +920,7 @@ namespace OmsiMapEditor.UI
                 if (OmsiNewMap.IsMadeHere(folder))
                 {
                     OpenOwnMap(path, Path.GetFileName(folder), "Could not read map: ",
-                        () => SetStatus("Opened " + folder + ", a map made with MapWorks, with its project; edit it right away."));
+                        () => SetStatusT("map.opened_own", ("folder", folder)));
                     return;
                 }
                 OpenMapInBackground(path, string.Empty, null, "Could not read map: ", RememberCurrent);
@@ -929,7 +928,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not read map: " + exception.Message);
+                SetStatusT("map.read_failed", ("reason", exception.Message));
             }
         }
 
@@ -1663,7 +1662,7 @@ namespace OmsiMapEditor.UI
 
         private void OpenProject()
         {
-            var projectPath = WindowsFileDialog.OpenFile("Open a MapWorks project", WindowsFileDialog.ProjectFilter);
+            var projectPath = WindowsFileDialog.OpenFile(Loc.T("filedialog.open_project"), WindowsFileDialog.ProjectFilter);
             if (!string.IsNullOrEmpty(projectPath))
                 OpenProjectFile(projectPath);
         }
@@ -1690,7 +1689,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not open project: " + exception.Message);
+                SetStatusT("map.project_failed", ("reason", exception.Message));
             }
         }
 
@@ -1709,7 +1708,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not open map: " + exception.Message);
+                SetStatusT("map.open_failed", ("reason", exception.Message));
             }
         }
 
@@ -1729,7 +1728,7 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null)
             {
-                SetStatus("Open an OMSI map before saving a project.");
+                SetStatusT("map.open_first");
                 return;
             }
 
@@ -1738,7 +1737,7 @@ namespace OmsiMapEditor.UI
                 var suggestedName = string.IsNullOrWhiteSpace(currentProjectName)
                     ? (string.IsNullOrWhiteSpace(currentSummary.Name) ? "OMSI Map" : currentSummary.Name)
                     : currentProjectName;
-                var projectPath = WindowsFileDialog.SaveFile("Save MapWorks project", WindowsFileDialog.ProjectFilter,
+                var projectPath = WindowsFileDialog.SaveFile(Loc.T("filedialog.save_project"), WindowsFileDialog.ProjectFilter,
                     WindowsFileDialog.ProjectExtension, SanitizeFileName(suggestedName) + "." + WindowsFileDialog.ProjectExtension);
                 if (string.IsNullOrEmpty(projectPath))
                     return;
@@ -1753,12 +1752,12 @@ namespace OmsiMapEditor.UI
                 // From now on the map is read through the project's workspace, which also receives the edits.
                 LoadMap(currentSummary.GlobalConfigPath, project.projectName, fullProjectPath, true);
                 RememberCurrent();
-                SetStatus("Project saved: " + fullProjectPath + ". Edits are saved to " + session.Workspace.WorkspacePath);
+                SetStatusT("map.project_saved", ("path", fullProjectPath), ("workspace", session.Workspace.WorkspacePath));
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not save project: " + exception.Message);
+                SetStatusT("map.save_failed", ("reason", exception.Message));
             }
         }
 
@@ -1799,8 +1798,7 @@ namespace OmsiMapEditor.UI
             RenderProjectBrowser();
             RenderInspector();
             UpdateMapStateLabel();
-            SetStatus(currentSummary.Name + ": " + currentSummary.Tiles.Count + " tiles loaded" +
-                      (session.CanEdit ? " through the project workspace" : " read-only from the OMSI installation"));
+            SetStatusT("map.loaded", ("name", currentSummary.Name), ("tiles", currentSummary.Tiles.Count), ("mode", session.CanEdit ? "project" : "readonly"));
             if (toolsButton != null)
                 toolsButton.SetEnabled(true);
         }
@@ -1886,17 +1884,17 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private string ReadOnlyMessage(string action)
+        /// <summary>Why the map cannot be changed now; <paramref name="actionKey"/> is a key <c>readonly.action.*</c> naming what was tried.</summary>
+        private string ReadOnlyMessage(string actionKey)
         {
+            var action = Loc.T(actionKey); // i18n:keys
             if (session != null && session.CanEdit && (chronoDate == null || EditingVariant) && ReadingMapInBackground)
-                return "The map is being read for the map check or a chrono date; " + action + " again in a moment.";
+                return Loc.T("readonly.reading", ("action", action));
             if (EditingVariant)
-                return "The chrono variant " + editedVariant.Title + " is being edited; it takes objects, their types and labels, traffic rules and the right of way, the road types, new roads and deletion of splines, and the lines it switches off only. Choose Base map in the project browser to " +
-                       action + ".";
+                return Loc.T("readonly.variant", ("title", editedVariant.Title), ("action", action));
             return chronoDate != null
-                ? "The map shows " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
-                  " with its chrono variants and is read-only. Choose Base map in the project browser to " + action + "."
-                : "The map is read-only. Save a MapWorks project (File > Save map project as...) to " + action + ".";
+                ? Loc.T("readonly.chrono", ("date", chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("action", action))
+                : Loc.T("readonly.map", ("action", action));
         }
 
         /// <summary>
@@ -1918,12 +1916,12 @@ namespace OmsiMapEditor.UI
         {
             if (session == null || !session.CanEdit)
             {
-                SetStatus("Save a MapWorks project (File > Save map project as...) to edit chrono variants.");
+                SetStatusT("chrono.status.save_to_edit");
                 return;
             }
             if (variant?.FirstDay == null)
             {
-                SetStatus("The chrono variant " + variant?.Title + " has no date, so OMSI never applies it; give its Chrono.cfg a [startdate] to edit it.");
+                SetStatusT("chrono.status.no_date", ("title", variant?.Title ?? string.Empty));
                 return;
             }
             ShowChrono(variant.FirstDay, variant);
@@ -1934,7 +1932,7 @@ namespace OmsiMapEditor.UI
         {
             if (session == null || !session.CanEdit)
             {
-                SetStatus("Save a MapWorks project (File > Save map project as...) to make chrono variants.");
+                SetStatusT("chrono.status.save_to_make");
                 return;
             }
             OmsiChronoVariant made;
@@ -1945,7 +1943,7 @@ namespace OmsiMapEditor.UI
             }
             catch (Exception exception) when (exception is ArgumentException || exception is IOException || exception is UnauthorizedAccessException)
             {
-                SetStatus("Could not make the chrono variant: " + exception.Message);
+                SetStatusT("chrono.status.make_failed", ("reason", exception.Message));
                 return;
             }
             newVariantFormOpen = false;
@@ -1962,7 +1960,7 @@ namespace OmsiMapEditor.UI
             {
                 variantToDelete = variant;
                 RenderProjectBrowser();
-                SetStatus("Click Delete again to delete the chrono variant " + variant.Title + " with everything it changes.");
+                SetStatusT("chrono.status.confirm_delete", ("title", variant.Title));
                 return;
             }
             variantToDelete = null;
@@ -1972,7 +1970,7 @@ namespace OmsiMapEditor.UI
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is UnauthorizedAccessException)
             {
-                SetStatus("Could not delete the chrono variant: " + exception.Message);
+                SetStatusT("chrono.status.delete_failed", ("reason", exception.Message));
                 return;
             }
             chronoVariants = ReadChronoVariants(session.Source);
@@ -1980,7 +1978,7 @@ namespace OmsiMapEditor.UI
                 ShowChronoDate(chronoDate);
             else
                 RenderProjectBrowser();
-            SetStatus("Deleted the chrono variant " + variant.Title + ".");
+            SetStatusT("chrono.status.deleted", ("title", variant.Title));
         }
 
         /// <summary>
@@ -2024,8 +2022,7 @@ namespace OmsiMapEditor.UI
                     return;
                 chronoDate = null;
                 PresentChrono(baseSummary, null);
-                SetStatus(session.CanEdit ? "Base map shown; it can be edited again." + (wasEditing ? " The edits of the chrono variant are saved in the project." : string.Empty)
-                    : "Base map shown.");
+                SetStatusT(session.CanEdit ? "chrono.status.base_editable" : "chrono.status.base", ("wasEditing", wasEditing ? "yes" : "no")) /* i18n:keys */;
                 return;
             }
 
@@ -2043,7 +2040,7 @@ namespace OmsiMapEditor.UI
             var task = Task.Run(() => OmsiChrono.Overlay(baseMap, source, active, out report));
             chronoTask = task;
             UpdateToolbar();
-            SetStatus("Laying " + active.Count + " chrono variant(s) of " + dateText + " over the map...");
+            SetStatusT("chrono.status.laying", ("count", active.Count), ("date", dateText));
 
             IVisualElementScheduledItem poll = null;
             poll = mapCanvas.schedule.Execute(() =>
@@ -2058,7 +2055,7 @@ namespace OmsiMapEditor.UI
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
-                    SetStatus("The chrono variants of " + dateText + " could not be applied: " + task.Exception?.GetBaseException().Message);
+                    SetStatusT("chrono.status.apply_failed", ("date", dateText), ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
                 chronoDate = date.Value.Date;
@@ -2072,16 +2069,12 @@ namespace OmsiMapEditor.UI
                     undoSteps.Clear();
                     redoSteps.Clear();
                     PresentChrono(task.Result, active);
-                    SetStatus("Editing the chrono variant " + edit.Title + " on " + dateText + (active.Count > 1 ? " on top of " + (active.Count - 1) +
-                              " earlier variant(s)" : string.Empty) + ". Objects you place, move, turn or delete go into it; objects of the base map " +
-                              "move as copies with new IDs. Base map ends editing.");
+                    SetStatusT("chrono.status.editing", ("title", edit.Title), ("date", dateText), ("earlier", active.Count - 1));
                     return;
                 }
                 PresentChrono(task.Result, active);
-                SetStatus(dateText + ": " + active.Count + " chrono variant(s) active, " + report.AddedObjects + " objects and " + report.AddedSplines +
-                          " splines added, " + report.DeletedElements + " element(s) removed, " + report.ChangedTypes + " object(s) swapped, " + report.ChangedLabels + " relabelled" +
-                          (report.UnresolvedSelections > 0 ? ", " + report.UnresolvedSelections + " selection(s) without element" : string.Empty) +
-                          ". The chrono view is read-only.");
+                SetStatusT("chrono.status.view", ("date", dateText), ("active", active.Count), ("objects", report.AddedObjects), ("splines", report.AddedSplines),
+                          ("removed", report.DeletedElements), ("swapped", report.ChangedTypes), ("relabelled", report.ChangedLabels), ("unresolved", report.UnresolvedSelections));
             }).Every(100);
         }
 
@@ -2102,7 +2095,7 @@ namespace OmsiMapEditor.UI
             var text = chronoDateField?.value?.Trim() ?? string.Empty;
             if (!DateTime.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
             {
-                SetStatus("Enter the date as year-month-day, for example 1992-04-05.");
+                SetStatusT("chrono.status.date_format");
                 return;
             }
             ShowChronoDate(date);
@@ -2163,7 +2156,7 @@ namespace OmsiMapEditor.UI
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
-                    SetStatus("Object outlines could not be computed: " + task.Exception?.GetBaseException().Message);
+                    SetStatusT("outlines.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
 
@@ -2174,7 +2167,7 @@ namespace OmsiMapEditor.UI
                 foreach (var kind in kinds)
                     if (outlineCache.TryGetValue(kind, out var outline) && outline.Points.Length >= 2)
                         withOutline++;
-                SetStatus("Object outlines ready for " + withOutline + " of " + kinds.Count + " object kinds. Zoom in to see them.");
+                SetStatusT("outlines.ready", ("count", withOutline), ("total", kinds.Count));
             }).Every(150);
         }
 
@@ -2210,7 +2203,7 @@ namespace OmsiMapEditor.UI
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
-                    SetStatus("Bus routes could not be read: " + task.Exception?.GetBaseException().Message);
+                    SetStatusT("routes.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
                 // The line list changes with the first routes and with chrono dates that switch lines off.
@@ -2259,7 +2252,7 @@ namespace OmsiMapEditor.UI
                 moreSplines.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(tile, spline));
             mapCanvas?.SetMoreSelectedSplines(moreSplines.ConvertAll(pair => pair.Value));
             RenderInspector();
-            SetStatus((moreSplines.Count + 1) + " splines selected; Ctrl+click adds or takes away another. The traffic rules apply to all of them.");
+            SetStatusT("spline.status.many", ("count", moreSplines.Count + 1));
         }
 
         /// <summary>Chooses splines besides the selected one, as Ctrl+click does, such as all pieces of its road.</summary>
@@ -2282,8 +2275,7 @@ namespace OmsiMapEditor.UI
             selectedSpline = spline;
             mapCanvas?.SetSelectedSpline(spline);
             ApplySelection(tile);
-            SetStatus("Selected spline #" + spline.Id + " (" + spline.AssetPath + ")" +
-                      (CanEdit ? "; Del deletes it." : " - " + (chronoDate != null ? "chrono view, read-only" : "read-only; save a project to edit")));
+            SetStatusT("spline.status.selected", ("id", spline.Id), ("path", spline.AssetPath), ("mode", CanEdit ? "edit" : chronoDate != null ? "chrono" : "readonly"));
         }
 
         private void ClearSelectedSpline()
@@ -2308,7 +2300,7 @@ namespace OmsiMapEditor.UI
             }
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("delete splines"));
+                SetStatus(ReadOnlyMessage("readonly.action.delete_splines"));
                 return;
             }
             OmsiSplineChangeResult result;
@@ -2319,7 +2311,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not delete spline #" + selectedSpline.Id + ": " + exception.Message);
+                SetStatusT("splinevar.status.delete_failed", ("id", selectedSpline.Id), ("reason", exception.Message));
                 return;
             }
             if (!result.Succeeded)
@@ -2328,7 +2320,7 @@ namespace OmsiMapEditor.UI
                 foreach (var blocker in result.Blockers)
                     if (reasons.Count < 3)
                         reasons.Add(blocker.ToString());
-                SetStatus("Spline #" + selectedSpline.Id + " stays: " + result.Blockers.Count + " reference(s) still need it, such as " + string.Join("; ", reasons) + ".");
+                SetStatusT("spline.status.refs", ("id", selectedSpline.Id), ("count", result.Blockers.Count), ("reasons", string.Join("; ", reasons)));
                 return;
             }
             var id = selectedSpline.Id;
@@ -2336,7 +2328,7 @@ namespace OmsiMapEditor.UI
             ClearSelectedSpline();
             RefreshSplineViews(result.Change);
             RenderInspector();
-            SetStatus("Deleted spline #" + id + "; Ctrl+Z brings it back.");
+            SetStatusT("spline.status.deleted", ("id", id));
         }
 
         /// <summary>
@@ -2358,13 +2350,12 @@ namespace OmsiMapEditor.UI
             {
                 mapCanvas.SetRoadPreview(pieces, !move.HasErrors, move.Issues, null, null);
                 var text = bendingSpline
-                    ? (alt ? "Straightening spline #" : "Bending spline #") + draggedSplineEnd.Spline.Id + (alt ? string.Empty : "; Alt runs it straight")
-                    : "Moving the " + (draggedSplineEnd.AtEnd ? "end" : "start") + " of spline #" + draggedSplineEnd.Spline.Id +
-                      (move.Splines.Count > 1 ? " and the spline joined there" : string.Empty) +
-                      (alt ? " without kinks" : "; Alt keeps the road free of kinks");
+                    ? Loc.T("spline.drag.bend", ("alt", alt ? "yes" : "no"), ("id", draggedSplineEnd.Spline.Id))
+                    : Loc.T("spline.drag.move", ("which", draggedSplineEnd.AtEnd ? "end" : "start"), ("id", draggedSplineEnd.Spline.Id), ("joined", move.Splines.Count > 1 ? "yes" : "no"),
+                        ("alt", alt ? "yes" : "no"));
                 var twoArcs = move.Splines.FindAll(geometry => geometry.SplitOff);
                 if (twoArcs.Count > 0)
-                    text += "; #" + string.Join(", #", twoArcs.ConvertAll(split => split.Spline.Id)) + " becomes two arcs";
+                    text += Loc.T("spline.drag.arcs", ("list", string.Join(", #", twoArcs.ConvertAll(split => split.Spline.Id))));
                 foreach (var issue in move.Issues)
                     text += "; " + issue.Message;
                 SetStatus(text);
@@ -2376,12 +2367,12 @@ namespace OmsiMapEditor.UI
             mapCanvas.ClearRoadPreview();
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("move splines"));
+                SetStatus(ReadOnlyMessage("readonly.action.move_splines"));
                 return;
             }
             if (move.HasErrors)
             {
-                SetStatus("Spline #" + id + " stays: " + move.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                SetStatusT("spline.status.stays", ("id", id), ("reason", move.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message));
                 return;
             }
             List<OmsiSplineChange> changes;
@@ -2394,14 +2385,13 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 RefreshAfterChange(null);
-                SetStatus("Spline #" + id + " could not be moved: " + exception.Message);
+                SetStatusT("spline.status.move_failed", ("id", id), ("reason", exception.Message));
                 return;
             }
             if (changes == null)
             {
                 RefreshAfterChange(null);
-                SetStatus("Spline #" + id + " stays: a spline would be split into two arcs, but " + DescribeReferences(blockers) +
-                          " still need it whole. Drag without Alt to keep the shapes instead.");
+                SetStatus(Loc.T("spline.status.stays_split", ("id", id), ("references", DescribeReferences(blockers))));
                 return;
             }
             if (changes.Count == 0)
@@ -2416,12 +2406,12 @@ namespace OmsiMapEditor.UI
                     if (changedId != id && !moved.Contains(changedId))
                         moved.Add(changedId);
             }
-            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = "moving spline #" + id });
+            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = Loc.T("spline.step.move", ("id", id)) });
             var warnings = move.Issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
             var splits = move.Splines.FindAll(geometry => geometry.SplitOff);
-            SetStatus((bendingSpline ? "Bent spline #" : "Moved spline #") + id + (moved.Count > 0 ? " and #" + string.Join(", #", moved) : string.Empty) +
-                      (splits.Count > 0 ? "; split #" + string.Join(", #", splits.ConvertAll(split => split.Spline.Id)) + " into two arcs to stay free of kinks" : string.Empty) +
-                      (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + ". Ctrl+Z takes it back.");
+            SetStatusT("spline.status.moved", ("bent", bendingSpline ? "yes" : "no"), ("id", id), ("hasMoved", moved.Count > 0 ? "yes" : "no"), ("moved", string.Join(", #", moved)),
+                          ("hasSplit", splits.Count > 0 ? "yes" : "no"), ("split", string.Join(", #", splits.ConvertAll(split => split.Spline.Id))),
+                          ("hasWarning", warnings.Count > 0 ? "yes" : "no"), ("warning", warnings.Count > 0 ? warnings[0].Message : string.Empty));
         }
 
         /// <summary>The junction an object file holds when the editor made it, read once; null for any other object.</summary>
@@ -2478,7 +2468,7 @@ namespace OmsiMapEditor.UI
                 return;
             armRebuild = OmsiJunctionRebuild.Prepare(currentSummary, Junctions(), made, item.Tile, item.Record);
             if (armRebuild == null)
-                SetStatus("Junction #" + item.Record.Id + " cannot be made again: its connection points do not match its file.");
+                SetStatusT("lanes.status.mismatch", ("id", item.Record.Id));
         }
 
         /// <summary>
@@ -2525,12 +2515,12 @@ namespace OmsiMapEditor.UI
                         pieces.Add(points);
                     }
                 mapCanvas.SetRoadPreview(pieces, !turn.HasErrors, issues, null, null);
-                var text = "Turning arm " + (draggedArm + 1) + " of junction #" + junction.Id + " to " + degrees + (alt ? string.Empty : "; Alt turns it freely");
+                var text = Loc.T("junction.drag.turn", ("n", draggedArm + 1), ("id", junction.Id), ("degrees", degrees), ("alt", alt ? "yes" : "no"));
                 var furthest = 0.0;
                 foreach (var lead in turn.Leads)
                     furthest = Math.Max(furthest, lead.CutMeters);
                 if (turn.Leads.Count > 0)
-                    text += "; the roads are laid anew up to " + furthest.ToString("0", CultureInfo.InvariantCulture) + " m out";
+                    text += Loc.T("junction.drag.leads", ("meters", furthest));
                 if (turn.Problem != null)
                     text += "; " + turn.Problem;
                 foreach (var issue in issues)
@@ -2543,17 +2533,17 @@ namespace OmsiMapEditor.UI
             mapCanvas.ClearRoadPreview();
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("turn junction arms"));
+                SetStatus(ReadOnlyMessage("readonly.action.turn_arms"));
                 return;
             }
             if (unchanged)
             {
-                SetStatus("Arm " + (draggedArm + 1) + " of junction #" + junction.Id + " stays as it is.");
+                SetStatusT("junction.status.arm_stays", ("n", draggedArm + 1), ("id", junction.Id));
                 return;
             }
             if (turn.HasErrors)
             {
-                SetStatus("Junction #" + junction.Id + " stays: " + (turn.Problem ?? issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message));
+                SetStatusT("lanes.status.stays", ("id", junction.Id), ("reason", turn.Problem ?? issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message));
                 return;
             }
             string assetPath;
@@ -2567,7 +2557,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The junction could not be made again: " + exception.Message);
+                SetStatusT("lanes.status.rebuild_failed", ("reason", exception.Message));
                 return;
             }
             OmsiJunctionInsertionResult result;
@@ -2579,13 +2569,13 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 RefreshAfterChange(null);
-                SetStatus("Junction #" + junction.Id + " could not be made again: " + exception.Message);
+                SetStatusT("lanes.status.rebuild_failed_id", ("id", junction.Id), ("reason", exception.Message));
                 return;
             }
             if (!result.Succeeded)
             {
                 RefreshAfterChange(null);
-                SetStatus("Junction #" + junction.Id + " stays: " + DescribeReferences(result.Blockers) + " still need the roads at it as they are.");
+                SetStatus(Loc.T("junction.status.stays_roads", ("id", junction.Id), ("references", DescribeReferences(result.Blockers))));
                 return;
             }
             var steps = new List<object>(result.Steps);
@@ -2593,11 +2583,10 @@ namespace OmsiMapEditor.UI
                 if (step is OmsiSplineChange change)
                     RefreshSplineViews(change);
             roadPorts = null;
-            PushSteps(steps, "turning arm " + (draggedArm + 1) + " of junction #" + junction.Id);
+            PushSteps(steps, Loc.T("junction.step.turn", ("n", draggedArm + 1), ("id", junction.Id)));
             var warnings = issues.FindAll(issue => issue.Severity == OmsiRoadIssueSeverity.Warning);
-            SetStatus("Turned arm " + (draggedArm + 1) + " of junction #" + junction.Id + " to " + degrees + " and made it again as " +
-                      Path.GetFileNameWithoutExtension(assetPath) + "; the roads joined to it are led to its points" +
-                      (warnings.Count > 0 ? "; " + warnings[0].Message : string.Empty) + ". Ctrl+Z takes it back.");
+            SetStatusT("junction.status.turned", ("n", draggedArm + 1), ("id", junction.Id), ("degrees", degrees), ("name", Path.GetFileNameWithoutExtension(assetPath)),
+                          ("hasWarning", warnings.Count > 0 ? "yes" : "no"), ("warning", warnings.Count > 0 ? warnings[0].Message : string.Empty));
         }
 
         /// <summary>
@@ -2610,7 +2599,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("change spline heights"));
+                SetStatus(ReadOnlyMessage("readonly.action.spline_heights"));
                 return;
             }
             var id = selectedSpline.Id;
@@ -2654,16 +2643,15 @@ namespace OmsiMapEditor.UI
             }
 
             if (steps.Count > 0)
-                PushHistory(steps.Count == 1 ? steps[0] : new ObjectEditStep { Group = steps, Description = "Heights of spline #" + id });
+                PushHistory(steps.Count == 1 ? steps[0] : new ObjectEditStep { Group = steps, Description = Loc.T("spline.step.heights", ("id", id)) });
             if (failure != null)
             {
-                SetStatus("The heights of spline #" + id + " could not be changed: " + failure +
-                          (steps.Count > 0 ? " The change before it was saved; Ctrl+Z undoes it." : string.Empty));
+                SetStatusT("spline.heights.failed", ("id", id), ("failure", failure), ("saved", steps.Count > 0 ? "yes" : "no"));
                 return;
             }
             if (steps.Count == 0)
             {
-                SetStatus("The heights of spline #" + id + " are unchanged.");
+                SetStatusT("spline.heights.unchanged", ("id", id));
                 return;
             }
             var joined = new List<string>();
@@ -2671,8 +2659,8 @@ namespace OmsiMapEditor.UI
                 foreach (var changedId in step.SplineChange.SplineIds)
                     if (changedId != id && !joined.Contains("#" + changedId))
                         joined.Add("#" + changedId);
-            SetStatus("Changed the heights of spline #" + id + (joined.Count > 0 ? " and " + string.Join(", ", joined) : string.Empty) +
-                      (warnings.Count > 0 ? "; " + string.Join("; ", warnings) : ".") + " Ctrl+Z takes it back.");
+            SetStatusT("spline.heights.changed", ("id", id), ("hasJoined", joined.Count > 0 ? "yes" : "no"), ("joined", string.Join(", ", joined)),
+                          ("hasWarnings", warnings.Count > 0 ? "yes" : "no"), ("warnings", string.Join("; ", warnings)));
         }
 
         /// <summary>Fits the terrain to the road of the selected spline, or stops fitting it, as one undo step.</summary>
@@ -2688,17 +2676,17 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("The terrain could not be " + (align ? "fitted" : "restored") + ": " + exception.Message);
+                SetStatusT(align ? "terrain.road.fit_failed" : "terrain.road.restore_failed", ("reason", exception.Message)) /* i18n:keys */;
                 return;
             }
             if (change == null)
             {
-                SetStatus("Nothing to change on this road.");
+                SetStatusT("terrain.road.nothing");
                 return;
             }
             PushHistory(new ObjectEditStep { SplineChange = change });
             RefreshSplineViews(change);
-            SetStatus((align ? "Terrain fitted to " : "Terrain no longer fitted to ") + change.SplineIds.Count + " spline(s) of this road; Ctrl+Z takes it back.");
+            SetStatusT("terrain.road.changed", ("align", align ? "yes" : "no"), ("count", change.SplineIds.Count));
         }
 
         /// <summary>
@@ -2715,13 +2703,13 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("create junctions"));
+                SetStatus(ReadOnlyMessage("readonly.action.create_junctions"));
                 return;
             }
             profilePath = profilePath ?? roadPanel?.Profile;
             if (profilePath == null)
             {
-                SetStatus("Choose a spline profile in the road tool (R) first; the test junction is made in that profile.");
+                SetStatusT("junction.test.choose_profile");
                 return;
             }
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
@@ -2731,7 +2719,7 @@ namespace OmsiMapEditor.UI
                 var profile = new OmsiSplineProfileCatalog(root).Get(profilePath);
                 if (profile == null)
                 {
-                    SetStatus("The profile " + profilePath + " could not be read.");
+                    SetStatusT("junction.test.unreadable", ("path", profilePath));
                     return;
                 }
                 var kind = arms == 3 ? "T junction " : arms == 4 ? "Crossroads " : "Test ";
@@ -2754,7 +2742,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The test junction could not be created: " + exception.Message);
+                SetStatusT("junction.test.failed", ("reason", exception.Message));
                 return;
             }
             // Placing needs the clicks the road tool would take, and the library lists the new object after reading the
@@ -2763,14 +2751,14 @@ namespace OmsiMapEditor.UI
                 SetTool(EditorTool.Drag);
             StartInstallationScan(true);
             StartPlacement(assetPath);
-            SetStatus("Created " + assetPath + " in your OMSI installation. Click on a road to insert it, then export the map and try it in OMSI.");
+            SetStatusT("junction.test.created", ("path", assetPath));
         }
 
         private void RefitRoadTerrain()
         {
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("fit the terrain"));
+                SetStatus(ReadOnlyMessage("readonly.action.fit_terrain"));
                 return;
             }
             List<OmsiTileSummary> tiles;
@@ -2781,12 +2769,12 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("The terrain could not be fitted: " + exception.Message);
+                SetStatusT("terrain.all.failed", ("reason", exception.Message));
                 return;
             }
             if (tiles.Count == 0)
             {
-                SetStatus("The terrain already fits all roads built here.");
+                SetStatusT("terrain.all.fits");
                 return;
             }
             groundRenderer?.RefreshTerrain(tiles);
@@ -2796,7 +2784,7 @@ namespace OmsiMapEditor.UI
             foreach (var tile in tiles)
                 UpdateBrowserEntry(tile);
             UpdateMapStateLabel();
-            SetStatus("Terrain fitted again on " + tiles.Count + " tile(s).");
+            SetStatusT("terrain.all.fitted", ("count", tiles.Count));
         }
 
         /// <summary>Draws the changed splines again from above and in 3D and updates the counts.</summary>
@@ -2866,11 +2854,7 @@ namespace OmsiMapEditor.UI
             mapCanvas.BeginRoad();
             roadPorts = null;
             UpdateRoadPorts();
-            SetStatus(EditingVariant
-                ? "Road in " + editedVariant.Title + ": click to start a road, on a free spline end to meet it; click again for each bend, Esc ends the road. " +
-                  "It stands alone: no junction, parallel road or terrain fitting."
-                : "Road: click to start a road, on a free spline end to continue it or on a free connection point of a junction; " +
-                  "click again for each bend, Esc ends the road.");
+            SetStatus(EditingVariant ? Loc.T("roadbuild.status.start_variant", ("title", editedVariant.Title)) : Loc.T("roadbuild.status.start"));
         }
 
         private void EndRoadTool()
@@ -3048,7 +3032,7 @@ namespace OmsiMapEditor.UI
 
         private static string DescribePort(OmsiJunctionPort port)
         {
-            return "connection point " + (port.Index + 1) + " of #" + port.Object.Id + " " + Path.GetFileNameWithoutExtension(port.Object.AssetPath);
+            return Loc.T("roadbuild.port", ("n", port.Index + 1), ("id", port.Object.Id), ("name", Path.GetFileNameWithoutExtension(port.Object.AssetPath)));
         }
 
         /// <summary>
@@ -3272,7 +3256,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The junction could not be made: " + exception.Message);
+                SetStatusT("roadbuild.status.junction_failed", ("reason", exception.Message));
                 return null;
             }
             var catalog = Junctions();
@@ -3280,7 +3264,7 @@ namespace OmsiMapEditor.UI
                 OmsiRoadJunctions.MainPair(catalog.Helpers(assetPath)));
             if (plan == null || plan.Problem != null)
             {
-                SetStatus("No junction here: " + (plan?.Problem ?? "the made junction has no connection points."));
+                SetStatusT("roadbuild.status.no_junction", ("reason", plan?.Problem ?? Loc.T("roadbuild.status.no_points")));
                 return null;
             }
             OmsiJunctionInsertionResult result;
@@ -3291,12 +3275,12 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The junction could not be inserted: " + exception.Message);
+                SetStatusT("roadbuild.status.insert_failed", ("reason", exception.Message));
                 return null;
             }
             if (!result.Succeeded)
             {
-                SetStatus("The road cannot be cut for a junction here: " + DescribeReferences(result.Blockers) + ".");
+                SetStatus(Loc.T("roadbuild.status.cut_blocked", ("references", DescribeReferences(result.Blockers))));
                 return null;
             }
             foreach (var step in result.Steps)
@@ -3329,7 +3313,7 @@ namespace OmsiMapEditor.UI
             var plan = PlanRoadBetween(start, startHeading, startHeight, startGradient, end, endJoin, endPort);
             if (plan.HasErrors)
             {
-                SetStatus("The road cannot be built to the junction: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                SetStatusT("roadbuild.status.to_junction", ("reason", plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message));
                 return null;
             }
             try
@@ -3344,7 +3328,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The road could not be built: " + exception.Message);
+                SetStatusT("roadbuild.status.build_failed", ("reason", exception.Message));
                 return null;
             }
         }
@@ -3441,7 +3425,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The transition could not be made: " + exception.Message);
+                SetStatusT("roadbuild.status.transition_failed", ("reason", exception.Message));
                 return null;
             }
             // The transition runs on from the end, its far half towards the new road.
@@ -3463,7 +3447,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The transition could not be placed: " + exception.Message);
+                SetStatusT("roadbuild.status.transition_place_failed", ("reason", exception.Message));
                 return null;
             }
         }
@@ -3509,8 +3493,8 @@ namespace OmsiMapEditor.UI
                 RevertSteps(steps);
                 return;
             }
-            PushSteps(steps, "the road with " + (atStart && atEnd ? "two transitions" : "a transition"));
-            var message = "Built the road with " + (atStart && atEnd ? "transitions" : "a transition") + " to the road of another width. Ctrl+Z takes it all back.";
+            PushSteps(steps, Loc.T("roadbuild.step.transitions", ("two", atStart && atEnd ? "yes" : "no")));
+            var message = Loc.T("roadbuild.status.transitions", ("two", atStart && atEnd ? "yes" : "no"));
             if (endJoin != null || endPort != null)
             {
                 EndRoad();
@@ -3518,7 +3502,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             ContinueRoadFrom(change);
-            SetStatus(message + " Click to go on, Esc ends the road.");
+            SetStatus(message + " " + Loc.T("roadbuild.status.go_on"));
         }
 
         /// <summary>
@@ -3547,13 +3531,12 @@ namespace OmsiMapEditor.UI
             {
                 PushSteps(steps, DescribeJunctions(junctionIds.Count, true));
                 EndRoad();
-                SetStatus("Built the road" + (crossedIds.Count > 0 ? " across " + DescribeSplines(crossedIds) + " with new crossroads," : string.Empty) +
-                          " joined to spline #" + tee.Spline.Id + " with a new T junction (#" + teeJunction.Id + ")" + parallelNote + ". Ctrl+Z takes it all back.");
+                SetStatus(Loc.T("roadbuild.status.tee", ("hasCrossed", crossedIds.Count > 0 ? "yes" : "no"), ("splines", DescribeSplines(crossedIds)), ("spline", tee.Spline.Id),
+                    ("junction", teeJunction.Id), ("note", parallelNote)));
                 return;
             }
             PushSteps(steps, DescribeJunctions(junctionIds.Count, false));
-            var message = "Built the road across " + DescribeSplines(crossedIds) + " with new crossroads (#" + string.Join(", #", junctionIds) + ")" + parallelNote +
-                          ". Ctrl+Z takes it all back.";
+            var message = Loc.T("roadbuild.status.across", ("splines", DescribeSplines(crossedIds)), ("junctions", string.Join(", #", junctionIds)), ("note", parallelNote));
             if (endJoin != null || endPort != null)
             {
                 EndRoad();
@@ -3561,7 +3544,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             ContinueRoadFrom(parts[parts.Count - 1]);
-            SetStatus(message + " Click to go on, Esc ends the road.");
+            SetStatus(message + " " + Loc.T("roadbuild.status.go_on"));
         }
 
         /// <summary>
@@ -3590,7 +3573,7 @@ namespace OmsiMapEditor.UI
                 var startJoin = StartJoin();
                 if (startJoinId.HasValue && startJoin == null || !RefindEnd(endJoinId, endJoinAtEnd, out endJoin))
                 {
-                    FailJunctions(steps, "a spline the road joins changed on the way.");
+                    FailJunctions(steps, Loc.T("roadbuild.fail.changed"));
                     return false;
                 }
                 var end = endJoin?.Position(currentSummary.TileSizeMeters) ?? endPort?.Position ?? target;
@@ -3605,15 +3588,14 @@ namespace OmsiMapEditor.UI
                     break;
                 if (junctionIds.Count - built >= MaximumJunctionsPerRoad)
                 {
-                    FailJunctions(steps, "it crosses more than " + MaximumJunctionsPerRoad + " roads; build it in shorter parts.");
+                    FailJunctions(steps, Loc.T("roadbuild.fail.too_many", ("max", MaximumJunctionsPerRoad)));
                     return false;
                 }
                 var road = crossing.Road;
                 var relative = CrossingAngle(crossing);
                 if (Math.Abs(relative) < 30.0 || Math.Abs(relative) > 150.0)
                 {
-                    FailJunctions(steps, "it crosses spline #" + road.Spline.Id + " at " + Math.Abs(relative).ToString("0") +
-                                         "°, too shallow for crossroads; switch off Make junctions to build it without one.");
+                    FailJunctions(steps, Loc.T("roadbuild.fail.shallow", ("id", road.Spline.Id), ("angle", Math.Abs(relative))));
                     return false;
                 }
                 // The new road arrives on the arm facing its start and leaves on the one ahead.
@@ -3706,7 +3688,7 @@ namespace OmsiMapEditor.UI
             foreach (var pair in parallels)
             {
                 var parallel = pair.Value;
-                var side = pair.Key < 0 ? "left" : "right";
+                var side = Loc.T(pair.Key < 0 ? "roadbuild.side.left" : "roadbuild.side.right"); // i18n:keys
                 if (parallel.HasErrors)
                 {
                     problems.Add(side + ": " + parallel.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
@@ -3727,7 +3709,7 @@ namespace OmsiMapEditor.UI
                 if (!BuildAcross(start, first.HeadingDegrees, first.StartHeight, opposite ? null : join?.Spline.Id, join?.AtEnd ?? false, target,
                         opposite ? join?.Spline.Id : null, join?.AtEnd ?? false, null, false, own, ownJunctions, new List<int>(), parts, out _, out _))
                 {
-                    problems.Add(side + ": " + (statusLabel?.text ?? "it could not be built"));
+                    problems.Add(side + ": " + (statusLabel?.text ?? Loc.T("roadbuild.fail.not_built")));
                     continue;
                 }
                 steps.AddRange(own);
@@ -3741,9 +3723,10 @@ namespace OmsiMapEditor.UI
                     ? new KeyValuePair<int, bool>(parts[0].SplineIds[0], false)
                     : new KeyValuePair<int, bool>(lastPart.SplineIds[lastPart.SplineIds.Count - 1], true);
             }
-            return (built > 0 ? ", and " + built + " parallel road(s) " + roadPanel.ParallelDistance.ToString("0.#", CultureInfo.InvariantCulture) +
-                                " m beside it with crossroads of their own" : string.Empty) +
-                   (problems.Count > 0 ? "; no parallel road on the " + string.Join("; on the ", problems) : string.Empty);
+            var parallelNote = built > 0 ? Loc.T("roadbuild.note.parallel_built", ("count", built), ("distance", roadPanel.ParallelDistance)) : string.Empty;
+            foreach (var problem in problems)
+                parallelNote += Loc.T("roadbuild.note.parallel_problem", ("problem", problem));
+            return parallelNote;
         }
 
         /// <summary>A road crosses at most this many roads in one click; more would make a long undo step few would want.</summary>
@@ -3802,30 +3785,29 @@ namespace OmsiMapEditor.UI
             var reason = statusLabel?.text ?? string.Empty;
             if (steps.Count > 0)
                 RevertSteps(steps);
-            SetStatus("Nothing was built" + (builtBefore > 0 ? ", also not the " + builtBefore + " crossroads before it" : string.Empty) +
-                      ". At spline #" + splineId + ": " + reason);
+            SetStatus(Loc.T("roadbuild.status.nothing_built", ("before", builtBefore), ("id", splineId), ("reason", reason)));
         }
 
         private void FailJunctions(List<object> steps, string reason)
         {
             if (steps.Count > 0)
                 RevertSteps(steps);
-            SetStatus("This road cannot be built: " + reason);
+            SetStatusT("roadbuild.cannot", ("reason", reason));
         }
 
         private static string DescribeJunctions(int crossroads, bool tee)
         {
             var parts = new List<string>();
             if (crossroads > 0)
-                parts.Add(crossroads == 1 ? "the crossroads" : crossroads + " crossroads");
+                parts.Add(Loc.T("roadbuild.junction.crossroads", ("count", crossroads)));
             if (tee)
-                parts.Add("the T junction");
-            return string.Join(" and ", parts) + " and the road " + (tee && crossroads == 0 ? "to it" : "through them");
+                parts.Add(Loc.T("roadbuild.junction.tee"));
+            return Loc.T("roadbuild.junction.whole", ("what", string.Join(Loc.T("roadbuild.junction.and"), parts)), ("tail", tee && crossroads == 0 ? "to" : "through"));
         }
 
         private static string DescribeSplines(List<int> ids)
         {
-            return (ids.Count == 1 ? "spline #" : "splines #") + string.Join(", #", ids);
+            return Loc.T("roadbuild.splines", ("count", ids.Count), ("ids", string.Join(", #", ids)));
         }
 
         /// <summary>The spline end the road started from, found again by its ID after splines were read again; null when it went.</summary>
@@ -3884,11 +3866,10 @@ namespace OmsiMapEditor.UI
                 }
                 mapCanvas.SetRoadPreview(null, true, null, join?.Position(currentSummary.TileSizeMeters) ?? port?.Position ?? onGuide, null);
                 roadPanel.ShowPlan(join != null
-                    ? "Click to continue spline #" + join.Spline.Id + " from its " + (join.AtEnd ? "end" : "start") + "."
+                    ? Loc.T("roadbuild.plan.continue", ("id", join.Spline.Id), ("end", join.AtEnd ? "end" : "start"))
                     : port != null
-                        ? "Click to start a road at " + DescribePort(port) + "; it suggests the profile " + Path.GetFileNameWithoutExtension(port.ProfilePath) + "."
-                        : "Click to start a road. Free spline ends show as circles and free connection points of junctions as diamonds; " +
-                          "starting on one continues it.", false);
+                        ? Loc.T("roadbuild.plan.start_port", ("port", DescribePort(port)), ("profile", Path.GetFileNameWithoutExtension(port.ProfilePath)))
+                        : Loc.T("roadbuild.plan.start"), false);
                 return;
             }
 
@@ -3898,7 +3879,7 @@ namespace OmsiMapEditor.UI
             {
                 // Right after a click the pointer still rests on the new start.
                 mapCanvas.SetRoadPreview(null, true, null, null, roadStart);
-                roadPanel.ShowPlan("Click where the road should go next; Esc ends it.", false);
+                roadPanel.ShowPlan(Loc.T("roadbuild.plan.next"), false);
                 return;
             }
             if (roadPanel.Shape == OmsiRoadShape.Curved && !roadControl.HasValue)
@@ -3907,8 +3888,7 @@ namespace OmsiMapEditor.UI
                 var control = ControlPointAt(roadPointer.Value);
                 mapCanvas.SetRoadPreview(null, true, null, null, roadStart);
                 ShowRoadGuides(roadStartHeading.HasValue ? (OmsiMapPoint?)null : control, new[] { roadStart, control });
-                roadPanel.ShowPlan("Click the control point: the road leaves towards it" + (roadStartHeading.HasValue ? ", along the road it continues" : string.Empty) +
-                                   ". Then click where it ends; Esc ends the road.", false);
+                roadPanel.ShowPlan(Loc.T("roadbuild.plan.control", ("along", roadStartHeading.HasValue ? "yes" : "no")), false);
                 return;
             }
             var plan = PlanRoad(roadPointer.Value, out var endJoin, out var endPort, out var planEnd);
@@ -3947,21 +3927,20 @@ namespace OmsiMapEditor.UI
             FindJunction(plan, planEnd, endJoin, endPort, out var tee, out var crossings);
             var meets = string.Empty;
             if (crossings.Count == 1)
-                meets = " Crosses spline #" + crossings[0].Road.Spline.Id + " after " + crossings[0].Along.ToString("F0") + " m: a click makes crossroads there.";
+                meets = Loc.T("roadbuild.meets.one", ("id", crossings[0].Road.Spline.Id), ("along", crossings[0].Along));
             else if (crossings.Count > 1)
-                meets = " Crosses " + crossings.Count + " roads, after " + string.Join(", ", crossings.ConvertAll(crossing => crossing.Along.ToString("F0"))) +
-                        " m: a click makes crossroads at each.";
+                meets = Loc.T("roadbuild.meets.many", ("count", crossings.Count), ("list", string.Join(", ", crossings.ConvertAll(crossing => crossing.Along.ToString("F0", CultureInfo.InvariantCulture)))));
             var shallow = crossings.Find(crossing => Math.Abs(CrossingAngle(crossing)) < 30.0 || Math.Abs(CrossingAngle(crossing)) > 150.0);
             if (shallow != null)
-                meets += " Spline #" + shallow.Road.Spline.Id + " is crossed too shallowly for crossroads, so the road cannot be built with junctions.";
+                meets += Loc.T("roadbuild.meets.shallow", ("id", shallow.Road.Spline.Id));
             if (tee != null)
-                meets += " Ends on spline #" + tee.Spline.Id + ": a click joins it with a new T junction.";
+                meets += Loc.T("roadbuild.meets.tee", ("id", tee.Spline.Id));
             if (meets.Length == 0 && (NeedsTransition(roadStartJoin, false) || NeedsTransition(endJoin, true)))
-                meets = " Joins a road of another width: a click puts a transition between them.";
+                meets = Loc.T("roadbuild.meets.transition");
             var besides = string.Empty;
             for (var index = plan.Issues.Count; index < issues.Count; index++)
                 if (issues[index].Severity != OmsiRoadIssueSeverity.Note && besides.IndexOf(issues[index].Message, StringComparison.Ordinal) < 0)
-                    besides += "\nParallel " + issues[index].Severity.ToString().ToLowerInvariant() + ": " + issues[index].Message;
+                    besides += Loc.T("roadbuild.besides", ("severity", issues[index].Severity == OmsiRoadIssueSeverity.Error ? "error" : "warning"), ("message", issues[index].Message));
             roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort) + meets + besides,
                 plan.HasErrors || issues.Exists(issue => issue.Severity != OmsiRoadIssueSeverity.Note));
         }
@@ -3969,17 +3948,13 @@ namespace OmsiMapEditor.UI
         private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin, OmsiJunctionPort endPort)
         {
             var text = plan.Pieces.Count == 0
-                ? "No road here."
-                : plan.LengthMeters.ToString("F1") + " m in " + plan.Pieces.Count + " spline(s), " +
-                  (plan.Pieces[0].RadiusMeters == 0 ? "straight" : "radius " + Math.Abs(plan.Pieces[0].RadiusMeters).ToString("F0") + " m") +
-                  (plan.StartTrimMeters > 0.0
-                      ? ", corner rounded with a radius of " + plan.CornerRadiusMeters.ToString("F1") + " m (the road before is cut back " +
-                        plan.StartTrimMeters.ToString("F1") + " m)"
-                      : string.Empty) +
-                  ", gradient up to " + plan.MaximumGradientPercent.ToString("F1") + " %, end height " + plan.EndHeight.ToString("F2") + " m" +
-                  (endJoin != null ? "; joins spline #" + endJoin.Spline.Id : endPort != null ? "; joins " + DescribePort(endPort) : string.Empty) + ".";
+                ? Loc.T("roadbuild.describe.none")
+                : Loc.T("roadbuild.describe.main", ("length", plan.LengthMeters), ("pieces", plan.Pieces.Count), ("straight", plan.Pieces[0].RadiusMeters == 0 ? "yes" : "no"),
+                    ("radius", Math.Abs(plan.Pieces[0].RadiusMeters)), ("corner", plan.StartTrimMeters > 0.0 ? "yes" : "no"), ("cornerRadius", plan.CornerRadiusMeters),
+                    ("trim", plan.StartTrimMeters), ("gradient", plan.MaximumGradientPercent), ("height", plan.EndHeight),
+                    ("join", endJoin != null ? "spline" : endPort != null ? "port" : "none"), ("id", endJoin?.Spline.Id ?? 0), ("port", endPort != null ? DescribePort(endPort) : string.Empty));
             foreach (var issue in plan.Issues)
-                text += "\n" + issue.Severity + ": " + issue.Message;
+                text += Loc.T("roadbuild.issue", ("severity", issue.Severity.ToString()), ("message", issue.Message));
             return text;
         }
 
@@ -4000,7 +3975,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit && !CanEditSplinesInVariant)
             {
-                SetStatus(ReadOnlyMessage("build roads"));
+                SetStatus(ReadOnlyMessage("readonly.action.build_roads"));
                 return;
             }
             var point = new OmsiMapPoint(x, y);
@@ -4021,17 +3996,16 @@ namespace OmsiMapEditor.UI
                 roadReferenceHeading = roadStartHeading ?? OmsiRoadSnapping.NearbyRoadHeading(currentSummary, roadStart.X, roadStart.Y, RoadReferenceReach) ?? 0.0;
                 roadStarted = true;
                 UpdateRoadPreview();
-                var next = roadPanel.Shape == OmsiRoadShape.Curved ? "Click the control point the road leaves towards, then where it ends"
-                    : "Click where it should go";
-                SetStatus(join != null ? "Continuing spline #" + join.Spline.Id + ". " + next + "; Esc ends it."
-                    : port != null ? "Road started at " + DescribePort(port) + ", leaving it the way the point faces. " + next + "; Esc ends it."
-                    : "Road started. " + next + "; Esc ends it.");
+                var next = Loc.T(roadPanel.Shape == OmsiRoadShape.Curved ? "roadbuild.next.curved" : "roadbuild.next.free"); // i18n:keys
+                SetStatus(join != null ? Loc.T("roadbuild.started.continue", ("id", join.Spline.Id), ("next", next))
+                    : port != null ? Loc.T("roadbuild.started.port", ("port", DescribePort(port)), ("next", next))
+                    : Loc.T("roadbuild.started", ("next", next)));
                 return;
             }
 
             if (roadPanel.Profile == null)
             {
-                SetStatus("Choose a spline profile in the road panel first.");
+                SetStatusT("roadbuild.status.choose_profile");
                 return;
             }
             if (roadPanel.Shape == OmsiRoadShape.Curved && !roadControl.HasValue)
@@ -4039,18 +4013,18 @@ namespace OmsiMapEditor.UI
                 var control = ControlPointAt(point);
                 if (Distance(control, roadStart) < OmsiRoadPlanner.MinimumLength)
                 {
-                    SetStatus("Click the control point a little away from the start.");
+                    SetStatusT("roadbuild.status.control_far");
                     return;
                 }
                 roadControl = control;
                 UpdateRoadPreview();
-                SetStatus("Control point set. Click where the curve ends; Esc takes the control point back.");
+                SetStatusT("roadbuild.status.control_set");
                 return;
             }
             var plan = PlanRoad(point, out var endJoin, out var endPort, out var end);
             if (plan.HasErrors)
             {
-                SetStatus("This road cannot be built: " + plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message);
+                SetStatusT("roadbuild.cannot", ("reason", plan.Issues.Find(issue => issue.Severity == OmsiRoadIssueSeverity.Error).Message));
                 return;
             }
             // In a variant the road stands alone: no junction objects, corners, parallel roads or terrain fitting (ADR 066).
@@ -4099,8 +4073,7 @@ namespace OmsiMapEditor.UI
                     parallelEnds.Clear();
                     parallelSplineIds.Clear();
                     if (roadPanel.ParallelLeft || roadPanel.ParallelRight)
-                        SetStatus((statusLabel?.text ?? string.Empty) + " No parallel road was built here, as the road " +
-                                  (crossings.Count > 0 ? "rounds a corner or ends on a road, junction or connection point." : "meets a junction or a road of another width."));
+                        SetStatus((statusLabel?.text ?? string.Empty) + " " + Loc.T("roadbuild.no_parallel", ("reason", crossings.Count > 0 ? "corner" : "other")));
                 }
                 return;
             }
@@ -4131,32 +4104,31 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 RevertSteps(steps);
-                SetStatus("The road could not be built: " + exception.Message);
+                SetStatusT("roadbuild.status.build_failed", ("reason", exception.Message));
                 return;
             }
             if (steps.Count > 1)
                 PushHistory(new ObjectEditStep
                 {
                     Group = steps.ConvertAll(step => new ObjectEditStep { SplineChange = (OmsiSplineChange)step }),
-                    Description = parallels.Count > 0 ? "the road with its parallel roads" : "the road round the corner"
+                    Description = Loc.T(parallels.Count > 0 ? "roadbuild.step.parallel" : "roadbuild.step.corner") // i18n:keys
                 });
             else
                 PushHistory(new ObjectEditStep { SplineChange = change });
             RefreshSplineViews(change);
 
             var warnings = plan.Issues.FindAll(issue => issue.Severity != OmsiRoadIssueSeverity.Note).Count;
-            var built = "Built " + plan.LengthMeters.ToString("F1") + " m of road in " + change.SplineIds.Count + " spline(s)" +
-                        (plan.StartTrimMeters > 0.0 ? ", rounding the corner with a radius of " + plan.CornerRadiusMeters.ToString("F1") + " m" : string.Empty) +
-                        (warnings > 0 ? " with " + warnings + " warning(s)" : string.Empty) + parallelNote;
+            var built = Loc.T("roadbuild.built", ("meters", plan.LengthMeters), ("count", change.SplineIds.Count), ("rounding", plan.StartTrimMeters > 0.0 ? "yes" : "no"),
+                ("radius", plan.CornerRadiusMeters), ("warnings", warnings), ("note", parallelNote));
             if (endJoin != null || endPort != null)
             {
                 EndRoad();
-                SetStatus(built + ", joined to " + (endJoin != null ? "spline #" + endJoin.Spline.Id : DescribePort(endPort)) + ". Click to start the next road.");
+                SetStatus(Loc.T("roadbuild.status.joined", ("built", built), ("target", endJoin != null ? Loc.T("splinevar.spline", ("id", endJoin.Spline.Id)) : DescribePort(endPort))));
                 return;
             }
             // The road continues from the end of its last spline.
             ContinueRoadFrom(change);
-            SetStatus(built + (roadStarted ? ". Click to go on, Esc ends the road, Ctrl+Z takes it back." : "."));
+            SetStatus(Loc.T(roadStarted ? "splinevar.built.going" : "splinevar.built.done", ("built", built))) /* i18n:keys */;
         }
 
         /// <summary>
@@ -4194,7 +4166,7 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 RevertSteps(steps);
-                SetStatus("The corner could not be rounded: " + exception.Message);
+                SetStatusT("roadbuild.status.corner_failed", ("reason", exception.Message));
                 return null;
             }
         }
@@ -4262,8 +4234,8 @@ namespace OmsiMapEditor.UI
             }
             foreach (var end in ends)
                 parallelEnds[end.Key] = end.Value;
-            return (ends.Count > 0 ? ", and " + ends.Count + " parallel road(s) " + roadPanel.ParallelDistance.ToString("0.#", CultureInfo.InvariantCulture) + " m beside it" : string.Empty) +
-                   (problems.Count > 0 ? "; no parallel road where " + string.Join("; ", problems) : string.Empty);
+            return (ends.Count > 0 ? Loc.T("roadbuild.note.parallel_beside", ("count", ends.Count), ("distance", roadPanel.ParallelDistance)) : string.Empty) +
+                   (problems.Count > 0 ? Loc.T("roadbuild.note.parallel_where", ("problems", string.Join("; ", problems))) : string.Empty);
         }
 
         /// <summary>A spline end found again by the spline's ID, or null when the spline went.</summary>
@@ -4349,9 +4321,7 @@ namespace OmsiMapEditor.UI
             mapCanvas.ShowRoutes = visible;
             routesToggleButton?.EnableInClassList("view-control-active", visible);
             if (visible && routes != null)
-                SetStatus(routes.Stops.Count + " stops and " + routes.Lines.Count + " lines shown" +
-                          (routes.MissingEntryCount > 0 ? "; " + routes.MissingEntryCount + " driven paths are not on the map" : string.Empty) +
-                          ". Click a line in the project browser to highlight it.");
+                SetStatusT("routes.status.shown", ("stops", routes.Stops.Count), ("lines", routes.Lines.Count), ("missing", routes.MissingEntryCount));
         }
 
         /// <summary>Highlights a line on the map and in the line list; the highlighted line again shows all alike.</summary>
@@ -4381,8 +4351,7 @@ namespace OmsiMapEditor.UI
             ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, item);
-            SetStatus("Selected object #" + item.Id + " (" + item.AssetPath + ")" +
-                      (CanEditObjects ? "" : chronoDate != null ? " - chrono view, read-only" : " - read-only; save a project to edit"));
+            SetStatusT("selection.status.object", ("id", item.Id), ("path", item.AssetPath), ("mode", CanEditObjects ? "edit" : chronoDate != null ? "chrono" : "readonly"));
         }
 
         /// <summary>Adds an object to the selection or takes it out (Ctrl+click).</summary>
@@ -4410,7 +4379,7 @@ namespace OmsiMapEditor.UI
                     selection.Add(item);
             if (selection.Count == 0)
             {
-                SetStatus("There are no objects in the box.");
+                SetStatusT("selection.status.none_in_box");
                 return;
             }
             ApplySelection(selection[selection.Count - 1].Tile);
@@ -4427,7 +4396,7 @@ namespace OmsiMapEditor.UI
             ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, null);
-            SetStatus("Selected tile " + tile.X + ", " + tile.Y);
+            SetStatusT("selection.status.tile", ("x", tile.X), ("y", tile.Y));
         }
 
         /// <summary>Makes the last selected object the primary one, highlights the tile and refreshes the views.</summary>
@@ -4447,9 +4416,7 @@ namespace OmsiMapEditor.UI
             }
             mapCanvas?.SetSelection(tile, selection);
             if (selectionInfoLabel != null)
-                selectionInfoLabel.text = selection.Count == 0 ? string.Empty
-                    : selection.Count == 1 ? "1 object selected"
-                    : selection.Count + " objects selected";
+                selectionInfoLabel.text = selection.Count == 0 ? string.Empty : Loc.T("selection.count", ("count", selection.Count));
             UpdateToolbar();
             RenderInspector();
             UpdateArmHandles();
@@ -4458,10 +4425,10 @@ namespace OmsiMapEditor.UI
         private string DescribeSelection()
         {
             if (selection.Count == 0)
-                return "Selection cleared.";
+                return Loc.T("selection.cleared");
             if (selection.Count == 1)
-                return "Selected object #" + selectedObject.Id + " (" + selectedObject.AssetPath + ")";
-            return selection.Count + " objects selected. Drag one of them to move all; Del deletes them; Ctrl+click adds or removes one.";
+                return Loc.T("selection.describe.one", ("id", selectedObject.Id), ("path", selectedObject.AssetPath));
+            return Loc.T("selection.describe.many", ("count", selection.Count));
         }
 
         private bool IsSelected(OmsiObjectRecord item)
@@ -4479,7 +4446,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("edit it"));
+                SetStatus(ReadOnlyMessage("readonly.action.edit_it"));
                 return;
             }
 
@@ -4529,7 +4496,7 @@ namespace OmsiMapEditor.UI
                             // The move took chrono selections and attached objects along; the next one reads them anew.
                             references = null;
                             parts.Add(new ObjectEditStep { Change = result.Change });
-                            transfers.Add("#" + edit.Record.Id + " into tile " + target.X + ", " + target.Y);
+                            transfers.Add(Loc.T("objects.edit.transfer", ("id", edit.Record.Id), ("x", target.X), ("y", target.Y)));
                             // A transfer keeps height and orientation; an edit from the inspector may change them too.
                             AddValueStep(parts, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit);
                             continue;
@@ -4541,7 +4508,7 @@ namespace OmsiMapEditor.UI
                 catch (Exception exception)
                 {
                     Debug.LogException(exception);
-                    failure = "Could not save object #" + edit.Record.Id + ": " + exception.Message;
+                    failure = Loc.T("objects.edit.save_failed", ("id", edit.Record.Id), ("reason", exception.Message));
                     break;
                 }
             }
@@ -4556,35 +4523,35 @@ namespace OmsiMapEditor.UI
 
             if (failure != null)
             {
-                SetStatus(failure + (parts.Count > 0 ? " The changes before it were saved; Ctrl+Z undoes them." : string.Empty));
+                SetStatus(failure + (parts.Count > 0 ? " " + Loc.T("objects.edit.saved_before") : string.Empty));
                 return;
             }
             if (parts.Count == 0 && kept.Count > 0)
             {
-                SetStatus("Not changed in " + editedVariant.Title + ": " + JoinLimited(kept) + ".");
+                SetStatus(Loc.T("objects.edit.kept_in_variant", ("title", editedVariant.Title), ("list", JoinLimited(kept))));
                 return;
             }
             if (parts.Count == 0)
             {
-                SetStatus(edits.Count == 1 ? "Object #" + edits[0].Record.Id + " is unchanged." : "The objects are unchanged.");
+                SetStatusT(edits.Count == 1 ? "objects.edit.unchanged_one" : "objects.edit.unchanged_many", ("id", edits.Count == 1 ? edits[0].Record.Id : 0)) /* i18n:keys */;
                 return;
             }
             var message = edits.Count == 1
-                ? "Object #" + edits[0].Record.Id + " saved to " + (EditingVariant ? "the chrono variant " + editedVariant.Title : "the project workspace") + "."
-                : edits.Count + " objects saved to " + (EditingVariant ? "the chrono variant " + editedVariant.Title : "the project workspace") + ".";
+                ? Loc.T("objects.edit.saved_one", ("id", edits[0].Record.Id), ("where", EditingVariant ? "variant" : "project"), ("title", EditingVariant ? editedVariant.Title : string.Empty))
+                : Loc.T("objects.edit.saved_many", ("count", edits.Count), ("where", EditingVariant ? "variant" : "project"), ("title", EditingVariant ? editedVariant.Title : string.Empty));
             if (copies.Count > 0)
             {
                 var named = new List<string>();
                 foreach (var pair in copies)
                     named.Add("#" + pair.Key.Id + " by #" + pair.Value.Id);
-                message += " The variant took away and replaced " + JoinLimited(named) + "." +
-                           (stale.Count > 0 ? " Still naming the old ID: " + DescribeReferences(stale) + "." : string.Empty);
+                message += Loc.T("objects.edit.replaced", ("list", JoinLimited(named))) +
+                           (stale.Count > 0 ? Loc.T("objects.edit.stale", ("refs", DescribeReferences(stale))) : string.Empty);
             }
             if (transfers.Count > 0)
-                message += " Moved " + JoinLimited(transfers) + ".";
+                message += Loc.T("objects.edit.moved", ("list", JoinLimited(transfers)));
             if (kept.Count > 0)
-                message += (EditingVariant ? " Not changed: " : " Kept in their tile because references tie them to it: ") + JoinLimited(kept) + ".";
-            SetStatus(message + " Ctrl+Z undoes it.");
+                message += Loc.T(EditingVariant ? "objects.edit.not_changed" : "objects.edit.kept_in_tile", ("list", JoinLimited(kept))); // i18n:keys
+            SetStatus(message + " " + Loc.T("objects.edit.undo"));
         }
 
         /// <summary>True when an edit leaves the object's place and orientation as written.</summary>
@@ -4630,7 +4597,7 @@ namespace OmsiMapEditor.UI
         private static string JoinLimited(List<string> parts)
         {
             var shown = parts.GetRange(0, Math.Min(3, parts.Count));
-            return string.Join(", ", shown) + (parts.Count > shown.Count ? " and " + (parts.Count - shown.Count) + " more" : string.Empty);
+            return parts.Count > shown.Count ? Loc.T("objects.join_more", ("list", string.Join(", ", shown)), ("count", parts.Count - shown.Count)) : string.Join(", ", shown);
         }
 
         private static double[] Values(OmsiObjectRecord item)
@@ -4705,7 +4672,7 @@ namespace OmsiMapEditor.UI
             mapCanvas.BeginRoad();
             terrainRampStart = null;
             ShowTerrainBrush();
-            SetStatus("Terrain: hold the left button over the ground to shape it with the brush; Ramp lays an even slope between two clicks. Esc leaves the tool.");
+            SetStatusT("terrain.status.start");
         }
 
         private void EndTerrainTool()
@@ -4734,17 +4701,17 @@ namespace OmsiMapEditor.UI
             var radius = terrainOptions.Radius;
             var marks = new List<OmsiMapPoint[]> { Circle(pointer, radius) };
             var sampler = new OmsiTerrainSampler(currentSummary, session.Source);
-            var here = sampler.TryGetHeight(pointer.X, pointer.Y, out var height) ? height.ToString("0.0", CultureInfo.InvariantCulture) + " m" : "no terrain";
+            var here = sampler.TryGetHeight(pointer.X, pointer.Y, out var height) ? Loc.T("terrain.here_height", ("height", height)) : Loc.T("terrain.no_terrain");
             if (terrainOptions.Mode.HasValue)
             {
                 mapCanvas.SetRoadPreview(marks, true, null, null, null);
-                terrainOptions.ShowPlan("Ground under the pointer: " + here + ".", false);
+                terrainOptions.ShowPlan(Loc.T("terrain.here", ("here", here)), false);
                 return;
             }
             if (!terrainRampStart.HasValue)
             {
                 mapCanvas.SetRoadPreview(marks, true, null, null, null);
-                terrainOptions.ShowPlan("Ramp: click where it starts (" + here + ").", false);
+                terrainOptions.ShowPlan(Loc.T("terrain.ramp_start", ("here", here)), false);
                 return;
             }
             var start = terrainRampStart.Value;
@@ -4752,10 +4719,10 @@ namespace OmsiMapEditor.UI
             marks.Add(new[] { start, pointer });
             mapCanvas.SetRoadPreview(marks, true, null, null, null);
             var length = Math.Sqrt((pointer.X - start.X) * (pointer.X - start.X) + (pointer.Y - start.Y) * (pointer.Y - start.Y));
-            var text = "Ramp over " + length.ToString("0", CultureInfo.InvariantCulture) + " m";
+            var text = Loc.T("terrain.ramp_over", ("length", length));
             if (sampler.TryGetHeight(start.X, start.Y, out var from) && sampler.TryGetHeight(pointer.X, pointer.Y, out var to) && length > 0.01)
-                text += ", " + ((to - from) / length * 100.0).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " %";
-            terrainOptions.ShowPlan(text + "; click where it ends, Esc starts again.", false);
+                text += Loc.T("terrain.ramp_gradient", ("gradient", (to - from) / length * 100.0));
+            terrainOptions.ShowPlan(text + Loc.T("terrain.ramp_end"), false);
         }
 
         private static OmsiMapPoint[] Circle(OmsiMapPoint centre, double radius)
@@ -4788,7 +4755,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The ground cannot be shaped: " + exception.Message);
+                SetStatusT("terrain.status.cannot_shape", ("reason", exception.Message));
                 return;
             }
             terrainStroke.FlattenTo = terrainOptions.FlattenHeight ?? terrainStroke.HeightAt(x, y) ?? 0.0;
@@ -4821,7 +4788,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The ground could not be shaped: " + exception.Message);
+                SetStatusT("terrain.status.shape_failed", ("reason", exception.Message));
                 ReleaseTerrain();
                 return;
             }
@@ -4844,15 +4811,15 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The shaped ground could not be kept: " + exception.Message);
+                SetStatusT("terrain.status.not_kept", ("reason", exception.Message));
                 return;
             }
             if (change == null)
                 return;
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "shaping the ground" });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("terrain.step.shaping") });
             RefreshGround(change.Tiles);
             ShowTerrainBrush();
-            SetStatus("Shaped the ground of " + change.Tiles.Count + " tile(s). Ctrl+Z takes it back.");
+            SetStatusT("terrain.status.shaped", ("count", change.Tiles.Count));
         }
 
         /// <summary>A click of the ramp: its start, or its end, which lays it as one step.</summary>
@@ -4862,7 +4829,7 @@ namespace OmsiMapEditor.UI
             {
                 terrainRampStart = new OmsiMapPoint(x, y);
                 ShowTerrainBrush();
-                SetStatus("Ramp: click where it ends; Esc starts again.");
+                SetStatusT("terrain.status.ramp_end");
                 return;
             }
             var start = terrainRampStart.Value;
@@ -4878,20 +4845,19 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The ramp could not be laid: " + exception.Message);
+                SetStatusT("terrain.status.ramp_failed", ("reason", exception.Message));
                 return;
             }
             ShowTerrainBrush();
             if (change == null)
             {
-                SetStatus("No ramp: both ends must lie on terrain.");
+                SetStatusT("terrain.status.no_ramp");
                 return;
             }
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the ramp" });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("terrain.step.ramp") });
             RefreshGround(change.Tiles);
             var length = Math.Sqrt((x - start.X) * (x - start.X) + (y - start.Y) * (y - start.Y));
-            SetStatus("Laid a ramp of " + gradient.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " % over " +
-                      length.ToString("0", CultureInfo.InvariantCulture) + " m. Ctrl+Z takes it back.");
+            SetStatusT("terrain.status.ramp_laid", ("gradient", gradient), ("length", length));
         }
 
         /// <summary>
@@ -4903,7 +4869,7 @@ namespace OmsiMapEditor.UI
             if (currentSummary == null || session == null)
                 return;
             var name = string.IsNullOrWhiteSpace(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
-            path = path ?? WindowsFileDialog.SaveFile("Export the height map", WindowsFileDialog.PngFilter, "png", SanitizeFileName(name) + "_heights.png");
+            path = path ?? WindowsFileDialog.SaveFile(Loc.T("filedialog.export_heights"), WindowsFileDialog.PngFilter, "png", SanitizeFileName(name) + "_heights.png");
             if (string.IsNullOrEmpty(path))
                 return;
             try
@@ -4911,15 +4877,13 @@ namespace OmsiMapEditor.UI
                 var export = session.ExportHeightMap(currentSummary);
                 File.WriteAllBytes(path, export.Png);
                 File.WriteAllText(Path.ChangeExtension(path, ".txt"), export.Note);
-                SetStatus("Height map written: " + export.Width + " × " + export.Height + " px, " +
-                          export.Range.Lowest.ToString("0.0", CultureInfo.InvariantCulture) + " to " + export.Range.Highest.ToString("0.0", CultureInfo.InvariantCulture) +
-                          " m, with its heights in " + Path.GetFileName(Path.ChangeExtension(path, ".txt")) + ".");
+                SetStatusT("heightmap.status.written", ("width", export.Width), ("height", export.Height), ("lowest", export.Range.Lowest), ("highest", export.Range.Highest), ("file", Path.GetFileName(Path.ChangeExtension(path, ".txt"))));
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidOperationException ||
                                               exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The height map could not be written: " + exception.Message);
+                SetStatusT("heightmap.status.write_failed", ("reason", exception.Message));
             }
         }
 
@@ -4928,7 +4892,7 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null || terrainOptions == null)
                 return;
-            path = path ?? WindowsFileDialog.OpenFile("A height map for the whole map", WindowsFileDialog.HeightMapFilter);
+            path = path ?? WindowsFileDialog.OpenFile(Loc.T("filedialog.open_heights"), WindowsFileDialog.HeightMapFilter);
             if (string.IsNullOrEmpty(path))
                 return;
             try
@@ -4944,19 +4908,18 @@ namespace OmsiMapEditor.UI
                 {
                     var width = (maxX - minX + 1) * currentSummary.TileSizeMeters;
                     var height = (maxY - minY + 1) * currentSummary.TileSizeMeters;
-                    info = pendingHeightMap.Width + " × " + pendingHeightMap.Height + " px over " + width.ToString("0", CultureInfo.InvariantCulture) + " × " +
-                           height.ToString("0", CultureInfo.InvariantCulture) + " m (" +
-                           (width / Math.Max(1, pendingHeightMap.Width - 1)).ToString("0.0", CultureInfo.InvariantCulture) + " m a pixel)";
+                    info = Loc.T("heightmap.info", ("width", pendingHeightMap.Width), ("height", pendingHeightMap.Height), ("meterWidth", width), ("meterHeight", height),
+                        ("pixel", width / Math.Max(1, pendingHeightMap.Width - 1)));
                 }
                 terrainOptions.ShowImport(Path.GetFileName(path), info, range, pendingHeightMap.Coarse);
-                SetStatus("Height map " + Path.GetFileName(path) + ": choose the heights for black and white, then lay it on the map.");
+                SetStatusT("heightmap.status.choose", ("file", Path.GetFileName(path)));
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidDataException ||
                                               exception is ArgumentException)
             {
                 Debug.LogException(exception);
                 pendingHeightMap = null;
-                SetStatus("The picture could not be read: " + exception.Message);
+                SetStatusT("pictures.unreadable", ("reason", exception.Message));
             }
         }
 
@@ -4968,7 +4931,7 @@ namespace OmsiMapEditor.UI
             var range = terrainOptions.ImportRange;
             if (!range.HasValue)
             {
-                SetStatus("Type the heights for black and white as numbers.");
+                SetStatusT("heightmap.status.numbers");
                 return;
             }
             var picture = new OmsiGreyPicture(pendingHeightMap.Width, pendingHeightMap.Height, (float[])pendingHeightMap.Values.Clone(), pendingHeightMap.Coarse);
@@ -4981,19 +4944,19 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The height map could not be laid on the map: " + exception.Message);
+                SetStatusT("heightmap.status.lay_failed", ("reason", exception.Message));
                 return;
             }
             pendingHeightMap = null;
             terrainOptions.HideImport();
             if (change == null)
             {
-                SetStatus("The height map changed nothing.");
+                SetStatusT("heightmap.status.nothing");
                 return;
             }
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the height map" });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("heightmap.step") });
             RefreshGround(change.Tiles);
-            SetStatus("Laid the height map over " + change.Tiles.Count + " tile(s). Ctrl+Z takes it back.");
+            SetStatusT("heightmap.status.laid", ("count", change.Tiles.Count));
         }
 
         /// <summary>
@@ -5004,11 +4967,11 @@ namespace OmsiMapEditor.UI
         {
             if (tile == null || !tile.IsAvailable || !tile.HasTerrain)
                 return;
-            var heading = new Label("WATER");
+            var heading = new Label(Loc.T("water.heading").ToUpper(Loc.Manager?.Culture ?? System.Globalization.CultureInfo.CurrentCulture));
             heading.AddToClassList("inspector-section-heading");
             container.Add(heading);
             var level = tile.Water != null ? (tile.Water[0] + tile.Water[1] + tile.Water[2] + tile.Water[3]) / 4.0 : tile.TerrainMinHeight - 1.0;
-            var field = AddEditField(container, "Height (m)", level);
+            var field = AddEditField(container, "inspector.field.height", level);
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             var set = new Button(() =>
@@ -5016,18 +4979,17 @@ namespace OmsiMapEditor.UI
                 if (double.TryParse(field.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
                     SetTileWater(tile, height);
                 else
-                    SetStatus("Type the water's height as a number.");
+                    SetStatusT("water.status.height_number");
             })
             {
-                text = tile.Water != null ? "Set height" : "Add water",
-                tooltip = "Lays the tile's water at this height ([water]); it shows where the ground lies below it. Lower the ground for a lake or a river."
-            };
+                text = Loc.T(tile.Water != null ? "water.set_height" : "water.add") /* i18n:keys */,
+                tooltip = Loc.T("water.set.tooltip")};
             set.AddToClassList("map-control-button");
             set.AddToClassList("inspector-edit-apply");
             row.Add(set);
             if (tile.Water != null)
             {
-                var remove = new Button(() => SetTileWater(tile, null)) { text = "Remove water", tooltip = "Takes the tile's water away" };
+                var remove = new Button(() => SetTileWater(tile, null)) { text = Loc.T("water.remove"), tooltip = Loc.T("water.remove.tooltip")};
                 remove.AddToClassList("map-control-button");
                 remove.AddToClassList("inspector-edit-delete");
                 row.Add(remove);
@@ -5039,8 +5001,8 @@ namespace OmsiMapEditor.UI
             // Each corner its own height, as tile.map.water keeps them: water that slopes like a river.
             var corners = new[]
             {
-                AddEditField(container, "South-west (m)", tile.Water[0]), AddEditField(container, "South-east (m)", tile.Water[1]),
-                AddEditField(container, "North-west (m)", tile.Water[2]), AddEditField(container, "North-east (m)", tile.Water[3])
+                AddEditField(container, "inspector.field.sw", tile.Water[0]), AddEditField(container, "inspector.field.se", tile.Water[1]),
+                AddEditField(container, "inspector.field.nw", tile.Water[2]), AddEditField(container, "inspector.field.ne", tile.Water[3])
             };
             var setCorners = new Button(() =>
             {
@@ -5050,15 +5012,14 @@ namespace OmsiMapEditor.UI
                         heights[corner] = (float)height;
                     else
                     {
-                        SetStatus("Type the corners' heights as numbers.");
+                        SetStatusT("water.status.corners_numbers");
                         return;
                     }
                 SetTileWaterCorners(tile, heights);
             })
             {
-                text = "Set corners",
-                tooltip = "Gives each corner of the tile's water its own height, so the water slopes, as along a river. Neighbouring tiles meet where their corners are alike."
-            };
+                text = Loc.T("water.set_corners"),
+                tooltip = Loc.T("water.set_corners.tooltip")};
             setCorners.AddToClassList("map-control-button");
             setCorners.AddToClassList("inspector-edit-apply");
             container.Add(setCorners);
@@ -5076,17 +5037,15 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The water could not be changed: " + exception.Message);
+                SetStatusT("water.status.failed", ("reason", exception.Message));
                 return;
             }
             if (change == null)
                 return;
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the water of tile " + tile.X + ", " + tile.Y });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("water.step", ("x", tile.X), ("y", tile.Y)) });
             RefreshGround(change.Tiles);
             RenderInspector();
-            SetStatus("Water from " + Math.Min(Math.Min(corners[0], corners[1]), Math.Min(corners[2], corners[3])).ToString("0.##", CultureInfo.InvariantCulture) + " to " +
-                      Math.Max(Math.Max(corners[0], corners[1]), Math.Max(corners[2], corners[3])).ToString("0.##", CultureInfo.InvariantCulture) + " m on tile " + tile.X + ", " +
-                      tile.Y + ". Ctrl+Z takes it back.");
+            SetStatusT("water.status.slope", ("low", Math.Min(Math.Min(corners[0], corners[1]), Math.Min(corners[2], corners[3]))), ("high", Math.Max(Math.Max(corners[0], corners[1]), Math.Max(corners[2], corners[3]))), ("x", tile.X), ("y", tile.Y));
         }
 
         private void SetTileWater(OmsiTileSummary tile, double? level)
@@ -5101,16 +5060,15 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The water could not be changed: " + exception.Message);
+                SetStatusT("water.status.failed", ("reason", exception.Message));
                 return;
             }
             if (change == null)
                 return;
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "the water of tile " + tile.X + ", " + tile.Y });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("water.step", ("x", tile.X), ("y", tile.Y)) });
             RefreshGround(change.Tiles);
             RenderInspector();
-            SetStatus((level.HasValue ? "Water at " + level.Value.ToString("0.##", CultureInfo.InvariantCulture) + " m on" : "Took the water off") +
-                      " tile " + tile.X + ", " + tile.Y + ". Ctrl+Z takes it back.");
+            SetStatusT(level.HasValue ? "water.status.level" : "water.status.removed", ("level", level ?? 0.0), ("x", tile.X), ("y", tile.Y)) /* i18n:keys */;
         }
 
         /// <summary>Levels the ground under the selected objects (ADR 040, stage 2), as one step.</summary>
@@ -5128,17 +5086,17 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The ground could not be levelled: " + exception.Message);
+                SetStatusT("level.status.failed", ("reason", exception.Message));
                 return;
             }
             if (change == null)
             {
-                SetStatus(levelled == 0 ? "Nothing to level: trees and objects without an outline keep their ground." : "The ground there is level already.");
+                SetStatusT(levelled == 0 ? "level.status.nothing" : "level.status.level") /* i18n:keys */;
                 return;
             }
-            PushHistory(new ObjectEditStep { TerrainChange = change, Description = "levelling the ground under " + levelled + " object(s)" });
+            PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("level.step", ("count", levelled)) });
             RefreshGround(change.Tiles);
-            SetStatus("Levelled the ground under " + levelled + " object(s). Ctrl+Z takes it back.");
+            SetStatusT("level.status.done", ("count", levelled));
         }
 
         /// <summary>Draws the ground and the objects standing on it again where the terrain changed.</summary>
@@ -5162,7 +5120,7 @@ namespace OmsiMapEditor.UI
                 return;
             UpdateObjectsCatalog();
             StartInstallationScan();
-            objectsPanel.UseOptions(rowOptions, "Point at a road and click to lay a row of it; Esc ends the tool.");
+            objectsPanel.UseOptions(rowOptions, Loc.T("rows.panel_hint"));
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.None;
             objectsPanel.style.display = DisplayStyle.Flex;
@@ -5173,9 +5131,8 @@ namespace OmsiMapEditor.UI
             rowStart = null;
             DeselectRow();
             rowOptions.ShowObject(rowAsset);
-            rowOptions.ShowPlan(rowAsset == null ? "Choose the object for the row in the library." : "Point at a road.", false);
-            SetStatus("Rows: choose an object in the library, point at a road and click; the row lies on the side of the pointer. " +
-                      "Click an object of a row to select the row, Del deletes it; Esc leaves the tool.");
+            rowOptions.ShowPlan(Loc.T(rowAsset == null ? "rows.plan.choose" : "rows.plan.point"), false); // i18n:keys
+            SetStatusT("rows.status.start");
         }
 
         private void EndRowTool()
@@ -5217,7 +5174,7 @@ namespace OmsiMapEditor.UI
             if (rowLaidAt.HasValue)
             {
                 mapCanvas.ClearRoadPreview();
-                rowOptions.ShowPlan("Laid. Move the pointer to lay another row.", false);
+                rowOptions.ShowPlan(Loc.T("rows.plan.laid"), false);
                 return;
             }
             if (selectedRow != null)
@@ -5228,9 +5185,8 @@ namespace OmsiMapEditor.UI
                 if (OmsiAttachmentRows.Same(request, selectedRow.Request))
                 {
                     ShowRowMarks(Placed(selectedRow), true);
-                    rowOptions.ShowPlan("Row of " + name + " with " + selectedRow.ObjectCount + " object(s) in " + selectedRow.Records.Count + " record(s)" +
-                                        (selectedRow.Continues ? ", continued on other tiles" : string.Empty) +
-                                        ": change its values and press Enter, or choose another object; Del deletes it, Esc lets it go.", false);
+                    rowOptions.ShowPlan(Loc.T("rows.plan.selected", ("name", name), ("objects", selectedRow.ObjectCount), ("records", selectedRow.Records.Count),
+                        ("continues", selectedRow.Continues ? "yes" : "no")), false);
                     return;
                 }
                 rowLayout = rowLayout ?? new OmsiSplineAttachmentLayout(currentSummary);
@@ -5238,7 +5194,7 @@ namespace OmsiMapEditor.UI
                 ShowRowMarks(plan.Objects, plan.Problem == null);
                 if (plan.Problem == null)
                     objectRenderer?.SetRowPreview(request.AssetPath, plan.Objects);
-                rowOptions.ShowPlan(plan.Problem ?? plan.Objects.Count + " object(s) instead of " + selectedRow.ObjectCount + "; Enter changes the row.", plan.Problem != null);
+                rowOptions.ShowPlan(plan.Problem ?? Loc.T("rows.plan.replan", ("count", plan.Objects.Count), ("old", selectedRow.ObjectCount)), plan.Problem != null);
                 return;
             }
             if (!roadPointer.HasValue)
@@ -5251,21 +5207,20 @@ namespace OmsiMapEditor.UI
                     hoveredRow = RowOf(hovered.Value);
                 var objects = hoveredRow != null ? Placed(hoveredRow) : Placed(hovered.Value);
                 ShowRowMarks(objects, true);
-                rowOptions.ShowPlan("Row of " + Path.GetFileNameWithoutExtension(hovered.Value.Value.AssetPath) + " with " + objects.Count +
-                                    " object(s); click selects it.", false);
+                rowOptions.ShowPlan(Loc.T("rows.plan.hover", ("name", Path.GetFileNameWithoutExtension(hovered.Value.Value.AssetPath)), ("count", objects.Count)), false);
                 return;
             }
             if (rowAsset == null)
             {
                 mapCanvas.ClearRoadPreview();
-                rowOptions.ShowPlan("Choose the object for the row in the library.", true);
+                rowOptions.ShowPlan(Loc.T("rows.plan.choose"), true);
                 return;
             }
             var plans = PlanRows(pointer, out var problem);
             if (plans == null)
             {
                 mapCanvas.ClearRoadPreview();
-                rowOptions.ShowPlan(problem, problem != null && !problem.StartsWith("Point", StringComparison.Ordinal));
+                rowOptions.ShowPlan(problem, problem != null && problem != Loc.T("rows.plan.point"));
                 return;
             }
             var marks = new List<OmsiPlacedAttachment>();
@@ -5280,8 +5235,7 @@ namespace OmsiMapEditor.UI
             ShowRowMarks(marks, failure == null);
             if (failure == null)
                 objectRenderer?.SetRowPreview(rowAsset, marks);
-            rowOptions.ShowPlan(failure ?? marks.Count + " object(s) in " + parts + " record(s)" +
-                                (rowStart != null ? "; click where the row ends" : rowOptions.WholeRoad ? "; click to lay them" : "; click where the row starts"), failure != null);
+            rowOptions.ShowPlan(failure ?? Loc.T("rows.plan.marks", ("count", marks.Count), ("records", parts), ("phase", rowStart != null ? "end" : rowOptions.WholeRoad ? "lay" : "start")), failure != null);
         }
 
         /// <summary>
@@ -5296,7 +5250,7 @@ namespace OmsiMapEditor.UI
             var at = rowStart ?? OmsiSplinePoint.Nearest(currentSummary, pointer.X, pointer.Y, reach);
             if (at == null)
             {
-                problem = "Point at a road.";
+                problem = Loc.T("rows.plan.point");
                 return null;
             }
             // The side of the road the pointer is on, seen along the spline.
@@ -5342,8 +5296,7 @@ namespace OmsiMapEditor.UI
                     SelectRow(hovered.Value);
                     UpdateRowPreview();
                     if (selectedRow != null)
-                        SetStatus("Selected the row of " + hovered.Value.Value.AssetPath + " (#" + hovered.Value.Value.Id + "): change its values and press Enter, " +
-                                  "or choose another object in the library; Del deletes it.");
+                        SetStatusT("rows.status.selected", ("path", hovered.Value.Value.AssetPath), ("id", hovered.Value.Value.Id));
                     return;
                 }
             }
@@ -5352,12 +5305,12 @@ namespace OmsiMapEditor.UI
             {
                 DeselectRow();
                 UpdateRowPreview();
-                SetStatus("Rows: point at a road and click to lay a row; Esc leaves the tool.");
+                SetStatusT("rows.status.idle");
                 return;
             }
             if (rowAsset == null)
             {
-                SetStatus("Choose the object for the row in the library first.");
+                SetStatusT("rows.status.choose_first");
                 return;
             }
             if (!rowOptions.WholeRoad && rowStart == null)
@@ -5366,25 +5319,25 @@ namespace OmsiMapEditor.UI
                 var at = OmsiSplinePoint.Nearest(currentSummary, x, y, Math.Max(RowSnapMeters, RowSnapPixels * mapCanvas.MetersPerPixel));
                 if (at == null)
                 {
-                    SetStatus("Rows: point at a road.");
+                    SetStatusT("rows.status.point");
                     return;
                 }
                 rowStart = at;
                 rowStartAlong = OmsiAttachmentRows.Project(rowLayout, rowLayout.Chain(at.Tile, at.Spline), x, y);
                 UpdateRowPreview();
-                SetStatus("Rows: click where the row ends; Esc starts again.");
+                SetStatusT("rows.status.end");
                 return;
             }
             var plans = PlanRows(pointer, out var problem);
             if (plans == null)
             {
-                SetStatus("Rows: " + problem);
+                SetStatusT("rows.status.problem", ("problem", problem));
                 return;
             }
             var failed = plans.Find(plan => plan.Problem != null);
             if (failed != null)
             {
-                SetStatus("No row laid: " + failed.Problem);
+                SetStatusT("rows.status.not_laid", ("reason", failed.Problem));
                 return;
             }
             var changes = new List<OmsiAttachmentChange>();
@@ -5398,7 +5351,7 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
                 for (var index = changes.Count - 1; index >= 0; index--)
                     session.Undo(currentSummary, changes[index]);
-                SetStatus("The row could not be laid: " + exception.Message);
+                SetStatusT("rows.status.lay_failed", ("reason", exception.Message));
                 return;
             }
             rowStart = null;
@@ -5412,10 +5365,10 @@ namespace OmsiMapEditor.UI
             foreach (var plan in plans)
                 objects += plan.Objects.Count;
             var name = Path.GetFileNameWithoutExtension(rowAsset);
-            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = "the rows of " + name });
+            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = Loc.T("rows.step.laid", ("name", name)) });
             RefreshAfterChange(null);
             UpdateRowPreview();
-            SetStatus("Laid " + objects + " " + name + " along the road" + (plans.Count > 1 ? " on both sides" : string.Empty) + ". Ctrl+Z takes it back.");
+            SetStatusT("rows.status.laid", ("objects", objects), ("name", name), ("both", plans.Count > 1 ? "yes" : "no"));
         }
 
         /// <summary>Deletes the selected row, all its records in one step.</summary>
@@ -5433,7 +5386,7 @@ namespace OmsiMapEditor.UI
                     var result = session.DeleteAttachmentRow(currentSummary, record.Key, record.Value);
                     if (!result.Succeeded)
                     {
-                        failure = "The row stays: " + DescribeReferences(result.Blockers) + " still name it.";
+                        failure = Loc.T("rows.status.stays_refs", ("refs", DescribeReferences(result.Blockers)));
                         break;
                     }
                     changes.Add(result.Change);
@@ -5442,7 +5395,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
             {
                 Debug.LogException(exception);
-                failure = "The row could not be deleted: " + exception.Message;
+                failure = Loc.T("rows.status.delete_failed", ("reason", exception.Message));
             }
             if (failure != null)
             {
@@ -5455,10 +5408,10 @@ namespace OmsiMapEditor.UI
             rowLayout = null;
             rowObjects = null;
             var parts = changes.ConvertAll(change => new ObjectEditStep { AttachmentChange = change });
-            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = "the deletion of the row of " + Path.GetFileNameWithoutExtension(row.Request.AssetPath) });
+            PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts, Description = Loc.T("rows.step.deleted", ("name", Path.GetFileNameWithoutExtension(row.Request.AssetPath))) });
             RefreshAfterChange(null);
             UpdateRowPreview();
-            SetStatus("Deleted the row of " + row.Request.AssetPath + ". Ctrl+Z takes it back.");
+            SetStatusT("rows.status.deleted", ("path", row.Request.AssetPath));
         }
 
         /// <summary>Selects the row a record belongs to and shows its values in the options.</summary>
@@ -5468,7 +5421,7 @@ namespace OmsiMapEditor.UI
             if (selectedRow == null)
             {
                 DeselectRow();
-                SetStatus("The row of " + record.Value.AssetPath + " (#" + record.Value.Id + ") has no objects along its road.");
+                SetStatusT("rows.status.no_objects", ("path", record.Value.AssetPath), ("id", record.Value.Id));
                 return;
             }
             // Values as when laying: the distance from the centre, the heading as on the right of the road.
@@ -5518,12 +5471,12 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The row could not be changed: " + exception.Message);
+                SetStatusT("rows.status.change_failed", ("reason", exception.Message));
                 return;
             }
             if (!result.Succeeded)
             {
-                SetStatus(result.Problem != null ? "The row stays as it was: " + result.Problem : "The row stays: " + DescribeReferences(result.Blockers) + " still name it.");
+                SetStatus(result.Problem != null ? Loc.T("rows.status.stays_problem", ("reason", result.Problem)) : Loc.T("rows.status.stays_refs", ("refs", DescribeReferences(result.Blockers))));
                 UpdateRowPreview();
                 return;
             }
@@ -5537,8 +5490,7 @@ namespace OmsiMapEditor.UI
                 kept = result.Change.Added.Find(item => !item.Value.IsRepeater);
             SelectRow(kept);
             UpdateRowPreview();
-            SetStatus("Changed the row of " + Path.GetFileNameWithoutExtension(request.AssetPath) + (selectedRow != null ? ": " + selectedRow.ObjectCount + " object(s)" : string.Empty) +
-                      ". Ctrl+Z takes it back.");
+            SetStatusT("rows.status.changed", ("name", Path.GetFileNameWithoutExtension(request.AssetPath)), ("hasCount", selectedRow != null ? "yes" : "no"), ("count", selectedRow?.ObjectCount ?? 0));
         }
 
         /// <summary>The row a record belongs to, with its parts on other tiles, or null when it has no objects along its road.</summary>
@@ -5639,7 +5591,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The terrain could not be fitted to the junctions: " + exception.Message);
+                SetStatusT("terrain.junctions_failed", ("reason", exception.Message));
                 return;
             }
             if (tiles.Count == 0)
@@ -5662,11 +5614,12 @@ namespace OmsiMapEditor.UI
 
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog)))
+            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog)))
             {
                 HidePopup(exportDialog);
                 HidePopup(newMapDialog);
                 HidePopup(checkDialog);
+                HidePopup(settingsDialog);
                 evt.StopPropagation();
                 return;
             }
@@ -5683,7 +5636,7 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog))
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog))
                 return;
 
             if (evt.keyCode == KeyCode.Escape && PickingElementType && !(evt.ctrlKey || evt.commandKey))
@@ -5708,7 +5661,7 @@ namespace OmsiMapEditor.UI
                         rowStart = null;
                         DeselectRow();
                         UpdateRowPreview();
-                        SetStatus("Rows: point at a road and click to lay a row; Esc leaves the tool.");
+                        SetStatusT("rows.status.idle");
                     }
                     else
                         SetTool(EditorTool.Drag);
@@ -5722,7 +5675,7 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.R && activeTool == EditorTool.Rows && rowOptions != null)
                 {
                     rowOptions.TurnBy(evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep);
-                    SetStatus("Rows: objects turned to " + rowOptions.HeadingDegrees.ToString("0.#", CultureInfo.InvariantCulture) + "° against the road.");
+                    SetStatusT("rows.status.turned", ("degrees", rowOptions.HeadingDegrees));
                     if (selectedRow != null)
                         ChangeSelectedRow(null);
                     evt.StopPropagation();
@@ -5783,7 +5736,7 @@ namespace OmsiMapEditor.UI
                     {
                         terrainRampStart = null;
                         ShowTerrainBrush();
-                        SetStatus("Ramp: click where it starts.");
+                        SetStatusT("terrain.status.ramp_start");
                     }
                     else
                         SetTool(EditorTool.Drag);
@@ -5796,18 +5749,18 @@ namespace OmsiMapEditor.UI
                     else if (RoadBuilderShown)
                     {
                         ShowRoadBuilder(false);
-                        SetStatus("Road builder closed without saving.");
+                        SetStatusT("roadbuilder.status.closed");
                     }
                     else if (roadControl.HasValue)
                     {
                         roadControl = null;
                         UpdateRoadPreview();
-                        SetStatus("Control point taken back. Click it again, or Esc ends the road.");
+                        SetStatusT("roadbuild.status.control_back");
                     }
                     else if (roadStarted)
                     {
                         EndRoad();
-                        SetStatus("Road ended. Click to start the next one, Esc leaves the road tool.");
+                        SetStatusT("roadbuild.status.ended");
                     }
                     else
                         SetTool(EditorTool.Drag);
@@ -5816,7 +5769,7 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.Escape && mapCanvas != null && mapCanvas.IsPlacing)
                 {
                     StopPlacement();
-                    SetStatus("Placement stopped.");
+                    SetStatusT("place.status.stopped");
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Escape && objectsPanelOpen)
@@ -5833,7 +5786,7 @@ namespace OmsiMapEditor.UI
                 {
                     mapCanvas.PlacementHeading += evt.shiftKey ? -PlacementRotationStep : PlacementRotationStep;
                     objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
-                    SetStatus("Placing " + placementAsset + " at heading " + mapCanvas.PlacementHeading.ToString("0") + "°.");
+                    SetStatusT("place.status.heading", ("path", placementAsset), ("heading", mapCanvas.PlacementHeading));
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.R && mapCanvas != null && !mapCanvas.IsPlacing)
@@ -5880,7 +5833,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEditObjects || from.Count == 0)
             {
-                SetStatus(from.Count > 0 && session != null && session.CanEdit ? ReadOnlyMessage(undo ? "undo" : "redo") : undo ? "Nothing to undo." : "Nothing to redo.");
+                SetStatus(from.Count > 0 && session != null && session.CanEdit ? ReadOnlyMessage(undo ? "readonly.action.undo" : "readonly.action.redo") : Loc.T(undo ? "history.nothing_undo" : "history.nothing_redo")) /* i18n:keys */;
                 return;
             }
 
@@ -5900,13 +5853,13 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 RefreshAfterChange(null);
-                SetStatus("Could not " + (undo ? "undo" : "redo") + " " + DescribeStep(step) + ": " + exception.Message);
+                SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message))) /* i18n:keys */;
                 return;
             }
 
             to.Add(step);
             RefreshAfterChange(touched);
-            SetStatus((undo ? "Undid " : "Redid ") + DescribeStep(step) + ".");
+            SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
         }
 
         /// <summary>
@@ -6003,12 +5956,12 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not " + (undo ? "undo" : "redo") + " " + DescribeStep(step) + ": " + exception.Message);
+                SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message))) /* i18n:keys */;
                 return;
             }
             ReloadMap();
             to.Add(step);
-            SetStatus((undo ? "Undid " : "Redid ") + DescribeStep(step) + ".");
+            SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
         }
 
         /// <summary>Adds an empty tile at a free place beside the map, its terrain running on from its neighbours.</summary>
@@ -6016,7 +5969,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("add tiles"));
+                SetStatus(ReadOnlyMessage("readonly.action.add_tiles"));
                 return;
             }
             OmsiTileChange change;
@@ -6027,7 +5980,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not add tile " + x + ", " + y + ": " + exception.Message);
+                SetStatusT("tile.status.add_failed", ("x", x), ("y", y), ("reason", exception.Message));
                 return;
             }
             ReloadMap();
@@ -6035,7 +5988,7 @@ namespace OmsiMapEditor.UI
             var tile = currentSummary.Tiles.Find(candidate => candidate.X == x && candidate.Y == y);
             if (tile != null)
                 SelectTile(tile, false);
-            SetStatus("Added tile " + x + ", " + y + " with terrain running on from its neighbours. Ctrl+Z takes it back; earlier steps can no longer be undone.");
+            SetStatusT("tile.status.added", ("x", x), ("y", y));
             TileAddedForImagery(x, y);
         }
 
@@ -6044,7 +5997,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("delete tiles"));
+                SetStatus(ReadOnlyMessage("readonly.action.delete_tiles"));
                 return;
             }
             OmsiTileDeletionResult result;
@@ -6055,17 +6008,17 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not delete tile " + tile.X + ", " + tile.Y + ": " + exception.Message);
+                SetStatusT("tile.status.delete_failed", ("x", tile.X), ("y", tile.Y), ("reason", exception.Message));
                 return;
             }
             if (!result.Succeeded)
             {
-                SetStatus("Tile " + tile.X + ", " + tile.Y + " stays: " + JoinLimited(new List<string>(result.Blockers)) + ".");
+                SetStatus(Loc.T("tile.status.stays", ("x", tile.X), ("y", tile.Y), ("list", JoinLimited(new List<string>(result.Blockers)))));
                 return;
             }
             ReloadMap();
             PushHistory(new ObjectEditStep { TileChange = result.Change });
-            SetStatus("Deleted tile " + tile.X + ", " + tile.Y + " from the map. Ctrl+Z brings it back; earlier steps can no longer be undone.");
+            SetStatusT("tile.status.deleted", ("x", tile.X), ("y", tile.Y));
         }
 
         private static void Touch(List<MapSelectionItem> touched, OmsiTileSummary tile, OmsiObjectRecord item)
@@ -6081,42 +6034,42 @@ namespace OmsiMapEditor.UI
             if (step.Description != null)
                 return step.Description;
             if (step.TileChange != null)
-                return (step.TileChange.Added ? "the new tile " : "the deletion of tile ") + step.TileChange.X + ", " + step.TileChange.Y;
+                return Loc.T(step.TileChange.Added ? "history.step.new_tile" : "history.step.deleted_tile", ("x", step.TileChange.X), ("y", step.TileChange.Y)); // i18n:keys
             if (step.AttachedChange != null)
-                return step.AttachedChange.Added.Count > 0 ? "the attached " + Path.GetFileNameWithoutExtension(step.AttachedChange.Added[0].Value.AssetPath)
-                    : "taking off " + Path.GetFileNameWithoutExtension(step.AttachedChange.Removed[0].Value.AssetPath);
+                return step.AttachedChange.Added.Count > 0 ? Loc.T("history.step.attached", ("name", Path.GetFileNameWithoutExtension(step.AttachedChange.Added[0].Value.AssetPath)))
+                    : Loc.T("history.step.take_off", ("name", Path.GetFileNameWithoutExtension(step.AttachedChange.Removed[0].Value.AssetPath)));
             if (step.AttachmentChange != null)
-                return step.AttachmentChange.Added.Count > 0 && step.AttachmentChange.Removed.Count > 0 ? "the change of a row of objects" :
-                    step.AttachmentChange.Added.Count > 0 ? "the new row of objects" : "the deletion of a row of objects";
+                return Loc.T(/* i18n:keys */ step.AttachmentChange.Added.Count > 0 && step.AttachmentChange.Removed.Count > 0 ? "history.step.row_changed" :
+                    step.AttachmentChange.Added.Count > 0 ? "history.step.row_new" : "history.step.row_deleted"); // i18n:keys
             if (step.Group != null)
             {
                 var ids = new HashSet<int>();
                 CollectIds(step, ids);
-                return "the change of " + ids.Count + " objects";
+                return Loc.T("history.step.objects_changed", ("count", ids.Count));
             }
             if (step.SplineChange != null && step.SplineChange.Kind == OmsiSplineChangeKind.TerrainAlignment)
-                return "the terrain fit of " + step.SplineChange.SplineIds.Count + " spline(s)";
+                return Loc.T("history.step.terrain_fit", ("count", step.SplineChange.SplineIds.Count));
             if (step.SplineChange != null && step.SplineChange.Kind == OmsiSplineChangeKind.Geometry)
-                return "the move of " + (step.SplineChange.SplineIds.Count == 1 ? "spline #" + step.SplineChange.SplineIds[0] : step.SplineChange.SplineIds.Count + " splines");
+                return Loc.T("history.step.spline_move", ("count", step.SplineChange.SplineIds.Count), ("id", step.SplineChange.SplineIds[0]));
             if (step.SplineChange != null)
-                return (step.SplineChange.Kind == OmsiSplineChangeKind.Creation ? "the road of " : "the deletion of ") +
-                       (step.SplineChange.SplineIds.Count == 1 ? "spline #" + step.SplineChange.SplineIds[0] : step.SplineChange.SplineIds.Count + " splines");
+                return Loc.T(/* i18n:keys */ step.SplineChange.Kind == OmsiSplineChangeKind.Creation ? "history.step.road_of" : "history.step.spline_deleted",
+                    ("count", step.SplineChange.SplineIds.Count), ("id", step.SplineChange.SplineIds[0])); // i18n:keys
             if (step.Change == null)
-                return "the change of object #" + step.ObjectId;
+                return Loc.T("history.step.object_changed", ("id", step.ObjectId));
             switch (step.Change.Kind)
             {
                 case OmsiObjectChangeKind.Placement:
-                    return "the placement of object #" + step.Change.Record.Id;
+                    return Loc.T("history.step.placement", ("id", step.Change.Record.Id));
                 case OmsiObjectChangeKind.Deletion:
-                    return "the deletion of object #" + step.Change.Record.Id;
+                    return Loc.T("history.step.object_deleted", ("id", step.Change.Record.Id));
                 case OmsiObjectChangeKind.Replacement:
-                    return "the new shape of object #" + step.Change.Record.Id;
+                    return Loc.T("history.step.new_shape", ("id", step.Change.Record.Id));
                 case OmsiObjectChangeKind.Rules:
-                    return "the rules of object #" + step.Change.Record.Id;
+                    return Loc.T("history.step.rules", ("id", step.Change.Record.Id));
                 case OmsiObjectChangeKind.Copy:
-                    return "the copy #" + step.Change.Record.Id + " of object #" + step.Change.ReplacedRecord.Id;
+                    return Loc.T("history.step.copy", ("id", step.Change.Record.Id), ("original", step.Change.ReplacedRecord.Id));
                 default:
-                    return "the move of object #" + step.Change.Record.Id + " into tile " + step.Change.TargetTile.X + ", " + step.Change.TargetTile.Y;
+                    return Loc.T("history.step.object_move", ("id", step.Change.Record.Id), ("x", step.Change.TargetTile.X), ("y", step.Change.TargetTile.Y));
             }
         }
 
@@ -6147,12 +6100,12 @@ namespace OmsiMapEditor.UI
         {
             if (selection.Count == 0)
             {
-                SetStatus("Select an object to delete.");
+                SetStatusT("delete.select_first");
                 return;
             }
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("edit it"));
+                SetStatus(ReadOnlyMessage("readonly.action.edit_it"));
                 return;
             }
 
@@ -6184,7 +6137,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                failure = "Could not delete: " + exception.Message;
+                failure = Loc.T("delete.failed", ("reason", exception.Message));
             }
 
             if (parts.Count > 0)
@@ -6192,16 +6145,13 @@ namespace OmsiMapEditor.UI
             RefreshAfterChange(kept);
 
             if (failure != null)
-                SetStatus(failure + (parts.Count > 0 ? " " + parts.Count + " object(s) were deleted before; Ctrl+Z restores them." : string.Empty));
+                SetStatus(failure + (parts.Count > 0 ? " " + Loc.T("delete.before", ("count", parts.Count)) : string.Empty));
             else if (targets.Count == 1 && parts.Count == 1)
-                SetStatus("Deleted object #" + targets[0].Record.Id + " (" + targets[0].Record.AssetPath + ") " +
-                          (EditingVariant ? "in the chrono variant " + editedVariant.Title : "from " + targets[0].Tile.FileName) + ". Ctrl+Z restores it.");
+                SetStatusT("delete.done_one", ("id", targets[0].Record.Id), ("path", targets[0].Record.AssetPath), ("where", EditingVariant ? "variant" : "file"), ("title", EditingVariant ? editedVariant.Title : string.Empty), ("file", targets[0].Tile.FileName));
             else if (targets.Count == 1)
-                SetStatus("Object #" + targets[0].Record.Id + " was not deleted; it is still referenced by " + DescribeReferences(blockers) + ".");
+                SetStatus(Loc.T("delete.not_deleted", ("id", targets[0].Record.Id), ("refs", DescribeReferences(blockers))));
             else
-                SetStatus("Deleted " + parts.Count + " of " + targets.Count + " objects." +
-                          (kept.Count > 0 ? " Still referenced and kept: " + JoinLimited(reasons) + "." : string.Empty) +
-                          (parts.Count > 0 ? " Ctrl+Z restores them." : string.Empty));
+                SetStatus(Loc.T("delete.done_many", ("done", parts.Count), ("total", targets.Count), ("hasKept", kept.Count > 0 ? "yes" : "no"), ("list", kept.Count > 0 ? JoinLimited(reasons) : string.Empty), ("any", parts.Count > 0 ? "yes" : "no")));
         }
 
         private static string DescribeReferences(IReadOnlyList<OmsiReference> references)
@@ -6214,7 +6164,7 @@ namespace OmsiMapEditor.UI
                     described.Add(text);
             }
             var shown = described.GetRange(0, Math.Min(3, described.Count));
-            return string.Join(", ", shown) + (described.Count > shown.Count ? " and " + (described.Count - shown.Count) + " more" : string.Empty);
+            return described.Count > shown.Count ? Loc.T("objects.join_more", ("list", string.Join(", ", shown)), ("count", described.Count - shown.Count)) : string.Join(", ", shown);
         }
 
         /// <summary>
@@ -6236,12 +6186,12 @@ namespace OmsiMapEditor.UI
             }
             if (session == null || currentSummary == null)
             {
-                SetStatus("Open an OMSI map before placing objects.");
+                SetStatusT("place.status.open_first");
                 return;
             }
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("place objects"));
+                SetStatus(ReadOnlyMessage("readonly.action.place_objects"));
                 return;
             }
 
@@ -6297,9 +6247,9 @@ namespace OmsiMapEditor.UI
                 if (scan.IsFaulted)
                 {
                     Debug.LogException(scan.Exception);
-                    installationCatalog = OmsiInstallationCatalog.Empty("The installation could not be listed.");
+                    installationCatalog = OmsiInstallationCatalog.Empty(Loc.T("place.installation_failed"));
                     contentOrigins = installationCatalog.Origins;
-                    SetStatus("Could not list the scenery objects of the OMSI installation: " + scan.Exception?.GetBaseException().Message);
+                    SetStatusT("place.status.list_failed", ("reason", scan.Exception?.GetBaseException().Message ?? string.Empty));
                 }
                 else
                 {
@@ -6319,7 +6269,7 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEditObjects)
             {
-                SetStatus(ReadOnlyMessage("place objects"));
+                SetStatus(ReadOnlyMessage("readonly.action.place_objects"));
                 return;
             }
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
@@ -6335,7 +6285,7 @@ namespace OmsiMapEditor.UI
                 }
                 else
                 {
-                    problem = " The object file is missing in the OMSI installation; OMSI will not show it.";
+                    problem = " " + Loc.T("place.problem_missing");
                 }
 
                 // One outline is quick to compute; the preview needs it right away.
@@ -6348,7 +6298,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException ||
                                               exception is UnauthorizedAccessException || exception is ArgumentException)
             {
-                problem = " The object file could not be read: " + exception.Message;
+                problem = " " + Loc.T("place.problem_unreadable", ("reason", exception.Message));
             }
 
             placementAsset = assetPath;
@@ -6357,7 +6307,7 @@ namespace OmsiMapEditor.UI
                 objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
             UpdateToolbar();
             mapCanvas?.Focus();
-            SetStatus("Placing " + assetPath + ": click into the map. Shift+click keeps placing, R turns the preview, Esc stops." + (problem ?? string.Empty));
+            SetStatus(Loc.T("place.status.placing", ("path", assetPath), ("problem", problem ?? string.Empty)));
         }
 
         private void PlaceChosenObject(MapPlacement placement)
@@ -6379,7 +6329,7 @@ namespace OmsiMapEditor.UI
             }
             if (placement.Tile == null || !placement.Tile.IsAvailable)
             {
-                SetStatus(placement.Tile == null ? "Click inside a map tile to place the object." : "The tile file " + placement.Tile.FileName + " is missing.");
+                SetStatus(placement.Tile == null ? Loc.T("place.status.no_tile") : Loc.T("place.status.tile_missing", ("file", placement.Tile.FileName)));
                 return;
             }
 
@@ -6400,7 +6350,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not place the object: " + exception.Message);
+                SetStatusT("place.status.failed", ("reason", exception.Message));
                 return;
             }
 
@@ -6411,11 +6361,8 @@ namespace OmsiMapEditor.UI
             RefreshAfterChange(new[] { new MapSelectionItem { Tile = placement.Tile, Record = change.Record } });
             if (objectsPanelOpen)
                 UpdateObjectsCatalog();
-            SetStatus("Placed object #" + change.Record.Id + " (" + assetPath + ") in tile " + placement.Tile.X + ", " + placement.Tile.Y +
-                      (EditingVariant ? " of the chrono variant " + editedVariant.Title : string.Empty) + ". Ctrl+Z undoes it." +
-                      (placementHasAbsoluteHeight
-                          ? " Its height is absolute, not above the terrain, and was set to the terrain under it, " + change.Record.Height.ToString("0.00", CultureInfo.InvariantCulture) + " m."
-                          : string.Empty));
+            SetStatus(Loc.T("place.status.placed", ("id", change.Record.Id), ("path", assetPath), ("x", placement.Tile.X), ("y", placement.Tile.Y), ("inVariant", EditingVariant ? "yes" : "no"),
+                    ("title", EditingVariant ? editedVariant.Title : string.Empty), ("absolute", placementHasAbsoluteHeight ? "yes" : "no"), ("height", change.Record.Height)));
         }
 
         /// <summary>
@@ -6440,7 +6387,7 @@ namespace OmsiMapEditor.UI
                 return null;
             }
             placementPlan = plan;
-            ShowSnapMessage(plan.Problem ?? "Click to insert the junction into the road; its other arms point to the side of the pointer. Alt places it freely.");
+            ShowSnapMessage(plan.Problem ?? Loc.T("place.snap.junction"));
             return new PlacementSnap { WorldX = plan.Position.X, WorldY = plan.Position.Y, HeadingDegrees = plan.HeadingDegrees, Height = plan.Height };
         }
 
@@ -6457,9 +6404,8 @@ namespace OmsiMapEditor.UI
                 return null;
             }
             placementAttach = spot;
-            ShowSnapMessage("Click to hang it on point " + (spot.PointIndex + 1) + " of #" + spot.ParentId +
-                            (spot.ParentAsset != null ? " (" + Path.GetFileNameWithoutExtension(spot.ParentAsset) + ")" : string.Empty) +
-                            "; R turns it on the point, Alt places it freely.");
+            ShowSnapMessage(Loc.T("place.snap.attach", ("n", spot.PointIndex + 1), ("parent", spot.ParentId), ("hasName", spot.ParentAsset != null ? "yes" : "no"),
+                ("name", spot.ParentAsset != null ? Path.GetFileNameWithoutExtension(spot.ParentAsset) : string.Empty)));
             return new PlacementSnap
             {
                 WorldX = spot.WorldX, WorldY = spot.WorldY, HeadingDegrees = (spot.HeadingDegrees + mapCanvas.PlacementHeading) % 360.0, Height = spot.Height
@@ -6478,7 +6424,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not attach the object: " + exception.Message);
+                SetStatusT("place.status.attach_failed", ("reason", exception.Message));
                 return;
             }
             var assetPath = placementAsset;
@@ -6487,8 +6433,7 @@ namespace OmsiMapEditor.UI
                 StopPlacement();
             PushHistory(new ObjectEditStep { AttachedChange = change });
             RefreshAfterChange(null);
-            SetStatus("Hung " + Path.GetFileNameWithoutExtension(assetPath) + " (#" + change.Added[0].Value.Id + ") on point " + (spot.PointIndex + 1) + " of #" + spot.ParentId +
-                      ". Ctrl+Z takes it back.");
+            SetStatusT("place.status.hung", ("name", Path.GetFileNameWithoutExtension(assetPath)), ("id", change.Added[0].Value.Id), ("n", spot.PointIndex + 1), ("parent", spot.ParentId));
         }
 
         /// <summary>Takes an attached object off its parent, with what hangs on it, as one undo step.</summary>
@@ -6504,18 +6449,17 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
             {
                 Debug.LogException(exception);
-                SetStatus("The attached object could not be deleted: " + exception.Message);
+                SetStatusT("place.status.detach_failed", ("reason", exception.Message));
                 return;
             }
             if (!result.Succeeded)
             {
-                SetStatus("The attached object stays: " + DescribeReferences(result.Blockers) + " still name it.");
+                SetStatus(Loc.T("place.status.detach_stays", ("refs", DescribeReferences(result.Blockers))));
                 return;
             }
             PushHistory(new ObjectEditStep { AttachedChange = result.Change });
             RefreshAfterChange(null);
-            SetStatus("Took " + Path.GetFileNameWithoutExtension(record.AssetPath) + " (#" + record.Id + ") off" +
-                      (result.Change.Removed.Count > 1 ? " with " + (result.Change.Removed.Count - 1) + " object(s) hanging on it" : string.Empty) + ". Ctrl+Z takes it back.");
+            SetStatusT("place.status.took_off", ("name", Path.GetFileNameWithoutExtension(record.AssetPath)), ("id", record.Id), ("others", Math.Max(0, result.Change.Removed.Count - 1)));
         }
 
         private void ShowSnapMessage(string message)
@@ -6547,12 +6491,12 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The junction could not be inserted: " + exception.Message);
+                SetStatusT("roadbuild.status.insert_failed", ("reason", exception.Message));
                 return;
             }
             if (!result.Succeeded)
             {
-                SetStatus("The road cannot be cut here: " + DescribeReferences(result.Blockers) + ".");
+                SetStatus(Loc.T("roadbuild.status.cut_here", ("refs", DescribeReferences(result.Blockers))));
                 return;
             }
 
@@ -6567,7 +6511,7 @@ namespace OmsiMapEditor.UI
                 else if (step is OmsiObjectChange objectChange)
                     parts.Add(new ObjectEditStep { TileX = objectChange.Tile.X, TileY = objectChange.Tile.Y, ObjectId = objectChange.Record.Id, Change = objectChange });
             }
-            PushHistory(new ObjectEditStep { Group = parts, Description = "the junction #" + result.Junction.Id + " inserted into the road" });
+            PushHistory(new ObjectEditStep { Group = parts, Description = Loc.T("place.step.junction", ("id", result.Junction.Id)) });
 
             var assetPath = placementAsset;
             if (!placement.KeepPlacing)
@@ -6576,7 +6520,7 @@ namespace OmsiMapEditor.UI
             RefreshAfterChange(new[] { new MapSelectionItem { Tile = tile, Record = result.Junction } });
             if (objectsPanelOpen)
                 UpdateObjectsCatalog();
-            SetStatus("Inserted junction #" + result.Junction.Id + " (" + assetPath + ") into the road and joined it on both sides. Ctrl+Z undoes it.");
+            SetStatusT("roadbuild.status.junction_inserted", ("id", result.Junction.Id), ("path", assetPath));
         }
 
         private void StopPlacement()
@@ -6594,9 +6538,9 @@ namespace OmsiMapEditor.UI
         {
             if (selectedTile == null)
                 return;
-            if (!TryParseField(xField, "X", out var x) || !TryParseField(yField, "Y", out var y) ||
-                !TryParseField(zField, "Height", out var z) || !TryParseField(headingField, "Heading", out var heading) ||
-                !TryParseField(pitchField, "Pitch", out var pitch) || !TryParseField(bankField, "Bank", out var bank))
+            if (!TryParseField(xField, Loc.T("inspector.name.x"), out var x) || !TryParseField(yField, Loc.T("inspector.name.y"), out var y) ||
+                !TryParseField(zField, Loc.T("inspector.name.height"), out var z) || !TryParseField(headingField, Loc.T("inspector.name.heading"), out var heading) ||
+                !TryParseField(pitchField, Loc.T("inspector.name.pitch"), out var pitch) || !TryParseField(bankField, Loc.T("inspector.name.bank"), out var bank))
                 return;
             CommitEdits(new List<MapObjectEdit>
             {
@@ -6620,7 +6564,7 @@ namespace OmsiMapEditor.UI
             if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
                 !double.IsNaN(value) && !double.IsInfinity(value))
                 return true;
-            SetStatus(name + " is not a number: '" + field.value + "'.");
+            SetStatusT("inspector.status.not_number", ("name", name), ("value", field.value));
             return false;
         }
 
@@ -6630,24 +6574,24 @@ namespace OmsiMapEditor.UI
                 return;
             if (!CanEdit)
             {
-                SetStatus(ReadOnlyMessage("revert tile edits"));
+                SetStatus(ReadOnlyMessage("readonly.action.revert_tiles"));
                 return;
             }
             if (session.IsTileAdded(selectedTile.FileName))
             {
-                SetStatus(selectedTile.FileName + " was added in this project; delete the tile to take it out again.");
+                SetStatusT("tile.status.added_here", ("file", selectedTile.FileName));
                 return;
             }
             try
             {
                 session.RevertTile(selectedTile.FileName);
                 ReloadMap();
-                SetStatus("Edits of " + selectedTile.FileName + " were discarded; the original tile is shown again. The undo history was cleared.");
+                SetStatusT("tile.status.reverted", ("file", selectedTile.FileName));
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not revert " + selectedTile.FileName + ": " + exception.Message);
+                SetStatusT("tile.status.revert_failed", ("file", selectedTile.FileName), ("reason", exception.Message));
             }
         }
 
@@ -6655,12 +6599,12 @@ namespace OmsiMapEditor.UI
         {
             if (session == null)
             {
-                SetStatus("Open an OMSI map before exporting.");
+                SetStatusT("export.status.open_first");
                 return;
             }
             if (!session.CanEdit)
             {
-                SetStatus("Exports are built from a project workspace. Save a MapWorks project first.");
+                SetStatusT("export.status.save_first");
                 return;
             }
             if (exportDialog == null || exportFolderField == null || exportNameField == null)
@@ -6673,7 +6617,7 @@ namespace OmsiMapEditor.UI
             UpdateExportTarget();
             exportDialog.style.display = DisplayStyle.Flex;
             if (chronoDate != null)
-                SetStatus("The export holds the base map with your edits; chrono variants stay in their own folders as in the original.");
+                SetStatusT("export.status.chrono_note");
         }
 
         /// <summary>
@@ -6724,17 +6668,16 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Could not create the map: " + exception.Message);
+                SetStatusT("export.status.create_failed", ("reason", exception.Message));
                 return;
             }
             HidePopup(newMapDialog);
 
-            var failure = "The map was created in " + report.MapFolder + ", but it could not be opened: ";
+            var failure = Loc.T("export.created_open_prefix", ("folder", report.MapFolder));
             try
             {
                 OpenOwnMap(report.GlobalConfigPath, folderName, failure, () =>
-                    SetStatus("Created " + report.MapFolder + " with " + report.CopiedFiles.Count + " helper files from the template; edit it right away. " +
-                              "Export to OMSI... writes your edits into this folder; then select '" + friendlyName + "' in OMSI to try it."));
+                    SetStatusT("export.status.created", ("folder", report.MapFolder), ("count", report.CopiedFiles.Count), ("name", friendlyName)));
             }
             catch (Exception exception)
             {
@@ -6750,11 +6693,11 @@ namespace OmsiMapEditor.UI
             if (folderName.Length == 0 || folderName == "." || folderName == ".." ||
                 folderName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             {
-                problem = "Enter a folder name without path separators or special characters.";
+                problem = Loc.T("export.problem.folder");
                 return null;
             }
             if (string.IsNullOrWhiteSpace(exportNameField.value))
-                problem = "Enter the name OMSI shows for the exported map.";
+                problem = Loc.T("export.problem.name");
             return Path.Combine(Path.GetDirectoryName(session.Workspace.RootPath), folderName);
         }
 
@@ -6767,11 +6710,8 @@ namespace OmsiMapEditor.UI
             if (problem == null && !OmsiMapExporter.CanWriteTo(session.Workspace, target, out var reason))
                 problem = reason;
             var editedCount = session.ModifiedFiles().Count;
-            exportTargetLabel.text = problem ??
-                                     (OmsiMapExporter.IsInPlace(session.Workspace, target)
-                                         ? "Writes your edits into the map's own folder, as it was made with MapWorks:\n"
-                                         : Directory.Exists(target) ? "Replaces the earlier MapWorks export in:\n" : "Creates the map folder:\n") +
-                                     target + "\nEdited files included: " + editedCount;
+            exportTargetLabel.text = problem ?? Loc.T("export.target", ("kind", OmsiMapExporter.IsInPlace(session.Workspace, target) ? "inplace" : Directory.Exists(target) ? "replace" : "create"),
+                                         ("target", target), ("count", editedCount));
             exportTargetLabel.EnableInClassList("export-problem", problem != null);
             exportConfirmButton?.SetEnabled(problem == null);
         }
@@ -6793,17 +6733,15 @@ namespace OmsiMapEditor.UI
                 {
                     // The map holds the edits now and the workspace is empty again; what the view shows stays the same.
                     RefreshAfterChange(null);
-                    SetStatus("Wrote " + report.EditedFiles.Count + " edited file(s) into " + report.TargetFolder + ". Select '" +
-                              exportNameField.value.Trim() + "' in OMSI.");
+                    SetStatusT("export.status.wrote", ("count", report.EditedFiles.Count), ("folder", report.TargetFolder), ("name", exportNameField.value.Trim()));
                     return;
                 }
-                SetStatus("Exported to " + report.TargetFolder + ": " + report.CopiedFileCount + " files, " +
-                          report.EditedFiles.Count + " edited. Select '" + exportNameField.value.Trim() + "' in OMSI.");
+                SetStatusT("export.status.exported", ("folder", report.TargetFolder), ("files", report.CopiedFileCount), ("edited", report.EditedFiles.Count), ("name", exportNameField.value.Trim()));
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatus("Export failed: " + exception.Message);
+                SetStatusT("export.status.failed", ("reason", exception.Message));
             }
         }
 
@@ -6816,14 +6754,14 @@ namespace OmsiMapEditor.UI
                 ? currentSummary.Name
                 : currentSummary.FriendlyName;
             var mode = EditingVariant
-                ? "editing chrono variant " + editedVariant.Title + ", " + session.ModifiedFiles().Count + " edited file(s)"
+                ? Loc.T("status.mode.variant", ("title", editedVariant.Title), ("count", session.ModifiedFiles().Count))
                 : chronoDate != null
-                ? "chrono " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ", read-only"
+                ? Loc.T("status.mode.chrono", ("date", chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
                 : CanEdit
-                    ? session.ModifiedFiles().Count + " edited file(s)"
-                    : "read-only";
-            mapStateLabel.text = (string.IsNullOrWhiteSpace(currentProjectName) ? "Map: " + mapName : "Project: " + currentProjectName) +
-                                 "  |  " + currentSummary.Tiles.Count + " tiles  |  " + mode;
+                    ? Loc.T("status.mode.edited", ("count", session.ModifiedFiles().Count))
+                    : Loc.T("status.mode.readonly");
+            mapStateLabel.text = Loc.T("status.map", ("kind", string.IsNullOrWhiteSpace(currentProjectName) ? "map" : "project"), ("name", string.IsNullOrWhiteSpace(currentProjectName) ? mapName : currentProjectName),
+                ("tiles", currentSummary.Tiles.Count), ("mode", mode));
         }
 
         private static string SanitizeFileName(string value)
@@ -6867,9 +6805,9 @@ namespace OmsiMapEditor.UI
             var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate || tool == EditorTool.Priorities || tool == EditorTool.Road;
             if (tool != EditorTool.Drag && !(objectTool ? CanEditObjects : CanEdit))
             {
-                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "build roads" : tool == EditorTool.Rows ? "lay rows of objects"
-                    : tool == EditorTool.Terrain ? "shape the ground" : tool == EditorTool.Markings ? "draw road markings"
-                    : tool == EditorTool.Priorities ? "set the right of way" : tool == EditorTool.Lanes ? "choose the lanes of junctions" : "move or rotate objects"));
+                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "readonly.action.build_roads" : tool == EditorTool.Rows ? "readonly.action.lay_rows"
+                    : tool == EditorTool.Terrain ? "readonly.action.shape_ground" : tool == EditorTool.Markings ? "readonly.action.draw_markings"
+                    : tool == EditorTool.Priorities ? "readonly.action.right_of_way" : tool == EditorTool.Lanes ? "readonly.action.choose_lanes" : "readonly.action.move_rotate"));
                 return;
             }
             // Another tool ends placing and closes the object library.
@@ -6917,9 +6855,7 @@ namespace OmsiMapEditor.UI
             if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities ||
                 tool == EditorTool.Lanes)
                 return;
-            SetStatus(tool == EditorTool.Move ? "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres."
-                : tool == EditorTool.Rotate ? "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°."
-                : "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.");
+            SetStatusT(tool == EditorTool.Move ? "tool.status.move" : tool == EditorTool.Rotate ? "tool.status.rotate" : "tool.status.drag") /* i18n:keys */;
         }
 
         private void UpdateToolbar()
@@ -6931,14 +6867,18 @@ namespace OmsiMapEditor.UI
         /// Gives a button a Lucide icon and, if given, a label next to it; a button draws its own text over its children,
         /// so the text moves into a label.
         /// </summary>
-        private static void DecorateButton(Button button, string icon, string label)
+        private static void DecorateButton(Button button, string icon, string labelKey)
         {
             if (button == null)
                 return;
             button.text = string.Empty;
             button.Add(new IconElement(icon));
-            if (label != null)
-                button.Add(new Label(label) { pickingMode = PickingMode.Ignore });
+            if (labelKey != null)
+            {
+                var label = LocBindings.NewLabel(labelKey); // i18n:keys
+                label.pickingMode = PickingMode.Ignore;
+                button.Add(label);
+            }
         }
 
         /// <summary>Puts an accent icon before the title of a floating panel.</summary>
@@ -6972,7 +6912,7 @@ namespace OmsiMapEditor.UI
             {
                 // The project browser folds to the left, the inspector to the right.
                 button.Q<IconElement>()?.SetIcon(collapsed == isInspector ? "chevron-left" : "chevron-right");
-                button.tooltip = (collapsed ? "Open the " : "Collapse the ") + (isInspector ? "inspector" : "project browser");
+                button.tooltip = Loc.T("panel.collapse.tooltip", ("collapsed", collapsed ? "yes" : "no"), ("panel", isInspector ? "inspector" : "browser"));
             }
         }
 
@@ -7015,7 +6955,7 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null || session == null)
             {
-                SetStatus("Open a map before running validation.");
+                SetStatusT("check.status.open_first");
                 return;
             }
             if (checkTask != null)
@@ -7032,11 +6972,10 @@ namespace OmsiMapEditor.UI
             var configName = Path.GetFileName(session.GlobalConfigPath);
             checkSections?.Clear();
             if (checkSummaryLabel != null)
-                checkSummaryLabel.text = "Checking " + (string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName) +
-                                         (chronoDate != null ? " without chrono variants" : string.Empty) + "...";
+                checkSummaryLabel.text = Loc.T("check.running", ("name", string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName), ("noChrono", chronoDate != null ? "yes" : "no"));
             if (checkDialog != null)
                 checkDialog.style.display = DisplayStyle.Flex;
-            SetStatus("Checking the map...");
+            SetStatusT("check.status.checking");
             // The objects made for the project are looked for alongside, reading every map of the installation.
             OmsiMadeObjectScan made = null;
             List<OmsiChainOffsetFinding> stale = null;
@@ -7066,7 +7005,7 @@ namespace OmsiMapEditor.UI
                     if (task.IsFaulted)
                     {
                         Debug.LogException(task.Exception);
-                        SetStatus("The map check failed: " + task.Exception?.GetBaseException().Message);
+                        SetStatusT("check.status.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     }
                     HidePopup(checkDialog);
                     return;
@@ -7090,10 +7029,8 @@ namespace OmsiMapEditor.UI
             if (checkSections == null || checkSummaryLabel == null)
                 return;
             var problems = report.ProblemCount;
-            checkSummaryLabel.text = problems == 0
-                ? "No problems found in " + report.Sections.Count + " topics."
-                : problems + " of " + report.Sections.Count + " topics have findings that look like mistakes in the map data.";
-            SetStatus("Map check: " + (problems == 0 ? "passed." : problems + " topic(s) with problems; see the report."));
+            checkSummaryLabel.text = problems == 0 ? Loc.T("check.summary.ok", ("count", report.Sections.Count)) : Loc.T("check.summary.problems", ("problems", problems), ("count", report.Sections.Count));
+            SetStatusT("check.status.done", ("problems", problems));
             checkSections.Clear();
             foreach (var section in report.Sections)
             {
@@ -7101,7 +7038,7 @@ namespace OmsiMapEditor.UI
                 box.AddToClassList("check-section");
                 var header = new VisualElement();
                 header.AddToClassList("check-section-header");
-                var status = new Label(section.Status == OmsiCheckStatus.Passed ? "OK" : section.Status == OmsiCheckStatus.Note ? "Note" : "Problem");
+                var status = new Label(Loc.T(section.Status == OmsiCheckStatus.Passed ? "check.badge.ok" : section.Status == OmsiCheckStatus.Note ? "check.badge.note" : "check.badge.problem")) /* i18n:keys */;
                 status.AddToClassList("check-status");
                 status.AddToClassList(section.Status == OmsiCheckStatus.Passed ? "check-status-passed"
                     : section.Status == OmsiCheckStatus.Note ? "check-status-note" : "check-status-problem");
@@ -7117,7 +7054,7 @@ namespace OmsiMapEditor.UI
                         HidePopup(checkDialog);
                         if (tile != null)
                             SelectTile(tile, true);
-                    }) { text = "Show tile " + section.Tile.X + ", " + section.Tile.Y };
+                    }) { text = Loc.T("check.show_tile", ("x", section.Tile.X), ("y", section.Tile.Y))};
                     show.AddToClassList("map-control-button");
                     show.AddToClassList("check-section-button");
                     header.Add(show);
@@ -7151,7 +7088,7 @@ namespace OmsiMapEditor.UI
                 }
                 if (findings.Count <= count)
                     return;
-                var more = new Button(() => Fill(int.MaxValue)) { text = "Show all " + findings.Count };
+                var more = new Button(() => Fill(int.MaxValue)) { text = Loc.T("check.show_all", ("count", findings.Count))};
                 more.AddToClassList("map-control-button");
                 more.AddToClassList("check-more-button");
                 list.Add(more);
@@ -7221,13 +7158,13 @@ namespace OmsiMapEditor.UI
                 catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
                 {
                     Debug.LogException(exception);
-                    SetStatus("The chain offsets could not be stored: " + exception.Message);
+                    SetStatusT("chain.status.failed", ("reason", exception.Message));
                     return;
                 }
                 var count = staleChainOffsets.Count;
                 if (change != null)
                 {
-                    PushHistory(new ObjectEditStep { SplineChange = change, Description = "storing " + count + " chain offset(s)" });
+                    PushHistory(new ObjectEditStep { SplineChange = change, Description = Loc.T("chain.step", ("count", count)) });
                     RefreshSplineViews(change);
                 }
                 staleChainOffsets = OmsiMapSession.StaleChainOffsets(currentSummary);
@@ -7237,12 +7174,11 @@ namespace OmsiMapEditor.UI
                 chainOffsetsSection.Findings.Clear();
                 if (lastCheck != null)
                     ShowCheckReport(lastCheck);
-                SetStatus("Stored the chain offsets of " + count + " spline(s). Ctrl+Z takes it back.");
+                SetStatusT("chain.status.stored", ("count", count));
             })
             {
-                text = "Store offsets",
-                tooltip = "Writes into each listed spline how far along its chain it begins, and moves the rows along it so they stay where they stand"
-            };
+                text = Loc.T("chain.store"),
+                tooltip = Loc.T("chain.store.tooltip")};
             store.AddToClassList("map-control-button");
             store.AddToClassList("check-section-button");
             return store;
@@ -7287,11 +7223,11 @@ namespace OmsiMapEditor.UI
                 if (!armed)
                 {
                     armed = true;
-                    delete.text = "Click again to delete " + madeObjects.Unused.Count + " folder(s)";
+                    delete.text = Loc.T("made.click_again", ("count", madeObjects.Unused.Count));
                     delete.schedule.Execute(() =>
                     {
                         armed = false;
-                        delete.text = "Delete unused";
+                        delete.text = Loc.T("made.delete");
                     }).StartingIn(4000);
                     return;
                 }
@@ -7304,7 +7240,7 @@ namespace OmsiMapEditor.UI
                 catch (InvalidOperationException exception)
                 {
                     Debug.LogException(exception);
-                    SetStatus("The made objects could not be cleaned up: " + exception.Message);
+                    SetStatusT("made.status.failed", ("reason", exception.Message));
                     return;
                 }
                 madeObjects.Objects.RemoveAll(item => deleted.Contains(item.Name));
@@ -7317,12 +7253,11 @@ namespace OmsiMapEditor.UI
                 if (lastCheck != null)
                     ShowCheckReport(lastCheck);
                 StartInstallationScan(true);
-                SetStatus("Deleted " + deleted.Count + " unused made object(s)" + (problems.Count > 0 ? "; " + problems[0] : string.Empty) + ".");
+                SetStatusT("made.status.deleted", ("count", deleted.Count), ("hasProblem", problems.Count > 0 ? "yes" : "no"), ("problem", problems.Count > 0 ? problems[0] : string.Empty));
             })
             {
-                text = "Delete unused",
-                tooltip = "Deletes the folders of these objects from the OMSI installation. This cannot be undone."
-            };
+                text = Loc.T("made.delete"),
+                tooltip = Loc.T("made.delete.tooltip")};
             delete.AddToClassList("map-control-button");
             delete.AddToClassList("check-section-button");
             delete.AddToClassList("inspector-edit-delete");
@@ -7384,8 +7319,29 @@ namespace OmsiMapEditor.UI
 
         private void SetStatus(string message)
         {
+            statusKey = null;
+            statusArguments = null;
             if (statusLabel != null)
                 statusLabel.text = message;
+        }
+
+        /// <summary>
+        /// Shows a message from the language files. Unlike <see cref="SetStatus"/> it is written again when the language changes, as
+        /// long as nothing else has replaced it.
+        /// </summary>
+        private void SetStatusT(string key, params (string Name, object Value)[] arguments) // i18n:keys
+        {
+            statusKey = key;
+            statusArguments = arguments;
+            if (statusLabel != null)
+                statusLabel.text = Loc.T(key, arguments); // i18n:keys
+        }
+
+        /// <summary>Writes the message of <see cref="SetStatusT"/> again in the language now in use.</summary>
+        private void RefreshStatusText()
+        {
+            if (statusKey != null && statusLabel != null)
+                statusLabel.text = Loc.T(statusKey, statusArguments); // i18n:keys
         }
 
         private static void CreateBackgroundCamera()
@@ -7447,7 +7403,7 @@ namespace OmsiMapEditor.UI
         {
             mapCanvas?.FitToMap();
             UpdateZoomLabel();
-            SetStatus("Map fitted to the view");
+            SetStatusT("map.status.fitted");
         }
 
         private void ChangeZoom(float factor)
@@ -7464,9 +7420,7 @@ namespace OmsiMapEditor.UI
                 return;
             mapCanvas.CenterOn(selectedTile, selectedObject);
             UpdateZoomLabel();
-            SetStatus(selectedObject != null
-                ? "Centered object #" + selectedObject.Id
-                : "Centered tile " + selectedTile.X + ", " + selectedTile.Y);
+            SetStatus(selectedObject != null ? Loc.T("map.status.centered_object", ("id", selectedObject.Id)) : Loc.T("map.status.centered_tile", ("x", selectedTile.X), ("y", selectedTile.Y)));
         }
 
         private void UpdateMapHeader()
@@ -7483,17 +7437,9 @@ namespace OmsiMapEditor.UI
             if (mapHintLabel != null)
             {
                 var view = mapCanvas != null && mapCanvas.ThreeDimensional
-                    ? "3D view: right drag turns the view, middle drag moves it, the wheel zooms."
-                    : "From above: the wheel zooms, right or middle drag pans.";
-                mapHintLabel.text = view + (CanEdit
-                    ? "\nTools: Q drag objects freely, W move along axis arrows (Shift: whole metres), E rotate (round handle from above, rings in 3D; Shift: 15° steps), " +
-                      "Del delete, 3 place objects.\nCtrl+click or Ctrl+drag selects several. Ctrl+Z / Ctrl+Y undo and redo."
-                    : EditingVariant
-                    ? "\nEditing the chrono variant " + editedVariant.Title + ": Q, W and E move and turn objects, Del deletes, 3 places objects; " +
-                      "objects of the base map move as copies with new IDs.\nCtrl+Z / Ctrl+Y undo and redo. Base map in the project browser ends editing."
-                    : chronoDate != null
-                        ? "\nClick an object to inspect it. The chrono view is read-only; choose Base map in the project browser to edit."
-                        : "\nClick an object to inspect it. Save a project (File > Save map project as...) to edit the map.");
+                    ? Loc.T("map.hint.view3d")
+                    : Loc.T("map.hint.top");
+                mapHintLabel.text = view + Loc.T(CanEdit ? "map.hint.edit" : EditingVariant ? "map.hint.variant" : chronoDate != null ? "map.hint.chrono" : "map.hint.readonly", ("title", EditingVariant ? editedVariant.Title : string.Empty)) /* i18n:keys */;
                 mapHintLabel.style.display = DisplayStyle.Flex;
             }
             if (mapControls != null)
@@ -7533,7 +7479,7 @@ namespace OmsiMapEditor.UI
 
             if (currentSummary == null)
             {
-                var empty = new Label("No map loaded");
+                var empty = new Label(Loc.T("project.empty"));
                 empty.AddToClassList("muted");
                 projectPanel.Add(empty);
                 return;
@@ -7541,7 +7487,7 @@ namespace OmsiMapEditor.UI
 
             if (!string.IsNullOrWhiteSpace(currentProjectName))
             {
-                var projectLabel = new Label("Project: " + currentProjectName);
+                var projectLabel = new Label(Loc.T("project.name", ("name", currentProjectName)));
                 projectLabel.AddToClassList("browser-project-name");
                 projectPanel.Add(projectLabel);
             }
@@ -7560,7 +7506,7 @@ namespace OmsiMapEditor.UI
             var warnings = currentSummary.Warnings;
             if (warnings.Count > 0)
             {
-                var warningLabel = new Label(warnings.Count + " import warning(s): " + warnings[0] + (warnings.Count > 1 ? "  (hover for all)" : string.Empty))
+                var warningLabel = new Label(Loc.T("project.warnings", ("count", warnings.Count), ("first", warnings[0]), ("more", warnings.Count > 1 ? "yes" : "no")))
                 {
                     tooltip = string.Join("\n", warnings.GetRange(0, Math.Min(warnings.Count, 40)))
                 };
@@ -7570,7 +7516,7 @@ namespace OmsiMapEditor.UI
             if (!string.IsNullOrWhiteSpace(currentSummary.Description))
             {
                 // The description can be long; it stays folded until asked for.
-                var description = new Foldout { text = "About this map", value = false };
+                var description = new Foldout { text = Loc.T("project.about"), value = false };
                 description.AddToClassList("browser-map-description");
                 description.Add(new Label(currentSummary.Description.Trim()));
                 projectPanel.Add(description);
@@ -7583,7 +7529,7 @@ namespace OmsiMapEditor.UI
             lineEntries.Clear();
             if (routes != null && routes.Lines.Count > 0)
             {
-                var lines = new Foldout { text = "Lines (" + routes.Lines.Count + ")", value = false };
+                var lines = new Foldout { text = Loc.T("project.lines", ("count", routes.Lines.Count)), value = false };
                 lines.AddToClassList("browser-lines");
                 var lineList = new ScrollView(ScrollViewMode.Vertical);
                 lineList.AddToClassList("browser-line-list");
@@ -7594,9 +7540,8 @@ namespace OmsiMapEditor.UI
                     var name = line.Name;
                     var entry = new Button(() => HighlightLine(name))
                     {
-                        text = "Line " + name + "     " + line.StopIds.Count + " stops  /  " + line.ScheduledTripCount + " trips",
-                        tooltip = "Highlight line " + name + " on the map; click again to show all lines alike."
-                    };
+                        text = Loc.T("project.line", ("name", name), ("stops", line.StopIds.Count), ("trips", line.ScheduledTripCount)),
+                        tooltip = Loc.T("project.line.tooltip", ("name", name))};
                     entry.AddToClassList("browser-tile-entry");
                     entry.EnableInClassList("browser-tile-entry-selected", name == highlightedLine);
                     lineList.Add(entry);
@@ -7634,15 +7579,13 @@ namespace OmsiMapEditor.UI
         private VisualElement ChronoSection()
         {
             var canEditVariants = session != null && session.CanEdit;
-            var section = new Foldout { text = "Chrono (" + chronoVariants.Count + " variants)", value = chronoDate != null || newVariantFormOpen };
+            var section = new Foldout { text = Loc.T("chrono.foldout", ("count", chronoVariants.Count)), value = chronoDate != null || newVariantFormOpen };
             section.AddToClassList("browser-chrono");
             var state = new Label(EditingVariant
-                ? "Editing " + editedVariant.Title + " on " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) +
-                  ": objects you place, move, turn or delete go into it. Base map ends editing."
+                ? Loc.T("chrono.note.editing", ("title", editedVariant.Title), ("date", chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
                 : chronoDate == null
-                    ? "Showing the base map. Enter a date to see the map as OMSI loads it then" + (canEditVariants ? ", or edit a variant." : ".")
-                    : "Showing " + chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " with " +
-                      OmsiChrono.ActiveOn(chronoVariants, chronoDate.Value).Count + " active variant(s), read-only.");
+                    ? Loc.T("chrono.note.base", ("edit", canEditVariants ? "yes" : "no"))
+                    : Loc.T("chrono.note.date", ("date", chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("count", OmsiChrono.ActiveOn(chronoVariants, chronoDate.Value).Count)));
             state.AddToClassList("browser-chrono-state");
             section.Add(state);
 
@@ -7656,10 +7599,10 @@ namespace OmsiMapEditor.UI
                     ShowChronoDateFromField();
             });
             row.Add(chronoDateField);
-            var show = new Button(ShowChronoDateFromField) { text = "Show", tooltip = "Show the map with the chrono variants active on this date" };
+            var show = new Button(ShowChronoDateFromField) { text = Loc.T("chrono.show"), tooltip = Loc.T("chrono.show.tooltip")};
             show.AddToClassList("map-control-button");
             row.Add(show);
-            var back = new Button(() => ShowChronoDate(null)) { text = "Base map", tooltip = "Return to the map without chrono variants; it can be edited again" };
+            var back = new Button(() => ShowChronoDate(null)) { text = Loc.T("chrono.base"), tooltip = Loc.T("chrono.base.tooltip")};
             back.AddToClassList("map-control-button");
             back.SetEnabled(chronoDate != null);
             row.Add(back);
@@ -7680,10 +7623,7 @@ namespace OmsiMapEditor.UI
                     ShowChronoDateFromField();
                 })
                 {
-                    text = variant.ToString(), tooltip = variant.Folder + (variant.DeactivatedLines.Count > 0
-                        ? "\nSwitches off the lines " + string.Join(", ", variant.DeactivatedLines)
-                        : string.Empty)
-                };
+                    text = variant.ToString(), tooltip = Loc.T("chrono.variant.tooltip", ("folder", variant.Folder), ("hasLines", variant.DeactivatedLines.Count > 0 ? "yes" : "no"), ("lines", string.Join(", ", variant.DeactivatedLines)))};
                 entry.AddToClassList("browser-tile-entry");
                 entry.AddToClassList("browser-chrono-variant");
                 entry.style.flexGrow = 1f;
@@ -7695,9 +7635,8 @@ namespace OmsiMapEditor.UI
                 {
                     var edit = new Button(() => EditChronoVariant(captured))
                     {
-                        text = edited ? "Editing" : "Edit",
-                        tooltip = "Edit this variant on its first day: objects placed, moved, turned or deleted go into its change lists"
-                    };
+                        text = Loc.T(edited ? "chrono.editing" : "chrono.edit") /* i18n:keys */,
+                        tooltip = Loc.T("chrono.edit.tooltip")};
                     edit.AddToClassList("map-control-button");
                     edit.SetEnabled(!edited && variant.FirstDay != null);
                     line.Add(edit);
@@ -7705,9 +7644,8 @@ namespace OmsiMapEditor.UI
                     {
                         var delete = new Button(() => DeleteChronoVariant(captured))
                         {
-                            text = ReferenceEquals(variantToDelete, captured) ? "Delete?" : "Delete",
-                            tooltip = "Deletes this variant, made in this project, with all it changes; a second click confirms"
-                        };
+                            text = Loc.T(ReferenceEquals(variantToDelete, captured) ? "chrono.delete_confirm" : "chrono.delete") /* i18n:keys */,
+                            tooltip = Loc.T("chrono.delete.tooltip")};
                         delete.AddToClassList("map-control-button");
                         delete.AddToClassList("inspector-edit-delete");
                         delete.SetEnabled(!edited);
@@ -7735,15 +7673,15 @@ namespace OmsiMapEditor.UI
                 {
                     newVariantFormOpen = true;
                     RenderProjectBrowser();
-                }) { text = "New variant...", tooltip = "Make a chrono variant that applies from a date on, such as road works or a new line" };
+                }) { text = Loc.T("chrono.new"), tooltip = Loc.T("chrono.new.tooltip")};
                 open.AddToClassList("map-control-button");
                 box.Add(open);
                 return box;
             }
 
-            var name = new TextField("Name") { value = "Road works" };
-            var start = new TextField("First day") { value = (chronoDate ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
-            var end = new TextField("Last day") { value = string.Empty, tooltip = "Empty: the variant stays from its first day on" };
+            var name = new TextField(Loc.T("chrono.field.name")) { value = "Road works" };
+            var start = new TextField(Loc.T("chrono.field.first")) { value = (chronoDate ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+            var end = new TextField(Loc.T("chrono.field.last")) { value = string.Empty, tooltip = Loc.T("chrono.field.last.tooltip")};
             foreach (var field in new[] { name, start, end })
             {
                 field.AddToClassList("browser-chrono-date");
@@ -7755,7 +7693,7 @@ namespace OmsiMapEditor.UI
             {
                 if (!TryParseDay(start.value, out var first))
                 {
-                    SetStatus("Enter the first day as year-month-day, for example 1992-04-05.");
+                    SetStatusT("chrono.status.first_day");
                     return;
                 }
                 DateTime? last = null;
@@ -7763,20 +7701,20 @@ namespace OmsiMapEditor.UI
                 {
                     if (!TryParseDay(end.value, out var lastDay))
                     {
-                        SetStatus("Enter the last day as year-month-day, or leave it empty.");
+                        SetStatusT("chrono.status.last_day");
                         return;
                     }
                     last = lastDay;
                 }
                 CreateChronoVariant(name.value, first, last);
-            }) { text = "Make and edit" };
+            }) { text = Loc.T("chrono.make")};
             create.AddToClassList("map-control-button");
             buttons.Add(create);
             var cancel = new Button(() =>
             {
                 newVariantFormOpen = false;
                 RenderProjectBrowser();
-            }) { text = "Cancel" };
+            }) { text = Loc.T("chrono.cancel")};
             cancel.AddToClassList("map-control-button");
             buttons.Add(cancel);
             box.Add(buttons);
@@ -7789,12 +7727,9 @@ namespace OmsiMapEditor.UI
             if (currentSummary == null)
                 return;
             if (browserCountsLabel != null)
-                browserCountsLabel.text = currentSummary.Tiles.Count + " tiles  •  " + currentSummary.ObjectCount + " objects  •  " +
-                                          currentSummary.SplineCount + " splines\n" + currentSummary.AttachmentCount + " connections  •  terrain " +
-                                          currentSummary.TerrainTileCount + "/" + currentSummary.Tiles.Count +
-                                          (currentSummary.UsesWorldCoordinates
-                                              ? "\nWorld coordinates, " + currentSummary.TileSizeMeters.ToString("0.0") + " m tiles"
-                                              : string.Empty);
+                browserCountsLabel.text = Loc.T("project.counts", ("tiles", currentSummary.Tiles.Count), ("objects", currentSummary.ObjectCount), ("splines", currentSummary.SplineCount),
+                ("connections", currentSummary.AttachmentCount), ("terrain", currentSummary.TerrainTileCount), ("world", currentSummary.UsesWorldCoordinates ? "yes" : "no"),
+                ("size", currentSummary.TileSizeMeters));
         }
 
         /// <summary>Refreshes one tile list entry, for example its edited marker, without rebuilding the list.</summary>
@@ -7803,8 +7738,7 @@ namespace OmsiMapEditor.UI
             if (!browserEntries.TryGetValue(tile, out var entry))
                 return;
             var edited = IsTileEdited(tile);
-            entry.text = "Tile " + tile.X + ", " + tile.Y + "     " + tile.ObjectCount + " obj  /  " + tile.SplineCount + " spl" +
-                         (edited ? "  • edited" : string.Empty);
+            entry.text = Loc.T("project.tile", ("x", tile.X), ("y", tile.Y), ("objects", tile.ObjectCount), ("splines", tile.SplineCount), ("edited", edited ? "yes" : "no"));
             entry.EnableInClassList("browser-tile-entry-edited", edited);
         }
 
@@ -7834,28 +7768,23 @@ namespace OmsiMapEditor.UI
 
             if (selectedTile == null)
             {
-                var empty = new Label(currentSummary == null
-                    ? "Open an OMSI map to inspect its tiles."
-                    : "This map has no available tile entries.");
+                var empty = new Label(Loc.T(currentSummary == null ? "project.no_map" : "project.no_tiles")) /* i18n:keys */;
                 empty.AddToClassList("muted");
                 inspectorPanel.Add(empty);
                 return;
             }
 
-            var title = new Label("Tile " + selectedTile.X + ", " + selectedTile.Y);
+            var title = new Label(Loc.T("inspector.tile", ("x", selectedTile.X), ("y", selectedTile.Y)));
             title.AddToClassList("inspector-title");
             inspectorPanel.Add(title);
-            AddInspectorValue("File", selectedTile.FileName);
+            AddInspectorValue("inspector.file", selectedTile.FileName);
             if (currentSummary.UsesWorldCoordinates)
-                AddInspectorValue("South-west corner", OmsiWorldTiles.DescribeCorner(selectedTile.X, selectedTile.Y) + ", edge " +
-                                                       OmsiWorldTiles.EdgeMeters(selectedTile.Y + 0.5).ToString("F2") + " m");
-            AddInspectorValue("Status", selectedTile.IsAvailable ? "Available" : "Missing");
-            AddInspectorValue("Objects", selectedTile.ObjectCount.ToString());
-            AddInspectorValue("Splines", selectedTile.SplineCount.ToString());
-            AddInspectorValue("Connections", selectedTile.AttachmentCount.ToString());
-            AddInspectorValue("Terrain", selectedTile.HasTerrain
-                ? selectedTile.TerrainMinHeight.ToString("F1") + " to " + selectedTile.TerrainMaxHeight.ToString("F1") + " m"
-                : "Unavailable");
+                AddInspectorValue("inspector.corner", Loc.T("inspector.edge", ("corner", OmsiWorldTiles.DescribeCorner(selectedTile.X, selectedTile.Y)), ("meters", OmsiWorldTiles.EdgeMeters(selectedTile.Y + 0.5))));
+            AddInspectorValue("inspector.status", Loc.T(selectedTile.IsAvailable ? "inspector.available" : "inspector.missing")) /* i18n:keys */;
+            AddInspectorValue("inspector.objects", selectedTile.ObjectCount.ToString());
+            AddInspectorValue("inspector.splines", selectedTile.SplineCount.ToString());
+            AddInspectorValue("inspector.connections", selectedTile.AttachmentCount.ToString());
+            AddInspectorValue("inspector.terrain", selectedTile.HasTerrain ? Loc.T("inspector.terrain_range", ("low", selectedTile.TerrainMinHeight), ("high", selectedTile.TerrainMaxHeight)) : Loc.T("inspector.unavailable"));
 
             // The object editor scrolls together with the record lists, so neither squeezes the other.
             var records = new ScrollView(ScrollViewMode.Vertical);
@@ -7873,11 +7802,11 @@ namespace OmsiMapEditor.UI
             if (pathsShown && mapPaths != null && selection.Count <= 1 && (selectedObject != null || selectedSpline != null))
                 AddPathDetails(records, selectedTile, selectedObject?.Id ?? selectedSpline.Id, selectedObject == null);
 
-            var objectsHeading = new Label("OBJECT PLACEMENTS");
+            var objectsHeading = UpperLabel("inspector.object_placements");
             objectsHeading.AddToClassList("inspector-section-heading");
             records.Add(objectsHeading);
             if (selectedTile.Objects.Count == 0)
-                AddInspectorRecord(records, "No decoded objects.", "inspector-record-empty");
+                AddInspectorRecord(records, Loc.T("inspector.no_objects"), "inspector-record-empty");
             foreach (var item in selectedTile.Objects)
             {
                 var details = "#" + item.Id + "  " + item.AssetPath + "\n" +
@@ -7899,11 +7828,11 @@ namespace OmsiMapEditor.UI
                 });
             }
 
-            var splinesHeading = new Label("SPLINE PLACEMENTS");
+            var splinesHeading = UpperLabel("inspector.spline_placements");
             splinesHeading.AddToClassList("inspector-section-heading");
             records.Add(splinesHeading);
             if (selectedTile.Splines.Count == 0)
-                AddInspectorRecord(records, "No decoded splines.", "inspector-record-empty");
+                AddInspectorRecord(records, Loc.T("inspector.no_splines"), "inspector-record-empty");
             foreach (var spline in selectedTile.Splines)
             {
                 var details = "#" + spline.Id + "  " + spline.AssetPath + "\n" +
@@ -7930,17 +7859,25 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void AddInspectorValue(string label, string value)
+        private void AddInspectorValue(string labelKey, string value)
         {
             var row = new VisualElement();
             row.AddToClassList("inspector-property");
-            var name = new Label(label);
+            var name = LocBindings.NewLabel(labelKey); // i18n:keys
             name.AddToClassList("inspector-property-name");
             var content = new Label(value ?? string.Empty);
             content.AddToClassList("inspector-property-value");
             row.Add(name);
             row.Add(content);
             inspectorPanel.Add(row);
+        }
+
+        /// <summary>A heading label written in capitals as the language writes them, from a key.</summary>
+        private static Label UpperLabel(string key, params (string Name, object Value)[] arguments) // i18n:keys
+        {
+            var label = new Label();
+            LocBindings.TextUpper(label, key, arguments); // i18n:keys
+            return label;
         }
 
         private static Label AddInspectorRecord(VisualElement container, string text, string className)
@@ -7961,14 +7898,13 @@ namespace OmsiMapEditor.UI
         {
             var editor = new VisualElement();
             editor.AddToClassList("inspector-edit");
-            var heading = new Label("SELECTED OBJECTS");
+            var heading = UpperLabel("inspector.selected_objects");
             heading.AddToClassList("inspector-section-heading");
             editor.Add(heading);
             var ids = new List<string>();
             foreach (var entry in selection)
                 ids.Add("#" + entry.Record.Id);
-            var names = new Label(selection.Count + " objects: " + string.Join(", ", ids.GetRange(0, Math.Min(12, ids.Count))) +
-                                  (ids.Count > 12 ? ", ..." : string.Empty));
+            var names = new Label(Loc.T("inspector.selected_ids", ("count", selection.Count), ("ids", string.Join(", ", ids.GetRange(0, Math.Min(12, ids.Count)))), ("more", ids.Count > 12 ? "yes" : "no")));
             names.AddToClassList("inspector-edit-name");
             editor.Add(names);
 
@@ -7979,22 +7915,18 @@ namespace OmsiMapEditor.UI
                 {
                     var level = new Button(LevelSelectedGround)
                     {
-                        text = "Level ground under them",
-                        tooltip = "Makes the ground under each object's outline level with its foot, easing into the ground around over 3 m; trees are left out"
-                    };
+                        text = Loc.T("inspector.level_group"),
+                        tooltip = Loc.T("inspector.level_group.tooltip")};
                     level.AddToClassList("map-control-button");
                     level.AddToClassList("inspector-edit-apply");
                     editor.Add(level);
                 }
-                var delete = new Button(DeleteSelectedObjects) { text = "Delete " + selection.Count + " objects" };
+                var delete = new Button(DeleteSelectedObjects) { text = Loc.T("inspector.delete_many", ("count", selection.Count))};
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);
             }
-            var hint = new Label(canEdit
-                ? "Drag one of them on the map to move all; with Rotate (E) the handle in their middle turns them together. " +
-                  "Ctrl+click adds or removes an object, Esc clears the selection."
-                : "Read-only. Save a MapWorks project (File > Save map project as...) to edit this map.");
+            var hint = new Label(Loc.T(canEdit ? "inspector.group_hint" : "inspector.readonly")) /* i18n:keys */;
             hint.AddToClassList("muted");
             hint.AddToClassList("inspector-edit-hint");
             editor.Add(hint);
@@ -8008,7 +7940,7 @@ namespace OmsiMapEditor.UI
         private void AddAttachedObjects(VisualElement editor, OmsiObjectRecord item, bool canEdit)
         {
             var tile = TileHolding(new MapSelectionItem { Tile = selectedTile, Record = item }) ?? selectedTile;
-            AddAttachedObjects(editor, tile, item.Id, canEdit, "Place an object on a free point to hang it there; deleting the object takes these with it.");
+            AddAttachedObjects(editor, tile, item.Id, canEdit, Loc.T("inspector.attach_hint_object"));
         }
 
         /// <summary>
@@ -8021,8 +7953,7 @@ namespace OmsiMapEditor.UI
                 return;
             foreach (var record in selectedRow.Records)
                 if (!record.Value.IsRepeater)
-                    AddAttachedObjects(editor, record.Key, record.Value.Id, CanEdit,
-                        "Place an object on a free point of the row's first object to hang it there; deleting the row takes these with it.");
+                    AddAttachedObjects(editor, record.Key, record.Value.Id, CanEdit, Loc.T("inspector.attach_hint_row"));
         }
 
         private void AddAttachedObjects(VisualElement editor, OmsiTileSummary tile, int parentId, bool canEdit, string hintText)
@@ -8040,7 +7971,7 @@ namespace OmsiMapEditor.UI
             Collect(parentId, 0);
             if (hanging.Count == 0)
                 return;
-            var heading = new Label("ATTACHED OBJECTS");
+            var heading = UpperLabel("inspector.attached_objects");
             heading.AddToClassList("inspector-section-heading");
             editor.Add(heading);
             foreach (var pair in hanging)
@@ -8051,10 +7982,7 @@ namespace OmsiMapEditor.UI
                 row.style.flexDirection = FlexDirection.Row;
                 row.style.alignItems = Align.Center;
                 row.style.marginLeft = 12 * pair.Key;
-                var label = new Label("Point " + (attached.AttachPointIndex + 1) + ": #" + attached.Id + "  " + Path.GetFileNameWithoutExtension(attached.AssetPath))
-                {
-                    tooltip = attached.AssetPath
-                };
+                var label = new Label(Loc.T("inspector.attached_item", ("n", attached.AttachPointIndex + 1), ("id", attached.Id), ("name", Path.GetFileNameWithoutExtension(attached.AssetPath)))) { tooltip = attached.AssetPath };
                 label.AddToClassList("inspector-edit-name");
                 label.style.flexGrow = 1f;
                 label.style.flexShrink = 1f;
@@ -8062,14 +7990,14 @@ namespace OmsiMapEditor.UI
                 if (CanEditObjects)
                 {
                     var typed = attached;
-                    var retype = new Button(() => PickElementType(tile, typed)) { text = "Type...", tooltip = "Choose another object file for it in the library; its place and labels stay" };
+                    var retype = new Button(() => PickElementType(tile, typed)) { text = Loc.T("inspector.type_short"), tooltip = Loc.T("labels.change_type.tooltip")};
                     retype.AddToClassList("map-control-button");
                     row.Add(retype);
                 }
                 if (canEdit)
                 {
                     var captured = attached;
-                    var off = new Button(() => DeleteAttachedObject(tile, captured)) { text = "Delete", tooltip = "Takes this object off, with what hangs on it" };
+                    var off = new Button(() => DeleteAttachedObject(tile, captured)) { text = Loc.T("inspector.detach"), tooltip = Loc.T("inspector.detach.tooltip")};
                     off.AddToClassList("map-control-button");
                     off.AddToClassList("inspector-edit-delete");
                     row.Add(off);
@@ -8091,7 +8019,7 @@ namespace OmsiMapEditor.UI
         {
             var editor = new VisualElement();
             editor.AddToClassList("inspector-edit");
-            var heading = new Label("SELECTED OBJECT");
+            var heading = UpperLabel("inspector.selected_object");
             heading.AddToClassList("inspector-section-heading");
             editor.Add(heading);
             var name = new Label("#" + item.Id + "  " + item.AssetPath);
@@ -8101,12 +8029,12 @@ namespace OmsiMapEditor.UI
             AddTypeAndLabels(editor, TileHolding(new MapSelectionItem { Tile = selectedTile, Record = item }) ?? selectedTile, item, false);
             AddJunctionDetails(editor, item);
 
-            var xField = AddEditField(editor, "X (m)", item.LocalX);
-            var yField = AddEditField(editor, "Y (m)", item.LocalY);
-            var zField = AddEditField(editor, "Height (m)", item.Height);
-            var headingField = AddEditField(editor, "Heading (°)", item.HeadingDegrees);
-            var pitchField = AddEditField(editor, "Pitch (°)", item.PitchDegrees);
-            var bankField = AddEditField(editor, "Bank (°)", item.BankDegrees);
+            var xField = AddEditField(editor, "inspector.field.x", item.LocalX);
+            var yField = AddEditField(editor, "inspector.field.y", item.LocalY);
+            var zField = AddEditField(editor, "inspector.field.height", item.Height);
+            var headingField = AddEditField(editor, "inspector.field.heading", item.HeadingDegrees);
+            var pitchField = AddEditField(editor, "inspector.field.pitch", item.PitchDegrees);
+            var bankField = AddEditField(editor, "inspector.field.bank", item.BankDegrees);
 
             var canEdit = CanEditObjects;
             if (canEdit)
@@ -8115,12 +8043,12 @@ namespace OmsiMapEditor.UI
                 {
                     pitchField.SetEnabled(false);
                     bankField.SetEnabled(false);
-                    var locked = new Label("Joins splines like a crossing: pitch and bank stay as they are, so the roads stay connected.");
+                    var locked = new Label(Loc.T("inspector.junction_note"));
                     locked.AddToClassList("muted");
                     locked.AddToClassList("inspector-edit-hint");
                     editor.Add(locked);
                 }
-                var apply = new Button(() => ApplyObjectEdit(item, xField, yField, zField, headingField, pitchField, bankField)) { text = "Apply" };
+                var apply = new Button(() => ApplyObjectEdit(item, xField, yField, zField, headingField, pitchField, bankField)) { text = Loc.T("inspector.apply")};
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
@@ -8128,17 +8056,15 @@ namespace OmsiMapEditor.UI
                 {
                     var level = new Button(LevelSelectedGround)
                     {
-                        text = "Level ground",
-                        tooltip = "Makes the ground under the object's outline level with its foot, easing into the ground around over 3 m, as for a house on a slope"
-                    };
+                        text = Loc.T("inspector.level"),
+                        tooltip = Loc.T("inspector.level.tooltip")};
                     level.AddToClassList("map-control-button");
                     level.AddToClassList("inspector-edit-apply");
                     editor.Add(level);
                 }
                 var delete = new Button(DeleteSelectedObjects)
                 {
-                    text = EditingVariant && !session.IsInEditedVariant(item) ? "Delete in variant" : "Delete object"
-                };
+                    text = Loc.T(EditingVariant && !session.IsInEditedVariant(item) ? "inspector.delete_variant" : "inspector.delete_object") /* i18n:keys */};
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);
@@ -8149,7 +8075,7 @@ namespace OmsiMapEditor.UI
             {
                 foreach (var field in new[] { xField, yField, zField, headingField, pitchField, bankField })
                     field.SetEnabled(false);
-                var hint = new Label("Read-only. Save a MapWorks project (File > Save map project as...) to edit this map.");
+                var hint = new Label(Loc.T("inspector.readonly"));
                 hint.AddToClassList("muted");
                 hint.AddToClassList("inspector-edit-hint");
                 editor.Add(hint);
@@ -8167,9 +8093,8 @@ namespace OmsiMapEditor.UI
                 return;
             var origin = session.OriginOf(item);
             var label = new Label(session.IsInEditedVariant(item)
-                ? "Added by " + editedVariant.Title + "; it moves, turns and goes there."
-                : "From " + (origin != null ? "the variant " + origin.Title : "the base map") + ". Moving or turning it puts a copy with a new ID into " +
-                  editedVariant.Title + " in its place; deleting it takes it away there. The " + (origin != null ? "variant" : "base map") + " keeps it.");
+                    ? Loc.T("inspector.variant_note_own", ("title", editedVariant.Title))
+                    : Loc.T("inspector.variant_note_other", ("origin", origin != null ? "variant" : "base"), ("originTitle", origin?.Title ?? string.Empty), ("title", editedVariant.Title)));
             label.AddToClassList("muted");
             label.AddToClassList("inspector-edit-hint");
             editor.Add(label);
@@ -8187,7 +8112,7 @@ namespace OmsiMapEditor.UI
             var problem = catalog.Problem(item.AssetPath);
             if (problem != null)
             {
-                var unresolved = new Label("Unresolved: " + problem + " The object stays placed as it is.");
+                var unresolved = new Label(Loc.T("inspector.unresolved", ("problem", problem)));
                 unresolved.AddToClassList("muted");
                 unresolved.AddToClassList("inspector-edit-hint");
                 container.Add(unresolved);
@@ -8197,8 +8122,7 @@ namespace OmsiMapEditor.UI
             if (ports.Count == 0)
                 return;
             var checks = OmsiJunctionCatalog.Check(currentSummary, ports, null, catalog.PortsAround(currentSummary, selectedTile));
-            var heading = new Label("CONNECTION POINTS  " + checks.FindAll(check => check.State == OmsiJunctionPortState.Connected).Count + " of " +
-                                    checks.Count + " connected");
+            var heading = UpperLabel("inspector.ports", ("connected", checks.FindAll(check => check.State == OmsiJunctionPortState.Connected).Count), ("total", checks.Count));
             heading.AddToClassList("inspector-section-heading");
             container.Add(heading);
             foreach (var check in checks)
@@ -8221,19 +8145,20 @@ namespace OmsiMapEditor.UI
             switch (state)
             {
                 case OmsiJunctionPortState.Connected:
-                    return "Connected";
+                    return Loc.T("inspector.port.connected");
                 case OmsiJunctionPortState.NeedsReview:
-                    return "Needs review";
+                    return Loc.T("inspector.port.review");
                 case OmsiJunctionPortState.Invalid:
-                    return "Invalid";
+                    return Loc.T("inspector.port.invalid");
                 default:
-                    return "Unconnected";
+                    return Loc.T("inspector.port.unconnected");
             }
         }
 
-        private static TextField AddEditField(VisualElement container, string label, double value)
+        private static TextField AddEditField(VisualElement container, string labelKey, double value)
         {
-            var field = new TextField(label) { value = OmsiNumberFormat.Format(value) };
+            var field = new TextField { value = OmsiNumberFormat.Format(value) };
+            LocBindings.Text(field, labelKey); // i18n:keys
             field.AddToClassList("inspector-edit-field");
             container.Add(field);
             return field;
@@ -8248,7 +8173,7 @@ namespace OmsiMapEditor.UI
             var touching = selectedSplineTile == null || currentSummary == null
                 ? null
                 : OmsiSplineEditing.Neighbour(currentSummary, new OmsiSplineEnd(selectedSplineTile, spline, atEnd));
-            return touching == null ? "open" : "#" + touching.Spline.Id + " (touching, no ID)";
+            return touching == null ? Loc.T("inspector.join.open") : Loc.T("inspector.join.touching", ("id", touching.Spline.Id));
         }
 
         /// <summary>The selected spline: its profile, geometry, heights and neighbours, and the way to delete it.</summary>
@@ -8256,34 +8181,29 @@ namespace OmsiMapEditor.UI
         {
             var editor = new VisualElement();
             editor.AddToClassList("inspector-edit");
-            var heading = new Label("SELECTED SPLINE");
+            var heading = UpperLabel("inspector.selected_spline");
             heading.AddToClassList("inspector-section-heading");
             editor.Add(heading);
             var gradient = spline.LengthMeters > 0 ? (spline.EndHeight - spline.Height) / spline.LengthMeters * 100.0 : 0.0;
-            var text = "#" + spline.Id + "  " + spline.AssetPath + "\n" +
-                       "Length " + spline.LengthMeters.ToString("F1") + " m  •  " +
-                       (spline.RadiusMeters == 0 ? "straight" : "radius " + spline.RadiusMeters.ToString("F1") + " m") + "  •  heading " +
-                       spline.HeadingDegrees.ToString("F1") + "°\n" +
-                       "Height " + spline.Height.ToString("F2") + " to " + spline.EndHeight.ToString("F2") + " m  •  mean gradient " +
-                       gradient.ToString("F1") + " %\n" +
-                       "Joined at start: " + DescribeJoin(spline, false) + "  •  at end: " + DescribeJoin(spline, true) +
-                       (spline.AlignsTerrain ? "\nTerrain fitted to it" + (session != null && session.IsBuiltHere(spline) ? " by this editor" : " (original map)") : string.Empty);
+            var text = Loc.T("inspector.spline_info", ("id", spline.Id), ("path", spline.AssetPath), ("length", spline.LengthMeters), ("straight", spline.RadiusMeters == 0 ? "yes" : "no"),
+                    ("radius", spline.RadiusMeters), ("heading", spline.HeadingDegrees), ("from", spline.Height), ("to", spline.EndHeight), ("gradient", gradient),
+                    ("startJoin", DescribeJoin(spline, false)), ("endJoin", DescribeJoin(spline, true)),
+                    ("terrain", !spline.AlignsTerrain ? "none" : session != null && session.IsBuiltHere(spline) ? "here" : "original"));
             var details = new Label(text);
             details.AddToClassList("inspector-edit-name");
             editor.Add(details);
             if (CanEdit)
             {
-                var startField = AddEditField(editor, "Start height", spline.Height);
-                var endField = AddEditField(editor, "End height", spline.EndHeight);
+                var startField = AddEditField(editor, "inspector.field.start_height", spline.Height);
+                var endField = AddEditField(editor, "inspector.field.end_height", spline.EndHeight);
                 var apply = new Button(() =>
                 {
-                    if (TryParseField(startField, "Start height", out var start) && TryParseField(endField, "End height", out var end))
+                    if (TryParseField(startField, Loc.T("inspector.name.start_height"), out var start) && TryParseField(endField, Loc.T("inspector.name.end_height"), out var end))
                         SetSplineHeights(start, end);
                 })
                 {
-                    text = "Apply heights",
-                    tooltip = "Raises or lowers the ends of this spline together with the splines joined there; their other ends keep their height."
-                };
+                    text = Loc.T("inspector.apply_heights"),
+                    tooltip = Loc.T("inspector.apply_heights.tooltip")};
                 apply.AddToClassList("map-control-button");
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
@@ -8293,17 +8213,14 @@ namespace OmsiMapEditor.UI
                 var aligned = spline.AlignsTerrain;
                 var fit = new Button(() => SetRoadTerrainFit(!aligned))
                 {
-                    text = aligned ? "Stop fitting terrain" : "Fit terrain to this road",
-                    tooltip = aligned
-                        ? "The terrain along this road returns to the original, as far as no other road changes it."
-                        : "Lowers the ground under every spline of this road built here and shapes shoulders and slopes beside it."
-                };
+                    text = Loc.T(aligned ? "inspector.fit_stop" : "inspector.fit_start") /* i18n:keys */,
+                    tooltip = Loc.T(aligned ? "inspector.fit_stop.tooltip" : "inspector.fit_start.tooltip") /* i18n:keys */};
                 fit.AddToClassList("map-control-button");
                 editor.Add(fit);
             }
             if (CanEdit)
             {
-                var delete = new Button(DeleteSelectedSpline) { text = "Delete spline" };
+                var delete = new Button(DeleteSelectedSpline) { text = Loc.T("inspector.delete_spline")};
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 editor.Add(delete);
@@ -8318,7 +8235,7 @@ namespace OmsiMapEditor.UI
         {
             if (!IsTileEdited(selectedTile) || session.IsTileAdded(selectedTile.FileName))
                 return;
-            var revert = new Button(RevertSelectedTile) { text = "Revert tile edits" };
+            var revert = new Button(RevertSelectedTile) { text = Loc.T("inspector.revert_tile")};
             revert.AddToClassList("map-control-button");
             revert.AddToClassList("inspector-edit-revert");
             container.Add(revert);
@@ -8346,18 +8263,16 @@ namespace OmsiMapEditor.UI
                     return;
                 }
                 armed = true;
-                delete.text = "Click again to delete tile " + tile.X + ", " + tile.Y;
+                delete.text = Loc.T("inspector.delete_tile_confirm", ("x", tile.X), ("y", tile.Y));
                 delete.schedule.Execute(() =>
                 {
                     armed = false;
-                    delete.text = "Delete tile";
+                    delete.text = Loc.T("inspector.delete_tile");
                 }).StartingIn(4000);
             })
             {
-                text = "Delete tile",
-                tooltip = "Takes the tile out of the map. Later tiles move up in the list and everything naming them follows. " +
-                          "A tile stays while an entry point, timetable or something in another tile needs it."
-            };
+                text = Loc.T("inspector.delete_tile"),
+                tooltip = Loc.T("inspector.delete_tile.tooltip")};
             delete.AddToClassList("map-control-button");
             delete.AddToClassList("inspector-edit-delete");
             container.Add(delete);

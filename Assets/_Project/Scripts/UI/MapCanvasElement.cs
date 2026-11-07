@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using OmsiMapEditor.World;
 using UnityEngine;
@@ -2899,7 +2900,7 @@ namespace OmsiMapEditor.UI
 
         private static string ArrowName(MoveAxis axis)
         {
-            return axis == MoveAxis.East ? "X" : axis == MoveAxis.North ? "Y" : "Height";
+            return axis == MoveAxis.East ? "X" : axis == MoveAxis.North ? "Y" : Loc.T("canvas.arrow.height");
         }
 
         /// <summary>
@@ -3257,12 +3258,12 @@ namespace OmsiMapEditor.UI
         {
             if (TurnsGroup)
             {
-                ShowDragLabel(position, "Turn " + groupTurn.ToString("+0.0;-0.0;0.0") + "°");
+                ShowDragLabel(position, Loc.T("canvas.angle.turn", ("degrees", groupTurn)));
                 return;
             }
-            var name = activeRing == RingAxis.Pitch ? "Pitch" : activeRing == RingAxis.Bank ? "Bank" : "Heading";
+            var name = activeRing == RingAxis.Pitch ? "canvas.angle.pitch" : activeRing == RingAxis.Bank ? "canvas.angle.bank" : "canvas.angle.heading";
             var value = activeRing == RingAxis.Pitch ? previewPitch : activeRing == RingAxis.Bank ? previewBank : previewHeading;
-            ShowDragLabel(position, name + " " + value.ToString("0.0") + "°");
+            ShowDragLabel(position, Loc.T(name, ("degrees", value))); // i18n:keys
         }
 
         /// <summary>Shows what a drag changes, such as an angle or an offset, next to the pointer.</summary>
@@ -3883,14 +3884,13 @@ namespace OmsiMapEditor.UI
         {
             var tile = map.HasValue ? TileAt(map.Value) : null;
             return tile == null
-                ? "outside the map"
-                : "Tile " + tile.X + ", " + tile.Y + "   x " + (map.Value.x - TileRect(tile).xMin).ToString("0.0") +
-                  "   y " + (map.Value.y - TileRect(tile).yMin).ToString("0.0");
+                ? Loc.T("canvas.outside")
+                : Loc.T("canvas.position", ("tileX", tile.X), ("tileY", tile.Y), ("x", map.Value.x - TileRect(tile).xMin), ("y", map.Value.y - TileRect(tile).yMin));
         }
 
         private string TurnInfo()
         {
-            return selection.Count + " objects   turned " + groupTurn.ToString("+0.0;-0.0;0.0") + "° around " + DescribeMapPosition(GroupPivot());
+            return Loc.T("canvas.turned", ("count", selection.Count), ("degrees", groupTurn), ("pivot", DescribeMapPosition(GroupPivot())));
         }
 
         private void NotifyPointerInfo(Vector2? screen)
@@ -3900,18 +3900,17 @@ namespace OmsiMapEditor.UI
 
             if (ThreeDimensional)
             {
-                var view = "3D view   distance " + OrbitDistance.ToString("0") + " m   heading " + OrbitYaw.ToString("0") + "°   tilt " +
-                           OrbitPitch.ToString("0") + "°";
+                var view = Loc.T("canvas.view3d", ("distance", OrbitDistance), ("heading", OrbitYaw), ("tilt", OrbitPitch));
                 if (IsTurningGroup)
                     view = TurnInfo() + "      " + view;
                 else if (dragMode == DragMode.Turn)
-                    view = "#" + selectedObject.Id + "   heading " + previewHeading.ToString("0.0") + "°   pitch " + previewPitch.ToString("0.0") +
-                           "°   bank " + previewBank.ToString("0.0") + "°      " + view;
+                    view = Loc.T("canvas.object_turn", ("id", selectedObject.Id), ("heading", previewHeading), ("pitch", previewPitch), ("bank", previewBank)) + "      " + view;
                 else if (dragMode == DragMode.Move)
-                    view = (selection.Count > 1 ? selection.Count + " objects" : "#" + selectedObject.Id) + "   moved x " +
-                           (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") + "   y " +
-                           (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00") + "   height " +
-                           previewHeightOffset.ToString("+0.00;-0.00") + "      " + view;
+                    view = (selection.Count > 1
+                               ? Loc.T("canvas.moved_group_height", ("count", selection.Count), ("dx", previewLocalX - dragStartLocalX),
+                                   ("dy", previewLocalY - dragStartLocalY), ("dh", previewHeightOffset))
+                               : Loc.T("canvas.moved_one_height", ("id", selectedObject.Id), ("dx", previewLocalX - dragStartLocalX),
+                                   ("dy", previewLocalY - dragStartLocalY), ("dh", previewHeightOffset))) + "      " + view;
                 else if (screen.HasValue && hasView)
                 {
                     var ground = GroundPoint(OrbitCamera().RayThrough(screen.Value));
@@ -3920,7 +3919,7 @@ namespace OmsiMapEditor.UI
                 PointerInfoChanged(view);
                 return;
             }
-            var scale = "1 px = " + (metersPerPixel >= 1f ? metersPerPixel.ToString("0.#") : metersPerPixel.ToString("0.###")) + " m";
+            var scale = Loc.T("canvas.scale", ("meters", metersPerPixel));
             if (!screen.HasValue)
             {
                 PointerInfoChanged(scale);
@@ -3931,11 +3930,9 @@ namespace OmsiMapEditor.UI
             if (IsTurningGroup)
                 text = TurnInfo();
             else if (dragMode == DragMode.Move && selection.Count > 1)
-                text = selection.Count + " objects   moved x " + (previewLocalX - dragStartLocalX).ToString("+0.00;-0.00") +
-                       "   y " + (previewLocalY - dragStartLocalY).ToString("+0.00;-0.00");
+                text = Loc.T("canvas.moved_group", ("count", selection.Count), ("dx", previewLocalX - dragStartLocalX), ("dy", previewLocalY - dragStartLocalY));
             else if (IsDraggingObject())
-                text = "#" + selectedObject.Id + "   x " + previewLocalX.ToString("0.00") + "   y " + previewLocalY.ToString("0.00") +
-                       "   heading " + previewHeading.ToString("0.0") + "°";
+                text = Loc.T("canvas.dragging_one", ("id", selectedObject.Id), ("x", previewLocalX), ("y", previewLocalY), ("heading", previewHeading));
             PointerInfoChanged(text + "      " + scale);
         }
     }

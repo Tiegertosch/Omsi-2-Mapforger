@@ -17,20 +17,20 @@
             <ui:VisualElement name="empty-state" class="empty-state" />
             <ui:VisualElement name="project-frame" class="floating-panel project-frame">
                 <ui:VisualElement class="floating-panel-header">
-                    <ui:Label text="Project" class="floating-panel-title" />
+                    <ui:Label name="project-title" text="Project" class="floating-panel-title" />
                     <ui:Button name="project-collapse-button" class="panel-collapse-button" tooltip="Collapse the project browser" />
                 </ui:VisualElement>
                 <ui:VisualElement name="project-panel" class="floating-panel-content">
-                    <ui:Label text="No map loaded" class="muted" />
+                    <ui:Label name="project-empty" text="No map loaded" class="muted" />
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement name="inspector-frame" class="floating-panel inspector-frame">
                 <ui:VisualElement class="floating-panel-header">
-                    <ui:Label text="Inspector" class="floating-panel-title" />
+                    <ui:Label name="inspector-title" text="Inspector" class="floating-panel-title" />
                     <ui:Button name="inspector-collapse-button" class="panel-collapse-button" tooltip="Collapse the inspector" />
                 </ui:VisualElement>
                 <ui:VisualElement name="inspector-panel" class="floating-panel-content">
-                    <ui:Label text="Select an item to inspect its properties." class="muted" />
+                    <ui:Label name="inspector-empty" text="Select an item to inspect its properties." class="muted" />
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement name="tool-panel-host" class="tool-panel-host" picking-mode="Ignore" style="display: none;" />
@@ -54,6 +54,8 @@
             <ui:Button name="export-menu-item" text="Export to OMSI..." class="menu-popup-item" />
             <ui:Label class="menu-divider" />
             <ui:Button name="open-map-menu-item" text="Open OMSI map..." class="menu-popup-item" />
+            <ui:Label class="menu-divider" />
+            <ui:Button name="settings-menu-item" text="Settings..." class="menu-popup-item" />
         </ui:VisualElement>
         <ui:VisualElement name="edit-menu" class="menu-popup edit-menu">
             <ui:Button name="place-object-menu-item" text="Place object..." class="menu-popup-item" />
@@ -71,27 +73,27 @@
             <ui:Button name="inspector-menu-item" text="Inspector" class="menu-popup-item" />
             <ui:Button name="satellite-menu-item" text="Satellite and terrain..." class="menu-popup-item" tooltip="Place the map on the Earth and load pictures from the air and terrain heights for its tiles, without any key, as openMapper does." />
             <ui:Label class="menu-divider" />
-            <ui:Label text="Colours in the view from above" class="menu-section-label" />
+            <ui:Label name="legend-title" text="Colours in the view from above" class="menu-section-label" />
             <ui:VisualElement name="map-legend" class="map-legend">
-                <ui:Label text="Splines" class="map-legend-spline" />
-                <ui:Label text="Objects" class="map-legend-object" />
-                <ui:Label text="Trees" class="map-legend-tree" />
-                <ui:Label text="Wires (dashed)" class="map-legend-wire" />
-                <ui:Label text="Fences" class="map-legend-fence" />
-                <ui:Label text="Bus routes and stops" class="map-legend-route" />
-                <ui:Label text="Selected" class="map-legend-selected" />
+                <ui:Label name="legend-splines" text="Splines" class="map-legend-spline" />
+                <ui:Label name="legend-objects" text="Objects" class="map-legend-object" />
+                <ui:Label name="legend-trees" text="Trees" class="map-legend-tree" />
+                <ui:Label name="legend-wires" text="Wires (dashed)" class="map-legend-wire" />
+                <ui:Label name="legend-fences" text="Fences" class="map-legend-fence" />
+                <ui:Label name="legend-routes" text="Bus routes and stops" class="map-legend-route" />
+                <ui:Label name="legend-selected" text="Selected" class="map-legend-selected" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="help-menu" class="menu-popup help-menu">
             <ui:Label text="OMSI MapWorks" class="popup-title" />
             <ui:Label name="map-hint" class="popup-description help-controls" style="display: none;" />
-            <ui:Label text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
-            <ui:Label text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
-            <ui:Label text="With a project, click an object in the map or in the inspector list to edit its position and orientation. Edits are saved to the project's workspace; the original map is not changed." class="popup-description" />
-            <ui:Label text="Objects (3) opens the object library: browse the Sceneryobjects folders, the objects of this map or your favorites, click one and click into the map to place it. Del deletes the selected object unless other parts of the map still refer to it." class="popup-description" />
-            <ui:Label text="Ctrl+click adds objects to the selection or removes them; Ctrl+drag on empty space selects all objects in a box. Dragging one selected object moves all of them. An object moved over a tile border moves into that tile." class="popup-description" />
-            <ui:Label text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
-            <ui:Label text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
+            <ui:Label name="help-text-open" text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
+            <ui:Label name="help-text-save" text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
+            <ui:Label name="help-text-edit" text="With a project, click an object in the map or in the inspector list to edit its position and orientation. Edits are saved to the project's workspace; the original map is not changed." class="popup-description" />
+            <ui:Label name="help-text-library" text="Objects (3) opens the object library: browse the Sceneryobjects folders, the objects of this map or your favorites, click one and click into the map to place it. Del deletes the selected object unless other parts of the map still refer to it." class="popup-description" />
+            <ui:Label name="help-text-selection" text="Ctrl+click adds objects to the selection or removes them; Ctrl+drag on empty space selects all objects in a box. Dragging one selected object moves all of them. An object moved over a tile border moves into that tile." class="popup-description" />
+            <ui:Label name="help-text-export" text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
+            <ui:Label name="help-text-files" text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
             <ui:Label class="menu-divider" />
             <ui:Button name="check-updates-menu-item" text="Check for updates..." class="menu-popup-item" tooltip="Look on GitHub for a newer release of MapWorks and install it" />
             <ui:Button name="report-bug-menu-item" text="Report a bug..." class="menu-popup-item" tooltip="Describe a problem and open it as a new issue on GitHub, with the log attached" />
@@ -99,8 +101,8 @@
         </ui:VisualElement>
         <ui:VisualElement name="export-dialog" class="dialog-overlay" style="display: none;">
             <ui:VisualElement class="dialog">
-                <ui:Label text="Export to OMSI" class="popup-title" />
-                <ui:Label text="Writes the original map plus the edits of this project as a separate map folder next to the original. The original map is not changed." class="popup-description" />
+                <ui:Label name="export-title" text="Export to OMSI" class="popup-title" />
+                <ui:Label name="export-description" text="Writes the original map plus the edits of this project as a separate map folder next to the original. The original map is not changed." class="popup-description" />
                 <ui:TextField name="export-folder-field" label="Folder name" class="dialog-field" />
                 <ui:TextField name="export-name-field" label="Name in OMSI" class="dialog-field" />
                 <ui:Label name="export-target-label" class="popup-description export-target" />
@@ -110,9 +112,23 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
+        <ui:VisualElement name="settings-dialog" class="dialog-overlay" style="display: none;">
+            <ui:VisualElement class="dialog">
+                <ui:Label name="settings-title" text="Settings" class="popup-title" />
+                <ui:Label name="settings-general-heading" text="General" class="inspector-section-heading" />
+                <ui:VisualElement class="dialog-row">
+                    <ui:Label name="settings-language-label" text="Language" class="dialog-row-text" />
+                    <ui:VisualElement name="settings-language-list" class="panel-tabs" />
+                </ui:VisualElement>
+                <ui:Label name="settings-language-hint" text="The language of the program's interface. Maps, projects and exports do not depend on it; the choice is kept for the next start." class="popup-description" />
+                <ui:VisualElement class="dialog-buttons">
+                    <ui:Button name="settings-close-button" text="Close" class="map-control-button dialog-primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
         <ui:VisualElement name="check-dialog" class="dialog-overlay" style="display: none;">
             <ui:VisualElement class="dialog check-dialog">
-                <ui:Label text="Map check" class="popup-title" />
+                <ui:Label name="check-title" text="Map check" class="popup-title" />
                 <ui:Label name="check-summary" class="popup-description" />
                 <ui:ScrollView name="check-sections" class="check-sections" />
                 <ui:VisualElement class="dialog-buttons">

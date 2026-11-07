@@ -1,0 +1,11 @@
+{
+  "chronolines.foldout": "Von dieser Variante abgeschaltete Linien ({count})",
+  "chronolines.none": "Der Fahrplan hat vor dieser Variante keine Linien.",
+  "chronolines.line": "Linie {name}",
+  "chronolines.line.tooltip": "Angehakt: Diese Variante schaltet Linie {name} ab ihrem ersten Tag ab; nicht angehakt: Sie fährt weiter",
+  "chronolines.status.off": "Linie {name} wird jetzt von {variant} abgeschaltet.",
+  "chronolines.status.on": "Linie {name} fährt in {variant} wieder.",
+  "chronolines.status.none": "{variant} schaltet jetzt keine Linie mehr ab.",
+  "chronolines.status.some": "{variant} schaltet jetzt {names} ab.",
+  "chronolines.status.failed": "Die Linien konnten nicht geändert werden: {reason}"
+}

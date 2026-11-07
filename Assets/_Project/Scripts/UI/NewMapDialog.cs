@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -26,8 +27,8 @@ namespace OmsiMapEditor.UI
         private readonly Dictionary<int, Button> sizeButtons = new Dictionary<int, Button>();
         private readonly Label sizeLabel = new Label();
         private readonly TextField heightField = new TextField();
-        private readonly Button rightButton = new Button { text = "Right" };
-        private readonly Button leftButton = new Button { text = "Left" };
+        private readonly Button rightButton = LocBindings.NewButton("newmap.traffic.right", null);
+        private readonly Button leftButton = LocBindings.NewButton("newmap.traffic.left", null);
         private readonly Slider carSlider = new Slider(0f, 2f);
         private readonly Slider passengerSlider = new Slider(0f, 2f);
         private readonly Label carLabel = new Label();
@@ -61,11 +62,10 @@ namespace OmsiMapEditor.UI
         {
             AddToClassList("dialog");
             AddToClassList("new-map-dialog");
-            var title = new Label("New map");
+            var title = LocBindings.NewLabel("newmap.title");
             title.AddToClassList("popup-title");
             Add(title);
-            var intro = new Label("Creates a map folder in the maps folder of your OMSI installation. AI lists, drivers, parked cars, holidays and every " +
-                                  "setting you leave alone come from the template map; its tiles, timetables and entry points do not. The template is not changed.");
+            var intro = LocBindings.NewLabel("newmap.intro");
             intro.AddToClassList("popup-description");
             Add(intro);
 
@@ -79,35 +79,35 @@ namespace OmsiMapEditor.UI
             var right = Column(columns);
 
             // The map: template, names and description.
-            Section(left, "Map");
-            var templateRow = Row(left, "Template");
+            Section(left, "newmap.section.map");
+            var templateRow = Row(left, "newmap.template");
             templateLabel.AddToClassList("new-map-value");
             templateRow.Add(templateLabel);
-            var templateButton = new Button(ChooseTemplate) { text = "Choose...", tooltip = "Another map of your installation as template; the new map goes next to it." };
+            var templateButton = LocBindings.WithTooltip(LocBindings.NewButton("newmap.template.choose", ChooseTemplate), "newmap.template.choose.tooltip");
             templateButton.AddToClassList("map-control-button");
             templateButton.AddToClassList("new-map-small-button");
             templateRow.Add(templateButton);
-            AddField(Row(left, "Name in OMSI"), nameField, "The name OMSI's map list shows");
+            AddField(Row(left, "newmap.name"), nameField, "newmap.name.tooltip");
             nameField.RegisterValueChangedCallback(evt =>
             {
                 if (folderFollowsName)
                     folderField.SetValueWithoutNotify(FolderNameFor(evt.newValue));
                 UpdateTarget();
             });
-            AddField(Row(left, "Folder"), folderField, "The folder in OMSI's maps folder; follows the name until you change it");
+            AddField(Row(left, "newmap.folder"), folderField, "newmap.folder.tooltip");
             folderField.RegisterValueChangedCallback(evt =>
             {
                 folderFollowsName = evt.newValue == FolderNameFor(nameField.value);
                 UpdateTarget();
             });
-            var descriptionRow = Row(left, "Description");
+            var descriptionRow = Row(left, "newmap.description");
             descriptionRow.AddToClassList("new-map-row-tall");
-            AddField(descriptionRow, descriptionField, "What the map is, for the map list in the game; several lines are fine");
+            AddField(descriptionRow, descriptionField, "newmap.description.tooltip");
             descriptionField.AddToClassList("new-map-description");
 
             // The land: size and ground height.
-            Section(left, "Land");
-            var sizeRow = Row(left, "Size (tiles)");
+            Section(left, "newmap.section.land");
+            var sizeRow = Row(left, "newmap.size");
             var sizes = Segmented(sizeRow);
             foreach (var size in Sizes)
             {
@@ -119,59 +119,59 @@ namespace OmsiMapEditor.UI
             }
             sizeLabel.AddToClassList("new-map-hint");
             left.Add(sizeLabel);
-            var heightRow = Row(left, "Ground height (m)");
-            AddField(heightRow, heightField, "The height of all terrain; roads and objects built later follow it");
+            var heightRow = Row(left, "newmap.height");
+            AddField(heightRow, heightField, "newmap.height.tooltip");
             heightField.AddToClassList("new-map-number");
             heightField.RegisterValueChangedCallback(_ => UpdateTarget());
 
             // Traffic: side, how busy, rail.
-            Section(right, "Traffic");
-            var sideRow = Row(right, "Traffic keeps");
+            Section(right, "newmap.section.traffic");
+            var sideRow = Row(right, "newmap.traffic_keeps");
             var sides = Segmented(sideRow);
             rightButton.clicked += () => SetLeftHand(false);
             leftButton.clicked += () => SetLeftHand(true);
-            rightButton.tooltip = "Right-hand traffic, as in most of Europe";
-            leftButton.tooltip = "Left-hand traffic, as in Britain: OMSI's [LHT]";
+            LocBindings.Tooltip(rightButton, "newmap.traffic.right.tooltip");
+            LocBindings.Tooltip(leftButton, "newmap.traffic.left.tooltip");
             foreach (var button in new[] { rightButton, leftButton })
             {
                 button.AddToClassList("panel-tab");
                 sides.Add(button);
             }
-            AddSlider(Row(right, "Cars"), carSlider, carLabel, "How busy the streets are over the day, as a factor on the template's daily curve");
-            AddSlider(Row(right, "Passengers"), passengerSlider, passengerLabel, "How many passengers wait at the stops, as a factor on the template's daily curve");
+            AddSlider(Row(right, "newmap.cars"), carSlider, carLabel, "newmap.cars.tooltip");
+            AddSlider(Row(right, "newmap.passengers"), passengerSlider, passengerLabel, "newmap.passengers.tooltip");
             railToggle.AddToClassList("picker-option-toggle");
-            railToggle.tooltip = "Trams and trains follow the switches of their tracks: OMSI's [realrail]";
-            Row(right, "Real rail").Add(railToggle);
+            LocBindings.Tooltip(railToggle, "newmap.real_rail.tooltip");
+            Row(right, "newmap.real_rail").Add(railToggle);
 
             // Era and money.
-            Section(right, "Era and fares");
-            var yearsRow = Row(right, "Years");
-            AddField(yearsRow, firstYearField, "The first year a timetable may be set in");
+            Section(right, "newmap.section.era");
+            var yearsRow = Row(right, "newmap.years");
+            AddField(yearsRow, firstYearField, "newmap.first_year.tooltip");
             var dash = new Label("–");
             dash.AddToClassList("new-map-dash");
             yearsRow.Add(dash);
-            AddField(yearsRow, lastYearField, "The last year a timetable may be set in");
+            AddField(yearsRow, lastYearField, "newmap.last_year.tooltip");
             firstYearField.AddToClassList("new-map-number");
             lastYearField.AddToClassList("new-map-number");
             firstYearField.RegisterValueChangedCallback(_ => UpdateTarget());
             lastYearField.RegisterValueChangedCallback(_ => UpdateTarget());
-            var offsetRow = Row(right, "Year offset");
-            AddField(offsetRow, offsetField, "Added to today's year when the game starts at the real date; Berlin-Spandau has -25 for the 1980s");
+            var offsetRow = Row(right, "newmap.year_offset");
+            AddField(offsetRow, offsetField, "newmap.year_offset.tooltip");
             offsetField.AddToClassList("new-map-number");
             offsetField.RegisterValueChangedCallback(_ => UpdateTarget());
-            AddDropdown(Row(right, "Money"), moneyField, "The money system: coins and notes the driver hands out");
-            AddDropdown(Row(right, "Tickets"), ticketField, "The ticket pack: tickets passengers buy");
+            AddDropdown(Row(right, "newmap.money"), moneyField, "newmap.money.tooltip");
+            AddDropdown(Row(right, "newmap.tickets"), ticketField, "newmap.tickets.tooltip");
 
-            Section(right, "Seasons");
+            Section(right, "newmap.section.seasons");
             var seasons = Segmented(right);
             seasons.AddToClassList("new-map-seasons");
-            AddSeason(seasons, OmsiSeasonPreset.Template, "As template", "The template's seasons, unchanged");
-            AddSeason(seasons, OmsiSeasonPreset.FourWithSnow, "Snowy winter", "Spring, summer, autumn and a winter with snow from January to early February");
-            AddSeason(seasons, OmsiSeasonPreset.MildWinter, "Mild winter", "Spring, summer, autumn and a winter without snow");
-            AddSeason(seasons, OmsiSeasonPreset.SummerOnly, "Summer only", "Summer all year");
+            AddSeason(seasons, OmsiSeasonPreset.Template, "newmap.season.template", "newmap.season.template.tooltip");
+            AddSeason(seasons, OmsiSeasonPreset.FourWithSnow, "newmap.season.snow", "newmap.season.snow.tooltip");
+            AddSeason(seasons, OmsiSeasonPreset.MildWinter, "newmap.season.mild", "newmap.season.mild.tooltip");
+            AddSeason(seasons, OmsiSeasonPreset.SummerOnly, "newmap.season.summer", "newmap.season.summer.tooltip");
 
             // The ground texture across both columns.
-            Section(body, "Ground texture (all tiles)");
+            Section(body, "newmap.section.ground");
             swatches.AddToClassList("new-map-swatches");
             swatches.contentContainer.AddToClassList("new-map-swatches-content");
             body.Add(swatches);
@@ -183,9 +183,9 @@ namespace OmsiMapEditor.UI
             Add(targetLabel);
             var buttons = new VisualElement();
             buttons.AddToClassList("dialog-buttons");
-            var cancel = new Button(() => Cancelled?.Invoke()) { text = "Cancel" };
+            var cancel = LocBindings.NewButton("common.cancel", () => Cancelled?.Invoke());
             cancel.AddToClassList("map-control-button");
-            createButton = new Button(Create) { text = "Create" };
+            createButton = LocBindings.NewButton("newmap.create", Create);
             createButton.AddToClassList("map-control-button");
             createButton.AddToClassList("dialog-primary");
             buttons.Add(cancel);
@@ -199,6 +199,18 @@ namespace OmsiMapEditor.UI
         public event Action<string, string, string, OmsiNewMapOptions> CreateRequested;
 
         public event Action Cancelled;
+
+        /// <summary>The texts that are computed from the dialog's state are written again, after a language change.</summary>
+        public void RefreshTexts()
+        {
+            templateLabel.text = templatePath == null ? Loc.T("newmap.template.none") : Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(templatePath)));
+            if (swatchByTexture.Count == 0)
+                groundLabel.text = Loc.T("newmap.ground.none");
+            else
+                ChooseGround(options.GroundTexture);
+            SetSize(options.Size);
+            UpdateTarget();
+        }
 
         /// <summary>Starts over with a template: its settings, a free name and its installation's lists.</summary>
         public void Open(string templateGlobalConfigPath)
@@ -219,7 +231,7 @@ namespace OmsiMapEditor.UI
 
         private void ChooseTemplate()
         {
-            var path = WindowsFileDialog.OpenFile("Choose a map as template for the new map", WindowsFileDialog.GlobalConfigFilter);
+            var path = WindowsFileDialog.OpenFile(Loc.T("newmap.choose_template.title"), WindowsFileDialog.GlobalConfigFilter);
             if (string.IsNullOrEmpty(path))
                 return;
             SetTemplate(path);
@@ -246,7 +258,7 @@ namespace OmsiMapEditor.UI
                 }
             }
             installationRoot = templatePath == null ? null : OmsiNewMapContent.InstallationOf(templatePath);
-            templateLabel.text = templatePath == null ? "None chosen" : Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(templatePath)));
+            templateLabel.text = templatePath == null ? Loc.T("newmap.template.none") : Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(templatePath)));
             templateLabel.tooltip = templatePath ?? string.Empty;
 
             SetSize(1);
@@ -290,8 +302,7 @@ namespace OmsiMapEditor.UI
             foreach (var pair in sizeButtons)
                 pair.Value.EnableInClassList("panel-tab-active", pair.Key == size);
             var metres = size * 300;
-            sizeLabel.text = size * size + (size == 1 ? " tile, " : " tiles, ") + metres.ToString("N0", CultureInfo.InvariantCulture) + " × " +
-                             metres.ToString("N0", CultureInfo.InvariantCulture) + " m around tile 0, 0; more can be added beside the map later.";
+            sizeLabel.text = Loc.T("newmap.size.summary", ("tiles", size * size), ("metres", metres));
         }
 
         private void SetLeftHand(bool leftHand)
@@ -308,9 +319,9 @@ namespace OmsiMapEditor.UI
                 pair.Value.EnableInClassList("panel-tab-active", pair.Key == preset);
         }
 
-        private void AddSeason(VisualElement parent, OmsiSeasonPreset preset, string text, string tooltip)
+        private void AddSeason(VisualElement parent, OmsiSeasonPreset preset, string textKey, string tooltipKey)
         {
-            var button = new Button(() => SetSeasons(preset)) { text = text, tooltip = tooltip };
+            var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => SetSeasons(preset)), tooltipKey); // i18n:keys
             button.AddToClassList("panel-tab");
             parent.Add(button);
             seasonButtons[preset] = button;
@@ -332,7 +343,7 @@ namespace OmsiMapEditor.UI
                 if (paths.FindAll(other => other.Split('\\').Length >= 2 && other.Split('\\')[other.Split('\\').Length - 2] == name).Count > 1)
                     name = Path.GetFileNameWithoutExtension(path);
                 if (string.Equals(path, templateValue, StringComparison.OrdinalIgnoreCase))
-                    name += " (template)";
+                    name = Loc.T("newmap.dropdown.template_mark", ("name", name));
                 names.Add(name);
             }
             field.choices = names;
@@ -376,7 +387,7 @@ namespace OmsiMapEditor.UI
             ChooseGround(chosen);
             if (installationRoot == null || textures.Count == 0)
             {
-                groundLabel.text = "No ground textures found; the template's ground stays.";
+                groundLabel.text = Loc.T("newmap.ground.none");
                 return;
             }
             var root = installationRoot;
@@ -398,9 +409,7 @@ namespace OmsiMapEditor.UI
             options.GroundTexture = texture ?? string.Empty;
             foreach (var pair in swatchByTexture)
                 pair.Value.EnableInClassList("new-map-swatch-selected", string.Equals(pair.Key, texture, StringComparison.OrdinalIgnoreCase));
-            groundLabel.text = texture == null || texture.Length == 0
-                ? "The template's ground stays."
-                : texture + " as the base ground; more ground textures are painted on later.";
+            groundLabel.text = texture == null || texture.Length == 0 ? Loc.T("newmap.ground.template") : Loc.T("newmap.ground.chosen", ("texture", texture));
         }
 
         /// <summary>A texture of the installation reduced to a swatch, or null when it cannot be read; OMSI prefers a .dds of the same name.</summary>
@@ -467,7 +476,7 @@ namespace OmsiMapEditor.UI
                 !int.TryParse(lastYearField.value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var last) ||
                 !int.TryParse(offsetField.value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var offset))
             {
-                problem = "Ground height, years and year offset must be numbers.";
+                problem = Loc.T("newmap.problem.numbers");
                 return null;
             }
             var result = new OmsiNewMapOptions
@@ -503,9 +512,9 @@ namespace OmsiMapEditor.UI
             target = null;
             var mapsFolder = MapsFolder();
             if (mapsFolder == null)
-                return "Choose a map of your OMSI installation as template; the new map goes next to it.";
+                return Loc.T("newmap.problem.template");
             if (string.IsNullOrWhiteSpace(nameField.value))
-                return "Enter the name OMSI shows for the new map.";
+                return Loc.T("newmap.problem.name");
             var problem = OmsiNewMap.CheckFolderName(mapsFolder, folderField.value ?? string.Empty);
             if (problem != null)
                 return problem;
@@ -517,7 +526,7 @@ namespace OmsiMapEditor.UI
         private void UpdateTarget()
         {
             var problem = Problem(out var target);
-            targetLabel.text = problem ?? "Creates " + target + " and opens it ready to edit; its project is made for you.";
+            targetLabel.text = problem ?? Loc.T("newmap.target", ("target", target));
             targetLabel.EnableInClassList("export-problem", problem != null);
             createButton.SetEnabled(problem == null);
         }
@@ -547,20 +556,21 @@ namespace OmsiMapEditor.UI
             return column;
         }
 
-        private static void Section(VisualElement parent, string text)
+        private static void Section(VisualElement parent, string key)
         {
-            var label = new Label(text.ToUpperInvariant());
+            var label = new Label();
+            LocBindings.TextUpper(label, key); // i18n:keys
             label.AddToClassList("inspector-section-heading");
             label.AddToClassList("new-map-section");
             parent.Add(label);
         }
 
-        private static VisualElement Row(VisualElement parent, string label)
+        private static VisualElement Row(VisualElement parent, string labelKey)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
             row.AddToClassList("new-map-row");
-            var text = new Label(label);
+            var text = LocBindings.NewLabel(labelKey); // i18n:keys
             text.AddToClassList("picker-option-label");
             text.AddToClassList("new-map-label");
             row.Add(text);
@@ -577,31 +587,31 @@ namespace OmsiMapEditor.UI
             return group;
         }
 
-        private static void AddField(VisualElement row, TextField field, string tooltip)
+        private static void AddField(VisualElement row, TextField field, string tooltipKey)
         {
             field.AddToClassList("picker-field");
             field.AddToClassList("new-map-field");
-            field.tooltip = tooltip;
-            row.tooltip = tooltip;
+            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             row.Add(field);
         }
 
-        private void AddSlider(VisualElement row, Slider slider, Label value, string tooltip)
+        private void AddSlider(VisualElement row, Slider slider, Label value, string tooltipKey)
         {
             slider.AddToClassList("new-map-slider");
-            slider.tooltip = tooltip;
-            row.tooltip = tooltip;
+            LocBindings.Tooltip(slider, tooltipKey); // i18n:keys
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             slider.RegisterValueChangedCallback(evt => ShowFactor(value, evt.newValue));
             row.Add(slider);
             value.AddToClassList("new-map-factor");
             row.Add(value);
         }
 
-        private static void AddDropdown(VisualElement row, DropdownField field, string tooltip)
+        private static void AddDropdown(VisualElement row, DropdownField field, string tooltipKey)
         {
             field.AddToClassList("new-map-dropdown");
-            field.tooltip = tooltip;
-            row.tooltip = tooltip;
+            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
+            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             row.Add(field);
         }
     }

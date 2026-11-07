@@ -1,0 +1,6 @@
+{
+  "world.ground.failed": "Bodentexturen konnten nicht gelesen werden: {reason}",
+  "world.ground.ready": "Bodentexturen bereit: {layers, plural, one {# Textur} other {# Texturen}}, {masks, plural, one {# Kachelmaske wird} other {# Kachelmasken werden}} gelesen, sobald ihre Kacheln ins Bild kommen, {drawn} von {splines} Splines mit Oberflächen{lines, plural, =0 {} one {, # Oberleitung und Zäune} other {, # Oberleitungen und Zäune}}{holes, plural, =0 {} one {, Geländelöcher in # Kachel} other {, Geländelöcher in # Kacheln}}{problems, plural, =0 {} one {; # Problem, erstes: {first}} other {; # Probleme, erstes: {first}}}.",
+  "world.objects.failed": "Objekte konnten nicht gelesen werden: {reason}",
+  "world.objects.ready": "Objektmodelle bereit: {kinds, plural, one {# Art} other {# Arten}}, {textures, plural, one {# Textur} other {# Texturen}}{problems, plural, =0 {} one {; # Problem, erstes: {first}} other {; # Probleme, erstes: {first}}}."
+}

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 
@@ -62,7 +63,7 @@ namespace OmsiMapEditor.UI
             var name = string.IsNullOrWhiteSpace(projectName)
                 ? Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(globalConfigPath)))
                 : projectName;
-            SetStatus("Opening " + name + ": reading the map...");
+            SetStatusT("map.status.opening", ("name", name));
             StartCoroutine(FinishOpening(task, generation, projectName, failure, opened));
         }
 

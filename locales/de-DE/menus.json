@@ -4,5 +4,6 @@
   "menu.view": "Ansicht",
   "menu.tools": "Werkzeuge",
   "menu.help": "Hilfe",
-  "menu.tools.tooltip": "Die geladene Karte prüfen: Import, Spline-Verbindungen, IDs, Einstiegspunkte, Anhängungen, Dateien, Fahrplan, Chrono-Varianten und DLC-Objekte."
+  "menu.tools.tooltip": "Die geladene Karte prüfen: Import, Spline-Verbindungen, IDs, Einstiegspunkte, Anhängungen, Dateien, Fahrplan, Chrono-Varianten und DLC-Objekte.",
+  "menu.file.settings": "Einstellungen..."
 }

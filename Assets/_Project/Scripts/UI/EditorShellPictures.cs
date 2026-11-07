@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 
@@ -57,13 +58,13 @@ namespace OmsiMapEditor.UI
         {
             if (session?.Workspace == null || currentSummary == null)
                 return;
-            path = path ?? WindowsFileDialog.OpenFile("A picture for the tiles", WindowsFileDialog.PictureFilter);
+            path = path ?? WindowsFileDialog.OpenFile(Loc.T("pictures.dialog_title"), WindowsFileDialog.PictureFilter);
             if (string.IsNullOrEmpty(path))
                 return;
             var extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
             if (Array.IndexOf(OmsiOwnPictures.Extensions, extension) < 0)
             {
-                SetStatus("Pictures can be JPEG, PNG, BMP or TGA files.");
+                SetStatusT("pictures.formats");
                 return;
             }
             OmsiImage image;
@@ -76,12 +77,12 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is InvalidDataException)
             {
                 Debug.LogException(exception);
-                SetStatus("The picture could not be read: " + exception.Message);
+                SetStatusT("pictures.unreadable", ("reason", exception.Message));
                 return;
             }
             if (image == null)
             {
-                SetStatus("The picture could not be read: " + Path.GetFileName(path));
+                SetStatusT("pictures.unreadable", ("reason", Path.GetFileName(path)));
                 return;
             }
             var picture = new OmsiOwnPicture
@@ -107,14 +108,14 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The picture could not be kept in the project: " + exception.Message);
+                SetStatusT("pictures.not_kept", ("reason", exception.Message));
                 return;
             }
             ownPictureImages[picture.Id] = image;
             selectedPictureId = picture.Id;
             ShowOwnPictures();
             CutOwnPictures(true, touched);
-            SetStatus("The picture " + Path.GetFileName(path) + " lies on " + touched.Count + " tile(s): line it up under Line up the picture.");
+            SetStatusT("pictures.added", ("file", Path.GetFileName(path)), ("count", touched.Count));
         }
 
         private static bool AllCovered(OmsiOwnPicture old, OmsiOwnPicture by)
@@ -204,13 +205,13 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The picture could not be taken out of the project: " + exception.Message);
+                SetStatusT("pictures.not_removed", ("reason", exception.Message));
             }
             if (selectedPictureId == id)
                 selectedPictureId = null;
             ShowOwnPictures();
             CutOwnPictures(true, new List<KeyValuePair<int, int>>(picture.Tiles()));
-            SetStatus("Took the picture " + picture.File + " away.");
+            SetStatusT("pictures.removed", ("file", picture.File));
         }
 
         /// <summary>Saves a fit that came to rest and cuts the pieces again; called each frame.</summary>
@@ -226,7 +227,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatus("The picture's fit could not be saved: " + exception.Message);
+                SetStatusT("pictures.fit_not_saved", ("reason", exception.Message));
             }
             var selected = ownPictures.Find(item => item.Id == selectedPictureId);
             if (selected != null)
@@ -304,7 +305,7 @@ namespace OmsiMapEditor.UI
                 if (task.IsFaulted)
                 {
                     Debug.LogException(task.Exception);
-                    SetStatus("The picture could not be cut onto its tiles: " + task.Exception?.GetBaseException().Message);
+                    SetStatusT("pictures.not_cut", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
                 foreach (var piece in task.Result)

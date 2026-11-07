@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -22,7 +23,15 @@ namespace OmsiMapEditor.UI
         /// <summary>Signs stand this far out from where traffic comes into the junction.</summary>
         private const double PriorityHandleMeters = 5.0;
 
+        /// <summary>The levels as the log writes them; the interface asks <see cref="PriorityLevelName"/>.</summary>
         private static readonly string[] PriorityLevelNames = { "normal", "main road", "give way" };
+
+        private static readonly string[] PriorityLevelKeys = { "priorities.level.normal", "priorities.level.main", "priorities.level.yield" };
+
+        private static string PriorityLevelName(OmsiPriorityLevel level)
+        {
+            return Loc.T(PriorityLevelKeys[(int)level]); // i18n:keys
+        }
 
         private VisualElement priorityOptions;
         private Label priorityJunctionLabel;
@@ -41,34 +50,26 @@ namespace OmsiMapEditor.UI
             priorityOptions.AddToClassList("tool-panel");
             priorityOptions.AddToClassList("picker-options");
             priorityOptions.style.display = DisplayStyle.None;
-            var title = new Label("Right of way");
+            var title = LocBindings.NewLabel("priorities.title");
             title.AddToClassList("picker-options-title");
             priorityOptions.Add(title);
             priorityJunctionLabel = new Label();
             priorityJunctionLabel.AddToClassList("panel-info");
             priorityJunctionLabel.style.marginTop = 0f;
             priorityOptions.Add(priorityJunctionLabel);
-            foreach (var text in new[]
-                     {
-                         "Main road (yellow): its paths straight on and to the right go first, with priority 192.",
-                         "Give way (red edge): all its paths let the others go first, with 64.",
-                         "Normal (grey): no rule; who comes first goes first, and left turns wait for the oncoming traffic."
-                     })
+            foreach (var legendKey in new[] { "priorities.legend.main", "priorities.legend.yield", "priorities.legend.normal" })
             {
-                var legend = new Label(text);
+                var legend = LocBindings.NewLabel(legendKey); // i18n:keys
                 legend.AddToClassList("panel-info");
                 priorityOptions.Add(legend);
             }
-            var clear = new Button(ClearPriorities)
-            {
-                text = "All arms normal", tooltip = "Takes the priority rules off every arm of the junction, as one undo step"
-            };
+            var clear = LocBindings.WithTooltip(LocBindings.NewButton("priorities.clear", ClearPriorities), "priorities.clear.tooltip");
             clear.AddToClassList("map-control-button");
             priorityOptions.Add(clear);
             priorityPlanLabel = new Label();
             priorityPlanLabel.AddToClassList("panel-info");
             priorityOptions.Add(priorityPlanLabel);
-            var hint = new Label("Click a sign to switch its arm. Esc: leave.");
+            var hint = LocBindings.NewLabel("priorities.hint");
             hint.AddToClassList("panel-info");
             priorityOptions.Add(hint);
             objectsPanelHost.Add(priorityOptions);
@@ -94,7 +95,7 @@ namespace OmsiMapEditor.UI
                 ShowPaths(true);
             var item = selection.Count == 1 ? selection[0] : null;
             if (item?.Tile == null || !TargetPriorityJunction(item.Tile, item.Record))
-                SetStatus("Priority: click a junction to see the signs of its arms; Esc leaves the tool.");
+                SetStatusT("priorities.status.start");
         }
 
         private void EndPriorityTool()
@@ -123,7 +124,7 @@ namespace OmsiMapEditor.UI
             priorityHandlePoints.Clear();
             priorityHover = -1;
             if (priorityJunctionLabel != null)
-                priorityJunctionLabel.text = "Click a junction.";
+                LocBindings.Text(priorityJunctionLabel, "priorities.click_junction");
             if (priorityPlanLabel != null)
                 priorityPlanLabel.text = string.Empty;
             mapCanvas?.SetPriorityHandles(null, null, -1);
@@ -167,8 +168,8 @@ namespace OmsiMapEditor.UI
                 var inward = arm.InwardDegrees * Math.PI / 180.0;
                 priorityHandlePoints.Add(ObjectToWorld(tile, record, arm.X - Math.Sin(inward) * PriorityHandleMeters, arm.Y - Math.Cos(inward) * PriorityHandleMeters));
             }
-            priorityJunctionLabel.text = "Junction #" + record.Id + ": " + arms.Count + " arms, " + arms.FindAll(arm => arm.Level == OmsiPriorityLevel.Main).Count +
-                                         " main road, " + arms.FindAll(arm => arm.Level == OmsiPriorityLevel.Yield).Count + " give way.";
+            LocBindings.Text(priorityJunctionLabel, "priorities.junction", ("id", record.Id), ("arms", arms.Count),
+                ("main", arms.FindAll(arm => arm.Level == OmsiPriorityLevel.Main).Count), ("yield", arms.FindAll(arm => arm.Level == OmsiPriorityLevel.Yield).Count));
             if (selection.Count != 1 || !ReferenceEquals(selection[0].Record, record))
             {
                 selection.Clear();
@@ -176,7 +177,7 @@ namespace OmsiMapEditor.UI
                 ApplySelection(tile);
             }
             UpdatePriorityPreview();
-            SetStatus("Right of way at junction #" + record.Id + ": click the sign of an arm to switch it between normal, main road and give way.");
+            SetStatusT("priorities.status.target", ("id", record.Id));
             return true;
         }
 
@@ -261,10 +262,13 @@ namespace OmsiMapEditor.UI
             mapCanvas.SetPriorityHandles(priorityHandlePoints, levels, priorityHover, heights);
             if (priorityPlanLabel == null)
                 return;
-            priorityPlanLabel.text = priorityJunction == null ? "Click a junction to see its arms."
-                : priorityHover >= 0 ? "Arm " + (priorityHover + 1) + ", " + PriorityLevelNames[(int)priorityArms[priorityHover].Level] + ": click to make it " +
-                                       PriorityLevelNames[(int)OmsiJunctionPriorities.Next(priorityArms[priorityHover].Level)] + "."
-                : "Point at a sign to switch its arm.";
+            if (priorityJunction == null)
+                priorityPlanLabel.text = Loc.T("priorities.plan.none");
+            else if (priorityHover >= 0)
+                priorityPlanLabel.text = Loc.T("priorities.plan.hover", ("n", priorityHover + 1), ("level", PriorityLevelName(priorityArms[priorityHover].Level)),
+                    ("next", PriorityLevelName(OmsiJunctionPriorities.Next(priorityArms[priorityHover].Level))));
+            else
+                priorityPlanLabel.text = Loc.T("priorities.plan.point");
         }
 
         /// <summary>A click with the priority tool: switches the arm of a sign, or works on the junction clicked.</summary>
@@ -276,7 +280,7 @@ namespace OmsiMapEditor.UI
             roadPointer = point;
             if (!CanEditRules)
             {
-                SetStatus(ReadOnlyMessage("set the right of way"));
+                SetStatus(ReadOnlyMessage("readonly.action.right_of_way"));
                 return;
             }
             var handle = PriorityHandleAt(point);
@@ -291,7 +295,7 @@ namespace OmsiMapEditor.UI
                     TargetPriorityJunction(tile, record);
                 return;
             }
-            SetStatus("Priority: no junction here; click a junction object to see the signs of its arms.");
+            SetStatusT("priorities.status.none_here");
         }
 
         /// <summary>Switches an arm to its next level and writes the priorities of its paths, as one undo step.</summary>
@@ -300,7 +304,7 @@ namespace OmsiMapEditor.UI
             var arm = priorityArms[armIndex];
             arm.Level = OmsiJunctionPriorities.Next(arm.Level);
             WritePriorities(OmsiJunctionPriorities.Priorities(new[] { arm }),
-                "Arm " + (armIndex + 1) + " of junction #" + priorityJunction.Id + " is " + PriorityLevelNames[(int)arm.Level] + " now");
+                Loc.T("priorities.done.arm", ("n", armIndex + 1), ("id", priorityJunction.Id), ("level", PriorityLevelName(arm.Level))));
         }
 
         /// <summary>Takes the priorities off every arm of the junction.</summary>
@@ -308,19 +312,19 @@ namespace OmsiMapEditor.UI
         {
             if (priorityJunction == null)
             {
-                SetStatus("Priority: click a junction first.");
+                SetStatusT("priorities.status.first");
                 return;
             }
             foreach (var arm in priorityArms)
                 arm.Level = OmsiPriorityLevel.Normal;
-            WritePriorities(OmsiJunctionPriorities.Priorities(priorityArms), "Every arm of junction #" + priorityJunction.Id + " is normal now");
+            WritePriorities(OmsiJunctionPriorities.Priorities(priorityArms), Loc.T("priorities.done.all", ("id", priorityJunction.Id)));
         }
 
         private void WritePriorities(Dictionary<int, double?> priorities, string done)
         {
             if (!CanEditRules)
             {
-                SetStatus(ReadOnlyMessage("set the right of way"));
+                SetStatus(ReadOnlyMessage("readonly.action.right_of_way"));
                 return;
             }
             var record = priorityJunction;
@@ -332,23 +336,23 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The right of way could not be written: " + exception.Message);
+                SetStatusT("priorities.status.failed", ("reason", exception.Message));
                 RefreshPriorityTarget();
                 return;
             }
             if (change == null)
             {
                 RefreshPriorityTarget();
-                SetStatus(done + "; its rules were so already.");
+                SetStatus(Loc.T("priorities.status.same", ("done", done)));
                 return;
             }
-            PushSteps(new List<object> { change }, "the right of way at junction #" + record.Id);
+            PushSteps(new List<object> { change }, Loc.T("priorities.step", ("id", record.Id)));
             RefreshPriorityTarget();
             var count = 0;
             foreach (var pair in priorities)
                 if (pair.Value.HasValue)
                     count++;
-            SetStatus(done + ": " + count + " path(s) with a priority rule. Ctrl+Z takes it back.");
+            SetStatus(Loc.T("priorities.status.written", ("done", done), ("count", count)));
         }
 
         /// <summary>

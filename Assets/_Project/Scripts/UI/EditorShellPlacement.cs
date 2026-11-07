@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 
@@ -35,7 +36,7 @@ namespace OmsiMapEditor.UI
                 if (!HasPlacement(out var anchor) || Math.Abs(anchor.Scale - scale) < 1e-6)
                     return;
                 anchor.Scale = scale;
-                PlacementChanged("The map is scaled " + scale.ToString("0.######", CultureInfo.InvariantCulture) + ".");
+                PlacementChanged(Loc.T("placement.scaled", ("scale", scale.ToString("0.######", CultureInfo.InvariantCulture))));
             };
             satelliteWindow.MoveRequested += MoveMapOnEarth;
             satelliteWindow.FitRequested += FitMapToPoints;
@@ -49,9 +50,7 @@ namespace OmsiMapEditor.UI
             anchor = geoSettings?.Anchor;
             if (currentSummary == null || currentSummary.UsesWorldCoordinates || anchor == null)
             {
-                SetStatus(currentSummary != null && currentSummary.UsesWorldCoordinates
-                    ? "This map lies on the Earth by itself."
-                    : "Place the map first: find the place and click on the map of the world.");
+                SetStatusT(currentSummary != null && currentSummary.UsesWorldCoordinates ? "placement.own" : "placement.first"); // i18n:keys
                 return false;
             }
             return true;
@@ -63,7 +62,7 @@ namespace OmsiMapEditor.UI
             SaveGeo();
             ShowGeo();
             var loaded = groundRenderer != null && groundRenderer.ImageryTileCount > 0;
-            SetStatus(message + (loaded ? " The pictures shown follow it for now; load them again to cut them anew." : string.Empty));
+            SetStatus(message + (loaded ? " " + Loc.T("placement.follow") : string.Empty));
         }
 
         /// <summary>Marks the reference point and the points picked for a fit on the ground while the window is open.</summary>
@@ -101,12 +100,12 @@ namespace OmsiMapEditor.UI
             if (placementPickFor == which)
             {
                 EndPlacementPick();
-                SetStatus("Picking stopped.");
+                SetStatusT("placement.pick_stopped");
                 return;
             }
             if (currentSummary.UsesWorldCoordinates)
             {
-                SetStatus("This map lies on the Earth by itself.");
+                SetStatusT("placement.own");
                 return;
             }
             if (which == 0 && !HasPlacement(out _))
@@ -114,9 +113,10 @@ namespace OmsiMapEditor.UI
             placementPickFor = which;
             mapCanvas.BeginPointPick();
             satelliteWindow?.ShowPicking(which);
-            SetStatus(which == 0
-                ? "Click the map where the reference point is: it stays where it is on the Earth."
-                : "Click the map where point " + which + " is.");
+            if (which == 0)
+                SetStatusT("placement.pick_reference");
+            else
+                SetStatusT("placement.pick_point", ("n", which));
         }
 
         private void PlacementPointPicked(double x, double y)
@@ -131,13 +131,13 @@ namespace OmsiMapEditor.UI
                 if (geo == null || geo.IsWorldCoordinates)
                     return;
                 geoSettings.Anchor = geo.AnchorAt(x, y);
-                PlacementChanged("The reference point is " + Describe(x, y) + ".");
+                PlacementChanged(Loc.T("placement.reference_at", ("where", Describe(x, y))));
                 return;
             }
             fitPoints[which - 1] = new OmsiMapPoint(x, y);
             satelliteWindow?.ShowFitPoint(which - 1, Describe(x, y));
             UpdatePlacementMarks();
-            SetStatus("Point " + which + " is " + Describe(x, y) + ". Paste where it lies on the Earth.");
+            SetStatus(Loc.T("placement.point", ("n", which), ("where", Describe(x, y))));
         }
 
         private string Describe(double x, double y)
@@ -145,8 +145,7 @@ namespace OmsiMapEditor.UI
             var size = currentSummary.TileSizeMeters;
             var tileX = (int)Math.Floor(x / size);
             var tileY = (int)Math.Floor(y / size);
-            return "tile " + tileX + ", " + tileY + ", " + (x - tileX * size).ToString("0.#", CultureInfo.InvariantCulture) + " m east and " +
-                   (y - tileY * size).ToString("0.#", CultureInfo.InvariantCulture) + " m north of its south-west corner";
+            return Loc.T("placement.describe", ("x", tileX), ("y", tileY), ("east", x - tileX * size), ("north", y - tileY * size));
         }
 
         private void CentreReference()
@@ -155,7 +154,7 @@ namespace OmsiMapEditor.UI
                 return;
             var size = currentSummary.TileSizeMeters;
             geoSettings.Anchor = Georeference().AnchorAt((anchor.TileX + 0.5) * size, (anchor.TileY + 0.5) * size);
-            PlacementChanged("The reference point is the middle of tile " + anchor.TileX + ", " + anchor.TileY + ".");
+            PlacementChanged(Loc.T("placement.reference_middle", ("x", anchor.TileX), ("y", anchor.TileY)));
         }
 
         private void EnterReferencePosition(string text)
@@ -164,7 +163,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (!OmsiLatLon.TryParse(text, out var position))
             {
-                SetStatus("That is not a position: write the latitude and the longitude, like 52.5200, 13.4050.");
+                SetStatusT("placement.not_position");
                 return;
             }
             var anchor = geoSettings?.Anchor;
@@ -178,8 +177,8 @@ namespace OmsiMapEditor.UI
                 return;
             anchor.Latitude = position.Latitude;
             anchor.Longitude = position.Longitude;
-            PlacementChanged("The reference point lies at " + position.Latitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°, " +
-                             position.Longitude.ToString("0.000000", CultureInfo.InvariantCulture) + "°.");
+            PlacementChanged(Loc.T("placement.reference_lies", ("latitude", position.Latitude.ToString("0.000000", CultureInfo.InvariantCulture)),
+                ("longitude", position.Longitude.ToString("0.000000", CultureInfo.InvariantCulture))));
         }
 
         private void MoveMapOnEarth(double eastMeters, double northMeters)
@@ -189,8 +188,8 @@ namespace OmsiMapEditor.UI
             var moved = OmsiGeoreference.Moved(new OmsiLatLon(anchor.Latitude, anchor.Longitude), eastMeters, northMeters);
             anchor.Latitude = moved.Latitude;
             anchor.Longitude = moved.Longitude;
-            PlacementChanged("The map is moved " + Math.Abs(eastMeters + northMeters).ToString("0.##", CultureInfo.InvariantCulture) + " m " +
-                             (eastMeters > 0 ? "east" : eastMeters < 0 ? "west" : northMeters > 0 ? "north" : "south") + ".");
+            PlacementChanged(Loc.T("placement.moved", ("meters", Math.Abs(eastMeters + northMeters)),
+                ("direction", eastMeters > 0 ? "east" : eastMeters < 0 ? "west" : northMeters > 0 ? "north" : "south")));
         }
 
         private void FitMapToPoints(string firstText, string secondText, bool fitScale)
@@ -199,23 +198,22 @@ namespace OmsiMapEditor.UI
                 return;
             if (!fitPoints[0].HasValue || !fitPoints[1].HasValue)
             {
-                SetStatus("Pick both points in the map first.");
+                SetStatusT("placement.pick_both");
                 return;
             }
             if (!OmsiLatLon.TryParse(firstText, out var first) || !OmsiLatLon.TryParse(secondText, out var second))
             {
-                SetStatus("Paste the position of both points: latitude and longitude, like 52.5200, 13.4050.");
+                SetStatusT("placement.paste_both");
                 return;
             }
             var fitted = OmsiGeoreference.FitTwoPoints(currentSummary.TileSizeMeters, fitPoints[0].Value, first, fitPoints[1].Value, second, fitScale);
             if (fitted == null)
             {
-                SetStatus("The two points lie too close together, in the map or on the Earth, to fit the map.");
+                SetStatusT("placement.too_close");
                 return;
             }
             geoSettings.Anchor = fitted;
-            PlacementChanged("The map is fitted: north turned " + fitted.RotationDegrees.ToString("0.##", CultureInfo.InvariantCulture) + "°" +
-                             (fitScale ? ", scale " + fitted.Scale.ToString("0.#####", CultureInfo.InvariantCulture) : string.Empty) + ".");
+            PlacementChanged(Loc.T("placement.fitted", ("degrees", fitted.RotationDegrees), ("scaled", fitScale ? "yes" : "no"), ("scale", fitted.Scale)));
         }
 
         /// <summary>
@@ -286,14 +284,14 @@ namespace OmsiMapEditor.UI
             if (scale.HasValue && HasPlacement(out var scaled))
             {
                 scaled.Scale = scale.Value;
-                PlacementChanged("The map is scaled " + scale.Value.ToString("0.######", CultureInfo.InvariantCulture) + ".");
+                PlacementChanged(Loc.T("placement.scaled", ("scale", scale.Value.ToString("0.######", CultureInfo.InvariantCulture))));
                 LogSatellite();
             }
             var turned = Number("-satelliteTurn", 1);
             if (turned.HasValue && HasPlacement(out var turning))
             {
                 turning.RotationDegrees = turned.Value;
-                PlacementChanged("The map's north is turned " + turned.Value.ToString("0.##", CultureInfo.InvariantCulture) + "°.");
+                PlacementChanged(Loc.T("placement.north_turned", ("degrees", turned.Value)));
                 LogSatellite();
             }
             var east = Number("-satelliteMove", 1);

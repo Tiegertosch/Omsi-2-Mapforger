@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.Core;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
@@ -64,7 +65,7 @@ namespace OmsiMapEditor.UI
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
                 Debug.LogException(exception);
-                SetStatus("The project of this map could not be made in " + OwnProjectsFolder() + ": " + exception.Message);
+                SetStatusT("map.status.own_project_failed", ("folder", OwnProjectsFolder()), ("reason", exception.Message));
                 return;
             }
             OpenMapInBackground(globalConfigPath, Path.GetFileNameWithoutExtension(projectPath), projectPath, failure, () =>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -716,7 +717,7 @@ namespace OmsiMapEditor.World
                 {
                     var message = task.Exception?.GetBaseException().Message;
                     Debug.LogException(task.Exception);
-                    Loaded?.Invoke("Ground textures could not be read: " + message);
+                    Loaded?.Invoke(Loc.T("world.ground.failed", ("reason", message ?? string.Empty)));
                     return;
                 }
                 pending = task.Result;
@@ -1159,7 +1160,8 @@ namespace OmsiMapEditor.World
                 Debug.LogWarning(report + "\n" + string.Join("\n", data.Problems));
             if (waterSummary != null)
                 RefreshWater(waterSummary);
-            Loaded?.Invoke(report + ".");
+            Loaded?.Invoke(Loc.T("world.ground.ready", ("layers", data.Layers.Count), ("masks", masks), ("drawn", data.DrawnSplineCount), ("splines", data.SplineCount),
+                ("lines", data.LineSplineCount), ("holes", data.HoleTileCount), ("problems", data.Problems.Count), ("first", data.Problems.Count > 0 ? data.Problems[0] : string.Empty)));
             RunQueuedRefreshes();
         }
 
