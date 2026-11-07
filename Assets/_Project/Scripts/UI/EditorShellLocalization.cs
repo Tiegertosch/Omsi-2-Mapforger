@@ -130,6 +130,9 @@ namespace OmsiMapEditor.UI
             roadBuilder?.RefreshTexts();
             terrainOptions?.RefreshTexts();
             objectsPanel?.RefreshTexts();
+            // An open map check report was written in the earlier language: the check runs again, as the report is made when it runs.
+            if (currentSummary != null && IsShown(checkDialog))
+                ValidateLoadedMap();
             satelliteWindow?.RefreshTexts();
             if (currentSummary != null)
             {

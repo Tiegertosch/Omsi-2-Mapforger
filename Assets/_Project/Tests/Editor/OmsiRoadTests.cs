@@ -692,6 +692,7 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void TheMapCheckSumsUpTheConnectionPointsOfJunctions()
         {
+            using var english = EnglishTexts.Use();
             // One point where spline 10 starts, 2 m high and facing along it, and one 10 m to the left with nothing there.
             var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
             Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
@@ -700,7 +701,7 @@ namespace OmsiMapEditor.Tests
             var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
             summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\junction.sco", Id = 90, LocalX = 100, LocalY = 100, Height = 2 });
 
-            var section = OmsiMapCheck.Run(summary, new OmsiFolderSource(mapFolder), installation).Sections.Single(candidate => candidate.Title == "Junctions");
+            var section = OmsiMapCheck.Run(summary, new OmsiFolderSource(mapFolder), installation).Sections.Single(candidate => candidate.Key == "Junctions");
 
             Assert.AreEqual(OmsiCheckStatus.Note, section.Status);
             Assert.AreEqual("1 of 2 connection points of 1 junction objects are connected; 0 to review, 0 invalid, 1 free.", section.Summary);

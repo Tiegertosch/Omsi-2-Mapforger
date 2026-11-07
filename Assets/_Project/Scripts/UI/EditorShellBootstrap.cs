@@ -1204,7 +1204,7 @@ namespace OmsiMapEditor.UI
                         yield return null;
                     yield return null;
                     foreach (var box in checkSections.Children())
-                        if (box.Q<Label>(className: "check-section-title")?.text == topic)
+                        if (box.userData is string topicKey && (string.Equals(topicKey, topic, StringComparison.OrdinalIgnoreCase) || box.Q<Label>(className: "check-section-title")?.text == topic))
                             checkSections.schedule.Execute(() => checkSections.ScrollTo(box)).StartingIn(100);
                 }
             }
@@ -7037,7 +7037,7 @@ namespace OmsiMapEditor.UI
             checkSections.Clear();
             foreach (var section in report.Sections)
             {
-                var box = new VisualElement();
+                var box = new VisualElement { userData = section.Key };
                 box.AddToClassList("check-section");
                 var header = new VisualElement();
                 header.AddToClassList("check-section-header");
@@ -7105,22 +7105,19 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private OmsiCheckSection MadeObjectsSection(OmsiMadeObjectScan scan)
         {
-            var section = new OmsiCheckSection("Made objects") { Status = OmsiCheckStatus.Passed };
+            var section = new OmsiCheckSection("Made objects", Loc.T("mapcheck.title.made")) { Status = OmsiCheckStatus.Passed };
             var unused = scan.Unused;
             var folder = OmsiGeneratedObjectStore.Folder + "\\" + Path.GetFileName(scan.ProjectFolder);
             if (scan.Objects.Count == 0)
-                section.Summary = "No objects were made for this project under " + folder + ".";
+                section.Summary = Loc.T("mapcheck.made.none", ("folder", folder));
             else if (unused.Count == 0)
-                section.Summary = "All " + scan.Objects.Count + " object(s) made for this project under " + folder +
-                                  " are named by a map of the installation, an export or the undo history.";
+                section.Summary = Loc.T("mapcheck.made.all_used", ("count", scan.Objects.Count), ("folder", folder));
             else
             {
                 section.Status = OmsiCheckStatus.Note;
-                section.Summary = unused.Count + " of " + scan.Objects.Count + " object(s) made for this project under " + folder + " (" + Megabytes(scan.UnusedBytes) +
-                                  ") are named by no map of the installation, no export and not by the undo history, such as junctions made again. " +
-                                  "Delete unused removes their folders; maps of other projects with the same name are not looked at.";
+                section.Summary = Loc.T("mapcheck.made.unused", ("unused", unused.Count), ("count", scan.Objects.Count), ("folder", folder), ("size", Megabytes(scan.UnusedBytes)));
                 foreach (var item in unused)
-                    section.Findings.Add(item.Name + " (" + Megabytes(item.Bytes) + ")");
+                    section.Findings.Add(Loc.T("mapcheck.made.finding", ("name", item.Name), ("size", Megabytes(item.Bytes))));
             }
             return section;
         }
@@ -7131,20 +7128,17 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private static OmsiCheckSection ChainOffsetsSection(List<OmsiChainOffsetFinding> stale)
         {
-            var section = new OmsiCheckSection("Chain offsets") { Status = OmsiCheckStatus.Passed };
+            var section = new OmsiCheckSection("Chain offsets", Loc.T("mapcheck.title.chain")) { Status = OmsiCheckStatus.Passed };
             if (stale.Count == 0)
             {
-                section.Summary = "Every spline stores how far along its chain it begins.";
+                section.Summary = Loc.T("mapcheck.chain.ok");
                 return section;
             }
             section.Status = OmsiCheckStatus.Note;
-            section.Summary = stale.Count + " spline(s) store a chain offset that is not where their chain puts them, such as roads built with earlier versions " +
-                              "of this editor, which wrote 0. openOMSI counts the rows along a spline from that value and runs its textures on from it. " +
-                              "Store offsets writes the right values and moves the rows along those splines with them, so they stay where they stand.";
+            section.Summary = Loc.T("mapcheck.chain.stale", ("count", stale.Count));
             foreach (var item in stale)
-                section.Findings.Add("Spline #" + item.Spline.Id + " in tile " + item.Tile.X + ", " + item.Tile.Y + ": stores " +
-                                     item.Spline.ChainOffset.GetValueOrDefault().ToString("0.##", CultureInfo.InvariantCulture) + " m, its chain begins " +
-                                     item.ChainStart.ToString("0.##", CultureInfo.InvariantCulture) + " m before it");
+                section.Findings.Add(Loc.T("mapcheck.chain.finding", ("id", item.Spline.Id), ("x", item.Tile.X), ("y", item.Tile.Y),
+                    ("stored", item.Spline.ChainOffset.GetValueOrDefault()), ("start", item.ChainStart)));
             return section;
         }
 
@@ -7172,8 +7166,7 @@ namespace OmsiMapEditor.UI
                 }
                 staleChainOffsets = OmsiMapSession.StaleChainOffsets(currentSummary);
                 chainOffsetsSection.Status = staleChainOffsets.Count == 0 ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
-                chainOffsetsSection.Summary = "Stored the chain offsets of " + count + " spline(s) and moved the rows along them with them." +
-                                              (staleChainOffsets.Count > 0 ? " " + staleChainOffsets.Count + " still differ." : string.Empty);
+                chainOffsetsSection.Summary = Loc.T("mapcheck.chain.stored", ("count", count), ("differ", staleChainOffsets.Count));
                 chainOffsetsSection.Findings.Clear();
                 if (lastCheck != null)
                     ShowCheckReport(lastCheck);
@@ -7248,9 +7241,8 @@ namespace OmsiMapEditor.UI
                 }
                 madeObjects.Objects.RemoveAll(item => deleted.Contains(item.Name));
                 madeObjectsSection.Status = problems.Count == 0 ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
-                madeObjectsSection.Summary = "Deleted " + deleted.Count + " unused folder(s) under " + OmsiGeneratedObjectStore.Folder + "\\" +
-                                             Path.GetFileName(madeObjects.ProjectFolder) + "." +
-                                             (problems.Count > 0 ? " " + problems.Count + " could not be deleted." : string.Empty);
+                madeObjectsSection.Summary = Loc.T("mapcheck.made.deleted", ("count", deleted.Count),
+                    ("folder", OmsiGeneratedObjectStore.Folder + "\\" + Path.GetFileName(madeObjects.ProjectFolder)), ("problems", problems.Count));
                 madeObjectsSection.Findings.Clear();
                 madeObjectsSection.Findings.AddRange(problems);
                 if (lastCheck != null)
@@ -7269,13 +7261,13 @@ namespace OmsiMapEditor.UI
 
         private static string Megabytes(long bytes)
         {
-            return (bytes / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB";
+            return Loc.T("mapcheck.made.size", ("size", bytes / 1048576.0));
         }
 
         private OmsiCheckSection DlcSection()
         {
-            var section = new OmsiCheckSection("DLC objects") { Summary = DescribeDlcUse() };
-            section.Status = section.Summary.StartsWith("No DLC", StringComparison.Ordinal) ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
+            var section = new OmsiCheckSection("DLC objects", Loc.T("mapcheck.title.dlc")) { Summary = DescribeDlcUse(out var dlcNone) };
+            section.Status = dlcNone ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
             return section;
         }
 
@@ -7283,12 +7275,13 @@ namespace OmsiMapEditor.UI
         /// Which objects of the map, also attached ones and rows along splines, belong to a DLC; players without it
         /// do not see them.
         /// </summary>
-        private string DescribeDlcUse()
+        private string DescribeDlcUse(out bool none)
         {
+            none = false;
             if (contentOrigins == null)
-                return "The origin of the objects is still being read; run the check again in a moment.";
+                return Loc.T("mapcheck.dlc.reading");
             if (!contentOrigins.FromSteam && !contentOrigins.HasMarkedFolders)
-                return "DLC objects cannot be told apart without Steam's file lists or folders marked as DLC.";
+                return Loc.T("mapcheck.dlc.unknown");
             var kinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var placements = 0;
             void Count(string assetPath)
@@ -7307,10 +7300,10 @@ namespace OmsiMapEditor.UI
                 foreach (var row in tile.SplineAttachments)
                     Count(row.AssetPath);
             }
-            return kinds.Count == 0
-                ? "No DLC objects: the map needs only the base game and freeware."
-                : kinds.Count + " DLC object(s) in " + placements + " placement(s), such as " + Path.GetFileName(First(kinds)) +
-                  "; players without that DLC miss them.";
+            none = kinds.Count == 0;
+            return none
+                ? Loc.T("mapcheck.dlc.none")
+                : Loc.T("mapcheck.dlc.some", ("kinds", kinds.Count), ("placements", placements), ("example", Path.GetFileName(First(kinds))));
         }
 
         private static string First(IEnumerable<string> items)

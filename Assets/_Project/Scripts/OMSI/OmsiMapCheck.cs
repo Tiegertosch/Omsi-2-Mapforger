@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using OmsiMapEditor.Core.Localization;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -20,10 +21,19 @@ namespace OmsiMapEditor.OMSI
     /// <summary>One topic of the map check, such as spline connections or the timetable.</summary>
     public sealed class OmsiCheckSection
     {
-        public OmsiCheckSection(string title)
+        public OmsiCheckSection(string title) : this(title, title)
         {
+        }
+
+        /// <param name="key">The English name of the topic, which stays the same in every language (the command line finds a topic by it).</param>
+        /// <param name="title">The name in the language in use.</param>
+        public OmsiCheckSection(string key, string title)
+        {
+            Key = key;
             Title = title;
         }
+
+        public string Key { get; }
 
         public string Title { get; }
         public OmsiCheckStatus Status { get; set; }
@@ -54,15 +64,20 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
+        private static string StatusName(OmsiCheckStatus status)
+        {
+            return Loc.T(status == OmsiCheckStatus.Passed ? "mapcheck.status.passed" : status == OmsiCheckStatus.Note ? "mapcheck.status.note" : "mapcheck.status.problem"); // i18n:keys
+        }
+
         /// <summary>The report as plain text, for copying into a message or an issue.</summary>
         public string ToText(string mapName)
         {
             var text = new System.Text.StringBuilder();
-            text.AppendLine("Map check of " + mapName);
+            text.AppendLine(Loc.T("mapcheck.report.title", ("name", mapName)));
             foreach (var section in Sections)
             {
                 text.AppendLine();
-                text.AppendLine(section.Title + " - " + section.Status + ": " + section.Summary);
+                text.AppendLine(Loc.T("mapcheck.report.line", ("title", section.Title), ("status", StatusName(section.Status)), ("summary", section.Summary)));
                 foreach (var finding in section.Findings)
                     text.AppendLine("  - " + finding);
             }
@@ -111,30 +126,28 @@ namespace OmsiMapEditor.OMSI
 
         private static OmsiCheckSection Import(OmsiMapSummary summary)
         {
-            var section = new OmsiCheckSection("Import");
+            var section = new OmsiCheckSection("Import", Loc.T("mapcheck.title.import"));
             foreach (var warning in summary.Warnings)
                 Add(section, warning);
             section.Status = summary.Warnings.Count == 0 ? OmsiCheckStatus.Passed : OmsiCheckStatus.Note;
             section.Summary = summary.Warnings.Count == 0
-                ? "All " + summary.Tiles.Count + " tiles read without warnings."
-                : summary.Warnings.Count + " warning(s) while reading " + summary.Tiles.Count + " tiles.";
+                ? Loc.T("mapcheck.import.ok", ("tiles", summary.Tiles.Count))
+                : Loc.T("mapcheck.import.warnings", ("warnings", summary.Warnings.Count), ("tiles", summary.Tiles.Count));
             return section;
         }
 
         private static OmsiCheckSection SplineConnections(OmsiMapSummary summary)
         {
-            var section = new OmsiCheckSection("Spline connections");
+            var section = new OmsiCheckSection("Spline connections", Loc.T("mapcheck.title.splines"));
             var continuity = OmsiSplineContinuity.Check(summary);
             foreach (var gap in continuity.Gaps)
-                Add(section, "splines " + gap.SplineId + " and " + gap.NeighbourId + " are " + gap.DistanceMeters.ToString("0.00", CultureInfo.InvariantCulture) +
-                             " m apart in tile " + gap.Tile.X + ", " + gap.Tile.Y + (gap.IsMutual ? string.Empty : "; only one of them names the other"));
+                Add(section, Loc.T("mapcheck.splines.gap", ("id", gap.SplineId), ("neighbour", gap.NeighbourId), ("meters", gap.DistanceMeters), ("x", gap.Tile.X), ("y", gap.Tile.Y),
+                    ("mutual", gap.IsMutual ? "yes" : "no")));
             if (continuity.Gaps.Count > 0)
                 section.Tile = continuity.Gaps[0].Tile;
             section.Status = continuity.Gaps.Count > 0 || continuity.MissingNeighbourCount > 0 ? OmsiCheckStatus.Problem : OmsiCheckStatus.Passed;
-            section.Summary = continuity.ConnectedCount + " of " + continuity.LinkCount + " links meet within " +
-                              continuity.ToleranceMeters.ToString("0.0#", CultureInfo.InvariantCulture) + " m" +
-                              (continuity.MissingNeighbourCount > 0 ? "; " + continuity.MissingNeighbourCount + " link(s) name splines the map does not have" : string.Empty) +
-                              ".";
+            section.Summary = Loc.T("mapcheck.splines.summary", ("connected", continuity.ConnectedCount), ("links", continuity.LinkCount), ("tolerance", continuity.ToleranceMeters),
+                ("missing", continuity.MissingNeighbourCount));
             return section;
         }
 
@@ -161,7 +174,7 @@ namespace OmsiMapEditor.OMSI
 
         private static OmsiCheckSection Ids(OmsiMapSummary summary, Dictionary<int, OmsiRecordFile> tiles)
         {
-            var section = new OmsiCheckSection("IDs");
+            var section = new OmsiCheckSection("IDs", Loc.T("mapcheck.title.ids"));
             var seen = new Dictionary<int, OmsiTileSummary>();
             var duplicates = 0;
             var highest = 0;
@@ -174,7 +187,7 @@ namespace OmsiMapEditor.OMSI
                     if (seen.TryGetValue(id, out var first))
                     {
                         duplicates++;
-                        Add(section, "ID " + id + " is used in tile " + first.X + ", " + first.Y + " and again in tile " + tile.X + ", " + tile.Y);
+                        Add(section, Loc.T("mapcheck.ids.duplicate", ("id", id), ("x1", first.X), ("y1", first.Y), ("x2", tile.X), ("y2", tile.Y)));
                         section.Tile = section.Tile ?? tile;
                     }
                     else
@@ -185,19 +198,18 @@ namespace OmsiMapEditor.OMSI
             }
             var stale = summary.NextIdCode.HasValue && summary.NextIdCode.Value <= highest;
             if (stale)
-                Add(section, "[NextIDCode] is " + summary.NextIdCode.Value + ", but ID " + highest + " is already used; new IDs continue above " + highest);
+                Add(section, Loc.T("mapcheck.ids.stale", ("next", summary.NextIdCode.Value), ("highest", highest)));
             if (!summary.NextIdCode.HasValue)
-                Add(section, "global.cfg has no [NextIDCode]");
+                Add(section, Loc.T("mapcheck.ids.missing"));
             section.Status = duplicates > 0 ? OmsiCheckStatus.Problem : stale || !summary.NextIdCode.HasValue ? OmsiCheckStatus.Note : OmsiCheckStatus.Passed;
-            section.Summary = seen.Count + " IDs in the base tiles, " + (duplicates == 0 ? "each used once" : duplicates + " used more than once") +
-                              (stale ? "; the ID counter is behind." : ".");
+            section.Summary = Loc.T("mapcheck.ids.summary", ("ids", seen.Count), ("duplicates", duplicates), ("stale", stale ? "yes" : "no"));
             return section;
         }
 
         private static OmsiCheckSection EntryPoints(OmsiMapSummary summary, IOmsiFileSource source, string globalConfigRelativePath,
             Dictionary<int, OmsiRecordFile> tiles)
         {
-            var section = new OmsiCheckSection("Entry points");
+            var section = new OmsiCheckSection("Entry points", Loc.T("mapcheck.title.entry"));
             var config = OmsiRecordFile.Parse(source.ReadAllBytes(globalConfigRelativePath), OmsiGlobalConfigLayouts.Instance);
             var count = 0;
             var wrong = 0;
@@ -212,42 +224,39 @@ namespace OmsiMapEditor.OMSI
                     if (!record.TryGetInt(field, out var placedIndex) || !record.TryGetInt(field + 1, out var id) || !record.TryGetInt(field + 10, out var tileIndex))
                     {
                         wrong++;
-                        Add(section, "entry point \"" + name + "\" has fields that are no numbers");
+                        Add(section, Loc.T("mapcheck.entry.nan", ("name", name)));
                         continue;
                     }
                     if (!tiles.TryGetValue(tileIndex, out var tile))
                     {
                         wrong++;
-                        Add(section, "entry point \"" + name + "\" lies in tile index " + tileIndex + ", which the map does not have or could not read");
+                        Add(section, Loc.T("mapcheck.entry.no_tile", ("name", name), ("index", tileIndex)));
                         continue;
                     }
                     var position = FindPlaced(tile, id, out var actualIndex, out var heading);
                     if (position < 0)
                     {
                         wrong++;
-                        Add(section, "entry point \"" + name + "\" names object " + id + ", which tile " + summary.Tiles[tileIndex].X + ", " +
-                                     summary.Tiles[tileIndex].Y + " does not contain");
+                        Add(section, Loc.T("mapcheck.entry.no_object", ("name", name), ("id", id), ("x", summary.Tiles[tileIndex].X), ("y", summary.Tiles[tileIndex].Y)));
                         section.Tile = section.Tile ?? summary.Tiles[tileIndex];
                         continue;
                     }
                     if (actualIndex != placedIndex)
                     {
                         wrong++;
-                        Add(section, "entry point \"" + name + "\" counts object " + id + " as number " + placedIndex + " of its tile; it is number " + actualIndex);
+                        Add(section, Loc.T("mapcheck.entry.number", ("name", name), ("id", id), ("placed", placedIndex), ("actual", actualIndex)));
                     }
                     if (heading.HasValue && record.TryGetDouble(field + 7, out var qy) && record.TryGetDouble(field + 9, out var qw))
                     {
                         var angle = 2.0 * Math.Atan2(qy, qw) * 180.0 / Math.PI;
                         var difference = Math.Abs(((angle - heading.Value) % 360.0 + 540.0) % 360.0 - 180.0);
                         if (difference > 5.0)
-                            Add(section, "entry point \"" + name + "\" faces " + difference.ToString("0", CultureInfo.InvariantCulture) + "° away from its object");
+                            Add(section, Loc.T("mapcheck.entry.heading", ("name", name), ("degrees", difference)));
                     }
                 }
             }
             section.Status = wrong > 0 ? OmsiCheckStatus.Problem : section.Findings.Count > 0 ? OmsiCheckStatus.Note : OmsiCheckStatus.Passed;
-            section.Summary = count == 0
-                ? "The map has no entry points; OMSI needs one to start a bus on it."
-                : count - wrong + " of " + count + " entry points lie on their object.";
+            section.Summary = count == 0 ? Loc.T("mapcheck.entry.none") : Loc.T("mapcheck.entry.summary", ("ok", count - wrong), ("count", count));
             if (count == 0)
                 section.Status = OmsiCheckStatus.Note;
             return section;
@@ -280,7 +289,7 @@ namespace OmsiMapEditor.OMSI
 
         private static OmsiCheckSection Attachments(OmsiMapSummary summary, Dictionary<int, OmsiRecordFile> tiles)
         {
-            var section = new OmsiCheckSection("Attachments");
+            var section = new OmsiCheckSection("Attachments", Loc.T("mapcheck.title.attach"));
             var masters = new HashSet<int>();
             var repeaters = new List<KeyValuePair<int, OmsiTileSummary>>();
             var attachedCount = 0;
@@ -304,8 +313,7 @@ namespace OmsiMapEditor.OMSI
                             attachedCount++;
                             if (!earlier.Contains(attached.ParentId))
                             {
-                                Add(section, "attached object " + attached.Id + " in tile " + tile.X + ", " + tile.Y + " hangs on " + attached.ParentId +
-                                             ", which is not written before it in the same tile");
+                                Add(section, Loc.T("mapcheck.attach.parent", ("id", attached.Id), ("x", tile.X), ("y", tile.Y), ("parent", attached.ParentId)));
                                 section.Tile = section.Tile ?? tile;
                             }
                             earlier.Add(attached.Id);
@@ -314,8 +322,8 @@ namespace OmsiMapEditor.OMSI
                             rowCount++;
                             if (attachment.SplineIndex < 0 || attachment.SplineIndex >= TileSplineCount(pair.Value))
                             {
-                                Add(section, (attachment.IsRepeater ? "continued row " : "row ") + attachment.Id + " in tile " + tile.X + ", " + tile.Y +
-                                             " lies on spline number " + attachment.SplineIndex + ", but the tile has " + TileSplineCount(pair.Value) + " splines");
+                                Add(section, Loc.T("mapcheck.attach.spline", ("kind", attachment.IsRepeater ? "repeater" : "row"), ("id", attachment.Id), ("x", tile.X), ("y", tile.Y),
+                                    ("index", attachment.SplineIndex), ("count", TileSplineCount(pair.Value))));
                                 section.Tile = section.Tile ?? tile;
                             }
                             if (attachment.IsRepeater)
@@ -330,10 +338,9 @@ namespace OmsiMapEditor.OMSI
             }
             foreach (var pair in repeaters)
                 if (!masters.Contains(pair.Key))
-                    Add(section, "continued row " + pair.Key + " in tile " + pair.Value.X + ", " + pair.Value.Y + " has no row it continues");
+                    Add(section, Loc.T("mapcheck.attach.no_master", ("id", pair.Key), ("x", pair.Value.X), ("y", pair.Value.Y)));
             section.Status = section.Findings.Count > 0 ? OmsiCheckStatus.Problem : OmsiCheckStatus.Passed;
-            section.Summary = attachedCount + " attached objects and " + rowCount + " rows along splines" +
-                              (section.Findings.Count == 0 ? ", all on existing parents and splines." : "; " + section.Findings.Count + " without their parent or spline.");
+            section.Summary = Loc.T("mapcheck.attach.summary", ("attached", attachedCount), ("rows", rowCount), ("ok", section.Findings.Count == 0 ? "yes" : "no"), ("count", section.Findings.Count));
             return section;
         }
 
@@ -348,7 +355,7 @@ namespace OmsiMapEditor.OMSI
 
         private static OmsiCheckSection VariableParents(OmsiMapSummary summary, Dictionary<int, OmsiRecordFile> tiles)
         {
-            var section = new OmsiCheckSection("Variable parents");
+            var section = new OmsiCheckSection("Variable parents", Loc.T("mapcheck.title.varparents"));
             var ids = new HashSet<int>();
             foreach (var tile in tiles.Values)
                 foreach (var id in OmsiTileRecords.DefinedIds(tile))
@@ -373,20 +380,18 @@ namespace OmsiMapEditor.OMSI
                 var tile = summary.Tiles[pair.Key];
                 foreach (var parent in missingPerParent)
                 {
-                    Add(section, (parent.Value == 1 ? "an element of tile " + tile.X + ", " + tile.Y + " takes its"
-                            : parent.Value + " elements of tile " + tile.X + ", " + tile.Y + " take their") +
-                        " variables from " + parent.Key + ", which the map does not have");
+                    Add(section, Loc.T("mapcheck.varparents.missing", ("count", parent.Value), ("x", tile.X), ("y", tile.Y), ("parent", parent.Key)));
                     section.Tile = section.Tile ?? tile;
                 }
             }
             section.Status = missing > 0 ? OmsiCheckStatus.Note : OmsiCheckStatus.Passed;
-            section.Summary = count == 0 ? "No element takes its variables from another." : count - missing + " of " + count + " variable parents exist.";
+            section.Summary = count == 0 ? Loc.T("mapcheck.varparents.none") : Loc.T("mapcheck.varparents.summary", ("ok", count - missing), ("count", count));
             return section;
         }
 
         private static OmsiCheckSection Files(OmsiMapSummary summary, string installationRoot)
         {
-            var section = new OmsiCheckSection("Object and spline files");
+            var section = new OmsiCheckSection("Object and spline files", Loc.T("mapcheck.title.files"));
             var paths = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var tile in summary.Tiles)
             {
@@ -414,10 +419,10 @@ namespace OmsiMapEditor.OMSI
                 if (exists)
                     continue;
                 missing++;
-                Add(section, path + " is not in the OMSI installation");
+                Add(section, Loc.T("mapcheck.files.missing", ("path", path)));
             }
             section.Status = missing > 0 ? OmsiCheckStatus.Problem : OmsiCheckStatus.Passed;
-            section.Summary = paths.Count - missing + " of " + paths.Count + " object and spline files are installed.";
+            section.Summary = Loc.T("mapcheck.files.summary", ("ok", paths.Count - missing), ("count", paths.Count));
             return section;
         }
 
@@ -427,7 +432,7 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         private static OmsiCheckSection Junctions(OmsiMapSummary summary, string installationRoot)
         {
-            var section = new OmsiCheckSection("Junctions");
+            var section = new OmsiCheckSection("Junctions", Loc.T("mapcheck.title.junctions"));
             var checks = OmsiJunctionCatalog.Check(summary, new OmsiJunctionCatalog(installationRoot).AllPorts(summary));
             var objects = new HashSet<OmsiObjectRecord>();
             var counts = new Dictionary<OmsiJunctionPortState, int>();
@@ -444,29 +449,28 @@ namespace OmsiMapEditor.OMSI
                     if (check.State != state)
                         continue;
                     section.Tile = section.Tile ?? check.Port.Tile;
-                    Add(section, (state == OmsiJunctionPortState.Invalid ? "invalid: " : state == OmsiJunctionPortState.NeedsReview ? "review: " : "free: ") +
-                                 "#" + check.Port.Object.Id + " " + Path.GetFileNameWithoutExtension(check.Port.Object.AssetPath ?? string.Empty) + " in tile " +
-                                 check.Port.Tile.X + ", " + check.Port.Tile.Y + ": " + check.Message);
+                    Add(section, Loc.T("mapcheck.junctions.finding", ("state", state == OmsiJunctionPortState.Invalid ? "invalid" : state == OmsiJunctionPortState.NeedsReview ? "review" : "free"),
+                        ("id", check.Port.Object.Id), ("name", Path.GetFileNameWithoutExtension(check.Port.Object.AssetPath ?? string.Empty)), ("x", check.Port.Tile.X), ("y", check.Port.Tile.Y),
+                        ("message", check.Message)));
                 }
             section.Status = counts[OmsiJunctionPortState.Invalid] > 0 ? OmsiCheckStatus.Problem
                 : counts[OmsiJunctionPortState.NeedsReview] > 0 || counts[OmsiJunctionPortState.Unconnected] > 0 ? OmsiCheckStatus.Note
                 : OmsiCheckStatus.Passed;
             section.Summary = checks.Count == 0
-                ? "No object of the map has connection points."
-                : counts[OmsiJunctionPortState.Connected] + " of " + checks.Count + " connection points of " + objects.Count + " junction objects are connected; " +
-                  counts[OmsiJunctionPortState.NeedsReview] + " to review, " + counts[OmsiJunctionPortState.Invalid] + " invalid, " +
-                  counts[OmsiJunctionPortState.Unconnected] + " free.";
+                ? Loc.T("mapcheck.junctions.none")
+                : Loc.T("mapcheck.junctions.summary", ("connected", counts[OmsiJunctionPortState.Connected]), ("count", checks.Count), ("objects", objects.Count),
+                    ("review", counts[OmsiJunctionPortState.NeedsReview]), ("invalid", counts[OmsiJunctionPortState.Invalid]), ("free", counts[OmsiJunctionPortState.Unconnected]));
             return section;
         }
 
         private static OmsiCheckSection Timetable(OmsiMapSummary summary, IOmsiFileSource source, List<OmsiChronoVariant> variants)
         {
-            var section = new OmsiCheckSection("Timetable");
+            var section = new OmsiCheckSection("Timetable", Loc.T("mapcheck.title.timetable"));
             var timetable = OmsiTimetable.Read(source);
             if (timetable.IsEmpty)
             {
                 section.Status = OmsiCheckStatus.Passed;
-                section.Summary = "The map has no timetable.";
+                section.Summary = Loc.T("mapcheck.timetable.none");
                 return section;
             }
             var chronoIds = variants.Count > 0 ? OmsiChrono.AddedIds(source, summary, variants) : null;
@@ -474,31 +478,30 @@ namespace OmsiMapEditor.OMSI
             foreach (var problem in report.Problems)
                 Add(section, problem.ToString());
             section.Status = report.Problems.Count > 0 ? OmsiCheckStatus.Problem : OmsiCheckStatus.Passed;
-            section.Summary = report.BusStopCount + " stops, " + report.StationLinkCount + " station links, " + report.TrackCount + " tracks, " +
-                              report.TripCount + " trips, " + report.LineCount + " lines with " + report.TourCount + " tours and " + report.ScheduledTripCount +
-                              " scheduled trips; " + (report.Problems.Count == 0 ? "all references hold." : report.Problems.Count + " finding(s).");
+            section.Summary = Loc.T("mapcheck.timetable.summary", ("stops", report.BusStopCount), ("links", report.StationLinkCount), ("tracks", report.TrackCount), ("trips", report.TripCount),
+                ("lines", report.LineCount), ("tours", report.TourCount), ("scheduled", report.ScheduledTripCount), ("findings", report.Problems.Count));
             return section;
         }
 
         private static OmsiCheckSection Chrono(OmsiMapSummary summary, IOmsiFileSource source, List<OmsiChronoVariant> variants)
         {
-            var section = new OmsiCheckSection("Chrono variants");
+            var section = new OmsiCheckSection("Chrono variants", Loc.T("mapcheck.title.chrono"));
             if (variants.Count == 0)
             {
                 section.Status = OmsiCheckStatus.Passed;
-                section.Summary = "The map has no chrono variants.";
+                section.Summary = Loc.T("mapcheck.chrono.none");
                 return section;
             }
 
             OmsiChrono.Overlay(summary, source, variants, out var report);
             foreach (var variant in variants)
                 if (variant.Start.HasValue && variant.End.HasValue && variant.End.Value < variant.Start.Value)
-                    Add(section, variant.Name + " ends before it starts");
+                    Add(section, Loc.T("mapcheck.chrono.reversed", ("name", variant.Name)));
             if (report.UnresolvedSelections > 0)
-                Add(section, report.UnresolvedSelections + " selection(s) of change lists name elements that neither the tile nor an earlier variant has");
+                Add(section, Loc.T("mapcheck.chrono.unresolved", ("count", report.UnresolvedSelections)));
             section.Status = section.Findings.Count > 0 ? OmsiCheckStatus.Note : OmsiCheckStatus.Passed;
-            section.Summary = variants.Count + " variant(s); all together they add " + report.AddedObjects + " objects and " + report.AddedSplines +
-                              " splines, delete " + report.DeletedElements + " element(s) and change the type of " + report.ChangedTypes + ".";
+            section.Summary = Loc.T("mapcheck.chrono.summary", ("count", variants.Count), ("objects", report.AddedObjects), ("splines", report.AddedSplines), ("deleted", report.DeletedElements),
+                ("changed", report.ChangedTypes));
             return section;
         }
 
@@ -507,7 +510,7 @@ namespace OmsiMapEditor.OMSI
             if (section.Findings.Count < MaximumFindings)
                 section.Findings.Add(finding);
             else if (section.Findings.Count == MaximumFindings)
-                section.Findings.Add("and more");
+                section.Findings.Add(Loc.T("mapcheck.and_more"));
         }
     }
 }

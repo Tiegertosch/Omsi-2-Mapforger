@@ -223,6 +223,7 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void MapCheckGroupsMissingVariableParentsAndNamesDuplicateIds()
         {
+            using var english = EnglishTexts.Use();
             WriteTile("tile_1_0.map", "[version]", "14", "",
                 "[spline]", "0", @"Splines\road.sli", "30", "0", "0", "0", "0", "0", "90", "50", "0", "0", "0", "0", "0", "0", "0", "",
                 "[object]", "0", @"Sceneryobjects\lamp.sco", "10", "20", "20", "0", "0", "0", "0", "0", "",
@@ -235,14 +236,14 @@ namespace OmsiMapEditor.Tests
 
             var report = OmsiMapCheck.Run(OmsiMapReader.Read(source), source, null);
 
-            var parents = report.Sections.Single(section => section.Title == "Variable parents");
+            var parents = report.Sections.Single(section => section.Key == "Variable parents");
             Assert.AreEqual(OmsiCheckStatus.Note, parents.Status);
             Assert.AreEqual("1 of 3 variable parents exist.", parents.Summary);
             CollectionAssert.AreEqual(new[] { "2 elements of tile 1, 0 take their variables from 555, which the map does not have" }, parents.Findings);
-            var ids = report.Sections.Single(section => section.Title == "IDs");
+            var ids = report.Sections.Single(section => section.Key == "IDs");
             Assert.AreEqual(OmsiCheckStatus.Problem, ids.Status);
             Assert.That(ids.Findings, Has.Some.Contains("ID 10 is used in tile 0, 0 and again in tile 1, 0"));
-            var chrono = report.Sections.Single(section => section.Title == "Chrono variants");
+            var chrono = report.Sections.Single(section => section.Key == "Chrono variants");
             Assert.AreEqual(OmsiCheckStatus.Passed, chrono.Status);
             Assert.AreEqual("The map has no chrono variants.", chrono.Summary);
         }

@@ -57,6 +57,7 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void CreatesAMapWithOneFlatTileAndTheTemplatesHelperFiles()
         {
+            using var english = EnglishTexts.Use();
             var created = new DateTime(2026, 10, 23, 18, 30, 0);
             var report = OmsiNewMap.Create(Path.Combine(templateFolder, "global.cfg"), "Neustadt", "Neustadt (Test)", created);
 
@@ -112,7 +113,7 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEqual(new[] { "0", "0", "150", "50", "150", "166.8", "-13.4", "42.5" }, camera.AllValues().Take(8).ToArray());
             Assert.IsTrue(config.IsExactRoundTrip);
             var check = OmsiMapCheck.Run(summary, new OmsiFolderSource(target), null);
-            var entryCheck = check.Sections.Single(section => section.Title == "Entry points");
+            var entryCheck = check.Sections.Single(section => section.Key == "Entry points");
             Assert.AreEqual(OmsiCheckStatus.Passed, entryCheck.Status, string.Join("\n", entryCheck.Findings));
             Assert.AreEqual("1 of 1 entry points lie on their object.", entryCheck.Summary);
 
@@ -125,6 +126,7 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void TakesTheChosenSizeHeightTrafficYearsMoneySeasonsAndGround()
         {
+            using var english = EnglishTexts.Use();
             var templatePath = Path.Combine(templateFolder, "global.cfg");
             var options = OmsiNewMapOptions.FromTemplate(templatePath);
             Assert.AreEqual(@"Money\DM\DM.cfg", options.MoneySystem);
@@ -185,7 +187,7 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual("tile_0_0.map", All("map")[0].GetField(2));
             Assert.AreEqual(9, All("map").Count);
             var check = OmsiMapCheck.Run(summary, new OmsiFolderSource(report.MapFolder), null);
-            Assert.AreEqual(OmsiCheckStatus.Passed, check.Sections.Single(section => section.Title == "Entry points").Status);
+            Assert.AreEqual(OmsiCheckStatus.Passed, check.Sections.Single(section => section.Key == "Entry points").Status);
 
             // Summer only takes all seasons out; an unchanged option keeps the template's line.
             options.Seasons = OmsiSeasonPreset.SummerOnly;
