@@ -1,0 +1,10 @@
+{
+  "world.ground.failed": "Pozemní textury nelze přečíst: {reason}",
+  "@world.ground.failed": "{reason} is a message from the system, in English",
+  "world.ground.ready": "Pozemní textury jsou připraveny: {layers, plural, one {# textura} few {# textury} many {# textury} other {# textur}}, {masks, plural, one {# maska tile} few {# masky tile} many {Masky # tile} other {# tile masek}} čtené, když se jejich tiles objeví, {drawn} z {splines} splines s plochami{lines, plural, one {, # venkovní vedení a ploty} few {, # venkovní vedení a ploty} many {, # venkovního vedení a plotů} other {, # venkovních vedení a plotů} =0 {}}{holes, plural, one {, terénní otvory v # tile} few {, terénní otvory ve # tiles} many {, terénní otvory v # tiles} other {, terénní otvory v # tiles} =0 {}}{problems, plural, one {; # problém, první: {first}} few {; # problémy, první: {first}} many {; # problémy, první: {first}} other {; # problémů, první: {first}} =0 {}}.",
+  "@world.ground.ready": "{first} is a message of MapWorks in English",
+  "world.objects.failed": "Objekty nelze přečíst: {reason}",
+  "@world.objects.failed": "{reason} is a message from the system, in English",
+  "world.objects.ready": "Připravené modely objektů: {kinds, plural, one {# druh} few {# druhy} many {# druhu} other {# druhů}}, {textures, plural, one {# textura} few {# textury} many {# textury} other {# textur}}{problems, plural, one {; # problém, první: {first}} few {; # problémy, první: {first}} many {; # problémy, první: {first}} other {; # problémů, první: {first}} =0 {}}.",
+  "@world.objects.ready": "{first} is a message of MapWorks in English"
+}

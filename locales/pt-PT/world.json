@@ -1,0 +1,10 @@
+{
+  "world.ground.failed": "Não foi possível ler as texturas do solo: {reason}",
+  "@world.ground.failed": "{reason} is a message from the system, in English",
+  "world.ground.ready": "Texturas de solo prontas: {layers, plural, one {# textura} other {# texturas}}, {masks, plural, one {# máscara tile} other {# máscaras tile}} lidos quando o seu tiles aparece, {drawn} de {splines} splines com superfícies{lines, plural, =0 {} one {, # linha aérea e vedações} other {, # linhas aéreas e vedações}}{holes, plural, =0 {} one {, buracos de terreno em # tile} other {, buracos de terreno em # tiles}}{problems, plural, =0 {} one {; # problema, primeiro: {first}} other {; # problemas, primeiro: {first}}}.",
+  "@world.ground.ready": "{first} is a message of MapWorks in English",
+  "world.objects.failed": "Os objetos não puderam ser lidos: {reason}",
+  "@world.objects.failed": "{reason} is a message from the system, in English",
+  "world.objects.ready": "Modelos de objetos prontos: {kinds, plural, one {# tipo} other {# tipos}}, {textures, plural, one {# textura} other {# texturas}}{problems, plural, =0 {} one {; # problema, primeiro: {first}} other {; # problemas, primeiro: {first}}}.",
+  "@world.objects.ready": "{first} is a message of MapWorks in English"
+}

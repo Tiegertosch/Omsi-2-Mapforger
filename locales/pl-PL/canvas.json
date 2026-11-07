@@ -1,0 +1,19 @@
+{
+  "canvas.outside": "poza mapą",
+  "canvas.position": "Tile {tileX}, {tileY} x {x, number, 0.0} i {y, number, 0.0}",
+  "canvas.turned": "{count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}} obrócił {degrees, number, +0.0;-0.0;0.0}° wokół {pivot}",
+  "@canvas.turned": "{pivot} is a position written like canvas.position",
+  "canvas.view3d": "Odległość widoku 3D {distance, number, 0} m kurs {heading, number, 0}° nachylenie {tilt, number, 0}°",
+  "canvas.object_turn": "#{id}  kierunek {heading, number, 0.0}°  nachylenie wzdłużne {pitch, number, 0.0}°  przechył {bank, number, 0.0}°",
+  "@canvas.object_turn": "{id} is the number of the object, shown unchanged",
+  "canvas.moved_group": "{count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}} przesunięty x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00}",
+  "canvas.moved_group_height": "{count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}} przesunięty x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} wysokość {dh, number, +0.00;-0.00}",
+  "canvas.moved_one_height": "#{id} przesunięty x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} wysokość {dh, number, +0.00;-0.00}",
+  "canvas.dragging_one": "#{id} x {x, number, 0.00} y {y, number, 0.00} kurs {heading, number, 0.0}°",
+  "canvas.scale": "1 piksel = {meters, number, 0.###} m",
+  "canvas.angle.turn": "Obróć {degrees, number, +0.0;-0.0;0.0}°",
+  "canvas.angle.pitch": "Nachylenie wzdłużne {degrees, number, 0.0}°",
+  "canvas.angle.bank": "Przechył {degrees, number, 0.0}°",
+  "canvas.angle.heading": "Kierunek {degrees, number, 0.0}°",
+  "canvas.arrow.height": "Wysokość"
+}

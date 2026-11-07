@@ -1,0 +1,20 @@
+{
+  "rows.title": "Filas ao longo das estradas",
+  "rows.selected": "Linha selecionada",
+  "rows.choose": "Escolha um objeto da biblioteca.",
+  "rows.object": "Objecto: {name}",
+  "@rows.object": "{name} is a file name without extension, shown unchanged",
+  "rows.interval": "Cada (m)",
+  "rows.interval.tooltip": "Distância entre os objetos de uma linha ao longo da estrada",
+  "rows.offset": "Do centro (m)",
+  "rows.offset.tooltip": "Distância dos objetos ao eixo da estrada; vazio coloca-os a 0,5 m dentro da berma do perfil da estrada, no passeio",
+  "rows.height": "Altura (m)",
+  "rows.height.tooltip": "Altura dos objetos acima da estrada",
+  "rows.heading": "Orientação (°)",
+  "rows.heading.tooltip": "Vire cada objeto contra a direção da estrada; do outro lado, o objeto está virado para a estrada ao contrário",
+  "rows.both": "Ambos os lados",
+  "rows.both.tooltip": "Estabelece uma fileira em ambos os lados da estrada ao mesmo tempo",
+  "rows.whole": "Estrada inteira",
+  "rows.whole.tooltip": "Um clique estabelece a linha ao longo de toda a estrada, desde o cruzamento ou extremidade livre até ao cruzamento ou extremidade livre, com um espaçamento uniforme. Desligue para clicar onde começa e onde termina a linha.",
+  "rows.hint": "Aponte para uma estrada: a linha está ao lado do ponteiro. Clique para o colocar; R roda os objetos 15°, Shift+R para trás. Clique num objeto de uma linha para selecionar a linha: altere os seus valores e prima Enter, ou escolha outro objeto da biblioteca; Del apaga-o. Esc termina a ferramenta."
+}

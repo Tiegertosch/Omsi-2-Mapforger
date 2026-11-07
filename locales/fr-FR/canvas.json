@@ -1,0 +1,19 @@
+{
+  "canvas.outside": "en dehors de la carte",
+  "canvas.position": "Tile {tileX}, {tileY} x {x, number, 0.0} et {y, number, 0.0}",
+  "canvas.turned": "{count, plural, one {# objet} other {# objets}} a transformé {degrees, number, +0.0;-0.0;0.0}° autour de {pivot}",
+  "@canvas.turned": "{pivot} is a position written like canvas.position",
+  "canvas.view3d": "Distance de vue 3D {distance, number, 0} m cap {heading, number, 0}° inclinaison {tilt, number, 0}°",
+  "canvas.object_turn": "#{id}  orientation {heading, number, 0.0}°  tangage {pitch, number, 0.0}°  roulis {bank, number, 0.0}°",
+  "@canvas.object_turn": "{id} is the number of the object, shown unchanged",
+  "canvas.moved_group": "{count, plural, one {# objet} other {# objets}} déplacé x {dx, number, +0.00;-0.00} et {dy, number, +0.00;-0.00}",
+  "canvas.moved_group_height": "{count, plural, one {# objet} other {# objets}} déplacé x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} hauteur {dh, number, +0.00;-0.00}",
+  "canvas.moved_one_height": "#{id} déplacé x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} hauteur {dh, number, +0.00;-0.00}",
+  "canvas.dragging_one": "#{id} x {x, number, 0.00} et {y, number, 0.00} rubrique {heading, number, 0.0}°",
+  "canvas.scale": "1 px = {meters, number, 0.###} m",
+  "canvas.angle.turn": "Tourner {degrees, number, +0.0;-0.0;0.0}°",
+  "canvas.angle.pitch": "Tangage {degrees, number, 0.0}°",
+  "canvas.angle.bank": "Roulis {degrees, number, 0.0}°",
+  "canvas.angle.heading": "Rubrique {degrees, number, 0.0}°",
+  "canvas.arrow.height": "Hauteur"
+}

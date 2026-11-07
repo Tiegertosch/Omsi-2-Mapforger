@@ -1,0 +1,5 @@
+{
+  "dev.selftest.objects": "{count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu} =0 {Żadnych obiektów}} w {name}",
+  "@dev.selftest.objects": "Only for the language self test (-i18nSelfTest); shows that numbers, plurals and file names format correctly",
+  "dev.selftest.when": "Sprawdzone na {when, date, medium} w {when, time, short}: {value, number} m"
+}

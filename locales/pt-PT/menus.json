@@ -1,0 +1,12 @@
+{
+  "menu.file": "Ficheiro",
+  "menu.edit": "Editar",
+  "menu.view": "Ver",
+  "menu.tools": "Ferramentas",
+  "menu.help": "Ajuda",
+  "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",
+  "menu.tools.tooltip": "Verificar o mapa carregado: importação, ligações de splines, identificadores, pontos de entrada, objetos associados, ficheiros, horários, variantes chrono e objetos DLC.",
+  "@menu.tools.tooltip": "Tooltip of the Tools menu button. Keep the list of what the map check covers in the same order",
+  "menu.file.settings": "Definições...",
+  "@menu.file.settings": "Item of the File menu that opens the settings dialog"
+}

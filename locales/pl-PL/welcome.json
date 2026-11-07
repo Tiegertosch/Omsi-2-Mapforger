@@ -1,0 +1,17 @@
+{
+  "welcome.tagline": "Buduj światy. Kształtuj drogi. Realizuj swoją wizję.",
+  "welcome.card.open_project.title": "Otwórz projekt",
+  "welcome.card.open_project.text": "Kontynuuj edycję projektu MapWorks (.omproj).",
+  "welcome.card.open_map.title": "Otwórz mapę OMSI",
+  "welcome.card.open_map.text": "Przeglądaj mapę ze swojej instalacji OMSI. Zapisz ją jako projekt, aby ją edytować.",
+  "welcome.card.new_map.title": "Nowa mapa",
+  "welcome.card.new_map.text": "Utwórz pustą mapę z pierwszym tile na podstawie mapy ze swojej instalacji.",
+  "welcome.recent": "Ostatnio otwierane",
+  "welcome.recent.empty": "Tutaj pojawią się otwierane projekty i mapy.",
+  "welcome.recent.not_found.tooltip": "Nie znaleziono: {path}",
+  "@welcome.recent.not_found.tooltip": "{path} is the file path of the project or map; it is shown unchanged",
+  "welcome.recent.kind.not_found": "Nie znaleziono",
+  "welcome.recent.kind.project": "Projekt",
+  "welcome.recent.kind.map": "Mapa, tylko do odczytu",
+  "welcome.card.planned.tooltip": "Funkcja {title} jest planowana i nie jest jeszcze dostępna."
+}

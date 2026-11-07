@@ -1,0 +1,10 @@
+{
+  "world.ground.failed": "Impossibile leggere le texture del terreno: {reason}",
+  "@world.ground.failed": "{reason} is a message from the system, in English",
+  "world.ground.ready": "Texture del terreno pronte: {layers, plural, one {# struttura} other {# texture}}, {masks, plural, one {# maschera tile} other {# maschere tile}} lette non appena vengono visualizzati i loro tiles, {drawn} di {splines} splines con superfici{lines, plural, =0 {} one {, # linea aerea e recinzioni} other {, # linee aeree e recinzioni}}{holes, plural, =0 {} one {, buchi del terreno in # tile} other {, buchi del terreno in # tiles}}{problems, plural, =0 {} one {; # problema, primo: {first}} other {; # problemi, primo: {first}}}.",
+  "@world.ground.ready": "{first} is a message of MapWorks in English",
+  "world.objects.failed": "Impossibile leggere gli oggetti: {reason}",
+  "@world.objects.failed": "{reason} is a message from the system, in English",
+  "world.objects.ready": "Modelli di oggetti pronti: {kinds, plural, one {# tipo} other {# tipi}}, {textures, plural, one {# struttura} other {# texture}}{problems, plural, =0 {} one {; # problema, primo: {first}} other {; # problemi, primo: {first}}}.",
+  "@world.objects.ready": "{first} is a message of MapWorks in English"
+}

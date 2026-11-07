@@ -1,0 +1,17 @@
+{
+  "welcome.tagline": "Budujte světy. Tvořte silnice. Uskutečněte svou vizi.",
+  "welcome.card.open_project.title": "Otevřít projekt",
+  "welcome.card.open_project.text": "Pokračujte v úpravách projektu MapWorks (.omproj).",
+  "welcome.card.open_map.title": "Otevřít mapu OMSI",
+  "welcome.card.open_map.text": "Prohlédněte si mapu ze své instalace OMSI. Chcete-li ji upravovat, uložte ji jako projekt.",
+  "welcome.card.new_map.title": "Nová mapa",
+  "welcome.card.new_map.text": "Vytvořte prázdnou mapu s prvním tile na základě mapy ze své instalace.",
+  "welcome.recent": "Nedávné",
+  "welcome.recent.empty": "Zde se zobrazí projekty a mapy, které otevřete.",
+  "welcome.recent.not_found.tooltip": "Nenalezeno: {path}",
+  "@welcome.recent.not_found.tooltip": "{path} is the file path of the project or map; it is shown unchanged",
+  "welcome.recent.kind.not_found": "Nenalezeno",
+  "welcome.recent.kind.project": "Projekt",
+  "welcome.recent.kind.map": "Mapa, pouze pro čtení",
+  "welcome.card.planned.tooltip": "Funkce {title} je plánována a zatím není dostupná."
+}

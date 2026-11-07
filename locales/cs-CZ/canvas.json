@@ -1,0 +1,19 @@
+{
+  "canvas.outside": "mimo mapu",
+  "canvas.position": "Tile {tileX}, {tileY} x {x, number, 0.0} a {y, number, 0.0}",
+  "canvas.turned": "{count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}} otočil {degrees, number, +0.0;-0.0;0.0}° kolem {pivot}",
+  "@canvas.turned": "{pivot} is a position written like canvas.position",
+  "canvas.view3d": "3D vzdálenost pohledu {distance, number, 0} m směr {heading, number, 0}° sklon {tilt, number, 0}°",
+  "canvas.object_turn": "#{id}  směr {heading, number, 0.0}°  podélný sklon {pitch, number, 0.0}°  příčný sklon {bank, number, 0.0}°",
+  "@canvas.object_turn": "{id} is the number of the object, shown unchanged",
+  "canvas.moved_group": "{count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}} přesunuto x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00}",
+  "canvas.moved_group_height": "{count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}} posunuto x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} výška {dh, number, +0.00;-0.00}",
+  "canvas.moved_one_height": "#{id} posunuto x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} výška {dh, number, +0.00;-0.00}",
+  "canvas.dragging_one": "#{id} x {x, number, 0.00} y {y, number, 0.00} nadpis {heading, number, 0.0}°",
+  "canvas.scale": "1 px = {meters, number, 0.###} m",
+  "canvas.angle.turn": "Otočte {degrees, number, +0.0;-0.0;0.0}°",
+  "canvas.angle.pitch": "Podélný sklon {degrees, number, 0.0}°",
+  "canvas.angle.bank": "Příčný sklon {degrees, number, 0.0}°",
+  "canvas.angle.heading": "Okruh {degrees, number, 0.0}°",
+  "canvas.arrow.height": "Výška"
+}

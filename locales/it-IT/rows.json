@@ -1,0 +1,20 @@
+{
+  "rows.title": "File lungo le strade",
+  "rows.selected": "Riga selezionata",
+  "rows.choose": "Scegli un oggetto nella libreria.",
+  "rows.object": "Oggetto: {name}",
+  "@rows.object": "{name} is a file name without extension, shown unchanged",
+  "rows.interval": "Ogni (m)",
+  "rows.interval.tooltip": "Distanza tra gli oggetti di una fila lungo la strada",
+  "rows.offset": "Dal centro (m)",
+  "rows.offset.tooltip": "Distanza degli oggetti dalla mezzeria della strada; vuoto li posiziona 0,5 m all'interno del bordo del profilo stradale, sul marciapiede",
+  "rows.height": "Altezza (m)",
+  "rows.height.tooltip": "Altezza degli oggetti sopra la strada",
+  "rows.heading": "Orientamento (°)",
+  "rows.heading.tooltip": "Girare ogni oggetto contro la direzione della strada; dall'altro lato l'oggetto è rivolto verso la strada al contrario",
+  "rows.both": "Entrambi i lati",
+  "rows.both.tooltip": "Pone una fila su entrambi i lati della strada contemporaneamente",
+  "rows.whole": "Intera strada",
+  "rows.whole.tooltip": "Un clic posiziona la fila lungo l'intera strada, dall'incrocio o dall'estremità libera all'incrocio o dall'estremità libera, a spaziatura uniforme. Spegni per fare clic dove inizia e dove finisce la riga.",
+  "rows.hint": "Puntare su una strada: la riga si trova sul lato del puntatore. Fare clic per posarlo; R ruota gli oggetti di 15°, Shift+R indietro. Fare clic su un oggetto di una riga per selezionare la riga: modificarne i valori e premere Enter, oppure scegliere un altro oggetto nella libreria; Del lo cancella. Esc termina lo strumento."
+}

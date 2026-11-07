@@ -1,0 +1,20 @@
+{
+  "rows.title": "Rzędy wzdłuż dróg",
+  "rows.selected": "Wybrany wiersz",
+  "rows.choose": "Wybierz obiekt w bibliotece.",
+  "rows.object": "Obiekt: {name}",
+  "@rows.object": "{name} is a file name without extension, shown unchanged",
+  "rows.interval": "Każdy (m)",
+  "rows.interval.tooltip": "Odległość pomiędzy obiektami rzędu wzdłuż drogi",
+  "rows.offset": "Od centrum (m)",
+  "rows.offset.tooltip": "Odległość obiektów od osi drogi; pusty umieszcza je 0,5 m wewnątrz krawędzi profilu drogi, na chodniku",
+  "rows.height": "Wysokość (m)",
+  "rows.height.tooltip": "Wysokość obiektów nad drogą",
+  "rows.heading": "Kierunek (°)",
+  "rows.heading.tooltip": "Obróć każdy obiekt w kierunku przeciwnym do kierunku drogi; z drugiej strony obiekt jest zwrócony w stronę drogi",
+  "rows.both": "Obie strony",
+  "rows.both.tooltip": "Układa rząd po obu stronach drogi jednocześnie",
+  "rows.whole": "Cała droga",
+  "rows.whole.tooltip": "Kliknięcie powoduje ułożenie rzędu wzdłuż całej drogi, od skrzyżowania lub wolnego końca do skrzyżowania lub wolnego końca, w równych odstępach. Wyłącz, aby kliknąć miejsce, w którym zaczyna się i kończy wiersz.",
+  "rows.hint": "Wskaż drogę: rząd leży po stronie wskaźnika. Kliknij, aby go położyć; R obraca obiekty o 15°, Shift+R do tyłu. Kliknij obiekt w wierszu, aby zaznaczyć wiersz: zmień jego wartości i naciśnij Enter lub wybierz inny obiekt w bibliotece; Del usuwa go. Esc kończy działanie narzędzia."
+}

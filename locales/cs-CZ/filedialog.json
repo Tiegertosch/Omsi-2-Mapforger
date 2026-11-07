@@ -1,0 +1,13 @@
+{
+  "filedialog.all": "Všechny soubory",
+  "filedialog.config": "Konfigurace mapy OMSI (global.cfg)",
+  "filedialog.project": "Projekt MapWorks (*.omproj)",
+  "filedialog.png": "Obrázek PNG (*.png)",
+  "filedialog.heightmaps": "Výškové mapy (*.png, *.tif, *.tiff)",
+  "filedialog.pictures": "Obrázky (*.jpg, *.jpeg, *.png, *.bmp, *.tga)",
+  "filedialog.open_config": "Otevřete konfiguraci mapy OMSI",
+  "filedialog.open_project": "Otevřít projekt MapWorks",
+  "filedialog.save_project": "Uložit projekt MapWorks",
+  "filedialog.export_heights": "Exportovat výškovou mapu",
+  "filedialog.open_heights": "Výšková mapa pro celou mapu"
+}

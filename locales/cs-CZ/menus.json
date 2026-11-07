@@ -1,0 +1,12 @@
+{
+  "menu.file": "Soubor",
+  "menu.edit": "Upravit",
+  "menu.view": "Zobrazení",
+  "menu.tools": "Nástroje",
+  "menu.help": "Nápověda",
+  "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",
+  "menu.tools.tooltip": "Zkontrolovat načtenou mapu: import, propojení spline, identifikátory, vstupní body, připojené objekty, soubory, jízdní řád, varianty chrono a objekty DLC.",
+  "@menu.tools.tooltip": "Tooltip of the Tools menu button. Keep the list of what the map check covers in the same order",
+  "menu.file.settings": "Nastavení...",
+  "@menu.file.settings": "Item of the File menu that opens the settings dialog"
+}

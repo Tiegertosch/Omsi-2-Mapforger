@@ -1,0 +1,11 @@
+{
+  "settings.title": "Ustawienia",
+  "@settings.title": "Title of the settings dialog (File menu, Settings...)",
+  "settings.section.general": "Ogólne",
+  "settings.language.label": "Język",
+  "@settings.language.label": "Label of the drop-down list of interface languages; the list itself shows each language in its own language",
+  "settings.language.hint": "Język interfejsu programu. Nie wpływa na mapy, projekty ani eksporty; wybór zostanie zachowany przy następnym uruchomieniu.",
+  "settings.language.changed": "Język interfejsu to teraz {language}.",
+  "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
+  "settings.close": "Zamknij"
+}

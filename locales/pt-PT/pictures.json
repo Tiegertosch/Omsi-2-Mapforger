@@ -1,0 +1,17 @@
+{
+  "pictures.dialog_title": "Uma foto para o tiles",
+  "pictures.formats": "As imagens podem ser ficheiros JPEG, PNG, BMP ou TGA.",
+  "pictures.unreadable": "A imagem não pôde ser lida: {reason}",
+  "@pictures.unreadable": "{reason} is a message from the system in English, or a file name",
+  "pictures.not_kept": "A imagem não pôde ser mantida no projeto: {reason}",
+  "@pictures.not_kept": "{reason} is a message from the system, in English",
+  "pictures.added": "A imagem {file} está em {count, plural, one {# tile} other {# tiles}}: alinhe-a em Alinhe a imagem.",
+  "@pictures.added": "\"Line up the picture\" is the name of a section in the Satellite window: use the same words as there",
+  "pictures.not_removed": "A foto não pôde ser retirada do projeto: {reason}",
+  "@pictures.not_removed": "{reason} is a message from the system, in English",
+  "pictures.removed": "Tirou a foto {file}.",
+  "pictures.fit_not_saved": "O ajuste da imagem não pôde ser guardado: {reason}",
+  "@pictures.fit_not_saved": "{reason} is a message from the system, in English",
+  "pictures.not_cut": "A imagem não pôde ser cortada no seu tiles: {reason}",
+  "@pictures.not_cut": "{reason} is a message from the system, in English"
+}

@@ -1,0 +1,17 @@
+{
+  "pictures.dialog_title": "Un'immagine per l'tiles",
+  "pictures.formats": "Le immagini possono essere file JPEG, PNG, BMP o TGA.",
+  "pictures.unreadable": "Impossibile leggere l'immagine: {reason}",
+  "@pictures.unreadable": "{reason} is a message from the system in English, or a file name",
+  "pictures.not_kept": "Impossibile mantenere l'immagine nel progetto: {reason}",
+  "@pictures.not_kept": "{reason} is a message from the system, in English",
+  "pictures.added": "L'immagine {file} si trova su {count, plural, one {# tile} other {# tiles}}: allineala sotto Allinea l'immagine.",
+  "@pictures.added": "\"Line up the picture\" is the name of a section in the Satellite window: use the same words as there",
+  "pictures.not_removed": "Non è stato possibile eliminare l'immagine dal progetto: {reason}",
+  "@pictures.not_removed": "{reason} is a message from the system, in English",
+  "pictures.removed": "Ho portato via la foto {file}.",
+  "pictures.fit_not_saved": "Impossibile salvare la dimensione dell'immagine: {reason}",
+  "@pictures.fit_not_saved": "{reason} is a message from the system, in English",
+  "pictures.not_cut": "Impossibile ritagliare l'immagine sul tiles: {reason}",
+  "@pictures.not_cut": "{reason} is a message from the system, in English"
+}

@@ -1,0 +1,19 @@
+{
+  "canvas.outside": "fora do mapa",
+  "canvas.position": "Tile {tileX}, {tileY} x {x, number, 0.0} e {y, number, 0.0}",
+  "canvas.turned": "{count, plural, one {# objeto} other {# objetos}} passou a {degrees, number, +0.0;-0.0;0.0}° em torno de {pivot}",
+  "@canvas.turned": "{pivot} is a position written like canvas.position",
+  "canvas.view3d": "Distância de visualização 3D {distance, number, 0} m rumo {heading, number, 0}° inclinação {tilt, number, 0}°",
+  "canvas.object_turn": "#{id}  orientação {heading, number, 0.0}°  inclinação longitudinal {pitch, number, 0.0}°  inclinação transversal {bank, number, 0.0}°",
+  "@canvas.object_turn": "{id} is the number of the object, shown unchanged",
+  "canvas.moved_group": "{count, plural, one {# objeto} other {# objetos}} movido x {dx, number, +0.00;-0.00} e {dy, number, +0.00;-0.00}",
+  "canvas.moved_group_height": "{count, plural, one {# objeto} other {# objetos}} movido x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} altura {dh, number, +0.00;-0.00}",
+  "canvas.moved_one_height": "#{id} movido x {dx, number, +0.00;-0.00} y {dy, number, +0.00;-0.00} altura {dh, number, +0.00;-0.00}",
+  "canvas.dragging_one": "#{id} x {x, number, 0.00} y {y, number, 0.00} rumo {heading, number, 0.0}°",
+  "canvas.scale": "1px = {meters, number, 0.###} m",
+  "canvas.angle.turn": "Rodar {degrees, number, +0.0;-0.0;0.0}°",
+  "canvas.angle.pitch": "Inclinação longitudinal {degrees, number, 0.0}°",
+  "canvas.angle.bank": "Inclinação transversal {degrees, number, 0.0}°",
+  "canvas.angle.heading": "Rumo {degrees, number, 0.0}°",
+  "canvas.arrow.height": "Altura"
+}

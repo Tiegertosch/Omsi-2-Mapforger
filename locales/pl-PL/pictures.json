@@ -1,0 +1,17 @@
+{
+  "pictures.dialog_title": "Zdjęcie tiles",
+  "pictures.formats": "Zdjęcia mogą być plikami JPEG, PNG, BMP lub TGA.",
+  "pictures.unreadable": "Nie można odczytać obrazu: {reason}",
+  "@pictures.unreadable": "{reason} is a message from the system in English, or a file name",
+  "pictures.not_kept": "Nie można zachować obrazu w projekcie: {reason}",
+  "@pictures.not_kept": "{reason} is a message from the system, in English",
+  "pictures.added": "Obrazek {file} leży na {count, plural, one {# tile} few {# tiles} many {# tiles} other {# tiles}}: wyrównaj go w obszarze Ustaw obraz.",
+  "@pictures.added": "\"Line up the picture\" is the name of a section in the Satellite window: use the same words as there",
+  "pictures.not_removed": "Nie można usunąć zdjęcia z projektu: {reason}",
+  "@pictures.not_removed": "{reason} is a message from the system, in English",
+  "pictures.removed": "Zabrałem zdjęcie {file}.",
+  "pictures.fit_not_saved": "Nie można zapisać dopasowania obrazu: {reason}",
+  "@pictures.fit_not_saved": "{reason} is a message from the system, in English",
+  "pictures.not_cut": "Nie można przyciąć obrazu do tiles: {reason}",
+  "@pictures.not_cut": "{reason} is a message from the system, in English"
+}

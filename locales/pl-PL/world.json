@@ -1,0 +1,10 @@
+{
+  "world.ground.failed": "Nie można odczytać tekstur podłoża: {reason}",
+  "@world.ground.failed": "{reason} is a message from the system, in English",
+  "world.ground.ready": "Gotowe tekstury podłoża: {layers, plural, one {# tekstura} few {# tekstury} many {# tekstur} other {# tekstury}}, {masks, plural, one {# maska tile} few {# maski tile} many {# masek tile} other {# maski tile}} czytane, gdy pojawia się ich tiles, {drawn} z {splines} splines z powierzchniami{lines, plural, one {, # linia napowietrzna i płoty} few {, # linie napowietrzne i ogrodzenia} many {, # linii napowietrznych i ogrodzeń} other {, # linii napowietrznych i ogrodzeń} =0 {}}{holes, plural, one {, dziury terenowe w # tile} few {, dziury terenowe w # tiles} many {, dziury terenowe w # tiles} other {, dziury terenowe w # tiles} =0 {}}{problems, plural, one {; # problem, pierwszy: {first}} few {; # problemy, pierwszy: {first}} many {; # problemów, pierwszy: {first}} other {; # problemów, po pierwsze: {first}} =0 {}}.",
+  "@world.ground.ready": "{first} is a message of MapWorks in English",
+  "world.objects.failed": "Nie można odczytać obiektów: {reason}",
+  "@world.objects.failed": "{reason} is a message from the system, in English",
+  "world.objects.ready": "Gotowe modele obiektów: {kinds, plural, one {# rodzaj} few {# rodzaje} many {# rodzajów} other {# rodzaju}}, {textures, plural, one {# tekstura} few {# tekstury} many {# tekstur} other {# tekstury}}{problems, plural, one {; # problem, pierwszy: {first}} few {; # problemy, pierwszy: {first}} many {; # problemów, pierwszy: {first}} other {; # problemów, po pierwsze: {first}} =0 {}}.",
+  "@world.objects.ready": "{first} is a message of MapWorks in English"
+}

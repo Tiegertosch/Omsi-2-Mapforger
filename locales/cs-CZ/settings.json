@@ -1,0 +1,11 @@
+{
+  "settings.title": "Nastavení",
+  "@settings.title": "Title of the settings dialog (File menu, Settings...)",
+  "settings.section.general": "Obecné",
+  "settings.language.label": "Jazyk",
+  "@settings.language.label": "Label of the drop-down list of interface languages; the list itself shows each language in its own language",
+  "settings.language.hint": "Jazyk rozhraní programu. Nemá vliv na mapy, projekty ani exporty; volba se uloží pro příští spuštění.",
+  "settings.language.changed": "Jazyk rozhraní je nyní {language}.",
+  "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
+  "settings.close": "Zavřít"
+}

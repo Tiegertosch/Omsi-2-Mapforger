@@ -1,0 +1,20 @@
+{
+  "rows.title": "Filas a lo largo de las carreteras",
+  "rows.selected": "Fila seleccionada",
+  "rows.choose": "Elija un objeto en la biblioteca.",
+  "rows.object": "Objeto: {name}",
+  "@rows.object": "{name} is a file name without extension, shown unchanged",
+  "rows.interval": "Cada (m)",
+  "rows.interval.tooltip": "Distancia entre los objetos de una fila a lo largo del camino.",
+  "rows.offset": "Desde el centro (m)",
+  "rows.offset.tooltip": "Distancia de los objetos desde la línea central de la carretera; vacío los coloca 0,5 m dentro del borde del perfil de la carretera, en el pavimento",
+  "rows.height": "Altura (m)",
+  "rows.height.tooltip": "Altura de los objetos sobre la carretera.",
+  "rows.heading": "Orientación (°)",
+  "rows.heading.tooltip": "Giro de cada objeto en contra de la dirección de la carretera; en el otro lado el objeto mira hacia la carretera al revés",
+  "rows.both": "Ambos lados",
+  "rows.both.tooltip": "Coloca una fila a ambos lados de la carretera a la vez.",
+  "rows.whole": "Carretera completa",
+  "rows.whole.tooltip": "Un clic coloca la fila a lo largo de toda la carretera, desde el cruce o extremo libre hasta el cruce o extremo libre, espaciadas uniformemente. Desactive para hacer clic donde comienza la fila y donde termina.",
+  "rows.hint": "Señale una carretera: la fila se encuentra al lado del puntero. Haga clic para colocarlo; R gira los objetos 15°, Shift+R hacia atrás. Haga clic en un objeto de una fila para seleccionar la fila: cambie sus valores y presione Enter, o elija otro objeto en la biblioteca; Del lo elimina. Esc finaliza la herramienta."
+}

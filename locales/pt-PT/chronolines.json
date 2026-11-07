@@ -1,0 +1,15 @@
+{
+  "chronolines.foldout": "Linhas desligadas por esta variante ({count})",
+  "chronolines.none": "O horário não tem linhas anteriores a esta variante.",
+  "chronolines.line": "Linha {name}",
+  "@chronolines.line": "{name} is the name of a bus line, shown unchanged",
+  "chronolines.line.tooltip": "Verificado: esta variante desliga a linha {name} desde o primeiro dia; desmarcado: continua a funcionar",
+  "chronolines.status.off": "A linha {name} está desligada pelo {variant} agora.",
+  "@chronolines.status.off": "{variant} is the name of the chrono variant, shown unchanged",
+  "chronolines.status.on": "A linha {name} é novamente executada em {variant}.",
+  "chronolines.status.none": "{variant} não desliga nenhuma linha agora.",
+  "chronolines.status.some": "{variant} desliga {names} agora.",
+  "@chronolines.status.some": "{names} is a list of line names separated by commas",
+  "chronolines.status.failed": "As linhas não puderam ser alteradas: {reason}",
+  "@chronolines.status.failed": "{reason} is a message from the system, in English"
+}

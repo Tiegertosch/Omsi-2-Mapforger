@@ -1,0 +1,12 @@
+{
+  "menu.file": "Plik",
+  "menu.edit": "Edytuj",
+  "menu.view": "Widok",
+  "menu.tools": "Narzędzia",
+  "menu.help": "Pomoc",
+  "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",
+  "menu.tools.tooltip": "Sprawdź wczytaną mapę: import, połączenia spline, identyfikatory, punkty startowe, obiekty dołączone, pliki, rozkład jazdy, warianty chrono i obiekty DLC.",
+  "@menu.tools.tooltip": "Tooltip of the Tools menu button. Keep the list of what the map check covers in the same order",
+  "menu.file.settings": "Ustawienia...",
+  "@menu.file.settings": "Item of the File menu that opens the settings dialog"
+}

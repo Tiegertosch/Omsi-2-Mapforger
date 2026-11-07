@@ -1,0 +1,17 @@
+{
+  "pictures.dialog_title": "Obrázek pro tiles",
+  "pictures.formats": "Obrázky mohou být soubory JPEG, PNG, BMP nebo TGA.",
+  "pictures.unreadable": "Obrázek nelze přečíst: {reason}",
+  "@pictures.unreadable": "{reason} is a message from the system in English, or a file name",
+  "pictures.not_kept": "Snímek nelze v projektu uložit: {reason}",
+  "@pictures.not_kept": "{reason} is a message from the system, in English",
+  "pictures.added": "Obraz {file} leží na {count, plural, one {# tile} few {# tiles} many {# tiles} other {# tiles}}: zarovnejte jej pod Zarovnat obraz.",
+  "@pictures.added": "\"Line up the picture\" is the name of a section in the Satellite window: use the same words as there",
+  "pictures.not_removed": "Snímek nelze vyjmout z projektu: {reason}",
+  "@pictures.not_removed": "{reason} is a message from the system, in English",
+  "pictures.removed": "Odebral obrázek {file}.",
+  "pictures.fit_not_saved": "Přizpůsobení obrázku nelze uložit: {reason}",
+  "@pictures.fit_not_saved": "{reason} is a message from the system, in English",
+  "pictures.not_cut": "Obrázek nelze oříznout na tiles: {reason}",
+  "@pictures.not_cut": "{reason} is a message from the system, in English"
+}

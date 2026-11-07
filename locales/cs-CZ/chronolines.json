@@ -1,0 +1,15 @@
+{
+  "chronolines.foldout": "Linky vypnuté touto variantou ({count})",
+  "chronolines.none": "Před touto variantou jízdní řád nemá žádné linky.",
+  "chronolines.line": "Řádek {name}",
+  "@chronolines.line": "{name} is the name of a bus line, shown unchanged",
+  "chronolines.line.tooltip": "Zaškrtnuto: tato varianta od prvního dne vypíná linku {name}; nezaškrtnuto: běží dál",
+  "chronolines.status.off": "Linka {name} je nyní vypnuta pomocí {variant}.",
+  "@chronolines.status.off": "{variant} is the name of the chrono variant, shown unchanged",
+  "chronolines.status.on": "Linka {name} běží znovu v {variant}.",
+  "chronolines.status.none": "{variant} nyní vypíná žádnou linku.",
+  "chronolines.status.some": "{variant} nyní vypne {names}.",
+  "@chronolines.status.some": "{names} is a list of line names separated by commas",
+  "chronolines.status.failed": "Řádky nebylo možné změnit: {reason}",
+  "@chronolines.status.failed": "{reason} is a message from the system, in English"
+}
