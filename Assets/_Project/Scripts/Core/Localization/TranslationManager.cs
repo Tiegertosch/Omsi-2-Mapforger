@@ -71,6 +71,21 @@ namespace OmsiMapEditor.Core.Localization
         /// <summary>The languages that can be chosen: the released ones, with drafts only when the manager was made to offer them.</summary>
         public List<LocaleInfo> Languages => found.FindAll(info => includeDrafts || info.IsApproved);
 
+        /// <summary>
+        /// The code of the first language that can be chosen and lists the operating system's language (<c>German</c>,
+        /// <c>Portuguese</c>) under <c>system</c> in languages.json; null when none does.
+        /// </summary>
+        public string CodeForSystemLanguage(string systemLanguage)
+        {
+            if (string.IsNullOrWhiteSpace(systemLanguage))
+                return null;
+            foreach (var info in Languages)
+                foreach (var name in info.SystemLanguages)
+                    if (string.Equals(name, systemLanguage.Trim(), StringComparison.OrdinalIgnoreCase))
+                        return info.Code;
+            return null;
+        }
+
         public bool ReferenceLoaded => reference != null;
 
         /// <summary>The code of the language in use; empty when no language could be loaded.</summary>
@@ -166,7 +181,7 @@ namespace OmsiMapEditor.Core.Localization
                 return entry.Text;
             if (entry.Compiled.IsPlain)
                 return entry.Compiled.PlainText;
-            return entry.Compiled.Format(source.Culture, source.Info.Code, arguments);
+            return entry.Compiled.Format(source.Culture, source.Info.Code, arguments, source.Info.PluralRules);
         }
 
         private void ReportOnce(string id, string message)

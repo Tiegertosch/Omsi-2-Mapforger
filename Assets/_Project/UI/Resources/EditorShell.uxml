@@ -118,7 +118,7 @@
                 <ui:Label name="settings-general-heading" text="General" class="inspector-section-heading" />
                 <ui:VisualElement class="dialog-row">
                     <ui:Label name="settings-language-label" text="Language" class="dialog-row-text" />
-                    <ui:VisualElement name="settings-language-list" class="panel-tabs" />
+                    <ui:VisualElement name="settings-language-list" class="settings-language-slot" />
                 </ui:VisualElement>
                 <ui:Label name="settings-language-hint" text="The language of the program's interface. Maps, projects and exports do not depend on it; the choice is kept for the next start." class="popup-description" />
                 <ui:VisualElement class="dialog-buttons">

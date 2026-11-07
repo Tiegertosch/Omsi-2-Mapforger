@@ -4,7 +4,7 @@ Stand: 7. November 2026, Zweig `feature/i18n`. Grundsatzentscheidung: ADR 068 in
 
 ## Verwendete Technik und Begründung
 
-Ein eigenes, kleines System in `Editor.Core/Localization/`, ohne neue Abhängigkeit: JSON-Sprachdateien, eine Teilmenge des ICU-MessageFormat (`{name}`, `number`, `date`, `plural`, `select`) und CLDR-Pluralregeln für Englisch, Deutsch, Polnisch, Tschechisch, Französisch und Spanisch.
+Ein eigenes, kleines System in `Editor.Core/Localization/`, ohne neue Abhängigkeit: JSON-Sprachdateien, eine Teilmenge des ICU-MessageFormat (`{name}`, `number`, `date`, `plural`, `select`) und CLDR-Pluralregeln, die als Daten in `locales/languages.json` stehen (für Englisch, Deutsch, Polnisch, Tschechisch, Französisch und Spanisch eingetragen, als Rückfall auch eingebaut).
 
 Warum nicht Unitys Localization-Paket: Es hält Texte als Assets (schlecht für Beiträge per Pull Request, `.meta`-Dateien), ist schwer ohne Unity zu testen und bringt mehr mit, als hier gebraucht wird. Das eigene System lässt sich mit dem schnellen Testlauf ohne Unity prüfen und liest Sprachen als gewöhnliche Textdateien neben dem Programm.
 
@@ -18,7 +18,7 @@ Warum nicht Unitys Localization-Paket: Es hält Texte als Assets (schlecht für 
 
 ## Speicherort der Sprachdateien
 
-`locales/<Code>/` im Repository (`locale.json` und beliebig viele `*.json` mit flachen Schlüsseln). Der Build kopiert sie nach `OMSIMapWorks_Data/StreamingAssets/locales`; eine Sprache erscheint in der Auswahl, wenn ihre Dateien dort liegen und `status` auf `approved` steht (Entwürfe nur in Editor- und Entwicklungsbuilds). Auswahl: **Einstellungen > Allgemein > Sprache**; Befehlszeile: `-language <Code>` (nur dieser Lauf), `-chooseLanguage <Code>` (speichert).
+`locales/languages.json` im Repository ist die Übersicht aller Sprachen (Name, englischer Name, Status, Systemsprache, Pluralregeln); `locales/<Code>/` enthält die Texte (beliebig viele `*.json` mit flachen Schlüsseln). Der Build kopiert sie nach `OMSIMapWorks_Data/StreamingAssets/locales`; eine Sprache erscheint in der Auswahl, wenn ihre Dateien dort liegen und `status` auf `approved` steht (Entwürfe nur in Editor- und Entwicklungsbuilds). Auswahl: **Einstellungen > Allgemein > Sprache**; Befehlszeile: `-language <Code>` (nur dieser Lauf), `-chooseLanguage <Code>` (speichert).
 
 ## Vollständig migrierte Bereiche
 
@@ -26,13 +26,13 @@ Menüleiste, Statusleiste und Kartenhinweise, Willkommensbild, Werkzeugleiste, P
 
 ## Noch offene Übersetzungen
 
-- `pl-PL`, `cs-CZ`, `fr-FR`, `es-ES` sind Entwürfe ohne Texte (nur `locale.json`); sie erscheinen nicht in der Auswahl der Release-Builds.
+- `pl-PL`, `cs-CZ`, `fr-FR`, `es-ES` sind Entwürfe ohne Texte (nur Zeilen in `languages.json`, noch ohne Ordner); sie erscheinen nicht in der Auswahl der Release-Builds.
 - Texte aus `Editor.OMSI` bleiben teils englisch (siehe Ausnahmen). Die Kartenprüfung ist übersetzt (Titel, Zusammenfassungen und fast alle Befunde, `mapcheck.*`); englisch bleiben nur die Einzeltexte, die andere Klassen liefern: Importwarnungen des Kartenlesers, die Meldungen zu Kreuzungs-Anschlusspunkten und die Befunde der Fahrplanprüfung.
 
 ## Testergebnisse
 
-- Unity-EditMode: 439 Tests grün (davon 29 in `LocalizationTests`, 5 in `LocalizationKeyUsageTests`, 5 in `LocalizationInterfaceTests`), Windows-Player-Build erfolgreich.
-- Schneller Lauf ohne Unity (Core, OMSI, Tests): 421 grün.
+- Unity-EditMode: 455 Tests grün (davon 29 in `LocalizationTests`, 16 neue in `LocalizationLanguageListTests` für die Sprachliste und die Pluralregeln als Daten, 5 in `LocalizationKeyUsageTests`, 5 in `LocalizationInterfaceTests`), Windows-Player-Build erfolgreich; der Player startet mit `languages.json` auf Deutsch (`-language de-DE -i18nSelfTest`).
+- Schneller Lauf ohne Unity (Core, OMSI, Tests): 437 grün.
 - `LocaleCheck`: 0 Fehler, 4 Warnungen (die leeren Entwurfssprachen).
 - `LocalizationKeyUsageTests` liest den Quelltext und prüft jeden Schlüssel (`Loc.T`, `SetStatusT`, `LocBindings.*`, `UpperLabel`) gegen `locales/en-US`, samt Argumentnamen; Schlüssel müssen als ganzer Text geschrieben sein.
 - Player-Prüfung an Grundorf auf Deutsch und im Live-Wechsel Englisch nach Deutsch (Hauptfenster, Straßenwerkzeug, Straßenbauer, Objekte, Satellit, Gelände, Einstellungen, Neue Karte, Fehlerbericht).
@@ -48,10 +48,10 @@ Menüleiste, Statusleiste und Kartenhinweise, Willkommensbild, Werkzeugleiste, P
 
 ## Neue Sprache hinzufügen
 
-1. Ordner `locales/<Code>/` anlegen (z. B. `pl-PL`) mit `locale.json` (`code`, `name` in der eigenen Sprache, `englishName`, `status`: `draft`).
-2. Die Dateien von `locales/en-US` kopieren und die Werte übersetzen; Platzhalter in `{…}` und die Pluralformen der Sprache (`one`, `few`, `many`, `other`) beachten; Hinweise für Übersetzer stehen als `"@schluessel"`.
+1. In `locales/languages.json` die Zeilen der Sprache ergänzen, z. B. für Portugiesisch (Brasilien): `"pt-BR.name": "Português (Brasil)"`, `"pt-BR.englishName": "Portuguese (Brazil)"`, `"pt-BR.status": "draft"`, `"pt-BR.system": "Portuguese"` und die Pluralregeln nach CLDR, `"pt-BR.plural.one": "i = 0..1"`.
+2. Den Ordner `locales/pt-BR/` anlegen, die Dateien von `locales/en-US` hineinkopieren und die Werte übersetzen; Platzhalter in `{…}` und die Pluralformen der Sprache beachten; Hinweise für Übersetzer stehen als `"@schluessel"`.
 3. `LocaleCheck.exe locales` (oder der Workflow) prüft die Dateien.
-4. Ist die Übersetzung vollständig, `status` auf `approved` setzen. Am Programm ändert sich nichts.
+4. Ist die Übersetzung vollständig, `status` auf `approved` setzen. **Am Programm und am Quelltext ändert sich nichts**; der Build kopiert `locales/` samt `languages.json` nach `StreamingAssets/locales`. Die Sprache erscheint danach in der Auswahl, und `system` entscheidet, welche Systemsprache sie beim ersten Start wählt.
 
 ## Abschließende Suche nach fest codierten Texten
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OmsiMapEditor.Core.Localization
 {
@@ -11,14 +12,29 @@ namespace OmsiMapEditor.Core.Localization
         public const string Approved = "approved";
         public const string Draft = "draft";
 
-        public LocaleInfo(string code, string nativeName, string englishName, string status, string directory)
+        public LocaleInfo(string code, string nativeName, string englishName, string status, string directory,
+            PluralRuleSet pluralRules = null, IReadOnlyList<string> systemLanguages = null)
         {
             Code = code;
             NativeName = nativeName;
             EnglishName = englishName;
             Status = status;
             Directory = directory;
+            PluralRules = pluralRules;
+            SystemLanguages = systemLanguages ?? new string[0];
         }
+
+        /// <summary>
+        /// The plural rules written in <c>languages.json</c>; null when the language gives none, then the rules built into
+        /// <see cref="Localization.PluralRules"/> apply for the languages it knows and "other" for all others.
+        /// </summary>
+        public PluralRuleSet PluralRules { get; }
+
+        /// <summary>The names of the operating system's languages (Unity's <c>SystemLanguage</c>, such as <c>Portuguese</c>) this language answers to.</summary>
+        public IReadOnlyList<string> SystemLanguages { get; }
+
+        /// <summary>The plural cases a translation has to give, besides the exact =N cases: the ones with a rule, and always "other".</summary>
+        public IReadOnlyList<string> RequiredPluralCategories => PluralRules != null ? PluralRules.Categories : Localization.PluralRules.RequiredCategories(Code);
 
         /// <summary>The language tag, such as <c>de-DE</c>.</summary>
         public string Code { get; }
@@ -66,12 +82,19 @@ namespace OmsiMapEditor.Core.Localization
     }
 
     /// <summary>
-    /// Reads the language folders: <c>locales/&lt;code&gt;/locale.json</c> says what the language is, every other <c>*.json</c> beside
-    /// it holds texts (one object of keys and texts). Never throws: what cannot be read becomes an issue.
+    /// Reads the languages: <c>locales/languages.json</c> lists every language with its name, status, plural rules and system languages,
+    /// and the folder <c>locales/&lt;code&gt;/</c> holds its texts (every <c>*.json</c> in it is one object of keys and texts). A
+    /// language is added by a few lines in <c>languages.json</c> and a folder; no code changes. A folder with its own
+    /// <c>locale.json</c> and no entry in the overview still works (the older way). Never throws: what cannot be read becomes an issue.
     /// </summary>
     public static class LocaleLoader
     {
+        public const string OverviewFileName = "languages.json";
+
+        /// <summary>The older description of one language, inside its folder; used only for a folder the overview does not list.</summary>
         public const string InfoFileName = "locale.json";
+
+        private static readonly Regex CodePattern = new Regex(@"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$", RegexOptions.CultureInvariant);
 
         /// <summary>The languages found under <paramref name="root"/>, by code; a folder without a usable locale.json is reported and left out.</summary>
         public static List<LocaleInfo> List(string root, List<LocaleIssue> issues)
@@ -82,6 +105,18 @@ namespace OmsiMapEditor.Core.Localization
                 issues?.Add(new LocaleIssue(LocaleIssueSeverity.Error, root ?? string.Empty, 0, null, "the folder with the language files does not exist"));
                 return result;
             }
+            var listed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var overview = Path.Combine(root, OverviewFileName);
+            if (File.Exists(overview))
+                foreach (var info in ReadOverview(overview, root, issues))
+                {
+                    listed.Add(info.Code);
+                    result.Add(info);
+                    // A draft may still be without texts (and so without a folder); a released language may not.
+                    if (info.IsApproved && !Directory.Exists(info.Directory))
+                        issues?.Add(new LocaleIssue(LocaleIssueSeverity.Error, OverviewFileName, 0, info.Code,
+                            "the folder " + info.Code + " with the texts of this language does not exist"));
+                }
             string[] folders;
             try
             {
@@ -95,9 +130,107 @@ namespace OmsiMapEditor.Core.Localization
             Array.Sort(folders, StringComparer.OrdinalIgnoreCase);
             foreach (var folder in folders)
             {
-                var info = ReadInfo(folder, issues);
-                if (info != null)
-                    result.Add(info);
+                var name = Path.GetFileName(folder);
+                if (listed.Contains(name))
+                    continue;
+                if (File.Exists(Path.Combine(folder, InfoFileName)))
+                {
+                    var info = ReadInfo(folder, issues);
+                    if (info != null)
+                    {
+                        listed.Add(info.Code);
+                        result.Add(info);
+                    }
+                }
+                else if (Directory.GetFiles(folder, "*.json").Length > 0)
+                    issues?.Add(new LocaleIssue(LocaleIssueSeverity.Warning, name, 0, null,
+                        "the folder holds texts but " + name + " is not listed in " + OverviewFileName + ", so the language is not offered"));
+            }
+            result.Sort((first, second) => string.Compare(first.Code, second.Code, StringComparison.OrdinalIgnoreCase));
+            return result;
+        }
+
+        /// <summary>
+        /// Reads <c>languages.json</c>: flat entries <c>"&lt;code&gt;.name"</c>, <c>".englishName"</c>, <c>".status"</c> (approved or draft),
+        /// optional <c>".system"</c> (names of operating system languages, separated by commas) and <c>".plural.&lt;case&gt;"</c> (a rule in CLDR
+        /// notation for zero, one, two, few or many). A language with a fault is reported and left out.
+        /// </summary>
+        public static List<LocaleInfo> ReadOverview(string path, string root, List<LocaleIssue> issues)
+        {
+            var result = new List<LocaleInfo>();
+            if (!TryRead(path, OverviewFileName, out var json, issues))
+                return result;
+            var order = new List<string>();
+            var fields = new Dictionary<string, Dictionary<string, LocaleEntry>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in json.Entries)
+            {
+                if (entry.Key.Length > 0 && entry.Key[0] == '@')
+                    continue;
+                var dot = entry.Key.IndexOf('.');
+                if (dot <= 0 || dot == entry.Key.Length - 1)
+                {
+                    issues?.Add(new LocaleIssue(LocaleIssueSeverity.Error, OverviewFileName, entry.Line, entry.Key,
+                        "the key must be like pt-BR.name: the language code, a dot and the setting"));
+                    continue;
+                }
+                var code = entry.Key.Substring(0, dot);
+                if (!fields.TryGetValue(code, out var own))
+                {
+                    own = new Dictionary<string, LocaleEntry>(StringComparer.Ordinal);
+                    fields[code] = own;
+                    order.Add(code);
+                }
+                own[entry.Key.Substring(dot + 1)] = entry;
+            }
+            foreach (var code in order)
+            {
+                var own = fields[code];
+                var failed = false;
+                void Fail(string field, int line, string message)
+                {
+                    issues?.Add(new LocaleIssue(LocaleIssueSeverity.Error, OverviewFileName, line, code + "." + field, message));
+                    failed = true;
+                }
+                string Text(string field)
+                {
+                    if (own.TryGetValue(field, out var entry) && entry.Value.Trim().Length > 0)
+                        return entry.Value.Trim();
+                    Fail(field, 0, "the setting is missing or empty");
+                    return string.Empty;
+                }
+                if (!CodePattern.IsMatch(code))
+                    Fail("name", 0, "\"" + code + "\" is not a language code such as de-DE or pt-BR");
+                var native = Text("name");
+                var english = Text("englishName");
+                var status = Text("status");
+                if (status.Length > 0 && status != LocaleInfo.Approved && status != LocaleInfo.Draft)
+                    Fail("status", own["status"].Line, "the status must be \"approved\" or \"draft\"");
+                var rules = new List<KeyValuePair<string, string>>();
+                var systems = new List<string>();
+                var ruleLine = 0;
+                foreach (var pair in own)
+                {
+                    if (pair.Key == "name" || pair.Key == "englishName" || pair.Key == "status")
+                        continue;
+                    if (pair.Key == "system")
+                    {
+                        foreach (var part in pair.Value.Value.Split(','))
+                            if (part.Trim().Length > 0)
+                                systems.Add(part.Trim());
+                    }
+                    else if (pair.Key.StartsWith("plural.", StringComparison.Ordinal))
+                    {
+                        rules.Add(new KeyValuePair<string, string>(pair.Key.Substring("plural.".Length), pair.Value.Value));
+                        ruleLine = pair.Value.Line;
+                    }
+                    else
+                        Fail(pair.Key, pair.Value.Line, "unknown setting (known: name, englishName, status, system, plural.zero/one/two/few/many)");
+                }
+                PluralRuleSet plural = null;
+                if (rules.Count > 0 && !PluralRuleSet.TryParse(rules, out plural, out var reason))
+                    Fail("plural", ruleLine, reason);
+                if (!failed)
+                    result.Add(new LocaleInfo(code, native, english, status, Path.Combine(root, code), plural, systems));
             }
             return result;
         }
@@ -146,6 +279,8 @@ namespace OmsiMapEditor.Core.Localization
         public static LocaleCatalog Load(LocaleInfo info)
         {
             var catalog = new LocaleCatalog(info);
+            if (!Directory.Exists(info.Directory))
+                return catalog;
             string[] files;
             try
             {

@@ -1,0 +1,55 @@
+{
+  "@about": "The overview of all languages of OMSI MapWorks. Add a language by adding its lines here and a folder with its texts next to this file (see README.md). No code changes.",
+
+  "en-US.name": "English",
+  "en-US.englishName": "English",
+  "en-US.status": "approved",
+  "en-US.system": "English",
+  "en-US.plural.one": "i = 1 and v = 0",
+
+  "de-DE.name": "Deutsch",
+  "de-DE.englishName": "German",
+  "de-DE.status": "approved",
+  "de-DE.system": "German",
+  "de-DE.plural.one": "i = 1 and v = 0",
+
+  "pl-PL.name": "Polski",
+  "pl-PL.englishName": "Polish",
+  "pl-PL.status": "approved",
+  "pl-PL.system": "Polish",
+  "pl-PL.plural.one": "i = 1 and v = 0",
+  "pl-PL.plural.few": "v = 0 and i % 10 = 2..4 and i % 100 != 12..14",
+  "pl-PL.plural.many": "v = 0 and i != 1 and i % 10 = 0..1 or v = 0 and i % 10 = 5..9 or v = 0 and i % 100 = 12..14",
+
+  "cs-CZ.name": "Čeština",
+  "cs-CZ.englishName": "Czech",
+  "cs-CZ.status": "approved",
+  "cs-CZ.system": "Czech",
+  "cs-CZ.plural.one": "i = 1 and v = 0",
+  "cs-CZ.plural.few": "i = 2..4 and v = 0",
+  "cs-CZ.plural.many": "v != 0",
+
+  "fr-FR.name": "Français",
+  "fr-FR.englishName": "French",
+  "fr-FR.status": "approved",
+  "fr-FR.system": "French",
+  "fr-FR.plural.one": "i = 0,1",
+
+  "es-ES.name": "Español",
+  "es-ES.englishName": "Spanish",
+  "es-ES.status": "approved",
+  "es-ES.system": "Spanish",
+  "es-ES.plural.one": "n = 1",
+
+  "it-IT.name": "Italiano",
+  "it-IT.englishName": "Italian",
+  "it-IT.status": "approved",
+  "it-IT.system": "Italian",
+  "it-IT.plural.one": "i = 1 and v = 0",
+
+  "pt-PT.name": "Português (Portugal)",
+  "pt-PT.englishName": "Portuguese (Portugal)",
+  "pt-PT.status": "approved",
+  "pt-PT.system": "Portuguese",
+  "pt-PT.plural.one": "i = 1 and v = 0"
+}

@@ -379,6 +379,8 @@
 .new-map-dropdown { flex-grow: 1; flex-shrink: 1; margin: 0; }
 .new-map-dropdown .unity-base-popup-field__input { height: 26px; margin: 0; padding: 0 6px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
 .new-map-dropdown .unity-base-popup-field__input:hover { border-color: var(--mf-color-accent); }
+.settings-language-slot { width: 220px; flex-grow: 0; flex-shrink: 0; margin: 0 8px; }
+.settings-dropdown { width: 100%; flex-grow: 0; }
 .new-map-seasons { margin: 0 var(--mf-space-2); }
 .new-map-swatches { height: 108px; flex-shrink: 0; margin: 0 var(--mf-space-2); }
 .new-map-swatches-content { flex-direction: row; }

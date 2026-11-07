@@ -8,18 +8,31 @@ namespace OmsiMapEditor.UI
 {
     /// <summary>
     /// The settings dialog (File, Settings...): at first only the interface language under General (ADR 068). The languages that can
-    /// be chosen are buttons, each named in its own language; a choice takes effect at once and is kept for the next start.
+    /// be chosen are a drop-down list, each named in its own language; a choice takes effect at once and is kept for the next start.
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
         private VisualElement settingsDialog;
-        private VisualElement languageList;
+        private VisualElement languageSlot;
+        private readonly DropdownField languageDropdown = new DropdownField();
         private List<LocaleInfo> languageChoices = new List<LocaleInfo>();
 
         private void SetUpSettings(VisualElement root)
         {
             settingsDialog = root.Q<VisualElement>("settings-dialog");
-            languageList = root.Q<VisualElement>("settings-language-list");
+            languageSlot = root.Q<VisualElement>("settings-language-list");
+            if (languageSlot != null)
+            {
+                languageDropdown.AddToClassList("new-map-dropdown");
+                languageDropdown.AddToClassList("settings-dropdown");
+                languageDropdown.RegisterValueChangedCallback(_ =>
+                {
+                    var index = languageDropdown.index;
+                    if (index >= 0 && index < languageChoices.Count)
+                        ChooseLanguage(languageChoices[index].Code);
+                });
+                languageSlot.Add(languageDropdown);
+            }
             var menuItem = root.Q<Button>("settings-menu-item");
             var close = root.Q<Button>("settings-close-button");
             var fileMenu = root.Q<VisualElement>("file-menu");
@@ -43,27 +56,21 @@ namespace OmsiMapEditor.UI
         /// <summary>Shows the dialog with the languages that can be chosen, the one in use marked.</summary>
         private void OpenSettings()
         {
-            if (settingsDialog == null || languageList == null)
+            if (settingsDialog == null || languageSlot == null)
                 return;
             languageChoices = Loc.Manager != null
                 ? Loc.Manager.Languages.OrderBy(info => info.NativeName, StringComparer.CurrentCultureIgnoreCase).ToList()
                 : new List<LocaleInfo>();
-            languageList.Clear();
-            foreach (var info in languageChoices)
-            {
-                var chosen = info;
-                var button = new Button(() => ChooseLanguage(chosen.Code)) { text = info.NativeName, name = "language-" + info.Code };
-                button.AddToClassList("panel-tab");
-                languageList.Add(button);
-            }
+            languageDropdown.choices = languageChoices.Select(info => info.NativeName).ToList();
             MarkLanguage();
             settingsDialog.style.display = DisplayStyle.Flex;
         }
 
         private void MarkLanguage()
         {
-            foreach (var button in languageList.Children())
-                button.EnableInClassList("panel-tab-active", button.name == "language-" + Loc.Manager?.Language);
+            var index = languageChoices.FindIndex(info => string.Equals(info.Code, Loc.Manager?.Language, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+                languageDropdown.SetValueWithoutNotify(languageChoices[index].NativeName);
         }
 
         private void ChooseLanguage(string code)

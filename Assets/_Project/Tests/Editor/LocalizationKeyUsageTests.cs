@@ -104,7 +104,7 @@ namespace OmsiMapEditor.Tests
         {
             foreach (var code in new[] { "en-US", "de-DE" })
             {
-                var info = LocaleLoader.ReadInfo(Path.Combine(RepositoryRoot(), "locales", code), null);
+                var info = LocaleLoader.List(Path.Combine(RepositoryRoot(), "locales"), null).Find(item => item.Code == code);
                 var messages = LocaleLoader.Load(info).Messages;
                 var culture = System.Globalization.CultureInfo.InvariantCulture;
                 string Format(string key, params (string Name, object Value)[] arguments)
@@ -177,9 +177,8 @@ namespace OmsiMapEditor.Tests
 
         private static LocaleInfo English()
         {
-            var folder = Path.Combine(RepositoryRoot(), "locales", TranslationManager.ReferenceLanguage);
-            var info = LocaleLoader.ReadInfo(folder, null);
-            Assert.IsNotNull(info, "locales/en-US/locale.json must be usable");
+            var info = LocaleLoader.List(Path.Combine(RepositoryRoot(), "locales"), null).Find(item => item.Code == TranslationManager.ReferenceLanguage);
+            Assert.IsNotNull(info, "locales/languages.json must list en-US");
             return info;
         }
 

@@ -65,7 +65,7 @@ namespace OmsiMapEditor.UI
             var codes = manager.Languages.Select(info => info.Code).ToList();
             var start = forced != null
                 ? LanguageChoice.Match(forced, codes) ?? TranslationManager.ReferenceLanguage
-                : LanguageChoice.Resolve(Store, SystemLanguageCode(), codes);
+                : LanguageChoice.Resolve(Store, SystemLanguageCode(manager), codes);
             if (!manager.SetLanguage(start) && manager.ReferenceLoaded)
                 manager.SetLanguage(TranslationManager.ReferenceLanguage);
             Debug.Log("Language: " + manager.Language + " (" + (forced != null ? "-language" : "kept or system language") + "; files in " + manager.Root + ")");
@@ -82,21 +82,17 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// The system's language as a code. Unity's own report is used: it comes from the operating system's display language, while the
-        /// culture of the player's runtime may be another.
+        /// The code of the language that answers to the system's language, or null. Unity's own report is used: it comes from the
+        /// operating system's display language, while the culture of the player's runtime may be another. Which language answers to
+        /// which system language is written in <c>languages.json</c> (<c>system</c>), so a new language needs no code; a language
+        /// without that entry still matches when its code has the primary language of the runtime's culture.
         /// </summary>
-        public static string SystemLanguageCode()
+        public static string SystemLanguageCode(TranslationManager manager)
         {
-            switch (Application.systemLanguage)
-            {
-                case SystemLanguage.German: return "de-DE";
-                case SystemLanguage.English: return "en-US";
-                case SystemLanguage.Polish: return "pl-PL";
-                case SystemLanguage.Czech: return "cs-CZ";
-                case SystemLanguage.French: return "fr-FR";
-                case SystemLanguage.Spanish: return "es-ES";
-                default: return null;
-            }
+            var listed = manager.CodeForSystemLanguage(Application.systemLanguage.ToString());
+            if (listed != null)
+                return listed;
+            return LanguageChoice.Match(CultureInfo.CurrentCulture.Name, manager.Languages.Select(info => info.Code));
         }
 
         /// <summary>

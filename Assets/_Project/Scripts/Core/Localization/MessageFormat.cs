@@ -97,14 +97,14 @@ namespace OmsiMapEditor.Core.Localization
         }
 
         /// <summary>The text for the arguments, numbers and dates written the way <paramref name="culture"/> writes them.</summary>
-        public string Format(CultureInfo culture, string language, IReadOnlyList<(string Name, object Value)> arguments)
+        public string Format(CultureInfo culture, string language, IReadOnlyList<(string Name, object Value)> arguments, PluralRuleSet pluralRules = null)
         {
             if (IsPlain)
                 return PlainText;
             var builder = new StringBuilder();
             var context = new Context
             {
-                Culture = culture ?? CultureInfo.InvariantCulture, Language = language ?? string.Empty,
+                Culture = culture ?? CultureInfo.InvariantCulture, Language = language ?? string.Empty, PluralRules = pluralRules,
                 Arguments = arguments ?? new (string Name, object Value)[0]
             };
             foreach (var node in nodes)
@@ -116,6 +116,7 @@ namespace OmsiMapEditor.Core.Localization
         {
             public CultureInfo Culture;
             public string Language;
+            public PluralRuleSet PluralRules;
             public IReadOnlyList<(string Name, object Value)> Arguments;
             public bool InPlural;
             public decimal PluralNumber;
@@ -303,7 +304,9 @@ namespace OmsiMapEditor.Core.Localization
                 var exact = Cases.Find(candidate => candidate.Selector.Length > 1 && candidate.Selector[0] == '=' &&
                                                     decimal.TryParse(candidate.Selector.Substring(1), NumberStyles.Number, CultureInfo.InvariantCulture, out var wanted) &&
                                                     wanted == number);
-                var category = exact == null ? PluralRules.Select(context.Language, shifted, digits) : null;
+                var category = exact != null ? null
+                    : context.PluralRules != null ? context.PluralRules.Select(shifted, digits)
+                    : Localization.PluralRules.Select(context.Language, shifted, digits);
                 var chosen = exact ?? Cases.Find(candidate => candidate.Selector == category) ?? Cases.Find(candidate => candidate.Selector == "other");
                 if (chosen == null)
                     return;

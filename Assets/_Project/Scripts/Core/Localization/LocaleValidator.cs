@@ -33,7 +33,7 @@ namespace OmsiMapEditor.Core.Localization
             if (referenceInfo == null)
             {
                 report.Issues.Add(new LocaleIssue(LocaleIssueSeverity.Error, root ?? string.Empty, 0, null,
-                    "the reference language " + TranslationManager.ReferenceLanguage + " has no folder with a locale.json"));
+                    "the reference language " + TranslationManager.ReferenceLanguage + " is not listed in languages.json (or its folder has no locale.json)"));
                 return report;
             }
 
@@ -47,6 +47,8 @@ namespace OmsiMapEditor.Core.Localization
                 if (!reference.Messages.ContainsKey(note))
                     report.Issues.Add(new LocaleIssue(LocaleIssueSeverity.Warning, referenceInfo.Code, 0, note, "a note (\"@" + note + "\") belongs to no key"));
 
+            foreach (var info in languages)
+                CheckInfo(info, report);
             foreach (var info in languages)
             {
                 if (ReferenceEquals(info, referenceInfo))
@@ -75,6 +77,35 @@ namespace OmsiMapEditor.Core.Localization
             return report;
         }
 
+        /// <summary>Checks what languages.json says about a language: its plural rules must be known, and so must its culture.</summary>
+        private static void CheckInfo(LocaleInfo info, LocaleReport report)
+        {
+            if (info.PluralRules == null && PluralRules.RequiredCategories(info.Code).Count == 1 && !IsNoPluralLanguage(info.Code))
+                report.Issues.Add(new LocaleIssue(LocaleIssueSeverity.Warning, LocaleLoader.OverviewFileName, 0, info.Code,
+                    "no plural rules (plural.one, plural.few and so on) are given for " + info.Code + ", so every number counts as \"other\""));
+            try
+            {
+                System.Globalization.CultureInfo.GetCultureInfo(info.Code);
+            }
+            catch (System.Globalization.CultureNotFoundException)
+            {
+                report.Issues.Add(new LocaleIssue(LocaleIssueSeverity.Warning, LocaleLoader.OverviewFileName, 0, info.Code,
+                    "the system knows no culture " + info.Code + ", so numbers and dates are written in the neutral format"));
+            }
+        }
+
+        // Languages whose nouns do not change with the number (the CLDR gives them "other" only).
+        private static bool IsNoPluralLanguage(string code)
+        {
+            switch (PluralRules.LanguageOf(code))
+            {
+                case "ja": case "zh": case "ko": case "vi": case "th": case "id": case "ms": case "tr": case "hu": case "fa": case "ka":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         /// <summary>Checks key names, the syntax of each text, its plural cases and, against the reference, its placeholders; returns the parsed texts.</summary>
         private static Dictionary<string, MessageFormat> CheckTexts(LocaleCatalog catalog, LocaleReport report, Dictionary<string, MessageFormat> reference)
         {
@@ -95,18 +126,20 @@ namespace OmsiMapEditor.Core.Localization
                     continue;
                 }
                 parsed[key] = message;
-                CheckPlurals(message, catalog.Info.Code, file, origin.Value, key, report);
+                CheckPlurals(message, catalog.Info, file, origin.Value, key, report);
                 if (reference != null && reference.TryGetValue(key, out var english))
                     ComparePlaceholders(english, message, file, origin.Value, key, report);
             }
             return parsed;
         }
 
-        private static void CheckPlurals(MessageFormat message, string language, string file, int line, string key, LocaleReport report)
+        private static void CheckPlurals(MessageFormat message, LocaleInfo info, string file, int line, string key, LocaleReport report)
         {
+            var required = info.RequiredPluralCategories;
+            var language = info.Code;
             foreach (var argument in message.Arguments.Where(item => item.Kind == MessageArgumentKind.Plural))
             {
-                var missing = PluralRules.RequiredCategories(language).Where(category => !argument.Cases.Contains(category)).ToList();
+                var missing = required.Where(category => !argument.Cases.Contains(category)).ToList();
                 if (missing.Count > 0)
                     report.Issues.Add(new LocaleIssue(LocaleIssueSeverity.Error, file, line, key,
                         "the plural {" + argument.Name + "} needs the cases " + string.Join(", ", missing) + " in " + language));
