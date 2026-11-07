@@ -978,7 +978,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 064: Regeln und Vorfahrt in Chrono-Varianten bearbeiten
 
-**Status:** Angenommen, 7. November 2026 (Chrono-Varianten bearbeiten, Etappe 3, ergänzt ADR 042 und 060). Der Nutzer hat „Regeln in Varianten“ als nächste Etappe gewählt; noch nicht im Editor und in openOMSI getestet.
+**Status:** Angenommen, 7. November 2026 (Chrono-Varianten bearbeiten, Etappe 3, ergänzt ADR 042 und 060). Der Nutzer hat „Regeln in Varianten“ als nächste Etappe gewählt; vom Nutzer im Editor getestet und bestätigt (7. November 2026), in openOMSI noch ungeprüft.
 
 **Ausgangslage:** Regeln (`[rule]`, `[kill_rule]`) sind mit 2.370 gesetzten und 39 entfernten Befehlen in Berlin-Spandau der häufigste Chrono-Befehl. Der Overlay übersprang sie bisher: Eine Karte mit Datum zeigte also die Pfade und Verkehrsregeln der Basiskarte, und in einer bearbeiteten Variante ließen sich keine Regeln ändern (`CanEdit` ist mit Datum falsch).
 
