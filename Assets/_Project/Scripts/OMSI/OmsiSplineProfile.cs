@@ -94,6 +94,13 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The height of the cross-section at its outer edges, such as the top of a kerb, averaged over both sides.</summary>
         public double EdgeHeight { get; private set; }
 
+        /// <summary>
+        /// How far out from the centre line a spline's cant lifts the cross-section, as OMSI takes it (ADR 083): the [halfcantwidth] of the
+        /// file, else as far as its [heightprofile]s reach either side, 0 for a type without them; beyond it the profile keeps the height it
+        /// has there. Null when the profile was not read from a file.
+        /// </summary>
+        public double? HalfCantWidth { get; private set; }
+
         /// <summary>The kind of a lane whose [path] could not be read.</summary>
         public const int UnreadableLane = -1;
 
@@ -108,7 +115,8 @@ namespace OmsiMapEditor.OMSI
         {
             var result = new OmsiSplineProfile
             {
-                EditorOnly = EditorOnly, LineKind = LineKind, LeftEdge = -RightEdge, RightEdge = -LeftEdge, EdgeHeight = EdgeHeight
+                EditorOnly = EditorOnly, LineKind = LineKind, LeftEdge = -RightEdge, RightEdge = -LeftEdge, EdgeHeight = EdgeHeight,
+                HalfCantWidth = HalfCantWidth
             };
             result.Textures.AddRange(Textures);
             foreach (var strip in Strips)
@@ -144,7 +152,7 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public OmsiSplineProfile Clipped(double from, double to)
         {
-            var result = new OmsiSplineProfile { EditorOnly = EditorOnly, LineKind = LineKind, EdgeHeight = EdgeHeight };
+            var result = new OmsiSplineProfile { EditorOnly = EditorOnly, LineKind = LineKind, EdgeHeight = EdgeHeight, HalfCantWidth = HalfCantWidth };
             result.Textures.AddRange(Textures);
             double left = double.MaxValue, right = double.MinValue;
             foreach (var strip in Strips)
@@ -202,6 +210,8 @@ namespace OmsiMapEditor.OMSI
             var folder = System.IO.Path.GetDirectoryName(assetPath ?? string.Empty) ?? string.Empty;
             var result = new OmsiSplineProfile();
             OmsiProfileStrip strip = null;
+            double? explicitCantWidth = null;
+            double heightLow = 0.0, heightHigh = 0.0;
             foreach (var record in file.Records)
             {
                 // Keywords are followed by their values; comments come after them and are ignored.
@@ -225,6 +235,19 @@ namespace OmsiMapEditor.OMSI
                             : null;
                         if (strip != null)
                             result.Strips.Add(strip);
+                        break;
+                    case "halfcantwidth":
+                        if (values.Count > 0 && double.TryParse(values[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var cantWidth) && cantWidth >= 0.0)
+                            explicitCantWidth = cantWidth;
+                        break;
+                    case "heightprofile":
+                        // Lateral start and end of a stretch with its own heights; the stretches say how far the cant reaches.
+                        if (values.Count >= 2 && double.TryParse(values[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var heightFrom) &&
+                            double.TryParse(values[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var heightTo))
+                        {
+                            heightLow = Math.Min(heightLow, heightFrom);
+                            heightHigh = Math.Max(heightHigh, heightTo);
+                        }
                         break;
                     case "terrainholeprofile":
                         result.TerrainHoles.Add(new List<double>());
@@ -260,6 +283,7 @@ namespace OmsiMapEditor.OMSI
             result.TerrainHoles.RemoveAll(item => item.Count < 2);
             result.LineKind = Classify(result);
             MeasureEdges(result);
+            result.HalfCantWidth = explicitCantWidth ?? Math.Max(-heightLow, heightHigh);
             return result;
         }
 

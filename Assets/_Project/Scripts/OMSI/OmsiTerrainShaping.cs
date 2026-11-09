@@ -41,6 +41,7 @@ namespace OmsiMapEditor.OMSI
             Left = spline.IsMirrored ? -profile.RightEdge : profile.LeftEdge;
             Right = spline.IsMirrored ? -profile.LeftEdge : profile.RightEdge;
             EdgeHeight = profile.EdgeHeight;
+            HalfCantWidth = profile.HalfCantWidth ?? Math.Max(-profile.LeftEdge, profile.RightEdge);
             var count = Math.Max(2, (int)Math.Ceiling(spline.LengthMeters));
             Points = new OmsiMapPoint[count + 1];
             Headings = new double[count + 1];
@@ -72,6 +73,9 @@ namespace OmsiMapEditor.OMSI
         public double Right { get; }
 
         public double EdgeHeight { get; }
+
+        /// <summary>How far out from the centre line the spline's cant lifts the cross-section (ADR 083).</summary>
+        public double HalfCantWidth { get; }
 
         /// <summary>
         /// True when the start lies on a connection point of an object, such as a junction: the object goes on from there,
@@ -324,6 +328,15 @@ namespace OmsiMapEditor.OMSI
             if (beyondEnd && atObject)
                 return false;
             var roadHeight = road.Spline.HeightAt(along);
+            // The cant tilts the cross-section: the height at a place across the road is the centre's less cant × the place's offset, within the
+            // half cant width (openOMSI, offset_point); outside the road the terrain starts from the height of the edge.
+            if (!beyondEnd)
+            {
+                var spline = road.Spline;
+                var cant = spline.CantStartPercent + (spline.CantEndPercent - spline.CantStartPercent) * (spline.LengthMeters > 0.0 ? along / spline.LengthMeters : 0.0);
+                var across = Math.Max(road.Left, Math.Min(road.Right, lateral));
+                roadHeight -= Math.Max(-road.HalfCantWidth, Math.Min(road.HalfCantWidth, across)) * cant / 100.0;
+            }
             // Past the ends the road edge is the end itself, so the slopes round off around it.
             var edge = beyondEnd ? 0.0 : lateral >= 0 ? road.Right : -road.Left;
             var outside = Math.Abs(lateral) - edge;
