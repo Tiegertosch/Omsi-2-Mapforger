@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 76 · Teilweise 18 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 78 · Teilweise 16 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -42,8 +42,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Steigung am Anfang und Ende bearbeiten — Vorhanden
 - [x] Querneigung / Cant bearbeiten — Vorhanden (Inspector eines Splines, wirkt auf den verbundenen Nachbarn; seit 9. November 2026)
 - [x] Spline-Skew bearbeiten — Vorhanden (Inspector eines Splines, ab Kachelversion 14; seit 9. November 2026)
-- [ ] Spline-Mirroring verwenden — Teilweise
-- [ ] Spline-Texturversatz bearbeiten — Teilweise (der Kettenabstand wird automatisch gepflegt, nicht von Hand)
+- [x] Spline-Mirroring verwenden — Vorhanden (Schalter „Mirrored“ im Inspector; seit 9. November 2026)
+- [x] Spline-Texturversatz bearbeiten — Vorhanden (Feld „Tex. offset“ im Inspector; bleibt bis sich die Kette ändert; seit 9. November 2026)
 - [x] Splines automatisch verbinden — Vorhanden
 - [x] Spline-Endpunkte nachträglich verschieben — Vorhanden
 - [x] Splines teilen und löschen — Vorhanden

@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Gespiegelt",
+  "inspector.mirror.tooltip": "Dreht den Querschnitt dieses Splines um: Pfade, Objektreihen und das Profil liegen auf der anderen Seite der Mittellinie. Am besten längs einer ganzen Straße gleich lassen.",
+  "inspector.field.tex_offset": "Tex.-Versatz",
+  "inspector.tex_offset.tooltip": "Wie weit dieser Spline vom Anfang seiner Kette entfernt beginnt, in Metern. Von hier laufen die Texturen, und Objektreihen längs des Splines zählen davon. Beim Bearbeiten der Straße setzt der Editor den Wert wieder so, wie die Kette ihn ergibt; die Kartenprüfung nennt einen abweichenden Wert.",
+  "inspector.name.tex_offset": "Texturversatz",
+  "inspector.apply_look": "Textur und Spiegelung übernehmen",
+  "inspector.apply_look.tooltip": "Schreibt die Spiegelung und den Texturversatz dieses Splines.",
+  "readonly.action.spline_look": "Spiegelung und Texturversatz von Splines zu ändern",
+  "spline.look.failed": "Spiegelung und Texturversatz von Spline #{id} ließen sich nicht ändern: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "Spiegelung und Texturversatz von Spline #{id} sind unverändert.",
+  "spline.look.changed": "Spiegelung und Texturversatz von Spline #{id} geändert; er ist jetzt {mirrored, select, yes {gespiegelt} other {nicht gespiegelt}}. Strg+Z nimmt es zurück.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

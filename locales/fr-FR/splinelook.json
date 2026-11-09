@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Inversé",
+  "inspector.mirror.tooltip": "Retourne la section de ce spline : les chemins, les rangées d'objets et le profil se trouvent de l'autre côté de l'axe. À garder identique sur toute une route.",
+  "inspector.field.tex_offset": "Décal. tex.",
+  "inspector.tex_offset.tooltip": "À quelle distance du début de sa chaîne ce spline commence, en mètres. Les textures partent d'ici, et les rangées d'objets le long du spline comptent à partir de là. Modifier la route remet la valeur que donne la chaîne ; le contrôle de la carte signale une valeur différente.",
+  "inspector.name.tex_offset": "Décalage de texture",
+  "inspector.apply_look": "Appliquer texture et inversion",
+  "inspector.apply_look.tooltip": "Écrit l'inversion et le décalage de texture de ce spline.",
+  "readonly.action.spline_look": "modifier l'inversion et le décalage de texture du spline",
+  "spline.look.failed": "L'inversion et le décalage de texture du spline #{id} n'ont pas pu être modifiés : {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "L'inversion et le décalage de texture du spline #{id} sont inchangés.",
+  "spline.look.changed": "Inversion et décalage de texture du spline #{id} modifiés ; il est maintenant {mirrored, select, yes {inversé} other {non inversé}}. Ctrl+Z l'annule.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

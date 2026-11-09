@@ -3239,6 +3239,42 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void MirroringAndTheTextureOffsetOfASplineAreWrittenAndUndone()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var before = session.Workspace.ReadAllBytes("tile_0_0.map");
+            var spline = tile.Splines.Single(candidate => candidate.Id == 10);
+            Assert.IsFalse(spline.IsMirrored);
+            Assert.IsNotNull(spline.ChainOffset);
+
+            var change = session.UpdateSplineLook(summary, new[] { new OmsiSplineLook { Tile = tile, Spline = spline, Mirrored = true, TextureOffset = 12.5 } });
+            Assert.IsNotNull(change);
+            spline = tile.Splines.Single(candidate => candidate.Id == 10);
+            Assert.IsTrue(spline.IsMirrored);
+            Assert.AreEqual(12.5, spline.ChainOffset.Value, 1e-9);
+            var view = OmsiTileRecords.Of<OmsiSplineView>(OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance))
+                .Single(candidate => candidate.Id == 10);
+            Assert.IsTrue(view.IsMirrored);
+            Assert.AreEqual(12.5, view.ChainOffset, 1e-9);
+            Assert.IsNull(session.UpdateSplineLook(summary, new[] { new OmsiSplineLook { Tile = tile, Spline = spline, Mirrored = true, TextureOffset = 12.5 } }),
+                "The same values change nothing.");
+
+            // Mirroring alone keeps the offset; turning it off removes the line again.
+            var plain = session.UpdateSplineLook(summary, new[] { new OmsiSplineLook { Tile = tile, Spline = spline, Mirrored = false } });
+            Assert.IsNotNull(plain);
+            spline = tile.Splines.Single(candidate => candidate.Id == 10);
+            Assert.IsFalse(spline.IsMirrored);
+            Assert.AreEqual(12.5, spline.ChainOffset.Value, 1e-9);
+            Assert.Throws<ArgumentException>(() => session.UpdateSplineLook(summary, new[] { new OmsiSplineLook { Tile = tile, Spline = spline, TextureOffset = double.NaN } }));
+
+            session.Undo(summary, plain);
+            session.Undo(summary, change);
+            CollectionAssert.AreEqual(before, session.Workspace.ReadAllBytes("tile_0_0.map"));
+        }
+
+        [Test]
         public void ChangingTheHeightOfAFreeEndKeepsTheGradientAtTheJoinedOtherEnd()
         {
             var session = OpenProject();

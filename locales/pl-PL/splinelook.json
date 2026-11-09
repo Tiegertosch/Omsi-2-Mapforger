@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Odbity",
+  "inspector.mirror.tooltip": "Odwraca przekrój tego splajnu: ścieżki, rzędy obiektów i profil leżą po drugiej stronie osi. Najlepiej zostawić tak samo na całej drodze.",
+  "inspector.field.tex_offset": "Przes. tekstury",
+  "inspector.tex_offset.tooltip": "Jak daleko od początku swojego łańcucha zaczyna się ten splajn, w metrach. Od tego miejsca biegną tekstury i liczą się rzędy obiektów wzdłuż splajnu. Edycja drogi przywraca wartość wynikającą z łańcucha; kontrola mapy wskazuje inną wartość.",
+  "inspector.name.tex_offset": "Przesunięcie tekstury",
+  "inspector.apply_look": "Zastosuj teksturę i odbicie",
+  "inspector.apply_look.tooltip": "Zapisuje odbicie i przesunięcie tekstury tego splajnu.",
+  "readonly.action.spline_look": "zmień odbicie i przesunięcie tekstury splajnu",
+  "spline.look.failed": "Nie udało się zmienić odbicia i przesunięcia tekstury splajnu #{id}: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "Odbicie i przesunięcie tekstury splajnu #{id} bez zmian.",
+  "spline.look.changed": "Zmieniono odbicie i przesunięcie tekstury splajnu #{id}; jest teraz {mirrored, select, yes {odbity} other {nieodbity}}. Ctrl+Z to cofa.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

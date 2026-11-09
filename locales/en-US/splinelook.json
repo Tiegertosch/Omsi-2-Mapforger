@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Mirrored",
+  "inspector.mirror.tooltip": "Turns the cross-section of this spline over: paths, rows of objects and the profile lie on the other side of the centre line. Keep it the same along a whole road.",
+  "inspector.field.tex_offset": "Tex. offset",
+  "inspector.tex_offset.tooltip": "How far along its chain this spline begins, in metres. The textures start from here, and rows of objects along the spline count from it. Editing the road puts it back to where the chain puts it; the map check lists a value that differs.",
+  "inspector.name.tex_offset": "Texture offset",
+  "inspector.apply_look": "Apply texture and mirror",
+  "inspector.apply_look.tooltip": "Writes the mirroring and the texture offset of this spline.",
+  "readonly.action.spline_look": "change spline mirroring and texture offset",
+  "spline.look.failed": "The mirroring and texture offset of spline #{id} could not be changed: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "The mirroring and texture offset of spline #{id} are unchanged.",
+  "spline.look.changed": "Changed the mirroring and texture offset of spline #{id}; it is now {mirrored, select, yes {mirrored} other {not mirrored}}. Ctrl+Z takes it back.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

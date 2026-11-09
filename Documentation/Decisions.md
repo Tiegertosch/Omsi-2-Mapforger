@@ -1168,3 +1168,18 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Detailstufe nicht bearbeitbar:** Das erste Feld von `[object]`, `[attachObj]` und `[spline]` ab Kachelversion 9 ist die Detailstufe; in Grundorf kommen 0 und 1 vor, in Berlin-Spandau 0, 1 und 2 (Objekte: 24.039 / 3.903 / 1.508). openOMSI liest das Feld und verwirft es (`let _detail = r.line()`, `crates/omsi-map/src/tile.rs`), der Nutzer prüft nur in openOMSI; eine Änderung wäre dort weder zu sehen noch zu prüfen. Der Editor erhält den Wert wie jedes unverstandene Feld unverändert. Entscheidung des Nutzers am 9. November 2026: überspringen.
 
 **Prüfung:** `OmsiRoadTests.AnOvertakingBanIsASwitchRuleTheEditorManagesWithTheOtherTrafficRules` (Regel wird geschrieben, ohne Haken wieder entfernt, andere Regeln bleiben).
+
+## ADR 074: Spiegelung und Texturversatz von Splines im Inspector
+
+**Status:** Angenommen, 9. November 2026 (schließt „Spline-Mirroring verwenden“ und „Spline-Texturversatz bearbeiten“ der Feature-Parity-Liste).
+
+**Format:** Das letzte Feld eines `[spline]` (18 in Version 14, 15 in Version 11 und 12, in `[spline_h]` eins mehr) ist der Kettenabstand: wie weit der Spline vom Anfang seiner Kette entfernt beginnt, zugleich der Startpunkt der Texturen und der Zählbeginn der Reihen längs des Splines (ADR 038). Eine angehängte Zeile `mirror` dreht den Querschnitt um; Pfade, Reihen und Profil liegen dann auf dem negierten Seitenabstand (`OmsiMapPaths`, `OmsiSplineAttachmentLayout`, `OmsiSplineProfile` werten das schon aus).
+
+**Entscheidung:**
+- **Schreiben:** `OmsiMapSession.UpdateSplineLook` (`OmsiSplineLook.cs`) schreibt die Spiegelung (`OmsiSplineView.IsMirrored`) und den Texturversatz, alles andere bleibt, ein Rückgängig-Schritt über Dateistände wie `UpdateSplineCross`; nichts, wenn die Werte schon so stehen. Ohne Angabe bleibt der Versatz, wie er ist.
+- **Oberfläche:** Im Inspector eines gewählten Splines unter Querneigung und Skew: Schalter „Mirrored“, Feld „Tex. offset“ (nur wo der Spline das Feld hat) und „Apply texture and mirror“ (`EditorShellSplineLook.cs`), nur in der Basiskarte. Kommandozeile `-splineLook mirror|plain [Versatz]` mit `-selectSpline`; „Spline look:“ im Player-Log.
+- **Wechselwirkung mit der Kettenpflege:** Ein von Hand gesetzter Versatz bleibt, bis die Kette sich ändert (`KeepChains` schreibt nur Splines neu, deren errechneter Wert sich ändert); die Kartenprüfung nennt ihn bis dahin als abweichenden gespeicherten Kettenabstand, mit der Schaltfläche, die ihn zurücksetzt.
+
+**Grenzen:** Gespiegelt wird nur der gewählte Spline; ein einheitlicher Wert längs einer Straße bleibt Sache des Nutzers. Kein Mehrfach-Setzen über „Whole road“.
+
+**Prüfung:** `OmsiRoadTests.MirroringAndTheTextureOffsetOfASplineAreWrittenAndUndone` (Schreiben, Lesen aus der Datei, gleiche Werte ändern nichts, Spiegelung allein lässt den Versatz, Rückgängig stellt die Datei byteidentisch her).

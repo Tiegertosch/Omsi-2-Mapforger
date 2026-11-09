@@ -4,6 +4,7 @@
 
 ### Roads
 
+- **Mirroring and texture offset of a spline.** The inspector of a selected spline has a *Mirrored* switch (the cross-section is turned over) and a *Tex. offset* field (where along its chain the spline begins: the textures start there and rows of objects count from it).
 - **No overtaking.** The traffic rules of a road lane in the inspector have a *No overtaking* switch: nobody drives over to the oncoming half of the road to pass there, as with a solid centre line.
 - **Cant and skew of a spline.** The inspector of a selected spline shows the cant (banking across the road, in percent) and, in tiles of version 14 and later, the skew at its start and end, and changes them in one undo step. A cant given at a joined end goes to the spline joined there too, so the road stays level across the joint.
 

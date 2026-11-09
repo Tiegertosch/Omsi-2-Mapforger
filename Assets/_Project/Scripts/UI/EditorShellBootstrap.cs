@@ -1397,7 +1397,10 @@ namespace OmsiMapEditor.UI
                     double.TryParse(Argument("-splineHeights", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var endHeight))
                     SetSplineHeights(startHeight, endHeight);
                 if (selectedSpline != null)
+                {
                     RunSplineCrossArguments(args);
+                    RunSplineLookArguments(args);
+                }
             }
 
             // -splineType, -splinePick, -splineDelete, -splineUndo and -splineRedo work on the spline chosen above in a variant being edited (ADR 065).
@@ -8258,6 +8261,7 @@ namespace OmsiMapEditor.UI
                 apply.AddToClassList("inspector-edit-apply");
                 editor.Add(apply);
                 AddSplineCrossFields(editor, spline);
+                AddSplineLookFields(editor, spline);
             }
             if (CanEdit && session.IsBuiltHere(spline))
             {

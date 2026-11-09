@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Specchiato",
+  "inspector.mirror.tooltip": "Rovescia la sezione di questo spline: percorsi, file di oggetti e profilo stanno dall'altra parte dell'asse. Meglio tenerlo uguale lungo tutta una strada.",
+  "inspector.field.tex_offset": "Sp. texture",
+  "inspector.tex_offset.tooltip": "A che distanza dall'inizio della sua catena inizia questo spline, in metri. Le texture partono da qui e le file di oggetti lungo lo spline contano da qui. Modificando la strada si torna al valore che dà la catena; il controllo della mappa segnala un valore diverso.",
+  "inspector.name.tex_offset": "Spostamento texture",
+  "inspector.apply_look": "Applica texture e specchio",
+  "inspector.apply_look.tooltip": "Scrive lo specchio e lo spostamento texture di questo spline.",
+  "readonly.action.spline_look": "modificare specchio e spostamento texture dello spline",
+  "spline.look.failed": "Non è stato possibile modificare specchio e spostamento texture dello spline #{id}: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "Specchio e spostamento texture dello spline #{id} sono invariati.",
+  "spline.look.changed": "Specchio e spostamento texture dello spline #{id} modificati; ora è {mirrored, select, yes {specchiato} other {non specchiato}}. Ctrl+Z li annulla.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

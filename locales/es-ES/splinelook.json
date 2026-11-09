@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Reflejado",
+  "inspector.mirror.tooltip": "Da la vuelta a la sección de este spline: los caminos, las filas de objetos y el perfil quedan al otro lado del eje. Conviene mantenerlo igual en toda una carretera.",
+  "inspector.field.tex_offset": "Desp. textura",
+  "inspector.tex_offset.tooltip": "A qué distancia del inicio de su cadena empieza este spline, en metros. Las texturas parten de aquí y las filas de objetos a lo largo del spline cuentan desde aquí. Al editar la carretera se vuelve al valor que da la cadena; la comprobación del mapa indica un valor distinto.",
+  "inspector.name.tex_offset": "Desplazamiento de textura",
+  "inspector.apply_look": "Aplicar textura y reflejo",
+  "inspector.apply_look.tooltip": "Escribe el reflejo y el desplazamiento de textura de este spline.",
+  "readonly.action.spline_look": "cambiar el reflejo y el desplazamiento de textura del spline",
+  "spline.look.failed": "No se pudieron cambiar el reflejo y el desplazamiento de textura del spline #{id}: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "El reflejo y el desplazamiento de textura del spline #{id} no han cambiado.",
+  "spline.look.changed": "Reflejo y desplazamiento de textura del spline #{id} cambiados; ahora está {mirrored, select, yes {reflejado} other {sin reflejar}}. Ctrl+Z lo deshace.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

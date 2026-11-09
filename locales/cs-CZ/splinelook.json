@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Zrcadlený",
+  "inspector.mirror.tooltip": "Otočí průřez tohoto splinu: cesty, řady objektů a profil leží na druhé straně osy. Nejlépe nechat stejné podél celé silnice.",
+  "inspector.field.tex_offset": "Posun text.",
+  "inspector.tex_offset.tooltip": "Jak daleko od začátku svého řetězce tento spline začíná, v metrech. Odtud běží textury a počítají se řady objektů podél splinu. Úprava silnice vrátí hodnotu, kterou dává řetězec; kontrola mapy ukáže odlišnou hodnotu.",
+  "inspector.name.tex_offset": "Posun textury",
+  "inspector.apply_look": "Použít texturu a zrcadlení",
+  "inspector.apply_look.tooltip": "Zapíše zrcadlení a posun textury tohoto splinu.",
+  "readonly.action.spline_look": "změnit zrcadlení a posun textury splinu",
+  "spline.look.failed": "Zrcadlení a posun textury splinu #{id} se nepodařilo změnit: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "Zrcadlení a posun textury splinu #{id} zůstaly beze změny.",
+  "spline.look.changed": "Zrcadlení a posun textury splinu #{id} změněny; nyní je {mirrored, select, yes {zrcadlený} other {nezrcadlený}}. Ctrl+Z to vrátí zpět.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

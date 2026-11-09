@@ -1,0 +1,15 @@
+{
+  "inspector.field.mirror": "Espelhado",
+  "inspector.mirror.tooltip": "Vira a secção deste spline ao contrário: caminhos, filas de objetos e perfil ficam do outro lado do eixo. Convém manter igual ao longo de uma estrada inteira.",
+  "inspector.field.tex_offset": "Desl. textura",
+  "inspector.tex_offset.tooltip": "A que distância do início da sua cadeia este spline começa, em metros. As texturas partem daqui e as filas de objetos ao longo do spline contam a partir daqui. Ao editar a estrada volta-se ao valor que a cadeia dá; a verificação do mapa indica um valor diferente.",
+  "inspector.name.tex_offset": "Deslocamento de textura",
+  "inspector.apply_look": "Aplicar textura e espelho",
+  "inspector.apply_look.tooltip": "Escreve o espelho e o deslocamento de textura deste spline.",
+  "readonly.action.spline_look": "alterar o espelho e o deslocamento de textura do spline",
+  "spline.look.failed": "Não foi possível alterar o espelho e o deslocamento de textura do spline #{id}: {failure}",
+  "@spline.look.failed": "{failure} is a message of MapWorks in English",
+  "spline.look.unchanged": "O espelho e o deslocamento de textura do spline #{id} não mudaram.",
+  "spline.look.changed": "Espelho e deslocamento de textura do spline #{id} alterados; agora está {mirrored, select, yes {espelhado} other {não espelhado}}. Ctrl+Z anula.",
+  "@spline.look.changed": "{mirrored} is yes or no and chooses a part: keep it in English"
+}

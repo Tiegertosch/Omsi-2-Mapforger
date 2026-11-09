@@ -159,6 +159,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Fenster „Satellite and terrain“ in vier Reitern nach Aufgabe: Place, Pictures, Terrain, More (ADR 063)
   - [x] Volle Luftbilder beim Zoomen ohne Ruckeln (ADR 062): komprimierte Kopie im Zwischenspeicher mit 2-GB-Grenze (beim Laden der Bilder auf Arbeitsfäden berechnet, `OmsiDxt`), Texturen länger behalten
   - [x] Genaue Verortung klassischer Karten (ADR 061, Wunsch aus der Rückmeldung zu 1.0): Bezugspunkt, Koordinaten einfügen, Maßstab, Verschieben, Zwei-Punkt-Passung, geladene Bilder folgen sofort; wartet auf den Nutzertest. Offen: neue Karten mit Koordinaten im Dialog „New map“ anlegen (`[worldcoordinates]`)
+  - [x] Spiegelung und Texturversatz von Splines im Inspector (ADR 074)
   - [x] Überholverbot als Pfadregel im Inspector (ADR 073)
   - [x] Querneigung und Skew von Splines im Inspector (ADR 072)
   - [x] Zufällige Ausrichtung beim Platzieren, Einfügen und für die Auswahl (ADR 071)
