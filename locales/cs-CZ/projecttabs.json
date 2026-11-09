@@ -1,0 +1,10 @@
+{
+  "project.tab.tiles": "Tiles",
+  "project.tab.map": "Mapa",
+  "project.tab.chrono": "Chrono",
+  "project.tab.lines": "Linky",
+  "project.tab.paths": "Cesty",
+  "project.filter": "Najít tile",
+  "project.filter.tooltip": "Zadejte souřadnice tile, například 2,-1, nebo část názvu souboru.",
+  "project.no_match": "Žádná tile neodpovídá."
+}

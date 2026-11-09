@@ -192,6 +192,7 @@ namespace OmsiMapEditor.UI
             var filter = new TextField { value = tileFilter };
             filter.AddToClassList("panel-search-field");
             filter.AddToClassList("inspector-filter");
+            filter.AddToClassList("compact-filter");
             filter.textEdition.placeholder = Loc.T("inspector.filter");
             filter.tooltip = Loc.T("inspector.filter.tooltip");
             container.Add(filter);

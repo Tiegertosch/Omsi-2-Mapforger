@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Project browser
+
+- **Tabs by task.** The name, counts and warnings of the map stay on top; below them *Tiles* (the list of tiles, with a filter by coordinates such as `2,-1` or by file name), *Map* (map settings and its description), *Chrono*, *Lines* and *Paths* show one thing at a time. Tabs that have nothing to show are left out. The tab you chose stays when the browser is drawn again, and the *Paths* and *Routes* buttons of the map open their tab. There are no more lists scrolling inside the scrolling list.
+
 ### Inspector
 
 - **A calmer inspector.** The header is one line (name of the tile and how much it holds). With something selected there are two tabs: *Selection* (the selected object, spline or group) and *Tile* (its file, water, picture, and a search for an object or spline of the tile by ID or name; the long lists of everything in the tile are gone). Fields sit in compact rows (X, Y and height in one line), related settings are in groups that fold (type and labels, heights, cant and skew, texture and mirroring, traffic rules, AI paths) and stay open or shut as you left them, and *Apply*, *Level ground* and *Delete* stay in a bar at the bottom instead of scrolling away.

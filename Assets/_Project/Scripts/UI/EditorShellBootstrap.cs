@@ -688,7 +688,13 @@ namespace OmsiMapEditor.UI
             if (routesToggleButton != null)
             {
                 routesToggleButton.SetEnabled(false);
-                routesToggleButton.clicked += () => ShowRoutes(mapCanvas != null && !mapCanvas.ShowRoutes);
+                routesToggleButton.clicked += () =>
+                {
+                    var show = mapCanvas != null && !mapCanvas.ShowRoutes;
+                    ShowRoutes(show);
+                    if (show && ProjectTabAvailable(ProjectTab.Lines))
+                        ShowProjectTab(ProjectTab.Lines);
+                };
             }
 
             if (viewButton != null)
@@ -1141,6 +1147,7 @@ namespace OmsiMapEditor.UI
 
             RunClipboardArguments(args);
             RunMapSettingsArguments(args);
+            RunProjectTabArguments(args);
 
             if (Array.IndexOf(args, "-deleteSelection") >= 0 && selection.Count > 0)
             {
@@ -2059,6 +2066,7 @@ namespace OmsiMapEditor.UI
             if (session == null || baseSummary == null)
                 return;
             var generation = ++chronoGeneration;
+            projectTab = ProjectTab.Chrono;
             StopPlacement();
             ShowObjectsPanel(false);
             var wasEditing = editedVariant != null;
@@ -7580,8 +7588,6 @@ namespace OmsiMapEditor.UI
             browserCountsLabel.AddToClassList("browser-map-counts");
             projectPanel.Add(browserCountsLabel);
             UpdateCounts();
-            if (session != null && session.CanEdit)
-                projectPanel.Add(MapSettingsButton());
 
             var warnings = currentSummary.Warnings;
             if (warnings.Count > 0)
@@ -7593,62 +7599,30 @@ namespace OmsiMapEditor.UI
                 warningLabel.AddToClassList("browser-map-warnings");
                 projectPanel.Add(warningLabel);
             }
-            if (!string.IsNullOrWhiteSpace(currentSummary.Description))
-            {
-                // The description can be long; it stays folded until asked for.
-                var description = new Foldout { text = Loc.T("project.about"), value = false };
-                description.AddToClassList("browser-map-description");
-                description.Add(new Label(currentSummary.Description.Trim()));
-                projectPanel.Add(description);
-            }
 
-            // A project can make variants, so it shows the section even without any.
-            if (chronoVariants.Count > 0 || session != null && session.CanEdit)
-                projectPanel.Add(ChronoSection());
-
+            // The tab chosen stays through every redraw; one that has nothing to show now falls back to the tiles.
             lineEntries.Clear();
-            if (routes != null && routes.Lines.Count > 0)
+            if (!ProjectTabAvailable(projectTab))
+                projectTab = ProjectTab.Tiles;
+            projectPanel.Add(ProjectTabStrip(projectTab));
+            switch (projectTab)
             {
-                var lines = new Foldout { text = Loc.T("project.lines", ("count", routes.Lines.Count)), value = false };
-                lines.AddToClassList("browser-lines");
-                var lineList = new ScrollView(ScrollViewMode.Vertical);
-                lineList.AddToClassList("browser-line-list");
-                var sorted = new List<OmsiRouteLine>(routes.Lines);
-                sorted.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
-                foreach (var line in sorted)
-                {
-                    var name = line.Name;
-                    var entry = new Button(() => HighlightLine(name))
-                    {
-                        text = Loc.T("project.line", ("name", name), ("stops", line.StopIds.Count), ("trips", line.ScheduledTripCount)),
-                        tooltip = Loc.T("project.line.tooltip", ("name", name))};
-                    entry.AddToClassList("browser-tile-entry");
-                    entry.EnableInClassList("browser-tile-entry-selected", name == highlightedLine);
-                    lineList.Add(entry);
-                    lineEntries[name] = entry;
-                }
-                lines.Add(lineList);
-                projectPanel.Add(lines);
+                case ProjectTab.Map:
+                    projectPanel.Add(MapTab());
+                    break;
+                case ProjectTab.Chrono:
+                    projectPanel.Add(ProjectTabPage(ChronoSection()));
+                    break;
+                case ProjectTab.Lines:
+                    projectPanel.Add(ProjectTabPage(LinesSection()));
+                    break;
+                case ProjectTab.Paths:
+                    projectPanel.Add(ProjectTabPage(PathsSection()));
+                    break;
+                default:
+                    projectPanel.Add(TilesTab());
+                    break;
             }
-            if (pathsShown && mapPaths != null)
-                projectPanel.Add(PathsSection());
-
-            var tileList = new ScrollView(ScrollViewMode.Vertical);
-            tileList.AddToClassList("browser-tile-list");
-            foreach (var tile in currentSummary.Tiles)
-            {
-                var capturedTile = tile;
-                var entry = new Button(() => SelectTile(capturedTile, true));
-                entry.AddToClassList("browser-tile-entry");
-                if (ReferenceEquals(tile, selectedTile))
-                    entry.AddToClassList("browser-tile-entry-selected");
-                if (!tile.IsAvailable)
-                    entry.AddToClassList("browser-tile-entry-missing");
-                tileList.Add(entry);
-                browserEntries[tile] = entry;
-                UpdateBrowserEntry(tile);
-            }
-            projectPanel.Add(tileList);
         }
 
         /// <summary>
@@ -7659,8 +7633,12 @@ namespace OmsiMapEditor.UI
         private VisualElement ChronoSection()
         {
             var canEditVariants = session != null && session.CanEdit;
-            var section = new Foldout { text = Loc.T("chrono.foldout", ("count", chronoVariants.Count)), value = chronoDate != null || newVariantFormOpen };
+            var section = new VisualElement();
             section.AddToClassList("browser-chrono");
+            var chronoHeading = new Label(Loc.T("chrono.foldout", ("count", chronoVariants.Count)));
+            chronoHeading.AddToClassList("inspector-group-title");
+            chronoHeading.style.marginBottom = 4;
+            section.Add(chronoHeading);
             var state = new Label(EditingVariant
                 ? Loc.T("chrono.note.editing", ("title", editedVariant.Title), ("date", chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
                 : chronoDate == null
@@ -7688,8 +7666,7 @@ namespace OmsiMapEditor.UI
             row.Add(back);
             section.Add(row);
 
-            var list = new ScrollView(ScrollViewMode.Vertical);
-            list.AddToClassList("browser-line-list");
+            var list = new VisualElement();
             foreach (var variant in chronoVariants)
             {
                 var captured = variant;

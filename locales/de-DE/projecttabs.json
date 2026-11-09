@@ -1,0 +1,10 @@
+{
+  "project.tab.tiles": "Kacheln",
+  "project.tab.map": "Karte",
+  "project.tab.chrono": "Chrono",
+  "project.tab.lines": "Linien",
+  "project.tab.paths": "Pfade",
+  "project.filter": "Kachel suchen",
+  "project.filter.tooltip": "Koordinaten einer Kachel wie 2,-1 oder einen Teil des Dateinamens eintippen.",
+  "project.no_match": "Keine Kachel passt."
+}

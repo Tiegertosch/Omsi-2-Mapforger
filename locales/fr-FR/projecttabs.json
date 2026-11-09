@@ -1,0 +1,10 @@
+{
+  "project.tab.tiles": "Tiles",
+  "project.tab.map": "Carte",
+  "project.tab.chrono": "Chrono",
+  "project.tab.lines": "Lignes",
+  "project.tab.paths": "Chemins",
+  "project.filter": "Chercher une tile",
+  "project.filter.tooltip": "Saisissez les coordonnées d'une tile, comme 2,-1, ou une partie du nom de fichier.",
+  "project.no_match": "Aucune tile ne correspond."
+}

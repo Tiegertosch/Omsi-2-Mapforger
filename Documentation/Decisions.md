@@ -1229,3 +1229,20 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Nicht geändert:** Inhalte, Schreibvorgänge, Rückgängig-Schritte und Rechte (nur lesen, Chrono-Variante, nur Regeln) bleiben, wie sie waren; nur die Anordnung ändert sich.
 
 **Prüfung:** Screenshots am Player (Grundorf: Spline mit KI-Pfaden, Objekt, Kachel ohne Auswahl, `-inspectorTo`); `LocaleCheck` ohne Befunde, 485 Unity-Tests grün.
+
+## ADR 078: Project-Fenster überarbeitet (Reiter nach Aufgabe)
+
+**Status:** Angenommen, 9. November 2026 (Phase 2 von „Project und Inspector grundlegend überarbeiten“, nach dem Inspector, ADR 077).
+
+**Anlass:** Das Project-Fenster stapelte alles untereinander: Kartenkopf, Einstellungen, Beschreibung, Chrono mit Datum, Varianten, Tage, Linienliste und Formular, Linien, KI-Pfade und darunter die Kachelliste (bei Spandau 766 Einträge), dazu verschachtelte Rollbereiche mit je eigener Höhe. Der Foldout „Lines“ klappte bei jedem Neuaufbau wieder zu.
+
+**Entscheidung:**
+- **Kopf bleibt:** Projekt- und Kartenname, die Zahlen der Karte und Warnungen stehen immer oben.
+- **Reiter nach Aufgabe** (`EditorShellProjectTabs.cs`): *Tiles* (die Kachelliste mit einem Filter nach Koordinaten wie `2,-1` oder Dateiname, nimmt den übrigen Platz), *Map* („Map settings...“ und die Beschreibung der Karte), *Chrono* (Datum, Varianten, Tage, Linien der Variante, neue Variante), *Lines* (Linien des Fahrplans), *Paths* (KI-Pfade nach Art, nächstes offenes Ende). Es erscheinen nur Reiter, die etwas zu zeigen haben: *Chrono* mit Varianten oder Projekt, *Lines* mit Linien, *Paths* solange die Anzeige „Paths“ an ist.
+- **Der gewählte Reiter bleibt** bei jedem Neuaufbau (`projectTab`); ein Reiter, der nichts mehr zeigt, fällt auf *Tiles* zurück. Der Schalter „Paths“ in der Kartenleiste öffnet den Reiter *Paths*, der Schalter „Routes“ den Reiter *Lines*, jede Chrono-Aktion (Datum zeigen, Variante bearbeiten oder anlegen) den Reiter *Chrono*.
+- **Kein Rollbereich im Rollbereich:** Die Reiter außer *Tiles* sind eine Seite (`ProjectTabPage`) mit einem Rollbereich; die Foldouts und die Rollbereiche mit fester Höhe für Linien und Varianten sind entfallen. Die Kachelliste bleibt ein Rollbereich, damit `ScrollBrowserTo` die gewählte Kachel weiter in Sicht rollt; mit Filter stehen nur Treffer in `browserEntries`.
+- **Kommandozeile:** `-projectTab tiles|map|chrono|lines|paths` öffnet einen Reiter, `-tileFilter Text` tippt in den Filter der Kachelliste (für Screenshots; `-projectTab lines` greift zu früh, solange die Linien noch laden).
+
+**Nicht geändert:** Inhalte und Schreibvorgänge; nur die Anordnung ändert sich. Die Reiter-Kennungen sind keine Sprachschlüssel (`project.tab.*` sind Texte in `locales/*/projecttabs.json`).
+
+**Prüfung:** Screenshots am Player (Grundorf: Tiles, Filter, Map, Chrono in einer bearbeiteten Variante, Paths); `LocaleCheck` ohne Befunde, 485 Unity-Tests grün.

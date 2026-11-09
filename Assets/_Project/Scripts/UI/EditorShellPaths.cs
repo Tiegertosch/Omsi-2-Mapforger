@@ -50,6 +50,8 @@ namespace OmsiMapEditor.UI
             if (mapCanvas == null)
                 return;
             pathsShown = visible && currentSummary != null;
+            if (pathsShown)
+                projectTab = ProjectTab.Paths;
             mapCanvas.ShowPaths = pathsShown;
             pathsToggleButton?.EnableInClassList("view-control-active", pathsShown);
             if (pathsShown && mapPaths == null && pathsTask == null)
@@ -156,8 +158,17 @@ namespace OmsiMapEditor.UI
         /// <summary>The project browser's list of paths by kind, each shown or hidden by a click, and a way to the open ends.</summary>
         private VisualElement PathsSection()
         {
-            var section = new Foldout { text = Loc.T("paths.foldout", ("count", mapPaths.Count)), value = true };
+            var section = new VisualElement();
             section.AddToClassList("browser-lines");
+            if (mapPaths == null)
+            {
+                section.Add(new Label(Loc.T("paths.reading")));
+                return section;
+            }
+            var pathsHeading = new Label(Loc.T("paths.foldout", ("count", mapPaths.Count)));
+            pathsHeading.AddToClassList("inspector-group-title");
+            pathsHeading.style.marginBottom = 4;
+            section.Add(pathsHeading);
             for (var kind = 0; kind < 3; kind++)
             {
                 var captured = kind;
