@@ -18,6 +18,7 @@ namespace OmsiMapEditor.UI
         {
             Tiles,
             Map,
+            Entries,
             Chrono,
             Lines,
             Paths
@@ -56,7 +57,7 @@ namespace OmsiMapEditor.UI
             strip.AddToClassList("project-tabs");
             var tabs = new[]
             {
-                (ProjectTab.Tiles, "project.tab.tiles"), (ProjectTab.Map, "project.tab.map"), (ProjectTab.Chrono, "project.tab.chrono"),
+                (ProjectTab.Tiles, "project.tab.tiles"), (ProjectTab.Map, "project.tab.map"), (ProjectTab.Entries, "project.tab.entries"), (ProjectTab.Chrono, "project.tab.chrono"),
                 (ProjectTab.Lines, "project.tab.lines"), (ProjectTab.Paths, "project.tab.paths")
             };
             foreach (var (tab, key) in tabs)
@@ -191,7 +192,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// Command line: <c>-projectTab tiles|map|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
+        /// Command line: <c>-projectTab tiles|map|entries|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
         /// <c>-tileFilter Text</c> types a text into the filter of the tile tab.
         /// </summary>
         private void RunProjectTabArguments(string[] args)

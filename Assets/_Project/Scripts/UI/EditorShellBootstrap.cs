@@ -1148,6 +1148,7 @@ namespace OmsiMapEditor.UI
             RunClipboardArguments(args);
             RunMapSettingsArguments(args);
             RunProjectTabArguments(args);
+            RunEntryPointArguments(args);
 
             if (Array.IndexOf(args, "-deleteSelection") >= 0 && selection.Count > 0)
             {
@@ -4697,6 +4698,8 @@ namespace OmsiMapEditor.UI
             RefitTerrainAtJunctions();
             mapCanvas?.Refresh();
             objectRenderer?.RefreshPlacements();
+            if (projectTab == ProjectTab.Entries && projectPanel != null && currentSummary != null)
+                RenderProjectBrowser();
             groundRenderer?.RefreshTerrainHoles(currentSummary);
             // Moved stops and crossings move their routes.
             ScheduleRoutesRebuild();
@@ -6355,6 +6358,8 @@ namespace OmsiMapEditor.UI
                 return;
             }
             clipboardPlacing = false;
+            placingEntryName = pendingEntryName;
+            pendingEntryName = null;
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             placementHasAbsoluteHeight = false;
             var problem = (string)null;
@@ -6386,7 +6391,7 @@ namespace OmsiMapEditor.UI
 
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
-            if (RandomHeadingOn)
+            if (RandomHeadingOn && placingEntryName == null)
                 RollPlacementHeading();
             if (mapCanvas != null)
                 objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
@@ -6420,6 +6425,12 @@ namespace OmsiMapEditor.UI
             if (placement.Tile == null || !placement.Tile.IsAvailable)
             {
                 SetStatus(placement.Tile == null ? Loc.T("place.status.no_tile") : Loc.T("place.status.tile_missing", ("file", placement.Tile.FileName)));
+                return;
+            }
+
+            if (placingEntryName != null)
+            {
+                PlaceEntryPoint(placement);
                 return;
             }
 
@@ -6465,7 +6476,7 @@ namespace OmsiMapEditor.UI
         {
             placementPlan = null;
             placementAttach = null;
-            if (placementAsset == null || !CanEdit || currentSummary == null)
+            if (placementAsset == null || !CanEdit || currentSummary == null || placingEntryName != null)
                 return null;
             var catalog = Junctions();
             if (catalog == null || catalog.Helpers(placementAsset).Count < 2)
@@ -6620,6 +6631,7 @@ namespace OmsiMapEditor.UI
             placementPlan = null;
             placementSnapMessage = null;
             placementAsset = null;
+            placingEntryName = null;
             clipboardPlacing = false;
             mapCanvas?.EndPlacement();
             objectsPanel?.ClearChosen();
@@ -7610,6 +7622,9 @@ namespace OmsiMapEditor.UI
                 case ProjectTab.Map:
                     projectPanel.Add(MapTab());
                     break;
+                case ProjectTab.Entries:
+                    projectPanel.Add(ProjectTabPage(EntriesSection()));
+                    break;
                 case ProjectTab.Chrono:
                     projectPanel.Add(ProjectTabPage(ChronoSection()));
                     break;
@@ -8093,6 +8108,9 @@ namespace OmsiMapEditor.UI
             }
 
             var holdingTile = TileHolding(new MapSelectionItem { Tile = selectedTile, Record = item }) ?? selectedTile;
+            var entryPoint = EditingVariant ? null : session?.EntryPointOf(currentSummary, holdingTile, item);
+            if (entryPoint != null)
+                AddEntryPointGroup(editor, entryPoint);
             AddInspectorGroup(editor, "object-type", Loc.T("inspector.group.type"), false, body => AddTypeAndLabels(body, holdingTile, item, false, true));
             AddJunctionDetails(editor, item);
             // Taking off attached objects works on the base map's tiles only.
@@ -8114,9 +8132,11 @@ namespace OmsiMapEditor.UI
                     level.AddToClassList("inspector-edit-apply");
                     inspectorActions.Add(level);
                 }
-                var delete = new Button(DeleteSelectedObjects)
-                {
-                    text = Loc.T(EditingVariant && !session.IsInEditedVariant(item) ? "inspector.delete_variant" : "inspector.delete_object") /* i18n:keys */};
+                var delete = entryPoint != null
+                    ? new Button(() => DeleteEntryPoint(entryPoint)) { text = Loc.T("entry.delete") }
+                    : new Button(DeleteSelectedObjects)
+                    {
+                        text = Loc.T(EditingVariant && !session.IsInEditedVariant(item) ? "inspector.delete_variant" : "inspector.delete_object") /* i18n:keys */};
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 inspectorActions.Add(delete);

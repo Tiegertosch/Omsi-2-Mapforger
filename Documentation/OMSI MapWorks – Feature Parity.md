@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 80 · Teilweise 14 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 81 · Teilweise 13 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -10,7 +10,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Kartenkacheln entfernen — Vorhanden
 - [x] Kartenbeschreibung und Grundeinstellungen — Vorhanden (Knopf „Map settings...“ im Projektbrowser; seit 9. November 2026)
 - [x] Weltkoordinaten verwenden — Vorhanden
-- [ ] Einstiegspunkte erstellen und verwalten — Teilweise
+- [x] Einstiegspunkte erstellen und verwalten — Vorhanden (Reiter „Entries“ im Project-Fenster, Gruppe „Entry point“ im Inspector; seit 9. November 2026)
 - [ ] Kachel als DirectX-X-Terrain exportieren — Offen
 - [x] Links- und Rechtsverkehr konfigurieren — Vorhanden (beim Anlegen und danach unter „Map settings...“; bestehende Straßen ändern sich nicht)
 - [ ] KI-Verkehrsdichte und Fahrgastdichte konfigurieren — Teilweise (Faktor auf die Tageskurve unter „Map settings...“, einzelne Stunden der Kurve nicht)

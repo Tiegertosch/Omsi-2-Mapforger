@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Entry points
+
+- **Make, rename and delete entry points.** The project browser has an *Entries* tab that lists the entry points of the map, selects the object one stands on when you click it, and puts a new one down: type a name, press *Place entry point* and click in the map (Shift+click for several, R turns it). The inspector of an entry point's object renames it (the name is kept in global.cfg and as the object's label, as OMSI does) and deletes it together with its object, as one undo step. A map keeps at least one entry point. *Revert tile edits* now also takes away an entry point made in that tile.
+
 ### Project browser
 
 - **Tabs by task.** The name, counts and warnings of the map stay on top; below them *Tiles* (the list of tiles, with a filter by coordinates such as `2,-1` or by file name), *Map* (map settings and its description), *Chrono*, *Lines* and *Paths* show one thing at a time. Tabs that have nothing to show are left out. The tab you chose stays when the browser is drawn again, and the *Paths* and *Routes* buttons of the map open their tab. There are no more lists scrolling inside the scrolling list.

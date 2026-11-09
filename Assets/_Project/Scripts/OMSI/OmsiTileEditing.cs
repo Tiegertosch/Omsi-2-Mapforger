@@ -580,6 +580,15 @@ namespace OmsiMapEditor.OMSI
             return index;
         }
 
+        /// <summary>The position of the object with this ID among the placed objects of the tile, the number [entrypoints] holds in its first field.</summary>
+        internal static int PlacedIndexOfObject(OmsiRecordFile tile, int objectId)
+        {
+            foreach (var view in OmsiTileRecords.Of<OmsiObjectView>(tile))
+                if (view.Id == objectId)
+                    return PlacedIndexOf(tile, tile.Records.IndexOf(view.Record));
+            throw new InvalidOperationException("Object " + objectId + " is not in the tile.");
+        }
+
         private static int SplineIndexOf(OmsiRecordFile tile, int position)
         {
             var index = 0;

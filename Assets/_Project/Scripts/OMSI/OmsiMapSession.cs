@@ -833,20 +833,52 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
+        /// <summary>
+        /// After a tile was reverted, the entry points of that tile are the ones the original map lists: one made for an object the revert took
+        /// away goes, one deleted comes back, and the numbers of the rest are the original's.
+        /// </summary>
         private void RestoreEntryPoints(OmsiMapWorkspace workspace, string tilePath)
         {
-            const int entryPointFieldCount = 12;
             var original = OmsiRecordFile.Load(GlobalConfigPath, OmsiGlobalConfigLayouts.Instance);
             var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
             var tileIndex = TileIndexOf(original, tilePath);
-            var originalEntries = original.Records.Find(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase));
-            var entries = config.Records.Find(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase));
-            if (originalEntries == null || entries == null || originalEntries.Fields.Count != entries.Fields.Count)
+            var originalEntries = FindEntryList(original);
+            var entries = FindEntryList(config);
+            if (originalEntries == null || entries == null)
                 return;
 
-            for (var field = 1; field + entryPointFieldCount <= entries.Fields.Count; field += entryPointFieldCount)
-                if (originalEntries.TryGetInt(field + 10, out var entryTile) && entryTile == tileIndex)
-                    entries.SetField(field, originalEntries.GetField(field));
+            List<string[]> Groups(OmsiRecord list, bool inTile)
+            {
+                var groups = new List<string[]>();
+                for (var field = 1; field + EntryFieldCount <= list.Fields.Count; field += EntryFieldCount)
+                {
+                    var group = new string[EntryFieldCount];
+                    for (var part = 0; part < EntryFieldCount; part++)
+                        group[part] = list.GetField(field + part);
+                    var inThisTile = list.TryGetInt(field + 10, out var entryTile) && entryTile == tileIndex;
+                    if (inThisTile == inTile)
+                        groups.Add(group);
+                }
+                return groups;
+            }
+
+            var others = Groups(entries, false);
+            var restored = Groups(originalEntries, true);
+            // The restored ones take the place the tile's had in the list, else the end.
+            var firstOfTile = -1;
+            var seen = 0;
+            for (var field = 1; field + EntryFieldCount <= entries.Fields.Count && firstOfTile < 0; field += EntryFieldCount)
+            {
+                if (entries.TryGetInt(field + 10, out var entryTile) && entryTile == tileIndex)
+                    firstOfTile = seen;
+                else
+                    seen++;
+            }
+            var all = new List<string[]>(others);
+            all.InsertRange(firstOfTile < 0 ? all.Count : firstOfTile, restored);
+            if (all.Count == 0)
+                return;
+            ReplaceEntryList(config, _ => all.SelectMany(group => group));
             workspace.Save(GlobalConfigFileName, config);
         }
 

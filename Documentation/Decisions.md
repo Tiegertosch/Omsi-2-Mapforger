@@ -1246,3 +1246,24 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Nicht geändert:** Inhalte und Schreibvorgänge; nur die Anordnung ändert sich. Die Reiter-Kennungen sind keine Sprachschlüssel (`project.tab.*` sind Texte in `locales/*/projecttabs.json`).
 
 **Prüfung:** Screenshots am Player (Grundorf: Tiles, Filter, Map, Chrono in einer bearbeiteten Variante, Paths); `LocaleCheck` ohne Befunde, 485 Unity-Tests grün.
+
+## ADR 079: Einstiegspunkte erstellen, umbenennen und löschen
+
+**Status:** Angenommen, 9. November 2026 (schließt „Einstiegspunkte erstellen und verwalten“ der Feature-Parity-Liste; bisher las und prüfte der Editor sie und führte sie beim Verschieben ihrer Objekte nach).
+
+**Befund aus openOMSIs Quelltext** (`crates/omsi-map/src/global.rs`, `crates/omsi-scene/src/world.rs`) **und Grundorf:**
+- openOMSI sucht den Einstiegspunkt über die **ID seines Objekts** in der Kachel, die der Datensatz nennt (Feld 11, Index in der `[map]`-Liste), nicht über die Nummer in Feld 1. Der Bus steht auf dem **Objekt** (Ort und Richtung); die Angaben im Datensatz gelten nur, wenn das Objekt fehlt.
+- Jedes Objekt vom Typ `[entrypoint]` zählt; steht es nicht in `[entrypoints]`, hängt Omsi.exe es an, mit seinem **ersten Beschriftungstext als Namen**. Gibt es gar keinen `[entrypoints]`-Abschnitt, bildet openOMSI die Liste aus den Objekten der Kacheln.
+- Grundorf schreibt den Namen deshalb zweimal: im Datensatz und als einzige Beschriftung des Objekts (`1` und `Nordspitze Bauernhof` nach Pitch und Bank). Namen wiederholen sich: drei „Nordspitze Bauernhof“, drei „Einsteindorf Krankenhaus“ sind die Plätze mehrerer Busse eines Starts.
+- Die Höhe im Datensatz ist die Höhe des Geländes, die des Objekts ist 0 (auf dem Gelände), wie `OmsiNewMap` es schreibt.
+
+**Entscheidung:**
+- **Sitzung** (`OmsiMapSessionEntryPoints.cs`): `ReadEntryPoints`, `AddEntryPoint`, `RenameEntryPoint`, `DeleteEntryPoint`; jede Änderung schreibt Objekt und Zeile in `[entrypoints]` als **einen** Rückgängig-Schritt (Dateistände von Kachel und `global.cfg` im `OmsiObjectChange`). Neu: Name als erste Beschriftung des Objekts und in der Zeile; Löschen nimmt zuerst die Zeile heraus und löscht dann das Objekt (die Nummern der folgenden Einstiegspunkte der Kachel rückt der bestehende Löschvorgang nach); Umbenennen ändert Zeile und Beschriftung.
+- **Verweigert:** in einer bearbeiteten Chrono-Variante (Einstiegspunkte nennen Kacheln der Basiskarte), den letzten Einstiegspunkt zu löschen (OMSI hängt ohne einen), leere Namen, Namen mit Zeilenumbruch oder einer Klammer am Anfang, und das Anlegen in einer Karte ohne `[entrypoints]`-Abschnitt (openOMSI nähme dann nur die Objekte der Kacheln; die Liste würde diese Einstiege abschalten).
+- **Kachel zurücksetzen:** `RestoreEntryPoints` ersetzt die Einstiegspunkte der Kachel durch die der Originalkarte. Vorher blieb eine Zeile für ein weggenommenes Objekt zurück, sobald sich die Anzahl der Einstiegspunkte geändert hatte.
+- **Oberfläche:** Reiter „Entries“ im Project-Fenster (Liste, Klick wählt das Objekt und zeigt es; Namensfeld und „Place entry point“, Klick in die Karte, Umschalt+Klick für mehrere, R dreht, ohne Einrasten und ohne zufällige Ausrichtung); der Inspector des Objekts zeigt die Gruppe „Entry point“ mit Namensfeld und „Rename“, und die Knopfleiste „Delete entry point“ statt „Delete object“.
+- **Kommandozeile:** `-entryAdd Name kachelX kachelY x y [Richtung]`, `-entryRename objektID Name`, `-entryDelete objektID`; „Entry point:“ im Player-Log; `-projectTab entries`.
+
+**Grenzen:** Wer in der Karte ein beliebiges Objekt vom Typ `[entrypoint]` setzt, bekommt keinen Eintrag in `[entrypoints]`; die Kartenprüfung findet das nicht (sie prüft nur die Zeilen). Der Name gilt für einen Einstiegspunkt; die Plätze eines Starts benennt man einzeln um.
+
+**Prüfung:** `OmsiEntryPointTests` (Anlegen, Löschen mit Nachrücken der Nummern und letzter Einstiegspunkt, Umbenennen, Namensregeln, Kachel zurücksetzen; jeweils Rückgängig byte-genau und der Abschnitt „Entry points“ der Kartenprüfung ohne Befund), Screenshots am Player (Grundorf).
