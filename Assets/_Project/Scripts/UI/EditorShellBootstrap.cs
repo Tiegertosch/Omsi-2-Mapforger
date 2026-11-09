@@ -1149,6 +1149,7 @@ namespace OmsiMapEditor.UI
             RunMapSettingsArguments(args);
             RunProjectTabArguments(args);
             RunEntryPointArguments(args);
+            RunTerrainXArguments(args);
 
             if (Array.IndexOf(args, "-deleteSelection") >= 0 && selection.Count > 0)
             {

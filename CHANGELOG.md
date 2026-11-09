@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Terrain
+
+- **Export a tile's terrain as a DirectX mesh.** The *Tile* tab of the inspector has *Export terrain as .x...*: it writes the ground of the tile as the map shows it (the roads fitted into it) to a DirectX text mesh for a 3D program, 61 × 61 points with normals and texture coordinates, x east, y up, z north, the origin at the tile's south-west corner.
+
 ### Roads
 
 - **Rows follow the slope.** The Rows tool has a *Follow slope* option: the objects of the row lie in the surface of the road, tilted by its gradient and cant, instead of standing upright. It suits parking spaces, surface markings and rails; posts and lamps are better without. It can be switched for a selected row, and the editor shows the tilt.

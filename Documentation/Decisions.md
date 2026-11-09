@@ -1285,3 +1285,17 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Die Halbbreite der Querneigung ist immer 10 m, weil der Plan der Reihen die Splineart nicht kennt; bei schmalen Arten neigt MapWorks Objekte jenseits ihrer Breite etwas, wo openOMSI sie nur der Steigung folgen lässt. Die Höhe der Objekte folgt weiter der bisherigen linearen Höhe zwischen Anfang und Ende des Splines. Die Reihen des Straßenbauers (ADR 049) schreiben das Flag nicht.
 
 **Prüfung:** `OmsiRowTiltTests` (Flag lesen, Pitch und Bank an einer Straße von 10 % Steigung und 5 % Querneigung, Flag nur für das Gefälle jenseits der Breite, Schreiben und Rückweg des Flags), Screenshots am Player (Grundorf, Straße mit Steigung, Reihe mit und ohne Flag).
+
+## ADR 081: Gelände einer Kachel als DirectX-Netz (.x) exportieren
+
+**Status:** Angenommen, 9. November 2026 (schließt „Kachel als DirectX-X-Terrain exportieren“ der Feature-Parity-Liste; der Nutzer wählte „gewählte Kachel, Knopf im Kachel-Reiter“ statt aller Kacheln oder einer Datei für die ganze Karte).
+
+**Entscheidung:**
+- **Bedienung:** Im Kachel-Reiter des Inspectors steht unter den Daten der Kachel der Knopf „Export terrain as .x...“ (nur für eine Kachel mit Gelände). Ein Speichern-Dialog schlägt `Kartenname_tile_X_Y_terrain.x` vor. Es geht auch bei einer Karte ohne Projekt, weil das Gelände nur gelesen wird. Kommandozeile `-terrainExportX kachelX kachelY datei.x` („Terrain X:“ im Player-Log).
+- **Inhalt** (`OmsiTerrainXExport`, Editor.OMSI): ein Text-.x (`xof 0303txt 0032`) mit einem Netz aus 61 × 61 Punkten im Abstand einer Probe (bei 300 m Kante 5 m), zwei Dreiecken je Zelle (7.200), Normalen und Texturkoordinaten über die ganze Kachel (u von West nach Ost, v von Nord nach Süd wie ein Bild der Kachel) und einem grauen Material ohne Textur. Der Bezugsrahmen ist OMSIs Objektrahmen: x nach Osten, y nach oben, z nach Norden, der Ursprung an der Südwestecke der Kachel; das Netz liegt also an seinem Platz, wenn man es um die Kachelposition verschiebt.
+- **Welches Gelände:** das, was der Editor zeigt (`.terrain` der Arbeitskopie, mit den eingepassten Straßen), über die kartenweite Probe `OmsiTerrainGrid`. Die Normalen schauen über die Kachelgrenze in die Nachbarkachel, sofern sie Gelände hat, sonst mit einseitiger Differenz; so zeigen nebeneinandergelegte Kacheln keine Naht im Licht.
+- **Dreiecksrichtung:** Die Vorderseite eines Direct3D-Dreiecks ist im linkshändigen Rahmen die im Uhrzeigersinn; die Eckenfolge Südwest, Südost, Nordwest zeigt nach oben. Der Test prüft jedes Dreieck mit derselben Regel wie der Modellaufbau (`AddX`).
+
+**Grenzen:** Nur eine Kachel je Export; Löcher im Gelände (`OmsiTerrainHoles`), Wasserflächen und die Bodentexturen werden nicht geschrieben, und ein Rückweg (.x einlesen) gibt es nicht; dafür bleibt die Höhenkarte (ADR 040).
+
+**Prüfung:** `OmsiTerrainXExportTests` (61 × 61 Punkte, 7.200 Dreiecke, Lesen mit dem eigenen .x-Leser, alle Dreiecke zeigen nach oben, Normalen in der Mitte und über die Kachelgrenze, Kachel ohne Gelände wird abgelehnt), ein Export einer Grundorf-Kachel am Player.

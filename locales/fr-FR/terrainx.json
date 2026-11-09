@@ -1,0 +1,9 @@
+{
+  "terrainx.export": "Exporter le terrain en .x...",
+  "terrainx.export.tooltip": "Écrit le terrain de cette tile comme maillage DirectX (.x) pour un programme 3D : 61 × 61 points avec normales et coordonnées de texture sur la tile, x vers l'est, y vers le haut, z vers le nord, l'origine au coin sud-ouest. Le terrain est écrit tel qu'il est montré ici, avec les routes ajustées.",
+  "terrainx.status.written": "Terrain de la tile {x}, {y} écrit dans {file} : {vertices} points, {triangles} triangles, hauteurs de {lowest, number, 0.0} à {highest, number, 0.0} m.",
+  "terrainx.status.failed": "Le terrain n'a pas pu être écrit : {reason}",
+  "terrainx.status.none": "La tile {x}, {y} n'a pas de terrain.",
+  "filedialog.export_terrain": "Exporter le terrain en .x",
+  "filedialog.directx": "Maillages DirectX (*.x)"
+}

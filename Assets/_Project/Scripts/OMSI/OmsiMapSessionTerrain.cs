@@ -131,6 +131,24 @@ namespace OmsiMapEditor.OMSI
             return workspace.FileExists(terrainPath) ? workspace.ReadAllBytes(terrainPath) : null;
         }
 
+        /// <summary>
+        /// The terrain of a tile as the map shows it, the roads fitted into it, written as a DirectX text mesh (ADR 081). Also works for a map
+        /// that is open read-only: the ground is read from the files.
+        /// </summary>
+        public OmsiTerrainMeshExport ExportTerrainMesh(OmsiMapSummary summary, OmsiTileSummary tile)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tile == null)
+                throw new ArgumentNullException(nameof(tile));
+            var grid = new OmsiTerrainGrid(summary, candidate =>
+            {
+                var path = OmsiRelativePath.Normalize(candidate.FileName) + ".terrain";
+                return Source.FileExists(path) ? OmsiTerrain.Parse(Source.ReadAllBytes(path)).CopyHeights() : null;
+            });
+            return OmsiTerrainXExport.Build(grid, tile);
+        }
+
         /// <summary>Starts a brush stroke or ramp; nothing is kept until <see cref="EndTerrainStroke"/>.</summary>
         public OmsiTerrainStroke BeginTerrainStroke(OmsiMapSummary summary)
         {

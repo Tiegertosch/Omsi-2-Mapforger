@@ -1,0 +1,9 @@
+{
+  "terrainx.export": "Eksportuj teren jako .x...",
+  "terrainx.export.tooltip": "Zapisuje teren tej tile jako siatkę DirectX (.x) dla programu 3D: 61 × 61 punktów z normalnymi i współrzędnymi tekstury na całej tile, x na wschód, y w górę, z na północ, początek w rogu południowo-zachodnim. Zapisywany jest teren tak, jak jest tu pokazany, z dopasowanymi drogami.",
+  "terrainx.status.written": "Teren tile {x}, {y} zapisany w {file}: {vertices} punktów, {triangles} trójkątów, wysokości od {lowest, number, 0.0} do {highest, number, 0.0} m.",
+  "terrainx.status.failed": "Nie udało się zapisać terenu: {reason}",
+  "terrainx.status.none": "Tile {x}, {y} nie ma terenu.",
+  "filedialog.export_terrain": "Eksportuj teren jako .x",
+  "filedialog.directx": "Siatki DirectX (*.x)"
+}

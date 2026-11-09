@@ -1,0 +1,9 @@
+{
+  "terrainx.export": "Export terrain as .x...",
+  "terrainx.export.tooltip": "Writes the terrain of this tile as a DirectX mesh (.x) for a 3D program: 61 × 61 points with normals and texture coordinates over the tile, x east, y up, z north, the origin at the south-west corner. The ground as shown here is written, with the roads fitted into it.",
+  "terrainx.status.written": "Terrain of tile {x}, {y} written to {file}: {vertices} points, {triangles} triangles, heights {lowest, number, 0.0} to {highest, number, 0.0} m.",
+  "terrainx.status.failed": "The terrain could not be written: {reason}",
+  "terrainx.status.none": "Tile {x}, {y} has no terrain.",
+  "filedialog.export_terrain": "Export terrain as .x",
+  "filedialog.directx": "DirectX meshes (*.x)"
+}

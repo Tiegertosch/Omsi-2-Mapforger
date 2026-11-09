@@ -187,6 +187,7 @@ namespace OmsiMapEditor.UI
             AddInspectorValue(facts, "inspector.terrain", tile.HasTerrain ? Loc.T("inspector.terrain_range", ("low", tile.TerrainMinHeight), ("high", tile.TerrainMaxHeight)) : Loc.T("inspector.unavailable"));
             container.Add(facts);
 
+            AddTerrainExportButton(container, tile);
             AddTileButtons(container);
 
             var filter = new TextField { value = tileFilter };

@@ -1,0 +1,9 @@
+{
+  "terrainx.export": "Gelände als .x exportieren...",
+  "terrainx.export.tooltip": "Schreibt das Gelände dieser Kachel als DirectX-Netz (.x) für ein 3D-Programm: 61 × 61 Punkte mit Normalen und Texturkoordinaten über die Kachel, x nach Osten, y nach oben, z nach Norden, der Ursprung an der Südwestecke. Geschrieben wird das Gelände, wie es hier gezeigt wird, mit den eingepassten Straßen.",
+  "terrainx.status.written": "Gelände der Kachel {x}, {y} nach {file} geschrieben: {vertices} Punkte, {triangles} Dreiecke, Höhen {lowest, number, 0.0} bis {highest, number, 0.0} m.",
+  "terrainx.status.failed": "Das Gelände konnte nicht geschrieben werden: {reason}",
+  "terrainx.status.none": "Kachel {x}, {y} hat kein Gelände.",
+  "filedialog.export_terrain": "Gelände als .x exportieren",
+  "filedialog.directx": "DirectX-Netze (*.x)"
+}

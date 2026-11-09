@@ -13,6 +13,7 @@ namespace OmsiMapEditor.UI
         public static string ProjectFilter => Loc.T("filedialog.project") + "\0*.omproj\0";
         public const string ProjectExtension = "omproj";
         public static string PngFilter => Loc.T("filedialog.png") + "\0*.png\0" + Loc.T("filedialog.all") + "\0*.*\0";
+        public static string DirectXFilter => Loc.T("filedialog.directx") + "\0*.x\0" + Loc.T("filedialog.all") + "\0*.*\0";
         public static string HeightMapFilter => Loc.T("filedialog.heightmaps") + "\0*.png;*.tif;*.tiff\0" + Loc.T("filedialog.all") + "\0*.*\0";
         public static string PictureFilter => Loc.T("filedialog.pictures") + "\0*.jpg;*.jpeg;*.png;*.bmp;*.tga\0" + Loc.T("filedialog.all") + "\0*.*\0";
 

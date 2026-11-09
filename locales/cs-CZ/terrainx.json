@@ -1,0 +1,9 @@
+{
+  "terrainx.export": "Exportovat terén jako .x...",
+  "terrainx.export.tooltip": "Zapíše terén této tile jako síť DirectX (.x) pro 3D program: 61 × 61 bodů s normálami a texturovými souřadnicemi přes tile, x na východ, y nahoru, z na sever, počátek v jihozápadním rohu. Zapíše se terén tak, jak je zde zobrazen, s přizpůsobenými silnicemi.",
+  "terrainx.status.written": "Terén tile {x}, {y} zapsán do {file}: {vertices} bodů, {triangles} trojúhelníků, výšky {lowest, number, 0.0} až {highest, number, 0.0} m.",
+  "terrainx.status.failed": "Terén se nepodařilo zapsat: {reason}",
+  "terrainx.status.none": "Tile {x}, {y} nemá terén.",
+  "filedialog.export_terrain": "Exportovat terén jako .x",
+  "filedialog.directx": "Sítě DirectX (*.x)"
+}
