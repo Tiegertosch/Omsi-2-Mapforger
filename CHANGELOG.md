@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Chrono variants
+
+- **Change the days of a variant.** While a chrono variant is edited, the project browser shows its first and last day as fields; *Apply days* writes them to the variant.
+
 ### Roads
 
 - **Mirroring and texture offset of a spline.** The inspector of a selected spline has a *Mirrored* switch (the cross-section is turned over) and a *Tex. offset* field (where along its chain the spline begins: the textures start there and rows of objects count from it).

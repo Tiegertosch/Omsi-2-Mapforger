@@ -105,6 +105,38 @@ namespace OmsiMapEditor.Tests
             Assert.Throws<ArgumentException>(() => session.SetDeactivatedLines(edited, new[] { "two\r\nlines" }));
         }
 
+        [Test]
+        public void TheDaysOfAVariantAreWrittenKeepingTheRestOfItsSettings()
+        {
+            var variant = OmsiChrono.ReadVariants(session.Workspace).Single();
+            Assert.Throws<InvalidOperationException>(() => session.SetChronoDates(variant, new DateTime(1991, 1, 1), null));
+            variant = Edit();
+            Assert.Throws<ArgumentException>(() => session.SetChronoDates(variant, new DateTime(1991, 1, 1), new DateTime(1990, 12, 31)));
+            var before = session.Workspace.ReadAllBytes(@"Chrono\0550_LineE\Chrono.cfg");
+            Assert.IsFalse(session.SetChronoDates(variant, new DateTime(1990, 1, 1), null), "The same days leave the file as it was.");
+            CollectionAssert.AreEqual(before, session.Workspace.ReadAllBytes(@"Chrono\0550_LineE\Chrono.cfg"));
+
+            // A last day is added after the first, a new first day replaces the old one, and the other settings stay.
+            Assert.IsTrue(session.SetChronoDates(variant, new DateTime(1991, 3, 5), new DateTime(1992, 2, 29)));
+            var text = OmsiTextFile.Decode(session.Workspace.ReadAllBytes(@"Chrono\0550_LineE\Chrono.cfg"));
+            StringAssert.Contains("[startdate]\r\n19910305\r\n", text);
+            StringAssert.Contains("[enddate]\r\n19920229\r\n", text);
+            StringAssert.Contains("[deactivate_lines]\r\n2\r\nE\r\nM32 & N32\r\n", text);
+            StringAssert.Contains("[ticketpack]", text);
+            Assert.Less(text.IndexOf("[startdate]", StringComparison.Ordinal), text.IndexOf("[enddate]", StringComparison.Ordinal));
+            var read = OmsiChrono.ReadVariants(session.Workspace).Single();
+            Assert.AreEqual(new DateTime(1991, 3, 5), read.Start);
+            Assert.AreEqual(new DateTime(1992, 2, 29), read.End);
+            Assert.AreEqual(new DateTime(1991, 3, 5), variant.Start);
+
+            // Written over, then taken away again.
+            Assert.IsTrue(session.SetChronoDates(variant, new DateTime(1991, 3, 5), new DateTime(1993, 1, 1)));
+            StringAssert.Contains("[enddate]\r\n19930101\r\n", OmsiTextFile.Decode(session.Workspace.ReadAllBytes(@"Chrono\0550_LineE\Chrono.cfg")));
+            Assert.IsTrue(session.SetChronoDates(variant, new DateTime(1991, 3, 5), null));
+            StringAssert.DoesNotContain("enddate", OmsiTextFile.Decode(session.Workspace.ReadAllBytes(@"Chrono\0550_LineE\Chrono.cfg")));
+            Assert.IsNull(OmsiChrono.ReadVariants(session.Workspace).Single().End);
+        }
+
         private OmsiChronoVariant Edit(string name = "0550_LineE")
         {
             var variants = OmsiChrono.ReadVariants(session.Workspace);

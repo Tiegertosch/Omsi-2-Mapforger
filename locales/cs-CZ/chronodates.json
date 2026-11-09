@@ -1,0 +1,13 @@
+{
+  "chrono.dates.first.tooltip": "První den, od kterého tato varianta platí, jako rok-měsíc-den",
+  "chrono.dates.apply": "Použít dny",
+  "chrono.dates.apply.tooltip": "Zapíše první a poslední den do souboru Chrono.cfg varianty. Pokud zobrazený den už mezi nimi není, mapa se znovu zobrazí v novém prvním dni a kroky zpět se vymažou.",
+  "readonly.action.variant_dates": "změnit dny varianty",
+  "chrono.dates.failed": "Dny varianty se nepodařilo změnit: {reason}",
+  "@chrono.dates.failed": "{reason} is a message of MapWorks in English",
+  "chrono.dates.unchanged": "Dny varianty {title} zůstaly beze změny.",
+  "chrono.dates.changed": "{title} nyní platí od {first}{hasLast, select, yes { do {last}} other {}}.",
+  "@chrono.dates.changed": "{first} and {last} are days written year-month-day, {hasLast} is yes or no and chooses a part: keep it in English",
+  "chrono.dates.moved": "{title} nyní platí od {first}{hasLast, select, yes { do {last}} other {}}; mapa ukazuje její první den.",
+  "@chrono.dates.moved": "{first} and {last} are days written year-month-day, {hasLast} is yes or no and chooses a part: keep it in English"
+}

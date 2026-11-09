@@ -1183,3 +1183,16 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Gespiegelt wird nur der gewählte Spline; ein einheitlicher Wert längs einer Straße bleibt Sache des Nutzers. Kein Mehrfach-Setzen über „Whole road“.
 
 **Prüfung:** `OmsiRoadTests.MirroringAndTheTextureOffsetOfASplineAreWrittenAndUndone` (Schreiben, Lesen aus der Datei, gleiche Werte ändern nichts, Spiegelung allein lässt den Versatz, Rückgängig stellt die Datei byteidentisch her).
+
+## ADR 075: Erster und letzter Tag einer Chrono-Variante nachträglich ändern
+
+**Status:** Angenommen, 9. November 2026 (schließt „Start- und Enddatum bearbeiten“ der Feature-Parity-Liste).
+
+**Format:** `Chrono.cfg` einer Variante hat `[startdate]` und `[enddate]` mit Jahr, Monat und Tag zusammengeschrieben (`19900101`); eine Variante ohne Datum gilt nie, eine ohne `[enddate]` bleibt ab dem ersten Tag (`OmsiChronoVariant.IsActiveOn`, wie Omsi.exe und openOMSI).
+
+**Entscheidung:**
+- **Schreiben:** `OmsiMapSession.SetChronoDates` (`OmsiMapSessionChronoDates.cs`) ersetzt den Wert von `[startdate]` und `[enddate]` im Datensatz der Datei, legt einen fehlenden an (`[startdate]` vorn, `[enddate]` dahinter) und nimmt `[enddate]` weg, wenn kein letzter Tag gewünscht ist; alles andere der Datei (Zeilenabschaltung, Ticketpacks, Kodierung) bleibt, eine Datei mit denselben Tagen bleibt Byte für Byte. Nur für die bearbeitete Variante, wie `SetDeactivatedLines`; ein letzter Tag vor dem ersten wird abgelehnt.
+- **Oberfläche:** Solange eine Variante bearbeitet wird, zeigt der Projektbrowser über der Linienliste zwei Felder („First day“, „Last day“, Jahr-Monat-Tag) und „Apply days“ (`EditorShellChronoDates.cs`). Gilt die Variante am gezeigten Tag weiter, werden die Routen neu gebaut; fällt der Tag heraus, würde die Variante aus der Ansicht verschwinden, deshalb wird sie am neuen ersten Tag neu geöffnet, was den Rückgängig-Verlauf leert (die Meldung sagt es). Das Ändern der Tage selbst steht nicht im Rückgängig-Verlauf (wie das Abschalten von Linien); man stellt sie wieder zurück.
+- **Kommandozeile:** `-chronoDates JJJJ-MM-TT [JJJJ-MM-TT|-]` mit `-chronoEdit` („-“ oder nichts: ohne letzten Tag); „Chrono dates:“ im Player-Log.
+
+**Prüfung:** `OmsiChronoLinesTests.TheDaysOfAVariantAreWrittenKeepingTheRestOfItsSettings` (nur die bearbeitete Variante, Ablehnung eines früheren letzten Tags, gleiche Tage ändern nichts, `[enddate]` wird eingefügt, überschrieben und entfernt, Zeilenabschaltung und Ticketpack bleiben, der Leser liest dasselbe).

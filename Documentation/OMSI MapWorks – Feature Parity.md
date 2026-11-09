@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 78 · Teilweise 16 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 79 · Teilweise 15 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -113,7 +113,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 ## H. Chrono und zeitabhängige Varianten
 - [x] Chrono-Varianten laden und anzeigen — Vorhanden
 - [x] Chrono-Varianten anlegen — Vorhanden (Name, erster und letzter Tag)
-- [ ] Start- und Enddatum bearbeiten — Teilweise (nur beim Anlegen einer Variante)
+- [x] Start- und Enddatum bearbeiten — Vorhanden (Felder im Projektbrowser bei einer bearbeiteten Variante; seit 9. November 2026)
 - [x] Objekte innerhalb von Chrono bearbeiten — Vorhanden
 - [x] Objektbeschriftungen in Chrono ändern — Vorhanden
 - [x] Straßen in Chrono ändern oder entfernen — Vorhanden (Typ tauschen und löschen (seit 1.1.1); die Form lässt sich nicht ändern)

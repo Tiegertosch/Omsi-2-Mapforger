@@ -1,0 +1,13 @@
+{
+  "chrono.dates.first.tooltip": "Le premier jour où cette variante s'applique, en année-mois-jour",
+  "chrono.dates.apply": "Appliquer les jours",
+  "chrono.dates.apply.tooltip": "Écrit le premier et le dernier jour dans le Chrono.cfg de la variante. Si le jour affiché n'est plus dedans, la carte est de nouveau montrée au nouveau premier jour et les étapes d'annulation sont effacées.",
+  "readonly.action.variant_dates": "modifier les jours d'une variante",
+  "chrono.dates.failed": "Les jours de la variante n'ont pas pu être modifiés : {reason}",
+  "@chrono.dates.failed": "{reason} is a message of MapWorks in English",
+  "chrono.dates.unchanged": "Les jours de {title} sont inchangés.",
+  "chrono.dates.changed": "{title} s'applique maintenant à partir du {first}{hasLast, select, yes { jusqu'au {last}} other {}}.",
+  "@chrono.dates.changed": "{first} and {last} are days written year-month-day, {hasLast} is yes or no and chooses a part: keep it in English",
+  "chrono.dates.moved": "{title} s'applique maintenant à partir du {first}{hasLast, select, yes { jusqu'au {last}} other {}} ; la carte montre son premier jour.",
+  "@chrono.dates.moved": "{first} and {last} are days written year-month-day, {hasLast} is yes or no and chooses a part: keep it in English"
+}

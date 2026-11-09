@@ -1410,6 +1410,9 @@ namespace OmsiMapEditor.UI
             // -linesOff A|B|C makes the variant being edited switch off these lines, "-" none (ADR 067).
             if (EditingVariant && Array.IndexOf(args, "-linesOff") >= 0)
                 RunLinesArgument(args);
+            // -chronoDates yyyy-MM-dd [yyyy-MM-dd|-] gives the variant being edited a first and a last day (ADR 075).
+            if (EditingVariant && Array.IndexOf(args, "-chronoDates") >= 0)
+                RunChronoDatesArgument(args);
 
             if (int.TryParse(Argument("-moveSplineEnd", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var moveId) &&
                 int.TryParse(Argument("-moveSplineEnd", 3), out var moveTileX) && int.TryParse(Argument("-moveSplineEnd", 4), out var moveTileY) &&
@@ -7702,7 +7705,10 @@ namespace OmsiMapEditor.UI
             }
             section.Add(list);
             if (EditingVariant)
+            {
+                section.Add(VariantDatesEditor());
                 section.Add(VariantLinesEditor());
+            }
             if (canEditVariants)
                 section.Add(NewVariantForm());
             return section;

@@ -1,0 +1,13 @@
+{
+  "chrono.dates.first.tooltip": "The first day this variant applies on, as year-month-day",
+  "chrono.dates.apply": "Apply days",
+  "chrono.dates.apply.tooltip": "Writes the first and last day into the variant's Chrono.cfg. If the day shown no longer falls inside them, the map is shown on the new first day again and the undo steps are cleared.",
+  "readonly.action.variant_dates": "change the days of a variant",
+  "chrono.dates.failed": "The days of the variant could not be changed: {reason}",
+  "@chrono.dates.failed": "{reason} is a message of MapWorks in English",
+  "chrono.dates.unchanged": "The days of {title} are unchanged.",
+  "chrono.dates.changed": "{title} now applies from {first}{hasLast, select, yes { to {last}} other { on}}.",
+  "@chrono.dates.changed": "{first} and {last} are days written year-month-day, {hasLast} is yes or no and chooses a part: keep it in English",
+  "chrono.dates.moved": "{title} now applies from {first}{hasLast, select, yes { to {last}} other { on}}; the map is shown on its first day.",
+  "@chrono.dates.moved": "{first} and {last} are days written year-month-day, {hasLast} is yes or no and chooses a part: keep it in English"
+}
