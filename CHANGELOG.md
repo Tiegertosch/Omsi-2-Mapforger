@@ -1,12 +1,19 @@
 # Changelog
 
-## Unreleased
+## 1.1.2
+
+Terrain heights from the world no longer have spikes, and water is laid flat.
 
 ### Terrain heights
 
 - **Spikes are removed.** The world's elevation data holds single pixels far off their surroundings (a pit of 200 m, say). They are replaced by the median of their neighbours; every other height stays exactly as it was.
 - **Water is laid flat.** Lakes, rivers, docks and the sea, as OpenStreetMap has them, are levelled: the water surface comes from the banks, and the bed lies 1.5 m under it, so the blocks tens of metres too high that the data has over water are gone. Turn it off with *Level water* in the Terrain tab of *Satellite and terrain*. It needs a connection to OpenStreetMap; if there is none, the heights load as they are and the status line says so. The message names the surface, and the *Height* field of *Add water* in the inspector proposes it for each tile.
 - The inspector shows the new range of heights of a tile after loading heights, painting terrain and undoing it.
+
+### Good to know
+
+- Projects and settings from 1.1.1 open as before. Heights you have already loaded stay as they are; load them again to get the levelled water.
+- One body of water gets one surface, so a long river that really falls is too flat over some kilometres. Rivers that OpenStreetMap only has as a line are not levelled.
 
 ## 1.1.1
 
