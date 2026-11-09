@@ -166,5 +166,7 @@
   "satellite.fit.scale": "Fit the scale too",
   "satellite.fit.scale.tooltip": "Also takes the scale from the distance between the two points; without it the map keeps its scale",
   "satellite.fit.button": "Fit the map",
-  "satellite.fit.button.tooltip": "Moves and turns the map so that both points meet their positions"
+  "satellite.fit.button.tooltip": "Moves and turns the map so that both points meet their positions",
+  "satellite.level_water": "Level water",
+  "satellite.level_water.tooltip": "Lays lakes, rivers, docks and the sea, as OpenStreetMap has them, flat 1.5 m under a water surface taken from their banks. The world's elevation data is often wrong over water: blocks tens of metres too high, or deep pits. Needs a connection to OpenStreetMap; without it the data is used as it is. Add water to the tile at the height reported to see it."
 }

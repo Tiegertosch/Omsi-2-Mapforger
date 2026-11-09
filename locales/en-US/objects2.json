@@ -100,5 +100,7 @@
   "inspector.field.nw": "North-west (m)",
   "inspector.field.ne": "North-east (m)",
   "inspector.field.start_height": "Start height",
-  "inspector.field.end_height": "End height"
+  "inspector.field.end_height": "End height",
+  "water.suggested": "The height shown is the surface of the water that was levelled in this tile.",
+  "@water.suggested": "A small note under the height field of a tile's water (inspector) when the height was proposed from water levelled in the tile"
 }

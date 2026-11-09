@@ -100,5 +100,6 @@
   "inspector.field.nw": "Nord-ovest (m)",
   "inspector.field.ne": "Nord-est (m)",
   "inspector.field.start_height": "Altezza iniziale",
-  "inspector.field.end_height": "Altezza finale"
+  "inspector.field.end_height": "Altezza finale",
+  "water.suggested": "L'altezza indicata è la superficie dell'acqua livellata in questa tessera."
 }

@@ -48,5 +48,7 @@
   "aerial.step.edges": "les bords tile ajustés",
   "aerial.edges.fitted": "Ajustement des bords du {count, plural, one {# tile} other {# tiles}} aux hauteurs chargées. Ctrl+Z le reprend.",
   "aerial.prefs_not_saved": "Les clés d'imagerie et les serveurs n'ont pas pu être enregistrés : {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "eau aplanie : {count, plural, one {# étendue} other {# étendues}} avec la surface {same, select, yes {à {low, number, 0.0} m} other {entre {low, number, 0.0} et {high, number, 0.0} m}} ; ajoutez de l'eau aux tuiles à cette hauteur pour la voir",
+  "aerial.report.water_failed": "eau non aplanie, les données ont été reprises telles quelles : {reason}"
 }

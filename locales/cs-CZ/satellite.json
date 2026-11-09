@@ -166,5 +166,7 @@
   "satellite.fit.scale": "Nasaďte také váhu",
   "satellite.fit.scale.tooltip": "Také bere měřítko ze vzdálenosti mezi dvěma body; bez něj si mapa zachovává své měřítko",
   "satellite.fit.button": "Přizpůsobte mapu",
-  "satellite.fit.button.tooltip": "Posouvá a otáčí mapu tak, aby se oba body setkaly se svými pozicemi"
+  "satellite.fit.button.tooltip": "Posouvá a otáčí mapu tak, aby se oba body setkaly se svými pozicemi",
+  "satellite.level_water": "Vyrovnat vodu",
+  "satellite.level_water.tooltip": "Položí jezera, řeky, přístavní bazény a moře, jak je zná OpenStreetMap, plošně 1,5 m pod hladinu vody určenou z břehů. Výšková data světa bývají nad vodou často chybná: bloky o desítky metrů příliš vysoko nebo hluboké jámy. Vyžaduje připojení k OpenStreetMap; bez něj se data použijí beze změny. Chcete-li vodu vidět, přidejte ji dlaždici v uvedené výšce."
 }

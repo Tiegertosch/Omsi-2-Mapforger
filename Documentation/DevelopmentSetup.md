@@ -31,6 +31,7 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 | Pruefung | Status |
 |---|---|
 | Verzeichnis- und Quellstruktur | Erledigt, statisch geprueft |
+| Ausreißer und Wasser in den Geländehöhen (ADR 069), 9. November 2026 | 473 EditMode-Tests gruen (6 in `OmsiHeightDespikeTests`, 11 in `OmsiWaterTests`, dazu der Auftrag mit und ohne Overpass in `OmsiRoadTests`); `LocaleCheck` 0 Fehler in 8 Sprachen; Player an einer Kopie des Fehlerprojekts „Terrain Bug“ (Tay-Mündung): Kachel 0,0 von −39,3…15,0 auf 0,6…7,4 m, alle Punkte ≥ 12 m über Wasser weg, ein Gewässer mit Spiegel 2,1 m, Kacheln ohne Wasser bitgleich; der Inspector schlägt bei „Add water“ den Spiegel vor (am Nutzerprojekt mit 65 Kacheln geprüft). Vom Nutzer getestet: Fehler behoben. Offen: Messung an einer großen Karte |
 | Genaue Verortung klassischer Karten (ADR 061), 6. November 2026 | 339 EditMode-Tests gruen (17 neue in `OmsiGeoPlacementTests`); Player-Pruefung an Grundorf mit Wegwerf-Projekt und Esri: geladenes Bild folgt Verschieben, Drehen (um den Bildmittelpunkt und um einen fernen Bezugspunkt) und Maßstab und liegt dabei deckungsgleich mit einem neu geschnittenen Bild; Klick auf die Karte zum Wählen der Punkte noch nicht per Skript pruefbar, steht im Nutzertest aus |
 | JSON-Syntax der Paketdateien und Assembly Definitions | Erfolgreich: JSON-Parser |
 | UXML/XML-Syntax | Erfolgreich: XML-Parser |

@@ -48,5 +48,9 @@
   "aerial.step.edges": "the fitted tile edges",
   "aerial.edges.fitted": "Fitted the edges of {count, plural, one {# tile} other {# tiles}} to the loaded heights. Ctrl+Z takes it back.",
   "aerial.prefs_not_saved": "The imagery keys and servers could not be saved: {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "water levelled: {count, plural, one {# body} other {# bodies}} with the surface {same, select, yes {at {low, number, 0.0} m} other {between {low, number, 0.0} and {high, number, 0.0} m}}; add water to the tiles at this height to see it",
+  "@aerial.report.water": "{count} is how many bodies of water were levelled; {same} is yes or no and chooses a part: keep it in English; {low} and {high} are heights in metres, numbers with one decimal",
+  "aerial.report.water_failed": "water not levelled, the data was used as it is: {reason}",
+  "@aerial.report.water_failed": "{reason} is a message from the system, in English"
 }

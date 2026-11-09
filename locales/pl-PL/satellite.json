@@ -166,5 +166,7 @@
   "satellite.fit.scale": "Dopasuj także skalę",
   "satellite.fit.scale.tooltip": "Przyjmuje również skalę z odległości między dwoma punktami; bez niego mapa zachowuje swoją skalę",
   "satellite.fit.button": "Dopasuj mapę",
-  "satellite.fit.button.tooltip": "Przesuwa i obraca mapę tak, aby oba punkty spotkały się ze swoimi pozycjami"
+  "satellite.fit.button.tooltip": "Przesuwa i obraca mapę tak, aby oba punkty spotkały się ze swoimi pozycjami",
+  "satellite.level_water": "Wyrównaj wodę",
+  "satellite.level_water.tooltip": "Układa jeziora, rzeki, baseny portowe i morze, takie jak zna je OpenStreetMap, płasko 1,5 m pod powierzchnią wody wyznaczoną z brzegów. Dane o wysokościach świata często są błędne nad wodą: bloki o dziesiątki metrów za wysokie lub głębokie doły. Wymaga połączenia z OpenStreetMap; bez niego dane są używane bez zmian. Aby zobaczyć wodę, dodaj ją do kafelka na podanej wysokości."
 }

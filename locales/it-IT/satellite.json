@@ -166,5 +166,7 @@
   "satellite.fit.scale": "Monta anche la bilancia",
   "satellite.fit.scale.tooltip": "Prende anche la scala dalla distanza tra i due punti; senza di esso la mappa mantiene la sua scala",
   "satellite.fit.button": "Adatta la mappa",
-  "satellite.fit.button.tooltip": "Muove e ruota la mappa in modo che entrambi i punti incontrino le rispettive posizioni"
+  "satellite.fit.button.tooltip": "Muove e ruota la mappa in modo che entrambi i punti incontrino le rispettive posizioni",
+  "satellite.level_water": "Livella l'acqua",
+  "satellite.level_water.tooltip": "Rende piani laghi, fiumi, bacini e il mare, come li conosce OpenStreetMap, 1,5 m sotto una superficie d'acqua ricavata dalle rive. I dati di altitudine del mondo sono spesso sbagliati sull'acqua: blocchi alti decine di metri di troppo o fosse profonde. Richiede una connessione a OpenStreetMap; senza, i dati vengono usati così come sono. Per vedere l'acqua, aggiungila alla tessera all'altezza indicata."
 }

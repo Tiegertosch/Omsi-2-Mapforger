@@ -35,5 +35,7 @@
   "aerial.edges.met": "Die Kachelränder passen schon zusammen.",
   "aerial.step.edges": "angepasste Kachelränder",
   "aerial.edges.fitted": "Die Ränder von {count, plural, one {# Kachel} other {# Kacheln}} wurden an die geladenen Höhen angepasst. Strg+Z nimmt es zurück.",
-  "aerial.prefs_not_saved": "Die Schlüssel und Server der Luftbilder konnten nicht gespeichert werden: {reason}"
+  "aerial.prefs_not_saved": "Die Schlüssel und Server der Luftbilder konnten nicht gespeichert werden: {reason}",
+  "aerial.report.water": "Wasser eingeebnet: {count, plural, one {# Gewässer} other {# Gewässer}} mit dem Wasserspiegel {same, select, yes {bei {low, number, 0.0} m} other {zwischen {low, number, 0.0} und {high, number, 0.0} m}}; um es zu sehen, den Kacheln Wasser in dieser Höhe hinzufügen",
+  "aerial.report.water_failed": "Wasser nicht eingeebnet, die Daten wurden unverändert übernommen: {reason}"
 }

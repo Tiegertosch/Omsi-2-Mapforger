@@ -100,5 +100,6 @@
   "inspector.field.nw": "Noroeste (m)",
   "inspector.field.ne": "Nordeste (m)",
   "inspector.field.start_height": "Altura inicial",
-  "inspector.field.end_height": "Altura final"
+  "inspector.field.end_height": "Altura final",
+  "water.suggested": "A altura indicada é a superfície da água nivelada neste mosaico."
 }

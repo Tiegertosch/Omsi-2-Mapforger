@@ -166,5 +166,7 @@
   "satellite.fit.scale": "Ajustez également la balance",
   "satellite.fit.scale.tooltip": "Prend également l'échelle de la distance entre les deux points ; sans cela, la carte garde son échelle",
   "satellite.fit.button": "Ajuster la carte",
-  "satellite.fit.button.tooltip": "Déplace et tourne la carte pour que les deux points correspondent à leurs positions"
+  "satellite.fit.button.tooltip": "Déplace et tourne la carte pour que les deux points correspondent à leurs positions",
+  "satellite.level_water": "Aplanir l'eau",
+  "satellite.level_water.tooltip": "Met à plat les lacs, rivières, bassins et la mer, tels qu'OpenStreetMap les connaît, 1,5 m sous une surface d'eau déduite des berges. Les données d'altitude du monde sont souvent fausses au-dessus de l'eau : des blocs trop hauts de plusieurs dizaines de mètres, ou des fosses profondes. Nécessite une connexion à OpenStreetMap ; sans elle, les données sont reprises telles quelles. Pour voir l'eau, ajoutez-la à la tuile à la hauteur indiquée."
 }

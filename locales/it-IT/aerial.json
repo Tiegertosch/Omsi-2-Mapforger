@@ -48,5 +48,7 @@
   "aerial.step.edges": "i bordi tile montati",
   "aerial.edges.fitted": "Adattato i bordi di {count, plural, one {# tile} other {# tiles}} alle altezze caricate. Ctrl+Z lo riprende.",
   "aerial.prefs_not_saved": "Impossibile salvare le chiavi e i server delle immagini: {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "acqua livellata: {count, plural, one {# specchio d'acqua} other {# specchi d'acqua}} con la superficie {same, select, yes {a {low, number, 0.0} m} other {tra {low, number, 0.0} e {high, number, 0.0} m}}; aggiungi acqua alle tessere a questa altezza per vederla",
+  "aerial.report.water_failed": "acqua non livellata, i dati sono stati usati così come sono: {reason}"
 }

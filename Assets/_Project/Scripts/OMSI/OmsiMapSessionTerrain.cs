@@ -653,13 +653,19 @@ namespace OmsiMapEditor.OMSI
                 change.Files.Add(new OmsiObjectChange.FileState { RelativePath = waterPath, Before = workspace.ReadAllBytes(waterPath), After = null });
         }
 
-        /// <summary>Reads the water of tiles again from the workspace.</summary>
+        /// <summary>Reads the water and the range of heights of tiles again from the workspace, so the inspector shows what the ground is now.</summary>
         private void ReadWaterOf(IEnumerable<OmsiTileSummary> tiles)
         {
             var workspace = RequireWorkspace();
             foreach (var tile in tiles)
             {
                 var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+                var terrainPath = tilePath + ".terrain";
+                if (workspace.FileExists(terrainPath) && OmsiMapReader.TryReadTerrainRange(workspace.ReadAllBytes(terrainPath), out var minHeight, out var maxHeight))
+                {
+                    tile.TerrainMinHeight = minHeight;
+                    tile.TerrainMaxHeight = maxHeight;
+                }
                 var file = OmsiRecordFile.Parse(workspace.ReadAllBytes(tilePath), OmsiTileRecordLayouts.Instance);
                 tile.Water = file.Records.Exists(record => string.Equals(record.Name, "water", StringComparison.OrdinalIgnoreCase))
                     ? OmsiMapReader.ReadWater(workspace, tilePath)

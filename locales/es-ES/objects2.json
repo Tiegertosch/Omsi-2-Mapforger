@@ -100,5 +100,6 @@
   "inspector.field.nw": "Noroeste (m)",
   "inspector.field.ne": "Noreste (m)",
   "inspector.field.start_height": "Altura inicial",
-  "inspector.field.end_height": "Altura final"
+  "inspector.field.end_height": "Altura final",
+  "water.suggested": "La altura mostrada es la superficie del agua nivelada en esta casilla."
 }

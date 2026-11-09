@@ -48,5 +48,7 @@
   "aerial.step.edges": "zamontowane krawędzie tile",
   "aerial.edges.fitted": "Dopasowano krawędzie {count, plural, one {# tile} few {# tiles} many {# tiles} other {# tiles}} do załadowanej wysokości. Ctrl+Z zabiera to z powrotem.",
   "aerial.prefs_not_saved": "Nie można zapisać kluczy obrazów i serwerów: {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "woda wyrównana: {count, plural, one {# zbiornik} few {# zbiorniki} many {# zbiorników} other {# zbiornika}} z powierzchnią {same, select, yes {na {low, number, 0.0} m} other {między {low, number, 0.0} a {high, number, 0.0} m}}; dodaj wodę do kafelków na tej wysokości, aby ją zobaczyć",
+  "aerial.report.water_failed": "woda niewyrównana, dane użyto bez zmian: {reason}"
 }

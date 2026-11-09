@@ -158,5 +158,7 @@
   "satellite.fit.scale": "Maßstab auch anpassen",
   "satellite.fit.scale.tooltip": "Nimmt den Maßstab auch aus dem Abstand der beiden Punkte; ohne ihn behält die Karte ihren Maßstab",
   "satellite.fit.button": "Karte anpassen",
-  "satellite.fit.button.tooltip": "Verschiebt und dreht die Karte, sodass beide Punkte ihre Positionen treffen"
+  "satellite.fit.button.tooltip": "Verschiebt und dreht die Karte, sodass beide Punkte ihre Positionen treffen",
+  "satellite.level_water": "Wasser einebnen",
+  "satellite.level_water.tooltip": "Legt Seen, Flüsse, Hafenbecken und das Meer, wie OpenStreetMap sie kennt, flach 1,5 m unter einen Wasserspiegel, der aus den Ufern bestimmt wird. Die Höhendaten der Welt sind über Wasser oft falsch: Blöcke, die Dutzende Meter zu hoch liegen, oder tiefe Gruben. Braucht eine Verbindung zu OpenStreetMap; ohne sie werden die Daten unverändert übernommen. Um das Wasser zu sehen, der Kachel Wasser in der gemeldeten Höhe hinzufügen."
 }

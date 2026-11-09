@@ -54,6 +54,20 @@ namespace OmsiMapEditor.OMSI
                    ");out geom;";
         }
 
+        /// <summary>The Overpass query for the water within a box: lakes, docks, riverbanks and the coastline, with their geometry.</summary>
+        public static string WaterQuery(double south, double west, double north, double east)
+        {
+            var b = string.Join(",", new[] { south, west, north, east }.Select6());
+            return "[out:json][timeout:90];(" +
+                   "way[\"natural\"~\"^(water|coastline)$\"](" + b + ");" +
+                   "way[\"waterway\"=\"riverbank\"](" + b + ");" +
+                   "way[\"landuse\"~\"^(reservoir|basin)$\"](" + b + ");" +
+                   "rel[\"natural\"=\"water\"](" + b + ");" +
+                   "rel[\"waterway\"=\"riverbank\"](" + b + ");" +
+                   "rel[\"landuse\"~\"^(reservoir|basin)$\"](" + b + ");" +
+                   ");out geom;";
+        }
+
         private static IEnumerable<string> Select6(this double[] values)
         {
             foreach (var value in values)

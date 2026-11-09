@@ -48,5 +48,7 @@
   "aerial.step.edges": "osazené hrany tile",
   "aerial.edges.fitted": "Připevněte okraje {count, plural, one {# tile} few {# tiles} many {# tiles} other {# tiles}} na zatížené výšky. Ctrl+Z to bere zpět.",
   "aerial.prefs_not_saved": "Klíče snímků a servery nelze uložit: {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "voda vyrovnána: {count, plural, one {# vodní plocha} few {# vodní plochy} many {# vodní plochy} other {# vodních ploch}} s hladinou {same, select, yes {na {low, number, 0.0} m} other {mezi {low, number, 0.0} a {high, number, 0.0} m}}; přidejte vodu dlaždicím v této výšce, abyste ji viděli",
+  "aerial.report.water_failed": "voda nevyrovnána, data byla použita beze změny: {reason}"
 }

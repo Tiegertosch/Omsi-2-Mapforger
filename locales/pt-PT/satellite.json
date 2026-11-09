@@ -166,5 +166,7 @@
   "satellite.fit.scale": "Ajuste a escala também",
   "satellite.fit.scale.tooltip": "Também retira a escala da distância entre os dois pontos; sem ele o mapa mantém a sua escala",
   "satellite.fit.button": "Ajustar o mapa",
-  "satellite.fit.button.tooltip": "Move e vira o mapa de modo a que ambos os pontos encontrem as suas posições"
+  "satellite.fit.button.tooltip": "Move e vira o mapa de modo a que ambos os pontos encontrem as suas posições",
+  "satellite.level_water": "Nivelar a água",
+  "satellite.level_water.tooltip": "Deixa planos os lagos, rios, docas e o mar, como o OpenStreetMap os conhece, 1,5 m abaixo de uma superfície de água tirada das margens. Os dados de altitude do mundo estão muitas vezes errados sobre a água: blocos dezenas de metros demasiado altos ou fossas profundas. Precisa de ligação ao OpenStreetMap; sem ela, os dados são usados tal como estão. Para ver a água, adicione-a ao mosaico à altura indicada."
 }

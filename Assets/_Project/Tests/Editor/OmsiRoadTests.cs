@@ -1420,6 +1420,12 @@ namespace OmsiMapEditor.Tests
 
             var change = session.ImportTerrainHeights(summary, heights);
             Assert.AreEqual(2.0, OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_1_0.map.terrain"))[30, 30], 1e-4);
+            // The tiles tell the range of the heights now laid, as the inspector shows it (it showed the old one before).
+            foreach (var imported in heights.Keys)
+            {
+                Assert.AreEqual(2.0, imported.TerrainMinHeight, 1e-4);
+                Assert.AreEqual(2.0, imported.TerrainMaxHeight, 1e-4);
+            }
             session.Undo(summary, change);
             Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
 
@@ -1430,6 +1436,72 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEqual(new byte[] { 9 }, session.ReadImagery(summary.Tiles[0], out var meta));
             Assert.AreEqual(19, meta.Zoom);
             Assert.AreEqual(@"Mapforge\Imagery\tile_0_0.map.jpg", OmsiMapSession.ImageryPath(summary.Tiles[0]));
+        }
+
+        [Test]
+        public void TheJobLaysWaterFlatUnderTheSurfaceOfItsBanksAndAFailureOfOpenStreetMapOnlyLeavesTheDataAsItIs()
+        {
+            var grey = new ushort[256 * 256];
+            for (var index = 0; index < grey.Length; index++)
+                grey[index] = 128 * 257;
+            var png = OmsiPng.EncodeGrey16(256, 256, grey);
+            // A lake of 100 m by 100 m in the middle of the first tile, as Overpass would answer.
+            var centre = new OmsiLatLon(52.5, 13.4);
+            var corners = new[] { new[] { -50.0, -50.0 }, new[] { 50.0, -50.0 }, new[] { 50.0, 50.0 }, new[] { -50.0, 50.0 }, new[] { -50.0, -50.0 } };
+            var geometry = string.Join(",", corners.Select(corner =>
+            {
+                var at = OmsiGeoreference.Moved(centre, corner[0], corner[1]);
+                return "{\"lat\":" + at.Latitude.ToString("R", CultureInfo.InvariantCulture) + ",\"lon\":" + at.Longitude.ToString("R", CultureInfo.InvariantCulture) + "}";
+            }));
+            var lake = "{\"elements\":[{\"type\":\"way\",\"id\":1,\"tags\":{\"natural\":\"water\"},\"geometry\":[" + geometry + "]}]}";
+            var summary = OpenProject().Read();
+
+            OmsiAerialJob Run(bool overpassAnswers, out float[] firstTile)
+            {
+                var root = Path.Combine(Path.GetTempPath(), "mapforge-water-" + Guid.NewGuid().ToString("N"));
+                var fetcher = new OmsiTileFetcher(Path.Combine(root, "tiles"), (url, cancel) =>
+                    url.Contains("overpass") ? new KeyValuePair<int, byte[]>(overpassAnswers ? 200 : 503, Encoding.UTF8.GetBytes(lake)) : new KeyValuePair<int, byte[]>(200, png));
+                var job = new OmsiAerialJob
+                {
+                    Geo = OmsiGeoreference.Placed(new OmsiGeoAnchor { Latitude = 52.5, Longitude = 13.4 }, 300), TileSize = 300, Fetcher = fetcher,
+                    Heights = new OmsiGeoHeightOptions { Relative = false, Offset = 0, Smoothing = 0 }
+                };
+                job.Tiles.AddRange(summary.Tiles);
+                float[] first = null;
+                job.HeightsReady = (tile, values) =>
+                {
+                    if (tile.X == 0 && tile.Y == 0)
+                        first = values;
+                };
+                try
+                {
+                    job.Run(CancellationToken.None);
+                }
+                finally
+                {
+                    Directory.Delete(root, true);
+                }
+                firstTile = first;
+                return job;
+            }
+
+            // The data says 128.5 m everywhere: the lake's bank and its inside alike, so the surface is 128.5 m and the bed 1.5 m under it.
+            var job1 = Run(true, out var laid);
+            Assert.IsNull(job1.WaterNote);
+            Assert.AreEqual(1, job1.WaterBodies);
+            Assert.AreEqual(1, job1.WaterSurfaces.Count);
+            Assert.AreEqual(128.5, job1.WaterSurfaces[0], 1e-3);
+            Assert.AreEqual(127.0, laid[30 * OmsiTerrain.Resolution + 30], 1e-3, "the bed in the middle of the lake");
+            Assert.AreEqual(128.5, laid[0], 1e-3, "land stays as the data has it");
+            // The tile the lake lies in proposes its surface for water; the other tile has no water to propose for.
+            Assert.AreEqual(128.5, job1.SuggestedWaterLevel(summary.Tiles.Find(tile => tile.X == 0 && tile.Y == 0)).Value, 1e-3);
+            Assert.IsNull(job1.SuggestedWaterLevel(summary.Tiles.Find(tile => tile.X == 1 && tile.Y == 0)));
+
+            // OpenStreetMap does not answer: the heights come all the same, as the data has them, and the note says why.
+            var job2 = Run(false, out var asIs);
+            Assert.IsNotNull(job2.WaterNote);
+            Assert.AreEqual(0, job2.WaterSurfaces.Count);
+            Assert.AreEqual(128.5, asIs[30 * OmsiTerrain.Resolution + 30], 1e-3);
         }
 
         [Test]

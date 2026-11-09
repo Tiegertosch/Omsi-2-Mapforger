@@ -83,7 +83,11 @@ namespace OmsiMapEditor.OMSI
         private static readonly HttpClient Client = CreateClient(30);
         private static readonly HttpClient SlowClient = CreateClient(150);
         private static readonly object OverpassLock = new object();
-        private static readonly string[] OverpassServers = { "https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter" };
+        private static readonly string[] OverpassServers =
+        {
+            "https://overpass-api.de/api/interpreter", "https://lz4.overpass-api.de/api/interpreter", "https://z.overpass-api.de/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+        };
         private static readonly SemaphoreSlim Slots = new SemaphoreSlim(4);
         private static readonly object SearchLock = new object();
         private static DateTime lastSearch = DateTime.MinValue;
@@ -361,6 +365,21 @@ namespace OmsiMapEditor.OMSI
         private readonly int pixels;
         private readonly byte[] rgb;
 
+        /// <summary>The heights in metres after <see cref="Despike"/>; null for a mosaic of colours.</summary>
+        private float[] metres;
+
+        /// <summary>
+        /// A height pixel that differs from the median of its 3 × 3 neighbours by more than this many metres is a spike
+        /// of the source, such as the single pixels of −198 m that the world's elevation data holds here and there.
+        /// </summary>
+        public const double SpikeMetres = 10.0;
+
+        /// <summary>How many source pixels around a point <see cref="Height"/> reads: its four corners, and the ring around each that the despiking looks at.</summary>
+        public const int HeightReachPixels = 2;
+
+        /// <summary>The edge of a Terrarium tile in pixels.</summary>
+        public const int TerrariumTilePixels = 256;
+
         private OmsiMosaic(int zoom, int x0, int y0, int columns, int rows, int pixels, byte[] rgb)
         {
             this.zoom = zoom;
@@ -410,7 +429,47 @@ namespace OmsiMapEditor.OMSI
                 lock (mosaic)
                     mosaic.Place(job.Key, job.Value, picture, coarser);
             });
+            if (heights)
+                mosaic.Despike();
             return mosaic;
+        }
+
+        /// <summary>
+        /// Replaces every pixel that stands out by more than <see cref="SpikeMetres"/> from the median of its 3 × 3 neighbours
+        /// with that median. A step, such as a quay wall, is kept (a median keeps edges), and a pixel that does not stand out
+        /// keeps its height exactly. A spike one or two pixels wide goes; a wider block of the source is real as far as this knows.
+        /// </summary>
+        private void Despike()
+        {
+            var width = columns * pixels;
+            var height = rows * pixels;
+            var source = new float[width * height];
+            for (var index = 0; index < source.Length; index++)
+                source[index] = OmsiImagerySource.TerrariumHeight(rgb[index * 3], rgb[index * 3 + 1], rgb[index * 3 + 2]);
+            var result = (float[])source.Clone();
+            var window = new float[9];
+            for (var y = 0; y < height; y++)
+                for (var x = 0; x < width; x++)
+                {
+                    var value = source[y * width + x];
+                    // A pixel above the median by more than the limit has at least five neighbours lower by more than it (and the other way round).
+                    var apart = 0;
+                    var count = 0;
+                    for (var j = -1; j <= 1; j++)
+                        for (var i = -1; i <= 1; i++)
+                        {
+                            var neighbour = source[Clamp(y + j, height) * width + Clamp(x + i, width)];
+                            window[count++] = neighbour;
+                            if (Math.Abs(neighbour - value) > SpikeMetres)
+                                apart++;
+                        }
+                    if (apart < 5)
+                        continue;
+                    Array.Sort(window);
+                    if (Math.Abs(value - window[4]) > SpikeMetres)
+                        result[y * width + x] = window[4];
+                }
+            metres = result;
         }
 
         private void Place(int i, int j, OmsiRgbImage picture, bool coarser)
@@ -526,7 +585,7 @@ namespace OmsiMapEditor.OMSI
             Corners(mercator, out var a, out var b, out var c, out var d, out var u, out var v);
             double At(int pixel)
             {
-                return OmsiImagerySource.TerrariumHeight(rgb[pixel * 3], rgb[pixel * 3 + 1], rgb[pixel * 3 + 2]);
+                return metres != null ? metres[pixel] : OmsiImagerySource.TerrariumHeight(rgb[pixel * 3], rgb[pixel * 3 + 1], rgb[pixel * 3 + 2]);
             }
             var top = At(a) + (At(b) - At(a)) * u;
             var bottom = At(c) + (At(d) - At(c)) * u;
@@ -623,18 +682,51 @@ namespace OmsiMapEditor.OMSI
         /// both, so they get the same height.
         /// </summary>
         public static float[] SampleHeights(OmsiGeoreference geo, int tileX, int tileY, double tileSize, int zoom, double smoothing,
+            Func<int, int, int, OmsiRgbImage> tile, CancellationToken cancel, OmsiWaterMask water = null, OmsiWaterLevels levels = null)
+        {
+            return SampleHeights(geo, tileX, tileY, tileSize, smoothing, HeightMosaic(geo, tileX, tileY, tileSize, zoom, smoothing, tile, cancel), water, levels);
+        }
+
+        /// <summary>The Terrarium tiles a map tile's terrain points read, despiked, with room for the smoothing and the despiking around them.</summary>
+        public static OmsiMosaic HeightMosaic(OmsiGeoreference geo, int tileX, int tileY, double tileSize, int zoom, double smoothing,
             Func<int, int, int, OmsiRgbImage> tile, CancellationToken cancel)
         {
             const int cells = OmsiTerrain.Resolution - 1;
             TileBox(geo, tileX, tileY, tileSize, Math.Max(0.0, smoothing) + tileSize / cells, out var low, out var high);
-            var mosaic = OmsiMosaic.Fetch(zoom, low, high, true, tile, cancel);
+            // The pixels the despiking looks at beyond the ones a point reads, so two tiles side by side see the same neighbours of
+            // a shared point and still get the same height, whatever the zoom.
+            var around = OmsiMosaic.HeightReachPixels / ((double)(1L << zoom) * OmsiMosaic.TerrariumTilePixels);
+            low = new OmsiMapPoint(low.X - around, low.Y - around);
+            high = new OmsiMapPoint(high.X + around, high.Y + around);
+            return OmsiMosaic.Fetch(zoom, low, high, true, tile, cancel);
+        }
+
+        /// <summary>
+        /// The heights above the sea of a map tile's 61 × 61 terrain points from a mosaic, as <see cref="SampleHeights(OmsiGeoreference,int,int,double,int,double,Func{int,int,int,OmsiRgbImage},CancellationToken,OmsiWaterMask,OmsiWaterLevels)"/>;
+        /// where a body of water lies, the height of its bed instead of the data, before the smoothing.
+        /// </summary>
+        public static float[] SampleHeights(OmsiGeoreference geo, int tileX, int tileY, double tileSize, double smoothing, OmsiMosaic mosaic,
+            OmsiWaterMask water, OmsiWaterLevels levels)
+        {
+            const int cells = OmsiTerrain.Resolution - 1;
+            double Height(double px, double py)
+            {
+                var mercator = geo.Mercator(px, py);
+                if (water != null && levels != null)
+                {
+                    var bed = levels.Bed(water.BodyAt(mercator.X, mercator.Y));
+                    if (bed.HasValue)
+                        return bed.Value;
+                }
+                return mosaic.Height(mercator);
+            }
             var heights = new float[OmsiTerrain.Resolution * OmsiTerrain.Resolution];
             for (var row = 0; row < OmsiTerrain.Resolution; row++)
                 for (var column = 0; column < OmsiTerrain.Resolution; column++)
                 {
                     var x = ((long)tileX * cells + column) * tileSize / cells;
                     var y = ((long)tileY * cells + row) * tileSize / cells;
-                    heights[row * OmsiTerrain.Resolution + column] = (float)Smoothed(x, y, smoothing, (px, py) => mosaic.Height(geo.Mercator(px, py)));
+                    heights[row * OmsiTerrain.Resolution + column] = (float)Smoothed(x, y, smoothing, Height);
                 }
             return heights;
         }
@@ -799,14 +891,18 @@ namespace OmsiMapEditor.OMSI
             }
 
             var heightZoom = 0;
+            OmsiWaterMask water = null;
+            OmsiWaterLevels levels = null;
             if (Heights != null)
             {
                 heightZoom = OmsiAerial.HeightZoom(middle.Latitude, TileSize / (OmsiTerrain.Resolution - 1), OmsiImagerySource.Terrain.MaxZoom);
+                if (Heights.LevelWater)
+                    PrepareWater(heightZoom, cancel, out water, out levels);
                 if (Heights.Relative && Heights.Base.HasValue)
                     Base = Heights.Base;
                 else if (Heights.Relative)
                 {
-                    var raw = OmsiAerial.SampleHeights(Geo, middleTile.X, middleTile.Y, TileSize, heightZoom, 0.0, TerrainTile(cancel), cancel);
+                    var raw = OmsiAerial.SampleHeights(Geo, middleTile.X, middleTile.Y, TileSize, heightZoom, 0.0, TerrainTile(cancel), cancel, water, levels);
                     var sum = 0.0;
                     foreach (var height in raw)
                         sum += height;
@@ -837,7 +933,7 @@ namespace OmsiMapEditor.OMSI
                         }
                         if (Heights != null)
                         {
-                            var raw = OmsiAerial.SampleHeights(Geo, tile.X, tile.Y, TileSize, heightZoom, Heights.Smoothing, TerrainTile(cancel), cancel);
+                            var raw = OmsiAerial.SampleHeights(Geo, tile.X, tile.Y, TileSize, heightZoom, Heights.Smoothing, TerrainTile(cancel), cancel, water, levels);
                             for (var index = 0; index < raw.Length; index++)
                                 raw[index] = (float)(raw[index] - (Base ?? 0.0) + Heights.Offset);
                             HeightsReady?.Invoke(tile, raw);
@@ -853,6 +949,93 @@ namespace OmsiMapEditor.OMSI
                 if (last != null)
                     TileFailed?.Invoke(tile, last.Message);
                 done++;
+            }
+        }
+
+        /// <summary>The surfaces of the bodies of water that were levelled, in metres above the sea (before the base and offset are applied).</summary>
+        public List<double> WaterSurfaces { get; } = new List<double>();
+
+        /// <summary>Why the water was not levelled, when it was asked for and could not be; null when it was, or there is no water here.</summary>
+        public string WaterNote { get; private set; }
+
+        /// <summary>How many bodies of water OpenStreetMap has within the tiles' box.</summary>
+        public int WaterBodies { get; private set; }
+
+        // The surface of the body that covers most of a tile, in metres above the sea, by tile (OmsiGeoSettings.TileKey).
+        private readonly Dictionary<long, double> tileSurfaces = new Dictionary<long, double>();
+
+        /// <summary>
+        /// The water surface to propose for a tile whose water was levelled, in the heights laid on the map (the base taken off and the
+        /// offset added, as for the heights themselves): that of the body of water that covers most of the tile; null for a tile without.
+        /// </summary>
+        public double? SuggestedWaterLevel(OmsiTileSummary tile)
+        {
+            return tileSurfaces.TryGetValue(OmsiGeoSettings.TileKey(tile.X, tile.Y), out var surface) ? surface - (Base ?? 0.0) + (Heights?.Offset ?? 0.0) : (double?)null;
+        }
+
+        /// <summary>
+        /// Looks up the water of the tiles' box in OpenStreetMap and decides the surface of each body from the heights around it. The heights
+        /// must still load when OpenStreetMap does not answer, so a failure is only noted and the data is taken as it is.
+        /// </summary>
+        private void PrepareWater(int heightZoom, CancellationToken cancel, out OmsiWaterMask water, out OmsiWaterLevels levels)
+        {
+            water = null;
+            levels = null;
+            try
+            {
+                Status?.Invoke("Looking up the water in OpenStreetMap");
+                var box = OmsiOsmMap.Box(Geo, Tiles, TileSize);
+                // A little wider, so a coastline just outside the tiles is in the answer and tells which side is sea.
+                const double reach = 0.003;
+                var elements = OmsiOsmMap.Parse(Fetcher.Overpass(OmsiOsmMap.WaterQuery(box[0] - reach, box[1] - reach, box[2] + reach, box[3] + reach), cancel));
+                var mask = OmsiWaterMask.Build(elements, box[0] - reach, box[1] - reach, box[2] + reach, box[3] + reach);
+                WaterBodies = mask.BodyCount;
+                if (mask.BodyCount == 0)
+                    return;
+                var survey = new OmsiWaterLevels(mask);
+                var terrain = TerrainTile(cancel);
+                foreach (var tile in Tiles)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                    OmsiAerial.TileBox(Geo, tile.X, tile.Y, TileSize, 0.0, out var low, out var high);
+                    if (!mask.AnyWaterIn(low, high))
+                        continue;
+                    try
+                    {
+                        var mosaic = OmsiAerial.HeightMosaic(Geo, tile.X, tile.Y, TileSize, heightZoom, Heights.Smoothing, terrain, cancel);
+                        survey.Add(low, high, mosaic.Height);
+                    }
+                    catch (Exception exception) when (!(exception is OperationCanceledException))
+                    {
+                        // A tile that cannot be read now is tried again when its heights are laid; its water only adds no heights to the levels.
+                    }
+                }
+                survey.Finish();
+                foreach (var tile in Tiles)
+                {
+                    OmsiAerial.TileBox(Geo, tile.X, tile.Y, TileSize, 0.0, out var low, out var high);
+                    var cells = new Dictionary<int, int>();
+                    mask.ForCellsIn(low, high, (index, body, isShore, middle) =>
+                    {
+                        if (!isShore)
+                            cells[body] = (cells.TryGetValue(body, out var count) ? count : 0) + 1;
+                    });
+                    var best = -1;
+                    foreach (var pair in cells)
+                        if (survey.Surface(pair.Key).HasValue && (best < 0 || pair.Value > cells[best]))
+                            best = pair.Key;
+                    if (best >= 0)
+                        tileSurfaces[OmsiGeoSettings.TileKey(tile.X, tile.Y)] = survey.Surface(best).Value;
+                }
+                water = mask;
+                levels = survey;
+                WaterSurfaces.AddRange(survey.Decided());
+            }
+            catch (Exception exception) when (!(exception is OperationCanceledException))
+            {
+                WaterNote = exception.Message;
+                water = null;
+                levels = null;
             }
         }
 

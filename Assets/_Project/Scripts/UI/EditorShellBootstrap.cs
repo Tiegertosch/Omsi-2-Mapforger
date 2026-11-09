@@ -4973,8 +4973,17 @@ namespace OmsiMapEditor.UI
             var heading = new Label(Loc.T("water.heading").ToUpper(Loc.Manager?.Culture ?? System.Globalization.CultureInfo.CurrentCulture));
             heading.AddToClassList("inspector-section-heading");
             container.Add(heading);
-            var level = tile.Water != null ? (tile.Water[0] + tile.Water[1] + tile.Water[2] + tile.Water[3]) / 4.0 : tile.TerrainMinHeight - 1.0;
+            // Without water yet: the surface of the water that was levelled in this tile, if any, else a metre under the lowest ground.
+            var suggested = tile.Water == null ? geoSettings?.SuggestedWaterOf(tile.X, tile.Y) : null;
+            var level = tile.Water != null ? (tile.Water[0] + tile.Water[1] + tile.Water[2] + tile.Water[3]) / 4.0 : suggested ?? tile.TerrainMinHeight - 1.0;
             var field = AddEditField(container, "inspector.field.height", level);
+            if (suggested.HasValue)
+            {
+                var hint = new Label(Loc.T("water.suggested"));
+                hint.AddToClassList("inspector-record-empty");
+                hint.style.whiteSpace = WhiteSpace.Normal;
+                container.Add(hint);
+            }
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             var set = new Button(() =>
@@ -5114,6 +5123,8 @@ namespace OmsiMapEditor.UI
             if (roadTerrain != null)
                 roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
             UpdateMapStateLabel();
+            // The inspector tells the tile's range of heights and proposes a water height from it; it keeps where it was scrolled to.
+            RenderInspector();
         }
 
         /// <summary>Starts the row tool: the object library with the row options beside it, and the map's road mode for pointing.</summary>

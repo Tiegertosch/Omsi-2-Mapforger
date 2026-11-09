@@ -89,5 +89,6 @@
   "inspector.field.nw": "Nordwest (m)",
   "inspector.field.ne": "Nordost (m)",
   "inspector.field.start_height": "Starthöhe",
-  "inspector.field.end_height": "Endhöhe"
+  "inspector.field.end_height": "Endhöhe",
+  "water.suggested": "Die gezeigte Höhe ist der Wasserspiegel des Wassers, das in dieser Kachel eingeebnet wurde."
 }

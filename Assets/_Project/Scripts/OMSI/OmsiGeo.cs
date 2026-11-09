@@ -368,6 +368,12 @@ namespace OmsiMapEditor.OMSI
         public double Smoothing { get; set; } = 10.0;
 
         /// <summary>
+        /// Lakes, rivers, docks and the sea, as OpenStreetMap has them, are laid flat at their own level: the world's elevation data is
+        /// often wrong over water (blocks of tens of metres too high, steep pits).
+        /// </summary>
+        public bool LevelWater { get; set; } = true;
+
+        /// <summary>
         /// The height relative heights took off the first time, kept so that tiles loaded later meet the earlier ones;
         /// null to measure it at the middle tile.
         /// </summary>
@@ -408,9 +414,30 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public Dictionary<long, double> TileOpacity { get; } = new Dictionary<long, double>();
 
+        /// <summary>
+        /// The water surface proposed for tiles whose heights were laid with their water levelled, by tile (as <see cref="TileOpacity"/>), in the
+        /// map's heights: what the inspector proposes when the tile gets water.
+        /// </summary>
+        public Dictionary<long, double> SuggestedWater { get; } = new Dictionary<long, double>();
+
         public static long TileKey(int x, int y)
         {
             return ((long)x << 32) | (uint)y;
+        }
+
+        /// <summary>The water surface proposed for a tile, or null when none is.</summary>
+        public double? SuggestedWaterOf(int x, int y)
+        {
+            return SuggestedWater.TryGetValue(TileKey(x, y), out var level) ? level : (double?)null;
+        }
+
+        /// <summary>Keeps the water surface proposed for a tile; null takes the proposal away.</summary>
+        public void SetSuggestedWater(int x, int y, double? level)
+        {
+            if (level.HasValue && !double.IsNaN(level.Value) && !double.IsInfinity(level.Value))
+                SuggestedWater[TileKey(x, y)] = level.Value;
+            else
+                SuggestedWater.Remove(TileKey(x, y));
         }
 
         /// <summary>A tile's factor on the opacity, 1 unless it was changed.</summary>
@@ -454,6 +481,7 @@ namespace OmsiMapEditor.OMSI
             settings.Heights.Relative = !values.TryGetValue("relative", out var relative) || relative != "0";
             settings.Heights.Offset = Number("offset", 0);
             settings.Heights.Smoothing = Number("smoothing", 10);
+            settings.Heights.LevelWater = !values.TryGetValue("levelwater", out var levelWater) || levelWater != "0";
             if (values.ContainsKey("base"))
                 settings.Heights.Base = Number("base", 0);
             settings.ImageryOpacity = Math.Max(0.0, Math.Min(1.0, Number("opacity", 1)));
@@ -469,6 +497,10 @@ namespace OmsiMapEditor.OMSI
                     int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tileY) &&
                     double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var factor))
                     settings.SetOpacityOf(tileX, tileY, factor);
+                else if (parts.Length == 4 && parts[0] == "watersurface" && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var waterX) &&
+                         int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var waterY) &&
+                         double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var surface))
+                    settings.SetSuggestedWater(waterX, waterY, surface);
             }
             var size = (int)Number("picture", 0);
             settings.PictureSize = size == 1024 || size == 2048 || size == 4096 ? size : 0;
@@ -500,6 +532,7 @@ namespace OmsiMapEditor.OMSI
             Line("relative", Heights.Relative ? 1 : 0);
             Line("offset", Heights.Offset);
             Line("smoothing", Heights.Smoothing);
+            Line("levelwater", Heights.LevelWater ? 1 : 0);
             if (Heights.Base.HasValue)
                 Line("base", Heights.Base.Value);
             Line("opacity", ImageryOpacity);
@@ -509,6 +542,10 @@ namespace OmsiMapEditor.OMSI
             Line("picture", PictureSize);
             foreach (var pair in TileOpacity)
                 text.Append("tile ").Append(((int)(pair.Key >> 32)).ToString(CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(((int)(pair.Key & 0xffffffffL)).ToString(CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(pair.Value.ToString("R", CultureInfo.InvariantCulture)).Append('\n');
+            foreach (var pair in SuggestedWater)
+                text.Append("watersurface ").Append(((int)(pair.Key >> 32)).ToString(CultureInfo.InvariantCulture)).Append(' ')
                     .Append(((int)(pair.Key & 0xffffffffL)).ToString(CultureInfo.InvariantCulture)).Append(' ')
                     .Append(pair.Value.ToString("R", CultureInfo.InvariantCulture)).Append('\n');
             if (!string.IsNullOrEmpty(Source))

@@ -47,6 +47,7 @@ namespace OmsiMapEditor.UI
         private readonly Label progressLabel = new Label();
         private readonly Button cancelButton;
         private readonly Toggle relativeToggle = new Toggle();
+        private readonly Toggle levelWaterToggle = new Toggle();
         private readonly TextField offsetField = new TextField();
         private readonly TextField smoothingField = new TextField();
         private readonly Label baseLabel = new Label();
@@ -307,6 +308,12 @@ namespace OmsiMapEditor.UI
             LocBindings.Tooltip(relativeToggle, "satellite.relative.tooltip");
             relativeToggle.RegisterValueChangedCallback(_ => HeightOptionsChanged?.Invoke());
             terrainTab.Add(relativeToggle);
+            LocBindings.Text(levelWaterToggle, "satellite.level_water");
+            levelWaterToggle.AddToClassList("picker-option-toggle");
+            levelWaterToggle.AddToClassList("panel-toggle");
+            LocBindings.Tooltip(levelWaterToggle, "satellite.level_water.tooltip");
+            levelWaterToggle.RegisterValueChangedCallback(_ => HeightOptionsChanged?.Invoke());
+            terrainTab.Add(levelWaterToggle);
             Field(Row(terrainTab, "satellite.raise"), offsetField, "satellite.raise.tooltip");
             Field(Row(terrainTab, "satellite.smoothing"), smoothingField, "satellite.smoothing.tooltip");
             offsetField.RegisterCallback<FocusOutEvent>(_ => HeightOptionsChanged?.Invoke());
@@ -532,6 +539,8 @@ namespace OmsiMapEditor.UI
 
         public bool Relative => relativeToggle.value;
 
+        public bool LevelWater => levelWaterToggle.value;
+
         public double? Offset => Number(offsetField.value);
 
         public double? Smoothing => Number(smoothingField.value);
@@ -543,6 +552,7 @@ namespace OmsiMapEditor.UI
             placeSection.style.display = worldCoordinates ? DisplayStyle.None : DisplayStyle.Flex;
             rotationField.SetValueWithoutNotify((settings.Anchor?.RotationDegrees ?? 0.0).ToString("0.##", CultureInfo.InvariantCulture));
             relativeToggle.SetValueWithoutNotify(settings.Heights.Relative);
+            levelWaterToggle.SetValueWithoutNotify(settings.Heights.LevelWater);
             offsetField.SetValueWithoutNotify(settings.Heights.Offset.ToString("0.##", CultureInfo.InvariantCulture));
             smoothingField.SetValueWithoutNotify(settings.Heights.Smoothing.ToString("0.##", CultureInfo.InvariantCulture));
             baseLabel.text = settings.Heights.Relative && settings.Heights.Base.HasValue

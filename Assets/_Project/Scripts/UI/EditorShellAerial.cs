@@ -127,6 +127,7 @@ namespace OmsiMapEditor.UI
                 if (geoSettings == null)
                     return;
                 geoSettings.Heights.Relative = satelliteWindow.Relative;
+                geoSettings.Heights.LevelWater = satelliteWindow.LevelWater;
                 geoSettings.Heights.Offset = satelliteWindow.Offset ?? geoSettings.Heights.Offset;
                 geoSettings.Heights.Smoothing = Math.Max(0.0, satelliteWindow.Smoothing ?? geoSettings.Heights.Smoothing);
                 SaveGeo();
@@ -472,7 +473,7 @@ namespace OmsiMapEditor.UI
                     ? new OmsiGeoHeightOptions
                     {
                         Relative = geoSettings.Heights.Relative, Offset = geoSettings.Heights.Offset, Smoothing = geoSettings.Heights.Smoothing,
-                        Base = geoSettings.Heights.Base
+                        Base = geoSettings.Heights.Base, LevelWater = geoSettings.Heights.LevelWater
                     }
                     : null
             };
@@ -595,6 +596,15 @@ namespace OmsiMapEditor.UI
                         RefreshGround(change.Tiles);
                         report.Add(Loc.T("aerial.report.heights", ("count", change.Tiles.Count)));
                     }
+                    // What the inspector proposes for the water of each tile whose heights were laid: its levelled water's surface, or nothing.
+                    if (geoSettings != null)
+                    {
+                        foreach (var pair in heights)
+                            geoSettings.SetSuggestedWater(pair.Key.X, pair.Key.Y, job.SuggestedWaterLevel(pair.Key));
+                        SaveGeo();
+                        // The inspector was drawn with the new heights but before this; it proposes the water from it.
+                        RenderInspector();
+                    }
                     steppedEdges = stepped;
                     var steppedTiles = new HashSet<long>();
                     foreach (var edge in stepped)
@@ -612,6 +622,25 @@ namespace OmsiMapEditor.UI
                     Debug.LogException(exception);
                     report.Add(Loc.T("aerial.report.heights_failed", ("reason", exception.Message)));
                 }
+            }
+            if (job.WaterSurfaces.Count > 0)
+            {
+                var lowest = double.MaxValue;
+                var highest = double.MinValue;
+                foreach (var surface in job.WaterSurfaces)
+                {
+                    lowest = Math.Min(lowest, surface);
+                    highest = Math.Max(highest, surface);
+                }
+                // Rounded to a decimetre; two numbers only when the bodies of water differ by more than that.
+                var same = Math.Round(lowest, 1) == Math.Round(highest, 1);
+                report.Add(Loc.T("aerial.report.water", ("count", job.WaterSurfaces.Count), ("same", same ? "yes" : "no"),
+                    ("low", Math.Round(lowest, 1)), ("high", Math.Round(highest, 1))));
+            }
+            else if (job.WaterNote != null)
+            {
+                Debug.LogWarning("Satellite: the water was not levelled: " + job.WaterNote);
+                report.Add(Loc.T("aerial.report.water_failed", ("reason", job.WaterNote)));
             }
             if (job.PassedOver.Count > 0)
                 report.Add(Loc.T("aerial.report.passed", ("list", string.Join(" ", job.PassedOver))));

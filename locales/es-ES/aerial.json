@@ -48,5 +48,7 @@
   "aerial.step.edges": "los bordes tile ajustados",
   "aerial.edges.fitted": "Ajustó los bordes de {count, plural, one {# tile} other {# tiles}} a las alturas cargadas. Ctrl+Z lo retira.",
   "aerial.prefs_not_saved": "No se pudieron guardar las claves de imágenes y los servidores: {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "agua nivelada: {count, plural, one {# masa de agua} other {# masas de agua}} con la superficie {same, select, yes {a {low, number, 0.0} m} other {entre {low, number, 0.0} y {high, number, 0.0} m}}; añade agua a las casillas a esta altura para verla",
+  "aerial.report.water_failed": "agua sin nivelar, se usaron los datos tal cual: {reason}"
 }

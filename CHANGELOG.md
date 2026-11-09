@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Terrain heights
+
+- **Spikes are removed.** The world's elevation data holds single pixels far off their surroundings (a pit of 200 m, say). They are replaced by the median of their neighbours; every other height stays exactly as it was.
+- **Water is laid flat.** Lakes, rivers, docks and the sea, as OpenStreetMap has them, are levelled: the water surface comes from the banks, and the bed lies 1.5 m under it, so the blocks tens of metres too high that the data has over water are gone. Turn it off with *Level water* in the Terrain tab of *Satellite and terrain*. It needs a connection to OpenStreetMap; if there is none, the heights load as they are and the status line says so. The message names the surface, and the *Height* field of *Add water* in the inspector proposes it for each tile.
+- The inspector shows the new range of heights of a tile after loading heights, painting terrain and undoing it.
+
 ## 1.1.1
 
 OMSI MapWorks speaks eight languages, and chrono variants can now be edited much further.

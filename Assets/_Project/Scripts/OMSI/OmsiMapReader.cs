@@ -443,7 +443,7 @@ namespace OmsiMapEditor.OMSI
             return true;
         }
 
-        private static bool TryReadTerrainRange(byte[] bytes, out float minHeight, out float maxHeight)
+        internal static bool TryReadTerrainRange(byte[] bytes, out float minHeight, out float maxHeight)
         {
             minHeight = 0f;
             maxHeight = 0f;

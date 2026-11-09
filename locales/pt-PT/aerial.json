@@ -48,5 +48,7 @@
   "aerial.step.edges": "as arestas tile ajustadas",
   "aerial.edges.fitted": "Ajuste as extremidades do {count, plural, one {# tile} other {# tiles}} às alturas carregadas. Ctrl+Z leva de volta.",
   "aerial.prefs_not_saved": "Não foi possível guardar as chaves e os servidores de imagens: {reason}",
-  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English"
+  "@aerial.prefs_not_saved": "{reason} is a message from the system, in English",
+  "aerial.report.water": "água nivelada: {count, plural, one {# massa de água} other {# massas de água}} com a superfície {same, select, yes {a {low, number, 0.0} m} other {entre {low, number, 0.0} e {high, number, 0.0} m}}; adicione água aos mosaicos a esta altura para a ver",
+  "aerial.report.water_failed": "água não nivelada, os dados foram usados tal como estão: {reason}"
 }

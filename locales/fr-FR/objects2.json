@@ -100,5 +100,6 @@
   "inspector.field.nw": "Nord-ouest (m)",
   "inspector.field.ne": "Nord-est (m)",
   "inspector.field.start_height": "Hauteur initiale",
-  "inspector.field.end_height": "Hauteur finale"
+  "inspector.field.end_height": "Hauteur finale",
+  "water.suggested": "La hauteur indiquée est la surface de l'eau aplanie dans cette tuile."
 }

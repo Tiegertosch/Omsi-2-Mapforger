@@ -100,5 +100,6 @@
   "inspector.field.nw": "Severozápad (m)",
   "inspector.field.ne": "Severovýchod (m)",
   "inspector.field.start_height": "Počáteční výška",
-  "inspector.field.end_height": "Koncová výška"
+  "inspector.field.end_height": "Koncová výška",
+  "water.suggested": "Zobrazená výška je hladina vody, která byla v této dlaždici vyrovnána."
 }

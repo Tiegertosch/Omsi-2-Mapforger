@@ -100,5 +100,6 @@
   "inspector.field.nw": "Północno-zachodni (m)",
   "inspector.field.ne": "Północno-wschodni (m)",
   "inspector.field.start_height": "Wysokość początku",
-  "inspector.field.end_height": "Wysokość końca"
+  "inspector.field.end_height": "Wysokość końca",
+  "water.suggested": "Pokazana wysokość to powierzchnia wody wyrównanej w tym kafelku."
 }
