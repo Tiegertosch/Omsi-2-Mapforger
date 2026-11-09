@@ -64,6 +64,6 @@
   "paths.step": "zasady ruchu drogowego {what}",
   "paths.status.write_failed": "Nie można zapisać reguł ruchu drogowego: {reason}",
   "@paths.status.write_failed": "{reason} is a message from the system, in English",
-  "paths.status.written": "Zasady ruchu {what}: {limit, select, none {brak ograniczenia prędkości} other {{limit} km/h}}, {density, select, none {normalny ruch} other {ruch {density}}}{cars, select, yes {} other {, żadnych samochodów AI}}{buses, select, yes {, autobusy AI} other {}}{trucks, select, yes {, ciężarówki AI} other {}}. Ctrl+Z cofa tę czynność.",
-  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses} and {trucks} are yes or no: they choose the words, keep them in English"
+  "paths.status.written": "Zasady ruchu {what}: {limit, select, none {brak ograniczenia prędkości} other {{limit} km/h}}, {density, select, none {normalny ruch} other {ruch {density}}}{cars, select, yes {} other {, żadnych samochodów AI}}{buses, select, yes {, autobusy AI} other {}}{trucks, select, yes {, ciężarówki AI} other {}}{overtaking, select, yes {, zakaz wyprzedzania} other {}}. Ctrl+Z cofa tę czynność.",
+  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English"
 }

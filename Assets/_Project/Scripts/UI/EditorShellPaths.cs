@@ -269,7 +269,7 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// The rules of the element's road lanes (stage 4 of the AI paths): which lanes, a speed limit, how much random
-        /// traffic, and whether AI cars, buses and trucks may use them, as openOMSI reads [rule] no_cars, bus and trucks.
+        /// traffic, and whether AI cars, buses and trucks may use them, as openOMSI reads [rule] no_cars, bus and trucks, and whether overtaking is forbidden ([rule] overtaking_prohib).
         /// Shown with the values of the first lane chosen; Apply writes them to every lane chosen, as one undo step.
         /// </summary>
         private void AddPathRuleEditor(VisualElement container, OmsiTileSummary tile, int elementId, bool onSpline, List<OmsiMapPath> paths)
@@ -394,6 +394,7 @@ namespace OmsiMapEditor.UI
             var cars = RuleToggle(container, "paths.cars", "paths.cars.tooltip", !Rule("no_cars").HasValue);
             var buses = RuleToggle(container, "paths.buses", "paths.buses.tooltip", Rule("bus").HasValue);
             var trucks = RuleToggle(container, "paths.trucks", "paths.trucks.tooltip", Rule("trucks").HasValue);
+            var noOvertaking = RuleToggle(container, "paths.overtaking", "paths.overtaking.tooltip", Rule("overtaking_prohib").HasValue);
 
             var apply = new Button(() =>
             {
@@ -409,7 +410,7 @@ namespace OmsiMapEditor.UI
                     newLimit = parsed;
                 }
                 ApplyPathRules(tile, elementId, onSpline, new List<int>(ruleEditorPaths), newLimit,
-                    chosenLevel >= 0 ? TrafficLevels[chosenLevel].Value : density, cars.value, buses.value, trucks.value);
+                    chosenLevel >= 0 ? TrafficLevels[chosenLevel].Value : density, cars.value, buses.value, trucks.value, noOvertaking.value);
             });
             LocBindings.Text(apply, "paths.apply", ("target", ruleEditorPaths.Count == 1 ? "one" : "many"), ("n", ruleEditorPaths.Min()), ("count", ruleEditorPaths.Count),
                 ("splines", targets != null && targets.Count > 1 ? targets.Count : 0));
@@ -487,11 +488,13 @@ namespace OmsiMapEditor.UI
             ruleEditorElement = selectedTile.X + "|" + selectedTile.Y + "|" + id + "|" + onSpline;
             ruleEditorPaths.Clear();
             ruleEditorPaths.UnionWith(lanes);
-            ApplyPathRules(selectedTile, id, onSpline, lanes, Number(args[at + 1]), Number(args[at + 2]), args[at + 3] == "1", args[at + 4] == "1", args[at + 5] == "1");
+            // An optional seventh value, 1 or 0, forbids overtaking on the lanes.
+            var noOvertaking = at + 6 < args.Length && args[at + 6] == "1";
+            ApplyPathRules(selectedTile, id, onSpline, lanes, Number(args[at + 1]), Number(args[at + 2]), args[at + 3] == "1", args[at + 4] == "1", args[at + 5] == "1", noOvertaking);
         }
 
         /// <summary>Writes the traffic rules of road lanes of an object or spline as one undo step.</summary>
-        private void ApplyPathRules(OmsiTileSummary tile, int elementId, bool onSpline, List<int> lanes, double? limit, double? density, bool cars, bool buses, bool trucks)
+        private void ApplyPathRules(OmsiTileSummary tile, int elementId, bool onSpline, List<int> lanes, double? limit, double? density, bool cars, bool buses, bool trucks, bool noOvertaking)
         {
             if (!CanEditRules)
             {
@@ -511,6 +514,8 @@ namespace OmsiMapEditor.UI
                     rules.Add(new OmsiPathRule(lane, "bus", 0));
                 if (trucks)
                     rules.Add(new OmsiPathRule(lane, "trucks", 0));
+                if (noOvertaking)
+                    rules.Add(new OmsiPathRule(lane, "overtaking_prohib", 0));
             }
             var names = OmsiMapSession.TrafficRuleNames.ToList();
             var what = Loc.T("paths.what.element", ("lanes", lanes.Count), ("first", lanes[0]), ("kind", onSpline ? "spline" : "object"), ("id", elementId));
@@ -563,7 +568,7 @@ namespace OmsiMapEditor.UI
             RefreshAfterChange(null);
             SetStatus(Loc.T("paths.status.written", ("what", what), ("limit", limit.HasValue ? limit.Value.ToString("0.#", CultureInfo.InvariantCulture) : "none"),
                 ("density", density.HasValue ? density.Value.ToString("0.###", CultureInfo.InvariantCulture) : "none"), ("cars", cars ? "yes" : "no"),
-                ("buses", buses ? "yes" : "no"), ("trucks", trucks ? "yes" : "no")));
+                ("buses", buses ? "yes" : "no"), ("trucks", trucks ? "yes" : "no"), ("overtaking", noOvertaking ? "yes" : "no")));
         }
 
         /// <summary>One path of a kind, as the status and the inspector name it.</summary>

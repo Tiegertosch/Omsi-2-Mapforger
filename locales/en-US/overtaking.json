@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "No overtaking",
+  "paths.overtaking.tooltip": "Nobody drives over to the oncoming half of the road to pass here, as with a solid centre line ([rule] overtaking_prohib)"
+}

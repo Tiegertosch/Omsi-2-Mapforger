@@ -468,6 +468,30 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AnOvertakingBanIsASwitchRuleTheEditorManagesWithTheOtherTrafficRules()
+        {
+            CollectionAssert.Contains(OmsiMapSession.TrafficRuleNames, "overtaking_prohib");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var spline = tile.Splines.Single(candidate => candidate.Id == 10);
+            var ban = new OmsiSplinePathRules { Tile = tile, Spline = spline, Names = OmsiMapSession.TrafficRuleNames.ToList() };
+            ban.Rules.Add(new OmsiPathRule(1, "overtaking_prohib", 0));
+            ban.Rules.Add(new OmsiPathRule(1, "speedlimit", 30));
+
+            var change = session.SetSplinePathRules(summary, new[] { ban });
+            Assert.IsNotNull(change);
+            CollectionAssert.AreEqual(new[] { "1 overtaking_prohib", "1 speedlimit" },
+                tile.Splines.Single(candidate => candidate.Id == 10).Rules.Select(rule => rule.PathIndex + " " + rule.Name));
+
+            // Applying the same lanes again without the ban takes it off and leaves the other rule.
+            var lifted = new OmsiSplinePathRules { Tile = tile, Spline = tile.Splines.Single(candidate => candidate.Id == 10), Names = OmsiMapSession.TrafficRuleNames.ToList() };
+            lifted.Rules.Add(new OmsiPathRule(1, "speedlimit", 30));
+            Assert.IsNotNull(session.SetSplinePathRules(summary, new[] { lifted }));
+            CollectionAssert.AreEqual(new[] { "1 speedlimit" }, tile.Splines.Single(candidate => candidate.Id == 10).Rules.Select(rule => rule.PathIndex + " " + rule.Name));
+        }
+
+        [Test]
         public void RoadsCannotJoinTakenEndsOrStartOutsideTheTiles()
         {
             var session = OpenProject();

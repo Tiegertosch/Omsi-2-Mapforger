@@ -95,7 +95,7 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>The rules that say who may use a path and how fast (ADR 049, stage 4 of the AI paths).</summary>
-        public static readonly IReadOnlyList<string> TrafficRuleNames = new[] { "speedlimit", "trafficdensity", "no_cars", "bus", "trucks" };
+        public static readonly IReadOnlyList<string> TrafficRuleNames = new[] { "speedlimit", "trafficdensity", "no_cars", "bus", "trucks", "overtaking_prohib" };
 
         /// <summary>
         /// Sets rules of an object's paths: on the paths given, its [rule] records of the names given go (a traffic density

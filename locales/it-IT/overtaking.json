@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "Sorpasso vietato",
+  "paths.overtaking.tooltip": "Nessuno passa sulla metà opposta della strada per sorpassare qui, come con una linea di mezzeria continua ([rule] overtaking_prohib)"
+}

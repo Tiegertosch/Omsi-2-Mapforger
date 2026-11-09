@@ -64,6 +64,6 @@
   "paths.step": "les règles de circulation de {what}",
   "paths.status.write_failed": "Les règles de circulation n'ont pas pu être écrites : {reason}",
   "@paths.status.write_failed": "{reason} is a message from the system, in English",
-  "paths.status.written": "Règles de circulation de {what} : {limit, select, none {pas de limite de vitesse} other {{limit} km/h}}, {density, select, none {trafic normal} other {trafic {density}}}{cars, select, yes {} other {, pas de voitures IA}}{buses, select, yes {, bus IA} other {}}{trucks, select, yes {, camions IA} other {}}. Ctrl+Z l'annule.",
-  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses} and {trucks} are yes or no: they choose the words, keep them in English"
+  "paths.status.written": "Règles de circulation de {what} : {limit, select, none {pas de limite de vitesse} other {{limit} km/h}}, {density, select, none {trafic normal} other {trafic {density}}}{cars, select, yes {} other {, pas de voitures IA}}{buses, select, yes {, bus IA} other {}}{trucks, select, yes {, camions IA} other {}}{overtaking, select, yes {, dépassement interdit} other {}}. Ctrl+Z l'annule.",
+  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English"
 }

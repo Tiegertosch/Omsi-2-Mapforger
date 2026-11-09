@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "Zákaz předjíždění",
+  "paths.overtaking.tooltip": "Nikdo tu nevyjíždí do protisměru, aby předjel, jako u plné středové čáry ([rule] overtaking_prohib)"
+}

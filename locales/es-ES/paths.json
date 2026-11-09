@@ -64,6 +64,6 @@
   "paths.step": "las reglas de tráfico de {what}",
   "paths.status.write_failed": "No se pudieron escribir las reglas de tráfico: {reason}",
   "@paths.status.write_failed": "{reason} is a message from the system, in English",
-  "paths.status.written": "Normas de tráfico de {what}: {limit, select, none {sin límite de velocidad} other {{limit} kilómetros por hora}}, {density, select, none {tráfico normal} other {tráfico {density}}}{cars, select, yes {} other {, no hay coches de IA}}{buses, select, yes {, autobuses AI} other {}}{trucks, select, yes {, camiones AI} other {}}. Ctrl+Z lo deshace.",
-  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses} and {trucks} are yes or no: they choose the words, keep them in English"
+  "paths.status.written": "Normas de tráfico de {what}: {limit, select, none {sin límite de velocidad} other {{limit} kilómetros por hora}}, {density, select, none {tráfico normal} other {tráfico {density}}}{cars, select, yes {} other {, no hay coches de IA}}{buses, select, yes {, autobuses AI} other {}}{trucks, select, yes {, camiones AI} other {}}{overtaking, select, yes {, adelantar prohibido} other {}}. Ctrl+Z lo deshace.",
+  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English"
 }

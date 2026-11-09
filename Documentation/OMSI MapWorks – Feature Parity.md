@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 75 · Teilweise 18 · Prüfen 0 · Offen 23 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 76 · Teilweise 18 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -11,7 +11,6 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [ ] Kartenbeschreibung und Grundeinstellungen — Teilweise (nur beim Anlegen der Karte einstellbar)
 - [x] Weltkoordinaten verwenden — Vorhanden
 - [ ] Einstiegspunkte erstellen und verwalten — Teilweise
-- [ ] Kartenübersicht / Roadmap generieren — Offen (nichts im Code)
 - [ ] Kachel als DirectX-X-Terrain exportieren — Offen
 - [x] Links- und Rechtsverkehr konfigurieren — Vorhanden (nur beim Anlegen der Karte)
 - [ ] KI-Verkehrsdichte und Fahrgastdichte konfigurieren — Teilweise
@@ -32,7 +31,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [ ] Objektspezifische Optionen bearbeiten — Teilweise
 - [x] Zufällige Rotation von Objektgruppen — Vorhanden (Option „Random heading“ beim Platzieren und Einfügen, Knopf „Randomize headings“ für die Auswahl; seit 9. November 2026)
 - [x] Objektgruppen und Favoriten durchsuchen — Vorhanden
-- [ ] Detailstufen und Sichtbarkeitsoptionen bearbeiten — Offen (wird gelesen, nicht bearbeitet)
+- [ ] Detailstufen und Sichtbarkeitsoptionen bearbeiten — Bewusst nicht gebaut (openOMSI verwirft die Detailstufe, ADR 073; der Wert bleibt erhalten)
 
 ## C. Splines und Straßen
 - [x] Spline-Typen laden und auswählen — Vorhanden
@@ -75,7 +74,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 ## E. Verkehr und KI-Regeln
 - [x] KI-Fahrpfade anzeigen — Vorhanden
 - [x] Geschwindigkeitsbegrenzungen setzen — Vorhanden
-- [ ] Überholverbote definieren — Offen (Pfadregeln kennen Tempo, Dichte, Fahrzeugarten und Vorfahrt)
+- [x] Überholverbote definieren — Vorhanden (Kontrollkästchen „No overtaking“ bei den Verkehrsregeln, `[rule] overtaking_prohib`; seit 9. November 2026)
 - [x] Busspuren und Busfreigaben konfigurieren — Vorhanden
 - [x] Lkw-Verbote konfigurieren — Vorhanden
 - [x] Pkw-Verbote konfigurieren — Vorhanden

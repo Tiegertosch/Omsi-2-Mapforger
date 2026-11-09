@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "Überholverbot",
+  "paths.overtaking.tooltip": "Niemand fährt hier auf die Gegenfahrbahn, um zu überholen, wie bei einer durchgezogenen Mittellinie ([rule] overtaking_prohib)"
+}

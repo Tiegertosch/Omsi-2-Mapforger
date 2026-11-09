@@ -58,5 +58,5 @@
   "paths.status.same": "Verkehrsregeln: {what} haben diese Regeln schon.",
   "paths.step": "Verkehrsregeln von {what}",
   "paths.status.write_failed": "Verkehrsregeln konnten nicht geschrieben werden: {reason}",
-  "paths.status.written": "Verkehrsregeln von {what}: {limit, select, none {keine Höchstgeschwindigkeit} other {{limit} km/h}}, {density, select, none {normaler Verkehr} other {Verkehr {density}}}{cars, select, yes {} other {, keine KI-Autos}}{buses, select, yes {, KI-Busse} other {}}{trucks, select, yes {, KI-Lkw} other {}}. Strg+Z macht es rückgängig."
+  "paths.status.written": "Verkehrsregeln von {what}: {limit, select, none {keine Höchstgeschwindigkeit} other {{limit} km/h}}, {density, select, none {normaler Verkehr} other {Verkehr {density}}}{cars, select, yes {} other {, keine KI-Autos}}{buses, select, yes {, KI-Busse} other {}}{trucks, select, yes {, KI-Lkw} other {}}{overtaking, select, yes {, Überholverbot} other {}}. Strg+Z macht es rückgängig."
 }

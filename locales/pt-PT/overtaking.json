@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "Ultrapassagem proibida",
+  "paths.overtaking.tooltip": "Ninguém passa para a metade contrária da estrada para ultrapassar aqui, como com uma linha central contínua ([rule] overtaking_prohib)"
+}

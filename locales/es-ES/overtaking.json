@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "Adelantar prohibido",
+  "paths.overtaking.tooltip": "Nadie pasa a la mitad contraria de la calzada para adelantar aquí, como con una línea central continua ([rule] overtaking_prohib)"
+}

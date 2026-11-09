@@ -1,0 +1,4 @@
+{
+  "paths.overtaking": "Zakaz wyprzedzania",
+  "paths.overtaking.tooltip": "Nikt nie wjeżdża tu na przeciwną połowę jezdni, żeby wyprzedzić, jak przy ciągłej linii środkowej ([rule] overtaking_prohib)"
+}

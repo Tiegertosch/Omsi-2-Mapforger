@@ -1158,3 +1158,13 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Die Ansicht zeigt die Querneigung nicht (Draufsicht und 3D zeichnen die Straße ohne sie); Straßen, die der Editor baut, haben Querneigung und Skew 0. Der Straßenplaner setzt sie nicht. Das Terrain unter einer Straße folgt der Querneigung nicht.
 
 **Prüfung:** `OmsiRoadTests.CantAtAJoinedEndGoesToTheSplineJoinedThereAndUndoRestoresTheFile` (Weitergabe an den Nachbarn, Stetigkeit, Warnung, kein Schreiben ohne Änderung, Rückgängig stellt die Datei byteidentisch her, Wiederholen), `SkewIsOnlyThatOfTheSplineAndOnlyWhereTheTileHasIt`.
+
+## ADR 073: Überholverbot als Pfadregel; Detailstufe bewusst nicht bearbeitbar
+
+**Status:** Angenommen, 9. November 2026 (Feature-Parity-Liste: „Überholverbote definieren“ gebaut, „Detailstufen und Sichtbarkeitsoptionen bearbeiten“ bewusst nicht).
+
+**Überholverbot:** openOMSI kennt `[rule] overtaking_prohib` am Pfad einer Straße (`crates/omsi-sim/src/traffic/lane.rs`, `Lane::no_overtaking`): eine durchgezogene Mittellinie, auf der niemand auf die Gegenhälfte wechselt, um ein Fahrzeug zu überholen, das weiterfährt. Wie `no_cars`, `bus` und `trucks` ist sie ein Schalter, der Wert dahinter wird nicht gelesen (OMSI: `TPathRule_Road`+0x18); der Editor schreibt `0`. Sie ist neben den anderen Verkehrsregeln im Inspector einstellbar („No overtaking“, Kontrollkästchen unter „AI trucks“), gilt wie diese für die gewählten Fahrstreifen eines Objekts oder mehrerer Splines und ist ein Rückgängig-Schritt; `OmsiMapSession.TrafficRuleNames` führt den Namen, damit ein erneutes Anwenden ohne Haken die Regel wieder entfernt. In Chrono-Varianten gilt dasselbe über `[rule]`/`[kill_rule]` (ADR 064). Kommandozeile: `-pathRules all|n,n km/h|- Dichte|- Autos Busse Lkw [Überholverbot 1|0]`.
+
+**Detailstufe nicht bearbeitbar:** Das erste Feld von `[object]`, `[attachObj]` und `[spline]` ab Kachelversion 9 ist die Detailstufe; in Grundorf kommen 0 und 1 vor, in Berlin-Spandau 0, 1 und 2 (Objekte: 24.039 / 3.903 / 1.508). openOMSI liest das Feld und verwirft es (`let _detail = r.line()`, `crates/omsi-map/src/tile.rs`), der Nutzer prüft nur in openOMSI; eine Änderung wäre dort weder zu sehen noch zu prüfen. Der Editor erhält den Wert wie jedes unverstandene Feld unverändert. Entscheidung des Nutzers am 9. November 2026: überspringen.
+
+**Prüfung:** `OmsiRoadTests.AnOvertakingBanIsASwitchRuleTheEditorManagesWithTheOtherTrafficRules` (Regel wird geschrieben, ohne Haken wieder entfernt, andere Regeln bleiben).
