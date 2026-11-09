@@ -223,3 +223,5 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Angehängte Objekte (`[attachObj]`, auch mehrstufig) und Spline-Anhängungen zeichnen; der Startabstand zählt ab dem gespeicherten Kettenabstand des Splines (ADR 038)
 - [x] Rückseiten wie OMSI weglassen, Glas überblenden, `[matl_transmap]` als Deckkraft auswerten, Bäume in 3D als gekreuzte Flächen
 - [x] Transparenzkarten am 70er-Wartehäuschen im Player prüfen (22. Oktober 2026: Seitenscheiben halbdurchsichtig)
+- [x] Variable parent (`[varparent]`) von Objekten und angehängten Objekten im Inspector setzen, wählen, anzeigen und entfernen, ein Rückgängig-Schritt (ADR 082, 9. November 2026)
+- [x] Geländeanpassung folgt der Querneigung von Straßen, neu angepasst nach dem Ändern von Querneigung und Schräge (ADR 083, 9. November 2026; Befund des Nutzers aus openOMSI)

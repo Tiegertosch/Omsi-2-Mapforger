@@ -32,7 +32,10 @@ namespace OmsiMapEditor.OMSI
         Retype,
 
         /// <summary>The labels of an object or attached object changed; in a chrono variant a [relabel] (ADR 060).</summary>
-        Labels
+        Labels,
+
+        /// <summary>The [varparent] of an object or attached object was set, changed or taken away (ADR 082).</summary>
+        VarParent
     }
 
     /// <summary>
@@ -73,7 +76,8 @@ namespace OmsiMapEditor.OMSI
         public bool ObjectExists => Kind == OmsiObjectChangeKind.Deletion
             ? !IsApplied
             : Kind == OmsiObjectChangeKind.Transfer || Kind == OmsiObjectChangeKind.Replacement || Kind == OmsiObjectChangeKind.Copy ||
-              Kind == OmsiObjectChangeKind.Rules || Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels || IsApplied;
+              Kind == OmsiObjectChangeKind.Rules || Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels || Kind == OmsiObjectChangeKind.VarParent ||
+              IsApplied;
 
         /// <summary>
         /// The object in the summary in the current state of the change: for an undone copy the original; for a new type or
@@ -85,7 +89,7 @@ namespace OmsiMapEditor.OMSI
             {
                 if (Kind == OmsiObjectChangeKind.Copy && !IsApplied)
                     return ReplacedRecord;
-                if ((Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels || Kind == OmsiObjectChangeKind.Rules) &&
+                if ((Kind == OmsiObjectChangeKind.Retype || Kind == OmsiObjectChangeKind.Labels || Kind == OmsiObjectChangeKind.Rules || Kind == OmsiObjectChangeKind.VarParent) &&
                     ElementAfter is OmsiObjectRecord after &&
                     ElementBefore is OmsiObjectRecord before)
                     return IsApplied ? after : before;
@@ -111,6 +115,11 @@ namespace OmsiMapEditor.OMSI
         internal IReadOnlyList<string> LabelsBefore { get; set; }
 
         internal IReadOnlyList<string> LabelsAfter { get; set; }
+
+        /// <summary>The [varparent] before and after a change of it; null for none. Not used by other changes.</summary>
+        internal int? VarParentBefore { get; set; }
+
+        internal int? VarParentAfter { get; set; }
 
         /// <summary>For a copy the object it replaces; null for other changes.</summary>
         public OmsiObjectRecord ReplacedRecord { get; internal set; }
@@ -667,7 +676,7 @@ namespace OmsiMapEditor.OMSI
             }
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, false);
-            else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels)
+            else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels || change.Kind == OmsiObjectChangeKind.VarParent)
                 ApplyElementChange(change, false);
             else
                 MoveInSummary(change, false);
@@ -697,7 +706,7 @@ namespace OmsiMapEditor.OMSI
             }
             else if (change.Kind == OmsiObjectChangeKind.Copy)
                 SwapCopyInSummary(change, true);
-            else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels)
+            else if (change.Kind == OmsiObjectChangeKind.Retype || change.Kind == OmsiObjectChangeKind.Labels || change.Kind == OmsiObjectChangeKind.VarParent)
                 ApplyElementChange(change, true);
             else
                 MoveInSummary(change, true);

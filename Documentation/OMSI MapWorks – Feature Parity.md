@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 83 · Teilweise 12 · Prüfen 0 · Offen 20 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 85 · Teilweise 10 · Prüfen 0 · Offen 20 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -27,8 +27,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Objekte entlang Splines platzieren — Vorhanden
 - [x] Objektreihen mit Abstand und Wiederholung — Vorhanden
 - [x] Objekte an Splineverlauf und Steigung ausrichten — Vorhanden (Reihen folgen dem Verlauf der Straße; die Option „Follow slope“ im Rows-Werkzeug neigt sie mit Steigung und Querneigung; seit 9. November 2026)
-- [ ] Parent-/Varparent-Zuordnungen bearbeiten — Teilweise
-- [ ] Objektspezifische Optionen bearbeiten — Teilweise
+- [x] Parent-/Varparent-Zuordnungen bearbeiten — Vorhanden (Variable parent im Inspector, ADR 082, 9. November 2026; Anhängen und Abnehmen gab es schon; den Elternwechsel eines angehängten Objekts gibt es nicht, es wird abgenommen und neu angehängt)
+- [x] Objektspezifische Optionen bearbeiten — Vorhanden (mehr als Typ, Beschriftungen und Lage hat ein `[object]`-Eintrag nicht; die Detailstufe bleibt bewusst unberührt, ADR 073; geprüft am 9. November 2026)
 - [x] Zufällige Rotation von Objektgruppen — Vorhanden (Option „Random heading“ beim Platzieren und Einfügen, Knopf „Randomize headings“ für die Auswahl; seit 9. November 2026)
 - [x] Objektgruppen und Favoriten durchsuchen — Vorhanden
 - [ ] Detailstufen und Sichtbarkeitsoptionen bearbeiten — Bewusst nicht gebaut (openOMSI verwirft die Detailstufe, ADR 073; der Wert bleibt erhalten)

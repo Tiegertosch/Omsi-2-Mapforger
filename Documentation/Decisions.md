@@ -1299,3 +1299,34 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Nur eine Kachel je Export; Löcher im Gelände (`OmsiTerrainHoles`), Wasserflächen und die Bodentexturen werden nicht geschrieben, und ein Rückweg (.x einlesen) gibt es nicht; dafür bleibt die Höhenkarte (ADR 040).
 
 **Prüfung:** `OmsiTerrainXExportTests` (61 × 61 Punkte, 7.200 Dreiecke, Lesen mit dem eigenen .x-Leser, alle Dreiecke zeigen nach oben, Normalen in der Mitte und über die Kachelgrenze, Kachel ohne Gelände wird abgelehnt), ein Export einer Grundorf-Kachel am Player.
+
+## ADR 082: Variable parent (`[varparent]`) von Objekten bearbeiten
+
+**Status:** Angenommen, 9. November 2026 (Teil „Varparent“ des Punktes „Parent-/Varparent-Zuordnungen bearbeiten“ der Feature-Parity-Liste). Die Angabe, woran ein Objekt hängt (`[attachObj]`: Elternobjekt und Anhängepunkt), gab es schon (Anhängen, Abnehmen, Typwechsel, Kopieren); das „Parent“ des Punktes ist damit erledigt, der Elternwechsel eines schon angehängten Objekts bleibt bewusst offen.
+
+**Befund:** `[varparent]` hat ein Feld, die ID des Elements, dessen Daten das Objekt zeigt oder ausführt. openOMSI hängt es an das davor stehende `[object]`, `[attachObj]` oder `[splineAttachement]` (`omsi-map/src/tile.rs`); Ampelköpfe nennen damit ihre Kreuzung (deren Programm läuft, wenn die erste Beschriftung eine Lichtnummer ist, `RefreshAmpelParenting`), Abfahrtsanzeigen ihre Haltestelle. Vor Kachelversion 6 stehen zwei Zahlen einer alten Zählung. In den Testkarten (Zählung 9. November 2026): Grundorf 31 (22 Objekte, 9 angehängte), Berlin-Spandau 1.047 (862 Objekte, 184 angehängte, 1 Reihe), immer unmittelbar nach dem Element, Ziele fast immer Objekte, selten Reihen.
+
+**Entscheidung:**
+- **Daten:** `OmsiObjectRecord.VarParentId` und `OmsiAttachedObjectRecord.VarParentId` (`int?`); der Leser setzt sie aus dem `[varparent]` nach dem Element (Kachelversion ab 6). Alle Kopierstellen der Records tragen das Feld weiter (Chrono-Kopien, Typwechsel, Beschriftung).
+- **Sitzung** (`OmsiMapSessionVarParent.cs`): `SetVarParent(summary, tile, element, int? parentId)` schreibt oder entfernt den Eintrag unmittelbar nach dem Element (vor `[rule]`), als **ein** Rückgängig-Schritt über Dateistände (`OmsiObjectChangeKind.VarParent`); `FindVarParent` sucht das Ziel in der Kachel und den acht Nachbarkacheln (Objekt, angehängtes Objekt oder Reihe). Abgelehnt mit genauer Meldung: sich selbst, ein Ziel, das es dort nicht gibt oder weiter als eine Kachel entfernt liegt (ADR 012), eine Kachelversion unter 6, eine bearbeitete Chrono-Variante (Änderungslisten haben keinen Befehl dafür). Das Ziel ist durch den Verweisindex vor dem Löschen geschützt („variable parent“).
+- **Bedienung:** Im Inspector eines Objekts die Gruppe „Variable parent“ (offen, wenn es eines hat): Text „Takes its data from object #12 (Name)“, Feld „Parent ID“ mit „Set“, „Pick in map“ (das nächste angeklickte Objekt wird Eltern, Esc oder ein Klick auf eine Kachel bricht ab), „Remove“ und „Show parent“; angehängte Objekte haben dieselbe Zeile unter „Attached objects“. Angehängte Objekte und Reihen als Ziel gehen über die ID. Kommandozeile `-varParent ID|none [-elementId n]` („Variable parent:“ im Log).
+- **Kopieren:** Kopien (Strg+C/V/D) übernehmen das `[varparent]` nicht: Ein kopierter Ampelkopf wäre sonst an eine Kreuzung gebunden, die bei der Kopie weit entfernt liegen kann. Der Nutzer setzt sie danach (der Hinweis in der Gruppe nennt die Lichtnummer).
+
+**Grenzen:** `[varparent]` hinter Splines und Spline-Anhängungen wird weder gelesen noch bearbeitet (1 Fall in Berlin-Spandau); in einer Chrono-Variante gibt es die Gruppe nicht. MapWorks prüft nicht, ob das Ziel eine Kreuzung oder Haltestelle ist; die Kartenprüfung („Variable parents“) prüft nur, dass das Ziel existiert.
+
+**Prüfung:** `OmsiVarParentTests` (Lesen für Objekt und angehängtes Objekt, Setzen mit Platz unmittelbar nach dem Objekt, Wechsel samt `[rule]` dahinter, Entfernen, Undo/Redo bytegleich, Ablehnungen, Löschschutz des Ziels, Kopie ohne Eintrag), Player an Grundorf (Ampelkopf: Eltern anzeigen, entfernen, neu wählen, rückgängig).
+
+## ADR 083: Die Geländeanpassung folgt der Querneigung der Straße
+
+**Status:** Angenommen, 9. November 2026 (Befund des Nutzers aus openOMSI: Straßen mit Querneigung ließen eine „unschöne Terrain-Kante“ stehen; Einstiegspunkte, Reihen mit Steigung, Querneigung und Schräge selbst funktionierten dort).
+
+**Befund:** `OmsiTerrainShaping.Locate` nahm die Höhe der Mittellinie für die ganze Breite und setzte das Gelände daneben auf Kantenhöhe; mit Querneigung liegt die hohe Seite der Straße aber höher (und die niedrige tiefer), das Gelände blieb darunter bzw. darüber stehen, und die Seitenfläche der Straße zeigte sich als Wand. Außerdem fügte das Ändern der Querneigung das Gelände nicht neu an.
+
+**Entscheidung:**
+- **Höhe quer zur Straße** wie openOMSI (`SplineCurve::offset_point`): `dz = −clamp(x, −hcw, hcw) · Querneigung / 100` mit x rechts positiv (positive Querneigung senkt die rechte Seite) und der Querneigung linear zwischen Anfang und Ende. Das Gelände unter der Straße folgt dieser Höhe am Ort des Gitterpunkts, das Gelände daneben beginnt an der Höhe der Kante (x auf die Kanten des Profils begrenzt).
+- **`hcw`, die halbe Querneigungsbreite** (`OmsiSplineProfile.HalfCantWidth`): `[halfcantwidth]` der `.sli`, sonst so weit wie die `[heightprofile]`-Abschnitte nach beiden Seiten reichen (Omsi.exe 0x5adb3c, nach `half_cant_width` in `omsi-geometry`); ein Profil ohne `[heightprofile]` hat 0, die Querneigung tut dort nichts. Bei einem Profil, das nicht aus einer Datei kommt (Straßenbauer-Vorschau), ist der Wert unbekannt und die halbe Breite gilt.
+- **Neu anpassen:** `UpdateSplineCross` fügt das Gelände nach dem Ändern von Querneigung und Schräge neu an (wie die Höhen); Rückgängig und Wiederholen taten das schon für jede Straßenänderung. Straßen, die vor dieser Änderung mit Querneigung versehen wurden, bekommen die Anpassung mit **Edit > Fit terrain to built roads again**.
+
+**Grenzen:** Die Schräge (`skew`) ändert die Höhe nicht und fließt nicht ein. Die halbe Querneigungsbreite der Reihen (ADR 080) ist weiter 10 m, weil der Plan der Reihen die Splineart nicht kennt. Ob die gespiegelte Straße die Querneigung gespiegelt braucht, ist nicht geprüft; es gilt die Lage im Gelände.
+
+**Prüfung:** `OmsiTerrainCantTests` (Breite aus Datei und Höhenprofilen, Gelände bei 5 % Querneigung: unter der Mitte unverändert, 20 cm tiefer an der Ostkante, 20 cm höher an der Westkante), Screenshot am Player mit einer Straße mit Querneigung vor und nach der Anpassung.

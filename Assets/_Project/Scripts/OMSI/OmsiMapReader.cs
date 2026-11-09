@@ -122,6 +122,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Oldest tile version whose [spline] records carry separate previous and next IDs.</summary>
         private const int FirstVersionWithSplineNeighbourIds = 11;
 
+        /// <summary>Oldest tile version whose [varparent] holds one ID; before it two numbers of a numbering that is gone, as openOMSI reads it.</summary>
+        private const int FirstVersionWithVarParent = 6;
+
         /// <summary>
         /// The elements a file adds in the tile record format, such as a chrono change list: objects, splines, attached
         /// objects and rows along splines, in a new tile summary with the position and file name of
@@ -151,10 +154,27 @@ namespace OmsiMapEditor.OMSI
             OmsiSplineRecord lastSpline = null;
             // Rules belong to the object or spline right before them; another placed element ends that.
             List<OmsiPathRule> lastRules = null;
+            // A [varparent] belongs to the object or attached object right before it, too.
+            object lastParented = null;
             var hasWater = false;
             foreach (var section in sections)
             {
                 TrackHighestId(section, summary);
+                if (string.Equals(section.Name, "varparent", StringComparison.OrdinalIgnoreCase))
+                {
+                    var values = Values(section);
+                    if (lastParented != null && (version < 0 || version >= FirstVersionWithVarParent) && values.Count > 0 &&
+                        int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parentId))
+                    {
+                        if (lastParented is OmsiObjectRecord parentedObject)
+                            parentedObject.VarParentId = parentId;
+                        else
+                            ((OmsiAttachedObjectRecord)lastParented).VarParentId = parentId;
+                    }
+                    continue;
+                }
+                if (PlacedSections.Contains(section.Name))
+                    lastParented = null;
                 if (string.Equals(section.Name, "water", StringComparison.OrdinalIgnoreCase))
                     hasWater = true;
                 if (string.Equals(section.Name, "rule", StringComparison.OrdinalIgnoreCase) || string.Equals(section.Name, "kill_rule", StringComparison.OrdinalIgnoreCase))
@@ -180,6 +200,7 @@ namespace OmsiMapEditor.OMSI
                     {
                         tile.Objects.Add(objectRecord);
                         lastRules = objectRecord.Rules;
+                        lastParented = objectRecord;
                     }
                     else
                         summary.Warnings.Add("Could not decode an [object] placement in " + tile.FileName + ".");
@@ -203,7 +224,10 @@ namespace OmsiMapEditor.OMSI
                 {
                     tile.AttachmentCount++;
                     if (version >= 12 && TryReadAttachedObject(section, out var attached))
+                    {
                         tile.AttachedObjects.Add(attached);
+                        lastParented = attached;
+                    }
                 }
                 else if (string.Equals(section.Name, "splineAttachement", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(section.Name, "splineAttachement_repeater", StringComparison.OrdinalIgnoreCase))

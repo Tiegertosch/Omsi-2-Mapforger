@@ -505,7 +505,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = record.AssetPath, Id = record.Id, LocalX = record.LocalX, LocalY = record.LocalY, Height = record.Height,
                 HeadingDegrees = record.HeadingDegrees, PitchDegrees = record.PitchDegrees, BankDegrees = record.BankDegrees,
-                Labels = record.Labels
+                Labels = record.Labels, VarParentId = record.VarParentId
             };
             copy.Rules.AddRange(record.Rules);
             return copy;
@@ -517,7 +517,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = record.AssetPath, Id = record.Id, ParentId = record.ParentId, AttachPointIndex = record.AttachPointIndex,
                 HeadingDegrees = record.HeadingDegrees, PitchDegrees = record.PitchDegrees, BankDegrees = record.BankDegrees,
-                Labels = record.Labels
+                Labels = record.Labels, VarParentId = record.VarParentId
             };
         }
 

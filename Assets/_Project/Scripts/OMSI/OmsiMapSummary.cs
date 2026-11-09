@@ -92,6 +92,12 @@ namespace OmsiMapEditor.OMSI
         /// size, the seven lines of a bus stop). Empty labels are kept; none when the object has none.
         /// </summary>
         public IReadOnlyList<string> Labels { get; internal set; } = OmsiLabels.None;
+
+        /// <summary>
+        /// The ID of the [varparent] after the object: the element whose data it shows or runs, such as the crossing a traffic
+        /// light belongs to or the bus stop a departure display lists (ADR 082); null when it has none.
+        /// </summary>
+        public int? VarParentId { get; internal set; }
     }
 
     /// <summary>The label list shared by every element without labels, so the many objects that have none cost nothing.</summary>
@@ -155,6 +161,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The labels as for <see cref="OmsiObjectRecord.Labels"/>, such as the line number on a bus stop's plate.</summary>
         public IReadOnlyList<string> Labels { get; internal set; } = OmsiLabels.None;
+
+        /// <summary>The [varparent] after the attached object, as for <see cref="OmsiObjectRecord.VarParentId"/>; most traffic light heads hang this way.</summary>
+        public int? VarParentId { get; internal set; }
     }
 
     /// <summary>A row of objects along a spline chain: lamps, posts, signs or a single bus stop.</summary>

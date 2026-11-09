@@ -1160,6 +1160,9 @@ namespace OmsiMapEditor.UI
             // -retype <file.sco> and -relabel <line|line|...> change the selected object, or with -elementId <ID> the attached
             // object with that ID in its tile (ADR 060); -pickType opens the library for it, -elementUndo and -elementRedo step through the
             // history; the status goes to the log as "Retype:", "Relabel:", "Pick type:", "Undo:" and "Redo:".
+            // -varParent <ID|none> sets or takes away the variable parent of the selected object (or with -elementId of an attached one; ADR 082).
+            if (Array.IndexOf(args, "-varParent") >= 0)
+                RunVarParentArguments(args);
             if (Array.IndexOf(args, "-retype") >= 0 || Array.IndexOf(args, "-relabel") >= 0 || Array.IndexOf(args, "-pickType") >= 0 ||
                 Array.IndexOf(args, "-elementUndo") >= 0 || Array.IndexOf(args, "-elementRedo") >= 0)
                 RunElementArguments(args);
@@ -4405,6 +4408,8 @@ namespace OmsiMapEditor.UI
         {
             if (tile == null || item == null)
                 return;
+            if (CompleteVarParentPick(item))
+                return;
 
             selection.Clear();
             selection.Add(new MapSelectionItem { Tile = tile, Record = item });
@@ -4450,6 +4455,7 @@ namespace OmsiMapEditor.UI
         {
             if (tile == null || currentSummary == null)
                 return;
+            EndVarParentPick(true);
 
             selection.Clear();
             ClearSelectedSpline();
@@ -5713,6 +5719,12 @@ namespace OmsiMapEditor.UI
             if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog))
                 return;
 
+            if (evt.keyCode == KeyCode.Escape && PickingVarParent && !(evt.ctrlKey || evt.commandKey))
+            {
+                EndVarParentPick(true);
+                evt.StopPropagation();
+                return;
+            }
             if (evt.keyCode == KeyCode.Escape && PickingElementType && !(evt.ctrlKey || evt.commandKey))
             {
                 EndElementTypePick(null);
@@ -8055,6 +8067,8 @@ namespace OmsiMapEditor.UI
                     }
                     body.Add(row);
                     AddTypeAndLabels(body, tile, attached, true);
+                    if (!EditingVariant)
+                        AddVarParentEditor(body, tile, attached, true);
                 }
                 if (canEdit)
                 {
@@ -8116,6 +8130,8 @@ namespace OmsiMapEditor.UI
             if (entryPoint != null)
                 AddEntryPointGroup(editor, entryPoint);
             AddInspectorGroup(editor, "object-type", Loc.T("inspector.group.type"), false, body => AddTypeAndLabels(body, holdingTile, item, false, true));
+            if (!EditingVariant)
+                AddVarParentGroup(editor, holdingTile, item);
             AddJunctionDetails(editor, item);
             // Taking off attached objects works on the base map's tiles only.
             AddAttachedObjects(editor, item, CanEdit);

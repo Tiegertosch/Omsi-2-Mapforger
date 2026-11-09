@@ -187,7 +187,7 @@ namespace OmsiMapEditor.OMSI
                     {
                         AssetPath = objectView.AssetPath, Id = objectView.Id, LocalX = objectView.X, LocalY = objectView.Y, Height = objectView.Z,
                         HeadingDegrees = objectView.HeadingDegrees, PitchDegrees = objectView.PitchDegrees, BankDegrees = objectView.BankDegrees,
-                        Labels = record.Labels
+                        Labels = record.Labels, VarParentId = record.VarParentId
                     };
                     copy.Rules.AddRange(effectiveRules);
                 }
@@ -207,7 +207,7 @@ namespace OmsiMapEditor.OMSI
                     {
                         AssetPath = attachedView.AssetPath, Id = attachedView.Id, ParentId = attachedView.ParentId, AttachPointIndex = attachedView.AttachPointIndex,
                         HeadingDegrees = attachedView.HeadingDegrees, PitchDegrees = attachedView.PitchDegrees, BankDegrees = attachedView.BankDegrees,
-                        Labels = shown?.Labels ?? OmsiLabels.None
+                        Labels = shown?.Labels ?? OmsiLabels.None, VarParentId = shown?.VarParentId
                     });
                 }
             }

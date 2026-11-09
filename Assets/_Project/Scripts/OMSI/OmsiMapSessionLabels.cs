@@ -214,7 +214,7 @@ namespace OmsiMapEditor.OMSI
                 {
                     AssetPath = change.AssetAfter, Id = item.Id, LocalX = item.LocalX, LocalY = item.LocalY, Height = item.Height,
                     HeadingDegrees = item.HeadingDegrees, PitchDegrees = item.PitchDegrees, BankDegrees = item.BankDegrees,
-                    Labels = change.LabelsAfter
+                    Labels = change.LabelsAfter, VarParentId = item.VarParentId
                 };
                 copy.Rules.AddRange(item.Rules);
                 return copy;
@@ -224,7 +224,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = change.AssetAfter, Id = attached.Id, ParentId = attached.ParentId, AttachPointIndex = attached.AttachPointIndex,
                 HeadingDegrees = attached.HeadingDegrees, PitchDegrees = attached.PitchDegrees, BankDegrees = attached.BankDegrees,
-                Labels = change.LabelsAfter
+                Labels = change.LabelsAfter, VarParentId = attached.VarParentId
             };
         }
 
@@ -233,6 +233,15 @@ namespace OmsiMapEditor.OMSI
         {
             var from = forward ? change.ElementBefore : change.ElementAfter;
             var to = forward ? change.ElementAfter : change.ElementBefore;
+            if (ReferenceEquals(from, to) && change.Kind == OmsiObjectChangeKind.VarParent)
+            {
+                var parent = forward ? change.VarParentAfter : change.VarParentBefore;
+                if (to is OmsiObjectRecord parented)
+                    parented.VarParentId = parent;
+                else
+                    ((OmsiAttachedObjectRecord)to).VarParentId = parent;
+                return;
+            }
             if (ReferenceEquals(from, to))
             {
                 var asset = forward ? change.AssetAfter : change.AssetBefore;
