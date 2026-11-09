@@ -1,0 +1,137 @@
+
+name: Discord Release Announcement
+
+on:
+  release:
+    types: [published]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    name: Announce MapWorks Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send release announcement to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_EVENT_PATH: ${{ github.event_path }}
+          GH_EVENT_NAME: ${{ github.event_name }}
+          GH_REPOSITORY: ${{ github.repository }}
+
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          # Configuration
+          ROLE_ID = "1568357332411359233"
+          DOWNLOAD_URL = "https://omsi-modhub.de/de/mods/mapworks"
+
+          # Load GitHub event
+          with open(os.environ["GH_EVENT_PATH"], encoding="utf-8") as f:
+              event = json.load(f)
+
+          release = event.get("release")
+
+          # Manual workflow runs do not contain a release
+          if not release:
+              print("No release payload found. Skipping announcement.")
+              exit(0)
+
+          # Skip drafts and prereleases
+          if release.get("draft") or release.get("prerelease"):
+              print("Skipping draft or prerelease.")
+              exit(0)
+
+          # Release information
+          version = release["tag_name"]
+          notes = release.get("body") or "No release notes provided."
+          release_url = release["html_url"]
+
+          # Discord embed description limit
+          description = notes[:3800]
+
+          if len(notes) > 3800:
+              description += (
+                  "\n\n*Read the full changelog on GitHub.*"
+              )
+
+          # Discord message
+          payload = {
+              "username": "MapWorks Updates",
+              "content": f"<@&{ROLE_ID}>",
+              "allowed_mentions": {
+                  "parse": [],
+                  "roles": [ROLE_ID]
+              },
+              "embeds": [
+                  {
+                      "title": f"🚀 OMSI MapWorks {version} is here!",
+                      "url": release_url,
+                      "description": description,
+                      "color": 5793266,
+                      "fields": [
+                          {
+                              "name": "📥 Download",
+                              "value": (
+                                  "**New to MapWorks?**\n"
+                                  "[Download the latest version on OMSI Mod Hub]"
+                                  f"({DOWNLOAD_URL})"
+                              ),
+                              "inline": False
+                          },
+                          {
+                              "name": "🔄 Automatic Updates",
+                              "value": (
+                                  "Already have MapWorks installed? "
+                                  "The built-in auto-updater will automatically "
+                                  "download and install the latest version.\n\n"
+                                  "If the update window doesn't appear "
+                                  "automatically, you can manually check "
+                                  "for updates via "
+                                  "**Help > Check for updates...**"
+                              ),
+                              "inline": False
+                          }
+                      ],
+                      "footer": {
+                          "text": "OMSI MapWorks • Release Announcement"
+                      }
+                  }
+              ]
+          }
+
+          # Validate webhook configuration
+          webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+
+          if not webhook_url:
+              raise RuntimeError(
+                  "DISCORD_WEBHOOK_URL secret is not configured."
+              )
+
+          # Send message to Discord
+          data = json.dumps(payload).encode("utf-8")
+
+          request = urllib.request.Request(
+              webhook_url,
+              data=data,
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "MapWorks-Release-Notifier"
+              },
+              method="POST"
+          )
+
+          with urllib.request.urlopen(request, timeout=20) as response:
+              print(
+                  f"Discord announcement sent successfully. "
+                  f"HTTP status: {response.status}"
+              )
+
+          PY
