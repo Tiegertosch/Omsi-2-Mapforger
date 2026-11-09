@@ -156,9 +156,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Etappe 2b: OpenStreetMap-Karte als Unterlage, aus den OSM-Daten gezeichnet wie openMapper, mit Straßen- und Haltestellennamen (Quelle „OpenStreetMap map (vector)“)
   - [x] Etappe 3: Mapbox und MapTiler mit eigenem Schlüssel, eigene Kachelserver (XYZ/WMTS, WMS), beides nur auf diesem Rechner; Kanten nicht geladener Nachbarkacheln an geladene Höhen anpassen („Fit their edges“); Bildgröße bis 4.096 px, beim Hineinzoomen volle Bilder der Kacheln im Blick
   - [x] Reste: Deckkraft und Sichtbarkeit je Kachel, schärfere eigene Bilder beim Hineinzoomen
-  - [ ] Fenster „Satellite and terrain“ in vier Reitern nach Aufgabe: Place, Pictures, Terrain, More (ADR 063)
-  - [ ] Volle Luftbilder beim Zoomen ohne Ruckeln (ADR 062): komprimierte Kopie im Zwischenspeicher mit 2-GB-Grenze (beim Laden der Bilder auf Arbeitsfäden berechnet, `OmsiDxt`), Texturen länger behalten
-  - [ ] Genaue Verortung klassischer Karten (ADR 061, Wunsch aus der Rückmeldung zu 1.0): Bezugspunkt, Koordinaten einfügen, Maßstab, Verschieben, Zwei-Punkt-Passung, geladene Bilder folgen sofort; wartet auf den Nutzertest. Offen: neue Karten mit Koordinaten im Dialog „New map“ anlegen (`[worldcoordinates]`)
+  - [x] Fenster „Satellite and terrain“ in vier Reitern nach Aufgabe: Place, Pictures, Terrain, More (ADR 063)
+  - [x] Volle Luftbilder beim Zoomen ohne Ruckeln (ADR 062): komprimierte Kopie im Zwischenspeicher mit 2-GB-Grenze (beim Laden der Bilder auf Arbeitsfäden berechnet, `OmsiDxt`), Texturen länger behalten
+  - [x] Genaue Verortung klassischer Karten (ADR 061, Wunsch aus der Rückmeldung zu 1.0): Bezugspunkt, Koordinaten einfügen, Maßstab, Verschieben, Zwei-Punkt-Passung, geladene Bilder folgen sofort; wartet auf den Nutzertest. Offen: neue Karten mit Koordinaten im Dialog „New map“ anlegen (`[worldcoordinates]`)
   - [x] Ausreißer in den Höhen entfernen und Wasser einebnen (ADR 069): Median gegen einzelne Pixel, Wasserflächen und Küstenlinien aus OpenStreetMap als Maske, ein Wasserspiegel je Gewässer aus den Ufern, Bett 1,5 m darunter; Kontrollkästchen „Level water“
   - Später: Google (nur für Konten außerhalb des EWR), eigene Höhenquellen, Höhenkarten als TIFF schreiben, Flüsse als Linie einebnen, das Wasser der Kachel (`[water]`) gleich mit setzen
 - [x] Fahrplandaten lesend importieren und ihre Querverweise als Validierungsregeln prüfen (`OmsiTimetable`, `OmsiTimetableCheck`); Verweise auf Elemente, die erst Chrono-Varianten anlegen, werden eigens benannt
