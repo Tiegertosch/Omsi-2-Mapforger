@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -347,7 +348,8 @@ namespace OmsiMapEditor.OMSI
         /// object to the summary. Existing indices do not change, so nothing else has to be updated.
         /// </summary>
         public OmsiObjectChange PlaceObject(OmsiMapSummary summary, OmsiTileSummary tile, string assetPath,
-            double x, double y, double z, double headingDegrees)
+            double x, double y, double z, double headingDegrees, double pitchDegrees = 0.0, double bankDegrees = 0.0, IList<string> labels = null,
+            IEnumerable<OmsiPathRule> rules = null)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -365,7 +367,23 @@ namespace OmsiMapEditor.OMSI
             var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
 
             ids = ids ?? OmsiIdAllocator.ForMap(workspace, GlobalConfigFileName);
-            var view = OmsiTileEditing.AppendObject(tileFile, ids, assetPath, x, y, z, headingDegrees);
+            var view = OmsiTileEditing.AppendObject(tileFile, ids, assetPath, x, y, z, headingDegrees, labels, pitchDegrees, bankDegrees);
+            // The rules lie right after the object, before anything appended later (a sign hung on it, say).
+            var written = new List<OmsiPathRule>();
+            foreach (var rule in rules ?? Enumerable.Empty<OmsiPathRule>())
+            {
+                if (rule.Kills)
+                    continue;
+                var counted = string.Equals(rule.Name, "speedlimit", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(rule.Name, "trafficdensity", StringComparison.OrdinalIgnoreCase);
+                tileFile.InsertRecord(tileFile.Records.Count, tileFile.CreateRecord("rule", new[]
+                {
+                    rule.PathIndex.ToString(System.Globalization.CultureInfo.InvariantCulture), rule.Name,
+                    rule.Value.ToString(counted ? "0.000" : "0.###", System.Globalization.CultureInfo.InvariantCulture),
+                    rule.Extra.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)
+                }));
+                written.Add(new OmsiPathRule(rule.PathIndex, rule.Name, rule.Value, rule.Extra));
+            }
             ids.ApplyTo(config);
 
             var record = new OmsiObjectRecord
@@ -377,8 +395,10 @@ namespace OmsiMapEditor.OMSI
                 Height = view.Z,
                 HeadingDegrees = view.HeadingDegrees,
                 PitchDegrees = view.PitchDegrees,
-                BankDegrees = view.BankDegrees
+                BankDegrees = view.BankDegrees,
+                Labels = labels != null && labels.Count > 0 ? new List<string>(labels) : OmsiLabels.None
             };
+            record.Rules.AddRange(written);
             var change = new OmsiObjectChange(OmsiObjectChangeKind.Placement, tile, record, tile.Objects.Count);
             AddFile(change, tilePath, tileBefore, tileFile.ToBytes());
             AddFile(change, GlobalConfigFileName, configBefore, config.ToBytes());

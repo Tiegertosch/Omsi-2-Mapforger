@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Sélectionnez d'abord des objets, puis copiez-les avec Ctrl+C.",
+  "copy.only_generated": "Rien n'a été copié : les carrefours créés par MapWorks ont chacun leur propre fichier d'objet et ne peuvent pas être copiés.",
+  "copy.done": "{count, plural, one {# objet copié} other {# objets copiés}}{attached, plural, =0 {} one { avec # objet attaché} other { avec # objets attachés}}{left, plural, =0 {} one {; # carrefour créé par MapWorks a été laissé de côté} other {; # carrefours créés par MapWorks ont été laissés de côté}}. Ctrl+V les dépose.",
+  "paste.copy_first": "Copiez d'abord des objets avec Ctrl+C.",
+  "paste.status.placing": "Dépôt de {count, plural, one {# copie} other {# copies}}{attached, plural, =0 {} one { avec # objet attaché} other { avec # objets attachés}} : cliquez pour poser, R les tourne, Maj+clic les garde en main, Échap arrête.{variant, select, yes { Dans une variante chrono, seuls les objets eux-mêmes sont déposés, sans objets attachés ni règles.} other {}}",
+  "paste.status.failed": "Rien n'a été collé : {reason}",
+  "paste.status.done": "{count, plural, one {# objet déposé} other {# objets déposés}}{attached, plural, =0 {} one { et # objet attaché} other { et # objets attachés}}{variant, select, yes { dans la variante chrono} other {}}{hasLeftOut, select, yes {; les objets attachés et les règles restent hors d'une variante} other {}}. Ctrl+Z les reprend.",
+  "paste.step": "coller {count, plural, one {# objet} other {# objets}}"
+}

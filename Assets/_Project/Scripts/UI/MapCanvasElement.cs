@@ -28,6 +28,19 @@ namespace OmsiMapEditor.UI
         public double BankDegrees;
     }
 
+    /// <summary>One object of a group being placed: where it lies from the group's middle (metres east and north) and how it is turned.</summary>
+    internal sealed class PlacementGroupItem
+    {
+        public string Asset;
+        public double OffsetX;
+        public double OffsetY;
+        public double HeadingDegrees;
+        public double PitchDegrees;
+        public double BankDegrees;
+        public double Height;
+        public double? SourceGround;
+    }
+
     /// <summary>A click while placing: the tile under the pointer (null outside the map) and the tile-local position.</summary>
     internal sealed class MapPlacement
     {
@@ -346,6 +359,7 @@ namespace OmsiMapEditor.UI
 
         // Placement mode: the object to place and the map position under the pointer, if any.
         private string placementAsset;
+        private List<PlacementGroupItem> placementGroup;
         private double placementHeading;
         private PlacementSnap placementSnap;
         private Vector2? placementPointer;
@@ -523,6 +537,12 @@ namespace OmsiMapEditor.UI
         public event Action<string, Vector2?, double, double?> PlacementPreviewed;
 
         /// <summary>
+        /// Where each object of a group being placed would stand (map-relative metres) with the group's turn, whenever the pointer or the
+        /// turn changes; null when no group is being placed.
+        /// </summary>
+        internal event Action<List<PlacementGroupItem>, List<Vector2>, double> GroupPlacementPreviewed;
+
+        /// <summary>
         /// Asked with the world position under the pointer while placing; returns where the object snaps to, such as a
         /// junction onto a road, or null to place it freely. Alt places freely.
         /// </summary>
@@ -698,6 +718,9 @@ namespace OmsiMapEditor.UI
 
         public bool IsPlacing => placementAsset != null;
 
+        /// <summary>Several objects are being placed together, as pasted from the clipboard; the pointer holds their middle.</summary>
+        public bool IsPlacingGroup => placementGroup != null;
+
         /// <summary>Heading of the placement preview in degrees.</summary>
         public double PlacementHeading
         {
@@ -712,7 +735,24 @@ namespace OmsiMapEditor.UI
 
         private void NotifyPlacementPreview()
         {
-            PlacementPreviewed?.Invoke(placementAsset, placementAsset != null ? PlacementPosition : null, PlacementPreviewHeading, placementSnap?.Height);
+            // A group has its own preview: each object in its model.
+            PlacementPreviewed?.Invoke(placementGroup != null ? null : placementAsset, placementAsset != null && placementGroup == null ? PlacementPosition : null,
+                PlacementPreviewHeading, placementSnap?.Height);
+            if (GroupPlacementPreviewed == null)
+                return;
+            if (placementGroup != null && PlacementPosition.HasValue)
+            {
+                var items = new List<PlacementGroupItem>(placementGroup.Count);
+                var positions = new List<Vector2>(placementGroup.Count);
+                foreach (var pair in GroupPositions(PlacementPosition.Value, out var turn))
+                {
+                    items.Add(pair.Key);
+                    positions.Add(pair.Value);
+                }
+                GroupPlacementPreviewed(items, positions, placementHeading);
+            }
+            else
+                GroupPlacementPreviewed(null, null, 0.0);
         }
 
         /// <summary>Where the placement preview stands: snapped, or under the pointer.</summary>
@@ -724,7 +764,17 @@ namespace OmsiMapEditor.UI
         public void BeginPlacement(string assetPath, double headingDegrees)
         {
             CancelDrag();
+            placementGroup = null;
             placementAsset = assetPath;
+            PlacementHeading = headingDegrees;
+        }
+
+        /// <summary>Starts placing a group: left clicks report where its middle goes; R turns the whole group.</summary>
+        internal void BeginGroupPlacement(List<PlacementGroupItem> items, double headingDegrees)
+        {
+            CancelDrag();
+            placementGroup = items;
+            placementAsset = items.Count > 0 ? items[0].Asset : null;
             PlacementHeading = headingDegrees;
         }
 
@@ -744,6 +794,7 @@ namespace OmsiMapEditor.UI
         public void EndPlacement()
         {
             placementAsset = null;
+            placementGroup = null;
             placementPointer = null;
             placementSnap = null;
             NotifyPlacementPreview();
@@ -2323,10 +2374,60 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>Where each object of a group lies when its middle is at a position and the group is turned clockwise by the placement heading.</summary>
+        private IEnumerable<KeyValuePair<PlacementGroupItem, Vector2>> GroupPositions(Vector2 middle, out double turn)
+        {
+            turn = placementHeading;
+            var radians = turn * Math.PI / 180.0;
+            var sin = Math.Sin(radians);
+            var cos = Math.Cos(radians);
+            var list = new List<KeyValuePair<PlacementGroupItem, Vector2>>(placementGroup.Count);
+            foreach (var item in placementGroup)
+                list.Add(new KeyValuePair<PlacementGroupItem, Vector2>(item,
+                    middle + new Vector2((float)(item.OffsetX * cos + item.OffsetY * sin), (float)(-item.OffsetX * sin + item.OffsetY * cos))));
+            return list;
+        }
+
+        private void DrawGroupPlacement(Painter2D painter)
+        {
+            var middle = PlacementPosition.Value;
+            painter.strokeColor = placementColor;
+            painter.lineWidth = 2f;
+            foreach (var pair in GroupPositions(middle, out var turn))
+            {
+                if (footprints.TryGetValue(pair.Key.Asset, out var footprint))
+                {
+                    painter.fillColor = placementFillColor;
+                    painter.BeginPath();
+                    AddFootprint(painter, footprint, pair.Value, pair.Key.HeadingDegrees + turn);
+                    painter.Fill();
+                    painter.Stroke();
+                }
+                else
+                {
+                    painter.BeginPath();
+                    painter.Arc(MapToScreen(pair.Value), 4f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                    painter.Stroke();
+                }
+            }
+            var screen = MapToScreen(middle);
+            painter.BeginPath();
+            painter.MoveTo(screen + new Vector2(-6f, 0f));
+            painter.LineTo(screen + new Vector2(6f, 0f));
+            painter.MoveTo(screen + new Vector2(0f, -6f));
+            painter.LineTo(screen + new Vector2(0f, 6f));
+            painter.Stroke();
+        }
+
         private void DrawPlacement(Painter2D painter)
         {
             if (placementAsset == null || !PlacementPosition.HasValue)
                 return;
+            if (placementGroup != null)
+            {
+                DrawGroupPlacement(painter);
+                return;
+            }
 
             var position = PlacementPosition.Value;
             var placementHeading = PlacementPreviewHeading;
@@ -2362,7 +2463,7 @@ namespace OmsiMapEditor.UI
             {
                 placementPointer = screen.HasValue ? ScreenToMap(screen.Value) : (Vector2?)null;
             }
-            placementSnap = !free && placementPointer.HasValue && PlacementSnapper != null
+            placementSnap = !free && placementGroup == null && placementPointer.HasValue && PlacementSnapper != null
                 ? PlacementSnapper(placementPointer.Value.x + originX, placementPointer.Value.y + originY)
                 : null;
             NotifyPlacementPreview();
@@ -3427,6 +3528,30 @@ namespace OmsiMapEditor.UI
         {
             if (placementAsset == null || !PlacementPosition.HasValue)
                 return;
+            if (placementGroup != null)
+            {
+                painter.strokeColor = placementColor;
+                painter.lineWidth = 2f;
+                foreach (var pair in GroupPositions(PlacementPosition.Value, out var turn))
+                {
+                    var itemHeading = (float)((pair.Key.HeadingDegrees + turn) * Math.PI / 180.0);
+                    var itemSin = Mathf.Sin(itemHeading);
+                    var itemCos = Mathf.Cos(itemHeading);
+                    if (footprints.TryGetValue(pair.Key.Asset, out var groupFootprint))
+                        foreach (var contour in groupFootprint.Contours)
+                        {
+                            var corners = new List<Vector3>(contour.Length + 1);
+                            foreach (var local in contour)
+                                corners.Add(OnGround(ObjectToMap(local, pair.Value, itemSin, itemCos), 0.2f));
+                            if (corners.Count > 0)
+                                corners.Add(corners[0]);
+                            StrokeWorldLine(painter, camera, corners);
+                        }
+                    else
+                        StrokeWorldLine(painter, camera, new[] { OnGround(pair.Value, 0.2f), OnGround(pair.Value + new Vector2(itemSin, itemCos) * 2f, 0.2f) });
+                }
+                return;
+            }
             var position = PlacementPosition.Value;
             var heading = (float)(PlacementPreviewHeading * Math.PI / 180.0);
             var sin = Mathf.Sin(heading);

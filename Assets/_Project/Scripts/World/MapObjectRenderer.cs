@@ -159,6 +159,7 @@ namespace OmsiMapEditor.World
         private double previewFrameY;
 
         // A row about to be laid along a road, drawn as extra instances where its objects would stand.
+        private List<GroupPreviewObject> groupPreview;
         private string rowPreviewAsset;
         private readonly List<OmsiPlacedAttachment> rowPreview = new List<OmsiPlacedAttachment>();
         private Matrix4x4[] rowPreviewInstances = new Matrix4x4[0];
@@ -408,6 +409,31 @@ namespace OmsiMapEditor.World
                 DrawKind(preview, previewInstance, previewInstance, 1);
             }
             DrawRowPreview();
+            DrawGroupPreview();
+        }
+
+        /// <summary>
+        /// Draws the objects of a group about to be put down, each in its own model where its place would be: on the terrain, or for an
+        /// object of absolute height as far above it as the original stood above its ground.
+        /// </summary>
+        private void DrawGroupPreview()
+        {
+            if (groupPreview == null)
+                return;
+            foreach (var item in groupPreview)
+            {
+                if (!kinds.TryGetValue(item.Asset, out var kind) || kind.Mesh == null)
+                    continue;
+                var worldX = item.MapPosition.x + originX;
+                var worldY = item.MapPosition.y + originY;
+                var ground = GroundAt(worldX, worldY);
+                var height = kind.Model.HasAbsoluteHeight ? item.Height + (ground - (item.SourceGround ?? ground)) : ground + item.Height;
+                var frame = Matrix4x4.TRS(new Vector3(item.MapPosition.x, (float)height, item.MapPosition.y),
+                    Orientation(item.HeadingDegrees, item.PitchDegrees, item.BankDegrees), Vector3.one);
+                var crossed = ThreeDimensional && kind.CrossMaterial != null;
+                previewInstance[0] = crossed ? CrossMatrix(kind.Model, frame) : InstanceMatrix(kind.Model, frame);
+                DrawKind(kind, previewInstance, previewInstance, 1);
+            }
         }
 
         /// <summary>Draws the row about to be laid where its objects would stand, as rows along splines are drawn.</summary>
@@ -1154,6 +1180,12 @@ namespace OmsiMapEditor.World
             previewPosition = mapPosition;
             previewHeading = headingDegrees;
             previewHeight = height;
+        }
+
+        /// <summary>Shows a group of objects about to be put down, as pasted from the clipboard; null hides it.</summary>
+        public void SetGroupPreview(List<GroupPreviewObject> objects)
+        {
+            groupPreview = objects != null && objects.Count > 0 ? objects : null;
         }
 
         /// <summary>

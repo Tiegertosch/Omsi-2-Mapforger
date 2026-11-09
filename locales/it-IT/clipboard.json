@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Seleziona prima degli oggetti, poi copiali con Ctrl+C.",
+  "copy.only_generated": "Niente copiato: gli incroci creati da MapWorks hanno ciascuno il proprio file oggetto e non si possono copiare.",
+  "copy.done": "{count, plural, one {# oggetto copiato} other {# oggetti copiati}}{attached, plural, =0 {} one { con # oggetto collegato} other { con # oggetti collegati}}{left, plural, =0 {} one {; # incrocio creato da MapWorks è stato escluso} other {; # incroci creati da MapWorks sono stati esclusi}}. Ctrl+V li deposita.",
+  "paste.copy_first": "Copia prima degli oggetti con Ctrl+C.",
+  "paste.status.placing": "Deposito di {count, plural, one {# copia} other {# copie}}{attached, plural, =0 {} one { con # oggetto collegato} other { con # oggetti collegati}}: clic per posare, R li ruota, Maiusc+clic li tiene in mano, Esc interrompe.{variant, select, yes { In una variante cronologica vengono depositati solo gli oggetti, senza oggetti collegati e regole.} other {}}",
+  "paste.status.failed": "Niente incollato: {reason}",
+  "paste.status.done": "{count, plural, one {# oggetto depositato} other {# oggetti depositati}}{attached, plural, =0 {} one { e # oggetto collegato} other { e # oggetti collegati}}{variant, select, yes { nella variante cronologica} other {}}{hasLeftOut, select, yes {; oggetti collegati e regole restano fuori da una variante} other {}}. Ctrl+Z li annulla.",
+  "paste.step": "incolla {count, plural, one {# oggetto} other {# oggetti}}"
+}

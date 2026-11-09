@@ -64,7 +64,7 @@ namespace OmsiMapEditor.OMSI
         /// allocator; apply the allocator to global.cfg before saving it.
         /// </summary>
         public static OmsiObjectView AppendObject(OmsiRecordFile tile, OmsiIdAllocator ids, string assetPath,
-            double x, double y, double z, double headingDegrees, IList<string> labels = null)
+            double x, double y, double z, double headingDegrees, IList<string> labels = null, double pitchDegrees = 0.0, double bankDegrees = 0.0)
         {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
@@ -80,7 +80,7 @@ namespace OmsiMapEditor.OMSI
             {
                 "0", assetPath.Trim(), OmsiNumberFormat.Format(ids.Allocate()),
                 OmsiNumberFormat.Format(x), OmsiNumberFormat.Format(y), OmsiNumberFormat.Format(z),
-                OmsiNumberFormat.Format(headingDegrees), "0", "0",
+                OmsiNumberFormat.Format(headingDegrees), OmsiNumberFormat.Format(pitchDegrees), OmsiNumberFormat.Format(bankDegrees),
                 labels.Count.ToString(CultureInfo.InvariantCulture)
             };
             fields.AddRange(labels);
@@ -98,7 +98,7 @@ namespace OmsiMapEditor.OMSI
         /// allocator to global.cfg before saving it.
         /// </summary>
         public static OmsiAttachedObjectView AppendAttachedObject(OmsiRecordFile tile, OmsiIdAllocator ids, string assetPath, int parentId, int pointIndex,
-            double headingDegrees)
+            double headingDegrees, double pitchDegrees = 0.0, double bankDegrees = 0.0, IList<string> labels = null)
         {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
@@ -118,11 +118,14 @@ namespace OmsiMapEditor.OMSI
             if (!parentFound)
                 throw new InvalidOperationException("Object or row " + parentId + " is not in this tile.");
 
+            labels = labels ?? new string[0];
             var fields = new List<string>
             {
                 "0", assetPath.Trim(), OmsiNumberFormat.Format(ids.Allocate()), OmsiNumberFormat.Format(parentId), "0",
-                pointIndex.ToString(CultureInfo.InvariantCulture), OmsiNumberFormat.Format(headingDegrees), "0", "0", "0"
+                pointIndex.ToString(CultureInfo.InvariantCulture), OmsiNumberFormat.Format(headingDegrees), OmsiNumberFormat.Format(pitchDegrees),
+                OmsiNumberFormat.Format(bankDegrees), labels.Count.ToString(CultureInfo.InvariantCulture)
             };
+            fields.AddRange(labels);
             var created = tile.CreateRecord("attachObj", fields);
             tile.InsertRecord(tile.Records.Count, created);
             return (OmsiAttachedObjectView)OmsiTileRecords.Create(tile, created);

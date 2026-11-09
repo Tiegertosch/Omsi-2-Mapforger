@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Nejprve vyberte objekty a pak je zkopírujte klávesami Ctrl+C.",
+  "copy.only_generated": "Nic nebylo zkopírováno: křižovatky vytvořené MapWorks mají každá vlastní soubor objektu a nelze je kopírovat.",
+  "copy.done": "Zkopírováno: {count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}}{attached, plural, =0 {} one { s # připojeným objektem} few { se # připojenými objekty} many { s # připojeného objektu} other { s # připojenými objekty}}{left, plural, =0 {} one {; vynechána # křižovatka vytvořená MapWorks} few {; vynechány # křižovatky vytvořené MapWorks} many {; vynecháno # křižovatky vytvořené MapWorks} other {; vynecháno # křižovatek vytvořených MapWorks}}. Ctrl+V je položí.",
+  "paste.copy_first": "Nejprve zkopírujte objekty klávesami Ctrl+C.",
+  "paste.status.placing": "Pokládání: {count, plural, one {# kopie} few {# kopie} many {# kopie} other {# kopií}}{attached, plural, =0 {} one { s # připojeným objektem} few { se # připojenými objekty} many { s # připojeného objektu} other { s # připojenými objekty}}. Kliknutím položíte, R je otočí, Shift+klik je nechá v ruce, Esc skončí.{variant, select, yes { Ve variantě chrono se pokládají jen samotné objekty, bez připojených objektů a pravidel.} other {}}",
+  "paste.status.failed": "Nic nebylo vloženo: {reason}",
+  "paste.status.done": "Položeno: {count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}}{attached, plural, =0 {} one { a # připojený objekt} few { a # připojené objekty} many { a # připojeného objektu} other { a # připojených objektů}}{variant, select, yes { ve variantě chrono} other {}}{hasLeftOut, select, yes {; připojené objekty a pravidla zůstávají mimo variantu} other {}}. Ctrl+Z je vrátí.",
+  "paste.step": "vložit {count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}}"
+}

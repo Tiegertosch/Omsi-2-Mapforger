@@ -2232,6 +2232,125 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void CopiedObjectsComeWithLabelsPitchBankRulesAndWhatHangsOnThemAndOneUndoTakesThemAllBack()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var mast = session.PlaceObject(summary, tile, @"Sceneryobjects\mast.sco", 100, 100, 2, 30, 5, -3, new[] { "Stop", "12" },
+                new[] { new OmsiPathRule(0, "speedlimit", 30), new OmsiPathRule(1, "priority", 192) }).Record;
+            var lamp = session.AttachObject(summary, tile, mast.Id, 1, @"Sceneryobjects\lamp.sco", 180, 4, 0, new[] { "L1" }).Added.Single().Value;
+            session.AttachObject(summary, tile, lamp.Id, 0, @"Sceneryobjects\sign.sco", 90);
+            var reread = session.Read();
+            var source = reread.Tiles[0].Objects.Single(item => item.Id == mast.Id);
+            Assert.AreEqual(5.0, source.PitchDegrees, 1e-9);
+            CollectionAssert.AreEqual(new[] { "Stop", "12" }, source.Labels);
+            Assert.AreEqual(2, source.Rules.Count);
+
+            var data = OmsiClipboardData.Capture(reread, new[] { new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(reread.Tiles[0], source) });
+            Assert.AreEqual(1, data.Items.Count);
+            Assert.AreEqual(2, data.AttachedCount);
+            var tileBefore = session.Workspace.ReadAllBytes("tile_0_0.map");
+            var configBefore = session.Workspace.ReadAllBytes("global.cfg");
+            var nextBefore = reread.NextIdCode;
+
+            var result = session.PasteObjects(reread, data.PlaceAt(data.CentreX + 40, data.CentreY + 10, 0));
+
+            var after = session.Read().Tiles[0];
+            Assert.AreEqual(2, after.Objects.Count);
+            var copy = after.Objects.Single(item => item.Id != mast.Id);
+            Assert.AreEqual(140.0, copy.LocalX, 1e-6);
+            Assert.AreEqual(110.0, copy.LocalY, 1e-6);
+            Assert.AreEqual(2.0, copy.Height, 1e-9);
+            Assert.AreEqual(30.0, copy.HeadingDegrees, 1e-9);
+            Assert.AreEqual(5.0, copy.PitchDegrees, 1e-9);
+            Assert.AreEqual(-3.0, copy.BankDegrees, 1e-9);
+            CollectionAssert.AreEqual(new[] { "Stop", "12" }, copy.Labels);
+            CollectionAssert.AreEqual(new[] { "speedlimit", "priority" }, copy.Rules.Select(rule => rule.Name).ToArray());
+            Assert.AreEqual(4, after.AttachedObjects.Count, "two for the mast and two for the copy");
+            var copiedLamp = after.AttachedObjects.Single(item => item.ParentId == copy.Id);
+            Assert.AreEqual(4.0, copiedLamp.PitchDegrees, 1e-9);
+            CollectionAssert.AreEqual(new[] { "L1" }, copiedLamp.Labels);
+            Assert.AreEqual(@"Sceneryobjects\sign.sco", after.AttachedObjects.Single(item => item.ParentId == copiedLamp.Id).AssetPath);
+            var ids = after.Objects.Select(item => item.Id).Concat(after.AttachedObjects.Select(item => item.Id)).ToList();
+            Assert.AreEqual(ids.Count, ids.Distinct().Count(), "every copy has a new ID");
+            Assert.Greater(session.Read().NextIdCode, nextBefore);
+            Assert.AreEqual(3, result.Changes.Count);
+            Assert.AreEqual(2, result.AttachedPasted);
+
+            // Taking the changes back in reverse order restores both files byte for byte; redoing them forwards writes them again.
+            for (var index = result.Changes.Count - 1; index >= 0; index--)
+            {
+                if (result.Changes[index] is OmsiObjectChange placed)
+                    session.Undo(reread, placed);
+                else
+                    session.Undo(reread, (OmsiAttachedObjectChange)result.Changes[index]);
+            }
+            CollectionAssert.AreEqual(tileBefore, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            CollectionAssert.AreEqual(configBefore, session.Workspace.ReadAllBytes("global.cfg"));
+            foreach (var change in result.Changes)
+            {
+                if (change is OmsiObjectChange placed)
+                    session.Redo(reread, placed);
+                else
+                    session.Redo(reread, (OmsiAttachedObjectChange)change);
+            }
+            Assert.AreEqual(4, session.Read().Tiles[0].AttachedObjects.Count);
+        }
+
+        [Test]
+        public void CopiesCanLandInAnotherTileAndAPasteThatCannotBeDoneWritesNothing()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var tree = session.PlaceObject(summary, tile, @"Sceneryobjects\tree.sco", 290, 100, 0, 0).Record;
+            var data = OmsiClipboardData.Capture(summary, new[] { new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(tile, tree) });
+
+            // 50 m east of the tile border: tile 1 takes it, with the position as that tile counts it.
+            session.PasteObjects(summary, data.PlaceAt(data.CentreX + 50, data.CentreY, 0));
+            var east = session.Read().Tiles.Single(item => item.X == 1 && item.Y == 0);
+            Assert.AreEqual(1, east.Objects.Count);
+            Assert.AreEqual(40.0, east.Objects[0].LocalX, 1e-6);
+
+            // One target is outside the map: nothing at all is written, not even for the first.
+            var tileBefore = session.Workspace.ReadAllBytes("tile_0_0.map");
+            var eastBefore = session.Workspace.ReadAllBytes("tile_1_0.map");
+            var configBefore = session.Workspace.ReadAllBytes("global.cfg");
+            var targets = data.PlaceAt(data.CentreX + 5, data.CentreY, 0);
+            targets.AddRange(data.PlaceAt(data.CentreX + 9000, data.CentreY, 0));
+            Assert.Throws<InvalidOperationException>(() => session.PasteObjects(session.Read(), targets));
+            CollectionAssert.AreEqual(tileBefore, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            CollectionAssert.AreEqual(eastBefore, session.Workspace.ReadAllBytes("tile_1_0.map"));
+            CollectionAssert.AreEqual(configBefore, session.Workspace.ReadAllBytes("global.cfg"));
+        }
+
+        [Test]
+        public void AGroupTurnsClockwiseAboutItsMiddleLikeTheRotateToolAndGeneratedObjectsStayOut()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var west = session.PlaceObject(summary, tile, @"Sceneryobjects\a.sco", 100, 100, 0, 0).Record;
+            var east = session.PlaceObject(summary, tile, @"Sceneryobjects\b.sco", 110, 100, 0, 20).Record;
+            var generated = session.PlaceObject(summary, tile, @"Sceneryobjects\Mapforge\Demo\junction.sco", 130, 100, 0, 0).Record;
+            var data = OmsiClipboardData.Capture(summary, new[] { west, east, generated }.Select(record => new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(tile, record)));
+            Assert.AreEqual(2, data.Items.Count);
+            Assert.AreEqual(1, data.GeneratedLeftOut);
+            Assert.AreEqual(105.0, data.CentreX, 1e-9);
+
+            // A quarter turn clockwise: what lay east of the middle lies south of it, what lay west lies north; headings turn with it.
+            var turned = data.PlaceAt(200, 200, 90);
+            Assert.AreEqual(200.0, turned[0].WorldX, 1e-9);
+            Assert.AreEqual(205.0, turned[0].WorldY, 1e-9);
+            Assert.AreEqual(200.0, turned[1].WorldX, 1e-9);
+            Assert.AreEqual(195.0, turned[1].WorldY, 1e-9);
+            Assert.AreEqual(90.0, turned[0].HeadingDegrees, 1e-9);
+            Assert.AreEqual(110.0, turned[1].HeadingDegrees, 1e-9);
+            Assert.AreEqual(350.0, data.PlaceAt(0, 0, -30)[1].HeadingDegrees, 1e-9);
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

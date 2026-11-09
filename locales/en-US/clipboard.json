@@ -1,0 +1,15 @@
+{
+  "copy.select_first": "Select objects first, then copy them with Ctrl+C.",
+  "copy.only_generated": "Nothing was copied: junctions made by MapWorks each have their own object file, so they cannot be copied.",
+  "copy.done": "Copied {count, plural, one {# object} other {# objects}}{attached, plural, =0 {} one { with # attached object} other { with # attached objects}}{left, plural, =0 {} one {; # junction made by MapWorks was left out} other {; # junctions made by MapWorks were left out}}. Ctrl+V puts them down.",
+  "@copy.done": "{count} is how many objects were copied, {attached} how many attached objects came with them, {left} how many junctions made by MapWorks were left out",
+  "paste.copy_first": "Copy objects first with Ctrl+C.",
+  "paste.status.placing": "Putting down {count, plural, one {# copy} other {# copies}}{attached, plural, =0 {} one { with # attached object} other { with # attached objects}}: click to place, R turns them, Shift+click keeps them in hand, Esc stops.{variant, select, yes { In a chrono variant only the objects themselves are put down, without attached objects and rules.} other {}}",
+  "@paste.status.placing": "{count} copies, {attached} attached objects among them, {variant} is yes or no and chooses a part: keep it in English",
+  "paste.status.failed": "Nothing was pasted: {reason}",
+  "@paste.status.failed": "{reason} is a message from the system, in English",
+  "paste.status.done": "Put down {count, plural, one {# object} other {# objects}}{attached, plural, =0 {} one { and # attached object} other { and # attached objects}}{variant, select, yes { in the chrono variant} other {}}{hasLeftOut, select, yes {; attached objects and rules stay out of a variant} other {}}. Ctrl+Z takes them back.",
+  "@paste.status.done": "{variant} is yes or no and chooses a part: keep it in English; {hasLeftOut} is yes or no and chooses a part: keep it in English",
+  "paste.step": "paste {count, plural, one {# object} other {# objects}}",
+  "@paste.step": "Name of the undo step, shown in the status line after Ctrl+Z, such as 'paste 3 objects'"
+}

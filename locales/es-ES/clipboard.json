@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Selecciona primero objetos y cópialos con Ctrl+C.",
+  "copy.only_generated": "No se copió nada: los cruces creados por MapWorks tienen cada uno su propio archivo de objeto y no se pueden copiar.",
+  "copy.done": "{count, plural, one {# objeto copiado} other {# objetos copiados}}{attached, plural, =0 {} one { con # objeto adjunto} other { con # objetos adjuntos}}{left, plural, =0 {} one {; se omitió # cruce creado por MapWorks} other {; se omitieron # cruces creados por MapWorks}}. Ctrl+V los coloca.",
+  "paste.copy_first": "Copia primero objetos con Ctrl+C.",
+  "paste.status.placing": "Colocando {count, plural, one {# copia} other {# copias}}{attached, plural, =0 {} one { con # objeto adjunto} other { con # objetos adjuntos}}: clic para colocar, R las gira, Mayús+clic las mantiene en la mano, Esc termina.{variant, select, yes { En una variante cronológica solo se colocan los objetos, sin objetos adjuntos ni reglas.} other {}}",
+  "paste.status.failed": "No se pegó nada: {reason}",
+  "paste.status.done": "{count, plural, one {# objeto colocado} other {# objetos colocados}}{attached, plural, =0 {} one { y # objeto adjunto} other { y # objetos adjuntos}}{variant, select, yes { en la variante cronológica} other {}}{hasLeftOut, select, yes {; los objetos adjuntos y las reglas quedan fuera de una variante} other {}}. Ctrl+Z los deshace.",
+  "paste.step": "pegar {count, plural, one {# objeto} other {# objetos}}"
+}

@@ -97,7 +97,7 @@ namespace OmsiMapEditor.OMSI
         /// [NextIDCode] raised in global.cfg.
         /// </summary>
         public OmsiAttachedObjectChange AttachObject(OmsiMapSummary summary, OmsiTileSummary tile, int parentId, int pointIndex, string assetPath,
-            double headingDegrees)
+            double headingDegrees, double pitchDegrees = 0.0, double bankDegrees = 0.0, IList<string> labels = null)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -113,7 +113,7 @@ namespace OmsiMapEditor.OMSI
             var tilePath = OmsiRelativePath.Normalize(tile.FileName);
             var tileBefore = workspace.ReadAllBytes(tilePath);
             var tileFile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
-            var view = OmsiTileEditing.AppendAttachedObject(tileFile, ids, assetPath, parentId, pointIndex, headingDegrees);
+            var view = OmsiTileEditing.AppendAttachedObject(tileFile, ids, assetPath, parentId, pointIndex, headingDegrees, pitchDegrees, bankDegrees, labels);
             var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
             var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
             ids.ApplyTo(config);
@@ -121,7 +121,9 @@ namespace OmsiMapEditor.OMSI
             var change = new OmsiAttachedObjectChange();
             change.Added.Add(new KeyValuePair<OmsiTileSummary, OmsiAttachedObjectRecord>(tile, new OmsiAttachedObjectRecord
             {
-                AssetPath = view.AssetPath, Id = view.Id, ParentId = parentId, AttachPointIndex = pointIndex, HeadingDegrees = view.HeadingDegrees
+                AssetPath = view.AssetPath, Id = view.Id, ParentId = parentId, AttachPointIndex = pointIndex, HeadingDegrees = view.HeadingDegrees,
+                PitchDegrees = view.PitchDegrees, BankDegrees = view.BankDegrees,
+                Labels = labels != null && labels.Count > 0 ? new List<string>(labels) : OmsiLabels.None
             }));
             change.Files.Add(new OmsiObjectChange.FileState { RelativePath = tilePath, Before = tileBefore, After = tileFile.ToBytes() });
             change.Files.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });

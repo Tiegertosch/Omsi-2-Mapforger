@@ -790,6 +790,7 @@ namespace OmsiMapEditor.UI
                     else
                         objectRenderer.SetPlacementFrame(null, 0.0, 0.0);
                 };
+                mapCanvas.GroupPlacementPreviewed += ShowGroupPreview;
                 mapCanvas.PreviewEnded += objectRenderer.EndPreview;
                 mapCanvas.MovePreviewed += (items, offsetX, offsetY, offsetHeight) => PreviewJunctionMarkers(item => new[]
                 {
@@ -1131,6 +1132,8 @@ namespace OmsiMapEditor.UI
                 CommitEdits(edits);
                 Debug.Log("Move selection: " + statusLabel?.text);
             }
+
+            RunClipboardArguments(args);
 
             if (Array.IndexOf(args, "-deleteSelection") >= 0 && selection.Count > 0)
             {
@@ -5831,7 +5834,22 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (evt.keyCode == KeyCode.Z && !evt.shiftKey)
+            if (evt.keyCode == KeyCode.C && !evt.shiftKey)
+            {
+                CopySelection();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.V && !evt.shiftKey)
+            {
+                BeginPaste();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.D && !evt.shiftKey)
+            {
+                DuplicateSelection();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.Z && !evt.shiftKey)
             {
                 StepHistory(undoSteps, redoSteps, true);
                 evt.StopPropagation();
@@ -6286,6 +6304,7 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.place_objects"));
                 return;
             }
+            clipboardPlacing = false;
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             placementHasAbsoluteHeight = false;
             var problem = (string)null;
@@ -6329,6 +6348,11 @@ namespace OmsiMapEditor.UI
             if (placementAsset == null || !CanEditObjects)
             {
                 StopPlacement();
+                return;
+            }
+            if (clipboardPlacing)
+            {
+                PlaceClipboardAt(placement);
                 return;
             }
             if (placement.Snapped && placementAttach != null)
@@ -6542,6 +6566,7 @@ namespace OmsiMapEditor.UI
             placementPlan = null;
             placementSnapMessage = null;
             placementAsset = null;
+            clipboardPlacing = false;
             mapCanvas?.EndPlacement();
             objectsPanel?.ClearChosen();
             UpdateToolbar();

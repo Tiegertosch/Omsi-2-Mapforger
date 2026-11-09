@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -156,6 +157,32 @@ namespace OmsiMapEditor.Tests
             session.Redo(map, relabelled);
             Assert.AreEqual("sign3.sco", plate.AssetPath);
             Assert.AreEqual(3, stop.Labels.Count);
+        }
+
+        [Test]
+        public void ACopyPastedInAVariantTakesTheObjectAndItsLabelsButNotWhatHangsOnItOrItsRules()
+        {
+            var made = session.CreateChronoVariant("Edit", new DateTime(1993, 5, 1), null);
+            var map = Edit(made, out _);
+            var tile = map.Tiles[0];
+            var stop = tile.Objects.Single(item => item.Id == 5);
+            var data = OmsiClipboardData.Capture(map, new[] { new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(tile, stop) });
+            Assert.AreEqual(1, data.AttachedCount, "sign 8 hangs on the stop");
+            Assert.AreEqual(1, data.Items[0].Rules.Count);
+            var baseBytes = session.Workspace.ReadAllBytes("tile_0_0.map");
+
+            var result = session.PasteObjects(map, data.PlaceAt(data.CentreX + 20, data.CentreY, 0));
+
+            Assert.AreEqual(1, result.Placed.Count);
+            Assert.AreEqual(0, result.AttachedPasted);
+            Assert.AreEqual(1, result.AttachedLeftOut);
+            Assert.AreEqual(1, result.RulesLeftOut);
+            CollectionAssert.AreEqual(baseBytes, session.Workspace.ReadAllBytes("tile_0_0.map"), "the base map stays as it is");
+            var text = OmsiTextFile.Decode(session.Workspace.ReadAllBytes(@"Chrono\0200_Edit\tile_0_0.map"));
+            StringAssert.Contains("stop.sco", text);
+            StringAssert.Contains("U Rathaus", text);
+            StringAssert.DoesNotContain("[attachObj]", text);
+            StringAssert.DoesNotContain("[rule]", text);
         }
 
         [Test]

@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Wähle zuerst Objekte aus und kopiere sie dann mit Strg+C.",
+  "copy.only_generated": "Nichts kopiert: Kreuzungen, die MapWorks erzeugt hat, haben je eine eigene Objektdatei und lassen sich nicht kopieren.",
+  "copy.done": "{count, plural, one {# Objekt} other {# Objekte}} kopiert{attached, plural, =0 {} one { mit # angehängtem Objekt} other { mit # angehängten Objekten}}{left, plural, =0 {} one {; # von MapWorks erzeugte Kreuzung ausgelassen} other {; # von MapWorks erzeugte Kreuzungen ausgelassen}}. Strg+V setzt sie ab.",
+  "paste.copy_first": "Kopiere zuerst Objekte mit Strg+C.",
+  "paste.status.placing": "{count, plural, one {# Kopie wird} other {# Kopien werden}} abgesetzt{attached, plural, =0 {} one { (mit # angehängtem Objekt)} other { (mit # angehängten Objekten)}}: Klick setzt sie, R dreht sie, Umschalt+Klick behält sie in der Hand, Esc beendet.{variant, select, yes { In einer Chrono-Variante werden nur die Objekte selbst abgesetzt, ohne angehängte Objekte und Regeln.} other {}}",
+  "paste.status.failed": "Nichts eingefügt: {reason}",
+  "paste.status.done": "{count, plural, one {# Objekt} other {# Objekte}}{attached, plural, =0 {} one { und # angehängtes Objekt} other { und # angehängte Objekte}} abgesetzt{variant, select, yes { in der Chrono-Variante} other {}}{hasLeftOut, select, yes {; angehängte Objekte und Regeln bleiben aus einer Variante draußen} other {}}. Strg+Z nimmt sie zurück.",
+  "paste.step": "{count, plural, one {# Objekt} other {# Objekte}} einfügen"
+}

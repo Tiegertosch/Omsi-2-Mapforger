@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Najpierw zaznacz obiekty, potem skopiuj je klawiszami Ctrl+C.",
+  "copy.only_generated": "Nic nie skopiowano: skrzyżowania utworzone przez MapWorks mają każde własny plik obiektu i nie można ich kopiować.",
+  "copy.done": "Skopiowano {count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}}{attached, plural, =0 {} one { z # dołączonym obiektem} few { z # dołączonymi obiektami} many { z # dołączonymi obiektami} other { z # dołączonymi obiektami}}{left, plural, =0 {} one {; pominięto # skrzyżowanie utworzone przez MapWorks} few {; pominięto # skrzyżowania utworzone przez MapWorks} many {; pominięto # skrzyżowań utworzonych przez MapWorks} other {; pominięto # skrzyżowania utworzonego przez MapWorks}}. Ctrl+V je odkłada.",
+  "paste.copy_first": "Najpierw skopiuj obiekty klawiszami Ctrl+C.",
+  "paste.status.placing": "Odkładanie: {count, plural, one {# kopia} few {# kopie} many {# kopii} other {# kopii}}{attached, plural, =0 {} one { z # dołączonym obiektem} few { z # dołączonymi obiektami} many { z # dołączonymi obiektami} other { z # dołączonymi obiektami}}. Kliknij, aby położyć, R obraca, Shift+klik zostawia w ręku, Esc kończy.{variant, select, yes { W wariancie chrono odkładane są tylko same obiekty, bez dołączonych obiektów i reguł.} other {}}",
+  "paste.status.failed": "Nic nie wklejono: {reason}",
+  "paste.status.done": "Odłożono {count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}}{attached, plural, =0 {} one { i # dołączony obiekt} few { i # dołączone obiekty} many { i # dołączonych obiektów} other { i # dołączonego obiektu}}{variant, select, yes { w wariancie chrono} other {}}{hasLeftOut, select, yes {; dołączone obiekty i reguły zostają poza wariantem} other {}}. Ctrl+Z cofa.",
+  "paste.step": "wklej {count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}}"
+}

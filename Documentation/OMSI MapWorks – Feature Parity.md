@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 71 · Teilweise 18 · Prüfen 0 · Offen 27 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 72 · Teilweise 18 · Prüfen 0 · Offen 26 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -21,7 +21,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Objekte verschieben und löschen — Vorhanden
 - [x] Objekte um alle drei Achsen drehen — Vorhanden
 - [x] Numerische Position und Rotation bearbeiten — Vorhanden
-- [ ] Objekte kopieren und duplizieren — Offen (kein Kopieren und Einfügen, nur erneut aus der Bibliothek platzieren)
+- [x] Objekte kopieren und duplizieren — Vorhanden (Strg+C, Strg+V mit Vorschau, Strg+D; seit 9. November 2026)
 - [x] Mehrfachauswahl und gemeinsame Bearbeitung — Vorhanden
 - [x] Objektbeschriftungen und Variablen ändern — Vorhanden
 - [x] Objekte an Attachpoints anhängen — Vorhanden

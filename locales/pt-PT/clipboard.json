@@ -1,0 +1,10 @@
+{
+  "copy.select_first": "Selecione primeiro objetos e copie-os com Ctrl+C.",
+  "copy.only_generated": "Nada foi copiado: os cruzamentos criados pelo MapWorks têm cada um o seu ficheiro de objeto e não podem ser copiados.",
+  "copy.done": "{count, plural, one {# objeto copiado} other {# objetos copiados}}{attached, plural, =0 {} one { com # objeto anexado} other { com # objetos anexados}}{left, plural, =0 {} one {; # cruzamento criado pelo MapWorks foi deixado de fora} other {; # cruzamentos criados pelo MapWorks foram deixados de fora}}. Ctrl+V coloca-os.",
+  "paste.copy_first": "Copie primeiro objetos com Ctrl+C.",
+  "paste.status.placing": "A colocar {count, plural, one {# cópia} other {# cópias}}{attached, plural, =0 {} one { com # objeto anexado} other { com # objetos anexados}}: clique para colocar, R roda-as, Shift+clique mantém-nas na mão, Esc termina.{variant, select, yes { Numa variante cronológica só os próprios objetos são colocados, sem objetos anexados nem regras.} other {}}",
+  "paste.status.failed": "Nada foi colado: {reason}",
+  "paste.status.done": "{count, plural, one {# objeto colocado} other {# objetos colocados}}{attached, plural, =0 {} one { e # objeto anexado} other { e # objetos anexados}}{variant, select, yes { na variante cronológica} other {}}{hasLeftOut, select, yes {; os objetos anexados e as regras ficam fora de uma variante} other {}}. Ctrl+Z anula.",
+  "paste.step": "colar {count, plural, one {# objeto} other {# objetos}}"
+}
