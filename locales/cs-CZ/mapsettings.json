@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Nastavení mapy",
+  "mapsettings.intro": "Mění nastavení této mapy v projektové kopii jejího global.cfg: název a popis v OMSI, stranu provozu, intenzitu aut a cestujících, kolej, roky, peníze, jízdenky, roční období a texturu země. Každé nastavení ukazuje hodnotu, kterou má mapa nyní. Co nezměníte, zůstane beze změny.",
+  "mapsettings.apply": "Použít",
+  "mapsettings.curve.tooltip": "Vynásobí denní křivku mapy tímto činitelem; 1,00× ji nechá, jak je. Opětovné použití násobí znovu.",
+  "mapsettings.season.keep": "Jako nyní",
+  "mapsettings.season.keep.tooltip": "Roční období mapy, beze změny",
+  "mapsettings.dropdown.current_mark": "{name} (nyní)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "Země mapy zůstává.",
+  "mapsettings.note": "Zapíše se do projektové kopie global.cfg; původní mapa se nemění.",
+  "mapsettings.open": "Nastavení mapy...",
+  "mapsettings.open.tooltip": "Název, popis, strana provozu, hustota provozu, roky, peníze, jízdenky, roční období a textura země této mapy",
+  "readonly.action.map_settings": "změnit nastavení mapy",
+  "mapsettings.status.failed": "Nastavení mapy se nepodařilo změnit: {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Nastavení mapy {name} změněno. Dostane se do exportu mapy.",
+  "mapsettings.status.unchanged": "Nastavení mapy {name} zůstalo beze změny."
+}

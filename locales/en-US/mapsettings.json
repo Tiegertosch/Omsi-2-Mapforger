@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Map settings",
+  "mapsettings.intro": "Changes the settings of this map in the project copy of its global.cfg: name and description in OMSI, the side traffic keeps to, how busy cars and passengers are, rail, years, money, tickets, seasons and the ground texture. Every setting shows the value the map has now. Everything you leave alone stays as it is.",
+  "mapsettings.apply": "Apply",
+  "mapsettings.curve.tooltip": "Multiplies the map's daily curve by this factor; 1.00× leaves it as it is. Apply it again and it multiplies again.",
+  "mapsettings.season.keep": "As now",
+  "mapsettings.season.keep.tooltip": "The map's seasons, unchanged",
+  "mapsettings.dropdown.current_mark": "{name} (now)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "The map's ground stays.",
+  "mapsettings.note": "Written to the project copy of global.cfg; the original map is not changed.",
+  "mapsettings.open": "Map settings...",
+  "mapsettings.open.tooltip": "Name, description, traffic side, traffic density, years, money, tickets, seasons and ground texture of this map",
+  "readonly.action.map_settings": "change the map settings",
+  "mapsettings.status.failed": "The map settings could not be changed: {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Changed the settings of {name}. They go into the export of the map.",
+  "mapsettings.status.unchanged": "The settings of {name} are unchanged."
+}

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Map
+
+- **Map settings.** The project browser has a *Map settings...* button that opens the dialog of a new map for the open map, with the values the map has now: name and description in OMSI, the side traffic keeps to, how busy cars and passengers are (a factor on the daily curve), rail, years, money, tickets, seasons and the ground texture. The changes go into the project copy of the map and its export.
+
 ### Chrono variants
 
 - **Change the days of a variant.** While a chrono variant is edited, the project browser shows its first and last day as fields; *Apply days* writes them to the variant.

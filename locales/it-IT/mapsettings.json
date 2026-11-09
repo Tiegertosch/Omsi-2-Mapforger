@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Impostazioni della mappa",
+  "mapsettings.intro": "Modifica le impostazioni di questa mappa nella copia di progetto del suo global.cfg: nome e descrizione in OMSI, il lato su cui circola il traffico, quanto sono trafficate auto e passeggeri, ferrovia, anni, denaro, biglietti, stagioni e texture del terreno. Ogni impostazione mostra il valore che la mappa ha ora. Ciò che non tocchi resta com'è.",
+  "mapsettings.apply": "Applica",
+  "mapsettings.curve.tooltip": "Moltiplica la curva giornaliera della mappa per questo fattore; 1,00× la lascia com'è. Se lo applichi di nuovo, moltiplica di nuovo.",
+  "mapsettings.season.keep": "Come ora",
+  "mapsettings.season.keep.tooltip": "Le stagioni della mappa, invariate",
+  "mapsettings.dropdown.current_mark": "{name} (attuale)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "Il terreno della mappa resta.",
+  "mapsettings.note": "Scritto nella copia di progetto di global.cfg; la mappa originale non viene modificata.",
+  "mapsettings.open": "Impostazioni della mappa...",
+  "mapsettings.open.tooltip": "Nome, descrizione, lato del traffico, densità del traffico, anni, denaro, biglietti, stagioni e texture del terreno di questa mappa",
+  "readonly.action.map_settings": "modificare le impostazioni della mappa",
+  "mapsettings.status.failed": "Non è stato possibile modificare le impostazioni della mappa: {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Impostazioni di {name} modificate. Vanno nell'esportazione della mappa.",
+  "mapsettings.status.unchanged": "Le impostazioni di {name} sono invariate."
+}

@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Definições do mapa",
+  "mapsettings.intro": "Altera as definições deste mapa na cópia de projeto do seu global.cfg: nome e descrição no OMSI, o lado por onde circula o trânsito, quão movimentados estão os carros e os passageiros, caminho-de-ferro, anos, dinheiro, bilhetes, estações do ano e a textura do solo. Cada definição mostra o valor que o mapa tem agora. O que não tocar fica como está.",
+  "mapsettings.apply": "Aplicar",
+  "mapsettings.curve.tooltip": "Multiplica a curva diária do mapa por este fator; 1,00× deixa-a como está. Se aplicar outra vez, multiplica outra vez.",
+  "mapsettings.season.keep": "Como agora",
+  "mapsettings.season.keep.tooltip": "As estações do ano do mapa, sem alterações",
+  "mapsettings.dropdown.current_mark": "{name} (atual)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "O solo do mapa mantém-se.",
+  "mapsettings.note": "Escrito na cópia de projeto do global.cfg; o mapa original não é alterado.",
+  "mapsettings.open": "Definições do mapa...",
+  "mapsettings.open.tooltip": "Nome, descrição, lado do trânsito, densidade de trânsito, anos, dinheiro, bilhetes, estações do ano e textura do solo deste mapa",
+  "readonly.action.map_settings": "alterar as definições do mapa",
+  "mapsettings.status.failed": "Não foi possível alterar as definições do mapa: {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Definições de {name} alteradas. Vão para a exportação do mapa.",
+  "mapsettings.status.unchanged": "As definições de {name} não mudaram."
+}

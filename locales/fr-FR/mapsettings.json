@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Réglages de la carte",
+  "mapsettings.intro": "Modifie les réglages de cette carte dans la copie de projet de son global.cfg : nom et description dans OMSI, le côté de circulation, l'affluence des voitures et des voyageurs, le rail, les années, l'argent, les billets, les saisons et la texture du sol. Chaque réglage montre la valeur actuelle de la carte. Ce que vous ne touchez pas reste tel quel.",
+  "mapsettings.apply": "Appliquer",
+  "mapsettings.curve.tooltip": "Multiplie la courbe journalière de la carte par ce facteur ; 1,00× la laisse telle quelle. Appliqué de nouveau, il multiplie de nouveau.",
+  "mapsettings.season.keep": "Comme maintenant",
+  "mapsettings.season.keep.tooltip": "Les saisons de la carte, inchangées",
+  "mapsettings.dropdown.current_mark": "{name} (actuel)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "Le sol de la carte reste.",
+  "mapsettings.note": "Écrit dans la copie de projet de global.cfg ; la carte d'origine n'est pas modifiée.",
+  "mapsettings.open": "Réglages de la carte...",
+  "mapsettings.open.tooltip": "Nom, description, côté de circulation, densité du trafic, années, argent, billets, saisons et texture du sol de cette carte",
+  "readonly.action.map_settings": "modifier les réglages de la carte",
+  "mapsettings.status.failed": "Les réglages de la carte n'ont pas pu être modifiés : {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Réglages de {name} modifiés. Ils vont dans l'export de la carte.",
+  "mapsettings.status.unchanged": "Les réglages de {name} sont inchangés."
+}

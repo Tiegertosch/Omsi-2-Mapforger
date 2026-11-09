@@ -44,6 +44,11 @@ namespace OmsiMapEditor.UI
         private readonly Label groundLabel = new Label();
         private readonly Label targetLabel = new Label();
         private readonly Button createButton;
+        private readonly Label titleLabel;
+        private readonly Label introLabel;
+        private readonly List<VisualElement> creationOnly = new List<VisualElement>();
+        private readonly List<VisualElement> trafficRows = new List<VisualElement>();
+        private Button seasonKeepButton;
 
         private readonly Dictionary<string, VisualElement> swatchByTexture = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> moneyPaths = new List<string>();
@@ -58,16 +63,19 @@ namespace OmsiMapEditor.UI
         private bool folderFollowsName = true;
         private int swatchGeneration;
 
+        /// <summary>True while the dialog changes the settings of the open map instead of making a new one (ADR 076).</summary>
+        private bool editing;
+
         public NewMapDialog()
         {
             AddToClassList("dialog");
             AddToClassList("new-map-dialog");
-            var title = LocBindings.NewLabel("newmap.title");
-            title.AddToClassList("popup-title");
-            Add(title);
-            var intro = LocBindings.NewLabel("newmap.intro");
-            intro.AddToClassList("popup-description");
-            Add(intro);
+            titleLabel = LocBindings.NewLabel("newmap.title");
+            titleLabel.AddToClassList("popup-title");
+            Add(titleLabel);
+            introLabel = LocBindings.NewLabel("newmap.intro");
+            introLabel.AddToClassList("popup-description");
+            Add(introLabel);
 
             var body = new ScrollView(ScrollViewMode.Vertical);
             body.AddToClassList("new-map-body");
@@ -81,6 +89,7 @@ namespace OmsiMapEditor.UI
             // The map: template, names and description.
             Section(left, "newmap.section.map");
             var templateRow = Row(left, "newmap.template");
+            creationOnly.Add(templateRow);
             templateLabel.AddToClassList("new-map-value");
             templateRow.Add(templateLabel);
             var templateButton = LocBindings.WithTooltip(LocBindings.NewButton("newmap.template.choose", ChooseTemplate), "newmap.template.choose.tooltip");
@@ -94,7 +103,9 @@ namespace OmsiMapEditor.UI
                     folderField.SetValueWithoutNotify(FolderNameFor(evt.newValue));
                 UpdateTarget();
             });
-            AddField(Row(left, "newmap.folder"), folderField, "newmap.folder.tooltip");
+            var folderRow = Row(left, "newmap.folder");
+            creationOnly.Add(folderRow);
+            AddField(folderRow, folderField, "newmap.folder.tooltip");
             folderField.RegisterValueChangedCallback(evt =>
             {
                 folderFollowsName = evt.newValue == FolderNameFor(nameField.value);
@@ -106,8 +117,9 @@ namespace OmsiMapEditor.UI
             descriptionField.AddToClassList("new-map-description");
 
             // The land: size and ground height.
-            Section(left, "newmap.section.land");
+            creationOnly.Add(Section(left, "newmap.section.land"));
             var sizeRow = Row(left, "newmap.size");
+            creationOnly.Add(sizeRow);
             var sizes = Segmented(sizeRow);
             foreach (var size in Sizes)
             {
@@ -119,7 +131,9 @@ namespace OmsiMapEditor.UI
             }
             sizeLabel.AddToClassList("new-map-hint");
             left.Add(sizeLabel);
+            creationOnly.Add(sizeLabel);
             var heightRow = Row(left, "newmap.height");
+            creationOnly.Add(heightRow);
             AddField(heightRow, heightField, "newmap.height.tooltip");
             heightField.AddToClassList("new-map-number");
             heightField.RegisterValueChangedCallback(_ => UpdateTarget());
@@ -137,8 +151,12 @@ namespace OmsiMapEditor.UI
                 button.AddToClassList("panel-tab");
                 sides.Add(button);
             }
-            AddSlider(Row(right, "newmap.cars"), carSlider, carLabel, "newmap.cars.tooltip");
-            AddSlider(Row(right, "newmap.passengers"), passengerSlider, passengerLabel, "newmap.passengers.tooltip");
+            var carRow = Row(right, "newmap.cars");
+            var passengerRow = Row(right, "newmap.passengers");
+            trafficRows.Add(carRow);
+            trafficRows.Add(passengerRow);
+            AddSlider(carRow, carSlider, carLabel, "newmap.cars.tooltip");
+            AddSlider(passengerRow, passengerSlider, passengerLabel, "newmap.passengers.tooltip");
             railToggle.AddToClassList("picker-option-toggle");
             LocBindings.Tooltip(railToggle, "newmap.real_rail.tooltip");
             Row(right, "newmap.real_rail").Add(railToggle);
@@ -166,6 +184,7 @@ namespace OmsiMapEditor.UI
             var seasons = Segmented(right);
             seasons.AddToClassList("new-map-seasons");
             AddSeason(seasons, OmsiSeasonPreset.Template, "newmap.season.template", "newmap.season.template.tooltip");
+            seasonKeepButton = seasonButtons[OmsiSeasonPreset.Template];
             AddSeason(seasons, OmsiSeasonPreset.FourWithSnow, "newmap.season.snow", "newmap.season.snow.tooltip");
             AddSeason(seasons, OmsiSeasonPreset.MildWinter, "newmap.season.mild", "newmap.season.mild.tooltip");
             AddSeason(seasons, OmsiSeasonPreset.SummerOnly, "newmap.season.summer", "newmap.season.summer.tooltip");
@@ -198,6 +217,9 @@ namespace OmsiMapEditor.UI
         /// <summary>The map is to be created: template, folder, display name and options.</summary>
         public event Action<string, string, string, OmsiNewMapOptions> CreateRequested;
 
+        /// <summary>The settings of the open map are to be changed: display name and options (ADR 076).</summary>
+        public event Action<string, OmsiNewMapOptions> SettingsRequested;
+
         public event Action Cancelled;
 
         /// <summary>The texts that are computed from the dialog's state are written again, after a language change.</summary>
@@ -215,6 +237,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Starts over with a template: its settings, a free name and its installation's lists.</summary>
         public void Open(string templateGlobalConfigPath)
         {
+            SetMode(false);
             nameField.SetValueWithoutNotify(string.Empty);
             descriptionField.SetValueWithoutNotify(string.Empty);
             SetTemplate(templateGlobalConfigPath);
@@ -227,6 +250,43 @@ namespace OmsiMapEditor.UI
             folderField.SetValueWithoutNotify(FolderNameFor(name));
             UpdateTarget();
             nameField.schedule.Execute(() => nameField.Focus());
+        }
+
+        /// <summary>
+        /// Shows the settings of the open map for changing (ADR 076): the same fields as a new map has, without template, folder, size and
+        /// height, each with the value global.cfg has now; the daily curves of cars and passengers are multiplied by the factor chosen.
+        /// </summary>
+        public void OpenForSettings(string globalConfigPath, string friendlyName, string description)
+        {
+            SetMode(true);
+            SetTemplate(globalConfigPath);
+            nameField.SetValueWithoutNotify(friendlyName ?? string.Empty);
+            descriptionField.SetValueWithoutNotify(description ?? string.Empty);
+            UpdateTarget();
+            nameField.schedule.Execute(() => nameField.Focus());
+        }
+
+        /// <summary>Switches the texts and the fields between making a map and changing the settings of the open one.</summary>
+        private void SetMode(bool edit)
+        {
+            editing = edit;
+            LocBindings.Text(titleLabel, edit ? "mapsettings.title" : "newmap.title"); // i18n:keys
+            LocBindings.Text(introLabel, edit ? "mapsettings.intro" : "newmap.intro"); // i18n:keys
+            LocBindings.Text(createButton, edit ? "mapsettings.apply" : "newmap.create"); // i18n:keys
+            foreach (var element in creationOnly)
+            {
+                if (edit)
+                    element.style.display = DisplayStyle.None;
+                else
+                    element.style.display = StyleKeyword.Null;
+            }
+            foreach (var row in trafficRows)
+            {
+                var key = edit ? "mapsettings.curve.tooltip" : row == trafficRows[0] ? "newmap.cars.tooltip" : "newmap.passengers.tooltip";
+                LocBindings.Tooltip(row, key); // i18n:keys
+            }
+            LocBindings.Text(seasonKeepButton, edit ? "mapsettings.season.keep" : "newmap.season.template"); // i18n:keys
+            LocBindings.Tooltip(seasonKeepButton, edit ? "mapsettings.season.keep.tooltip" : "newmap.season.template.tooltip"); // i18n:keys
         }
 
         private void ChooseTemplate()
@@ -328,7 +388,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Fills a dropdown with the installation's files, named by their folder, and the template's choice even when missing.</summary>
-        private static void FillDropdown(DropdownField field, List<string> paths, List<string> found, string templateValue)
+        private void FillDropdown(DropdownField field, List<string> paths, List<string> found, string templateValue)
         {
             paths.Clear();
             paths.AddRange(found);
@@ -343,7 +403,7 @@ namespace OmsiMapEditor.UI
                 if (paths.FindAll(other => other.Split('\\').Length >= 2 && other.Split('\\')[other.Split('\\').Length - 2] == name).Count > 1)
                     name = Path.GetFileNameWithoutExtension(path);
                 if (string.Equals(path, templateValue, StringComparison.OrdinalIgnoreCase))
-                    name = Loc.T("newmap.dropdown.template_mark", ("name", name));
+                    name = Loc.T(editing ? "mapsettings.dropdown.current_mark" : "newmap.dropdown.template_mark", ("name", name)) /* i18n:keys */;
                 names.Add(name);
             }
             field.choices = names;
@@ -409,7 +469,8 @@ namespace OmsiMapEditor.UI
             options.GroundTexture = texture ?? string.Empty;
             foreach (var pair in swatchByTexture)
                 pair.Value.EnableInClassList("new-map-swatch-selected", string.Equals(pair.Key, texture, StringComparison.OrdinalIgnoreCase));
-            groundLabel.text = texture == null || texture.Length == 0 ? Loc.T("newmap.ground.template") : Loc.T("newmap.ground.chosen", ("texture", texture));
+            groundLabel.text = texture == null || texture.Length == 0 ? Loc.T(editing ? "mapsettings.ground.keep" : "newmap.ground.template") /* i18n:keys */
+                : Loc.T("newmap.ground.chosen", ("texture", texture));
         }
 
         /// <summary>A texture of the installation reduced to a swatch, or null when it cannot be read; OMSI prefers a .dds of the same name.</summary>
@@ -510,6 +571,13 @@ namespace OmsiMapEditor.UI
         private string Problem(out string target)
         {
             target = null;
+            if (editing)
+            {
+                if (string.IsNullOrWhiteSpace(nameField.value))
+                    return Loc.T("newmap.problem.name");
+                ReadOptions(out var settingsProblem);
+                return settingsProblem;
+            }
             var mapsFolder = MapsFolder();
             if (mapsFolder == null)
                 return Loc.T("newmap.problem.template");
@@ -526,7 +594,7 @@ namespace OmsiMapEditor.UI
         private void UpdateTarget()
         {
             var problem = Problem(out var target);
-            targetLabel.text = problem ?? Loc.T("newmap.target", ("target", target));
+            targetLabel.text = problem ?? (editing ? Loc.T("mapsettings.note") : Loc.T("newmap.target", ("target", target)));
             targetLabel.EnableInClassList("export-problem", problem != null);
             createButton.SetEnabled(problem == null);
         }
@@ -540,7 +608,10 @@ namespace OmsiMapEditor.UI
                 UpdateTarget();
                 return;
             }
-            CreateRequested?.Invoke(templatePath, folderField.value, nameField.value.Trim(), result);
+            if (editing)
+                SettingsRequested?.Invoke(nameField.value.Trim(), result);
+            else
+                CreateRequested?.Invoke(templatePath, folderField.value, nameField.value.Trim(), result);
         }
 
         private void ShowFactor(Label label, float value)
@@ -556,13 +627,14 @@ namespace OmsiMapEditor.UI
             return column;
         }
 
-        private static void Section(VisualElement parent, string key)
+        private static Label Section(VisualElement parent, string key)
         {
             var label = new Label();
             LocBindings.TextUpper(label, key); // i18n:keys
             label.AddToClassList("inspector-section-heading");
             label.AddToClassList("new-map-section");
             parent.Add(label);
+            return label;
         }
 
         private static VisualElement Row(VisualElement parent, string labelKey)

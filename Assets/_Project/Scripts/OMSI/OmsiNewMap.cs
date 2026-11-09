@@ -278,6 +278,18 @@ namespace OmsiMapEditor.OMSI
             return OmsiNumberFormat.Format(metres);
         }
 
+        /// <summary>
+        /// Changes the global.cfg of a map that exists (ADR 076): the display name, the description when <paramref name="description"/> is
+        /// not null, and every setting of <paramref name="options"/> that differs from what the file says now. Everything else stays.
+        /// </summary>
+        internal static void EditGlobalConfig(OmsiRecordFile config, string friendlyName, string description, OmsiNewMapOptions options)
+        {
+            SetSingleField(config, "friendlyname", friendlyName, 1);
+            if (description != null)
+                SetDescription(config, description);
+            ApplySettings(config, options);
+        }
+
         /// <summary>Writes the settings that differ from the template; equal ones keep the template's lines.</summary>
         private static void ApplySettings(OmsiRecordFile config, OmsiNewMapOptions options)
         {

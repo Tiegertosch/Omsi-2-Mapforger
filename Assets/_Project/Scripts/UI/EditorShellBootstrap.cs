@@ -378,6 +378,7 @@ namespace OmsiMapEditor.UI
                 newMapForm = new NewMapDialog();
                 newMapForm.Cancelled += () => HidePopup(newMapDialog);
                 newMapForm.CreateRequested += CreateNewMap;
+                newMapForm.SettingsRequested += ApplyMapSettings;
                 newMapDialog.Add(newMapForm);
             }
             var fileMenu = root.Q<VisualElement>("file-menu");
@@ -1139,6 +1140,7 @@ namespace OmsiMapEditor.UI
             }
 
             RunClipboardArguments(args);
+            RunMapSettingsArguments(args);
 
             if (Array.IndexOf(args, "-deleteSelection") >= 0 && selection.Count > 0)
             {
@@ -7551,6 +7553,8 @@ namespace OmsiMapEditor.UI
             browserCountsLabel.AddToClassList("browser-map-counts");
             projectPanel.Add(browserCountsLabel);
             UpdateCounts();
+            if (session != null && session.CanEdit)
+                projectPanel.Add(MapSettingsButton());
 
             var warnings = currentSummary.Warnings;
             if (warnings.Count > 0)

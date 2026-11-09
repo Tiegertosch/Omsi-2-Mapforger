@@ -1196,3 +1196,18 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Kommandozeile:** `-chronoDates JJJJ-MM-TT [JJJJ-MM-TT|-]` mit `-chronoEdit` („-“ oder nichts: ohne letzten Tag); „Chrono dates:“ im Player-Log.
 
 **Prüfung:** `OmsiChronoLinesTests.TheDaysOfAVariantAreWrittenKeepingTheRestOfItsSettings` (nur die bearbeitete Variante, Ablehnung eines früheren letzten Tags, gleiche Tage ändern nichts, `[enddate]` wird eingefügt, überschrieben und entfernt, Zeilenabschaltung und Ticketpack bleiben, der Leser liest dasselbe).
+
+## ADR 076: Karteneinstellungen nach dem Anlegen ändern
+
+**Status:** Angenommen, 9. November 2026 (schließt „Kartenbeschreibung und Grundeinstellungen“ der Feature-Parity-Liste und erweitert „Links- und Rechtsverkehr“, „KI-Verkehrsdichte und Fahrgastdichte“ und „Umgebungs-/Jahreszeitenoptionen“).
+
+**Entscheidung:**
+- **Ein Dialog für beides:** „New map“ (`NewMapDialog`) hat einen zweiten Modus: Der Knopf „Map settings...“ im Projektbrowser (unter den Zahlen der Karte, nur mit Projekt) öffnet ihn für die offene Karte, ohne Vorlage, Ordner, Größe und Höhe, jede Einstellung mit dem Wert, den `global.cfg` jetzt hat (`OpenForSettings`, `SetMode`): Name und Beschreibung in OMSI, Fahrtseite, Verkehr von Autos und Fahrgästen, Schiene, Jahre und Jahresversatz, Geldsystem, Fahrscheine, Jahreszeiten, Bodentextur. Texte, die von „Vorlage“ sprechen, heißen im Einstellungsmodus „jetzt“ und „wie jetzt“.
+- **Schreiben:** `OmsiMapSession.UpdateMapSettings` (`OmsiMapSessionSettings.cs`) liest die `global.cfg` der Projektkopie, ändert sie mit derselben Logik wie beim Anlegen (`OmsiNewMap.EditGlobalConfig`: Anzeigename, Beschreibung nur wenn sie sich ändert, `ApplySettings` schreibt nur, was vom Dateistand abweicht) und speichert atomar über den Arbeitsbereich; die Zusammenfassung bekommt Name und Beschreibung sofort. Eine Datei, die schon so aussieht, bleibt Byte für Byte. Die Originalkarte wird nie berührt; die Änderung geht in den Export.
+- **Tageskurven:** Die Regler für Autos und Fahrgäste multiplizieren die Kurve, wie sie jetzt ist (1,00× lässt sie); wiederholtes Anwenden multipliziert wieder. Einzelne Stunden der Kurve sind nicht einstellbar.
+- **Kein Rückgängig-Schritt:** Wie bei den Tagen einer Chrono-Variante; man stellt die Werte wieder zurück. „Revert“ der ganzen Karte gibt es ohnehin.
+- **Kommandozeile:** `-mapSettings` öffnet den Dialog (für Screenshots), `-mapSettingsApply Name left|right ErstesJahr LetztesJahr Autos Fahrgäste` schreibt diese Einstellungen; „Map settings:“ im Player-Log; nur mit Projekt.
+
+**Grenzen:** Größe und Bodenhöhe der Karte, Kacheln und die Tageskurven selbst bleiben bei den Werkzeugen für Kacheln und Gelände. Eine Änderung der Fahrtseite (`[LHT]`) schreibt nur den Schalter; vorhandene Straßen und KI-Pfade ändert sie nicht. Die Jahreszeiten gibt es als Vorlagen (wie jetzt, vier mit Schnee, milder Winter, nur Sommer), nicht einzeln.
+
+**Prüfung:** `OmsiMapSettingsTests` (Name, Beschreibung, Fahrtseite, Jahre und Tageskurve werden geschrieben, alles andere und die Originaldatei bleiben, dieselben Werte ändern nichts, Name Pflicht, Abschnittsnamen und rückwärtslaufende Jahre werden abgelehnt).

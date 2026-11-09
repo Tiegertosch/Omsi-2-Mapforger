@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Ustawienia mapy",
+  "mapsettings.intro": "Zmienia ustawienia tej mapy w projektowej kopii jej pliku global.cfg: nazwę i opis w OMSI, stronę ruchu, natężenie ruchu samochodów i pasażerów, kolej, lata, pieniądze, bilety, pory roku i teksturę podłoża. Każde ustawienie pokazuje wartość, którą mapa ma teraz. Czego nie ruszysz, zostaje bez zmian.",
+  "mapsettings.apply": "Zastosuj",
+  "mapsettings.curve.tooltip": "Mnoży dobową krzywą mapy przez ten współczynnik; 1,00× zostawia ją bez zmian. Ponowne zastosowanie mnoży ponownie.",
+  "mapsettings.season.keep": "Jak teraz",
+  "mapsettings.season.keep.tooltip": "Pory roku mapy, bez zmian",
+  "mapsettings.dropdown.current_mark": "{name} (obecne)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "Podłoże mapy zostaje.",
+  "mapsettings.note": "Zapisywane w projektowej kopii global.cfg; oryginalna mapa nie jest zmieniana.",
+  "mapsettings.open": "Ustawienia mapy...",
+  "mapsettings.open.tooltip": "Nazwa, opis, strona ruchu, gęstość ruchu, lata, pieniądze, bilety, pory roku i tekstura podłoża tej mapy",
+  "readonly.action.map_settings": "zmień ustawienia mapy",
+  "mapsettings.status.failed": "Nie udało się zmienić ustawień mapy: {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Zmieniono ustawienia mapy {name}. Trafią do eksportu mapy.",
+  "mapsettings.status.unchanged": "Ustawienia mapy {name} bez zmian."
+}

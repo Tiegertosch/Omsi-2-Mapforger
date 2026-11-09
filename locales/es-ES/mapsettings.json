@@ -1,0 +1,19 @@
+{
+  "mapsettings.title": "Ajustes del mapa",
+  "mapsettings.intro": "Cambia los ajustes de este mapa en la copia de proyecto de su global.cfg: nombre y descripción en OMSI, el lado por el que circula el tráfico, cuántos coches y pasajeros hay, ferrocarril, años, dinero, billetes, estaciones y la textura del suelo. Cada ajuste muestra el valor que tiene el mapa ahora. Lo que no toques se queda como está.",
+  "mapsettings.apply": "Aplicar",
+  "mapsettings.curve.tooltip": "Multiplica la curva diaria del mapa por este factor; 1,00× la deja como está. Si lo aplicas otra vez, vuelve a multiplicar.",
+  "mapsettings.season.keep": "Como ahora",
+  "mapsettings.season.keep.tooltip": "Las estaciones del mapa, sin cambios",
+  "mapsettings.dropdown.current_mark": "{name} (actual)",
+  "@mapsettings.dropdown.current_mark": "{name} is the name of a file the map uses now",
+  "mapsettings.ground.keep": "El suelo del mapa se queda.",
+  "mapsettings.note": "Se escribe en la copia de proyecto de global.cfg; el mapa original no cambia.",
+  "mapsettings.open": "Ajustes del mapa...",
+  "mapsettings.open.tooltip": "Nombre, descripción, lado del tráfico, densidad de tráfico, años, dinero, billetes, estaciones y textura del suelo de este mapa",
+  "readonly.action.map_settings": "cambiar los ajustes del mapa",
+  "mapsettings.status.failed": "No se pudieron cambiar los ajustes del mapa: {reason}",
+  "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
+  "mapsettings.status.changed": "Ajustes de {name} cambiados. Pasan a la exportación del mapa.",
+  "mapsettings.status.unchanged": "Los ajustes de {name} no han cambiado."
+}

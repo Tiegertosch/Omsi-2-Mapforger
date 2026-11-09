@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 79 · Teilweise 15 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 80 · Teilweise 14 · Prüfen 0 · Offen 21 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -8,12 +8,12 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Karte speichern und exportieren — Vorhanden
 - [x] Kartenkacheln hinzufügen — Vorhanden
 - [x] Kartenkacheln entfernen — Vorhanden
-- [ ] Kartenbeschreibung und Grundeinstellungen — Teilweise (nur beim Anlegen der Karte einstellbar)
+- [x] Kartenbeschreibung und Grundeinstellungen — Vorhanden (Knopf „Map settings...“ im Projektbrowser; seit 9. November 2026)
 - [x] Weltkoordinaten verwenden — Vorhanden
 - [ ] Einstiegspunkte erstellen und verwalten — Teilweise
 - [ ] Kachel als DirectX-X-Terrain exportieren — Offen
-- [x] Links- und Rechtsverkehr konfigurieren — Vorhanden (nur beim Anlegen der Karte)
-- [ ] KI-Verkehrsdichte und Fahrgastdichte konfigurieren — Teilweise
+- [x] Links- und Rechtsverkehr konfigurieren — Vorhanden (beim Anlegen und danach unter „Map settings...“; bestehende Straßen ändern sich nicht)
+- [ ] KI-Verkehrsdichte und Fahrgastdichte konfigurieren — Teilweise (Faktor auf die Tageskurve unter „Map settings...“, einzelne Stunden der Kurve nicht)
 
 ## B. Objekte und Szenerie
 - [x] Objekte aus der OMSI-Bibliothek platzieren — Vorhanden
@@ -129,7 +129,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Rückgängig und Wiederholen — Vorhanden
 - [x] Kartenfehler und fehlende Dateien prüfen — Vorhanden
 - [x] Kachel- und Objektinformationen anzeigen — Vorhanden
-- [ ] Umgebungs-/Jahreszeitenoptionen bearbeiten — Teilweise (nur beim Anlegen der Karte)
+- [ ] Umgebungs-/Jahreszeitenoptionen bearbeiten — Teilweise (Jahre, Jahresversatz und Jahreszeiten-Vorlagen unter „Map settings...“, einzelne Jahreszeiten nicht)
 - [x] Debug-Informationen und Pfadverbindungen anzeigen — Vorhanden
 - [x] Originale OMSI-Datensätze verlustfrei erhalten — Vorhanden (ADR 008; unbekannte Datensätze bleiben als Text erhalten)
 - [ ] Karte im originalen OMSI 2 testen — Teilweise (im Oktober geprüft, seither nur in openOMSI)
