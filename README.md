@@ -27,7 +27,7 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 - **Stay up to date:** MapWorks looks for a new release on GitHub when it starts, once a day at most, and under **Help > Check for updates...**. Install and restart downloads it, checks it, replaces the program files and opens your project again; if anything goes wrong, the old version stays. Skip a version or turn the check off in the same window.
 - **Export safely:** Save edits in a `.omproj` project and export them into a separate OMSI map folder. The original map remains unchanged. Maps you made with MapWorks are your own: they open ready to edit and export back into their own folder.
 
-- **Translations:** The interface is multilingual (German and English complete, with a language choice in Settings; more languages can follow). Messages from the map check and from the OMSI file layer are still English. The texts live in plain JSON files under [locales](locales/README.md), so anyone can add or improve a language with a pull request; a built-in check validates every file.
+- **Translations:** The interface is multilingual, with a language choice in Settings: English and German are written by hand; Czech, French, Italian, Polish, Portuguese and Spanish are machine translations that native speakers are welcome to correct. The map check report is translated too; error messages from the OMSI file layer are still English. The texts and the list of languages live in plain JSON files under [locales](locales/README.md), so anyone can add or improve a language with a pull request, without changing code; a built-in check validates every file.
 
 ## Current limitations
 

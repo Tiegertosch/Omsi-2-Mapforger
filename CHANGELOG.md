@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.1.1
+
+OMSI MapWorks speaks eight languages, and chrono variants can now be edited much further.
+
+### Languages
+
+- **Choose your language** under *Settings > General > Language*: English, German, Czech, French, Italian, Polish, Portuguese and Spanish. By default MapWorks starts in the language of Windows.
+- English and German are written by hand. The other six are machine translations; if you find a clumsy or wrong text, please correct it (see `locales/README.md`) or open an issue.
+- The whole interface changes at once, including menus, panels, tooltips, the status bar and the map check report. Error messages that come from reading or writing OMSI files stay English.
+- A new language is only a folder of text files plus a few lines in `locales/languages.json`; no program change is needed.
+
+### Chrono variants
+
+- **Change the type and the labels** of objects and of objects attached to them (for example the line signs at a stop), in the base map and in a variant. Renaming a stop sign in a variant shows up in openOMSI.
+- **Traffic rules and right of way** can be set in a variant. The variant's change list records them, and the map on a date shows them.
+- **Change the type of a road or delete it** in a variant (*Change type...*, *Delete in variant*). The base map stays as it is.
+- **Build new roads** in a variant, for example a diversion around a building site. They are stored as a separate chain of roads in the variant's change list.
+- **Switch lines on and off** per variant. Stops, links and trips are not written by the editor.
+
+### Good to know
+
+- Projects, maps and settings from 1.1 open as before.
+- Apart from the labels, the new chrono variant edits have so far been checked in MapWorks itself, not yet in openOMSI.
+
 ## 1.1
 
 Place any map exactly on the Earth, a much calmer Satellite and terrain window, smooth zooming into aerial pictures, and faster, lighter loading of large maps.
