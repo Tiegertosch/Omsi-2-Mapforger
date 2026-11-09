@@ -39,6 +39,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The entry point object is the first and only element; IDs continue after it.</summary>
         private const int EntryPointId = 1;
 
+        /// <summary>The first ID of anything built after the map was made: the map starts with its entry point alone.</summary>
+        public const int FirstBuiltId = EntryPointId + 1;
+
         private const string TemporarySuffix = ".mapforge-new-tmp";
 
         /// <summary>Records of global.cfg that belong to the template's places and are left out.</summary>

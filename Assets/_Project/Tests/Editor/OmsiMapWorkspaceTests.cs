@@ -57,6 +57,27 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void RoadsOfAMapMadeHereStillShapeTheTerrainAfterAnExportAndReopening()
+        {
+            var made = OmsiNewMap.Create(Path.Combine(original, "global.cfg"), "Own map", "Own Map", new DateTime(2026, 10, 30));
+            var projectPath = Path.Combine(testRoot, "Projects", "Own.omproj");
+            var session = OmsiMapSession.OpenProject(made.GlobalConfigPath, projectPath);
+            var summary = session.Read();
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 50, StartY = 150, StartHeight = 0, EndX = 250, EndY = 150, EndHeight = 0, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+            Assert.IsTrue(session.ShapesTerrain(summary.Tiles[0].Splines.Last()));
+
+            // After the export the map folder holds the road; it is still one built here, so a new fit takes it into account.
+            OmsiMapExporter.Export(session.Workspace, made.MapFolder, "Own Map");
+            var reopened = OmsiMapSession.OpenProject(made.GlobalConfigPath, projectPath);
+            var again = reopened.Read();
+            Assert.IsTrue(reopened.ShapesTerrain(again.Tiles[0].Splines.Last()));
+        }
+
+        [Test]
         public void RejectsWorkspacesAndPathsThatCouldTouchTheOriginal()
         {
             Assert.Throws<ArgumentException>(() => new OmsiMapWorkspace(original, Path.Combine(original, "edits")));

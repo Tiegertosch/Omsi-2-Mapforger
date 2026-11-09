@@ -836,13 +836,16 @@ namespace OmsiMapEditor.OMSI
             return spline != null && spline.AlignsTerrain && spline.Id >= FirstNewId();
         }
 
-        /// <summary>The first ID the original map does not use: splines from here on were built in this editor.</summary>
+        /// <summary>
+        /// The first ID the original map does not use: splines from here on were built in this editor. In a map made here everything
+        /// but its entry point was built in this editor, also what an earlier export put into the folder (ADR 083).
+        /// </summary>
         private int FirstNewId()
         {
             if (!firstNewId.HasValue)
             {
                 var original = new OmsiFolderSource(RequireWorkspace().RootPath);
-                firstNewId = OmsiIdAllocator.ForMap(original, GlobalConfigFileName).NextFreeId;
+                firstNewId = OmsiNewMap.IsMadeHere(RequireWorkspace().RootPath) ? OmsiNewMap.FirstBuiltId : OmsiIdAllocator.ForMap(original, GlobalConfigFileName).NextFreeId;
             }
             return firstNewId.Value;
         }
