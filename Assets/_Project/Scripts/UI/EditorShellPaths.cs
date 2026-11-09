@@ -234,11 +234,12 @@ namespace OmsiMapEditor.UI
         {
             var paths = mapPaths.FindAll(path => path.TileX == tile.X && path.TileY == tile.Y && path.ElementId == elementId && path.OnSpline == onSpline);
             if (CanEditRules && paths.Exists(path => path.Kind == 0))
-                AddPathRuleEditor(container, tile, elementId, onSpline, paths);
-            var heading = new Label();
-            LocBindings.TextUpper(heading, "paths.heading", ("count", paths.Count));
-            heading.AddToClassList("inspector-section-heading");
-            container.Add(heading);
+                AddInspectorGroup(container, "rules", Loc.T("paths.rules.heading"), true, body => AddPathRuleEditor(body, tile, elementId, onSpline, paths));
+            AddInspectorGroup(container, "paths", Loc.T("paths.heading", ("count", paths.Count)), false, body => AddPathList(body, paths));
+        }
+
+        private void AddPathList(VisualElement container, List<OmsiMapPath> paths)
+        {
             if (paths.Count == 0)
                 AddInspectorRecord(container, Loc.T("paths.none"), "inspector-record-empty");
             foreach (var path in paths)
@@ -285,13 +286,13 @@ namespace OmsiMapEditor.UI
             // On splines the rules go to the selected one and those chosen with Ctrl+click of the same road type.
             var skipped = 0;
             var targets = onSpline ? RuleSplines(out skipped) : null;
-            var heading = new Label();
             if (targets != null && targets.Count > 1)
-                LocBindings.TextUpper(heading, "paths.rules.heading_splines", ("count", targets.Count));
-            else
-                LocBindings.TextUpper(heading, "paths.rules.heading");
-            heading.AddToClassList("inspector-section-heading");
-            container.Add(heading);
+            {
+                var heading = new Label();
+                LocBindings.Text(heading, "paths.rules.heading_splines", ("count", targets.Count));
+                heading.AddToClassList("muted");
+                container.Add(heading);
+            }
             if (onSpline)
             {
                 var whole = new Button(() =>

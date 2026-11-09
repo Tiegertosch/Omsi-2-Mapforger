@@ -42,7 +42,8 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The button to choose another object file, and the labels as text fields with a button that writes them together.</summary>
         /// <param name="nested">The element hangs on the selected object: a small heading, and the file button sits in its row.</param>
-        private void AddTypeAndLabels(VisualElement editor, OmsiTileSummary tile, object element, bool nested)
+        /// <param name="grouped">Drawn inside a group that has the title already: no heading of its own.</param>
+        private void AddTypeAndLabels(VisualElement editor, OmsiTileSummary tile, object element, bool nested, bool grouped = false)
         {
             var canEdit = CanEditObjects;
             var labels = element is OmsiObjectRecord item ? item.Labels : ((OmsiAttachedObjectRecord)element).Labels;
@@ -58,15 +59,18 @@ namespace OmsiMapEditor.UI
             if (labels.Count == 0)
                 return;
 
-            var heading = new Label();
-            if (nested)
-                LocBindings.Text(heading, "labels.heading");
-            else
-                LocBindings.TextUpper(heading, "labels.heading");
-            heading.AddToClassList(nested ? "muted" : "inspector-section-heading");
-            if (nested)
-                heading.style.marginLeft = 12;
-            editor.Add(heading);
+            if (!grouped)
+            {
+                var heading = new Label();
+                if (nested)
+                    LocBindings.Text(heading, "labels.heading");
+                else
+                    LocBindings.TextUpper(heading, "labels.heading");
+                heading.AddToClassList(nested ? "muted" : "inspector-section-heading");
+                if (nested)
+                    heading.style.marginLeft = 12;
+                editor.Add(heading);
+            }
             var fields = new List<TextField>();
             for (var index = 0; index < labels.Count; index++)
             {

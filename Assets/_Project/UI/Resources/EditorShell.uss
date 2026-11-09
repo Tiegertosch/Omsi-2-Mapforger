@@ -289,9 +289,15 @@
 
 /* Inspector */
 .inspector-title { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
-.inspector-property { margin-bottom: 6px; }
-.inspector-property-name { margin-bottom: 1px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
-.inspector-property-value { color: var(--mf-color-text-primary); white-space: normal; }
+.inspector-property { flex-direction: row; align-items: flex-start; margin-bottom: 3px; }
+.inspector-property-name { width: 84px; min-width: 84px; margin-bottom: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
+.inspector-property-value { flex-grow: 1; flex-shrink: 1; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); white-space: normal; }
+.inspector-tile-summary { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.inspector-tabs { flex-shrink: 0; margin-bottom: 0; }
+.inspector-facts { margin-top: var(--mf-space-1); margin-bottom: var(--mf-space-2); }
+.inspector-filter { margin-top: var(--mf-space-2); }
+.inspector-filter .unity-base-text-field__input { height: 30px; margin: 0; padding: 0 var(--mf-space-2); -unity-text-align: middle-left; }
+.inspector-filter .unity-base-text-field__input .unity-text-element { padding: 0; margin: 0; }
 .inspector-records { flex-grow: 1; min-height: 0; margin-top: var(--mf-space-2); border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); }
 .inspector-section-heading { margin-top: var(--mf-space-3); margin-bottom: 5px; font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .inspector-record { margin-bottom: 4px; padding: 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-sm); white-space: normal; }
@@ -302,7 +308,7 @@
 .junction-swatch-invalid { border-color: var(--mf-color-error); background-color: var(--mf-color-error); }
 .junction-swatch-unconnected { border-color: var(--mf-color-text-secondary); }
 .junction-text { flex-grow: 1; flex-shrink: 1; white-space: normal; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); }
-.inspector-record-empty { margin-bottom: 5px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); }
+.inspector-record-empty { margin-bottom: 5px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); white-space: normal; }
 .inspector-record-clickable:hover { background-color: var(--mf-color-panel-hover); }
 .inspector-record-selected { background-color: var(--mf-color-panel-hover); border-left-width: 3px; border-left-color: var(--mf-color-accent); }
 .inspector-edit { margin-top: var(--mf-space-2); padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); }
@@ -313,6 +319,19 @@
 .inspector-edit-revert { margin-top: 6px; align-self: flex-start; }
 .inspector-edit-delete { margin-top: 6px; align-self: flex-start; color: var(--mf-color-error); }
 .inspector-edit-hint { margin-top: 6px; font-size: var(--mf-font-secondary); }
+/* Groups that fold, compact rows and the bar of buttons under the scrolling part of the inspector (ADR 077) */
+.inspector-group { margin-top: 4px; border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); }
+.inspector-group-header { flex-direction: row; align-items: center; height: 28px; }
+.inspector-group-chevron { width: 14px; height: 14px; margin-right: 6px; flex-shrink: 0; color: var(--mf-color-text-secondary); }
+.inspector-group-title { flex-grow: 1; flex-shrink: 1; font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); white-space: normal; }
+.inspector-group-header:hover .inspector-group-title, .inspector-group-header:hover .inspector-group-chevron { color: var(--mf-color-text-primary); }
+.inspector-group-body { padding-bottom: 4px; }
+.inspector-edit-row { flex-direction: row; }
+.inspector-edit-row > .inspector-edit-field { flex-grow: 1; flex-shrink: 1; flex-basis: 0; min-width: 0; margin: 2px 4px 2px 0; flex-direction: column; align-items: stretch; }
+.inspector-edit-row > .inspector-edit-field > Label { width: auto; min-width: 0; margin: 0 0 1px; padding: 0; }
+.inspector-edit-row > .inspector-edit-field:last-child { margin-right: 0; }
+.inspector-actions { flex-direction: row; flex-wrap: wrap; flex-shrink: 0; margin-top: var(--mf-space-2); padding-top: var(--mf-space-2); border-top-width: 1px; border-top-color: var(--mf-color-border); }
+.inspector-actions > .map-control-button { margin: 0 6px 4px 0; align-self: auto; }
 .muted { color: var(--mf-color-text-muted); white-space: normal; }
 
 /* Scroll bars: a thin dark track without arrow buttons */

@@ -1,8 +1,4 @@
 {
-  "inspector.object_placements": "Objektplatzierungen",
-  "inspector.no_objects": "Keine entschlüsselten Objekte.",
-  "inspector.spline_placements": "Splineplatzierungen",
-  "inspector.no_splines": "Keine entschlüsselten Splines.",
   "inspector.selected_objects": "Gewählte Objekte",
   "inspector.selected_ids": "{count} Objekte: {ids}{more, select, yes {, ...} other {}}",
   "inspector.level_group": "Boden darunter einebnen",

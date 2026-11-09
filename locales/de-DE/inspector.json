@@ -1,0 +1,13 @@
+{
+  "inspector.tab.selection": "Auswahl",
+  "inspector.tab.tile": "Kachel",
+  "inspector.tile_summary": "Objekte {objects} · Splines {splines} · Verbindungen {connections}",
+  "inspector.filter": "Nach ID oder Name suchen",
+  "inspector.more": "{shown} von {total} gezeigt. Mit dem Filter eingrenzen, um den Rest zu sehen.",
+  "inspector.group.type": "Typ und Beschriftungen",
+  "inspector.group.heights": "Höhen",
+  "inspector.group.cross": "Neigung und Skew",
+  "inspector.group.look": "Textur und Spiegelung",
+  "inspector.filter.tooltip": "Findet ein Objekt oder einen Spline dieser Kachel nach ID oder einem Teil des Dateinamens, etwa verdeckte Dinge oder solche aus einer Meldung. Ein Klick auf einen Treffer wählt ihn aus.",
+  "inspector.no_match": "Nichts in dieser Kachel passt."
+}

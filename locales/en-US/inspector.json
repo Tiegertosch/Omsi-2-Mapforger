@@ -1,0 +1,13 @@
+{
+  "inspector.tab.selection": "Selection",
+  "inspector.tab.tile": "Tile",
+  "inspector.tile_summary": "Objects {objects} · Splines {splines} · Connections {connections}",
+  "inspector.filter": "Find by ID or name",
+  "inspector.more": "Showing {shown} of {total}. Narrow the filter to see the rest.",
+  "inspector.group.type": "Type and labels",
+  "inspector.group.heights": "Heights",
+  "inspector.group.cross": "Cant and skew",
+  "inspector.group.look": "Texture and mirroring",
+  "inspector.filter.tooltip": "Finds an object or spline of this tile by its ID or by part of its file name, for things hidden under others or named in a message. Click a hit to select it.",
+  "inspector.no_match": "Nothing in this tile matches."
+}

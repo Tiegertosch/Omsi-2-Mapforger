@@ -1,0 +1,13 @@
+{
+  "inspector.tab.selection": "Selección",
+  "inspector.tab.tile": "Tile",
+  "inspector.tile_summary": "Objetos {objects} · Splines {splines} · Conexiones {connections}",
+  "inspector.filter": "Buscar por ID o nombre",
+  "inspector.more": "Se muestran {shown} de {total}. Acota el filtro para ver el resto.",
+  "inspector.group.type": "Tipo y etiquetas",
+  "inspector.group.heights": "Alturas",
+  "inspector.group.cross": "Peralte y skew",
+  "inspector.group.look": "Textura y reflejo",
+  "inspector.filter.tooltip": "Encuentra un objeto o spline de esta tile por su ID o parte del nombre de archivo, por ejemplo cosas ocultas bajo otras o citadas en un mensaje. Haz clic en un resultado para seleccionarlo.",
+  "inspector.no_match": "Nada en esta tile coincide."
+}

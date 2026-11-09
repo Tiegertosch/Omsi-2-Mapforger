@@ -1,0 +1,13 @@
+{
+  "inspector.tab.selection": "Zaznaczenie",
+  "inspector.tab.tile": "Tile",
+  "inspector.tile_summary": "Obiekty {objects} · Splines {splines} · Połączenia {connections}",
+  "inspector.filter": "Szukaj według ID lub nazwy",
+  "inspector.more": "Pokazano {shown} z {total}. Zawęź filtr, aby zobaczyć resztę.",
+  "inspector.group.type": "Typ i etykiety",
+  "inspector.group.heights": "Wysokości",
+  "inspector.group.cross": "Przechył i skew",
+  "inspector.group.look": "Tekstura i odbicie",
+  "inspector.filter.tooltip": "Znajduje obiekt lub spline tej tile według ID albo fragmentu nazwy pliku, na przykład rzeczy ukryte pod innymi lub wymienione w komunikacie. Kliknij trafienie, aby je zaznaczyć.",
+  "inspector.no_match": "Nic w tej tile nie pasuje."
+}

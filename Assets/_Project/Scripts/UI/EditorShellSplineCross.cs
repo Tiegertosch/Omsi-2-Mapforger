@@ -18,14 +18,16 @@ namespace OmsiMapEditor.UI
         /// <summary>The fields for cant and skew under the heights of a selected spline, with the button that applies them.</summary>
         private void AddSplineCrossFields(VisualElement editor, OmsiSplineRecord spline)
         {
-            var cantStart = AddEditField(editor, "inspector.field.cant_start", spline.CantStartPercent);
-            var cantEnd = AddEditField(editor, "inspector.field.cant_end", spline.CantEndPercent);
+            var cant = AddEditRow(editor, ("inspector.field.cant_start", spline.CantStartPercent), ("inspector.field.cant_end", spline.CantEndPercent));
+            var cantStart = cant[0];
+            var cantEnd = cant[1];
             cantStart.tooltip = cantEnd.tooltip = Loc.T("inspector.cant.tooltip");
             TextField skewStart = null, skewEnd = null;
             if (spline.SkewStart.HasValue && spline.SkewEnd.HasValue)
             {
-                skewStart = AddEditField(editor, "inspector.field.skew_start", spline.SkewStart.Value);
-                skewEnd = AddEditField(editor, "inspector.field.skew_end", spline.SkewEnd.Value);
+                var skew = AddEditRow(editor, ("inspector.field.skew_start", spline.SkewStart.Value), ("inspector.field.skew_end", spline.SkewEnd.Value));
+                skewStart = skew[0];
+                skewEnd = skew[1];
                 skewStart.tooltip = skewEnd.tooltip = Loc.T("inspector.skew.tooltip");
             }
             var apply = new Button(() =>

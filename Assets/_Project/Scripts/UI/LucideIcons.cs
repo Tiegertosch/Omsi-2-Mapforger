@@ -68,6 +68,7 @@ namespace OmsiMapEditor.UI
             },
             ["chevron-left"] = new[] { "m15 18-6-6 6-6" },
             ["chevron-right"] = new[] { "m9 18 6-6-6-6" },
+            ["chevron-down"] = new[] { "m6 9 6 6 6-6" },
             ["maximize"] = new[] { "M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3" },
             ["minus"] = new[] { "M5 12h14" },
             ["plus"] = new[] { "M5 12h14", "M12 5v14" },

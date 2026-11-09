@@ -1,8 +1,4 @@
 {
-  "inspector.object_placements": "Rozmieszczenie obiektów",
-  "inspector.no_objects": "Żadnych dekodowanych obiektów.",
-  "inspector.spline_placements": "Miejsca docelowe Spline",
-  "inspector.no_splines": "Brak dekodowanego splines.",
   "inspector.selected_objects": "Wybrane obiekty",
   "inspector.selected_ids": "Obiekty {count}: {ids}{more, select, yes {, ...} other {}}",
   "inspector.level_group": "Pod nimi równy teren",

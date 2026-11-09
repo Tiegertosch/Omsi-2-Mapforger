@@ -160,6 +160,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Volle Luftbilder beim Zoomen ohne Ruckeln (ADR 062): komprimierte Kopie im Zwischenspeicher mit 2-GB-Grenze (beim Laden der Bilder auf Arbeitsfäden berechnet, `OmsiDxt`), Texturen länger behalten
   - [x] Genaue Verortung klassischer Karten (ADR 061, Wunsch aus der Rückmeldung zu 1.0): Bezugspunkt, Koordinaten einfügen, Maßstab, Verschieben, Zwei-Punkt-Passung, geladene Bilder folgen sofort; wartet auf den Nutzertest. Offen: neue Karten mit Koordinaten im Dialog „New map“ anlegen (`[worldcoordinates]`)
   - [x] Karteneinstellungen nach dem Anlegen ändern: Name, Beschreibung, Fahrtseite, Verkehr, Jahre, Geld, Jahreszeiten, Bodentextur (ADR 076)
+  - [x] Inspector überarbeitet: Reiter „Selection“/„Tile“, Gruppen mit Merkzustand, kompakte Zeilen, feste Knopfleiste (ADR 077)
+  - [ ] Project-Fenster überarbeiten: Reiter nach Aufgabe (Map, Chrono, Lines, Paths, Tiles), Zustand bleibt beim Neuaufbau
   - [x] Erster und letzter Tag einer Chrono-Variante nachträglich ändern (ADR 075)
   - [x] Spiegelung und Texturversatz von Splines im Inspector (ADR 074)
   - [x] Überholverbot als Pfadregel im Inspector (ADR 073)

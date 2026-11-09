@@ -1,8 +1,4 @@
 {
-  "inspector.object_placements": "Umístění objektů",
-  "inspector.no_objects": "Žádné dekódované objekty.",
-  "inspector.spline_placements": "Spline umístění",
-  "inspector.no_splines": "Žádné dekódované splines.",
   "inspector.selected_objects": "Vybrané objekty",
   "inspector.selected_ids": "Objekty {count}: {ids}{more, select, yes {, ...} other {}}",
   "inspector.level_group": "Pod nimi rovná půda",

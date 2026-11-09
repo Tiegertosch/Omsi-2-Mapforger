@@ -1,8 +1,4 @@
 {
-  "inspector.object_placements": "Posicionamentos de objetos",
-  "inspector.no_objects": "Nenhum objeto descodificado.",
-  "inspector.spline_placements": "Canais Spline",
-  "inspector.no_splines": "Nenhum splines descodificado.",
   "inspector.selected_objects": "Objetos selecionados",
   "inspector.selected_ids": "Objetos {count}: {ids}{more, select, yes {, ...} other {}}",
   "inspector.level_group": "Terreno plano abaixo deles",

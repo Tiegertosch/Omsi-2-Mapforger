@@ -1,0 +1,13 @@
+{
+  "inspector.tab.selection": "Výběr",
+  "inspector.tab.tile": "Tile",
+  "inspector.tile_summary": "Objekty {objects} · Splines {splines} · Spojení {connections}",
+  "inspector.filter": "Hledat podle ID nebo názvu",
+  "inspector.more": "Zobrazeno {shown} z {total}. Zúžením filtru uvidíte zbytek.",
+  "inspector.group.type": "Typ a štítky",
+  "inspector.group.heights": "Výšky",
+  "inspector.group.cross": "Sklon a skew",
+  "inspector.group.look": "Textura a zrcadlení",
+  "inspector.filter.tooltip": "Najde objekt nebo spline této tile podle ID nebo části názvu souboru, například skryté věci nebo ty uvedené ve zprávě. Kliknutím na nález jej vyberete.",
+  "inspector.no_match": "V této tile nic neodpovídá."
+}

@@ -1211,3 +1211,21 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Größe und Bodenhöhe der Karte, Kacheln und die Tageskurven selbst bleiben bei den Werkzeugen für Kacheln und Gelände. Eine Änderung der Fahrtseite (`[LHT]`) schreibt nur den Schalter; vorhandene Straßen und KI-Pfade ändert sie nicht. Die Jahreszeiten gibt es als Vorlagen (wie jetzt, vier mit Schnee, milder Winter, nur Sommer), nicht einzeln.
 
 **Prüfung:** `OmsiMapSettingsTests` (Name, Beschreibung, Fahrtseite, Jahre und Tageskurve werden geschrieben, alles andere und die Originaldatei bleiben, dieselben Werte ändern nichts, Name Pflicht, Abschnittsnamen und rückwärtslaufende Jahre werden abgelehnt).
+
+## ADR 077: Inspector überarbeitet (Reiter, Gruppen, feste Knopfleiste)
+
+**Status:** Angenommen, 9. November 2026 (Phase 1 von „Project und Inspector grundlegend überarbeiten“; Phase 2 ist das Project-Fenster).
+
+**Anlass:** Der Inspector war mit der Zeit so voll geworden, dass man viel scrollen musste: Der Kachelkopf mit sieben Zeilen stand auch bei gewähltem Objekt oben, jedes Feld hatte eine eigene Zeile, jede Feldgruppe einen eigenen „Apply“-Knopf, darunter hingen immer die vollständigen Listen aller Objekte und Splines der Kachel und der Regel-Editor der KI-Pfade.
+
+**Entscheidung** (der Nutzer wählte „Mischform: Tabs im Project, Kontext-Inspector“ und „erst Inspector, dann Project“):
+- **Kopf:** Name der Kachel und eine Zeile „Objects · Splines · Connections“. Datei, Zustand und Gelände stehen im Kachel-Reiter.
+- **Zwei Reiter, nur bei einer Auswahl:** „Selection“ (das Gewählte) und „Tile“ (Datei, Wasser, Luftbild, Löschen und eine Suche nach ID oder Dateiname im Objekt- und Spline-Bestand der Kachel; höchstens 10 Treffer, ohne Eingabe keine Liste). Die vollständigen Listen aller Objekte und Splines der Kachel sind entfallen: Man wählt in der Karte (Klick, Strg+Klick, Strg+Ziehen), die Liste war ein Überbleibsel aus der Anfangszeit; verdeckte Objekte und IDs aus Prüfmeldungen findet die Suche. Ohne Auswahl zeigt der Inspector den Kachel-Reiter. Eine andere Auswahl beginnt wieder im Reiter „Selection“; wer „Tile“ gewählt hat, bleibt dort, solange die Auswahl gleich bleibt (`ChooseInspectorTab`).
+- **Gruppen mit Merkzustand:** `AddInspectorGroup` (`EditorShellInspector.cs`) legt eine Gruppe mit Titel an, die auf- und zuklappt. Wie der Nutzer sie verlassen hat, merkt sich der Editor über die Kennung der Gruppe (`Mapforge.InspectorFolds` in den PlayerPrefs), auch zwischen Läufen; die Vorgabe gilt nur, bis sie das erste Mal geklickt wurde. Eine leere Gruppe erscheint nicht. Gruppen: Typ und Beschriftungen, Anschlusspunkte, angehängte Objekte, Höhen, Neigung und Skew, Textur und Spiegelung, Verkehrsregeln, KI-Pfade. Die Kennungen heißen mit Bindestrich (`spline-cross`), weil `LocalizationKeyUsageTests` jedes Textstück wie `spline.cross` für einen Sprachschlüssel hält.
+- **Kompakte Zeilen:** `AddEditRow` setzt mehrere Zahlenfelder in eine Zeile, die Beschriftung über dem Feld (X, Y, Höhe; Richtung, Pitch, Bank; Start- und Endhöhe; Neigung von und bis; Skew).
+- **Feste Knopfleiste:** Apply, „Level ground“, Löschen und „Revert tile edits“ liegen in `inspectorActions` unter dem scrollenden Teil und bleiben sichtbar. Die Apply-Knöpfe der Feldgruppen eines Splines bleiben in ihrer Gruppe, weil jede ihren eigenen Rückgängig-Schritt macht.
+- **Kommandozeile:** `-inspectorTo <Überschrift>` findet Überschriften und Gruppentitel, klappt die Gruppe auf und wechselt bei Bedarf in den Kachel-Reiter.
+
+**Nicht geändert:** Inhalte, Schreibvorgänge, Rückgängig-Schritte und Rechte (nur lesen, Chrono-Variante, nur Regeln) bleiben, wie sie waren; nur die Anordnung ändert sich.
+
+**Prüfung:** Screenshots am Player (Grundorf: Spline mit KI-Pfaden, Objekt, Kachel ohne Auswahl, `-inspectorTo`); `LocaleCheck` ohne Befunde, 485 Unity-Tests grün.

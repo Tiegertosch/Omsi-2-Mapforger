@@ -1,8 +1,4 @@
 {
-  "inspector.object_placements": "Object placements",
-  "inspector.no_objects": "No decoded objects.",
-  "inspector.spline_placements": "Spline placements",
-  "inspector.no_splines": "No decoded splines.",
   "inspector.selected_objects": "Selected objects",
   "inspector.selected_ids": "{count} objects: {ids}{more, select, yes {, ...} other {}}",
   "inspector.level_group": "Level ground under them",
