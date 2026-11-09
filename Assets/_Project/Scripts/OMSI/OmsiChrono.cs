@@ -635,7 +635,8 @@ namespace OmsiMapEditor.OMSI
                 LocalY = record.LocalY, Height = record.Height, EndHeight = record.EndHeight, HeadingDegrees = record.HeadingDegrees,
                 GradientStartPercent = record.GradientStartPercent, GradientEndPercent = record.GradientEndPercent,
                 LengthMeters = record.LengthMeters, RadiusMeters = record.RadiusMeters, IsSplineH = record.IsSplineH, IsMirrored = record.IsMirrored,
-                AlignsTerrain = record.AlignsTerrain, ChainOffset = record.ChainOffset
+                AlignsTerrain = record.AlignsTerrain, ChainOffset = record.ChainOffset, CantStartPercent = record.CantStartPercent,
+                CantEndPercent = record.CantEndPercent, SkewStart = record.SkewStart, SkewEnd = record.SkewEnd
             };
             copy.Rules.AddRange(record.Rules);
             return copy;

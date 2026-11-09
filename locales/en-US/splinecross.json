@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Cant start",
+  "inspector.field.cant_end": "Cant end",
+  "inspector.field.skew_start": "Skew start",
+  "inspector.field.skew_end": "Skew end",
+  "inspector.cant.tooltip": "How much the road rises or falls across its width, in percent. Positive values lower the right side, as on a right-hand bend. A cant given at a joined end goes to the spline joined there too.",
+  "inspector.skew.tooltip": "Shifts the cross-section along the spline by this many metres per metre out from the centre line, for mitred corners: where two splines meet at a corner, one ends with the skew the other starts with, with the opposite sign. Only this spline changes.",
+  "inspector.name.cant_start": "Cant at start",
+  "inspector.name.cant_end": "Cant at end",
+  "inspector.name.skew_start": "Skew at start",
+  "inspector.name.skew_end": "Skew at end",
+  "inspector.apply_cross": "Apply cant and skew",
+  "inspector.apply_cross.tooltip": "Writes the cant and skew of this spline; a changed cant is given to the splines joined at those ends.",
+  "readonly.action.spline_cross": "change spline cant and skew",
+  "spline.cross.failed": "The cant and skew of spline #{id} could not be changed: {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "The cant and skew of spline #{id} are unchanged.",
+  "spline.cross.changed": "Changed the cant and skew of spline #{id}{hasJoined, select, yes { and {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Ctrl+Z takes it back.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}

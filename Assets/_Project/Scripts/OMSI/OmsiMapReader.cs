@@ -438,6 +438,17 @@ namespace OmsiMapEditor.OMSI
             };
             // The chain offset is the last number: field 15 in versions 11 and 12, 17 from 14 on, one later in [spline_h].
             var last = record.IsMirrored ? section.FieldCount - 2 : section.FieldCount - 1;
+            var shift = isSplineH ? 1 : 0;
+            if (last >= 15 + shift && TryDouble(values, 13 + shift, out var cantStart) && TryDouble(values, 14 + shift, out var cantEnd))
+            {
+                record.CantStartPercent = cantStart;
+                record.CantEndPercent = cantEnd;
+            }
+            if (last >= 17 + shift && TryDouble(values, 15 + shift, out var skewStart) && TryDouble(values, 16 + shift, out var skewEnd))
+            {
+                record.SkewStart = skewStart;
+                record.SkewEnd = skewEnd;
+            }
             if (last >= (isSplineH ? 16 : 15) && TryDouble(values, last, out var chainOffset))
                 record.ChainOffset = chainOffset;
             return true;

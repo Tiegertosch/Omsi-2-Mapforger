@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Sobrel. ini.",
+  "inspector.field.cant_end": "Sobrel. fim",
+  "inspector.field.skew_start": "Skew ini.",
+  "inspector.field.skew_end": "Skew fim",
+  "inspector.cant.tooltip": "Quanto a estrada sobe ou desce ao longo da largura, em percentagem. Um valor positivo baixa o lado direito, como numa curva à direita. Uma sobrelevação dada a uma extremidade ligada passa também ao spline ligado aí.",
+  "inspector.skew.tooltip": "Desloca a secção ao longo do spline estes metros por cada metro de distância ao eixo, para esquinas em meia-esquadria: onde dois splines se encontram numa esquina, um termina com o skew com que o outro começa, com sinal oposto. Só este spline muda.",
+  "inspector.name.cant_start": "Sobrelevação no início",
+  "inspector.name.cant_end": "Sobrelevação no fim",
+  "inspector.name.skew_start": "Skew no início",
+  "inspector.name.skew_end": "Skew no fim",
+  "inspector.apply_cross": "Aplicar sobrelevação e skew",
+  "inspector.apply_cross.tooltip": "Escreve a sobrelevação e o skew deste spline; uma sobrelevação alterada passa aos splines ligados nessas extremidades.",
+  "readonly.action.spline_cross": "alterar a sobrelevação e o skew do spline",
+  "spline.cross.failed": "Não foi possível alterar a sobrelevação e o skew do spline #{id}: {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "A sobrelevação e o skew do spline #{id} não mudaram.",
+  "spline.cross.changed": "Sobrelevação e skew do spline #{id} alterados{hasJoined, select, yes { e {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Ctrl+Z anula.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}

@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Peralte ini.",
+  "inspector.field.cant_end": "Peralte fin",
+  "inspector.field.skew_start": "Skew ini.",
+  "inspector.field.skew_end": "Skew fin",
+  "inspector.cant.tooltip": "Cuánto sube o baja la calzada a lo ancho, en porcentaje. Un valor positivo baja el lado derecho, como en una curva a la derecha. Un peralte dado en un extremo unido pasa también al spline unido allí.",
+  "inspector.skew.tooltip": "Desplaza la sección a lo largo del spline estos metros por cada metro de distancia al eje, para esquinas en inglete: donde dos splines se encuentran en una esquina, uno acaba con el skew con el que empieza el otro, con signo contrario. Solo cambia este spline.",
+  "inspector.name.cant_start": "Peralte al inicio",
+  "inspector.name.cant_end": "Peralte al final",
+  "inspector.name.skew_start": "Skew al inicio",
+  "inspector.name.skew_end": "Skew al final",
+  "inspector.apply_cross": "Aplicar peralte y skew",
+  "inspector.apply_cross.tooltip": "Escribe el peralte y el skew de este spline; un peralte cambiado pasa a los splines unidos en esos extremos.",
+  "readonly.action.spline_cross": "cambiar el peralte y el skew del spline",
+  "spline.cross.failed": "No se pudieron cambiar el peralte y el skew del spline #{id}: {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "El peralte y el skew del spline #{id} no han cambiado.",
+  "spline.cross.changed": "Peralte y skew del spline #{id} cambiados{hasJoined, select, yes { y {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Ctrl+Z lo deshace.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}

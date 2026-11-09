@@ -212,6 +212,22 @@ namespace OmsiMapEditor.OMSI
         public double GradientEndPercent { get; internal set; }
 
         /// <summary>
+        /// Cant at the start and the end in percent: how much the cross-section rises or falls per metre across the road, positive
+        /// lowering the right side, changing evenly along the spline (fields 13 and 14).
+        /// </summary>
+        public double CantStartPercent { get; internal set; }
+
+        public double CantEndPercent { get; internal set; }
+
+        /// <summary>
+        /// Skew at the start and the end (tile version 14 on, else null): a cross-section at a metre out from the centre is shifted along the
+        /// spline by that many metres times the skew, so two splines meeting at a corner can mitre there.
+        /// </summary>
+        public double? SkewStart { get; internal set; }
+
+        public double? SkewEnd { get; internal set; }
+
+        /// <summary>
         /// The height after <paramref name="distance"/> metres: the start height plus the gradient running evenly from
         /// start to end, corrected evenly so the end has <see cref="EndHeight"/>, as [spline_h] states it directly.
         /// </summary>

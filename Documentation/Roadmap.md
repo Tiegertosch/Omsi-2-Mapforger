@@ -159,6 +159,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Fenster „Satellite and terrain“ in vier Reitern nach Aufgabe: Place, Pictures, Terrain, More (ADR 063)
   - [x] Volle Luftbilder beim Zoomen ohne Ruckeln (ADR 062): komprimierte Kopie im Zwischenspeicher mit 2-GB-Grenze (beim Laden der Bilder auf Arbeitsfäden berechnet, `OmsiDxt`), Texturen länger behalten
   - [x] Genaue Verortung klassischer Karten (ADR 061, Wunsch aus der Rückmeldung zu 1.0): Bezugspunkt, Koordinaten einfügen, Maßstab, Verschieben, Zwei-Punkt-Passung, geladene Bilder folgen sofort; wartet auf den Nutzertest. Offen: neue Karten mit Koordinaten im Dialog „New map“ anlegen (`[worldcoordinates]`)
+  - [x] Querneigung und Skew von Splines im Inspector (ADR 072)
   - [x] Zufällige Ausrichtung beim Platzieren, Einfügen und für die Auswahl (ADR 071)
   - [x] Objekte kopieren und einfügen (ADR 070): Strg+C, Strg+V mit Vorschau am Zeiger, Strg+D; Beschriftungen, Pitch, Bank, Regeln und angehängte Objekte kommen mit, ein Rückgängig-Schritt, alles oder nichts
   - [x] Ausreißer in den Höhen entfernen und Wasser einebnen (ADR 069): Median gegen einzelne Pixel, Wasserflächen und Küstenlinien aus OpenStreetMap als Maske, ein Wasserspiegel je Gewässer aus den Ufern, Bett 1,5 m darunter; Kontrollkästchen „Level water“

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Roads
+
+- **Cant and skew of a spline.** The inspector of a selected spline shows the cant (banking across the road, in percent) and, in tiles of version 14 and later, the skew at its start and end, and changes them in one undo step. A cant given at a joined end goes to the spline joined there too, so the road stays level across the joint.
+
 ### Objects
 
 - **Random heading.** Tick *Random heading* in the Objects tool and every object you put down, and every object of a pasted group, gets a heading of its own; with several objects selected, *Randomize headings* in the inspector turns each to a new random heading in one undo step. Trees and bushes look more natural that way.

@@ -1142,3 +1142,19 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Nur die Ausrichtung wird gewürfelt, nicht Pitch, Bank oder Größe (OMSI kennt keine Skalierung). Reihen längs Straßen haben ihre eigene Ausrichtung nach der Straße und werden nicht gewürfelt.
 
 **Prüfung:** `OmsiRoadTests.ARandomTurnPerObjectChangesOnlyTheHeadingsOfAPastedGroup` (Zufallswerte ändern nur die Ausrichtungen, Länge muss passen); Player an Grundorf: Bäume mit `-randomHeading 7` platziert, eingefügt und gewürfelt.
+
+## ADR 072: Querneigung und Skew von Splines im Inspector
+
+**Status:** Angenommen, 9. November 2026 (schließt „Querneigung / Cant bearbeiten“ und „Spline-Skew bearbeiten“ der Feature-Parity-Liste).
+
+**Format (aus openOMSI, `crates/omsi-geometry/src/lib.rs`, `SplineCurve`):** Die Querneigung (Felder 13 und 14, in `[spline_h]` 14 und 15) ist ein **Prozentwert**: Anstieg quer je Meter. Ein Punkt `x` Meter rechts der Mittellinie liegt um `-x · Querneigung / 100` höher, also senkt ein positiver Wert die rechte Seite wie in einer Rechtskurve; sie wirkt nur bis zur halben Neigungsbreite des Splinetyps (`[halfcantwidth]` der `.sli`, sonst 10 m). Sie verläuft linear von Anfang zu Ende. Der Skew (Felder 15 und 16, ab Kachelversion 14) verschiebt den Querschnitt im Abstand `x` von der Mittellinie um `x · Skew` längs des Splines, linear von Anfang zu Ende; er dient Gehrungsecken (ein Zaun, der um 90° abbiegt, endet mit Skew 1, der nächste beginnt mit −1).
+
+**Entscheidung:**
+- **Lesen:** `OmsiSplineRecord` hat `CantStartPercent`, `CantEndPercent` und `SkewStart`, `SkewEnd` (null vor Version 14); der Leser nimmt sie nach der Feldzahl, nicht nach der Kachelversion.
+- **Planen:** `OmsiSplineEditing.PlanCross` (`OmsiSplineCross.cs`) gibt die Querneigung eines geänderten Endes an den dort verbundenen Spline weiter (`Neighbour`, wie bei den Höhen): derselbe Wert, wenn beide in gleicher Richtung weiterlaufen, der negierte, wenn sie Ende an Ende oder Anfang an Anfang aufeinandertreffen (ihre rechten Seiten liegen dann an gegenüberliegenden Rändern der Straße). Den Skew behält nur der Spline selbst: Wie er am Nachbarn weitergeht, hängt vom Winkel der Ecke ab. Querneigung über 12 % wird gemeldet. Die Stetigkeit der Querneigung zwischen verbundenen Splines (1.436 von 1.438 in Berlin-Spandau) bleibt so erhalten.
+- **Schreiben:** `OmsiMapSession.UpdateSplineCross` schreibt nur diese Felder (alles andere bleibt, auch die Kette und Reihen), ein Rückgängig-Schritt über Dateistände wie `UpdateSplines`; nichts, wenn die Werte schon so stehen.
+- **Oberfläche:** Im Inspector eines gewählten Splines unter den Höhen: „Cant start/end“ (Prozent, im Tooltip erklärt), bei Kacheln ab Version 14 „Skew start/end“ und „Apply cant and skew“ (`EditorShellSplineCross.cs`); nur in der Basiskarte (nicht in Chrono-Varianten). Kommandozeile `-splineCant Anfang Ende [SkewAnfang SkewEnde]` mit `-selectSpline`; „Spline cross:“ im Player-Log.
+
+**Grenzen:** Die Ansicht zeigt die Querneigung nicht (Draufsicht und 3D zeichnen die Straße ohne sie); Straßen, die der Editor baut, haben Querneigung und Skew 0. Der Straßenplaner setzt sie nicht. Das Terrain unter einer Straße folgt der Querneigung nicht.
+
+**Prüfung:** `OmsiRoadTests.CantAtAJoinedEndGoesToTheSplineJoinedThereAndUndoRestoresTheFile` (Weitergabe an den Nachbarn, Stetigkeit, Warnung, kein Schreiben ohne Änderung, Rückgängig stellt die Datei byteidentisch her, Wiederholen), `SkewIsOnlyThatOfTheSplineAndOnlyWhereTheTileHasIt`.

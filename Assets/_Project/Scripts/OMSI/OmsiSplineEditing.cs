@@ -52,7 +52,7 @@ namespace OmsiMapEditor.OMSI
     /// Heights stay at both ends of each spline and run evenly in between. Kinks where a changed spline meets another are
     /// reported.
     /// </summary>
-    public static class OmsiSplineEditing
+    public static partial class OmsiSplineEditing
     {
         /// <summary>Headings closer than this meet without a kink.</summary>
         private const double KinkToleranceDegrees = 2.0;

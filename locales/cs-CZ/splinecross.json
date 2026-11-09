@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Sklon od",
+  "inspector.field.cant_end": "Sklon do",
+  "inspector.field.skew_start": "Skew od",
+  "inspector.field.skew_end": "Skew do",
+  "inspector.cant.tooltip": "O kolik silnice po šířce stoupá nebo klesá, v procentech. Kladná hodnota snižuje pravou stranu, jako v pravotočivé zatáčce. Sklon zadaný na spojeném konci se předá i splinu spojenému tam.",
+  "inspector.skew.tooltip": "Posune průřez podél splinu o tolik metrů na každý metr vzdálenosti od osy, pro rohy na pokos: kde se dva spliny potkají v rohu, jeden končí skewem, kterým druhý začíná, s opačným znaménkem. Mění se jen tento spline.",
+  "inspector.name.cant_start": "Příčný sklon na začátku",
+  "inspector.name.cant_end": "Příčný sklon na konci",
+  "inspector.name.skew_start": "Skew na začátku",
+  "inspector.name.skew_end": "Skew na konci",
+  "inspector.apply_cross": "Použít příčný sklon a skew",
+  "inspector.apply_cross.tooltip": "Zapíše příčný sklon a skew tohoto splinu; změněný sklon se předá splinům spojeným na těchto koncích.",
+  "readonly.action.spline_cross": "změnit příčný sklon a skew splinu",
+  "spline.cross.failed": "Příčný sklon a skew splinu #{id} se nepodařilo změnit: {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "Příčný sklon a skew splinu #{id} zůstaly beze změny.",
+  "spline.cross.changed": "Příčný sklon a skew splinu #{id} změněny{hasJoined, select, yes { a {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Ctrl+Z to vrátí zpět.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}

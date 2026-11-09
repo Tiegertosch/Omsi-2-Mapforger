@@ -3154,6 +3154,67 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void CantAtAJoinedEndGoesToTheSplineJoinedThereAndUndoRestoresTheFile()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 150, 1.0);
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 190, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2, MaximumPieceLength = 20
+            }, null), @"Splines\road.sli", end, null);
+            var tileBefore = session.Workspace.ReadAllBytes("tile_0_0.map");
+            var tile = summary.Tiles[0];
+            var spline10 = tile.Splines.Single(spline => spline.Id == 10);
+            var first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+
+            // The end of spline 10 is joined to the first new piece, which therefore starts with the same cant.
+            var plan = OmsiSplineEditing.PlanCross(summary, tile, spline10, spline10.CantStartPercent, 4.0, null, null);
+            Assert.IsFalse(plan.HasErrors);
+            Assert.AreEqual(2, plan.Splines.Count);
+            var change = session.UpdateSplineCross(summary, plan.Splines);
+            Assert.IsNotNull(change);
+            spline10 = tile.Splines.Single(spline => spline.Id == 10);
+            first = tile.Splines.Single(spline => spline.Id == first.Id);
+            Assert.AreEqual(4.0, spline10.CantEndPercent, 1e-9);
+            Assert.AreEqual(4.0, first.CantStartPercent, 1e-9);
+            Assert.AreEqual(0.0, first.CantEndPercent, 1e-9);
+            var continuity = OmsiSplineContinuity.Check(session.Read());
+            Assert.AreEqual(continuity.LinkCount, continuity.ConnectedCount);
+            Assert.IsNull(session.UpdateSplineCross(summary, OmsiSplineEditing.PlanCross(summary, tile, spline10, spline10.CantStartPercent, 4.0, null, null).Splines),
+                "Writing the values it already has changes nothing.");
+
+            var steep = OmsiSplineEditing.PlanCross(summary, tile, first, 4.0, 20.0, null, null);
+            Assert.That(steep.Issues.Select(issue => issue.Message), Has.Some.Contains("steeper than 12 %"));
+            Assert.IsTrue(OmsiSplineEditing.PlanCross(summary, tile, first, double.NaN, 0.0, null, null).HasErrors);
+
+            session.Undo(summary, change);
+            CollectionAssert.AreEqual(tileBefore, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            Assert.AreEqual(0.0, tile.Splines.Single(spline => spline.Id == 10).CantEndPercent, 1e-9);
+            session.Redo(summary, change);
+            Assert.AreEqual(4.0, tile.Splines.Single(spline => spline.Id == first.Id).CantStartPercent, 1e-9);
+        }
+
+        [Test]
+        public void SkewIsOnlyThatOfTheSplineAndOnlyWhereTheTileHasIt()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var spline10 = tile.Splines.Single(spline => spline.Id == 10);
+            if (!spline10.SkewStart.HasValue)
+                Assert.Pass("The sample tile is older than version 14 and has no skew.");
+
+            var plan = OmsiSplineEditing.PlanCross(summary, tile, spline10, spline10.CantStartPercent, spline10.CantEndPercent, 1.0, -1.0);
+            Assert.AreEqual(1, plan.Splines.Count, "Skew is not carried to a neighbour.");
+            session.UpdateSplineCross(summary, plan.Splines);
+            spline10 = tile.Splines.Single(spline => spline.Id == 10);
+            Assert.AreEqual(1.0, spline10.SkewStart.Value, 1e-9);
+            Assert.AreEqual(-1.0, spline10.SkewEnd.Value, 1e-9);
+        }
+
+        [Test]
         public void ChangingTheHeightOfAFreeEndKeepsTheGradientAtTheJoinedOtherEnd()
         {
             var session = OpenProject();

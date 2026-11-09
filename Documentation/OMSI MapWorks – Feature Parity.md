@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 73 · Teilweise 18 · Prüfen 0 · Offen 25 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 75 · Teilweise 18 · Prüfen 0 · Offen 23 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -41,8 +41,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Spline-Länge und Radius einstellen — Vorhanden
 - [x] Spline-Anfangs- und Endhöhe bearbeiten — Vorhanden
 - [x] Steigung am Anfang und Ende bearbeiten — Vorhanden
-- [ ] Querneigung / Cant bearbeiten — Offen (bleibt erhalten, ist nicht einstellbar)
-- [ ] Spline-Skew bearbeiten — Offen (bleibt erhalten, ist nicht einstellbar)
+- [x] Querneigung / Cant bearbeiten — Vorhanden (Inspector eines Splines, wirkt auf den verbundenen Nachbarn; seit 9. November 2026)
+- [x] Spline-Skew bearbeiten — Vorhanden (Inspector eines Splines, ab Kachelversion 14; seit 9. November 2026)
 - [ ] Spline-Mirroring verwenden — Teilweise
 - [ ] Spline-Texturversatz bearbeiten — Teilweise (der Kettenabstand wird automatisch gepflegt, nicht von Hand)
 - [x] Splines automatisch verbinden — Vorhanden

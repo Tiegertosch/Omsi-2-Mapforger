@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Przech. od",
+  "inspector.field.cant_end": "Przech. do",
+  "inspector.field.skew_start": "Skew od",
+  "inspector.field.skew_end": "Skew do",
+  "inspector.cant.tooltip": "O ile droga wznosi się lub opada na szerokość, w procentach. Wartość dodatnia obniża prawą stronę, jak w łuku w prawo. Przechyłka podana na połączonym końcu trafia też do splajnu połączonego w tym miejscu.",
+  "inspector.skew.tooltip": "Przesuwa przekrój wzdłuż splajnu o tyle metrów na każdy metr odległości od osi, dla narożników ściętych ukośnie: gdy dwa splajny spotykają się w narożniku, jeden kończy się skew, od którego zaczyna drugi, z przeciwnym znakiem. Zmienia się tylko ten splajn.",
+  "inspector.name.cant_start": "Przechyłka na początku",
+  "inspector.name.cant_end": "Przechyłka na końcu",
+  "inspector.name.skew_start": "Skew na początku",
+  "inspector.name.skew_end": "Skew na końcu",
+  "inspector.apply_cross": "Zastosuj przechyłkę i skew",
+  "inspector.apply_cross.tooltip": "Zapisuje przechyłkę i skew tego splajnu; zmieniona przechyłka trafia do splajnów połączonych na tych końcach.",
+  "readonly.action.spline_cross": "zmień przechyłkę i skew splajnu",
+  "spline.cross.failed": "Nie udało się zmienić przechyłki i skew splajnu #{id}: {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "Przechyłka i skew splajnu #{id} bez zmian.",
+  "spline.cross.changed": "Zmieniono przechyłkę i skew splajnu #{id}{hasJoined, select, yes { oraz {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Ctrl+Z to cofa.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}

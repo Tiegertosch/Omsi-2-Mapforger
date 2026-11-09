@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Neigung von",
+  "inspector.field.cant_end": "Neigung bis",
+  "inspector.field.skew_start": "Skew von",
+  "inspector.field.skew_end": "Skew bis",
+  "inspector.cant.tooltip": "Wie stark die Straße über ihre Breite ansteigt oder fällt, in Prozent. Positive Werte senken die rechte Seite, wie in einer Rechtskurve. Eine Querneigung an einem verbundenen Ende geht auch an den dort verbundenen Spline.",
+  "inspector.skew.tooltip": "Verschiebt den Querschnitt längs des Splines um so viele Meter je Meter Abstand von der Mittellinie, für Gehrungsecken: Treffen zwei Splines an einer Ecke, endet der eine mit dem Skew, mit dem der andere beginnt, nur mit umgekehrtem Vorzeichen. Es ändert sich nur dieser Spline.",
+  "inspector.name.cant_start": "Querneigung am Anfang",
+  "inspector.name.cant_end": "Querneigung am Ende",
+  "inspector.name.skew_start": "Skew am Anfang",
+  "inspector.name.skew_end": "Skew am Ende",
+  "inspector.apply_cross": "Querneigung und Skew übernehmen",
+  "inspector.apply_cross.tooltip": "Schreibt Querneigung und Skew dieses Splines; eine geänderte Querneigung geht an die Splines, die an diesen Enden verbunden sind.",
+  "readonly.action.spline_cross": "Querneigung und Skew von Splines zu ändern",
+  "spline.cross.failed": "Querneigung und Skew von Spline #{id} ließen sich nicht ändern: {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "Querneigung und Skew von Spline #{id} sind unverändert.",
+  "spline.cross.changed": "Querneigung und Skew von Spline #{id} geändert{hasJoined, select, yes { und {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Strg+Z nimmt es zurück.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}

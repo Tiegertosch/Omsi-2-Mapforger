@@ -1,0 +1,20 @@
+{
+  "inspector.field.cant_start": "Dévers déb.",
+  "inspector.field.cant_end": "Dévers fin",
+  "inspector.field.skew_start": "Skew déb.",
+  "inspector.field.skew_end": "Skew fin",
+  "inspector.cant.tooltip": "De combien la route monte ou descend sur sa largeur, en pourcentage. Une valeur positive abaisse le côté droit, comme dans un virage à droite. Un dévers donné à une extrémité reliée va aussi au spline relié.",
+  "inspector.skew.tooltip": "Décale la section le long du spline de ce nombre de mètres par mètre d'écart à l'axe, pour les coins en biseau : là où deux splines se rejoignent à un coin, l'un finit avec le skew par lequel l'autre commence, avec le signe opposé. Seul ce spline change.",
+  "inspector.name.cant_start": "Dévers au début",
+  "inspector.name.cant_end": "Dévers à la fin",
+  "inspector.name.skew_start": "Skew au début",
+  "inspector.name.skew_end": "Skew à la fin",
+  "inspector.apply_cross": "Appliquer dévers et skew",
+  "inspector.apply_cross.tooltip": "Écrit le dévers et le skew de ce spline ; un dévers modifié est donné aux splines reliés à ces extrémités.",
+  "readonly.action.spline_cross": "modifier le dévers et le skew du spline",
+  "spline.cross.failed": "Le dévers et le skew du spline #{id} n'ont pas pu être modifiés : {failure}",
+  "@spline.cross.failed": "{failure} is a message of MapWorks in English",
+  "spline.cross.unchanged": "Le dévers et le skew du spline #{id} sont inchangés.",
+  "spline.cross.changed": "Dévers et skew du spline #{id} modifiés{hasJoined, select, yes { et {joined}} other {}}{hasWarnings, select, yes {; {warnings}} other {.}} Ctrl+Z l'annule.",
+  "@spline.cross.changed": "{joined} lists the other splines changed, {warnings} are messages of MapWorks in English"
+}
