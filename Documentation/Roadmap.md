@@ -163,6 +163,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Inspector überarbeitet: Reiter „Selection“/„Tile“, Gruppen mit Merkzustand, kompakte Zeilen, feste Knopfleiste (ADR 077)
   - [x] Project-Fenster überarbeitet: Reiter Tiles (mit Filter), Map, Chrono, Lines, Paths; der gewählte Reiter bleibt beim Neuaufbau (ADR 078)
   - [x] Einstiegspunkte erstellen, umbenennen und löschen: Reiter „Entries“, Klick in die Karte, Gruppe im Inspector (ADR 079)
+  - [x] Reihen folgen der Steigung und Querneigung der Straße: Option „Follow slope“ im Rows-Werkzeug, Kippflag der Reihen (ADR 080)
   - [x] Erster und letzter Tag einer Chrono-Variante nachträglich ändern (ADR 075)
   - [x] Spiegelung und Texturversatz von Splines im Inspector (ADR 074)
   - [x] Überholverbot als Pfadregel im Inspector (ADR 073)

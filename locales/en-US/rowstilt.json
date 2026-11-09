@@ -1,0 +1,4 @@
+{
+  "rows.tilt": "Follow slope",
+  "rows.tilt.tooltip": "The objects lie in the road's surface: they tilt with its gradient and cant instead of standing upright. For parking spaces, surface markings and rails; posts and lamps stand better without."
+}

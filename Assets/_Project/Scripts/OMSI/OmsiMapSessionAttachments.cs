@@ -344,7 +344,7 @@ namespace OmsiMapEditor.OMSI
             throw new InvalidOperationException("Row " + record.Id + " was not found in " + tile.FileName + ".");
         }
 
-        /// <summary>Writes a row's values into its record; the detail level, pitch, bank, tilt and texts stay.</summary>
+        /// <summary>Writes a row's values into its record; the detail level, pitch, bank and texts stay.</summary>
         private static void Write(OmsiSplineAttachmentView view, OmsiSplineAttachmentRecord record)
         {
             view.AssetPath = record.AssetPath;
@@ -355,6 +355,7 @@ namespace OmsiMapEditor.OMSI
             view.HeadingDegrees = record.HeadingDegrees;
             view.Interval = record.Interval;
             view.Range = record.Range;
+            view.TiltFlag = record.Tilt ? 1 : 0;
         }
 
         /// <summary>
@@ -389,7 +390,8 @@ namespace OmsiMapEditor.OMSI
                 change.Added.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>(part.Tile, new OmsiSplineAttachmentRecord
                 {
                     AssetPath = view.AssetPath, Id = view.Id, SplineIndex = view.SplineIndex, LateralOffset = view.LateralOffset, Height = view.Height,
-                    StartDistance = view.StartDistance, HeadingDegrees = view.HeadingDegrees, Interval = view.Interval, Range = view.Range
+                    StartDistance = view.StartDistance, HeadingDegrees = view.HeadingDegrees, Interval = view.Interval, Range = view.Range,
+                    Tilt = view.TiltFlag != 0
                 }));
             }
             var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);

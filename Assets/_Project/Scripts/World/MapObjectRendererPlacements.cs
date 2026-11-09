@@ -298,6 +298,8 @@ namespace OmsiMapEditor.World
                 snapshot.Add(placed.WorldY);
                 snapshot.Add(placed.Height);
                 snapshot.Add(placed.HeadingDegrees);
+                snapshot.Add(placed.PitchDegrees);
+                snapshot.Add(placed.BankDegrees);
             }
         }
 
@@ -323,6 +325,8 @@ namespace OmsiMapEditor.World
                     snapshot.Add(spline.EndHeight);
                     snapshot.Add(spline.GradientStartPercent);
                     snapshot.Add(spline.GradientEndPercent);
+                    snapshot.Add(spline.CantStartPercent);
+                    snapshot.Add(spline.CantEndPercent);
                     snapshot.Add(spline.HeadingDegrees);
                     snapshot.Add(spline.LengthMeters);
                     snapshot.Add(spline.RadiusMeters);
@@ -344,6 +348,7 @@ namespace OmsiMapEditor.World
                     snapshot.Add(row.Interval);
                     snapshot.Add(row.Range);
                     snapshot.Add(row.IsRepeater ? 1 : 0);
+                    snapshot.Add(row.Tilt ? 1 : 0);
                 }
             }
         }
@@ -440,7 +445,7 @@ namespace OmsiMapEditor.World
                         continue;
                     var placed = first.Value.Value;
                     var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
-                    var frame = Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one);
+                    var frame = Matrix4x4.TRS(position, RowOrientation(placed), Vector3.one);
                     framesById[first.Key] = new KeyValuePair<Matrix4x4, OmsiObjectModel>(frame, rowKind.Model);
                     RememberAttachParent(placements, first.Key, first.Value.Key, frame, rowKind.Model);
                 }
@@ -481,7 +486,7 @@ namespace OmsiMapEditor.World
                         continue;
                     var placed = row.Value;
                     var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
-                    Add(SegmentOf(placements, kind, true), Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one));
+                    Add(SegmentOf(placements, kind, true), Matrix4x4.TRS(position, RowOrientation(placed), Vector3.one));
                 }
             }
         }

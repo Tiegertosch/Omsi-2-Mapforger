@@ -472,7 +472,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = record.AssetPath, Id = record.Id, SplineIndex = splineIndex, LateralOffset = record.LateralOffset, Height = record.Height,
                 StartDistance = record.StartDistance, HeadingDegrees = record.HeadingDegrees, Interval = record.Interval, Range = record.Range,
-                IsRepeater = record.IsRepeater
+                IsRepeater = record.IsRepeater, Tilt = record.Tilt
             };
         }
 
@@ -527,7 +527,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = record.AssetPath, Id = record.Id, SplineIndex = record.SplineIndex, LateralOffset = record.LateralOffset,
                 Height = record.Height, StartDistance = record.StartDistance, HeadingDegrees = record.HeadingDegrees, Interval = record.Interval,
-                Range = record.Range, IsRepeater = record.IsRepeater
+                Range = record.Range, IsRepeater = record.IsRepeater, Tilt = record.Tilt
             };
         }
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Roads
+
+- **Rows follow the slope.** The Rows tool has a *Follow slope* option: the objects of the row lie in the surface of the road, tilted by its gradient and cant, instead of standing upright. It suits parking spaces, surface markings and rails; posts and lamps are better without. It can be switched for a selected row, and the editor shows the tilt.
+
 ### Entry points
 
 - **Make, rename and delete entry points.** The project browser has an *Entries* tab that lists the entry points of the map, selects the object one stands on when you click it, and puts a new one down: type a name, press *Place entry point* and click in the map (Shift+click for several, R turns it). The inspector of an entry point's object renames it (the name is kept in global.cfg and as the object's label, as OMSI does) and deletes it together with its object, as one undo step. A map keeps at least one entry point. *Revert tile edits* now also takes away an entry point made in that tile. Entry points show the see-through box of the bus in the view from above and in 3D, not only their outline. So do all the other objects whose model is meant for the editor alone (bus stop markers, car parks, sound fields): the editor draws what OMSI's own editor draws.

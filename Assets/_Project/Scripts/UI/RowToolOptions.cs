@@ -22,10 +22,13 @@ namespace OmsiMapEditor.UI
         private readonly TextField headingField;
         private readonly Toggle bothSidesToggle;
         private readonly Toggle wholeRoadToggle;
+        private readonly Toggle tiltToggle;
         private readonly Label planLabel;
 
         /// <summary>The laying values of the fields while a selected row's values are shown; null otherwise.</summary>
         private string[] laying;
+
+        private bool layingTilt;
 
         public RowToolOptions()
         {
@@ -56,6 +59,19 @@ namespace OmsiMapEditor.UI
             wholeRoadToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             Row("rows.whole").Add(wholeRoadToggle);
 
+            tiltToggle = new Toggle();
+            LocBindings.Tooltip(tiltToggle, "rows.tilt.tooltip");
+            tiltToggle.AddToClassList("picker-option-toggle");
+            // A selected row changes at once; the laying values only plan the next row again.
+            tiltToggle.RegisterValueChangedCallback(_ =>
+            {
+                if (IsEditing)
+                    Committed?.Invoke();
+                else
+                    SettingsChanged?.Invoke();
+            });
+            Row("rows.tilt").Add(tiltToggle);
+
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
             Add(planLabel);
@@ -83,6 +99,15 @@ namespace OmsiMapEditor.UI
         public bool BothSides => bothSidesToggle.value;
         public bool WholeRoad => wholeRoadToggle.value;
 
+        /// <summary>The objects follow the gradient and cant of the road.</summary>
+        public bool Tilt => tiltToggle.value;
+
+        /// <summary>Sets the tilt as a user would; for command-line checks.</summary>
+        public void SetTilt(bool tilt)
+        {
+            tiltToggle.value = tilt;
+        }
+
         /// <summary>Turns the objects of the next row by some degrees, as R does while placing.</summary>
         public void TurnBy(double degrees)
         {
@@ -101,9 +126,12 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Shows the values of a selected row; the laying values come back with <see cref="EndEditing"/>.</summary>
-        public void BeginEditing(double interval, double offset, double height, double heading)
+        public void BeginEditing(double interval, double offset, double height, double heading, bool tilt)
         {
+            if (laying == null)
+                layingTilt = tiltToggle.value;
             laying = laying ?? new[] { intervalField.value, offsetField.value, heightField.value, headingField.value };
+            tiltToggle.SetValueWithoutNotify(tilt);
             LocBindings.Text(title, "rows.selected");
             intervalField.SetValueWithoutNotify(Format(interval));
             offsetField.SetValueWithoutNotify(Format(offset));
@@ -121,6 +149,7 @@ namespace OmsiMapEditor.UI
             offsetField.SetValueWithoutNotify(laying[1]);
             heightField.SetValueWithoutNotify(laying[2]);
             headingField.SetValueWithoutNotify(laying[3]);
+            tiltToggle.SetValueWithoutNotify(layingTilt);
             laying = null;
             LocBindings.Text(title, "rows.title");
             bothSidesToggle.SetEnabled(true);

@@ -186,6 +186,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True for [splineAttachement_repeater], which continues a row on another tile.</summary>
         public bool IsRepeater { get; internal set; }
+
+        /// <summary>
+        /// The tilt flag: the objects lie in the road's surface, tilted by its gradient and, within the width the cant acts over, its
+        /// cant, instead of standing upright (openOMSI, <c>place_upto</c> in map_index.rs).
+        /// </summary>
+        public bool Tilt { get; internal set; }
     }
 
     /// <summary>Plan-view curve parameters for one map spline.</summary>

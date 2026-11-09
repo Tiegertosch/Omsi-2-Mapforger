@@ -1,0 +1,4 @@
+{
+  "rows.tilt": "Steigung folgen",
+  "rows.tilt.tooltip": "Die Objekte liegen in der Fahrbahnfläche: Sie neigen sich mit Steigung und Querneigung der Straße, statt senkrecht zu stehen. Für Parkplätze, Fahrbahnmarkierungen und Schienen; Pfosten und Laternen stehen besser ohne."
+}

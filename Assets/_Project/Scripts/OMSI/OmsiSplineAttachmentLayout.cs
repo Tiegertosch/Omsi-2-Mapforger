@@ -19,6 +19,20 @@ namespace OmsiMapEditor.OMSI
         public OmsiSplineRecord Spline;
 
         public double AlongSpline;
+
+        /// <summary>
+        /// The tilt of a row with the tilt flag: the road's frame is turned by this pitch (negative while the road rises, as OMSI's pitch lowers the
+        /// front) and bank (negative while the cant lowers the right side). Both are 0 for rows without the flag.
+        /// </summary>
+        public double PitchDegrees;
+
+        public double BankDegrees;
+
+        /// <summary>
+        /// How far the object is turned in the road's frame, the row's own heading and the half turn of a chain that runs against its spline. Zero
+        /// without the tilt flag, where <see cref="HeadingDegrees"/> alone turns the object upright.
+        /// </summary>
+        public double TurnDegrees;
     }
 
     /// <summary>One spline of a chain as a row counts it: where it begins along the chain and whether the chain runs against it.</summary>
@@ -293,7 +307,7 @@ namespace OmsiMapEditor.OMSI
 
             // To the right of the direction of travel; a mirrored spline turns its cross-section over.
             var offset = record.LateralOffset * (spline.IsMirrored ? -1.0 : 1.0);
-            return new OmsiPlacedAttachment
+            var placed = new OmsiPlacedAttachment
             {
                 WorldX = segment.Tile.X * tileSize + position.X + Math.Cos(heading) * offset,
                 WorldY = segment.Tile.Y * tileSize + position.Y - Math.Sin(heading) * offset,
@@ -302,7 +316,25 @@ namespace OmsiMapEditor.OMSI
                 Spline = spline,
                 AlongSpline = onSpline
             };
+            if (!record.Tilt)
+                return placed;
+
+            // With the tilt flag the objects lie in the road's surface. The frame is the spline's own, also on a chain that runs against it, tilted by
+            // its gradient and cant; the row's heading and the half turn of the reversed chain turn the object inside that frame (openOMSI, place_upto).
+            var turn = record.HeadingDegrees + (segment.Reversed ? 180.0 : 0.0);
+            placed.TurnDegrees = turn;
+            placed.PitchDegrees = -Math.Atan(spline.GradientAtPercent(onSpline) / 100.0) * 180.0 / Math.PI;
+            // The cant acts only over the width of the spline type, 10 m where the type is not known (OMSI's default).
+            if (Math.Abs(record.LateralOffset) < HalfCantWidthMeters)
+            {
+                var cant = spline.CantStartPercent + (spline.CantEndPercent - spline.CantStartPercent) * onSpline / spline.LengthMeters;
+                placed.BankDegrees = -Math.Atan(cant / 100.0) * 180.0 / Math.PI;
+            }
+            return placed;
         }
+
+        /// <summary>Half the width over which the cant tilts the objects of a row.</summary>
+        private const double HalfCantWidthMeters = 10.0;
 
         private OmsiMapPoint WorldPoint(OmsiTileSummary tile, OmsiSplineRecord spline, double distance)
         {

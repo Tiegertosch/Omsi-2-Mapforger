@@ -1452,6 +1452,8 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 SetTool(EditorTool.Rows);
                 rowOptions?.Apply(Array.IndexOf(args, "-rowsBoth") >= 0, Argument("-rowsEvery", 1), Argument("-rowsHeading", 1));
+                if (Array.IndexOf(args, "-rowsTilt") >= 0)
+                    rowOptions?.SetTilt(true);
                 ChooseRowObject(rowsObject);
                 var rowsAt = OmsiMapGeometry.TileLocalToWorld(rowsTileX, rowsTileY, rowsX, rowsY, currentSummary.TileSizeMeters);
                 roadPointer = rowsAt;
@@ -5344,7 +5346,7 @@ namespace OmsiMapEditor.UI
                 var request = new OmsiAttachmentRowRequest
                 {
                     AssetPath = rowAsset, LateralOffset = onRight ? distance : -distance, Height = rowOptions.Height,
-                    HeadingDegrees = rowOptions.HeadingDegrees + (onRight ? 0.0 : 180.0), Interval = rowOptions.Interval
+                    HeadingDegrees = rowOptions.HeadingDegrees + (onRight ? 0.0 : 180.0), Interval = rowOptions.Interval, Tilt = rowOptions.Tilt
                 };
                 plans.Add(OmsiAttachmentRows.Plan(currentSummary, rowLayout, at.Tile, at.Spline, request, from, to));
             }
@@ -5498,7 +5500,7 @@ namespace OmsiMapEditor.UI
             var request = selectedRow.Request;
             var left = request.LateralOffset < 0.0;
             rowOptions.BeginEditing(request.Interval, Math.Abs(request.LateralOffset), request.Height,
-                ((request.HeadingDegrees - (left ? 180.0 : 0.0)) % 360.0 + 360.0) % 360.0);
+                ((request.HeadingDegrees - (left ? 180.0 : 0.0)) % 360.0 + 360.0) % 360.0, request.Tilt);
             rowOptions.ShowObject(request.AssetPath);
         }
 
@@ -5518,7 +5520,8 @@ namespace OmsiMapEditor.UI
             return new OmsiAttachmentRowRequest
             {
                 AssetPath = assetPath ?? row.Request.AssetPath, LateralOffset = left ? -distance : distance, Height = rowOptions.Height,
-                HeadingDegrees = ((rowOptions.HeadingDegrees + (left ? 180.0 : 0.0)) % 360.0 + 360.0) % 360.0, Interval = rowOptions.Interval
+                HeadingDegrees = ((rowOptions.HeadingDegrees + (left ? 180.0 : 0.0)) % 360.0 + 360.0) % 360.0, Interval = rowOptions.Interval,
+                Tilt = rowOptions.Tilt
             };
         }
 

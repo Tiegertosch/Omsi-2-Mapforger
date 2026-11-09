@@ -191,7 +191,7 @@ namespace OmsiMapEditor.OMSI
             {
                 "0", row.AssetPath.Trim(), OmsiNumberFormat.Format(ids.Allocate()), row.SplineIndex.ToString(CultureInfo.InvariantCulture),
                 OmsiNumberFormat.Format(row.LateralOffset), OmsiNumberFormat.Format(row.Height), OmsiNumberFormat.Format(row.StartDistance),
-                OmsiNumberFormat.Format(row.HeadingDegrees), "0", "0", OmsiNumberFormat.Format(row.Interval), OmsiNumberFormat.Format(row.Range), "0", "0"
+                OmsiNumberFormat.Format(row.HeadingDegrees), "0", "0", OmsiNumberFormat.Format(row.Interval), OmsiNumberFormat.Format(row.Range), row.Tilt ? "1" : "0", "0"
             };
             var record = tile.CreateRecord("splineAttachement", fields);
             tile.InsertRecord(tile.Records.Count, record);

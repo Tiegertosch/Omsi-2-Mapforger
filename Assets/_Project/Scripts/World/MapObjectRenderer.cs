@@ -450,7 +450,7 @@ namespace OmsiMapEditor.World
             {
                 var placed = rowPreview[index];
                 var position = new Vector3((float)(placed.WorldX - originX), (float)placed.Height, (float)(placed.WorldY - originY));
-                var frame = Matrix4x4.TRS(position, Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f), Vector3.one);
+                var frame = Matrix4x4.TRS(position, RowOrientation(placed), Vector3.one);
                 rowPreviewInstances[index] = InstanceMatrix(kind.Model, frame);
                 if (kind.CrossMaterial != null)
                     rowPreviewCrossInstances[index] = CrossMatrix(kind.Model, frame);
@@ -1222,6 +1222,17 @@ namespace OmsiMapEditor.World
         public static Quaternion Orientation(double headingDegrees, double pitchDegrees, double bankDegrees)
         {
             return Quaternion.Euler((float)pitchDegrees, (float)headingDegrees, (float)bankDegrees);
+        }
+
+        /// <summary>
+        /// The orientation of an object of a row: upright, turned by its heading; with the tilt flag the road's frame (its direction, tilted by gradient and
+        /// cant) with the object's own turn inside it.
+        /// </summary>
+        internal static Quaternion RowOrientation(OmsiPlacedAttachment placed)
+        {
+            if (placed.PitchDegrees == 0.0 && placed.BankDegrees == 0.0 && placed.TurnDegrees == 0.0)
+                return Quaternion.Euler(0f, (float)placed.HeadingDegrees, 0f);
+            return Orientation(placed.HeadingDegrees - placed.TurnDegrees, placed.PitchDegrees, placed.BankDegrees) * Quaternion.Euler(0f, (float)placed.TurnDegrees, 0f);
         }
 
         /// <summary>Terrain height at a world position, from the tile that contains it; 0 where no terrain was read.</summary>

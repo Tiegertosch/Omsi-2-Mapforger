@@ -18,6 +18,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Distance between objects; 0 places a single object.</summary>
         public double Interval { get; set; } = 25.0;
+
+        /// <summary>The objects follow the gradient and cant of the road (the tilt flag of the record).</summary>
+        public bool Tilt { get; set; }
     }
 
     /// <summary>One [splineAttachement] of a planned row: the objects that fall into one tile, anchored on a spline of it.</summary>
@@ -230,7 +233,7 @@ namespace OmsiMapEditor.OMSI
                 Request = new OmsiAttachmentRowRequest
                 {
                     AssetPath = record.AssetPath, LateralOffset = own.Offset, Height = record.Height, HeadingDegrees = own.Heading,
-                    Interval = Math.Max(0.0, record.Interval)
+                    Interval = Math.Max(0.0, record.Interval), Tilt = record.Tilt
                 }
             };
 
@@ -319,7 +322,7 @@ namespace OmsiMapEditor.OMSI
             {
                 AssetPath = now.AssetPath, Id = record.Id, SplineIndex = record.SplineIndex, LateralOffset = now.LateralOffset, Height = now.Height,
                 StartDistance = record.StartDistance, HeadingDegrees = Normalize360(now.HeadingDegrees), Interval = Math.Max(0.0, now.Interval),
-                Range = record.Range, IsRepeater = record.IsRepeater
+                Range = record.Range, IsRepeater = record.IsRepeater, Tilt = now.Tilt
             };
         }
 
@@ -332,7 +335,7 @@ namespace OmsiMapEditor.OMSI
             if (first == null || second == null)
                 return first == second;
             return string.Equals(first.AssetPath, second.AssetPath, StringComparison.OrdinalIgnoreCase) && Math.Abs(first.LateralOffset - second.LateralOffset) < SameValue &&
-                   Math.Abs(first.Height - second.Height) < SameValue && Math.Abs(first.Interval - second.Interval) < SameValue &&
+                   Math.Abs(first.Height - second.Height) < SameValue && Math.Abs(first.Interval - second.Interval) < SameValue && first.Tilt == second.Tilt &&
                    Math.Abs(Turn(first.HeadingDegrees, second.HeadingDegrees)) < SameValue;
         }
 
@@ -369,7 +372,8 @@ namespace OmsiMapEditor.OMSI
             return new OmsiSplineAttachmentRecord
             {
                 AssetPath = request.AssetPath, SplineIndex = part.SplineIndex, LateralOffset = part.LateralOffset, Height = request.Height,
-                StartDistance = part.StartDistance, HeadingDegrees = part.HeadingDegrees, Interval = Math.Max(0.0, request.Interval), Range = part.Range
+                StartDistance = part.StartDistance, HeadingDegrees = part.HeadingDegrees, Interval = Math.Max(0.0, request.Interval), Range = part.Range,
+                Tilt = request.Tilt
             };
         }
 

@@ -313,7 +313,8 @@ namespace OmsiMapEditor.OMSI
             record = new OmsiSplineAttachmentRecord
             {
                 AssetPath = values[1 + shift], Id = id, SplineIndex = spline, LateralOffset = offset, Height = height,
-                StartDistance = start, HeadingDegrees = heading, Interval = interval, Range = range, IsRepeater = repeater
+                StartDistance = start, HeadingDegrees = heading, Interval = interval, Range = range, IsRepeater = repeater,
+                Tilt = values.Count > 12 + shift && int.TryParse(values[12 + shift], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tilt) && tilt != 0
             };
             return true;
         }
