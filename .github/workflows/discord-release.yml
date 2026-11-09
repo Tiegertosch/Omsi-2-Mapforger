@@ -19,7 +19,6 @@ jobs:
       - name: Send release announcement to Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          GH_EVENT_PATH: ${{ github.event_path }}
           GH_EVENT_NAME: ${{ github.event_name }}
           GH_REPOSITORY: ${{ github.repository }}
 
@@ -34,7 +33,8 @@ jobs:
           DOWNLOAD_URL = "https://omsi-modhub.de/de/mods/mapworks"
 
           # Load GitHub event
-          with open(os.environ["GH_EVENT_PATH"], encoding="utf-8") as f:
+          # The runner sets GITHUB_EVENT_PATH itself; an expression for the event path does not exist and would be empty
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
               event = json.load(f)
 
           release = event.get("release")
