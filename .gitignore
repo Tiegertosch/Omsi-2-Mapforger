@@ -14,6 +14,8 @@
 .idea/
 *.sln
 *.csproj
+# The checker of the language files is a project of ours, not one Unity generates; the workflow in .github needs it.
+!Tools/LocaleCheck/LocaleCheck.csproj
 *.user
 *.suo
 *.userprefs
