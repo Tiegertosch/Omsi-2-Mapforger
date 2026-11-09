@@ -1,0 +1,9 @@
+{
+  "objects.random_heading": "Random heading",
+  "objects.random_heading.tooltip": "Each object you put down gets a heading of its own, and so does each object of a pasted group. The heading field shows the next one. Trees and bushes look more natural this way.",
+  "inspector.randomize_headings": "Randomize headings",
+  "inspector.randomize_headings.tooltip": "Gives each selected object a new random heading, as one undo step. Positions stay as they are.",
+  "random.select_first": "Select objects first.",
+  "random.done": "Gave {count, plural, one {# object} other {# objects}} a new random heading. Ctrl+Z takes it back.",
+  "@random.done": "{count} is how many objects were turned"
+}

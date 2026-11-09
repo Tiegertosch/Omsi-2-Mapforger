@@ -1,0 +1,9 @@
+{
+  "objects.random_heading": "Orientamento casuale",
+  "objects.random_heading.tooltip": "Ogni oggetto che posizioni riceve un orientamento proprio, così come ogni oggetto di un gruppo incollato. Il campo dell'orientamento mostra il prossimo. Alberi e cespugli appaiono così più naturali.",
+  "inspector.randomize_headings": "Orientamenti casuali",
+  "inspector.randomize_headings.tooltip": "Dà a ogni oggetto selezionato un nuovo orientamento casuale, in un solo passo di annullamento. Le posizioni restano invariate.",
+  "random.select_first": "Seleziona prima degli oggetti.",
+  "random.done": "{count, plural, one {# oggetto ha} other {# oggetti hanno}} un nuovo orientamento casuale. Ctrl+Z lo annulla.",
+  "@random.done": "{count} is how many objects were turned"
+}

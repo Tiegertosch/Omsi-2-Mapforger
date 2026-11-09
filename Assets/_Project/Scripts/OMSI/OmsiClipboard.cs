@@ -168,14 +168,18 @@ namespace OmsiMapEditor.OMSI
         /// The copies with the middle of the group put at a world position and the group turned clockwise by an angle about it, the
         /// way the Rotate tool turns a selection: positions swing about the middle, headings turn with it.
         /// </summary>
-        public List<OmsiPasteTarget> PlaceAt(double centreX, double centreY, double rotationDegrees)
+        /// <param name="headingOffsets">Extra turns in degrees, one per item in order, about each object's own centre (a random rotation); null for none.</param>
+        public List<OmsiPasteTarget> PlaceAt(double centreX, double centreY, double rotationDegrees, IReadOnlyList<double> headingOffsets = null)
         {
+            if (headingOffsets != null && headingOffsets.Count != Items.Count)
+                throw new ArgumentException("There must be one heading offset per item.", nameof(headingOffsets));
             var radians = rotationDegrees * Math.PI / 180.0;
             var sin = Math.Sin(radians);
             var cos = Math.Cos(radians);
             var targets = new List<OmsiPasteTarget>(Items.Count);
-            foreach (var item in Items)
+            for (var index = 0; index < Items.Count; index++)
             {
+                var item = Items[index];
                 var x = item.WorldX - CentreX;
                 var y = item.WorldY - CentreY;
                 targets.Add(new OmsiPasteTarget
@@ -183,7 +187,7 @@ namespace OmsiMapEditor.OMSI
                     Item = item,
                     WorldX = centreX + x * cos + y * sin,
                     WorldY = centreY - x * sin + y * cos,
-                    HeadingDegrees = ((item.HeadingDegrees + rotationDegrees) % 360.0 + 360.0) % 360.0
+                    HeadingDegrees = ((item.HeadingDegrees + rotationDegrees + (headingOffsets != null ? headingOffsets[index] : 0.0)) % 360.0 + 360.0) % 360.0
                 });
             }
             return targets;

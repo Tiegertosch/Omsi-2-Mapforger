@@ -1,0 +1,9 @@
+{
+  "objects.random_heading": "Zufällige Ausrichtung",
+  "objects.random_heading.tooltip": "Jedes Objekt, das du setzt, bekommt eine eigene Ausrichtung, ebenso jedes Objekt einer eingefügten Gruppe. Das Feld Ausrichtung zeigt die nächste. Bäume und Büsche wirken so natürlicher.",
+  "inspector.randomize_headings": "Ausrichtungen würfeln",
+  "inspector.randomize_headings.tooltip": "Gibt jedem gewählten Objekt eine neue zufällige Ausrichtung, als ein Rückgängig-Schritt. Die Positionen bleiben.",
+  "random.select_first": "Wähle zuerst Objekte aus.",
+  "random.done": "{count, plural, one {# Objekt hat} other {# Objekte haben}} eine neue zufällige Ausrichtung. Strg+Z nimmt es zurück.",
+  "@random.done": "{count} is how many objects were turned"
+}

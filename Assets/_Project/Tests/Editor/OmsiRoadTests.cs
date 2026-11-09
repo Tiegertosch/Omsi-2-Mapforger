@@ -2351,6 +2351,28 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ARandomTurnPerObjectChangesOnlyTheHeadingsOfAPastedGroup()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var first = session.PlaceObject(summary, tile, @"Sceneryobjects\a.sco", 100, 100, 0, 10).Record;
+            var second = session.PlaceObject(summary, tile, @"Sceneryobjects\b.sco", 110, 100, 0, 350).Record;
+            var data = OmsiClipboardData.Capture(summary, new[] { first, second }.Select(record => new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(tile, record)));
+
+            var plain = data.PlaceAt(200, 200, 90);
+            var random = data.PlaceAt(200, 200, 90, new[] { 45.0, 20.0 });
+            for (var index = 0; index < 2; index++)
+            {
+                Assert.AreEqual(plain[index].WorldX, random[index].WorldX, 1e-9);
+                Assert.AreEqual(plain[index].WorldY, random[index].WorldY, 1e-9);
+            }
+            Assert.AreEqual(145.0, random[0].HeadingDegrees, 1e-9);
+            Assert.AreEqual(100.0, random[1].HeadingDegrees, 1e-9);
+            Assert.Throws<ArgumentException>(() => data.PlaceAt(0, 0, 0, new[] { 1.0 }));
+        }
+
+        [Test]
         public void ObjectsHangOnAttachmentPointsAndGoWithTheirParent()
         {
             var session = OpenProject();

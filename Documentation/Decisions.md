@@ -1128,3 +1128,17 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Reihen längs Straßen und Splines lassen sich nicht kopieren (nur Objekte). Einstiegspunkte, Verweise aus Fahrplan und Chrono und `[varparent]`-Datensätze werden nicht mitkopiert. Einfügen schreibt je Objekt die Kachel und `global.cfg` neu; bei Hunderten Objekten in einer Kachel ist das merklich, aber nicht gemessen.
 
 **Prüfung:** `OmsiRoadTests` (Beschriftungen, Pitch, Bank, Regeln und Anhänge samt Beschriftung werden mit neuen IDs kopiert, `[NextIDCode]` steigt, Rückgängig stellt beide Dateien byteidentisch her, Wiederholen schreibt sie wieder; Einfügen über die Kachelgrenze; ein nicht ausführbares Einfügen schreibt nichts; Gruppe im Uhrzeigersinn und erzeugte Kreuzungen draußen), `OmsiChronoLabelsTests` (in einer Variante ohne Anhänge und Regeln, Basiskarte unverändert). Player an Grundorf: vier Bäume gedreht um 90° eingefügt (#8978–#8981, 1.099 statt 1.095 Objekte), Haltestellenschild #4895 dupliziert (#8982 mit der Beschriftung „Einsteindorf@Krankenhaus“, Linientafel #8983 hängt am neuen Mast).
+
+## ADR 071: Zufällige Ausrichtung beim Platzieren, Einfügen und für die Auswahl
+
+**Status:** Angenommen, 9. November 2026 (schließt „Zufällige Rotation von Objektgruppen“ der Feature-Parity-Liste).
+
+**Entscheidung:**
+- **Option „Random heading“** im Objekte-Werkzeug (Kontrollkästchen unter der Ausrichtung, gespeichert in PlayerPrefs `Mapforge.RandomHeading`, Vorgabe aus). Ist sie an, würfelt der Editor eine Ausrichtung (ganze Zehntelgrad) beim Beginn des Platzierens und nach jedem gesetzten Objekt bei Umschalt+Klick; das Feld „Heading“ und die Vorschau zeigen sie, R dreht trotzdem von Hand weiter. Angehängte Objekte nutzen die gewürfelte Ausrichtung als Drehung zum Anhängepunkt wie sonst die eingegebene; Kreuzungen auf Straßen behalten die Ausrichtung der Straße.
+- **Einfügen:** Jedes Objekt einer Zwischenablage-Gruppe bekommt eine eigene zusätzliche Drehung (`OmsiClipboardData.PlaceAt(…, headingOffsets)`: eigene Ausrichtung + Drehung der Gruppe + Zufallswert); die Positionen bleiben, nur die Ausrichtungen weichen ab. Die Vorschau am Zeiger zeigt dieselben Werte, nach jedem Einfügen mit Umschalt+Klick werden sie neu gewürfelt.
+- **Auswahl:** Der Knopf „Randomize headings“ im Inspector einer Mehrfachauswahl (und `-randomizeHeadings` mit `-select`) gibt jedem gewählten Objekt eine neue zufällige Ausrichtung, über `CommitEdits` als ein Rückgängig-Schritt (auch in Chrono-Varianten als Kopie des Objekts, Positionen und Pitch/Bank bleiben).
+- **Kommandozeile:** `-randomHeading [Startwert]` schaltet die Option nur für diesen Lauf ein (nicht gespeichert; ein Startwert macht die Zahlen wiederholbar); Meldungen als „Random headings:“ im Player-Log.
+
+**Grenzen:** Nur die Ausrichtung wird gewürfelt, nicht Pitch, Bank oder Größe (OMSI kennt keine Skalierung). Reihen längs Straßen haben ihre eigene Ausrichtung nach der Straße und werden nicht gewürfelt.
+
+**Prüfung:** `OmsiRoadTests.ARandomTurnPerObjectChangesOnlyTheHeadingsOfAPastedGroup` (Zufallswerte ändern nur die Ausrichtungen, Länge muss passen); Player an Grundorf: Bäume mit `-randomHeading 7` platziert, eingefügt und gewürfelt.

@@ -1,0 +1,9 @@
+{
+  "objects.random_heading": "Orientação aleatória",
+  "objects.random_heading.tooltip": "Cada objeto que colocar recebe a sua própria orientação, tal como cada objeto de um grupo colado. O campo da orientação mostra a seguinte. Árvores e arbustos parecem assim mais naturais.",
+  "inspector.randomize_headings": "Orientações aleatórias",
+  "inspector.randomize_headings.tooltip": "Dá a cada objeto selecionado uma nova orientação aleatória, num único passo de anulação. As posições mantêm-se.",
+  "random.select_first": "Selecione primeiro objetos.",
+  "random.done": "{count, plural, one {# objeto recebeu} other {# objetos receberam}} uma nova orientação aleatória. Ctrl+Z anula.",
+  "@random.done": "{count} is how many objects were turned"
+}

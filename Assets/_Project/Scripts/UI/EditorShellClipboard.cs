@@ -101,23 +101,34 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.place_objects"));
                 return;
             }
-            var items = new List<PlacementGroupItem>(clipboard.Items.Count);
-            foreach (var item in clipboard.Items)
-                items.Add(new PlacementGroupItem
-                {
-                    Asset = item.AssetPath, OffsetX = item.WorldX - clipboard.CentreX, OffsetY = item.WorldY - clipboard.CentreY, HeadingDegrees = item.HeadingDegrees,
-                    PitchDegrees = item.PitchDegrees, BankDegrees = item.BankDegrees, Height = item.Height, SourceGround = item.SourceGround
-                });
             if (placementAsset != null)
                 StopPlacement();
-            placementAsset = items[0].Asset;
+            RollPasteOffsets();
+            placementAsset = clipboard.Items[0].AssetPath;
             clipboardPlacing = true;
-            mapCanvas.BeginGroupPlacement(items, 0.0);
+            StartPasteGroup(0.0);
             objectsPanel?.ShowHeading(0.0);
             UpdateToolbar();
             mapCanvas.Focus();
             SetStatusT("paste.status.placing", ("count", clipboard.Items.Count), ("attached", clipboard.AttachedCount),
                 ("variant", EditingVariant ? "yes" : "no"));
+        }
+
+        /// <summary>Hands the copies to the canvas to follow the pointer, each with its random turn if the option is on.</summary>
+        private void StartPasteGroup(double turn)
+        {
+            var items = new List<PlacementGroupItem>(clipboard.Items.Count);
+            for (var index = 0; index < clipboard.Items.Count; index++)
+            {
+                var item = clipboard.Items[index];
+                items.Add(new PlacementGroupItem
+                {
+                    Asset = item.AssetPath, OffsetX = item.WorldX - clipboard.CentreX, OffsetY = item.WorldY - clipboard.CentreY,
+                    HeadingDegrees = item.HeadingDegrees + (pasteHeadingOffsets != null ? pasteHeadingOffsets[index] : 0.0),
+                    PitchDegrees = item.PitchDegrees, BankDegrees = item.BankDegrees, Height = item.Height, SourceGround = item.SourceGround
+                });
+            }
+            mapCanvas.BeginGroupPlacement(items, turn);
         }
 
         /// <summary>Draws the copies held at the pointer in their models, each turned with the group.</summary>
@@ -154,9 +165,14 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var size = currentSummary.TileSizeMeters;
-            var targets = clipboard.PlaceAt(placement.Tile.X * size + placement.LocalX, placement.Tile.Y * size + placement.LocalY, mapCanvas.PlacementHeading);
-            if (RunPaste(targets) && !placement.KeepPlacing)
+            var turn = mapCanvas.PlacementHeading;
+            var targets = clipboard.PlaceAt(placement.Tile.X * size + placement.LocalX, placement.Tile.Y * size + placement.LocalY, turn, pasteHeadingOffsets);
+            if (!RunPaste(targets))
+                return;
+            if (!placement.KeepPlacing)
                 StopPlacement();
+            else if (pasteHeadingOffsets != null)
+                RestartPasteGroup(turn);
         }
 
         /// <summary>Ctrl+D: copies the selection and puts the copies a few metres aside, as one step; the clipboard stays as it was.</summary>
@@ -241,7 +257,8 @@ namespace OmsiMapEditor.UI
                 else
                 {
                     var size = currentSummary.TileSizeMeters;
-                    RunPaste(clipboard.PlaceAt(tileX * size + x, tileY * size + y, degrees));
+                    RollPasteOffsets();
+                    RunPaste(clipboard.PlaceAt(tileX * size + x, tileY * size + y, degrees, pasteHeadingOffsets));
                     Debug.Log("Paste: " + statusLabel?.text);
                 }
             }

@@ -26,6 +26,7 @@ namespace OmsiMapEditor.UI
 
         private const string FavoritesKey = "Mapforge.ObjectFavorites";
         private const string HideDlcKey = "Mapforge.HideDlcObjects";
+        private const string RandomHeadingKey = "Mapforge.RandomHeading";
         private const string DlcFoldersKey = "Mapforge.DlcFolders";
         private const string RootFolder = "Sceneryobjects";
 
@@ -58,6 +59,7 @@ namespace OmsiMapEditor.UI
         private readonly Label info;
         private readonly Toggle hideDlc;
         private readonly TextField headingField;
+        private readonly Toggle randomHeading;
         private readonly Dictionary<string, VisualElement> tileByPath = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Texture2D> rendered = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
 
@@ -111,6 +113,18 @@ namespace OmsiMapEditor.UI
             });
             LocBindings.Tooltip(headingRow, "objects.heading.tooltip");
             headingRow.Add(headingField);
+            randomHeading = new Toggle { value = PlayerPrefs.GetInt(RandomHeadingKey, 0) != 0 };
+            randomHeading.AddToClassList("picker-option-toggle");
+            randomHeading.RegisterValueChangedCallback(evt =>
+            {
+                PlayerPrefs.SetInt(RandomHeadingKey, evt.newValue ? 1 : 0);
+                PlayerPrefs.Save();
+                RandomHeadingChanged?.Invoke(evt.newValue);
+            });
+            var randomRow = Row(options, "objects.random_heading");
+            LocBindings.Tooltip(randomRow, "objects.random_heading.tooltip");
+            LocBindings.Tooltip(randomHeading, "objects.random_heading.tooltip");
+            randomRow.Add(randomHeading);
             var hint = LocBindings.NewLabel("objects.hint");
             hint.AddToClassList("panel-info");
             options.Add(hint);
@@ -229,6 +243,18 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The user typed a heading for the next object.</summary>
         public event Action<double> HeadingChanged;
+
+        /// <summary>Whether each object put down gets a random heading of its own.</summary>
+        public bool RandomHeading => randomHeading.value;
+
+        /// <summary>Ticks or clears the option without storing it, for a run started from the command line.</summary>
+        public void SetRandomHeadingQuietly(bool on)
+        {
+            randomHeading.SetValueWithoutNotify(on);
+        }
+
+        /// <summary>The user ticked or cleared the random heading.</summary>
+        public event Action<bool> RandomHeadingChanged;
 
         /// <summary>
         /// The objects to offer: the installation's catalog with every .sco below Sceneryobjects, their groups, kinds, origins

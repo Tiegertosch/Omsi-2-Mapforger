@@ -4,6 +4,7 @@
 
 ### Objects
 
+- **Random heading.** Tick *Random heading* in the Objects tool and every object you put down, and every object of a pasted group, gets a heading of its own; with several objects selected, *Randomize headings* in the inspector turns each to a new random heading in one undo step. Trees and bushes look more natural that way.
 - **Copy, paste and duplicate objects.** *Ctrl+C* copies the selected objects; *Ctrl+V* shows the copies as outlines at the pointer, *R* turns them together, a click puts them down (*Shift+click* keeps them in hand for more), *Esc* stops. *Ctrl+D* copies and puts the copies 5 m aside at once. The copies keep their labels (the text of a stop sign or the line plate), pitch and bank, rules and the objects hung on them, all with new IDs; they can land in another tile. A paste is one undo step and happens all or not at all. Junctions made by MapWorks cannot be copied (they each have their own object file), and in a chrono variant only the objects themselves are pasted, without attached objects and rules.
 
 ## 1.1.2

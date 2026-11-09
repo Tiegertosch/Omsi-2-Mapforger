@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 72 · Teilweise 18 · Prüfen 0 · Offen 26 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
+Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 73 · Teilweise 18 · Prüfen 0 · Offen 25 von 116 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich.
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -30,7 +30,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [ ] Objekte an Splineverlauf und Steigung ausrichten — Teilweise
 - [ ] Parent-/Varparent-Zuordnungen bearbeiten — Teilweise
 - [ ] Objektspezifische Optionen bearbeiten — Teilweise
-- [ ] Zufällige Rotation von Objektgruppen — Offen
+- [x] Zufällige Rotation von Objektgruppen — Vorhanden (Option „Random heading“ beim Platzieren und Einfügen, Knopf „Randomize headings“ für die Auswahl; seit 9. November 2026)
 - [x] Objektgruppen und Favoriten durchsuchen — Vorhanden
 - [ ] Detailstufen und Sichtbarkeitsoptionen bearbeiten — Offen (wird gelesen, nicht bearbeitet)
 

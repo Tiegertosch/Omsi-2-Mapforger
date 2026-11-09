@@ -1,0 +1,9 @@
+{
+  "objects.random_heading": "Losowy kierunek",
+  "objects.random_heading.tooltip": "Każdy stawiany obiekt dostaje własny kierunek, tak samo każdy obiekt wklejonej grupy. Pole kierunku pokazuje następny. Drzewa i krzewy wyglądają dzięki temu naturalniej.",
+  "inspector.randomize_headings": "Losuj kierunki",
+  "inspector.randomize_headings.tooltip": "Nadaje każdemu zaznaczonemu obiektowi nowy losowy kierunek, jako jeden krok cofania. Położenia się nie zmieniają.",
+  "random.select_first": "Najpierw zaznacz obiekty.",
+  "random.done": "Nowy losowy kierunek dostał{count, plural, one { # obiekt} few { # obiekty} many { # obiektów} other { # obiektu}}. Ctrl+Z to cofa.",
+  "@random.done": "{count} is how many objects were turned"
+}

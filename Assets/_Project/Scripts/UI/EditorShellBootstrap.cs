@@ -435,6 +435,7 @@ namespace OmsiMapEditor.UI
                     if (mapCanvas != null)
                         mapCanvas.PlacementHeading = heading;
                 };
+                objectsPanel.RandomHeadingChanged += _ => RandomHeadingToggled();
                 objectsPanelHost.Add(objectsPanel);
                 roadPanel = new RoadToolPanel();
                 roadPanel.style.display = DisplayStyle.None;
@@ -1093,6 +1094,8 @@ namespace OmsiMapEditor.UI
                 Debug.Log("Chrono edit: " + statusLabel?.text);
             }
 
+            RunRandomHeadingArguments(args, false);
+
             // Several IDs select several objects, as Ctrl+click does.
             for (var offset = 1; int.TryParse(Argument("-select", offset), NumberStyles.Integer, CultureInfo.InvariantCulture, out var selectId); offset++)
             {
@@ -1112,6 +1115,8 @@ namespace OmsiMapEditor.UI
             var toolName = Argument("-tool", 1);
             if (toolName != null && Enum.TryParse<EditorTool>(toolName, true, out var chosenTool))
                 SetTool(chosenTool);
+
+            RunRandomHeadingArguments(args, true);
 
             if (double.TryParse(Argument("-turnSelection", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var turnDegrees) &&
                 mapCanvas != null && !mapCanvas.TurnSelection(turnDegrees))
@@ -6336,6 +6341,8 @@ namespace OmsiMapEditor.UI
 
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
+            if (RandomHeadingOn)
+                RollPlacementHeading();
             if (mapCanvas != null)
                 objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
             UpdateToolbar();
@@ -6395,6 +6402,8 @@ namespace OmsiMapEditor.UI
             var assetPath = placementAsset;
             if (!placement.KeepPlacing)
                 StopPlacement();
+            else if (RandomHeadingOn)
+                RollPlacementHeading();
             PushHistory(new ObjectEditStep { TileX = placement.Tile.X, TileY = placement.Tile.Y, ObjectId = change.Record.Id, Change = change });
             RefreshAfterChange(new[] { new MapSelectionItem { Tile = placement.Tile, Record = change.Record } });
             if (objectsPanelOpen)
@@ -7953,6 +7962,13 @@ namespace OmsiMapEditor.UI
                     level.AddToClassList("inspector-edit-apply");
                     editor.Add(level);
                 }
+                var randomize = new Button(RandomizeSelectedHeadings)
+                {
+                    text = Loc.T("inspector.randomize_headings"),
+                    tooltip = Loc.T("inspector.randomize_headings.tooltip")};
+                randomize.AddToClassList("map-control-button");
+                randomize.AddToClassList("inspector-edit-apply");
+                editor.Add(randomize);
                 var delete = new Button(DeleteSelectedObjects) { text = Loc.T("inspector.delete_many", ("count", selection.Count))};
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");

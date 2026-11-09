@@ -1,0 +1,9 @@
+{
+  "objects.random_heading": "Náhodný směr",
+  "objects.random_heading.tooltip": "Každý umístěný objekt dostane vlastní směr, stejně tak každý objekt vložené skupiny. Pole směru ukazuje další. Stromy a keře tak působí přirozeněji.",
+  "inspector.randomize_headings": "Náhodné směry",
+  "inspector.randomize_headings.tooltip": "Dá každému vybranému objektu nový náhodný směr jako jeden krok zpět. Polohy zůstanou.",
+  "random.select_first": "Nejprve vyberte objekty.",
+  "random.done": "Nový náhodný směr dostal{count, plural, one { # objekt} few { # objekty} many { # objektu} other { # objektů}}. Ctrl+Z to vrátí zpět.",
+  "@random.done": "{count} is how many objects were turned"
+}
