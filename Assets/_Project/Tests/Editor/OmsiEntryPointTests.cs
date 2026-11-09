@@ -134,6 +134,20 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TheEditorOnlyBoxOfAnEntryPointObjectIsDrawnSeeThroughAndOtherEditorMeshesAreLeftAlone()
+        {
+            var entry = OmsiSceneryObject.Parse(System.Text.Encoding.ASCII.GetBytes("[entrypoint]\r\n\r\n[onlyeditor]\r\n\r\n[mesh]\r\nentrypoint_bus.x\r\n"));
+            Assert.IsTrue(entry.IsEntryPoint);
+            Assert.IsTrue(entry.Meshes[0].EditorOnly);
+            Assert.AreEqual(OmsiSceneryObject.EntryPointOpacity, entry.Meshes[0].EditorOpacity);
+
+            var other = OmsiSceneryObject.Parse(System.Text.Encoding.ASCII.GetBytes("[onlyeditor]\r\n\r\n[mesh]\r\nmarker.x\r\n\r\n[mesh]\r\nwall.x\r\n"));
+            Assert.IsFalse(other.IsEntryPoint);
+            Assert.AreEqual(1f, other.Meshes[0].EditorOpacity);
+            Assert.AreEqual(1f, other.Meshes[1].EditorOpacity);
+        }
+
+        [Test]
         public void ANameIsRequiredAndStaysOneLineWithoutABracket()
         {
             var summary = session.Read();

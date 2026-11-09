@@ -152,7 +152,9 @@ namespace OmsiMapEditor.OMSI
 
             foreach (var mesh in sceneryObject.Meshes)
             {
-                if (mesh.EditorOnly || mesh.LodLevel > 0 || !IsVisible(mesh))
+                // Meshes marked [onlyeditor] (the box of an entry point, the markers of stops and sound fields) are what OMSI's own editor
+                // shows and the game leaves out; this is an editor, so they are drawn.
+                if (mesh.LodLevel > 0 || !IsVisible(mesh))
                     continue;
                 AddMesh(model, objectFolder, mesh, assetPath);
             }
@@ -325,7 +327,7 @@ namespace OmsiMapEditor.OMSI
                     Red = source.DiffuseRed,
                     Green = source.DiffuseGreen,
                     Blue = source.DiffuseBlue,
-                    Alpha = source.DiffuseAlpha,
+                    Alpha = Math.Min(source.DiffuseAlpha, sceneryMesh.EditorOpacity),
                     AlphaMode = settings?.AlphaMode ?? 0,
                     TransparencyTexturePath = settings?.TransparencyTexture != null ? ResolveTexture(objectFolder, settings.TransparencyTexture) : null
                 });

@@ -11,6 +11,9 @@ namespace OmsiMapEditor.OMSI
         public string FileName { get; internal set; }
         public bool EditorOnly { get; internal set; }
 
+        /// <summary>How opaque the editor draws the mesh, 1 for the opacity the file gives; an entry point's box is drawn see-through.</summary>
+        public float EditorOpacity { get; internal set; } = 1f;
+
         /// <summary>Index of the [LOD] level the mesh belongs to in file order, or -1 when it comes before any [LOD].</summary>
         public int LodLevel { get; internal set; } = -1;
 
@@ -127,6 +130,12 @@ namespace OmsiMapEditor.OMSI
         public bool HasAbsoluteHeight { get; internal set; }
         public bool HasSplineHelper => SplineHelpers.Count > 0;
 
+        /// <summary>[entrypoint]: a bus starts here; the object's [onlyeditor] mesh is the box of the bus, which only the editor shows.</summary>
+        public bool IsEntryPoint { get; internal set; }
+
+        /// <summary>How opaque the editor draws the box of an entry point, so the ground and roads under it stay visible.</summary>
+        public const float EntryPointOpacity = 0.4f;
+
         /// <summary>[splinehelper]: spline file, then x, height, y and heading, the order spline records use.</summary>
         public List<OmsiSplineHelper> SplineHelpers { get; } = new List<OmsiSplineHelper>();
 
@@ -229,6 +238,9 @@ namespace OmsiMapEditor.OMSI
                     case "absheight":
                         result.HasAbsoluteHeight = true;
                         break;
+                    case "entrypoint":
+                        result.IsEntryPoint = true;
+                        break;
                     case "splinehelper":
                         if (values.Count >= 5 && TryNumbers(values.GetRange(1, 4), 4, out var helper))
                             result.SplineHelpers.Add(new OmsiSplineHelper
@@ -238,6 +250,10 @@ namespace OmsiMapEditor.OMSI
                         break;
                 }
             }
+            if (result.IsEntryPoint)
+                foreach (var mesh in result.Meshes)
+                    if (mesh.EditorOnly)
+                        mesh.EditorOpacity = EntryPointOpacity;
             return result;
         }
 
