@@ -1,45 +1,42 @@
 # Changelog
 
-## Unreleased
+## 1.1.3
+
+The inspector and the project browser are tidier, and a good deal more can be edited: entry points, rows that follow the slope of the road, cant and skew, copy and paste, the settings of a map, and a tile's terrain can be exported.
+
+### Inspector and project browser
+
+- **A calmer inspector.** The header is one line (name of the tile and how much it holds). With something selected there are two tabs: *Selection* (the selected object, spline or group) and *Tile* (its file, water, picture, and a search for an object or spline of the tile by ID or name; the long lists of everything in the tile are gone). Fields sit in compact rows (X, Y and height in one line), related settings are in groups that fold (type and labels, heights, cant and skew, texture and mirroring, traffic rules, AI paths) and stay open or shut as you left them, and *Apply*, *Level ground* and *Delete* stay in a bar at the bottom instead of scrolling away.
+- **Tabs in the project browser.** The name, counts and warnings of the map stay on top; below them *Tiles* (the list of tiles, with a filter by coordinates such as `2,-1` or by file name), *Map* (map settings and its description), *Entries*, *Chrono*, *Lines* and *Paths* show one thing at a time. Tabs that have nothing to show are left out. The tab you chose stays when the browser is drawn again, and the *Paths* and *Routes* buttons of the map open their tab.
+
+### Objects and entry points
+
+- **Copy, paste and duplicate objects.** *Ctrl+C* copies the selected objects; *Ctrl+V* shows the copies as outlines at the pointer, *R* turns them together, a click puts them down (*Shift+click* keeps them in hand for more), *Esc* stops. *Ctrl+D* copies and puts the copies 5 m aside at once. The copies keep their labels (the text of a stop sign or the line plate), pitch and bank, rules and the objects hung on them, all with new IDs; they can land in another tile. A paste is one undo step and happens all or not at all. Junctions made by MapWorks cannot be copied (they each have their own object file), and in a chrono variant only the objects themselves are pasted, without attached objects and rules.
+- **Random heading.** Tick *Random heading* in the Objects tool and every object you put down, and every object of a pasted group, gets a heading of its own; with several objects selected, *Randomize headings* in the inspector turns each to a new random heading in one undo step. Trees and bushes look more natural that way.
+- **Make, rename and delete entry points.** The *Entries* tab of the project browser lists the entry points of the map, selects the object one stands on when you click it, and puts a new one down: type a name, press *Place entry point* and click in the map (*Shift+click* for several, *R* turns it). The inspector of an entry point's object renames it (the name is kept in global.cfg and as the object's label, as OMSI does) and deletes it together with its object, as one undo step. A map keeps at least one entry point. *Revert tile edits* now also takes away an entry point made in that tile.
+- **Models that only OMSI's editor shows are drawn.** An entry point appears as the see-through box of the bus, not only as an outline, and so do bus stop markers, car parks and sound fields: the editor draws what OMSI's own editor draws.
+
+### Roads
+
+- **Rows follow the slope.** The Rows tool has a *Follow slope* option: the objects of the row lie in the surface of the road, tilted by its gradient and cant, instead of standing upright. It suits parking spaces, surface markings and rails; posts and lamps are better without. It can be switched for a selected row, and the editor shows the tilt.
+- **Cant and skew of a spline.** The inspector of a selected spline shows the cant (banking across the road, in percent) and, in tiles of version 14 and later, the skew at its start and end, and changes them in one undo step. A cant given at a joined end goes to the spline joined there too, so the road stays level across the joint.
+- **Mirroring and texture offset of a spline.** The inspector of a selected spline has a *Mirrored* switch (the cross-section is turned over) and a *Tex. offset* field (where along its chain the spline begins: the textures start there and rows of objects count from it).
+- **No overtaking.** The traffic rules of a road lane in the inspector have a *No overtaking* switch: nobody drives over to the oncoming half of the road to pass there, as with a solid centre line.
 
 ### Terrain
 
 - **Export a tile's terrain as a DirectX mesh.** The *Tile* tab of the inspector has *Export terrain as .x...*: it writes the ground of the tile as the map shows it (the roads fitted into it) to a DirectX text mesh for a 3D program, 61 × 61 points with normals and texture coordinates, x east, y up, z north, the origin at the tile's south-west corner.
 
-### Roads
+### Map and chrono variants
 
-- **Rows follow the slope.** The Rows tool has a *Follow slope* option: the objects of the row lie in the surface of the road, tilted by its gradient and cant, instead of standing upright. It suits parking spaces, surface markings and rails; posts and lamps are better without. It can be switched for a selected row, and the editor shows the tilt.
+- **Map settings.** The project browser has a *Map settings...* button on the *Map* tab that opens the dialog of a new map for the open map, with the values the map has now: name and description in OMSI, the side traffic keeps to, how busy cars and passengers are (a factor on the daily curve), rail, years, money, tickets, seasons and the ground texture. The changes go into the project copy of the map and its export.
+- **Change the days of a variant.** While a chrono variant is edited, the *Chrono* tab shows its first and last day as fields; *Apply days* writes them to the variant.
 
-### Entry points
+### Good to know
 
-- **Make, rename and delete entry points.** The project browser has an *Entries* tab that lists the entry points of the map, selects the object one stands on when you click it, and puts a new one down: type a name, press *Place entry point* and click in the map (Shift+click for several, R turns it). The inspector of an entry point's object renames it (the name is kept in global.cfg and as the object's label, as OMSI does) and deletes it together with its object, as one undo step. A map keeps at least one entry point. *Revert tile edits* now also takes away an entry point made in that tile. Entry points show the see-through box of the bus in the view from above and in 3D, not only their outline. So do all the other objects whose model is meant for the editor alone (bus stop markers, car parks, sound fields): the editor draws what OMSI's own editor draws.
-
-### Project browser
-
-- **Tabs by task.** The name, counts and warnings of the map stay on top; below them *Tiles* (the list of tiles, with a filter by coordinates such as `2,-1` or by file name), *Map* (map settings and its description), *Chrono*, *Lines* and *Paths* show one thing at a time. Tabs that have nothing to show are left out. The tab you chose stays when the browser is drawn again, and the *Paths* and *Routes* buttons of the map open their tab. There are no more lists scrolling inside the scrolling list.
-
-### Inspector
-
-- **A calmer inspector.** The header is one line (name of the tile and how much it holds). With something selected there are two tabs: *Selection* (the selected object, spline or group) and *Tile* (its file, water, picture, and a search for an object or spline of the tile by ID or name; the long lists of everything in the tile are gone). Fields sit in compact rows (X, Y and height in one line), related settings are in groups that fold (type and labels, heights, cant and skew, texture and mirroring, traffic rules, AI paths) and stay open or shut as you left them, and *Apply*, *Level ground* and *Delete* stay in a bar at the bottom instead of scrolling away.
-
-### Map
-
-- **Map settings.** The project browser has a *Map settings...* button that opens the dialog of a new map for the open map, with the values the map has now: name and description in OMSI, the side traffic keeps to, how busy cars and passengers are (a factor on the daily curve), rail, years, money, tickets, seasons and the ground texture. The changes go into the project copy of the map and its export.
-
-### Chrono variants
-
-- **Change the days of a variant.** While a chrono variant is edited, the project browser shows its first and last day as fields; *Apply days* writes them to the variant.
-
-### Roads
-
-- **Mirroring and texture offset of a spline.** The inspector of a selected spline has a *Mirrored* switch (the cross-section is turned over) and a *Tex. offset* field (where along its chain the spline begins: the textures start there and rows of objects count from it).
-- **No overtaking.** The traffic rules of a road lane in the inspector have a *No overtaking* switch: nobody drives over to the oncoming half of the road to pass there, as with a solid centre line.
-- **Cant and skew of a spline.** The inspector of a selected spline shows the cant (banking across the road, in percent) and, in tiles of version 14 and later, the skew at its start and end, and changes them in one undo step. A cant given at a joined end goes to the spline joined there too, so the road stays level across the joint.
-
-### Objects
-
-- **Random heading.** Tick *Random heading* in the Objects tool and every object you put down, and every object of a pasted group, gets a heading of its own; with several objects selected, *Randomize headings* in the inspector turns each to a new random heading in one undo step. Trees and bushes look more natural that way.
-- **Copy, paste and duplicate objects.** *Ctrl+C* copies the selected objects; *Ctrl+V* shows the copies as outlines at the pointer, *R* turns them together, a click puts them down (*Shift+click* keeps them in hand for more), *Esc* stops. *Ctrl+D* copies and puts the copies 5 m aside at once. The copies keep their labels (the text of a stop sign or the line plate), pitch and bank, rules and the objects hung on them, all with new IDs; they can land in another tile. A paste is one undo step and happens all or not at all. Junctions made by MapWorks cannot be copied (they each have their own object file), and in a chrono variant only the objects themselves are pasted, without attached objects and rules.
+- Projects, maps and settings from 1.1.2 open as before.
+- The entry points, the tilt of rows and the cant and skew of splines follow what openOMSI's source code says; so far they have been checked in MapWorks itself, not yet in openOMSI.
+- Changing the side traffic keeps to in the map settings writes only the switch; roads and AI paths that exist stay as they are. The map settings have no undo step.
 
 ## 1.1.2
 
