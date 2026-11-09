@@ -125,6 +125,8 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 - `Documentation/Decisions.md` – ADR 001–068
 - `Documentation/DevelopmentSetup.md` – Werkzeuge, Kommandozeile, Validierungsstand
 - `Documentation/Roadmap.md` – erledigt `[x]` und offen
+- `Documentation/ProjectStatus.md` – laufender Stand, Releases, Zweige, offene Nutzertests
+- `Documentation/CommandLine.md` – alle Player-Argumente für Prüfläufe und Screenshots
 - `Documentation/TileRecordInventory.md`, `GrundorfFormatInventory.md`, `SceneryObjectInventory.md`, `TimetableChronoInventory.md` – OMSI-Formatbefunde
 - `Documentation/RefactoringAudit.md`, `PerformanceBaseline.md`, `RefactoringSummary.md` – Stabilisierung nach 1.0: Befunde, Messverfahren und -werte, umgesetzte Änderungen
 - `Documentation/DesignReview-2026-10-28.md` – Design-Review der Hauptansicht (9 Befunde, offen; Skalierung und Kontraste kritisch)
