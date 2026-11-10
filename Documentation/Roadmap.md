@@ -60,7 +60,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 
 - [x] Meilenstein 1 – Analyse und Datenmodell: Formatbefund (`TrafficSignalInventory.md`), `OmsiSignalProgram` in OMSIs eigener Form, Zeitlogik wie openOMSI, verlustfreies Lesen und Schreiben der `.sco`, Köpfe einer Kreuzung finden, Tests und Probe über alle 85 Programme der Installation
 - [x] Meilenstein 2 – Zufahrten, Fahrstreifen und Fahrbewegungen (auf `OmsiJunctionPriorities.Arms`, ADR 047), Signalgruppen verwalten, manuelle Zuordnung, Werkzeug „Signals“ (A) mit Anzeige in 2D und 3D; Bindungen erzeugter Kreuzungen über Bewegungsschlüssel (vom Nutzer getestet)
-- [ ] Meilenstein 3 – Zeitleiste, Phasen, Zykluszeit, Eigenschaften, Rückgängig/Wiederholen
+- [x] Meilenstein 3 – Zeitleiste je Gruppe mit Malen, Kanten ziehen, Entfernen, Wiederholen, Umlaufzeit, Zeitprüfungen; Entwurf mit *Apply*/*Discard* als ein Rückgängig-Schritt (einfacher Modus §8 kommt mit Meilenstein 4; vom Nutzer getestet)
 - [ ] Meilenstein 4 – Assistent: Signalgruppen vorschlagen, Grundschaltung, Köpfe setzen
 - [ ] Meilenstein 5 – Konfliktmatrix, Prüfungen, Vorschau mit Anforderungsschalter in 2D und 3D
 - [ ] Meilenstein 6 – Export (vom Nutzer entschieden: zuerst nur erzeugte Kreuzungen schreiben, ADR 085), Vorlagen, Rundreise-Tests, Doku

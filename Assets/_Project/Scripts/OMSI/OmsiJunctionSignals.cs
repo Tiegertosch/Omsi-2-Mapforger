@@ -23,6 +23,18 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The light each way through obeys, by its key; ways not listed obey none.</summary>
         public Dictionary<string, int> WayLights { get; } = new Dictionary<string, int>(StringComparer.Ordinal);
 
+        /// <summary>Takes the lights, cycle and stop points of an edited program; the bindings stay those of <see cref="WayLights"/>.</summary>
+        public void SetProgram(OmsiSignalProgram program)
+        {
+            if (program == null)
+                throw new ArgumentNullException(nameof(program));
+            Program = program.Copy();
+            Program.PathLights.Clear();
+            foreach (var key in WayLights.Keys.ToList())
+                if (WayLights[key] >= Program.Lights.Count)
+                    WayLights.Remove(key);
+        }
+
         public OmsiJunctionSignals Copy()
         {
             var copy = new OmsiJunctionSignals { Program = Program.Copy() };

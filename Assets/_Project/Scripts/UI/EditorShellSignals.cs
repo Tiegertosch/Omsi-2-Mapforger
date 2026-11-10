@@ -67,20 +67,25 @@ namespace OmsiMapEditor.UI
             signalOwnerLabel = new Label();
             signalOwnerLabel.AddToClassList("panel-info");
             signalOptions.Add(signalOwnerLabel);
+            signalOptions.Add(CreateSignalTabs());
+            signalMovementsPage = new VisualElement();
             var groupsTitle = LocBindings.NewLabel("signals.groups");
             groupsTitle.AddToClassList("inspector-section-heading");
-            signalOptions.Add(groupsTitle);
+            signalMovementsPage.Add(groupsTitle);
             signalGroupsBox = new VisualElement();
-            signalOptions.Add(signalGroupsBox);
+            signalMovementsPage.Add(signalGroupsBox);
             var movementsTitle = LocBindings.NewLabel("signals.movements");
             movementsTitle.AddToClassList("inspector-section-heading");
-            signalOptions.Add(movementsTitle);
+            signalMovementsPage.Add(movementsTitle);
             signalMovementsBox = new ScrollView(ScrollViewMode.Vertical);
             signalMovementsBox.AddToClassList("signal-movements");
-            signalOptions.Add(signalMovementsBox);
+            signalMovementsPage.Add(signalMovementsBox);
             signalPlanLabel = new Label();
             signalPlanLabel.AddToClassList("panel-info");
-            signalOptions.Add(signalPlanLabel);
+            signalMovementsPage.Add(signalPlanLabel);
+            signalOptions.Add(signalMovementsPage);
+            signalOptions.Add(CreateSignalTimelinePage());
+            ShowSignalTab(false);
             objectsPanelHost.Add(signalOptions);
         }
 
@@ -120,6 +125,10 @@ namespace OmsiMapEditor.UI
 
         private void ClearSignalTarget()
         {
+            if (signalDirty)
+                SetStatusT("signals.status.discarded");
+            signalDirty = false;
+            signalDraft = null;
             signalTile = null;
             signalJunction = null;
             signalMade = null;
@@ -170,6 +179,8 @@ namespace OmsiMapEditor.UI
             while (program.PathLights.Count < sceneryObject.Paths.Count)
                 program.PathLights.Add(-1);
             var crossing = OmsiSignalIntersection.Analyse(sceneryObject, program);
+            // Another crossing drops a draft with changes and says so; the same one read anew after Apply keeps quiet.
+            var sameCrossing = signalJunction != null && signalJunction.Id == record.Id;
             signalTile = tile;
             signalJunction = record;
             signalProgram = program;
@@ -179,6 +190,7 @@ namespace OmsiMapEditor.UI
             // The layout made anew must be the one the file holds, or its ways cannot be told apart.
             if (signalLayout != null && signalLayout.Paths.Count != sceneryObject.Paths.Count)
                 signalLayout = null;
+            ResetSignalDraft(!sameCrossing);
             if (signalSelected >= crossing.Movements.Count)
                 signalSelected = -1;
             signalLines.Clear();
@@ -191,6 +203,8 @@ namespace OmsiMapEditor.UI
                 ApplySelection(tile);
             }
             RenderSignalPanel();
+            if (signalTimelineShown)
+                RenderSignalTimeline();
             UpdateSignalPreview();
             SetStatusT("signals.status.target", ("id", record.Id), ("approaches", crossing.Approaches.Count), ("movements", crossing.Movements.Count),
                 ("groups", program.Lights.Count));
@@ -222,6 +236,12 @@ namespace OmsiMapEditor.UI
             if (signalJunction == null || signalTile == null)
                 return;
             var id = signalJunction.Id;
+            // Undo puts other files back: a draft with changes is dropped.
+            if (signalDirty)
+            {
+                signalDirty = false;
+                SetStatusT("signals.status.discarded");
+            }
             var current = signalTile.Objects.Find(candidate => candidate.Id == id);
             if (current == null || !TargetSignalJunction(signalTile, current))
                 ClearSignalTarget();
@@ -476,6 +496,9 @@ namespace OmsiMapEditor.UI
             var signals = signalMade.Signals?.Copy() ?? new OmsiJunctionSignals();
             if (signalMade.Signals == null)
                 signals.Program.CycleSeconds = 60;
+            // Changes of the timeline not yet applied go along with any other change.
+            if (signalDirty && signalDraft != null)
+                signals.SetProgram(signalDraft);
             return signals;
         }
 
@@ -679,6 +702,9 @@ namespace OmsiMapEditor.UI
             if (select >= 0 && select + 1 < args.Length && int.TryParse(args[select + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var chosen) &&
                 signalCrossing != null && chosen >= 1 && chosen <= signalCrossing.Movements.Count)
                 SelectSignalMovement(chosen - 1);
+            if (signalCrossing == null)
+                return;
+            RunSignalTimelineArguments(args);
             if (signalCrossing == null)
                 return;
             Debug.Log("Signals: crossing " + signalJunction.Id + " (" + signalJunction.AssetPath + "), " + (SignalsEditable ? "editable" : "read-only") + ", " +

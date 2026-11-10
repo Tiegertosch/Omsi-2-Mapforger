@@ -225,6 +225,23 @@
 .signal-movement-selected { background-color: var(--mf-color-panel-hover); }
 .signal-movement-text { flex-grow: 1; flex-shrink: 1; white-space: normal; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); margin-right: 4px; }
 .signal-movement-group { width: 118px; margin: 0; flex-shrink: 0; }
+.signal-movement-group .unity-base-popup-field__input { height: 24px; margin: 0; padding: 0 6px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.signal-movement-group .unity-base-popup-field__input:hover { border-color: var(--mf-color-accent); }
+.signal-movement-group .unity-base-popup-field__text { color: var(--mf-color-text-primary); }
+.signal-timeline { margin: 4px 0; }
+.signal-brush { width: 26px; height: 20px; margin: 0 4px 0 0; padding: 0; border-width: 2px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); overflow: hidden; }
+.signal-brush:hover { border-color: var(--mf-color-text-secondary); }
+.signal-brush.signal-brush-active { border-color: var(--mf-color-text-primary); }
+.signal-brush-lower { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; }
+.signal-timeline-axis { flex-direction: row; height: 14px; }
+.signal-timeline-scale { flex-grow: 1; position: relative; }
+.signal-timeline-tick { position: absolute; top: 0; translate: -50% 0; margin: 0; padding: 0; font-size: 10px; color: var(--mf-color-text-muted); }
+.signal-timeline-row { flex-direction: row; align-items: center; margin: 2px 0; }
+.signal-timeline-name { width: 74px; min-width: 74px; margin: 0 4px 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; }
+.signal-timeline-axis > .signal-timeline-name { width: 94px; min-width: 94px; }
+.signal-timeline-bar { flex-grow: 1; border-radius: 2px; background-color: var(--mf-color-field); }
+.signal-issues { white-space: normal; }
+.signal-dirty { border-color: var(--mf-color-warning); border-width: 2px; }
 .signal-shared-hint { margin: 0 0 4px 20px; color: var(--mf-color-text-muted); }
 .content-folders { color: var(--mf-color-text-primary); max-height: 92%; }
 .content-folders-toggle .unity-toggle__text { color: var(--mf-color-text-primary); margin-left: 6px; }
