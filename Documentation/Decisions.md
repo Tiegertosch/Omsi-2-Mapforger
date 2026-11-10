@@ -1350,3 +1350,31 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 **Grenzen:** Keine tieferen Ebenen (ein Paket, das seine Objekte auf mehrere Oberordner verteilt, braucht mehrere Häkchen). Die Ordneransicht im Reiter *Library* zeigt weggelassene Ordner nicht mehr; die DLC-Markierung von Ordnern (ADR 016) bleibt davon getrennt. Die Vorschaubilder auf der Festplatte werden nicht gelöscht.
 
 **Prüfung:** `OmsiContentFoldersTests` (erste Ebene ohne `Mapforge`, `Normalize`, Scan lässt Ordner samt Unterordnern weg und behält `Mapforge`, eine Auswahl je Installation, Speichern und Laden, kaputte Datei, Oberflächentexturen), Player mit Grundorf: Dialog, weggelassene Ordner fehlen im Objektmenü und im Straßenmenü, *In map* zeigt weiter alles.
+
+## ADR 085: Ampelschaltungen – Datenmodell, Lesen und Schreiben (Meilenstein 1)
+
+**Status:** Angenommen für Meilenstein 1, 10. November 2026 (Entwicklungsauftrag „Visueller Ampelphasen-Editor“ des Nutzers). Exportstrategie vom Nutzer entschieden: zuerst nur von MapWorks erzeugte Kreuzungen bearbeiten (siehe unten). Formatbefund: `Documentation/TrafficSignalInventory.md`.
+
+**Befund:** Eine Ampelschaltung steht im Kreuzungsobjekt (`.sco`) und gilt für jede Platzierung dieses Typs; die Köpfe sind Kachelobjekte mit `[trafficlight]`, `[varparent]` auf die Kreuzung und der Lichtnummer als erster Beschriftung; Fahrzeuge folgen über `[use_traffic_light]` an ihren Pfaden. openOMSI startet ein Programm nur, wenn ein Kopf die Kreuzung nennt. Der Zustand ist ein Rohwert, den jedes Kopfskript anders deutet.
+
+**Entscheidung:**
+- **Modell in OMSIs eigener Form** (`OmsiTrafficSignals.cs`, Editor.OMSI): `OmsiSignalProgram` mit Zykluslänge (fehlend, 0 oder Sekunden), Lichtern (`OmsiSignalLight`: Name, Phasen aus Rohwert und Dauer, Anforderungsabstand), Halte- und Sprungpunkten (`OmsiSignalHold`) und der Lichtbindung jedes Pfades (`PathLights`, gezählt an jedem `[path]` und `[path_2]` wie openOMSI). Ein Licht ist eine Signalgruppe des Auftrags, ein Pfad eine Fahrbewegung. Der „einfache Modus“ des Auftrags wird später aus diesen Phasenlisten abgeleitet, nie als zweite gespeicherte Form.
+- **Zeitlogik wie openOMSI** (`StateAt`, `CycleLength`, `PhaseStart`): Phasen ab Sekunde 0 nacheinander, letzte 0-s-Phase bis Zyklusende, Zyklus 0 = längstes Licht (mindestens 1 s), Licht ohne Phasen grün. `OmsiSignalAspects` deutet Rohwerte wie der Autokopf (`ampel1.osc`/`ampel1_ddr.osc`, openOMSIs `aspect`); gespeichert bleibt der Rohwert.
+- **Verlustfrei schreiben** (`WriteTo` auf einem `OmsiRecordFile` mit `OmsiSceneryRecordLayouts`): Unveränderte Werte behalten ihren Text (OMSIs lange Dezimalzahlen), solange Lichter, Phasen und Punkte ihre Anzahl behalten, ändern sich nur Felder; sonst wird der Programmblock dort neu geschrieben, wo er stand (oder vor dem ersten Pfad). Bindungen ändern sich in ihren `[use_traffic_light]`-Datensätzen, die direkt nach ihrem Pfad eingefügt oder entfernt werden. Alles andere bleibt unberührt. Ungültiges (Bindung an ein fehlendes Licht, negative Zeiten, falsche Pfadzahl, Name, der wie ein Abschnitt aussieht) wird vor dem Schreiben abgelehnt.
+- **Köpfe lesen** (`OmsiSignalHead.Of`): Objekte und angehängte Objekte der Kachel der Kreuzung und der acht Nachbarn, deren Typ `[trafficlight]` hat (`OmsiSceneryObject.IsTrafficLight`) und deren `[varparent]` die Kreuzung ist; Lichtnummer aus der ersten Beschriftung (`LightOf`).
+
+**Folgen für die nächsten Meilensteine:**
+- Schaltungen ändern heißt einen Objekttyp ändern: Kopie beim Schreiben (neue `.sco`, platzierte Kreuzung per „Change type“, ADR 060, umstellen) wie bei erzeugten Kreuzungen (ADR 026). Werden Lichter umnummeriert oder gelöscht, müssen im selben Rückgängig-Schritt die Bindungen, die Lichtnummern der Halte- und Sprungpunkte und die erste Beschriftung jedes Kopfes dieser Kreuzung mitgehen.
+- Von MapWorks erzeugte Kreuzungen werden beim Neubauen ganz neu geschrieben, ihre Pfadindizes ändern sich. Bindungen dort werden über den Schlüssel der Fahrbewegung (`OmsiLaneConnections.Key`, ADR 048) in einer Zeile „MapWorks signals:“ gemerkt und bei jedem Schreiben neu in Indizes übersetzt (Meilenstein 2/3).
+- Ohne Köpfe läuft kein Programm: Import zeigt die Köpfe mit, der Assistent muss Köpfe setzen oder warnen.
+- Gespeichert wird in `.sco`-Dateien wie bei erzeugten Kreuzungen; die Arbeitskopie des Projekts hält nur die umgestellten Kachelobjekte und Köpfe. Eigene Speicherorte bekommen nur Vorlagen.
+- Halte- und Sprungpunkte machen Programme anforderungsabhängig: Die Vorschau braucht einen Schalter „Anforderung“ je Licht.
+
+**Entscheidung des Nutzers (10. November 2026): Variante (c).** Zuerst sind nur Kreuzungen bearbeitbar, die MapWorks erzeugt hat; OMSIs eigene werden gelesen, angezeigt und in der Vorschau abgespielt. (a) und (b) bleiben als spätere Erweiterung offen.
+
+**Erwogene Varianten: Wohin geänderte Schaltungen von OMSIs eigenen Kreuzungen?**
+- (a) Neue Datei neben dem Original im selben Ordner: alle relativen Verweise (Modell, Skripte, Sounds, Texturen) gelten weiter, aber MapWorks legt Dateien in Inhaltsordnern an, die nicht seine sind.
+- (b) Kopie unter `Sceneryobjects\Mapforge\<Projekt>` mit allen Dateiverweisen auf `..\`-Pfade umgeschrieben: openOMSI löst `..` auf (`omsi-cfg` `resolve_path`), OMSI 2 ist ungeprüft, und jede übersehene Verweisart bricht das Objekt.
+- (c) Zuerst nur Kreuzungen, die MapWorks erzeugt hat, bearbeitbar; OMSIs eigene lesen, anzeigen und in der Vorschau abspielen. Das ist die umkehrbare Richtung.
+
+**Prüfung:** `OmsiTrafficSignalsTests` (Lesen nach dem Polizei-Programm, Zeitlogik und Zyklusregel, Deutung der Rohwerte, byte-gleiches Zurückschreiben in drei Kodierungen, eine Phase ändert eine Zeile, Bindungen mit `[path_2]` und `[crossingproblem]` dazwischen, neues Licht samt Sprungpunkt, Programm hinzufügen und wieder entfernen, Ablehnungen ohne Schreiben, Kopf-Erkennung und Kopfsuche über Nachbarkacheln); Probe gegen die Installation: alle 85 Programme exakt gelesen, unverändert byte-gleich geschrieben, Änderung zurückgelesen, Pfadzählung gleich.

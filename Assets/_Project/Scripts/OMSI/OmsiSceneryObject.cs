@@ -130,6 +130,12 @@ namespace OmsiMapEditor.OMSI
         public bool HasAbsoluteHeight { get; internal set; }
         public bool HasSplineHelper => SplineHelpers.Count > 0;
 
+        /// <summary>
+        /// [trafficlight] (no underscore): the object is a signal head. With a [varparent] naming a crossing it shows the
+        /// light whose index its first label gives (ADR 085); not to be mixed up with [traffic_light], a light of a program.
+        /// </summary>
+        public bool IsTrafficLight { get; internal set; }
+
         /// <summary>[entrypoint]: a bus starts here; the object's [onlyeditor] mesh is the box of the bus, which only the editor shows.</summary>
         public bool IsEntryPoint { get; internal set; }
 
@@ -237,6 +243,9 @@ namespace OmsiMapEditor.OMSI
                         break;
                     case "absheight":
                         result.HasAbsoluteHeight = true;
+                        break;
+                    case "trafficlight":
+                        result.IsTrafficLight = true;
                         break;
                     case "entrypoint":
                         result.IsEntryPoint = true;

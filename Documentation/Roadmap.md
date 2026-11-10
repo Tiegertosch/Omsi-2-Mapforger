@@ -56,6 +56,16 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Meilenstein 3: Einstellungsdialog „Einstellungen > Allgemein > Sprache“, Layout für längere deutsche Texte geprüft, Deutsch und Englisch vollständig, Live-Wechsel in allen Fenstern
 - [x] Meilenstein 4: Doku für Übersetzer (`locales/README.md`), Abschlussdokument `Documentation/Internationalisierung.md`, Tests für den Wechsel in der Oberfläche, Prüfung im Build und im Workflow-Quelltext
 
+## Ampelphasen-Editor (ADR 085, Entwicklungsauftrag des Nutzers vom 10. November 2026)
+
+- [x] Meilenstein 1 – Analyse und Datenmodell: Formatbefund (`TrafficSignalInventory.md`), `OmsiSignalProgram` in OMSIs eigener Form, Zeitlogik wie openOMSI, verlustfreies Lesen und Schreiben der `.sco`, Köpfe einer Kreuzung finden, Tests und Probe über alle 85 Programme der Installation
+- [ ] Meilenstein 2 – Zufahrten, Fahrstreifen und Fahrbewegungen (auf `OmsiJunctionPriorities.Arms`, ADR 047), Signalgruppen verwalten, manuelle Zuordnung, Anzeige in 2D; Bindungen erzeugter Kreuzungen über Bewegungsschlüssel
+- [ ] Meilenstein 3 – Zeitleiste, Phasen, Zykluszeit, Eigenschaften, Rückgängig/Wiederholen
+- [ ] Meilenstein 4 – Assistent: Signalgruppen vorschlagen, Grundschaltung, Köpfe setzen
+- [ ] Meilenstein 5 – Konfliktmatrix, Prüfungen, Vorschau mit Anforderungsschalter in 2D und 3D
+- [ ] Meilenstein 6 – Export (vom Nutzer entschieden: zuerst nur erzeugte Kreuzungen schreiben, ADR 085), Vorlagen, Rundreise-Tests, Doku
+- Testfälle des Auftrags: 8 (Import) und 15 (verlustfrei) sind mit Meilenstein 1 abgedeckt (Probe über die Installation); 1–6 und 7 (fehlende Köpfe) folgen mit Meilenstein 2, 9 und 11–12 mit 3 und 6, 10 und 14 mit 5, 13 mit 5.
+
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen
