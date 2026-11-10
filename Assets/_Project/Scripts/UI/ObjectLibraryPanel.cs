@@ -24,6 +24,9 @@ namespace OmsiMapEditor.UI
         /// <summary>At most this many tiles are built at once; a last tile shows more.</summary>
         private const int PageSize = 120;
 
+        /// <summary>The list follows the search field this long after the last key, so typing does not sort a large library per letter.</summary>
+        private const int SearchDelayMilliseconds = 150;
+
         private const string FavoritesKey = "Mapforge.ObjectFavorites";
         private const string HideDlcKey = "Mapforge.HideDlcObjects";
         private const string RandomHeadingKey = "Mapforge.RandomHeading";
@@ -61,7 +64,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField headingField;
         private readonly Toggle randomHeading;
         private readonly Dictionary<string, VisualElement> tileByPath = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, Texture2D> rendered = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        private IVisualElementScheduledItem searchRefresh;
 
         private IReadOnlyList<string> library;
         private IReadOnlyDictionary<string, List<string>> objectGroups = new Dictionary<string, List<string>>();
@@ -163,7 +166,8 @@ namespace OmsiMapEditor.UI
             search.RegisterValueChangedCallback(_ =>
             {
                 shownPages = 1;
-                Refresh();
+                searchRefresh?.Pause();
+                searchRefresh = schedule.Execute(Refresh).StartingIn(SearchDelayMilliseconds);
             });
             searchRow.Add(search);
             var searchIcon = new IconElement("search");
@@ -290,12 +294,20 @@ namespace OmsiMapEditor.UI
             Refresh();
         }
 
-        /// <summary>A preview the object renderer drew; null when the object has no model.</summary>
+        /// <summary>
+        /// A preview the object renderer drew; null when the object has no model. The renderer keeps the images, the panel
+        /// only shows them on the tiles it has built.
+        /// </summary>
         public void SetPreview(string assetPath, Texture2D image)
         {
-            rendered[assetPath] = image;
             if (tileByPath.TryGetValue(assetPath, out var tile))
                 ShowImage(tile, image);
+        }
+
+        /// <summary>True while a tile of this object is built; the renderer keeps the previews of such objects in memory.</summary>
+        public bool ShowsPreview(string assetPath)
+        {
+            return assetPath != null && tileByPath.ContainsKey(assetPath);
         }
 
         /// <summary>Shows the heading the next object is placed with, such as after R turned it.</summary>
@@ -539,21 +551,31 @@ namespace OmsiMapEditor.UI
         {
             tiles.Clear();
             tileByPath.Clear();
-            var limit = Math.Min(entries.Count, PageSize * shownPages);
-            for (var index = 0; index < limit; index++)
-                tiles.Add(entries[index].IsFolder ? FolderTile(entries[index]) : ObjectTile(entries[index]));
-            if (limit < entries.Count)
-            {
-                var more = new Button(() =>
-                {
-                    shownPages++;
-                    BuildTiles();
-                }) { text = Loc.T("objects.more", ("n", Math.Min(PageSize, entries.Count - limit)), ("total", entries.Count - limit)), tooltip = Loc.T("objects.more.tooltip") };
-                more.AddToClassList("picker-tile");
-                more.AddToClassList("picker-more");
-                tiles.Add(more);
-            }
+            AddTiles(0);
             emptyLabel.style.display = entries.Count > 0 ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// Adds the tiles from an entry on up to the pages shown, and a last tile for the next page. That tile only adds
+        /// its page: the tiles before it stay as they are, so a long list is not built again with every page.
+        /// </summary>
+        private void AddTiles(int from)
+        {
+            var limit = Math.Min(entries.Count, PageSize * shownPages);
+            for (var index = from; index < limit; index++)
+                tiles.Add(entries[index].IsFolder ? FolderTile(entries[index]) : ObjectTile(entries[index]));
+            if (limit >= entries.Count)
+                return;
+            Button more = null;
+            more = new Button(() =>
+            {
+                more.RemoveFromHierarchy();
+                shownPages++;
+                AddTiles(limit);
+            }) { text = Loc.T("objects.more", ("n", Math.Min(PageSize, entries.Count - limit)), ("total", entries.Count - limit)), tooltip = Loc.T("objects.more.tooltip") };
+            more.AddToClassList("picker-tile");
+            more.AddToClassList("picker-more");
+            tiles.Add(more);
         }
 
         private VisualElement ObjectTile(Entry entry)
@@ -573,16 +595,11 @@ namespace OmsiMapEditor.UI
             tile.Add(preview);
             // Registered first: a preview kept from before arrives while the request is still being made.
             tileByPath[path] = tile;
-            if (rendered.TryGetValue(path, out var image))
-                ShowImage(tile, image);
-            else
-            {
-                // Until the renderer has drawn it, a spinner shows that something is happening.
-                var spinner = new SpinnerElement { name = "spinner" };
-                spinner.AddToClassList("object-tile-spinner");
-                preview.Add(spinner);
-                PreviewRequested?.Invoke(path);
-            }
+            // Until the renderer has drawn it, a spinner shows that something is happening.
+            var spinner = new SpinnerElement { name = "spinner" };
+            spinner.AddToClassList("object-tile-spinner");
+            preview.Add(spinner);
+            PreviewRequested?.Invoke(path);
             var name = new Label(entry.Name) { pickingMode = PickingMode.Ignore };
             name.AddToClassList("picker-tile-name");
             tile.Add(name);
@@ -601,11 +618,11 @@ namespace OmsiMapEditor.UI
                 tag.AddToClassList("picker-tile-tag");
                 tile.Add(tag);
             }
-            var star = new Button { tooltip = Loc.T(favorites.Contains(path) ? "objects.favorite.remove" : "objects.favorite.add") }; // i18n:keys
+            var star = new Button { name = "star" };
             star.AddToClassList("panel-icon-button");
             star.AddToClassList("favorite-button");
             star.AddToClassList("picker-tile-star");
-            star.EnableInClassList("favorite-on", favorites.Contains(path));
+            ShowFavorite(star, favorites.Contains(path));
             star.Add(new IconElement("star"));
             star.clicked += () => ToggleFavorite(path);
             tile.Add(star);
@@ -748,12 +765,23 @@ namespace OmsiMapEditor.UI
                 : "objects.empty.none"); // i18n:keys
         }
 
+        private static void ShowFavorite(Button star, bool favorite)
+        {
+            star.tooltip = Loc.T(favorite ? "objects.favorite.remove" : "objects.favorite.add"); // i18n:keys
+            star.EnableInClassList("favorite-on", favorite);
+        }
+
         private void ToggleFavorite(string path)
         {
             if (!favorites.Remove(path))
                 favorites.Add(path);
             SaveFavorites();
-            Refresh();
+            // Only the list of favourites changes with a star; elsewhere the tile shows it and the list stays as it is.
+            var listsFavorites = tab == Tab.Favorites && string.IsNullOrWhiteSpace(search.value);
+            if (listsFavorites || !tileByPath.TryGetValue(path, out var tile))
+                Refresh();
+            else
+                ShowFavorite(tile.Q<Button>("star"), favorites.Contains(path));
         }
 
         private bool IsMarkedFolder(string path)

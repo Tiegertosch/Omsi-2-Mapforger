@@ -15,7 +15,8 @@ namespace OmsiMapEditor.World
     /// placed, drawn isometrically from the front left and above into a texture with a transparent background, a few per
     /// frame. The images
     /// are kept as PNG files below the user's data folder, named after the object and its file's time, so they are drawn
-    /// once.
+    /// once. A model the map does not use is read for its image alone and released as soon as the image is drawn, and
+    /// only the latest images stay in memory, so paging through a large installation does not fill it.
     /// </summary>
     public sealed partial class MapObjectRenderer
     {
@@ -27,10 +28,29 @@ namespace OmsiMapEditor.World
         private const float PreviewElevation = 30f;
         private const float PreviewAzimuth = 225f;
 
+        /// <summary>This many images stay in memory besides those in use; older ones are read from their files again.</summary>
+        private const int PreviewImagesKept = 1500;
+
+        /// <summary>Models read for their previews alone; they never join the kinds of the map.</summary>
+        private sealed class PreviewBatch
+        {
+            public readonly HashSet<string> Waiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public readonly Dictionary<string, KindData> Kinds = new Dictionary<string, KindData>(StringComparer.OrdinalIgnoreCase);
+            public Task<LoadData> Reading;
+            public LoadData Data;
+            public int Generation;
+        }
+
         private readonly List<string> previewQueue = new List<string>();
         private readonly HashSet<string> previewWanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Texture2D> previewImages = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        private readonly Queue<string> previewAge = new Queue<string>();
+        private PreviewBatch previewBatch;
         private RenderTexture previewTarget;
+
+        // While a model is built for its preview alone: where its textures come from and which of them were uploaded for it.
+        private LoadData transientData;
+        private readonly List<string> transientTextures = new List<string>();
 
         // Requests of one frame go to the front of the queue in their order, so the tiles shown last are drawn first.
         private int previewRequestFrame = -1;
@@ -42,6 +62,9 @@ namespace OmsiMapEditor.World
 
         /// <summary>A preview is ready; the texture is null when the object has no model to draw.</summary>
         public event Action<string, Texture2D> PreviewReady;
+
+        /// <summary>Tells whether the preview of an object is shown somewhere; such an image is never dropped from memory.</summary>
+        public Func<string, bool> PreviewInUse { get; set; }
 
         /// <summary>
         /// Asks for the preview of an object; it arrives through <see cref="PreviewReady"/>, at once when kept from before.
@@ -75,18 +98,40 @@ namespace OmsiMapEditor.World
             var stored = LoadStoredPreview(assetPath);
             if (stored != null)
             {
-                previewImages[assetPath] = stored;
+                Remember(assetPath, stored);
                 PreviewReady?.Invoke(assetPath, stored);
                 return;
             }
             previewQueue.Insert(Math.Min(previewInsertAt++, previewQueue.Count), assetPath);
         }
 
-        /// <summary>Draws queued previews whose kind is read, and reads the kinds of the next ones while nothing else loads.</summary>
+        /// <summary>
+        /// Draws queued previews, a few per frame: of kinds the map uses from their models, of others from models read in
+        /// the background while nothing else loads, a batch at a time.
+        /// </summary>
         private void UpdatePreviews()
         {
             if (previewQueue.Count == 0 || installationRoot == null || template == null)
                 return;
+            var batch = previewBatch;
+            if (batch != null && batch.Generation != generation)
+                previewBatch = batch = null;
+            if (batch != null && batch.Data == null && batch.Reading.IsCompleted)
+            {
+                if (batch.Reading.IsFaulted)
+                {
+                    // Its objects get the tile without an image, like objects without a model.
+                    Debug.LogException(batch.Reading.Exception);
+                    batch.Data = new LoadData();
+                }
+                else
+                    batch.Data = batch.Reading.Result;
+                foreach (var read in batch.Data.Kinds)
+                    batch.Kinds[read.AssetPath] = read;
+                if (batch.Data.Problems.Count > 0)
+                    Debug.LogWarning("Object previews: " + batch.Data.Problems.Count + " problem(s)\n" + string.Join("\n", batch.Data.Problems));
+            }
+
             var idle = loading == null && pending == null && stream == null;
             var drawn = 0;
             List<string> missing = null;
@@ -95,51 +140,127 @@ namespace OmsiMapEditor.World
                 var path = previewQueue[index];
                 if (kinds.TryGetValue(path, out var kind))
                 {
-                    Texture2D image = null;
-                    try
-                    {
-                        image = DrawPreview(kind);
-                        if (image != null)
-                            StorePreview(path, image);
-                    }
-                    catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
-                    {
-                        Debug.LogWarning("Could not keep the preview of " + path + ": " + exception.Message);
-                    }
+                    Finish(index--, path, Preview(kind, null));
+                    drawn++;
+                }
+                else if (batch != null && batch.Waiting.Contains(path))
+                {
+                    if (batch.Data == null)
+                        continue;
+                    var image = batch.Kinds.TryGetValue(path, out kind) ? Preview(kind, batch.Data) : null;
+                    batch.Kinds.Remove(path);
                     Finish(index--, path, image);
                     drawn++;
                 }
                 else if (requestedKinds.Contains(path))
                 {
-                    // Read once without a model: nothing to draw.
+                    // Read once for the map without a model: nothing to draw.
                     if (idle)
                         Finish(index--, path, null);
                 }
-                else if (idle)
+                else if (idle && batch == null)
                 {
                     missing = missing ?? new List<string>();
                     if (missing.Count < PreviewKindsPerRead)
                         missing.Add(path);
                 }
             }
-            if (missing == null || !idle)
+            if (batch != null && batch.Data != null && batch.Waiting.Count == 0)
+                previewBatch = null;
+            if (missing == null)
                 return;
-            requestedKinds.UnionWith(missing);
+
             var root = installationRoot;
-            loadingGeneration = generation;
-            loading = Task.Run(() =>
+            var next = new PreviewBatch { Generation = generation };
+            next.Waiting.UnionWith(missing);
+            next.Reading = Task.Run(() =>
             {
                 var data = new LoadData();
                 ReadKinds(missing, root, data);
                 return data;
             });
+            previewBatch = next;
+        }
+
+        /// <summary>
+        /// The preview of a kind, kept as a file. With <paramref name="transient"/> the kind was read for this image alone:
+        /// its mesh, materials and textures are made from that data and released again, so only the image stays.
+        /// </summary>
+        private Texture2D Preview(KindData kind, LoadData transient)
+        {
+            var ownedBefore = owned.Count;
+            Texture2D image = null;
+            try
+            {
+                if (transient != null)
+                {
+                    transientData = transient;
+                    transientTextures.Clear();
+                    BuildKind(kind);
+                }
+                image = DrawPreview(kind);
+                if (image != null)
+                    StorePreview(kind.AssetPath, image);
+            }
+            catch (Exception exception)
+            {
+                // Whatever a broken model or a full disk throws: the tile shows what there is, and the queue moves on.
+                Debug.LogWarning("Could not draw or keep the preview of " + kind.AssetPath + ": " + exception.Message);
+            }
+            finally
+            {
+                transientData = null;
+                if (transient != null)
+                {
+                    for (var index = owned.Count - 1; index >= ownedBefore; index--)
+                        Destroy(owned[index]);
+                    owned.RemoveRange(ownedBefore, owned.Count - ownedBefore);
+                    foreach (var path in transientTextures)
+                        textures.Remove(path);
+                    transientTextures.Clear();
+                    kind.Mesh = null;
+                    kind.Materials = null;
+                    kind.BlendedMaterials = null;
+                    kind.CrossMaterial = null;
+                    kind.CrossMaterials = null;
+                }
+            }
+            // Encoded and kept; the copy in main memory is no longer needed.
+            if (image != null)
+                image.Apply(false, true);
+            return image;
         }
 
         private void Finish(int index, string path, Texture2D image)
         {
             previewQueue.RemoveAt(index);
-            previewImages[path] = image;
+            previewBatch?.Waiting.Remove(path);
+            Remember(path, image);
             PreviewReady?.Invoke(path, image);
+        }
+
+        /// <summary>Keeps an image in memory and drops the oldest ones beyond the limit that no tile shows.</summary>
+        private void Remember(string path, Texture2D image)
+        {
+            previewImages[path] = image;
+            if (image == null)
+                return;
+            previewAge.Enqueue(path);
+            for (var checks = previewAge.Count; checks > 0 && previewAge.Count > PreviewImagesKept; checks--)
+            {
+                var oldest = previewAge.Dequeue();
+                if (PreviewInUse != null && PreviewInUse(oldest))
+                {
+                    previewAge.Enqueue(oldest);
+                    continue;
+                }
+                if (!previewImages.TryGetValue(oldest, out var dropped))
+                    continue;
+                previewImages.Remove(oldest);
+                previewWanted.Remove(oldest);
+                if (dropped != null)
+                    Destroy(dropped);
+            }
         }
 
         /// <summary>
@@ -267,7 +388,7 @@ namespace OmsiMapEditor.World
             try
             {
                 var image = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = assetPath, wrapMode = TextureWrapMode.Clamp };
-                if (image.LoadImage(File.ReadAllBytes(file), false))
+                if (image.LoadImage(File.ReadAllBytes(file), true))
                     return image;
                 Destroy(image);
             }
@@ -293,6 +414,8 @@ namespace OmsiMapEditor.World
                 if (image != null)
                     Destroy(image);
             previewImages.Clear();
+            previewAge.Clear();
+            previewBatch = null;
             previewQueue.Clear();
             previewWanted.Clear();
             if (previewTarget != null)

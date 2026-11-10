@@ -794,7 +794,9 @@ namespace OmsiMapEditor.World
             if (textures.TryGetValue(relativePath, out var existing))
                 return existing;
             TextureData data = null;
-            if (pending == null || !pending.Textures.TryGetValue(relativePath, out data))
+            if (transientData != null)
+                transientData.Textures.TryGetValue(relativePath, out data);
+            else if (pending == null || !pending.Textures.TryGetValue(relativePath, out data))
                 data = StreamTexture(relativePath);
             if (data == null)
                 return Texture2D.whiteTexture;
@@ -842,6 +844,8 @@ namespace OmsiMapEditor.World
             texture.anisoLevel = 4;
             owned.Add(texture);
             textures[relativePath] = texture;
+            if (transientData != null)
+                transientTextures.Add(relativePath);
             return texture;
         }
 

@@ -826,6 +826,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.PreviewEnded += () => PreviewJunctionMarkers(null);
                 mapCanvas.ObjectRenderer = objectRenderer;
                 objectRenderer.PreviewReady += (path, image) => objectsPanel?.SetPreview(path, image);
+                objectRenderer.PreviewInUse = path => objectsPanel != null && objectsPanel.ShowsPreview(path);
                 mapCanvas.GroundHeight = groundRenderer.HeightAt;
                 mapCanvas.GroundVersion = () => groundRenderer.TerrainVersion;
             }
