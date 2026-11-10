@@ -206,6 +206,11 @@ namespace OmsiMapEditor.UI
             searchIcon.AddToClassList("panel-search-icon");
             searchRow.Add(searchIcon);
             header.Add(searchRow);
+            foldersButton = new Button(() => FoldersRequested?.Invoke());
+            foldersButton.AddToClassList("panel-icon-button");
+            foldersButton.Add(new IconElement("folder"));
+            header.Add(foldersButton);
+            SetFoldersLeftOut(0);
             var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "roadtool.close.tooltip");
             close.AddToClassList("panel-icon-button");
             close.Add(new IconElement("x"));
@@ -245,6 +250,20 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The panel wants to close the road tool, or to end choosing a profile.</summary>
         public event Action CloseRequested;
+
+        /// <summary>The folder button was pressed: the shell opens the choice of folders (ADR 084).</summary>
+        public event Action FoldersRequested;
+
+        private readonly Button foldersButton;
+        private int foldersLeftOut;
+
+        /// <summary>Shows on the folder button how many folders of Splines are left out; the button is marked while any are.</summary>
+        public void SetFoldersLeftOut(int count)
+        {
+            foldersLeftOut = count;
+            foldersButton.tooltip = Loc.T("roadtool.folders.tooltip", ("count", count));
+            foldersButton.EnableInClassList("folders-left-out", count > 0);
+        }
 
         private string lastDefaultHint;
         private VisualElement optionsColumn;
@@ -456,6 +475,7 @@ namespace OmsiMapEditor.UI
         public void RefreshTexts()
         {
             search.textEdition.placeholder = Loc.T("roadtool.search");
+            SetFoldersLeftOut(foldersLeftOut);
             if (planLabel.text == lastDefaultHint)
             {
                 lastDefaultHint = Loc.T("roadtool.hint");

@@ -29,14 +29,27 @@ namespace OmsiMapEditor.OMSI
         public OmsiContentOrigins Origins { get; private set; }
 
 
-        /// <summary>Lists and reads the objects of an installation; unreadable object files simply have no groups.</summary>
-        public static OmsiInstallationCatalog Scan(string installationRoot, IEnumerable<string> steamRoots)
+        /// <summary>The folders left out of the listing (ADR 084), as <c>Sceneryobjects\Name</c> or <c>Splines\Name</c>.</summary>
+        public HashSet<string> ExcludedFolders { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Lists and reads the objects of an installation; unreadable object files simply have no groups. Folders left out
+        /// (<see cref="OmsiContentFolders"/>) are not entered.
+        /// </summary>
+        public static OmsiInstallationCatalog Scan(string installationRoot, IEnumerable<string> steamRoots, ICollection<string> excludedFolders = null)
         {
             var catalog = new OmsiInstallationCatalog();
-            var folder = Path.Combine(installationRoot, "Sceneryobjects");
+            if (excludedFolders != null)
+                foreach (var excluded in excludedFolders)
+                {
+                    var normal = OmsiContentFolders.Normalize(excluded);
+                    if (normal != null)
+                        catalog.ExcludedFolders.Add(normal);
+                }
+            var folder = Path.Combine(installationRoot, OmsiContentFolders.SceneryObjectsFolder);
             if (Directory.Exists(folder))
             {
-                foreach (var path in Directory.EnumerateFiles(folder, "*.sco", SearchOption.AllDirectories))
+                foreach (var path in OmsiContentFolders.EnumerateFiles(installationRoot, OmsiContentFolders.SceneryObjectsFolder, "*.sco", catalog.ExcludedFolders))
                 {
                     var relative = path.Substring(installationRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                     catalog.Objects.Add(relative);
@@ -57,10 +70,10 @@ namespace OmsiMapEditor.OMSI
                 }
                 catalog.Objects.Sort(StringComparer.OrdinalIgnoreCase);
             }
-            var splines = Path.Combine(installationRoot, "Splines");
+            var splines = Path.Combine(installationRoot, OmsiContentFolders.SplinesFolder);
             if (Directory.Exists(splines))
             {
-                foreach (var path in Directory.EnumerateFiles(splines, "*.sli", SearchOption.AllDirectories))
+                foreach (var path in OmsiContentFolders.EnumerateFiles(installationRoot, OmsiContentFolders.SplinesFolder, "*.sli", catalog.ExcludedFolders))
                     catalog.SplineProfiles.Add(path.Substring(installationRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 catalog.SplineProfiles.Sort(StringComparer.OrdinalIgnoreCase);
             }

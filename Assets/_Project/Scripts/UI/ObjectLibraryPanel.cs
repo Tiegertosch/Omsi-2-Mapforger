@@ -174,6 +174,11 @@ namespace OmsiMapEditor.UI
             searchIcon.AddToClassList("panel-search-icon");
             searchRow.Add(searchIcon);
             header.Add(searchRow);
+            foldersButton = new Button(() => FoldersRequested?.Invoke());
+            foldersButton.AddToClassList("panel-icon-button");
+            foldersButton.Add(new IconElement("folder"));
+            header.Add(foldersButton);
+            SetFoldersLeftOut(0);
             var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "objects.close.tooltip");
             close.AddToClassList("panel-icon-button");
             close.Add(new IconElement("x"));
@@ -242,6 +247,20 @@ namespace OmsiMapEditor.UI
 
         public event Action CloseRequested;
 
+        /// <summary>The folder button was pressed: the shell opens the choice of folders (ADR 084).</summary>
+        public event Action FoldersRequested;
+
+        private readonly Button foldersButton;
+        private int foldersLeftOut;
+
+        /// <summary>Shows on the folder button how many folders of Sceneryobjects are left out; the button is marked while any are.</summary>
+        public void SetFoldersLeftOut(int count)
+        {
+            foldersLeftOut = count;
+            foldersButton.tooltip = Loc.T("objects.folders.tooltip", ("count", count));
+            foldersButton.EnableInClassList("folders-left-out", count > 0);
+        }
+
         /// <summary>A tile shows an object whose preview is not drawn yet; the shell has the object renderer draw it.</summary>
         public event Action<string> PreviewRequested;
 
@@ -291,6 +310,7 @@ namespace OmsiMapEditor.UI
         {
             search.textEdition.placeholder = Loc.T("objects.search");
             UpdateHideDlcTooltip();
+            SetFoldersLeftOut(foldersLeftOut);
             Refresh();
         }
 

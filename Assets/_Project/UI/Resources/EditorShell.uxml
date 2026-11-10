@@ -56,6 +56,7 @@
             <ui:Button name="open-map-menu-item" text="Open OMSI map..." class="menu-popup-item" />
             <ui:Label class="menu-divider" />
             <ui:Button name="settings-menu-item" text="Settings..." class="menu-popup-item" />
+            <ui:Button name="content-folders-menu-item" text="Object and spline folders..." class="menu-popup-item" />
         </ui:VisualElement>
         <ui:VisualElement name="edit-menu" class="menu-popup edit-menu">
             <ui:Button name="place-object-menu-item" text="Place object..." class="menu-popup-item" />

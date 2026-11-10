@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Objects and roads
+
+- **Choose the folders the menus read.** *File > Object and spline folders...* and the new folder button of the object menu and the road menu list the folders right below *Sceneryobjects* and *Splines* of your OMSI installation. Untick the ones you do not need, such as add-ons for other maps, and MapWorks no longer reads them: the menus are quicker and shorter. Objects and roads the map already uses are still drawn and stay in the *In map* tabs. The folder button turns yellow while folders are left out. The choice is kept on your computer, for each OMSI installation; below *Mapforge*, MapWorks keeps a folder for each project with the junctions, road types and objects it made, and you can leave out those of other projects; the folder of the open project always stays in.
+
 ## 1.1.4
 
 A bug-fix release for large installations: the object menu no longer fills the memory while you page through it.

@@ -370,7 +370,11 @@ namespace OmsiMapEditor.UI
             if (show && activeTool != EditorTool.Road)
                 SetTool(EditorTool.Road);
             if (show && currentSummary != null)
-                roadBuilder.SetInstallation(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath));
+            {
+                var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+                roadBuilder.SetInstallation(installation);
+                roadBuilder.SetExcludedFolders(ExcludedContentFolders(installation));
+            }
             if (show && !RoadBuilderShown)
                 roadBuilder.Reset();
             if (show)

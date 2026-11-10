@@ -397,6 +397,21 @@ namespace OmsiMapEditor.UI
         public string RoadName => nameTyped && !string.IsNullOrWhiteSpace(nameField.value) ? nameField.value.Trim() : type.SuggestName();
 
         /// <summary>The installation whose textures the surface picker offers.</summary>
+        /// <summary>
+        /// The folders of <c>Splines</c> the user left out (ADR 084); their profiles give no surfaces. A change reads the
+        /// surfaces again the next time they are shown.
+        /// </summary>
+        public void SetExcludedFolders(ICollection<string> folders)
+        {
+            var next = new HashSet<string>(folders ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            if (next.SetEquals(excludedFolders))
+                return;
+            excludedFolders = next;
+            surfaceList = null;
+        }
+
+        private HashSet<string> excludedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         public void SetInstallation(string root)
         {
             if (string.Equals(root, installationRoot, StringComparison.OrdinalIgnoreCase))
@@ -509,7 +524,8 @@ namespace OmsiMapEditor.UI
             if (surfaceList == null && installationRoot != null)
             {
                 var root = installationRoot;
-                var list = Task.Run(() => OmsiRoadTypeStore.SurfaceTextures(root));
+                var excluded = excludedFolders;
+                var list = Task.Run(() => OmsiRoadTypeStore.SurfaceTextures(root, excluded));
                 surfaceList = list;
                 IVisualElementScheduledItem poll = null;
                 poll = schedule.Execute(() =>

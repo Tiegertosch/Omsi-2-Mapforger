@@ -1444,15 +1444,16 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// The surface textures the installation's spline profiles use, as paths relative to it, most used first; for
-        /// choosing a lane's surface. Profiles made by the editor and textures that are missing are left out.
+        /// choosing a lane's surface. Profiles made by the editor, those in folders the user left out (ADR 084) and textures
+        /// that are missing are left out.
         /// </summary>
-        public static List<string> SurfaceTextures(string installationRoot)
+        public static List<string> SurfaceTextures(string installationRoot, ICollection<string> excludedFolders = null)
         {
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var splines = Path.Combine(installationRoot, "Splines");
+            var splines = Path.Combine(installationRoot, OmsiContentFolders.SplinesFolder);
             if (!Directory.Exists(splines))
                 return new List<string>();
-            foreach (var file in Directory.EnumerateFiles(splines, "*.sli", SearchOption.AllDirectories))
+            foreach (var file in OmsiContentFolders.EnumerateFiles(installationRoot, OmsiContentFolders.SplinesFolder, "*.sli", excludedFolders))
             {
                 var relative = file.Substring(installationRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 if (IsMade(relative))

@@ -342,6 +342,7 @@ namespace OmsiMapEditor.UI
             rootElement = root;
             SetUpLocalization(root);
             SetUpSettings(root);
+            SetUpContentFolders(root);
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
             root.style.height = Length.Percent(100f);
@@ -437,6 +438,7 @@ namespace OmsiMapEditor.UI
                         mapCanvas.PlacementHeading = heading;
                 };
                 objectsPanel.RandomHeadingChanged += _ => RandomHeadingToggled();
+                objectsPanel.FoldersRequested += OpenContentFolders;
                 objectsPanelHost.Add(objectsPanel);
                 roadPanel = new RoadToolPanel();
                 roadPanel.style.display = DisplayStyle.None;
@@ -448,6 +450,7 @@ namespace OmsiMapEditor.UI
                         SetTool(EditorTool.Drag);
                 };
                 roadPanel.ProfilePicked += path => EndSplineTypePick(path);
+                roadPanel.FoldersRequested += OpenContentFolders;
                 roadPanel.SettingsChanged += UpdateRoadPreview;
                 // Another mode starts the next part anew; a control point belongs to Curved.
                 roadPanel.ShapeChanged += () => roadControl = null;
@@ -1148,6 +1151,7 @@ namespace OmsiMapEditor.UI
 
             RunClipboardArguments(args);
             RunMapSettingsArguments(args);
+            RunContentFolderArguments(args);
             RunProjectTabArguments(args);
             RunEntryPointArguments(args);
             RunTerrainXArguments(args);
@@ -5695,12 +5699,14 @@ namespace OmsiMapEditor.UI
 
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog)))
+            if (evt.keyCode == KeyCode.Escape && (IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog) ||
+                                                  IsShown(contentFoldersDialog)))
             {
                 HidePopup(exportDialog);
                 HidePopup(newMapDialog);
                 HidePopup(checkDialog);
                 HidePopup(settingsDialog);
+                HidePopup(contentFoldersDialog);
                 evt.StopPropagation();
                 return;
             }
@@ -5717,7 +5723,8 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog))
+            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || IsShown(exportDialog) || IsShown(newMapDialog) || IsShown(checkDialog) || IsShown(settingsDialog) ||
+                IsShown(contentFoldersDialog))
                 return;
 
             if (evt.keyCode == KeyCode.Escape && PickingVarParent && !(evt.ctrlKey || evt.commandKey))
@@ -6335,7 +6342,8 @@ namespace OmsiMapEditor.UI
             installationScanRoot = root;
             installationCatalog = null;
             contentOrigins = null;
-            var scan = Task.Run(() => OmsiInstallationCatalog.Scan(root, OmsiContentOrigins.LikelySteamRoots()));
+            var excludedFolders = ExcludedContentFolders(root);
+            var scan = Task.Run(() => OmsiInstallationCatalog.Scan(root, OmsiContentOrigins.LikelySteamRoots(), excludedFolders));
             installationScan = scan;
 
             IVisualElementScheduledItem poll = null;
@@ -6361,6 +6369,7 @@ namespace OmsiMapEditor.UI
                               installationCatalog.Objects.Count + " objects.");
                 }
                 objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
+                ShowFoldersLeftOut(installationCatalog);
                 if (activeTool == EditorTool.Road)
                     UpdateRoadProfiles();
             }).Every(150);
