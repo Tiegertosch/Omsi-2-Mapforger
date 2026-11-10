@@ -229,6 +229,21 @@
 .signal-movement-group .unity-base-popup-field__input:hover { border-color: var(--mf-color-accent); }
 .signal-movement-group .unity-base-popup-field__text { color: var(--mf-color-text-primary); }
 .signal-timeline { margin: 4px 0; }
+.signal-scroll-page { max-height: 520px; flex-shrink: 1; }
+.signal-window { margin: 1px 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.signal-phase { margin: 4px 0; padding: 4px 6px; border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.signal-phase-title { flex-grow: 1; color: var(--mf-color-text-primary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); margin: 0; }
+.signal-phase-groups { flex-direction: row; flex-wrap: wrap; margin-top: 2px; }
+.signal-phase-chip { margin: 2px 4px 2px 0; padding: 2px 8px; height: 22px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); background-color: rgba(0, 0, 0, 0); border-width: 1px 1px 1px 4px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.signal-phase-chip:hover { border-color: var(--mf-color-text-secondary); }
+.signal-phase-chip.signal-phase-chip-on { color: var(--mf-color-text-primary); background-color: var(--mf-color-field); border-top-color: var(--mf-color-text-secondary); border-right-color: var(--mf-color-text-secondary); border-bottom-color: var(--mf-color-text-secondary); }
+.signal-plan-field { flex-direction: row; align-items: center; margin: 2px 8px 2px 0; }
+.signal-plan-field > .signal-movement-text { margin-right: 4px; }
+.signal-plan-field > .picker-field { width: 52px; min-width: 52px; }
+.signal-head-type { margin: 2px 0; }
+.signal-head-type .unity-base-popup-field__input { height: 24px; margin: 0; padding: 0 6px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.signal-head-type .unity-base-popup-field__text { color: var(--mf-color-text-primary); }
+.signal-head-type > .unity-label, .signal-options .unity-text-field > .unity-label, .signal-options .unity-toggle > .unity-label { color: var(--mf-color-text-secondary); min-width: 110px; }
 .signal-brush { width: 26px; height: 20px; margin: 0 4px 0 0; padding: 0; border-width: 2px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); overflow: hidden; }
 .signal-brush:hover { border-color: var(--mf-color-text-secondary); }
 .signal-brush.signal-brush-active { border-color: var(--mf-color-text-primary); }

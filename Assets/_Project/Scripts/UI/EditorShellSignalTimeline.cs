@@ -53,7 +53,20 @@ namespace OmsiMapEditor.UI
         private Button signalDiscardButton;
         private OmsiSignalProgram signalDraft;
         private bool signalDirty;
-        private bool signalTimelineShown;
+        private SignalTab signalTab = SignalTab.Movements;
+        private Button signalPhasesTab;
+        private VisualElement signalDraftRow;
+
+        /// <summary>The pages of the signals tool; the assistant has no tab of its own and is opened from the movements.</summary>
+        private enum SignalTab
+        {
+            Movements,
+            Phases,
+            Timeline,
+            Wizard
+        }
+
+        private bool signalTimelineShown => signalTab == SignalTab.Timeline;
         private List<OmsiSignalAspect> signalStateChoices = new List<OmsiSignalAspect>();
 
         private static string AspectName(OmsiSignalAspect aspect)
@@ -74,10 +87,13 @@ namespace OmsiMapEditor.UI
         {
             var tabs = new VisualElement();
             tabs.AddToClassList("panel-tabs");
-            signalMovementsTab = LocBindings.NewButton("signals.tab.movements", () => ShowSignalTab(false));
+            signalMovementsTab = LocBindings.NewButton("signals.tab.movements", () => ShowSignalTab(SignalTab.Movements));
             signalMovementsTab.AddToClassList("panel-tab");
             tabs.Add(signalMovementsTab);
-            signalTimelineTab = LocBindings.NewButton("signals.tab.timeline", () => ShowSignalTab(true));
+            signalPhasesTab = LocBindings.NewButton("signals.tab.phases", () => ShowSignalTab(SignalTab.Phases));
+            signalPhasesTab.AddToClassList("panel-tab");
+            tabs.Add(signalPhasesTab);
+            signalTimelineTab = LocBindings.NewButton("signals.tab.timeline", () => ShowSignalTab(SignalTab.Timeline));
             signalTimelineTab.AddToClassList("panel-tab");
             tabs.Add(signalTimelineTab);
             return tabs;
@@ -179,8 +195,10 @@ namespace OmsiMapEditor.UI
             signalIssuesLabel.AddToClassList("signal-issues");
             signalTimelinePage.Add(signalIssuesLabel);
 
+            // Apply and Discard serve the phases and the timeline alike; the panel puts them below both.
             var applyRow = new VisualElement();
             applyRow.AddToClassList("signal-group-row");
+            signalDraftRow = applyRow;
             signalDiscardButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.discard", DiscardSignalDraft), "signals.discard.tooltip");
             signalDiscardButton.AddToClassList("map-control-button");
             applyRow.Add(signalDiscardButton);
@@ -188,22 +206,56 @@ namespace OmsiMapEditor.UI
             signalApplyButton.AddToClassList("map-control-button");
             signalApplyButton.AddToClassList("dialog-primary");
             applyRow.Add(signalApplyButton);
-            signalTimelinePage.Add(applyRow);
             signalTimelinePage.style.display = DisplayStyle.None;
             return signalTimelinePage;
         }
 
-        private void ShowSignalTab(bool timeline)
+        private void ShowSignalTab(SignalTab tab)
         {
-            signalTimelineShown = timeline;
-            if (signalMovementsPage != null)
-                signalMovementsPage.style.display = timeline ? DisplayStyle.None : DisplayStyle.Flex;
-            if (signalTimelinePage != null)
-                signalTimelinePage.style.display = timeline ? DisplayStyle.Flex : DisplayStyle.None;
-            signalMovementsTab?.EnableInClassList("panel-tab-active", !timeline);
-            signalTimelineTab?.EnableInClassList("panel-tab-active", timeline);
-            if (timeline)
+            signalTab = tab;
+            void Show(VisualElement page, SignalTab of)
+            {
+                if (page != null)
+                    page.style.display = tab == of ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            Show(signalMovementsPage, SignalTab.Movements);
+            Show(signalPhasesPage, SignalTab.Phases);
+            Show(signalTimelinePage, SignalTab.Timeline);
+            Show(signalWizardPage, SignalTab.Wizard);
+            Show(signalWizardButtons, SignalTab.Wizard);
+            signalMovementsTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Movements);
+            signalPhasesTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Phases);
+            signalTimelineTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Timeline);
+            if (tab != SignalTab.Wizard)
+                signalProposal = null;
+            if (tab == SignalTab.Timeline)
                 RenderSignalTimeline();
+            if (tab == SignalTab.Phases)
+                RenderSignalPhases();
+            UpdateSignalDraftRow();
+            UpdateSignalPreview();
+        }
+
+        /// <summary>Apply and Discard below the phases and the timeline of a junction made here.</summary>
+        private void UpdateSignalDraftRow()
+        {
+            if (signalDraftRow == null)
+                return;
+            var shown = SignalsEditable && (signalTab == SignalTab.Phases || signalTab == SignalTab.Timeline);
+            signalDraftRow.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
+            signalApplyButton.SetEnabled(shown && signalDirty);
+            signalDiscardButton.SetEnabled(shown && signalDirty);
+            signalApplyButton.EnableInClassList("signal-dirty", signalDirty);
+        }
+
+        /// <summary>Shows the draft again wherever it is shown, after a change.</summary>
+        private void RenderSignalDraft()
+        {
+            if (signalTab == SignalTab.Timeline)
+                RenderSignalTimeline();
+            if (signalTab == SignalTab.Phases)
+                RenderSignalPhases();
+            UpdateSignalDraftRow();
         }
 
         /// <summary>The program the timeline shows: the draft on a junction made here, else the crossing's own.</summary>
@@ -290,10 +342,7 @@ namespace OmsiMapEditor.UI
             signalSplitSegmentButton.SetEnabled(canEditSegment);
             signalBrushRow.style.display = editable ? DisplayStyle.Flex : DisplayStyle.None;
             signalTimelineHint.style.display = editable ? DisplayStyle.Flex : DisplayStyle.None;
-            signalApplyButton.SetEnabled(editable && signalDirty);
-            signalDiscardButton.SetEnabled(editable && signalDirty);
-            signalApplyButton.parent.style.display = SignalsEditable ? DisplayStyle.Flex : DisplayStyle.None;
-            signalApplyButton.EnableInClassList("signal-dirty", signalDirty);
+            UpdateSignalDraftRow();
             signalIssuesLabel.text = shown == null ? string.Empty : DescribeSignalIssues(OmsiSignalTimeline.CheckTiming(shown, pedestrian), shown);
         }
 
@@ -341,7 +390,7 @@ namespace OmsiMapEditor.UI
                 return;
             edit();
             signalDirty = true;
-            RenderSignalTimeline();
+            RenderSignalDraft();
         }
 
         private void SetSignalCycle(string text)
@@ -480,7 +529,7 @@ namespace OmsiMapEditor.UI
             if (!signalDirty)
                 return;
             ResetSignalDraft(false);
-            RenderSignalTimeline();
+            RenderSignalDraft();
             SetStatusT("signals.status.discarded");
         }
 
@@ -502,7 +551,8 @@ namespace OmsiMapEditor.UI
         {
             var tab = Array.IndexOf(args, "-signalTab");
             if (tab >= 0 && tab + 1 < args.Length)
-                ShowSignalTab(string.Equals(args[tab + 1], "timeline", StringComparison.OrdinalIgnoreCase));
+                ShowSignalTab(string.Equals(args[tab + 1], "timeline", StringComparison.OrdinalIgnoreCase) ? SignalTab.Timeline
+                    : string.Equals(args[tab + 1], "phases", StringComparison.OrdinalIgnoreCase) ? SignalTab.Phases : SignalTab.Movements);
             var cycle = Array.IndexOf(args, "-signalCycle");
             if (cycle >= 0 && cycle + 1 < args.Length)
                 SetSignalCycle(args[cycle + 1]);

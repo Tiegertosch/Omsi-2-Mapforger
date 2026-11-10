@@ -3447,7 +3447,8 @@ namespace OmsiMapEditor.UI
                 if (step is OmsiSplineChange change)
                     parts.Add(new ObjectEditStep { SplineChange = change });
                 else if (step is OmsiObjectChange item)
-                    parts.Add(new ObjectEditStep { TileX = item.Tile.X, TileY = item.Tile.Y, ObjectId = item.Record.Id, Change = item });
+                    // (a change of an attached object, such as a signal head on a mast, has no object record but its element id)
+                    parts.Add(new ObjectEditStep { TileX = item.Tile.X, TileY = item.Tile.Y, ObjectId = item.Record?.Id ?? item.ElementId, Change = item });
             }
             PushHistory(new ObjectEditStep { Group = parts, Description = description });
             StartInstallationScan(true);

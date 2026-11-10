@@ -83,9 +83,18 @@ namespace OmsiMapEditor.UI
             signalPlanLabel = new Label();
             signalPlanLabel.AddToClassList("panel-info");
             signalMovementsPage.Add(signalPlanLabel);
+            var headsTitle = LocBindings.NewLabel("signals.heads");
+            headsTitle.AddToClassList("inspector-section-heading");
+            signalMovementsPage.Add(headsTitle);
+            signalHeadsBox = new VisualElement();
+            signalMovementsPage.Add(signalHeadsBox);
             signalOptions.Add(signalMovementsPage);
+            signalOptions.Add(CreateSignalPhasesPage());
             signalOptions.Add(CreateSignalTimelinePage());
-            ShowSignalTab(false);
+            signalOptions.Add(CreateSignalWizardPage());
+            signalOptions.Add(signalWizardButtons);
+            signalOptions.Add(signalDraftRow);
+            ShowSignalTab(SignalTab.Movements);
             objectsPanelHost.Add(signalOptions);
         }
 
@@ -203,8 +212,11 @@ namespace OmsiMapEditor.UI
                 ApplySelection(tile);
             }
             RenderSignalPanel();
-            if (signalTimelineShown)
-                RenderSignalTimeline();
+            if (signalTab == SignalTab.Wizard && !SignalsEditable)
+                ShowSignalTab(SignalTab.Movements);
+            else if (signalTab == SignalTab.Wizard)
+                RenderSignalWizard();
+            RenderSignalDraft();
             UpdateSignalPreview();
             SetStatusT("signals.status.target", ("id", record.Id), ("approaches", crossing.Approaches.Count), ("movements", crossing.Movements.Count),
                 ("groups", program.Lights.Count));
@@ -258,9 +270,12 @@ namespace OmsiMapEditor.UI
             }
             var colours = new List<Color?>();
             var selected = new List<bool>();
+            // While the assistant is open, the map shows the groups it proposes.
+            var proposed = signalTab == SignalTab.Wizard ? signalProposal : null;
             foreach (var movement in signalCrossing.Movements)
             {
-                colours.Add(movement.Light >= 0 ? SignalGroupColour(movement.Light) : (Color?)null);
+                var light = proposed != null ? proposed.MovementLights[movement.Index] : movement.Light;
+                colours.Add(light >= 0 ? SignalGroupColour(light) : (Color?)null);
                 selected.Add(signalSelected >= 0 && signalCrossing.Movements[signalSelected].ControlPath == movement.ControlPath);
             }
             mapCanvas.SetSignalMovements(signalLines, colours, selected, signalJunction.Height);
@@ -289,9 +304,20 @@ namespace OmsiMapEditor.UI
             }
             if (editable)
             {
+                // Without groups the assistant is offered first (§6 of the brief); it stays at hand next to adding a group by hand.
+                if (signalProgram.Lights.Count == 0)
+                {
+                    var offer = LocBindings.NewLabel("signals.wizard.offer");
+                    offer.AddToClassList("panel-info");
+                    signalGroupsBox.Add(offer);
+                }
+                var buttons = new VisualElement();
+                buttons.AddToClassList("signal-group-row");
+                buttons.Add(SignalWizardButton());
                 var add = LocBindings.WithTooltip(LocBindings.NewButton("signals.group.add", AddSignalGroup), "signals.group.add.tooltip");
                 add.AddToClassList("map-control-button");
-                signalGroupsBox.Add(add);
+                buttons.Add(add);
+                signalGroupsBox.Add(buttons);
             }
 
             var shown = new HashSet<int>();
@@ -314,6 +340,7 @@ namespace OmsiMapEditor.UI
                     AddMovementRow(movement, null, editable, shown);
             }
             UpdateSignalPlan();
+            RenderSignalHeads();
         }
 
         private VisualElement SignalGroupRow(int light, bool editable)
@@ -425,13 +452,18 @@ namespace OmsiMapEditor.UI
                 signalPlanLabel.text = Loc.T("signals.plan.point");
         }
 
-        /// <summary>The way through of a movement on a junction made here, by its first arc; null elsewhere.</summary>
+        /// <summary>
+        /// The way through of a movement on a junction made here, by the first arc of its way; null elsewhere. A movement
+        /// from a left-turn lane first follows the lane's lead-in, which belongs to no way.
+        /// </summary>
         private string WayOf(OmsiSignalMovement movement)
         {
-            if (signalLayout == null || movement.ControlPath < 0 || movement.ControlPath >= signalLayout.Paths.Count)
+            if (signalLayout == null)
                 return null;
-            var path = signalLayout.Paths[movement.ControlPath];
-            return path.StartsWay ? path.WayThrough : null;
+            foreach (var index in movement.Paths)
+                if (index >= 0 && index < signalLayout.Paths.Count && signalLayout.Paths[index].StartsWay)
+                    return signalLayout.Paths[index].WayThrough;
+            return null;
         }
 
         /// <summary>A click with the signals tool: selects the movement under the pointer, or works on the crossing clicked.</summary>
@@ -702,6 +734,9 @@ namespace OmsiMapEditor.UI
             if (select >= 0 && select + 1 < args.Length && int.TryParse(args[select + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var chosen) &&
                 signalCrossing != null && chosen >= 1 && chosen <= signalCrossing.Movements.Count)
                 SelectSignalMovement(chosen - 1);
+            if (signalCrossing == null)
+                return;
+            RunSignalWizardArguments(args);
             if (signalCrossing == null)
                 return;
             RunSignalTimelineArguments(args);
