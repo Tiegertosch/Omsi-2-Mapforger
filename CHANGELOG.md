@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.4
+
+A bug-fix release for large installations: the object menu no longer fills the memory while you page through it.
+
+### Fixes
+
+- **The object menu stays stable with many DLCs and a lot of community content.** Paging through the object menu could make MapWorks slow and bring it down on installations with very many objects. A model read for its preview picture is now released as soon as the picture is drawn, only the latest previews stay in memory (the others are read from their files again when a tile shows them), *Show more* adds its page instead of building the whole list again, a favourite star changes only its tile, and the search waits a moment after the last key before it lists the matches.
+- **The terrain follows the cant of a road.** A road with cant no longer leaves an edge in the ground beside it, and changing the cant fits the terrain again.
+- **Roads keep fitting the terrain after an export.** In a map made with MapWorks, building roads after exporting it fits the terrain as before.
+
+### Objects
+
+- **Variable parent.** The inspector of an object has a *Variable parent* group: it shows the object the variables come from, sets it by ID or by picking it in the map, shows it and removes it, each as one undo step.
+
+### Good to know
+
+- Projects, maps and settings from 1.1.3 open as before.
+- Preview pictures already drawn are kept.
+
 ## 1.1.3
 
 The inspector and the project browser are tidier, and a good deal more can be edited: entry points, rows that follow the slope of the road, cant and skew, copy and paste, the settings of a map, and a tile's terrain can be exported.
