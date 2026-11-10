@@ -204,7 +204,7 @@ namespace OmsiMapEditor.UI
             if (!ReferenceEquals(signalConflictsOf, signalCrossing))
             {
                 var sceneryObject = PrioritySceneryObject(signalJunction.AssetPath);
-                signalConflicts = sceneryObject != null ? OmsiSignalConflicts.Of(sceneryObject, signalCrossing) : new List<OmsiSignalConflict>();
+                signalConflicts = sceneryObject != null ? OmsiSignalConflicts.Of(sceneryObject, signalCrossing, signalProgram?.PathLights) : new List<OmsiSignalConflict>();
                 signalConflictsOf = signalCrossing;
             }
             return signalConflicts;

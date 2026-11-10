@@ -29,6 +29,11 @@ namespace OmsiMapEditor.OMSI
         /// the oncoming traffic, a turning vehicle against pedestrians crossing where it leaves.
         /// </summary>
         public bool Permitted { get; internal set; }
+
+        /// <summary>Where they meet in the crossing's frame: the first crossing point, or where they end in one lane.</summary>
+        public double X { get; internal set; }
+
+        public double Y { get; internal set; }
     }
 
     /// <summary>A conflict whose movements are given way at the same time by the program.</summary>
@@ -41,6 +46,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>How long in one cycle both may go together.</summary>
         public double OverlapSeconds { get; internal set; }
+
+        /// <summary>
+        /// Both movements obey the same light: they always go together, so no program can keep them apart (a matter for the
+        /// lanes or the groups, not the timing).
+        /// </summary>
+        public bool SameLight { get; internal set; }
     }
 
     /// <summary>
@@ -67,13 +78,19 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The program is looked at in steps of this many seconds.</summary>
         private const double SampleSeconds = 0.25;
 
-        public static List<OmsiSignalConflict> Of(OmsiSceneryObject sceneryObject, OmsiSignalIntersection crossing)
+        /// <param name="pathLights">
+        /// The light each path is bound to (<see cref="OmsiSignalProgram.PathLights"/>), when known: a movement is then only
+        /// followed until the next bound path after its own stop line, where it obeys another light (crossing objects of OMSI
+        /// hold several junctions, and one chain of paths runs through all of them).
+        /// </param>
+        public static List<OmsiSignalConflict> Of(OmsiSceneryObject sceneryObject, OmsiSignalIntersection crossing, IList<int> pathLights = null)
         {
             if (sceneryObject == null)
                 throw new ArgumentNullException(nameof(sceneryObject));
             if (crossing == null)
                 throw new ArgumentNullException(nameof(crossing));
-            var lines = crossing.Movements.Select(movement => Line(sceneryObject, movement)).ToList();
+            var governed = crossing.Movements.Select(movement => Governed(movement, pathLights)).ToList();
+            var lines = governed.Select(paths => Line(sceneryObject, paths)).ToList();
             var conflicts = new List<OmsiSignalConflict>();
             for (var first = 0; first < crossing.Movements.Count; first++)
             for (var second = first + 1; second < crossing.Movements.Count; second++)
@@ -88,24 +105,38 @@ namespace OmsiMapEditor.OMSI
                     continue;
                 if (footA || footB)
                 {
-                    if (!Cross(lines[first], lines[second], footA, footB))
+                    // (a footpath's ends lie on the pavement: a lane passing the corner close by does not cross it)
+                    if (!Cross(lines[first], lines[second], false, false, out var at))
                         continue;
                     var vehicle = footA ? b : a;
                     conflicts.Add(new OmsiSignalConflict
                     {
-                        First = first, Second = second, Kind = OmsiConflictKind.Pedestrian,
+                        First = first, Second = second, Kind = OmsiConflictKind.Pedestrian, X = at.X, Y = at.Y,
                         Permitted = vehicle.Turn == OmsiMovementTurn.Left || vehicle.Turn == OmsiMovementTurn.Right
                     });
                     continue;
                 }
                 OmsiConflictKind kind;
-                if (Distance(a.ExitX, a.ExitY, b.ExitX, b.ExitY) <= SameLaneMeters)
+                OmsiMapPoint meet;
+                // Movements that run on in a path they share have joined one lane (in OMSI's own crossings chains often do).
+                var endA = lines[first].Count > 0 ? lines[first][lines[first].Count - 1] : new OmsiMapPoint(a.ExitX, a.ExitY);
+                var endB = lines[second].Count > 0 ? lines[second][lines[second].Count - 1] : new OmsiMapPoint(b.ExitX, b.ExitY);
+                if (Distance(endA.X, endA.Y, endB.X, endB.Y) <= SameLaneMeters || governed[first].Intersect(governed[second]).Any())
+                {
                     kind = OmsiConflictKind.Merging;
-                else if (Cross(lines[first], lines[second], false, false))
+                    meet = MergePoint(sceneryObject, governed[first], governed[second], endA);
+                }
+                else if (Cross(lines[first], lines[second], false, false, out var crossingPoint))
+                {
                     kind = OmsiConflictKind.Crossing;
+                    meet = crossingPoint;
+                }
                 else
                     continue;
-                conflicts.Add(new OmsiSignalConflict { First = first, Second = second, Kind = kind, Permitted = GivesWay(crossing, a, b) || GivesWay(crossing, b, a) });
+                conflicts.Add(new OmsiSignalConflict
+                {
+                    First = first, Second = second, Kind = kind, X = meet.X, Y = meet.Y, Permitted = GivesWay(crossing, a, b) || GivesWay(crossing, b, a)
+                });
             }
             return conflicts;
         }
@@ -151,7 +182,7 @@ namespace OmsiMapEditor.OMSI
                             at = step;
                     }
                 if (together > 0)
-                    clashes.Add(new OmsiSignalClash { Conflict = conflict, Seconds = at * cycle / steps, OverlapSeconds = together * cycle / steps });
+                    clashes.Add(new OmsiSignalClash { Conflict = conflict, Seconds = at * cycle / steps, OverlapSeconds = together * cycle / steps, SameLight = first == second });
             }
             return clashes;
         }
@@ -174,10 +205,25 @@ namespace OmsiMapEditor.OMSI
             return turning.Turn != OmsiMovementTurn.Straight && Opposite(crossing, turning.Approach, other.Approach);
         }
 
-        private static List<OmsiMapPoint> Line(OmsiSceneryObject sceneryObject, OmsiSignalMovement movement)
+        /// <summary>The paths of a movement up to the next bound path after its stop line, or all without bindings.</summary>
+        private static List<int> Governed(OmsiSignalMovement movement, IList<int> pathLights)
+        {
+            if (pathLights == null)
+                return movement.Paths;
+            var start = Math.Max(0, movement.Paths.IndexOf(movement.ControlPath));
+            for (var index = start + 1; index < movement.Paths.Count; index++)
+            {
+                var path = movement.Paths[index];
+                if (path >= 0 && path < pathLights.Count && pathLights[path] >= 0)
+                    return movement.Paths.Take(index).ToList();
+            }
+            return movement.Paths;
+        }
+
+        private static List<OmsiMapPoint> Line(OmsiSceneryObject sceneryObject, IEnumerable<int> paths)
         {
             var line = new List<OmsiMapPoint>();
-            foreach (var index in movement.Paths)
+            foreach (var index in paths)
             {
                 if (index < 0 || index >= sceneryObject.Paths.Count)
                     continue;
@@ -195,8 +241,21 @@ namespace OmsiMapEditor.OMSI
         /// <summary>
         /// True when two lines cross away from their ends (a footpath may be crossed anywhere: its ends lie on the pavement).
         /// </summary>
-        private static bool Cross(List<OmsiMapPoint> first, List<OmsiMapPoint> second, bool firstAnywhere, bool secondAnywhere)
+        /// <summary>Where two merging movements meet: the start of the first path they share, or else where the first ends.</summary>
+        private static OmsiMapPoint MergePoint(OmsiSceneryObject sceneryObject, List<int> first, List<int> second, OmsiMapPoint end)
         {
+            var shared = first.FirstOrDefault(path => second.Contains(path));
+            if (first.Any(path => second.Contains(path)) && shared >= 0 && shared < sceneryObject.Paths.Count)
+            {
+                var path = sceneryObject.Paths[shared];
+                return path.PointAt(path.Direction == 1 ? path.LengthMeters : 0.0);
+            }
+            return end;
+        }
+
+        private static bool Cross(List<OmsiMapPoint> first, List<OmsiMapPoint> second, bool firstAnywhere, bool secondAnywhere, out OmsiMapPoint at)
+        {
+            at = default;
             if (first.Count < 2 || second.Count < 2 || !Overlap(Bounds(first, 0, first.Count), Bounds(second, 0, second.Count)))
                 return false;
             // Pieces of a few steps each are passed over at once when their boxes do not meet.
@@ -217,6 +276,7 @@ namespace OmsiMapEditor.OMSI
                             continue;
                         if (!secondAnywhere && NearEnd(second, point))
                             continue;
+                        at = point;
                         return true;
                     }
                 }

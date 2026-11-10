@@ -91,6 +91,7 @@ namespace OmsiMapEditor.UI
             signalOptions.Add(signalMovementsPage);
             signalOptions.Add(CreateSignalPhasesPage());
             signalOptions.Add(CreateSignalTimelinePage());
+            signalOptions.Add(CreateSignalCheckPage());
             signalOptions.Add(CreateSignalWizardPage());
             signalOptions.Add(signalWizardButtons);
             signalOptions.Add(signalDraftRow);
@@ -134,6 +135,10 @@ namespace OmsiMapEditor.UI
 
         private void ClearSignalTarget()
         {
+            StopSignalPreview();
+            signalHeadPlaces.Clear();
+            signalFindings.Clear();
+            mapCanvas?.SetSignalMarkers(null);
             if (signalDirty)
                 SetStatusT("signals.status.discarded");
             signalDirty = false;
@@ -199,6 +204,8 @@ namespace OmsiMapEditor.UI
             // The layout made anew must be the one the file holds, or its ways cannot be told apart.
             if (signalLayout != null && signalLayout.Paths.Count != sceneryObject.Paths.Count)
                 signalLayout = null;
+            if (!sameCrossing)
+                StopSignalPreview();
             ResetSignalDraft(!sameCrossing);
             if (signalSelected >= crossing.Movements.Count)
                 signalSelected = -1;
@@ -211,6 +218,7 @@ namespace OmsiMapEditor.UI
                 selection.Add(new MapSelectionItem { Tile = tile, Record = record });
                 ApplySelection(tile);
             }
+            FindSignalHeadPlaces();
             RenderSignalPanel();
             if (signalTab == SignalTab.Wizard && !SignalsEditable)
                 ShowSignalTab(SignalTab.Movements);
@@ -248,6 +256,7 @@ namespace OmsiMapEditor.UI
             if (signalJunction == null || signalTile == null)
                 return;
             var id = signalJunction.Id;
+            StopSignalPreview();
             // Undo puts other files back: a draft with changes is dropped.
             if (signalDirty)
             {
@@ -270,12 +279,15 @@ namespace OmsiMapEditor.UI
             }
             var colours = new List<Color?>();
             var selected = new List<bool>();
-            // While the assistant is open, the map shows the groups it proposes.
+            // While the assistant is open, the map shows the groups it proposes; in the preview, what each movement is shown.
             var proposed = signalTab == SignalTab.Wizard ? signalProposal : null;
             foreach (var movement in signalCrossing.Movements)
             {
                 var light = proposed != null ? proposed.MovementLights[movement.Index] : movement.Light;
-                colours.Add(light >= 0 ? SignalGroupColour(light) : (Color?)null);
+                if (SignalPreviewActive && proposed == null)
+                    colours.Add(light >= 0 ? SignalStateColour(signalClockProgram.StateAt(light, signalClock.Time)) : (Color?)null);
+                else
+                    colours.Add(light >= 0 ? SignalGroupColour(light) : (Color?)null);
                 selected.Add(signalSelected >= 0 && signalCrossing.Movements[signalSelected].ControlPath == movement.ControlPath);
             }
             mapCanvas.SetSignalMovements(signalLines, colours, selected, signalJunction.Height);
@@ -581,6 +593,7 @@ namespace OmsiMapEditor.UI
                 else
                     signals.WayLights[key] = moved;
             }
+            signals.RemapExceptions(map);
             // Heads of the groups after it follow their group to its new number, in the same step.
             var relabel = heads.Where(head => head.LightIndex.HasValue && head.LightIndex.Value > light).ToList();
             ApplySignals(signals, relabel.Count > 0 ? (Func<List<object>>)(() => RelabelHeads(relabel, map)) : null,
@@ -740,6 +753,9 @@ namespace OmsiMapEditor.UI
             if (signalCrossing == null)
                 return;
             RunSignalTimelineArguments(args);
+            if (signalCrossing == null)
+                return;
+            RunSignalCheckArguments(args);
             if (signalCrossing == null)
                 return;
             Debug.Log("Signals: crossing " + signalJunction.Id + " (" + signalJunction.AssetPath + "), " + (SignalsEditable ? "editable" : "read-only") + ", " +

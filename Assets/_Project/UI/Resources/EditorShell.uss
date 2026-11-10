@@ -230,6 +230,25 @@
 .signal-movement-group .unity-base-popup-field__text { color: var(--mf-color-text-primary); }
 .signal-timeline { margin: 4px 0; }
 .signal-scroll-page { max-height: 520px; flex-shrink: 1; }
+.signal-matrix-scroll { max-height: 260px; margin: 2px 0 4px; }
+.signal-matrix { flex-direction: column; }
+.signal-matrix-row { flex-direction: row; }
+.signal-matrix-head { width: 22px; min-width: 22px; height: 20px; margin: 1px; padding: 0; -unity-text-align: middle-center; font-size: 10px; color: var(--mf-color-text-secondary); border-bottom-width: 3px; border-color: rgba(0, 0, 0, 0); }
+.signal-matrix-cell { width: 22px; min-width: 22px; height: 20px; margin: 1px; padding: 0; font-size: 10px; color: #ffffff; -unity-font: url("Fonts/Inter-SemiBold.ttf"); border-width: 0; border-radius: 3px; }
+.signal-matrix-cell:hover { border-width: 1px; border-color: #ffffff; }
+.signal-matrix-cell:disabled { opacity: 1; }
+.signal-matrix-self { background-color: rgba(0, 0, 0, 0.35); }
+.signal-matrix-manual { border-width: 2px; border-color: #ffffff; }
+.signal-matrix-swatch { width: 12px; height: 12px; border-radius: 3px; margin: 0 4px 0 0; }
+.signal-finding { margin: 1px 0; padding-left: 6px; font-size: var(--mf-font-secondary); white-space: normal; border-left-width: 3px; }
+.signal-finding-error { color: var(--mf-color-text-primary); border-left-color: #c84040; }
+.signal-finding-warning { color: var(--mf-color-text-primary); border-left-color: #d9a92e; }
+.signal-finding-hint { color: var(--mf-color-text-secondary); border-left-color: var(--mf-color-border); }
+.signal-preview { margin: 4px 0; padding: 4px; border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.signal-preview-button { width: 28px; min-width: 28px; height: 24px; margin: 0 3px 0 0; padding: 4px; }
+.signal-preview-button > .icon { flex-grow: 1; }
+.picker-field.signal-preview-time { width: 64px; min-width: 64px; margin: 0 3px 0 0; }
+.signal-movement-group.signal-preview-speed { width: 62px; }
 .signal-window { margin: 1px 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .signal-phase { margin: 4px 0; padding: 4px 6px; border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
 .signal-phase-title { flex-grow: 1; color: var(--mf-color-text-primary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); margin: 0; }

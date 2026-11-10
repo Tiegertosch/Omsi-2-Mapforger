@@ -847,6 +847,7 @@ namespace OmsiMapEditor.UI
                 benchmarkFrames.Add(Time.unscaledDeltaTime * 1000.0);
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
+            TickSignalPreview(Time.unscaledDeltaTime);
             PumpAerial();
             TickTerrain();
             var panelWidth = rootElement.worldBound.width;
@@ -6330,7 +6331,9 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (activeTool == EditorTool.Road || activeTool == EditorTool.Rows)
+            // Tools with a panel of their own in the same place end first, or both panels would stand there at once and Esc
+            // would close only one of them.
+            if (activeTool != EditorTool.Drag && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate)
                 SetTool(EditorTool.Drag);
             UpdateObjectsCatalog();
             StartInstallationScan();

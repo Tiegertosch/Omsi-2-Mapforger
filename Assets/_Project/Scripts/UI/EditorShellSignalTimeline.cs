@@ -63,6 +63,7 @@ namespace OmsiMapEditor.UI
             Movements,
             Phases,
             Timeline,
+            Check,
             Wizard
         }
 
@@ -96,6 +97,7 @@ namespace OmsiMapEditor.UI
             signalTimelineTab = LocBindings.NewButton("signals.tab.timeline", () => ShowSignalTab(SignalTab.Timeline));
             signalTimelineTab.AddToClassList("panel-tab");
             tabs.Add(signalTimelineTab);
+            tabs.Add(CreateSignalCheckTab());
             return tabs;
         }
 
@@ -113,6 +115,7 @@ namespace OmsiMapEditor.UI
             signalCycleField.RegisterValueChangedCallback(evt => SetSignalCycle(evt.newValue));
             cycleRow.Add(signalCycleField);
             signalTimelinePage.Add(cycleRow);
+            signalTimelinePage.Add(CreateSignalPreviewBar());
 
             // The colour a drag along a row paints with.
             signalBrushRow = new VisualElement();
@@ -221,19 +224,24 @@ namespace OmsiMapEditor.UI
             Show(signalMovementsPage, SignalTab.Movements);
             Show(signalPhasesPage, SignalTab.Phases);
             Show(signalTimelinePage, SignalTab.Timeline);
+            Show(signalCheckPage, SignalTab.Check);
             Show(signalWizardPage, SignalTab.Wizard);
             Show(signalWizardButtons, SignalTab.Wizard);
             signalMovementsTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Movements);
             signalPhasesTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Phases);
             signalTimelineTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Timeline);
+            signalCheckTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Check);
             if (tab != SignalTab.Wizard)
                 signalProposal = null;
             if (tab == SignalTab.Timeline)
                 RenderSignalTimeline();
             if (tab == SignalTab.Phases)
                 RenderSignalPhases();
+            if (tab == SignalTab.Check)
+                RenderSignalCheck();
             UpdateSignalDraftRow();
             UpdateSignalPreview();
+            UpdateSignalMarkers();
         }
 
         /// <summary>Apply and Discard below the phases and the timeline of a junction made here.</summary>
@@ -255,7 +263,15 @@ namespace OmsiMapEditor.UI
                 RenderSignalTimeline();
             if (signalTab == SignalTab.Phases)
                 RenderSignalPhases();
+            if (signalTab == SignalTab.Check)
+                RenderSignalCheck();
             UpdateSignalDraftRow();
+            // A preview follows the draft at once: the same program, changed in place.
+            if (SignalPreviewActive)
+            {
+                EnsureSignalClock();
+                ShowSignalPreviewState();
+            }
         }
 
         /// <summary>The program the timeline shows: the draft on a junction made here, else the crossing's own.</summary>
@@ -286,6 +302,7 @@ namespace OmsiMapEditor.UI
             signalTimeline.Show(shown, SignalGroupColour, editable);
             signalCycleField.SetValueWithoutNotify(shown != null ? shown.CycleLength.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty);
             signalCycleField.SetEnabled(editable);
+            RenderSignalPreviewRequests();
             RenderSignalTimelineDetails();
         }
 
@@ -552,7 +569,8 @@ namespace OmsiMapEditor.UI
             var tab = Array.IndexOf(args, "-signalTab");
             if (tab >= 0 && tab + 1 < args.Length)
                 ShowSignalTab(string.Equals(args[tab + 1], "timeline", StringComparison.OrdinalIgnoreCase) ? SignalTab.Timeline
-                    : string.Equals(args[tab + 1], "phases", StringComparison.OrdinalIgnoreCase) ? SignalTab.Phases : SignalTab.Movements);
+                    : string.Equals(args[tab + 1], "phases", StringComparison.OrdinalIgnoreCase) ? SignalTab.Phases
+                    : string.Equals(args[tab + 1], "check", StringComparison.OrdinalIgnoreCase) ? SignalTab.Check : SignalTab.Movements);
             var cycle = Array.IndexOf(args, "-signalCycle");
             if (cycle >= 0 && cycle + 1 < args.Length)
                 SetSignalCycle(args[cycle + 1]);

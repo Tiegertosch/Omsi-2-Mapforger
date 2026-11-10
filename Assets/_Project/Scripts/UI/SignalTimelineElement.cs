@@ -52,6 +52,18 @@ namespace OmsiMapEditor.UI
         /// <summary>The second last clicked in the selected row (where Split cuts), or -1.</summary>
         public double ClickedSeconds { get; private set; } = -1;
 
+        /// <summary>The second the preview is at, drawn as a line across every row; null without a preview.</summary>
+        public double? Playhead { get; private set; }
+
+        public void SetPlayhead(double? seconds)
+        {
+            if (Nullable.Equals(Playhead, seconds))
+                return;
+            Playhead = seconds;
+            foreach (var child in rows.Children())
+                child.Q<VisualElement>(className: "signal-timeline-bar")?.MarkDirtyRepaint();
+        }
+
         /// <summary>The colour a drag along a row paints with, shown while dragging.</summary>
         public Color BrushColour { get; set; } = Green;
 
@@ -221,6 +233,13 @@ namespace OmsiMapEditor.UI
                     painter.LineTo(new Vector2(left, height - 2f));
                     painter.ClosePath();
                     painter.Stroke();
+                }
+                // The preview's second.
+                if (owner.Playhead.HasValue && owner.program.CycleLength > 0)
+                {
+                    var x = XAt(Math.Max(0, Math.Min(owner.Playhead.Value, owner.program.CycleLength)));
+                    Fill(painter, x - 1.5f, x + 1.5f, 0f, height, new Color(0.05f, 0.05f, 0.06f, 0.9f));
+                    Fill(painter, x - 0.75f, x + 0.75f, 0f, height, Color.white);
                 }
                 // Stop and jump points of this light: a white mark at their second, a jump with a line to where it goes.
                 foreach (var hold in owner.program.Holds)

@@ -62,7 +62,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Meilenstein 2 – Zufahrten, Fahrstreifen und Fahrbewegungen (auf `OmsiJunctionPriorities.Arms`, ADR 047), Signalgruppen verwalten, manuelle Zuordnung, Werkzeug „Signals“ (A) mit Anzeige in 2D und 3D; Bindungen erzeugter Kreuzungen über Bewegungsschlüssel (vom Nutzer getestet)
 - [x] Meilenstein 3 – Zeitleiste je Gruppe mit Malen, Kanten ziehen, Entfernen, Wiederholen, Umlaufzeit, Zeitprüfungen; Entwurf mit *Apply*/*Discard* als ein Rückgängig-Schritt (einfacher Modus §8 kommt mit Meilenstein 4; vom Nutzer getestet)
 - [x] Meilenstein 4 – Assistent (Gruppen vorschlagen, Grundschaltung, Prüfung auf Konflikte aus den Pfaden, Köpfe setzen), einfacher Modus als Reiter „Phasen“, Köpfe einer Kreuzung umstellen (auch an OMSIs Kreuzungen), Köpfe mit Mast setzen (vom Nutzer in openOMSI getestet)
-- [ ] Meilenstein 5 – Konfliktmatrix, Prüfungen, Vorschau mit Anforderungsschalter in 2D und 3D
+- [x] Meilenstein 5 – Konfliktmatrix mit manuellen Ausnahmen, Prüfung (Fehler/Warnung/Hinweis, Zwischenzeiten, Köpfe), Vorschau wie openOMSI mit Anforderungsschalter in 2D und 3D, Köpfe und Konfliktpunkte als Markierungen
 - [ ] Meilenstein 6 – Export (vom Nutzer entschieden: zuerst nur erzeugte Kreuzungen schreiben, ADR 085), Vorlagen, Rundreise-Tests, Doku
 - Testfälle des Auftrags: 8 (Import) und 15 (verlustfrei) sind mit Meilenstein 1 abgedeckt (Probe über die Installation); 1–6 und 7 (fehlende Köpfe) folgen mit Meilenstein 2, 9 und 11–12 mit 3 und 6, 10 und 14 mit 5, 13 mit 5.
 

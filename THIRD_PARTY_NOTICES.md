@@ -8,6 +8,8 @@ The vertex unscrambling of OMSI `.o3d` meshes in `Assets/_Project/Scripts/OMSI/O
 - Copyright: the openOMSI contributors
 - License: GNU Affero General Public License v3.0 (see [LICENSE](LICENSE))
 
+The cycle clock of traffic light programs in `Assets/_Project/Scripts/OMSI/OmsiSignalClock.cs` (stop and jump points, requests) is ported from openOMSI's `TrafficLightController::advance` in `crates/omsi-sim/src/traffic/lights.rs`, commit `24847d14899ae86291973d55df4d5f90f7dd5690`, same copyright and license; its test cases in `OmsiSignalClockTests.cs` follow openOMSI's `crates/omsi-sim/src/traffic/tests.rs`.
+
 Format facts in the documentation also draw on openOMSI's `docs/FORMATS.md`; each document links to it where it does.
 
 ## openMapper

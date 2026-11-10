@@ -21,6 +21,78 @@ namespace OmsiMapEditor.UI
         }
 
         private readonly List<SignalLine> signalLines = new List<SignalLine>();
+
+        /// <summary>What a signal marker shows: a head (editor overlay in its group's or its current colour) or where movements meet.</summary>
+        internal enum SignalMarkerKind
+        {
+            Head,
+            Conflict,
+            ConditionalConflict
+        }
+
+        private struct SignalMarker
+        {
+            public Vector2 At;
+            public float Height;
+            public Color Colour;
+            public SignalMarkerKind Kind;
+        }
+
+        private readonly List<SignalMarker> signalMarkers = new List<SignalMarker>();
+
+        /// <summary>Heads and conflict points of the signals tool, in world metres with their height for the 3D view; null clears them.</summary>
+        public void SetSignalMarkers(IList<(OmsiMapPoint At, double Height, Color Colour, SignalMarkerKind Kind)> markers)
+        {
+            signalMarkers.Clear();
+            if (markers != null && summary != null)
+                foreach (var marker in markers)
+                    signalMarkers.Add(new SignalMarker { At = WorldToMap(marker.At), Height = (float)marker.Height, Colour = marker.Colour, Kind = marker.Kind });
+            MarkDirtyRepaint();
+        }
+
+        private void DrawSignalMarkers(Painter2D painter, MapOrbitCamera? camera)
+        {
+            foreach (var marker in signalMarkers)
+            {
+                if (!HandleScreen(marker.At, marker.Height, camera, out var at))
+                    continue;
+                if (marker.Kind == SignalMarkerKind.Head)
+                {
+                    // A dark ring round a disc of the colour: plainly the editor's mark, not a lamp of the model.
+                    painter.fillColor = new Color(0.08f, 0.09f, 0.11f, 0.95f);
+                    painter.BeginPath();
+                    painter.Arc(at, 8.5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                    painter.Fill();
+                    painter.fillColor = marker.Colour;
+                    painter.BeginPath();
+                    painter.Arc(at, 5.5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                    painter.Fill();
+                    painter.strokeColor = Color.white;
+                    painter.lineWidth = 1.2f;
+                    painter.BeginPath();
+                    painter.Arc(at, 8.5f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
+                    painter.Stroke();
+                    continue;
+                }
+                painter.lineCap = LineCap.Round;
+                painter.strokeColor = new Color(0.05f, 0.05f, 0.06f, 0.9f);
+                painter.lineWidth = 5.5f;
+                StrokeCross(painter, at, 6f);
+                painter.strokeColor = marker.Colour;
+                painter.lineWidth = 3f;
+                StrokeCross(painter, at, 6f);
+            }
+        }
+
+        private static void StrokeCross(Painter2D painter, Vector2 at, float size)
+        {
+            painter.BeginPath();
+            painter.MoveTo(at + new Vector2(-size, -size));
+            painter.LineTo(at + new Vector2(size, size));
+            painter.MoveTo(at + new Vector2(size, -size));
+            painter.LineTo(at + new Vector2(-size, size));
+            painter.Stroke();
+        }
         private float signalHeight = float.NaN;
         private static readonly Color UnboundSignalColour = new Color(0.68f, 0.72f, 0.77f, 0.75f);
 
@@ -50,6 +122,12 @@ namespace OmsiMapEditor.UI
         }
 
         private void DrawSignalMovements(Painter2D painter, MapOrbitCamera? camera = null)
+        {
+            DrawSignalLines(painter, camera);
+            DrawSignalMarkers(painter, camera);
+        }
+
+        private void DrawSignalLines(Painter2D painter, MapOrbitCamera? camera)
         {
             if (signalLines.Count == 0)
                 return;

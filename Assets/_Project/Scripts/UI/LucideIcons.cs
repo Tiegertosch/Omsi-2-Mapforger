@@ -77,6 +77,9 @@ namespace OmsiMapEditor.UI
             ["chevron-right"] = new[] { "m9 18 6-6-6-6" },
             ["chevron-down"] = new[] { "m6 9 6 6 6-6" },
             ["maximize"] = new[] { "M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3" },
+            ["play"] = new[] { "M6 3 20 12 6 21z" },
+            ["pause"] = new[] { "M14 4h4v16h-4z", "M6 4h4v16h-4z" },
+            ["skip-back"] = new[] { "M19 20 9 12 19 4z", "M5 19v-14" },
             ["minus"] = new[] { "M5 12h14" },
             ["plus"] = new[] { "M5 12h14", "M12 5v14" },
             ["tree-deciduous"] = new[]
