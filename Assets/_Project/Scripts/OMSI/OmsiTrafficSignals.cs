@@ -188,6 +188,40 @@ namespace OmsiMapEditor.OMSI
             return start;
         }
 
+        /// <summary>
+        /// Adds a light that is red for the whole cycle (one phase of 0 s, which holds to the end): a light without phases
+        /// would show green in openOMSI. Returns its index.
+        /// </summary>
+        public int AddLight(string name)
+        {
+            var light = new OmsiSignalLight { Name = (name ?? string.Empty).Trim() };
+            light.Phases.Add(new OmsiSignalPhase(OmsiSignalAspects.StateOf(OmsiSignalAspect.Red), 0));
+            Lights.Add(light);
+            return Lights.Count - 1;
+        }
+
+        /// <summary>
+        /// Takes light <paramref name="index"/> away: paths bound to it are bound to none, its stop and jump points go, and
+        /// the lights after it move down by one. Returns the new index of every old light (-1 for the one taken away), so
+        /// the first labels of the heads can follow.
+        /// </summary>
+        public int[] RemoveLight(int index)
+        {
+            if (index < 0 || index >= Lights.Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+            var map = new int[Lights.Count];
+            for (var old = 0; old < map.Length; old++)
+                map[old] = old < index ? old : old == index ? -1 : old - 1;
+            Lights.RemoveAt(index);
+            for (var path = 0; path < PathLights.Count; path++)
+                if (PathLights[path] >= 0)
+                    PathLights[path] = map[PathLights[path]];
+            Holds.RemoveAll(hold => hold.Light == index);
+            foreach (var hold in Holds)
+                hold.Light = map[hold.Light];
+            return map;
+        }
+
         public OmsiSignalProgram Copy()
         {
             var copy = new OmsiSignalProgram { CycleSeconds = CycleSeconds };

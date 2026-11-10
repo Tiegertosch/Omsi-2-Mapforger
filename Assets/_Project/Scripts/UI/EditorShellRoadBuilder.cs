@@ -645,7 +645,7 @@ namespace OmsiMapEditor.UI
             try
             {
                 assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, made.Name,
-                    OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + made.Name, made.Markings, made.Areas, made.Arrows, keepConnections ? made.Connections : null));
+                    WithSignalReport(OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + made.Name, made.Markings, made.Areas, made.Arrows, keepConnections ? made.Connections : null, made.Signals)));
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {

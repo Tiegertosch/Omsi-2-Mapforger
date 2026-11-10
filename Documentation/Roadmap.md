@@ -59,7 +59,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 ## Ampelphasen-Editor (ADR 085, Entwicklungsauftrag des Nutzers vom 10. November 2026)
 
 - [x] Meilenstein 1 – Analyse und Datenmodell: Formatbefund (`TrafficSignalInventory.md`), `OmsiSignalProgram` in OMSIs eigener Form, Zeitlogik wie openOMSI, verlustfreies Lesen und Schreiben der `.sco`, Köpfe einer Kreuzung finden, Tests und Probe über alle 85 Programme der Installation
-- [ ] Meilenstein 2 – Zufahrten, Fahrstreifen und Fahrbewegungen (auf `OmsiJunctionPriorities.Arms`, ADR 047), Signalgruppen verwalten, manuelle Zuordnung, Anzeige in 2D; Bindungen erzeugter Kreuzungen über Bewegungsschlüssel
+- [x] Meilenstein 2 – Zufahrten, Fahrstreifen und Fahrbewegungen (auf `OmsiJunctionPriorities.Arms`, ADR 047), Signalgruppen verwalten, manuelle Zuordnung, Werkzeug „Signals“ (A) mit Anzeige in 2D und 3D; Bindungen erzeugter Kreuzungen über Bewegungsschlüssel (vom Nutzer getestet)
 - [ ] Meilenstein 3 – Zeitleiste, Phasen, Zykluszeit, Eigenschaften, Rückgängig/Wiederholen
 - [ ] Meilenstein 4 – Assistent: Signalgruppen vorschlagen, Grundschaltung, Köpfe setzen
 - [ ] Meilenstein 5 – Konfliktmatrix, Prüfungen, Vorschau mit Anforderungsschalter in 2D und 3D

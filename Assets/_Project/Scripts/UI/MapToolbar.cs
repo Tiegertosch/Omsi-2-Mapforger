@@ -8,7 +8,7 @@ namespace OmsiMapEditor.UI
     /// What a left drag on the map does: drag the selection freely, move it freely or along axis arrows, or turn the
     /// selected object. Every tool selects with a click.
     /// </summary>
-    internal enum EditorTool { Drag, Move, Rotate, Road, Rows, Terrain, Markings, Priorities, Lanes }
+    internal enum EditorTool { Drag, Move, Rotate, Road, Rows, Terrain, Markings, Priorities, Lanes, Signals }
 
     /// <summary>
     /// The tool bar at the bottom of the map: grouped buttons with an icon, a name and their key, as the corporate
@@ -38,6 +38,7 @@ namespace OmsiMapEditor.UI
             AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "M", "toolbar.markings.tooltip");
             AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "V", "toolbar.priority.tooltip");
             AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes", "L", "toolbar.lanes.tooltip");
+            AddTool(world, EditorTool.Signals, "traffic-light", "toolbar.signals", "A", "toolbar.signals.tooltip");
             objectsButton = AddButton(world, "box", "toolbar.objects", "3", "toolbar.objects.tooltip", () => ObjectsRequested?.Invoke());
         }
 

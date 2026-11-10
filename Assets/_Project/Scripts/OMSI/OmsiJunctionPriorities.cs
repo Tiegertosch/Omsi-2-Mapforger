@@ -64,7 +64,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A path turning less than this from start to end runs straight on.</summary>
         private const double StraightDegrees = 30.0;
 
-        private struct Ends
+        internal struct Ends
         {
             public double EntryX, EntryY, EntryHeading, ExitX, ExitY, ExitHeading;
         }
@@ -269,7 +269,7 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>Where traffic comes onto a path and leaves it, with its headings; a path used against its points the other way round.</summary>
-        private static Ends EndsOf(OmsiObjectPath path)
+        internal static Ends EndsOf(OmsiObjectPath path)
         {
             var lane = new OmsiSplineRecord
             {
@@ -284,7 +284,7 @@ namespace OmsiMapEditor.OMSI
                 : new Ends { EntryX = start.X, EntryY = start.Y, EntryHeading = first, ExitX = end.X, ExitY = end.Y, ExitHeading = last };
         }
 
-        private static bool Joins(double exitX, double exitY, double exitHeading, double entryX, double entryY, double entryHeading)
+        internal static bool Joins(double exitX, double exitY, double exitHeading, double entryX, double entryY, double entryHeading)
         {
             return Distance(exitX, exitY, entryX, entryY) <= OmsiMapPaths.LinkMeters && Math.Abs(OmsiRoadPlanner.Normalize(entryHeading - exitHeading)) < OmsiMapPaths.LinkDegrees;
         }

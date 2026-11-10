@@ -1454,6 +1454,7 @@ namespace OmsiMapEditor.UI
             DrawObjects(context, painter, visible);
             DrawPaths(painter, visible);
             DrawHighlightedPaths(painter);
+            DrawSignalMovements(painter);
             DrawPriorityHandles(painter);
             DrawLaneEnds(painter);
             DrawRoutes(context, painter, visible);
@@ -3428,6 +3429,7 @@ namespace OmsiMapEditor.UI
             DrawRoad3D(painter, camera);
             DrawPlacementPoints3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
+            DrawSignalMovements(painter, camera);
             DrawPriorityHandles(painter, camera);
             DrawLaneEnds(painter, camera);
             DrawBox(painter);

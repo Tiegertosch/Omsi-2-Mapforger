@@ -82,6 +82,14 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The indicator a vehicle sets on it: 0 none, 2 left, 3 right.</summary>
         public int Blinker { get; internal set; }
+
+        /// <summary>The point <paramref name="along"/> metres from where it is defined to start, in the object frame.</summary>
+        public OmsiMapPoint PointAt(double along)
+        {
+            var lane = new OmsiSplineRecord { LocalX = X, LocalY = Y, HeadingDegrees = HeadingDegrees, LengthMeters = LengthMeters, RadiusMeters = RadiusMeters };
+            OmsiMapGeometry.GetLocalFrameAt(lane, along, out var point, out _);
+            return point;
+        }
     }
 
     /// <summary>A spline connection point of a crossing or switch, in the object frame (x right, y forward).</summary>

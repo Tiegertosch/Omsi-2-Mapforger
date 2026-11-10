@@ -89,5 +89,84 @@ namespace OmsiMapEditor.Tests
             Assert.IsNull(OmsiLaneConnections.Read(every.Sco));
             Assert.IsEmpty(OmsiLaneConnections.Read("MapWorks lanes:\r\n"));
         }
+
+        private static OmsiGeneratedJunction ReadBack(OmsiGeneratedObject made)
+        {
+            return OmsiGeneratedJunction.Parse(@"Sceneryobjects\Mapforge\Test\Signals\Signals.sco", OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252),
+                path => OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), path));
+        }
+
+        /// <summary>Two lights for the T junction: the through road (east-west both ways) and the side road turning in.</summary>
+        private static OmsiJunctionSignals TeeSignals()
+        {
+            var signals = new OmsiJunctionSignals();
+            signals.Program.CycleSeconds = 60;
+            var through = signals.Program.AddLight("Through");
+            signals.Program.Lights[through].Phases.Insert(0, new OmsiSignalPhase(6, 30));
+            var side = signals.Program.AddLight("Side");
+            signals.Program.Lights[side].Phases.Insert(0, new OmsiSignalPhase(0, 33));
+            signals.Program.Lights[side].Phases.Insert(1, new OmsiSignalPhase(6, 20));
+            signals.WayLights["1.0>2.1"] = through;
+            signals.WayLights["2.0>1.1"] = through;
+            signals.WayLights["0.0>1.1"] = side;
+            signals.WayLights["0.0>2.1"] = side;
+            return signals;
+        }
+
+        [Test]
+        public void TheSignalsOfAMadeJunctionAreWrittenOnTheFirstArcOfEachWay()
+        {
+            var made = OmsiJunctionGenerator.Junction(Tee(), null, "Signals", signals: TeeSignals());
+
+            StringAssert.Contains("MapWorks signals: 0.0>1.1=1 0.0>2.1=1 1.0>2.1=0 2.0>1.1=0", made.Sco);
+            var bytes = OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252);
+            var program = OmsiSignalProgram.Read(bytes);
+            CollectionAssert.AreEqual(new[] { "Through", "Side" }, program.Lights.Select(light => light.Name).ToArray());
+            Assert.AreEqual(60, program.CycleSeconds);
+            var layout = OmsiJunctionLayout.Build(Tee(), null);
+            for (var index = 0; index < layout.Paths.Count; index++)
+            {
+                var path = layout.Paths[index];
+                var expected = path.StartsWay ? TeeSignals().WayLights.TryGetValue(path.WayThrough, out var light) ? light : -1 : -1;
+                Assert.AreEqual(expected, program.PathLights[index], "path " + index + " " + path.WayThrough);
+            }
+            // The four bound ways obey their light at their first arc, the two ways into the side road none, and the analysis sees it so.
+            var crossing = OmsiSignalIntersection.Analyse(OmsiSceneryObject.Parse(bytes), program);
+            var road = crossing.Movements.Where(movement => movement.Turn != OmsiMovementTurn.Pedestrian).ToList();
+            Assert.AreEqual(6, road.Count);
+            Assert.AreEqual(2, road.Count(movement => movement.Light == 0));
+            Assert.AreEqual(2, road.Count(movement => movement.Light == 1));
+            Assert.AreEqual(2, road.Count(movement => movement.Light == -1));
+            // Each arm has one lane in; its two ways start on arcs of their own but at the same place, so they share the lane.
+            Assert.AreEqual(3, crossing.Approaches.Count);
+            Assert.IsTrue(crossing.Approaches.All(approach => approach.Lanes.Count == 1 && approach.Lanes[0].Movements.Count == 2));
+            CollectionAssert.IsEmpty(made.LostSignalWays);
+            // Without a program nothing is written.
+            StringAssert.DoesNotContain("traffic_light", OmsiJunctionGenerator.Junction(Tee(), null, "Plain").Sco);
+        }
+
+        [Test]
+        public void TheSignalsSurviveMakingTheJunctionAgainAndLoseOnlyWaysThatAreGone()
+        {
+            var first = ReadBack(OmsiJunctionGenerator.Junction(Tee(), null, "Signals", signals: TeeSignals()));
+            Assert.IsNotNull(first.Signals);
+            Assert.AreEqual(4, first.Signals.WayLights.Count);
+
+            // Made again with markings, as the markings tool does: the program and every binding stay.
+            var again = OmsiJunctionGenerator.Junction(first.Arms, null, "Signals", first.Markings, first.Areas, first.Arrows, first.Connections, first.Signals);
+            var second = ReadBack(again);
+            CollectionAssert.AreEquivalent(TeeSignals().WayLights, second.Signals.WayLights);
+            CollectionAssert.AreEqual(new[] { "Through", "Side" }, second.Signals.Program.Lights.Select(light => light.Name).ToArray());
+
+            // Made again with fewer lanes, as the lanes tool does: the ways that are gone lose their binding, and say so.
+            var fewer = OmsiJunctionGenerator.Junction(second.Arms, null, "Signals", null, null, null, new HashSet<string> { "1.0>2.1", "2.0>1.1", "0.0>2.1" },
+                second.Signals);
+            CollectionAssert.AreEqual(new[] { "0.0>1.1" }, fewer.LostSignalWays);
+            var third = ReadBack(fewer);
+            Assert.AreEqual(3, third.Signals.WayLights.Count);
+            Assert.IsFalse(third.Signals.WayLights.ContainsKey("0.0>1.1"));
+            // The junction's own copy of the signals is not changed by making the new one.
+            Assert.AreEqual(4, second.Signals.WayLights.Count);
+        }
     }
 }

@@ -155,6 +155,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Files the editor makes for the object, such as the plain textures of road markings, by their path in its folder.</summary>
         public Dictionary<string, byte[]> Files { get; } = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Ways through that obeyed a light but are gone from the junction made anew (ADR 085); their binding is dropped.</summary>
+        public List<string> LostSignalWays { get; } = new List<string>();
     }
 
     /// <summary>
@@ -225,7 +228,7 @@ namespace OmsiMapEditor.OMSI
         /// <param name="connections">The ways through to build as lanes (ADR 048); null for every way through.</param>
         public static OmsiGeneratedObject Junction(IEnumerable<OmsiJunctionArm> arms, string roadTexture, string friendlyName,
             IList<OmsiMarkingLine> markings = null, IList<OmsiMarkingArea> areas = null, IList<OmsiMarkingArrow> arrows = null,
-            ICollection<string> connections = null)
+            ICollection<string> connections = null, OmsiJunctionSignals signals = null)
         {
             var layout = OmsiJunctionLayout.Build(arms, roadTexture, connections);
             var meshes = new List<OmsiGeneratedMesh>(layout.Meshes);
@@ -264,6 +267,9 @@ namespace OmsiMapEditor.OMSI
                 sco.Append(OmsiJunctionMarkings.WriteArrows(arrows)).Append("\r\n");
             if (connections != null)
                 sco.Append(OmsiLaneConnections.Write(connections)).Append("\r\n");
+            // The traffic light program goes with the junction (ADR 085); its bindings are written once the paths are there.
+            signals = signals?.Program.HasProgram == true ? signals.Copy() : null;
+            var signalsLine = sco.Length;
             var turnLanes = OmsiTurnLane.Write(layout.Arms);
             if (turnLanes != null)
                 sco.Append(turnLanes).Append("\r\n");
@@ -302,7 +308,13 @@ namespace OmsiMapEditor.OMSI
                 Section(sco, "matl_alpha", "1");
             }
             Section(sco, "collision_mesh", "model.x");
-            generated.Sco = sco.ToString();
+            var text = sco.ToString();
+            if (signals != null)
+            {
+                generated.LostSignalWays.AddRange(signals.WriteInto(ref text, layout));
+                text = text.Insert(signalsLine, signals.Line() + "\r\n");
+            }
+            generated.Sco = text;
             return generated;
         }
 

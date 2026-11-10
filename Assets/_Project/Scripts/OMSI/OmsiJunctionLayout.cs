@@ -406,6 +406,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>0 none, 2 left, 3 right, as OMSI's own junctions mark turning lanes.</summary>
         public int Blinker;
+
+        /// <summary>The way through (<see cref="OmsiLaneConnections.Key"/>) this arc is part of, or null for other paths.</summary>
+        public string WayThrough;
+
+        /// <summary>True for the first arc of its way through: where its vehicles stop at a light (ADR 085).</summary>
+        public bool StartsWay;
     }
 
     /// <summary>
@@ -1544,7 +1550,13 @@ namespace OmsiMapEditor.OMSI
                                 continue;
                             var start = Point.Along(Arms[from], turnsAt[from], inbound.X);
                             var end = Point.Along(Arms[to], turnsAt[to], outbound.X);
+                            var first = Paths.Count;
                             AddArcs(start, startHeading, end, Arms[to].HeadingDegrees, inbound.Height, inbound.Kind, inbound.Width, 0, blinker);
+                            for (var arc = first; arc < Paths.Count; arc++)
+                            {
+                                Paths[arc].WayThrough = key;
+                                Paths[arc].StartsWay = arc == first;
+                            }
                             WaysThrough.Add(key);
                             leadIns.Add(new KeyValuePair<int, OmsiSplineLane>(from, inbound));
                             leadOuts.Add(new KeyValuePair<int, OmsiSplineLane>(to, outbound));

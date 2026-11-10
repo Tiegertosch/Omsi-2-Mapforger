@@ -470,6 +470,7 @@ namespace OmsiMapEditor.UI
                 CreateMarkingOptions();
                 CreatePriorityOptions();
                 CreateLaneOptions();
+                CreateSignalOptions();
             }
             statusLabel = root.Q<Label>("status-message");
             mapStateLabel = root.Q<Label>("map-state");
@@ -541,6 +542,8 @@ namespace OmsiMapEditor.UI
                         UpdatePriorityPreview();
                     else if (activeTool == EditorTool.Lanes)
                         UpdateLanePreview();
+                    else if (activeTool == EditorTool.Signals)
+                        UpdateSignalPlan();
                     else
                         UpdateRoadPreview();
                 };
@@ -561,6 +564,8 @@ namespace OmsiMapEditor.UI
                         ClickPriority(x, y);
                     else if (activeTool == EditorTool.Lanes)
                         ClickLane(x, y);
+                    else if (activeTool == EditorTool.Signals)
+                        ClickSignal(x, y);
                     else
                         BuildRoadTo(x, y);
                 };
@@ -1152,6 +1157,7 @@ namespace OmsiMapEditor.UI
             RunClipboardArguments(args);
             RunMapSettingsArguments(args);
             RunContentFolderArguments(args);
+            RunSignalArguments(args);
             RunProjectTabArguments(args);
             RunEntryPointArguments(args);
             RunTerrainXArguments(args);
@@ -1894,6 +1900,11 @@ namespace OmsiMapEditor.UI
                 activeTool = EditorTool.Drag;
                 EndPriorityTool();
             }
+            if (activeTool == EditorTool.Signals)
+            {
+                activeTool = EditorTool.Drag;
+                EndSignalTool();
+            }
             if (activeTool == EditorTool.Lanes)
             {
                 activeTool = EditorTool.Drag;
@@ -2619,7 +2630,8 @@ namespace OmsiMapEditor.UI
             {
                 // The markings, areas and arrows go along; their anchors are named by arm, so they follow the turned arm.
                 var made = OmsiJunctionGenerator.Junction(turn.Arms, plain, "Mapforge " + rebuild.Made.Name, rebuild.Made.Markings, rebuild.Made.Areas,
-                    rebuild.Made.Arrows, rebuild.Made.Connections);
+                    rebuild.Made.Arrows, rebuild.Made.Connections, rebuild.Made.Signals);
+                WithSignalReport(made);
                 assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, rebuild.Made.Name, made);
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
@@ -4730,6 +4742,9 @@ namespace OmsiMapEditor.UI
             // Undo may have put another file of the junction back; the lanes tool reads it anew.
             if (activeTool == EditorTool.Lanes)
                 UpdateLanePreview();
+            // So does the signals tool.
+            if (activeTool == EditorTool.Signals)
+                RefreshSignalTarget();
         }
 
         /// <summary>Starts the terrain tool: its options in the tool panel, and the map's road mode for pointing and holding.</summary>
@@ -5797,6 +5812,16 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.V && mapCanvas != null && !mapCanvas.IsPlacing)
                 {
                     SetTool(activeTool == EditorTool.Priorities ? EditorTool.Drag : EditorTool.Priorities);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.A && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Signals ? EditorTool.Drag : EditorTool.Signals);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Signals)
+                {
+                    SetTool(EditorTool.Drag);
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Priorities)
@@ -6938,7 +6963,8 @@ namespace OmsiMapEditor.UI
             {
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "readonly.action.build_roads" : tool == EditorTool.Rows ? "readonly.action.lay_rows"
                     : tool == EditorTool.Terrain ? "readonly.action.shape_ground" : tool == EditorTool.Markings ? "readonly.action.draw_markings"
-                    : tool == EditorTool.Priorities ? "readonly.action.right_of_way" : tool == EditorTool.Lanes ? "readonly.action.choose_lanes" : "readonly.action.move_rotate"));
+                    : tool == EditorTool.Priorities ? "readonly.action.right_of_way" : tool == EditorTool.Lanes ? "readonly.action.choose_lanes"
+                    : tool == EditorTool.Signals ? "readonly.action.edit_signals" : "readonly.action.move_rotate"));
                 return;
             }
             // Another tool ends placing and closes the object library.
@@ -6950,6 +6976,7 @@ namespace OmsiMapEditor.UI
             var wasMarkings = activeTool == EditorTool.Markings;
             var wasPriorities = activeTool == EditorTool.Priorities;
             var wasLanes = activeTool == EditorTool.Lanes;
+            var wasSignals = activeTool == EditorTool.Signals;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
@@ -6966,6 +6993,8 @@ namespace OmsiMapEditor.UI
                 EndPriorityTool();
             if (wasLanes && tool != EditorTool.Lanes)
                 EndLaneTool();
+            if (wasSignals && tool != EditorTool.Signals)
+                EndSignalTool();
             if (tool == EditorTool.Road)
                 BeginRoadTool();
             if (tool == EditorTool.Rows)
@@ -6978,13 +7007,15 @@ namespace OmsiMapEditor.UI
                 BeginPriorityTool();
             if (tool == EditorTool.Lanes && !wasLanes)
                 BeginLaneTool();
+            if (tool == EditorTool.Signals && !wasSignals)
+                BeginSignalTool();
             // Choosing the tool that is on again keeps its panel in view, which closing the object library hid above.
             if (objectsPanelHost != null && (tool == EditorTool.Markings && wasMarkings || tool == EditorTool.Priorities && wasPriorities ||
-                                             tool == EditorTool.Lanes && wasLanes))
+                                             tool == EditorTool.Lanes && wasLanes || tool == EditorTool.Signals && wasSignals))
                 objectsPanelHost.style.display = DisplayStyle.Flex;
             UpdateToolbar();
             if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities ||
-                tool == EditorTool.Lanes)
+                tool == EditorTool.Lanes || tool == EditorTool.Signals)
                 return;
             SetStatusT(tool == EditorTool.Move ? "tool.status.move" : tool == EditorTool.Rotate ? "tool.status.rotate" : "tool.status.drag") /* i18n:keys */;
         }

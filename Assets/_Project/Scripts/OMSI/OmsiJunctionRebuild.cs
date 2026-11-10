@@ -43,6 +43,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The ways through it has lanes for (ADR 048), or null for every way through.</summary>
         public HashSet<string> Connections { get; private set; }
 
+        /// <summary>Its traffic light program (ADR 085), or null without one.</summary>
+        public OmsiJunctionSignals Signals { get; private set; }
+
         /// <summary>True for an object file the editor makes, under Sceneryobjects\Mapforge.</summary>
         public static bool IsMadeHere(string assetPath)
         {
@@ -88,6 +91,7 @@ namespace OmsiMapEditor.OMSI
             junction.Areas.AddRange(OmsiJunctionMarkings.ReadAreas(text));
             junction.Arrows.AddRange(OmsiJunctionMarkings.ReadArrows(text));
             junction.Connections = OmsiLaneConnections.Read(text);
+            junction.Signals = OmsiJunctionSignals.Read(bytes);
             foreach (var pair in OmsiTurnLane.Read(text))
                 if (pair.Key >= 0 && pair.Key < junction.Arms.Count)
                     junction.Arms[pair.Key].TurnLane = pair.Value;

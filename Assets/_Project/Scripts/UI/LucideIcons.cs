@@ -34,6 +34,13 @@ namespace OmsiMapEditor.UI
                 "m3.3 7 8.7 5 8.7-5", "M12 22V12"
             },
             ["x"] = new[] { "M18 6 6 18", "m6 6 12 12" },
+            // (drawn here in Lucide's style for the traffic signals tool, not taken from Lucide)
+            ["traffic-light"] = new[]
+            {
+                "M10 2h4a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3h-4a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3z",
+                "M10.5 7a1.5 1.5 0 0 1 3 0a1.5 1.5 0 0 1-3 0", "M10.5 12a1.5 1.5 0 0 1 3 0a1.5 1.5 0 0 1-3 0",
+                "M10.5 17a1.5 1.5 0 0 1 3 0a1.5 1.5 0 0 1-3 0", "M7 6H4", "M7 11H4", "M20 6h-3", "M20 11h-3"
+            },
             ["mountain"] = new[] { "m8 3 4 8 5-5 5 15H2L8 3z" },
             ["brush"] = new[]
             {
