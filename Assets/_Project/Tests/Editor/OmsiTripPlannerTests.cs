@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -135,6 +136,116 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(broken.IsValid);
             StringAssert.Contains("Far", broken.Problems[0]);
             Assert.IsFalse(OmsiTripPlanner.Plan(stops.Take(1).ToList(), timetable, network, (x, y) => 0).IsValid);
+        }
+
+        [Test]
+        public void AWaypointLeadsTheWayOverAnotherRoadAndTheLengthStaysTheSumOfTheLanes()
+        {
+            var a = Straight(1, 0, 0, 0, 100, 0);
+            var shortWay = Straight(2, 0, 100, 0, 200, 0);
+            var upperOne = Straight(3, 0, 100, 0, 150, 10);
+            var upperTwo = Straight(4, 0, 150, 10, 200, 0);
+            var b = Straight(5, 0, 200, 0, 300, 0);
+            var network = OmsiPathNetwork.Build(new[] { a, shortWay, upperOne, upperTwo, b });
+            var stops = new[]
+            {
+                new OmsiTripStopChoice { Name = "One", TileIndex = 0, ObjectId = 10, World = new OmsiMapPoint(30, -3) },
+                new OmsiTripStopChoice { Name = "Two", TileIndex = 0, ObjectId = 11, World = new OmsiMapPoint(250, -3) }
+            };
+            var direct = OmsiTripPlanner.Plan(stops, new OmsiTimetable(), network, (x, y) => 0);
+            CollectionAssert.AreEqual(new[] { 1, 2, 5 }, direct.Legs[0].Entries.Select(entry => entry.ElementId).ToArray());
+            Assert.AreEqual(70.0 + 100.0 + 50.0, direct.Legs[0].LengthMeters, 1e-6);
+
+            var items = new List<OmsiTripStopChoice> { stops[0], new OmsiTripStopChoice { Name = "via", IsWaypoint = true, World = new OmsiMapPoint(150, 12) }, stops[1] };
+            var led = OmsiTripPlanner.Plan(items, new OmsiTimetable(), network, (x, y) => 0);
+            Assert.IsTrue(led.IsValid, string.Join(";", led.Problems));
+            Assert.IsTrue(led.Legs[0].HasWaypoints);
+            var ids = led.Legs[0].Entries.Select(entry => entry.ElementId).ToArray();
+            CollectionAssert.AreEqual(new[] { 1, 3, 4, 5 }, ids);
+            var expected = 70.0 + upperOne.LengthMeters + upperTwo.LengthMeters + 50.0;
+            Assert.AreEqual(expected, led.Legs[0].LengthMeters, 1e-6);
+
+            // A waypoint far from every lane keeps the trip from being made; one before the first stop is left out.
+            var lost = new List<OmsiTripStopChoice> { stops[0], new OmsiTripStopChoice { IsWaypoint = true, World = new OmsiMapPoint(150, 300) }, stops[1] };
+            Assert.IsFalse(OmsiTripPlanner.Plan(lost, new OmsiTimetable(), network, (x, y) => 0).IsValid);
+            var leading = new List<OmsiTripStopChoice> { new OmsiTripStopChoice { IsWaypoint = true, World = new OmsiMapPoint(150, 300) }, stops[0], stops[1] };
+            Assert.IsTrue(OmsiTripPlanner.Plan(leading, new OmsiTimetable(), network, (x, y) => 0).IsValid);
+        }
+
+        [Test]
+        public void ALegThatTakesOnFromTheLaneTheOneBeforeEndedOnKeepsTheLanesOfATripJoined()
+        {
+            // Two eastbound lanes of one road to the junction; only the inner one continues to the second stop's road, and the first leg has to end on it.
+            var outer = Straight(1, 0, 0, 0, 100, 0);
+            var inner = Straight(1, 1, 0, 3, 100, 3);
+            var ahead = Straight(2, 0, 100, 3, 200, 3);
+            var network = OmsiPathNetwork.Build(new[] { outer, inner, ahead });
+            var stops = new[]
+            {
+                new OmsiTripStopChoice { Name = "One", TileIndex = 0, ObjectId = 10, World = new OmsiMapPoint(20, -1) },
+                new OmsiTripStopChoice { Name = "Two", TileIndex = 0, ObjectId = 11, World = new OmsiMapPoint(80, -1) },
+                new OmsiTripStopChoice { Name = "Three", TileIndex = 0, ObjectId = 12, World = new OmsiMapPoint(150, 1) }
+            };
+            var plan = OmsiTripPlanner.Plan(stops, new OmsiTimetable(), network, (x, y) => 0);
+            Assert.IsTrue(plan.IsValid, string.Join(";", plan.Problems));
+            // Two stands beside both lanes of its road; the second leg leaves on the lane the first arrived on, and that one leads on to the third stop.
+            var firstEnd = plan.Legs[0].Entries.Last();
+            var secondStart = plan.Legs[1].Entries.First();
+            Assert.AreEqual(firstEnd.ElementId, secondStart.ElementId);
+            Assert.AreEqual(firstEnd.PathIndex, secondStart.PathIndex);
+        }
+
+        [Test]
+        public void AReplacedLinkTakesTheOldOnesPlaceInStnLinksAndTheOthersStay()
+        {
+            Func<int, int, double, bool, OmsiTripLeg> leg = (from, to, length, replaces) => new OmsiTripLeg
+            {
+                From = new OmsiTripStopChoice { Name = "S" + from, ObjectId = from }, To = new OmsiTripStopChoice { Name = "S" + to, ObjectId = to },
+                LengthMeters = length, ReplacesLink = replaces
+            };
+            var first = leg(1, 2, 100.0, false);
+            first.Entries.Add(new OmsiPathEntry { ElementId = 7, PathIndex = 0, TileIndex = 0, LengthMeters = 100.0 });
+            var second = leg(2, 3, 200.0, false);
+            second.Entries.Add(new OmsiPathEntry { ElementId = 8, PathIndex = 0, TileIndex = 0, LengthMeters = 200.0 });
+            var file = OmsiTimetableWriter.AppendStationLinks(null, new[] { first, second });
+            var replacement = leg(1, 2, 150.0, true);
+            replacement.Entries.Add(new OmsiPathEntry { ElementId = 9, PathIndex = 1, TileIndex = 0, LengthMeters = 150.0 });
+            var replaced = OmsiTimetableWriter.AppendStationLinks(file, new[] { replacement });
+
+            var folder = Path.Combine(Path.GetTempPath(), "mapforge-stn-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(folder, "TTData"));
+                File.WriteAllBytes(Path.Combine(folder, "TTData", "StnLinks.cfg"), replaced);
+                var links = OmsiTimetable.Read(new OmsiFolderSource(folder)).StationLinks;
+                Assert.AreEqual(2, links.Count);
+                var one = links.Single(link => link.FromStopId == 1);
+                Assert.AreEqual(150.0, one.LengthMeters, 1e-6);
+                Assert.AreEqual(9, one.Entries.Single().ElementId);
+                Assert.AreEqual(200.0, links.Single(link => link.FromStopId == 2).LengthMeters, 1e-6);
+                StringAssert.DoesNotContain("100.0000000000", Encoding.UTF8.GetString(replaced));
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
+        public void TheNameOfAStopIsSetWhereItIsListedAndAddedWhereItIsNot()
+        {
+            var listed = Encoding.UTF8.GetBytes("---\r\nTime Table BusStopList File\r\n---\r\n\r\n[busstop]\r\nOld\r\n3\r\n5\r\n0.0000000000\r\n0\r\n0\r\n\r\n\r\n[busstop]\r\nOther\r\n3\r\n6\r\n2.0000000000\r\n0\r\n0\r\n\r\n\r\n");
+            var renamed = Encoding.UTF8.GetString(OmsiTimetableWriter.SetBusStopName(listed, 3, 5, "New name"));
+            StringAssert.Contains("[busstop]\r\nNew name\r\n3\r\n5\r\n", renamed);
+            StringAssert.Contains("[busstop]\r\nOther\r\n3\r\n6\r\n2.0000000000", renamed);
+            StringAssert.DoesNotContain("Old", renamed);
+            // The same name again changes nothing.
+            CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(renamed), OmsiTimetableWriter.SetBusStopName(Encoding.UTF8.GetBytes(renamed), 3, 5, "New name"));
+            var added = Encoding.UTF8.GetString(OmsiTimetableWriter.SetBusStopName(listed, 3, 9, "Third"));
+            StringAssert.StartsWith(Encoding.UTF8.GetString(listed), added);
+            StringAssert.EndsWith("[busstop]\r\nThird\r\n3\r\n9\r\n0.0000000000\r\n0\r\n0\r\n\r\n\r\n", added);
+            // A map without a stop list gets one.
+            StringAssert.Contains("[busstop]\r\nFirst\r\n0\r\n1\r\n", Encoding.UTF8.GetString(OmsiTimetableWriter.SetBusStopName(null, 0, 1, "First")));
         }
 
         [Test]

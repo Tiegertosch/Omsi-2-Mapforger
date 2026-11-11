@@ -292,7 +292,11 @@ namespace OmsiMapEditor.UI
             });
             line.style.marginLeft = 0;
             row.Add(line);
-            row.Add(SmallButton("timetable.newtrip", "timetable.newtrip.tooltip", OpenNewTrip));
+            row.Add(SmallButton("timetable.newtrip", "timetable.newtrip.tooltip", () =>
+            {
+                CloseTimetable();
+                SetTool(EditorTool.Line);
+            }));
             timetableBody.Add(row);
             if (!timetableNewLineOpen)
                 return;

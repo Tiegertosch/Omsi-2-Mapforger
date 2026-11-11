@@ -345,7 +345,6 @@ namespace OmsiMapEditor.UI
             SetUpContentFolders(root);
             SetUpParkList(root);
             SetUpTimetable(root);
-            SetUpNewTrip(root);
             SetUpTrafficCurves(root);
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
@@ -473,6 +472,7 @@ namespace OmsiMapEditor.UI
                 terrainOptions.ImportConfirmed += LayHeightMap;
                 ConnectGroundPaint();
                 objectsPanelHost.Add(terrainOptions);
+                CreateLineTool(objectsPanelHost);
                 CreateMarkingOptions();
                 CreatePriorityOptions();
                 CreateLaneOptions();
@@ -550,6 +550,8 @@ namespace OmsiMapEditor.UI
                         UpdateLanePreview();
                     else if (activeTool == EditorTool.Signals)
                         UpdateSignalPlan();
+                    else if (activeTool == EditorTool.Line)
+                        UpdateLinePreview();
                     else
                         UpdateRoadPreview();
                 };
@@ -572,6 +574,8 @@ namespace OmsiMapEditor.UI
                         ClickLane(x, y);
                     else if (activeTool == EditorTool.Signals)
                         ClickSignal(x, y);
+                    else if (activeTool == EditorTool.Line)
+                        ClickLine(x, y);
                     else
                         BuildRoadTo(x, y);
                 };
@@ -1168,7 +1172,8 @@ namespace OmsiMapEditor.UI
             RunContentFolderArguments(args);
             RunParkListArguments(args);
             RunTimetableArguments(Argument, args);
-            RunNewTripArguments(Argument, args);
+            RunBusStopArguments(Argument, args);
+            RunLineArguments(Argument, args);
             RunTrafficCurveArguments(args);
             RunSignalArguments(args);
             RunProjectTabArguments(args);
@@ -6029,6 +6034,11 @@ namespace OmsiMapEditor.UI
                     SetTool(activeTool == EditorTool.Rows ? EditorTool.Drag : EditorTool.Rows);
                     evt.StopPropagation();
                 }
+                else if (evt.keyCode == KeyCode.B && mapCanvas != null && !mapCanvas.IsPlacing)
+                {
+                    SetTool(activeTool == EditorTool.Line ? EditorTool.Drag : EditorTool.Line);
+                    evt.StopPropagation();
+                }
                 else if (evt.keyCode == KeyCode.G && mapCanvas != null && !mapCanvas.IsPlacing)
                 {
                     SetTool(activeTool == EditorTool.Terrain ? EditorTool.Drag : EditorTool.Terrain);
@@ -7211,7 +7221,7 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "readonly.action.build_roads" : tool == EditorTool.Rows ? "readonly.action.lay_rows"
                     : tool == EditorTool.Terrain ? "readonly.action.shape_ground" : tool == EditorTool.Markings ? "readonly.action.draw_markings"
                     : tool == EditorTool.Priorities ? "readonly.action.right_of_way" : tool == EditorTool.Lanes ? "readonly.action.choose_lanes"
-                    : tool == EditorTool.Signals ? "readonly.action.edit_signals" : "readonly.action.move_rotate"));
+                    : tool == EditorTool.Signals ? "readonly.action.edit_signals" : tool == EditorTool.Line ? "readonly.action.make_lines" : "readonly.action.move_rotate"));
                 return;
             }
             // Another tool ends placing and closes the object library.
@@ -7224,6 +7234,7 @@ namespace OmsiMapEditor.UI
             var wasPriorities = activeTool == EditorTool.Priorities;
             var wasLanes = activeTool == EditorTool.Lanes;
             var wasSignals = activeTool == EditorTool.Signals;
+            var wasLine = activeTool == EditorTool.Line;
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
@@ -7242,6 +7253,8 @@ namespace OmsiMapEditor.UI
                 EndLaneTool();
             if (wasSignals && tool != EditorTool.Signals)
                 EndSignalTool();
+            if (wasLine && tool != EditorTool.Line)
+                EndLineTool();
             if (tool == EditorTool.Road)
                 BeginRoadTool();
             if (tool == EditorTool.Rows)
@@ -7256,13 +7269,15 @@ namespace OmsiMapEditor.UI
                 BeginLaneTool();
             if (tool == EditorTool.Signals && !wasSignals)
                 BeginSignalTool();
+            if (tool == EditorTool.Line && !wasLine)
+                BeginLineTool();
             // Choosing the tool that is on again keeps its panel in view, which closing the object library hid above.
             if (objectsPanelHost != null && (tool == EditorTool.Markings && wasMarkings || tool == EditorTool.Priorities && wasPriorities ||
-                                             tool == EditorTool.Lanes && wasLanes || tool == EditorTool.Signals && wasSignals))
+                                             tool == EditorTool.Lanes && wasLanes || tool == EditorTool.Signals && wasSignals || tool == EditorTool.Line && wasLine))
                 objectsPanelHost.style.display = DisplayStyle.Flex;
             UpdateToolbar();
             if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities ||
-                tool == EditorTool.Lanes || tool == EditorTool.Signals)
+                tool == EditorTool.Lanes || tool == EditorTool.Signals || tool == EditorTool.Line)
                 return;
             SetStatusT(tool == EditorTool.Move ? "tool.status.move" : tool == EditorTool.Rotate ? "tool.status.rotate" : "tool.status.drag") /* i18n:keys */;
         }
@@ -8420,6 +8435,8 @@ namespace OmsiMapEditor.UI
             AddInspectorGroup(editor, "object-type", Loc.T("inspector.group.type"), false, body => AddTypeAndLabels(body, holdingTile, item, false, true));
             if (!EditingVariant)
                 AddVarParentGroup(editor, holdingTile, item);
+            if (!EditingVariant)
+                AddBusStopGroup(editor, holdingTile, item);
             AddJunctionDetails(editor, item);
             // Taking off attached objects works on the base map's tiles only.
             AddAttachedObjects(editor, item, CanEdit);

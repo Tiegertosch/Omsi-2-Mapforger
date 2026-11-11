@@ -241,6 +241,8 @@ namespace OmsiMapEditor.UI
                 if (terrainOptions != null && terrainOptions.Painting)
                     RefreshPaintTextures();
             }
+            else if (change.TimetableFiles)
+                StartRoutesBuild(currentSummary);
             else
                 groundRenderer?.RefreshMasks(change.Tiles);
         }

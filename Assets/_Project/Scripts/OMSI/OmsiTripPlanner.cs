@@ -20,6 +20,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True when the stop is not in <c>Busstops.cfg</c> yet and gets an entry with the trip.</summary>
         public bool IsNew { get; set; }
+
+        /// <summary>True for a point the trip only passes, to lead it over another road than the shortest; it has no object and no stop.</summary>
+        public bool IsWaypoint { get; set; }
     }
 
     /// <summary>The way between two stops of a trip: the station link that is already in the timetable, or the one found on the map.</summary>
@@ -30,6 +33,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True when <c>StnLinks.cfg</c> has this link; nothing is written for it.</summary>
         public bool Existing { get; internal set; }
+
+        /// <summary>True when waypoints lead the leg over a road of their choice.</summary>
+        public bool HasWaypoints { get; internal set; }
+
+        /// <summary>True when <c>StnLinks.cfg</c> has a link for this pair that the leg's waypoints replace; other trips over the pair use the new one too.</summary>
+        public bool ReplacesLink { get; internal set; }
 
         public double LengthMeters { get; internal set; }
         public double FromPosition { get; internal set; }
@@ -61,15 +70,16 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public static class OmsiTripPlanner
     {
-        /// <param name="stops">The stops in the order the trip serves them, at least two.</param>
+        /// <param name="items">The stops in the order the trip serves them, at least two, with waypoints between them where the way is to lead over a road of choice.</param>
         /// <param name="timetable">The timetable whose station links count as there already.</param>
         /// <param name="network">The vehicle lanes of the map.</param>
         /// <param name="tileIndexOf">The position in the [map] list of the tile at a position, or -1.</param>
-        public static OmsiTripPlan Plan(IList<OmsiTripStopChoice> stops, OmsiTimetable timetable, OmsiPathNetwork network, Func<int, int, int> tileIndexOf,
-            bool rightHandTraffic = true)
+        /// <param name="tileCoordsOf">The tile at a position of the [map] list as x and y, to draw the way of a link the timetable has; null leaves such legs without a line.</param>
+        public static OmsiTripPlan Plan(IList<OmsiTripStopChoice> items, OmsiTimetable timetable, OmsiPathNetwork network, Func<int, int, int> tileIndexOf,
+            bool rightHandTraffic = true, Func<int, int[]> tileCoordsOf = null)
         {
-            if (stops == null)
-                throw new ArgumentNullException(nameof(stops));
+            if (items == null)
+                throw new ArgumentNullException(nameof(items));
             if (timetable == null)
                 throw new ArgumentNullException(nameof(timetable));
             if (network == null)
@@ -77,54 +87,123 @@ namespace OmsiMapEditor.OMSI
             if (tileIndexOf == null)
                 throw new ArgumentNullException(nameof(tileIndexOf));
             var plan = new OmsiTripPlan();
+            var stops = new List<OmsiTripStopChoice>();
+            var between = new List<List<OmsiTripStopChoice>>();
+            var current = new List<OmsiTripStopChoice>();
+            foreach (var item in items)
+            {
+                if (item.IsWaypoint)
+                {
+                    // A waypoint before the first stop or after the last leads nowhere.
+                    if (stops.Count > 0)
+                        current.Add(item);
+                    continue;
+                }
+                if (stops.Count > 0)
+                {
+                    between.Add(current);
+                    current = new List<OmsiTripStopChoice>();
+                }
+                stops.Add(item);
+            }
             if (stops.Count < 2)
             {
                 plan.Problems.Add("A trip needs at least two stops.");
                 return plan;
             }
-            var places = new Dictionary<int, List<OmsiStopPlace>>();
-            Func<OmsiTripStopChoice, List<OmsiStopPlace>> placeOf = stop =>
+            // Every stop could be served from several lanes of its road; the lane a bus stands on is the one it leaves on, so the lanes are chosen for
+            // the whole trip at once: the cheapest way over all choices (as OMSI's own links join).
+            const int MostLanes = 4;
+            const double Unreachable = 1e7;
+            var candidates = new List<List<OmsiStopPlace>>();
+            foreach (var stop in stops)
             {
-                if (!places.TryGetValue(stop.ObjectId, out var found))
-                    places[stop.ObjectId] = found = network.PlaceStopCandidates(stop.World, rightHandTraffic);
-                return found;
-            };
-            for (var index = 0; index + 1 < stops.Count; index++)
+                var found = network.PlaceStopCandidates(stop.World, rightHandTraffic);
+                candidates.Add(found.Count > MostLanes ? found.GetRange(0, MostLanes) : found);
+            }
+            var legCount = stops.Count - 1;
+            var links = new OmsiStationLink[legCount];
+            for (var index = 0; index < legCount; index++)
+            {
+                var link = timetable.StationLinks.Find(each => each.FromStopId == stops[index].ObjectId && each.ToStopId == stops[index + 1].ObjectId);
+                links[index] = link != null && between[index].Count == 0 ? link : null;
+            }
+            // best[i][c]: the cheapest total length of the legs before stop i when it is served from its candidate c; before[i][c]: the candidate of the stop before.
+            var best = new double[stops.Count][];
+            var before = new int[stops.Count][];
+            for (var index = 0; index < stops.Count; index++)
+            {
+                best[index] = new double[Math.Max(1, candidates[index].Count)];
+                before[index] = new int[best[index].Length];
+            }
+            for (var index = 0; index < legCount; index++)
+            {
+                var fromCount = best[index].Length;
+                var toCount = best[index + 1].Length;
+                for (var to = 0; to < toCount; to++)
+                {
+                    var cheapest = double.MaxValue;
+                    var chosen = 0;
+                    for (var from = 0; from < fromCount; from++)
+                    {
+                        var cost = links[index] != null || candidates[index].Count == 0 || candidates[index + 1].Count == 0
+                            ? 0.0
+                            : LegCost(network, candidates[index][from], candidates[index + 1][to], between[index], Unreachable);
+                        if (best[index][from] + cost < cheapest)
+                        {
+                            cheapest = best[index][from] + cost;
+                            chosen = from;
+                        }
+                    }
+                    best[index + 1][to] = cheapest;
+                    before[index + 1][to] = chosen;
+                }
+            }
+            var choice = new int[stops.Count];
+            var last = 0;
+            for (var to = 1; to < best[stops.Count - 1].Length; to++)
+                if (best[stops.Count - 1][to] < best[stops.Count - 1][last])
+                    last = to;
+            choice[stops.Count - 1] = last;
+            for (var index = stops.Count - 1; index > 0; index--)
+                choice[index - 1] = before[index][choice[index]];
+
+            for (var index = 0; index < legCount; index++)
             {
                 var from = stops[index];
                 var to = stops[index + 1];
-                var leg = new OmsiTripLeg { From = from, To = to };
-                var existing = timetable.StationLinks.Find(link => link.FromStopId == from.ObjectId && link.ToStopId == to.ObjectId);
-                if (existing != null)
+                var waypoints = between[index];
+                var leg = new OmsiTripLeg { From = from, To = to, HasWaypoints = waypoints.Count > 0 };
+                var existing = timetable.StationLinks.Find(each => each.FromStopId == from.ObjectId && each.ToStopId == to.ObjectId);
+                leg.ReplacesLink = existing != null && waypoints.Count > 0;
+                if (links[index] != null)
                 {
                     leg.Existing = true;
-                    leg.LengthMeters = existing.LengthMeters;
+                    leg.LengthMeters = links[index].LengthMeters;
+                    DrawLink(leg, links[index], network, tileCoordsOf);
                     plan.Legs.Add(leg);
                     continue;
                 }
-                var fromPlaces = placeOf(from);
-                var toPlaces = placeOf(to);
-                if (fromPlaces.Count == 0 || toPlaces.Count == 0)
+                if (candidates[index].Count == 0 || candidates[index + 1].Count == 0)
                 {
-                    plan.Problems.Add((fromPlaces.Count == 0 ? from.Name : to.Name) + " has no vehicle lane beside it.");
+                    plan.Problems.Add((candidates[index].Count == 0 ? from.Name : to.Name) + " has no vehicle lane beside it.");
                     plan.Legs.Add(leg);
                     continue;
                 }
-                var route = network.Route(fromPlaces, toPlaces);
-                if (route == null || route.Lanes.Count == 0)
+                var result = RouteLeg(network, candidates[index][choice[index]], candidates[index + 1][choice[index + 1]], waypoints, out var problem);
+                if (result == null)
                 {
-                    plan.Problems.Add("No way leads from " + from.Name + " to " + to.Name + ".");
+                    plan.Problems.Add(problem == null ? "No way leads from " + from.Name + " to " + to.Name + (waypoints.Count > 0 ? " over its waypoints." : ".")
+                        : problem.Replace("{from}", from.Name).Replace("{to}", to.Name));
                     plan.Legs.Add(leg);
                     continue;
                 }
-                var first = fromPlaces.Find(place => place.Lane == route.Lanes[0]) ?? fromPlaces[0];
-                var last = toPlaces.Find(place => place.Lane == route.Lanes[route.Lanes.Count - 1]) ?? toPlaces[0];
-                leg.LengthMeters = route.LengthMeters;
-                leg.FromPosition = first.Position;
-                leg.ToPosition = last.Position;
-                leg.FromDistance = first.Distance;
-                leg.ToDistance = last.Distance;
-                foreach (var lane in route.Lanes)
+                leg.LengthMeters = result.LengthMeters;
+                leg.FromPosition = candidates[index][choice[index]].Position;
+                leg.ToPosition = candidates[index + 1][choice[index + 1]].Position;
+                leg.FromDistance = candidates[index][choice[index]].Distance;
+                leg.ToDistance = candidates[index + 1][choice[index + 1]].Distance;
+                foreach (var lane in result.Lanes)
                 {
                     var tile = tileIndexOf(lane.Path.TileX, lane.Path.TileY);
                     if (tile < 0)
@@ -138,6 +217,69 @@ namespace OmsiMapEditor.OMSI
                 plan.Legs.Add(leg);
             }
             return plan;
+        }
+
+        /// <summary>The length of the way from one place of a stop to one of the next over the waypoints, counting a little for the lanes' distance to the stops; a large number when there is none.</summary>
+        private static double LegCost(OmsiPathNetwork network, OmsiStopPlace from, OmsiStopPlace to, List<OmsiTripStopChoice> waypoints, double unreachable)
+        {
+            var route = RouteLeg(network, from, to, waypoints, out _);
+            return route == null ? unreachable : route.LengthMeters + 2.0 * (from.Distance + to.Distance);
+        }
+
+        /// <summary>The way from a place to a place over the waypoints, joined to one route whose length is the sum of the lane lengths; null when none leads there.</summary>
+        private static OmsiNetworkRoute RouteLeg(OmsiPathNetwork network, OmsiStopPlace from, OmsiStopPlace to, List<OmsiTripStopChoice> waypoints, out string problem)
+        {
+            problem = null;
+            var targets = new List<List<OmsiStopPlace>>();
+            foreach (var waypoint in waypoints)
+            {
+                var found = network.PlaceWaypointCandidates(waypoint.World);
+                if (found.Count == 0)
+                {
+                    problem = "A waypoint between {from} and {to} is not near a vehicle lane.";
+                    return null;
+                }
+                targets.Add(found);
+            }
+            targets.Add(new List<OmsiStopPlace> { to });
+            var joined = new OmsiNetworkRoute();
+            var segmentFrom = new List<OmsiStopPlace> { from };
+            var total = 0.0;
+            foreach (var target in targets)
+            {
+                var route = network.Route(segmentFrom, target);
+                if (route == null || route.Lanes.Count == 0)
+                    return null;
+                foreach (var lane in route.Lanes)
+                    if (joined.Lanes.Count == 0 || joined.Lanes[joined.Lanes.Count - 1] != lane)
+                        joined.Lanes.Add(lane);
+                total += route.LengthMeters;
+                var arrival = target.Find(place => place.Lane == route.Lanes[route.Lanes.Count - 1]) ?? target[0];
+                segmentFrom = new List<OmsiStopPlace> { arrival };
+            }
+            joined.LengthMeters = total;
+            return joined;
+        }
+
+        /// <summary>The lines of a link the timetable has, from the lanes of its entries, and the place its last stop has on its last lane; null when the lanes are not found.</summary>
+        private static OmsiStopPlace DrawLink(OmsiTripLeg leg, OmsiStationLink link, OmsiPathNetwork network, Func<int, int[]> tileCoordsOf)
+        {
+            if (tileCoordsOf == null)
+                return null;
+            OmsiLane before = null;
+            foreach (var entry in link.Entries)
+            {
+                var tile = tileCoordsOf(entry.TileIndex);
+                if (tile == null)
+                    return null;
+                var candidates = network.LanesOfPath(tile[0], tile[1], entry.ElementId, entry.PathIndex);
+                if (candidates.Count == 0)
+                    continue;
+                var lane = candidates.FirstOrDefault(each => before != null && before.Next.Contains(each.Index)) ?? candidates[0];
+                leg.Lines.Add(lane.Geometry);
+                before = lane;
+            }
+            return before == null ? null : new OmsiStopPlace { Lane = before, Position = link.ToPosition, Distance = link.ToDistance };
         }
     }
 
@@ -156,11 +298,43 @@ namespace OmsiMapEditor.OMSI
             return Append(existing, text.ToString(), "---------------------------\r\nTime Table BusStopList File\r\n---------------------------\r\n\r\n" + Header + "\r\n\r\n");
         }
 
-        /// <summary><c>StnLinks.cfg</c> with the legs the timetable lacks added behind the others.</summary>
+        /// <summary>
+        /// <c>Busstops.cfg</c> with the name of a stop set: the stop of the object is renamed where it is listed, else added behind the others.
+        /// </summary>
+        public static byte[] SetBusStopName(byte[] existing, int tileIndex, int objectId, string name)
+        {
+            if (existing != null)
+            {
+                var file = OmsiRecordFile.Parse(existing, null);
+                foreach (var record in file.Records)
+                {
+                    if (!string.Equals(record.Name, "busstop", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var values = record.AllValues();
+                    if (values.Count < 3 || !int.TryParse(values[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tile) ||
+                        !int.TryParse(values[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) || tile != tileIndex || id != objectId)
+                        continue;
+                    if (record.Fields.Count > 0)
+                        record.Fields[0].Text = OneLine(name);
+                    else if (record.Trailer.Count > 0)
+                        record.Trailer[0].Text = OneLine(name);
+                    return file.ToBytes();
+                }
+            }
+            return AppendBusStops(existing, new[] { new OmsiTripStopChoice { Name = name, TileIndex = tileIndex, ObjectId = objectId } });
+        }
+
+        /// <summary>
+        /// <c>StnLinks.cfg</c> with the legs the timetable lacks added behind the others; a leg whose waypoints replace a link takes that link's place
+        /// (the old one is cut out, the new one follows the others).
+        /// </summary>
         public static byte[] AppendStationLinks(byte[] existing, IEnumerable<OmsiTripLeg> legs)
         {
+            var all = legs.ToList();
+            if (existing != null && all.Any(leg => leg.ReplacesLink))
+                existing = RemoveStationLinks(existing, all.Where(leg => leg.ReplacesLink).Select(leg => new KeyValuePair<int, int>(leg.From.ObjectId, leg.To.ObjectId)).ToList());
             var text = new StringBuilder();
-            foreach (var leg in legs)
+            foreach (var leg in all)
             {
                 if (leg.Existing)
                     continue;
@@ -176,6 +350,32 @@ namespace OmsiMapEditor.OMSI
                 }
             }
             return Append(existing, text.ToString(), "---------------------------\r\nTime Table StnLinkList File\r\n---------------------------\r\n\r\n" + Header + "\r\n\r\n");
+        }
+
+        /// <summary>Cuts the links of some stop pairs out of <c>StnLinks.cfg</c>: from the line that names them ("A ==> B") to the one that names the next.</summary>
+        private static byte[] RemoveStationLinks(byte[] bytes, IList<KeyValuePair<int, int>> pairs)
+        {
+            var text = OmsiTextFile.Decode(bytes, out var encoding);
+            var lines = new List<string>(text.Split('\n'));
+            for (var index = 0; index < lines.Count; index++)
+            {
+                if (!string.Equals(lines[index].Trim(), "[StnLink]", StringComparison.OrdinalIgnoreCase) || index + 3 >= lines.Count)
+                    continue;
+                if (!int.TryParse(lines[index + 2].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var from) ||
+                    !int.TryParse(lines[index + 3].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var to) || !pairs.Contains(new KeyValuePair<int, int>(from, to)))
+                    continue;
+                var start = index >= 2 && lines[index - 2].Contains("==>") && lines[index - 1].Trim().Length == 0 ? index - 2 : index;
+                var end = lines.Count;
+                for (var next = index + 1; next < lines.Count; next++)
+                    if (string.Equals(lines[next].Trim(), "[StnLink]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        end = next >= 2 && lines[next - 2].Contains("==>") && lines[next - 1].Trim().Length == 0 ? next - 2 : next;
+                        break;
+                    }
+                lines.RemoveRange(start, end - start);
+                index = start - 1;
+            }
+            return OmsiTextFile.Encode(string.Join("\n", lines), encoding);
         }
 
         /// <summary>A trip file: where it goes, the line it shows, its stops in order and one profile with the running time in minutes.</summary>

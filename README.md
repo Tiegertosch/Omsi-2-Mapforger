@@ -31,7 +31,7 @@ Mapforge keeps edits in a project workspace and leaves the source map untouched.
 
 
 
-Make a new trip: choose its stops in order and the editor finds the way between them on the map's vehicle lanes, shows it, and writes the station links, the stops and the trip file; new lines are made in the same dialog.
+Make bus lines on the map with the Line tool: click the bus stops in the order the bus serves them and the way over the map's vehicle lanes shows at once. Make the return trip from other stops or close a ring, lead the way over another road with waypoints, and save the line with its trips, then set the departures in the timetable editor.
 Change the timetable of the map's lines: departures, tours with the days they run, trips at a regular interval, shifting a whole tour and the running time of each profile, written into the TTData files without touching the rest of them.
 Paint the ground textures of a map with the terrain brush: choose one of the map's textures (or add one from the OMSI Texture folder), paint, erase or soften it with a hard or soft edge, and cover or clear a whole tile. The masks are written the way OMSI's own maps have them.
 - **Work with map tiles:** Create a map from an installed map template, then add or remove tiles as the layout grows.

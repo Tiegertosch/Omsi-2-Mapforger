@@ -55,6 +55,7 @@ namespace OmsiMapEditor.OMSI
         private readonly List<OmsiLane> lanes = new List<OmsiLane>();
         private readonly Dictionary<long, List<int>> starts = new Dictionary<long, List<int>>();
         private readonly Dictionary<long, List<int>> places = new Dictionary<long, List<int>>();
+        private readonly Dictionary<string, List<int>> byPath = new Dictionary<string, List<int>>();
         private const double PlaceCell = 16.0;
 
         private OmsiPathNetwork()
@@ -145,6 +146,13 @@ namespace OmsiMapEditor.OMSI
                         }
                     }
             }
+            foreach (var lane in network.lanes)
+            {
+                var key = PathKey(lane.Path.TileX, lane.Path.TileY, lane.Path.ElementId, lane.Path.PathIndex);
+                if (!network.byPath.TryGetValue(key, out var found))
+                    network.byPath[key] = found = new List<int>();
+                found.Add(lane.Index);
+            }
             // A grid of the lanes' bounding cells, for placing stops.
             foreach (var lane in network.lanes)
             {
@@ -196,6 +204,59 @@ namespace OmsiMapEditor.OMSI
                     }
                 }
             return best;
+        }
+
+        private static string PathKey(int tileX, int tileY, int elementId, int pathIndex)
+        {
+            return tileX + "/" + tileY + "/" + elementId + "/" + pathIndex;
+        }
+
+        /// <summary>The lanes of one path of the map (one for each way it is driven); empty when the network has none.</summary>
+        public IReadOnlyList<OmsiLane> LanesOfPath(int tileX, int tileY, int elementId, int pathIndex)
+        {
+            var result = new List<OmsiLane>();
+            if (byPath.TryGetValue(PathKey(tileX, tileY, elementId, pathIndex), out var found))
+                foreach (var index in found)
+                    result.Add(lanes[index]);
+            return result;
+        }
+
+        /// <summary>
+        /// The places a way can pass at a position, for a waypoint that leads a trip over another road: the lanes of the element nearest to it within
+        /// <paramref name="maxDistance"/>, whichever side they lie on, nearest first.
+        /// </summary>
+        public List<OmsiStopPlace> PlaceWaypointCandidates(OmsiMapPoint position, double maxDistance = 15.0)
+        {
+            var result = new List<OmsiStopPlace>();
+            var reach = (int)Math.Ceiling(maxDistance / PlaceCell) + 1;
+            var cellX = (long)Math.Floor(position.X / PlaceCell);
+            var cellY = (long)Math.Floor(position.Y / PlaceCell);
+            var tried = new HashSet<int>();
+            for (var dx = -reach; dx <= reach; dx++)
+                for (var dy = -reach; dy <= reach; dy++)
+                {
+                    if (!places.TryGetValue(((cellX + dx) << 32) ^ (uint)(int)(cellY + dy), out var list))
+                        continue;
+                    foreach (var index in list)
+                    {
+                        if (!tried.Add(index))
+                            continue;
+                        var lane = lanes[index];
+                        Project(lane, position, out var along, out var distance, out _);
+                        if (distance > maxDistance)
+                            continue;
+                        var scale = lane.PolylineLength > 0.0 ? lane.LengthMeters / lane.PolylineLength : 1.0;
+                        result.Add(new OmsiStopPlace { Lane = lane, Position = along * scale, Distance = distance });
+                    }
+                }
+            result.Sort((first, second) => first.Distance.CompareTo(second.Distance));
+            if (result.Count > 1)
+            {
+                var nearest = result[0].Lane.Path;
+                result.RemoveAll(place => place.Lane.Path.ElementId != nearest.ElementId || place.Lane.Path.TileX != nearest.TileX ||
+                                          place.Lane.Path.TileY != nearest.TileY || place.Lane.Path.OnSpline != nearest.OnSpline);
+            }
+            return result;
         }
 
         /// <summary>

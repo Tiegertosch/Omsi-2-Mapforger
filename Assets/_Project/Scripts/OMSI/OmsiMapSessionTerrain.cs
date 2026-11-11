@@ -64,6 +64,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>True when the step added a ground texture to global.cfg, so the map's ground is built anew.</summary>
         public bool TexturesChanged { get; internal set; }
 
+        /// <summary>True when the step wrote timetable files (a new line, ADR 093), so the lines of the map are read again.</summary>
+        public bool TimetableFiles { get; internal set; }
+
         /// <summary>The tiles whose ground changed, to draw again.</summary>
         public List<OmsiTileSummary> Tiles { get; } = new List<OmsiTileSummary>();
 

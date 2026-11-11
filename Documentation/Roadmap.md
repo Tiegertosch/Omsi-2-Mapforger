@@ -83,6 +83,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Geländetexturen malen – Modus „Malen“ im Geländewerkzeug: Texturen der Karte wählen oder neue hinzufügen, malen, radieren, weichzeichnen, Härte, Kachel füllen/leeren (ADR 091; wartet auf den Nutzertest)
 - [x] Fahrplan bearbeiten – Dialog im Reiter Lines: Abfahrten, Umläufe (Tours) mit Betriebstagen (Tagesmaske), Fahrten im Takt, Fahrzeiten je Profil; ohne neue Linien (ADR 092; wartet auf den Nutzertest)
 - [x] Neue Fahrten und Linien – Haltestellen wählen, Wegsuche über die Fahrspuren, Stationsverbindungen und Fahrt schreiben, neue Linie anlegen; Pfadnummern von Profilen mit auskommentiertem `[path]` korrigiert (ADR 093; wartet auf den Nutzertest)
+- [x] Linien-Werkzeug – Haltestellen auf der Karte anklicken (Taste B): Hin- und Rückfahrt, Ringlinie, Wegpunkte, Vorschau des Wegs, Speichern als ein Undo-Schritt (ADR 094; wartet auf den Nutzertest)
 
 ## Später
 
