@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Este mapa aún no utiliza perfiles spline.",
   "roadtool.empty.favorites": "Marca los perfiles con la estrella para encontrarlos aquí.",
   "roadtool.empty.mine": "Tipos de carreteras que haces con Nuevo tipo de carretera... mostrar aquí.",
-  "roadtool.empty.none": "Ningún perfil de este tipo en la instalación."
+  "roadtool.empty.none": "Ningún perfil de este tipo en la instalación.",
+  "roadtool.crossing": "Insertar paso de peatones",
+  "roadtool.crossing.tooltip": "Activado: un clic en una calle inserta allí un paso de peatones en vez de construir una calle. Se corta un tramo corto de la misma calle con franjas de cebra y un camino peatonal que la cruza, en un solo objeto, para que los coches cedan el paso. Se guarda en Sceneryobjects\\Mapforge de tu instalación de OMSI."
 }

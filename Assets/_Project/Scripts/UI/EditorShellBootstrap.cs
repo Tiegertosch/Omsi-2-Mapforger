@@ -1361,6 +1361,9 @@ namespace OmsiMapEditor.UI
                         out var roadMode))
                     roadPanel.SetHeightMode(roadMode);
                 // -roadShape straight|curved|free and -roadSnap none|all or a list such as roads,angles,guides (ADR 043).
+                // -roadCrossing: a click on a road puts a pedestrian crossing piece into it (ADR 086, step 5).
+                if (roadPanel != null && Array.IndexOf(args, "-roadCrossing") >= 0)
+                    roadPanel.CrossingMode = true;
                 if (roadPanel != null && Enum.TryParse<OmsiRoadShape>(Argument("-roadShape", 1) ?? string.Empty, true, out var roadShape))
                     roadPanel.SetShape(roadShape);
                 var roadSnap = Argument("-roadSnap", 1);
@@ -2971,6 +2974,7 @@ namespace OmsiMapEditor.UI
             roadTerrain = null;
             roadPorts = null;
             roadPortChecks = null;
+            pathModeProfile = null;
             RefreshJunctionMarkers();
         }
 
@@ -3149,6 +3153,13 @@ namespace OmsiMapEditor.UI
             roadGuideHits.Clear();
             if (roadPanel == null)
                 return pointer;
+            // The path tool's splines start and end on the paths already there (ADR 086, step 4); the path's line shows what it joined.
+            var onPath = SnapToPath(pointer);
+            if (onPath != null)
+            {
+                roadGuideHits.Add(new OmsiGuideLine(onPath.X, onPath.Y, onPath.HeadingDegrees, true));
+                return new OmsiMapPoint(onPath.X, onPath.Y);
+            }
             OmsiGuideLine direction = null;
             var point = pointer;
             if (roadStarted && roadPanel.SnapToAngles)
@@ -3184,6 +3195,48 @@ namespace OmsiMapEditor.UI
             if (direction != null)
                 roadGuideHits.Add(direction);
             return point;
+        }
+
+        /// <summary>
+        /// The kind of path the chosen profile is for the path tool: 1 for people and 0 for vehicles, as OMSI's invisible
+        /// sidewalks and streets are (<see cref="OmsiPathSnapping.PathToolKind"/>); null for any other profile.
+        /// </summary>
+        private int? RoadPathKind()
+        {
+            if (roadPanel?.Profile == null || currentSummary == null)
+                return null;
+            return OmsiPathSnapping.PathToolKind(RoadProfiles().Get(roadPanel.Profile));
+        }
+
+        /// <summary>The point of an existing path of the kind a path profile draws that the pointer snaps to, or null (other profiles, snapping off, paths not read yet).</summary>
+        private OmsiPathSnap SnapToPath(OmsiMapPoint pointer)
+        {
+            var kind = RoadPathKind();
+            if (!kind.HasValue || mapPaths == null || !roadPanel.SnapToRoads)
+                return null;
+            return OmsiPathSnapping.Nearest(mapPaths, kind.Value, pointer.X, pointer.Y, RoadSnapReach() * 1.6);
+        }
+
+        private string pathModeProfile;
+
+        /// <summary>
+        /// Choosing a path profile (an invisible street or sidewalk) turns on the paths view and reads the map's paths, so
+        /// the road tool can snap to them; says so once for each choice.
+        /// </summary>
+        private void UpdatePathMode()
+        {
+            var kind = RoadPathKind();
+            var profile = kind.HasValue ? roadPanel.Profile : null;
+            if (string.Equals(profile, pathModeProfile, StringComparison.Ordinal))
+                return;
+            pathModeProfile = profile;
+            if (!kind.HasValue)
+                return;
+            if (!pathsShown)
+                ShowPaths(true);
+            else if (mapPaths == null && pathsTask == null)
+                StartPathsBuild(currentSummary, false);
+            SetStatusT(kind.Value == 1 ? "roadbuild.path_mode.foot" : "roadbuild.path_mode.road"); // i18n:keys
         }
 
         /// <summary>How far from the pointer a road snaps, in metres: a few pixels from above, more in 3D the further the camera is.</summary>
@@ -3336,14 +3389,14 @@ namespace OmsiMapEditor.UI
         /// Makes a junction of the given arms under Sceneryobjects\Mapforge and inserts it into the road at a point, the
         /// main arms along the road and the others towards the pointer; adds the steps to <paramref name="steps"/>.
         /// </summary>
-        private OmsiObjectRecord InsertGeneratedJunction(List<OmsiJunctionArm> arms, OmsiSplinePoint at, OmsiMapPoint pointer, List<object> steps)
+        private OmsiObjectRecord InsertGeneratedJunction(List<OmsiJunctionArm> arms, OmsiSplinePoint at, OmsiMapPoint pointer, List<object> steps, string friendlyName = null)
         {
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             string assetPath;
             try
             {
                 var plain = File.Exists(Path.Combine(root, PlainAsphalt)) ? PlainAsphalt : null;
-                var name = "Junction " + Path.GetFileNameWithoutExtension(arms[0].ProfilePath) + " x " + Path.GetFileNameWithoutExtension(arms[arms.Count - 1].ProfilePath);
+                var name = friendlyName ?? "Junction " + Path.GetFileNameWithoutExtension(arms[0].ProfilePath) + " x " + Path.GetFileNameWithoutExtension(arms[arms.Count - 1].ProfilePath);
                 assetPath = OmsiGeneratedObjectStore.Write(root, currentProjectName, name, OmsiJunctionGenerator.Junction(arms, plain, "Mapforge " + name));
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
@@ -3385,6 +3438,44 @@ namespace OmsiMapEditor.UI
             // The road tool snaps to the new junction's points from now on.
             roadPorts = null;
             return result.Junction;
+        }
+
+        /// <summary>
+        /// A click with the road tool's crossing switch on: cuts the road under the pointer and puts a short piece of the same
+        /// road into it, with a pedestrian crossing in its middle, as one undo step (ADR 086, step 5). The piece is a made junction
+        /// of two opposite arms, so its footpath and its vehicle lanes lie in one object, which is what lets cars give way to people.
+        /// </summary>
+        private void InsertCrossingPiece(OmsiMapPoint point)
+        {
+            if (EditingVariant)
+            {
+                SetStatusT("roadbuild.crossing.variant");
+                return;
+            }
+            var profiles = RoadProfiles();
+            var road = OmsiRoadJunctions.RoadAt(currentSummary, profiles, point.X, point.Y);
+            if (road == null)
+            {
+                SetStatusT("roadbuild.crossing.no_road");
+                return;
+            }
+            var path = road.Spline.AssetPath;
+            var profile = profiles.Get(path);
+            var arms = OmsiRoadJunctions.Arms(path, profile, path, profile, new double[0], new double[0]);
+            arms[0].Crossing = new OmsiCrossing();
+            // The layout says whether the road can carry a crossing (pavements on both sides, no rails), before anything is cut.
+            var layout = OmsiJunctionLayout.Build(arms, null);
+            if (layout.CrossingProblems.Length > 0 && layout.CrossingProblems[0] != null)
+            {
+                SetStatusT("roadbuild.crossing.refused", ("reason", layout.CrossingProblems[0]));
+                return;
+            }
+            var steps = new List<object>();
+            var junction = InsertGeneratedJunction(arms, road, point, steps, "Crossing " + Path.GetFileNameWithoutExtension(path));
+            if (junction == null)
+                return;
+            PushSteps(steps, Loc.T("roadbuild.crossing.step", ("id", road.Spline.Id)));
+            SetStatusT("roadbuild.crossing.done", ("id", junction.Id));
         }
 
         /// <summary>The connection point of a placed junction whose outward heading lies nearest a heading.</summary>
@@ -3940,12 +4031,19 @@ namespace OmsiMapEditor.UI
         {
             if (mapCanvas == null || roadPanel == null || activeTool != EditorTool.Road || currentSummary == null)
                 return;
+            UpdatePathMode();
             if (!roadPointer.HasValue)
             {
                 mapCanvas.ClearRoadPreview();
                 return;
             }
             mapCanvas.SetRoadGuides(null);
+            if (roadPanel.CrossingMode)
+            {
+                mapCanvas.ClearRoadPreview();
+                roadPanel.ShowPlan(Loc.T("roadbuild.crossing.plan"), false);
+                return;
+            }
             if (!roadStarted)
             {
                 Snap(roadPointer.Value, out var join, out var port);
@@ -4074,6 +4172,11 @@ namespace OmsiMapEditor.UI
             }
             var point = new OmsiMapPoint(x, y);
             roadPointer = point;
+            if (roadPanel.CrossingMode)
+            {
+                InsertCrossingPiece(point);
+                return;
+            }
             if (!roadStarted)
             {
                 Snap(point, out var join, out var port);

@@ -50,6 +50,7 @@ namespace OmsiMapEditor.UI
         private readonly Label profileLabel;
         private readonly Toggle fitTerrainToggle;
         private readonly Toggle junctionsToggle;
+        private readonly Toggle crossingToggle;
         private readonly Label planLabel;
         private readonly List<string> profiles = new List<string>();
         private readonly HashSet<string> favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -162,6 +163,13 @@ namespace OmsiMapEditor.UI
             junctionsToggle.AddToClassList("picker-option-toggle");
             junctionsToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             Row(options, "roadtool.junctions").Add(junctionsToggle);
+
+            // A click on a road puts a pedestrian crossing piece into it instead of building a road (ADR 086, step 5).
+            crossingToggle = new Toggle { value = false };
+            LocBindings.Tooltip(crossingToggle, "roadtool.crossing.tooltip");
+            crossingToggle.AddToClassList("picker-option-toggle");
+            crossingToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
+            Row(options, "roadtool.crossing").Add(crossingToggle);
             Add(options);
 
             // The picker beside them.
@@ -368,6 +376,13 @@ namespace OmsiMapEditor.UI
 
         /// <summary>True when roads meeting other roads should be joined with new junctions (ADR 028).</summary>
         public bool MakeJunctions => junctionsToggle.value;
+
+        /// <summary>True when a click on a road inserts a pedestrian crossing piece instead of building a road.</summary>
+        public bool CrossingMode
+        {
+            get => crossingToggle.value;
+            set => crossingToggle.value = value;
+        }
 
         /// <summary>The end height for manual mode, or null while the field holds no number.</summary>
         public double? EndHeight => Number(endHeightField, double.MinValue);

@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Haga clic en el punto de control un poco alejado del inicio.",
   "roadbuild.status.control_set": "Conjunto de puntos de control. Haga clic donde termina la curva; Esc recupera el punto de control.",
   "roadbuild.status.corner_failed": "La esquina no se pudo redondear: {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Modo de caminos: traza un camino peatonal a través de la calle, sus extremos se ajustan a los caminos de acera y a otros caminos de peatones. La vista de caminos está activada.",
+  "roadbuild.path_mode.road": "Modo de caminos: traza un camino para vehículos, sus extremos se ajustan a los caminos de carretera existentes; trázalo en el sentido del tráfico. La vista de caminos está activada.",
+  "roadbuild.crossing.plan": "Haz clic en una calle para insertar un paso de peatones; desactiva «Insertar paso de peatones» para volver a construir calles.",
+  "roadbuild.crossing.no_road": "Aquí no hay una calle con calzada: haz clic en la calzada de una calle.",
+  "roadbuild.crossing.refused": "No hay paso aquí: {reason}",
+  "roadbuild.crossing.variant": "En una variante crono no se puede insertar un tramo con paso en las calles.",
+  "roadbuild.crossing.step": "Paso de peatones en la calle #{id}",
+  "roadbuild.crossing.done": "Paso de peatones insertado en la calle (cruce #{id}). Ctrl+Z lo deshace."
 }

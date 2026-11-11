@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Fare clic sul punto di controllo leggermente lontano dall'inizio.",
   "roadbuild.status.control_set": "Punto di controllo impostato. Fare clic nel punto in cui termina la curva; Esc riprende il punto di controllo.",
   "roadbuild.status.corner_failed": "Impossibile arrotondare l'angolo: {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Modalità percorsi: traccia un percorso pedonale attraverso la strada, le estremità si agganciano ai percorsi dei marciapiedi e ad altri percorsi pedonali. La vista dei percorsi è attiva.",
+  "roadbuild.path_mode.road": "Modalità percorsi: traccia un percorso per veicoli, le estremità si agganciano ai percorsi stradali esistenti; tracciali nel senso di marcia. La vista dei percorsi è attiva.",
+  "roadbuild.crossing.plan": "Clicca su una strada per inserirvi un attraversamento pedonale; disattiva «Inserisci attraversamento» per costruire di nuovo strade.",
+  "roadbuild.crossing.no_road": "Qui non c'è una strada con carreggiata: clicca sulla carreggiata di una strada.",
+  "roadbuild.crossing.refused": "Nessun attraversamento qui: {reason}",
+  "roadbuild.crossing.variant": "In una variante cronologica non si può inserire un tratto con attraversamento nelle strade.",
+  "roadbuild.crossing.step": "Attraversamento pedonale nella strada #{id}",
+  "roadbuild.crossing.done": "Attraversamento pedonale inserito nella strada (incrocio #{id}). Ctrl+Z lo annulla."
 }

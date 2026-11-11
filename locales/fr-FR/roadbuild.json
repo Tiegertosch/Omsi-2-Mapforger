@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Cliquez sur le point de contrôle un peu éloigné du début.",
   "roadbuild.status.control_set": "Ensemble de points de contrôle. Cliquez à l'endroit où se termine la courbe ; Esc reprend le point de contrôle.",
   "roadbuild.status.corner_failed": "Le coin n'a pas pu être arrondi : {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Mode chemins : trace un chemin piéton à travers la route, ses extrémités s'accrochent aux chemins de trottoir et aux autres chemins de piétons. L'affichage des chemins est activé.",
+  "roadbuild.path_mode.road": "Mode chemins : trace un chemin pour véhicules, ses extrémités s'accrochent aux chemins de route existants ; trace-le dans le sens de la circulation. L'affichage des chemins est activé.",
+  "roadbuild.crossing.plan": "Clique sur une route pour y insérer un passage piéton ; désactive « Insérer un passage » pour construire de nouveau des routes.",
+  "roadbuild.crossing.no_road": "Pas de route avec chaussée ici : clique sur la chaussée d'une route.",
+  "roadbuild.crossing.refused": "Pas de passage ici : {reason}",
+  "roadbuild.crossing.variant": "On ne peut pas insérer de tronçon de passage dans les routes d'une variante chrono.",
+  "roadbuild.crossing.step": "Passage piéton dans la route #{id}",
+  "roadbuild.crossing.done": "Passage piéton inséré dans la route (carrefour #{id}). Ctrl+Z l'annule."
 }

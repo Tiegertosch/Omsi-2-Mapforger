@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Este mapa ainda não utiliza perfis spline.",
   "roadtool.empty.favorites": "Marque os perfis com a estrela para os encontrar aqui.",
   "roadtool.empty.mine": "Tipos de estrada que cria com Novo tipo de estrada... mostre aqui.",
-  "roadtool.empty.none": "Sem perfil deste tipo na instalação."
+  "roadtool.empty.none": "Sem perfil deste tipo na instalação.",
+  "roadtool.crossing": "Inserir passadeira",
+  "roadtool.crossing.tooltip": "Ligado: um clique numa estrada insere lá uma passadeira em vez de construir uma estrada. Um troço curto da mesma estrada é inserido com faixas de zebra e um caminho pedonal que o atravessa, num só objeto, para os carros darem prioridade. Guardado em Sceneryobjects\\Mapforge na tua instalação do OMSI."
 }

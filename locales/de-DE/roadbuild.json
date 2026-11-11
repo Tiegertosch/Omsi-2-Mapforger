@@ -60,5 +60,13 @@
   "roadbuild.status.choose_profile": "Wähle zuerst ein Spline-Profil im Straßenpanel.",
   "roadbuild.status.control_far": "Klicke den Kontrollpunkt etwas abseits des Starts an.",
   "roadbuild.status.control_set": "Kontrollpunkt gesetzt. Klicke dorthin, wo die Kurve endet; Esc nimmt den Kontrollpunkt zurück.",
-  "roadbuild.status.corner_failed": "Die Ecke konnte nicht ausgerundet werden: {reason}"
+  "roadbuild.status.corner_failed": "Die Ecke konnte nicht ausgerundet werden: {reason}",
+  "roadbuild.path_mode.foot": "Pfadmodus: Zieh einen Fußpfad über die Straße, die Enden rasten an den Gehwegpfaden und anderen Fußgängerpfaden ein. Die Pfadansicht ist an.",
+  "roadbuild.path_mode.road": "Pfadmodus: Zieh einen Fahrzeugpfad, die Enden rasten an vorhandenen Straßenpfaden ein; zeichne ihn in Fahrtrichtung. Die Pfadansicht ist an.",
+  "roadbuild.crossing.plan": "Klick auf eine Straße, um dort einen Fußgängerüberweg einzufügen; schalte „Überweg einfügen“ aus, um wieder Straßen zu bauen.",
+  "roadbuild.crossing.no_road": "Hier ist keine Straße mit Fahrbahn: Klicke auf die Fahrbahn einer Straße.",
+  "roadbuild.crossing.refused": "Kein Überweg hier: {reason}",
+  "roadbuild.crossing.variant": "In eine Chrono-Variante lässt sich kein Überweg-Stück in die Straßen schneiden.",
+  "roadbuild.crossing.step": "Fußgängerüberweg in Straße #{id}",
+  "roadbuild.crossing.done": "Fußgängerüberweg in die Straße gesetzt (Kreuzung #{id}). Strg+Z nimmt ihn zurück."
 }

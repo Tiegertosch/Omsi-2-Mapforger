@@ -72,7 +72,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Schritt 1 – Überwege an erzeugten Kreuzungen: Pfade quer über einen Arm, Gehwegpfade geteilt, Werkzeug „Lanes“ (wartet auf den Nutzertest in openOMSI)
 - [x] Schritt 2 – Zebrastreifen-Markierung mit dem Überweg, Haltelinie vor dem Überweg (wartet auf den Nutzertest; der Haltepunkt der Fahrzeuge an Ampeln folgt mit Schritt 3)
 - [x] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor): Bindung des Überwegs, Zufahrt vor dem Überweg gebunden, Assistent mit Überweggruppen, Fußgängerköpfe, Warnung zu kurzes Grün (wartet auf den Nutzertest)
-- [ ] Schritt 4 – freies Pfad-Werkzeug (Fahrzeuge, Fußgänger, Schienen) mit eigenem Pfad-Objekt, auf jeder Karte
+- [x] Schritt 4 – Pfade mit OMSIs unsichtbaren Splines (`invis_sidewalk`, `invis_street`) im Straßen-Werkzeug, Einrasten auf vorhandene Pfadlinien, auf jeder Karte (wartet auf den Nutzertest; Zebra-Optik auf gewöhnlichen Straßen offen)
+- [x] Schritt 5 – Überweg-Stück in eine gewöhnliche Straße einfügen (Straßen-Werkzeug, Schalter „Insert crossing“): Fußpfad und Fahrspuren im selben Objekt, damit Autos Fußgängern auf dem Zebra Vorrang geben (wartet auf den Nutzertest; ohne Haltelinie und Ampel)
 
 ## Später
 

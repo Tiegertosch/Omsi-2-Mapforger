@@ -141,13 +141,91 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
-        public void ATransitionAndAnArmWithRailsRefuseTheCrossing()
+        public void ACrossingPieceIsAPlainStretchOfRoadWithTheCrossingInItsMiddle()
         {
             var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
-            var transition = OmsiJunctionLayout.Build(new[] { 90.0, 270.0 }.Select(heading => new OmsiJunctionArm
-                { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile, Crossing = new OmsiCrossing() }).ToList(), Texture);
-            Assert.IsTrue(transition.CrossingProblems.All(problem => problem != null));
-            Assert.IsTrue(transition.Arms.All(arm => arm.Crossing == null));
+            var piece = OmsiJunctionLayout.Build(new[] { 90.0, 270.0 }.Select(heading => new OmsiJunctionArm
+                { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile, Crossing = heading < 100 ? new OmsiCrossing() : null }).ToList(), Texture);
+
+            Assert.IsTrue(piece.IsTransition);
+            Assert.IsNull(piece.CrossingProblems[0]);
+            Assert.IsNotNull(piece.Arms[0].Crossing);
+            // Long enough for the crossing (3 m wide) with room before and behind it: 11 m, so each arm 5.5 m.
+            Assert.AreEqual(5.5, piece.Arms[0].Length, 1e-9);
+            Assert.AreEqual(5.5, piece.Arms[1].Length, 1e-9);
+            // The crossing's footpath runs across the carriageway from pavement to pavement, bound under its own key.
+            var across = piece.Paths.Single(path => path.WayThrough == OmsiCrossing.WayKey(0));
+            Assert.AreEqual(1, across.Kind);
+            Assert.AreEqual(11.0, across.LengthMeters, 1e-6);
+            CollectionAssert.AreEquivalent(new[] { OmsiCrossing.WayKey(0) }, piece.CrossingWays);
+            // Each pavement path is cut in the middle: two pieces of 5.5 m on each side.
+            var pieces = piece.Paths.Where(path => path.Kind == 1 && path.RadiusMeters == 0.0 && Math.Abs(path.LengthMeters - 5.5) < 1e-6).ToList();
+            Assert.AreEqual(4, pieces.Count);
+            // The zebra bars lie over the carriageway; the vehicle lanes run straight through the piece, crossing the footpath in one object.
+            var bars = piece.Meshes.Single(mesh => mesh.Texture == OmsiJunctionMarkings.WhiteTexture);
+            Assert.AreEqual(8 * 4, bars.Positions.Count / 3);
+            Assert.AreEqual(2, piece.Paths.Count(path => path.Kind == 0));
+
+            // Without a crossing the stretch has its footpaths whole, as before.
+            var plain = OmsiJunctionLayout.Build(new[] { 90.0, 270.0 }.Select(heading => new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile }).ToList(), Texture);
+            Assert.AreEqual(0, plain.CrossingWays.Count);
+            Assert.IsFalse(plain.Meshes.Any(mesh => mesh.Texture == OmsiJunctionMarkings.WhiteTexture));
+        }
+
+        [Test]
+        public void TheKerbOfACrossingPieceIsLoweredAtTheCrossingAndRisesAgainBeforeAndAfter()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            OmsiJunctionLayout Piece(bool crossing) => OmsiJunctionLayout.Build(new[] { 90.0, 270.0 }.Select(heading => new OmsiJunctionArm
+                { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile, Crossing = crossing && heading < 100 ? new OmsiCrossing() : null }).ToList(), Texture);
+            // Heights of the pavement at a place along the road (x, the arm runs east) and across it (y, up to 4 m is the kerb, 7 m the outer edge).
+            double? HeightAt(OmsiJunctionLayout layout, double along, double across)
+            {
+                foreach (var mesh in layout.Meshes.Where(each => each.Texture == "side.bmp"))
+                    for (var vertex = 0; vertex < mesh.Positions.Count / 3; vertex++)
+                        if (Math.Abs(mesh.Positions[vertex * 3] - along) < 0.13 && Math.Abs(Math.Abs(mesh.Positions[vertex * 3 + 2]) - across) < 0.01 &&
+                            mesh.Positions[vertex * 3 + 1] > 0.05)
+                            return mesh.Positions[vertex * 3 + 1];
+                return null;
+            }
+            var plain = Piece(false);
+            var lowered = Piece(true);
+
+            // Without a crossing the pavement is 0.25 m high everywhere, at the kerb too.
+            Assert.AreEqual(0.25, HeightAt(plain, 0.0, 4.0).Value, 1e-6);
+            // At the crossing the kerb is the carriageway's height (0.1) plus the 3 cm lip; the outer edge keeps its height, so the pavement slopes up.
+            Assert.AreEqual(0.13, HeightAt(lowered, 0.0, 4.0).Value, 0.005);
+            Assert.AreEqual(0.25, HeightAt(lowered, 0.0, 7.0).Value, 1e-6);
+            // Past the ramp, 1.5 m beyond the crossing's 1.5 m half width, and at the ends of the piece it is whole again.
+            Assert.AreEqual(0.25, HeightAt(lowered, 3.25, 4.0).Value, 0.01);
+            Assert.AreEqual(0.25, HeightAt(lowered, 5.5, 4.0).Value, 1e-6);
+            // In the ramp it lies between.
+            var halfway = HeightAt(lowered, 2.25, 4.0).Value;
+            Assert.That(halfway, Is.GreaterThan(0.14).And.LessThan(0.24));
+            // The people's path across walks at the carriageway.
+            Assert.AreEqual(0.13, lowered.Paths.Single(path => path.WayThrough == OmsiCrossing.WayKey(0)).Height, 1e-9);
+        }
+
+        [Test]
+        public void ACrossingPieceRefusesAChangeOfCrossSectionAndARoadWithoutPavements()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var bare = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(BareProfile), ProfilePath);
+            var change = OmsiJunctionLayout.Build(new[] { new OmsiJunctionArm { HeadingDegrees = 90.0, ProfilePath = ProfilePath, Profile = profile, Crossing = new OmsiCrossing() },
+                new OmsiJunctionArm { HeadingDegrees = 270.0, ProfilePath = ProfilePath, Profile = bare } }, Texture);
+            Assert.IsNotNull(change.CrossingProblems[0]);
+            Assert.IsNull(change.Arms[0].Crossing);
+            Assert.AreEqual(0, change.CrossingWays.Count);
+
+            var noPavement = OmsiJunctionLayout.Build(new[] { 90.0, 270.0 }.Select(heading => new OmsiJunctionArm
+                { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = bare, Crossing = heading < 100 ? new OmsiCrossing() : null }).ToList(), Texture);
+            Assert.IsNotNull(noPavement.CrossingProblems[0]);
+        }
+
+        [Test]
+        public void AnArmWithRailsRefusesTheCrossing()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
 
             var withRails = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile + "[path]\r\n2\r\n0\r\n0.1\r\n1.4\r\n2\r\n"), ProfilePath);
             var arms = new[] { 90.0, 270.0, 0.0 }.Select(heading => new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = withRails }).ToList();

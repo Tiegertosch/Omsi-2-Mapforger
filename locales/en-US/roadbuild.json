@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Click the control point a little away from the start.",
   "roadbuild.status.control_set": "Control point set. Click where the curve ends; Esc takes the control point back.",
   "roadbuild.status.corner_failed": "The corner could not be rounded: {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Path mode: draw a footpath over the road and its ends snap to the pavement paths and other paths of people. The paths view is on.",
+  "roadbuild.path_mode.road": "Path mode: draw a path for vehicles and its ends snap to the road paths already there, so draw it the way the traffic goes. The paths view is on.",
+  "roadbuild.crossing.plan": "Click a road to put a pedestrian crossing into it; switch \"Insert crossing\" off to build roads again.",
+  "roadbuild.crossing.no_road": "No road with a carriageway here: click on the carriageway of a road.",
+  "roadbuild.crossing.refused": "No crossing here: {reason}",
+  "roadbuild.crossing.variant": "A chrono variant cannot have a crossing piece cut into its roads.",
+  "roadbuild.crossing.step": "Pedestrian crossing in road #{id}",
+  "roadbuild.crossing.done": "Put a pedestrian crossing into the road (junction #{id}). Ctrl+Z takes it back."
 }

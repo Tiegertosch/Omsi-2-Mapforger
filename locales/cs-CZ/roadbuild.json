@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Klepněte na ovládací bod trochu dál od začátku.",
   "roadbuild.status.control_set": "Sada kontrolních bodů. Klepněte na místo, kde křivka končí; Esc vezme kontrolní bod zpět.",
   "roadbuild.status.corner_failed": "Roh nelze zaoblit: {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Režim cest: nakresli pěší cestu přes silnici, její konce se přichytí k chodníkovým cestám a dalším cestám chodců. Zobrazení cest je zapnuto.",
+  "roadbuild.path_mode.road": "Režim cest: nakresli cestu pro vozidla, její konce se přichytí k existujícím silničním cestám; kresli ji ve směru jízdy. Zobrazení cest je zapnuto.",
+  "roadbuild.crossing.plan": "Klikni na silnici a vlož do ní přechod pro chodce; vypni „Vložit přechod“, aby se zase stavěly silnice.",
+  "roadbuild.crossing.no_road": "Tady není silnice s vozovkou: klikni na vozovku silnice.",
+  "roadbuild.crossing.refused": "Tady žádný přechod: {reason}",
+  "roadbuild.crossing.variant": "Do chrono varianty nelze do silnic vložit kus s přechodem.",
+  "roadbuild.crossing.step": "Přechod pro chodce v silnici #{id}",
+  "roadbuild.crossing.done": "Přechod pro chodce vložen do silnice (křižovatka #{id}). Ctrl+Z ho vrátí zpět."
 }

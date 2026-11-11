@@ -445,6 +445,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Vehicles stop this far before the bars of a crossing.</summary>
         public const double StopLineGap = 1.5;
 
+        /// <summary>The kerb at a crossing stays this high above the carriageway, as the lowered kerbs of towns do for the blind.</summary>
+        public const double KerbLipMeters = 0.03;
+
+        /// <summary>The lowered kerb at a crossing rises back to its full height over this length before and after the crossing.</summary>
+        public const double KerbRampMeters = 1.5;
+
         /// <summary>The nose of a median island is rounded with half its width, or at most this radius at its two corners.</summary>
         public const double NoseRadius = 2.0;
 
@@ -549,14 +555,6 @@ namespace OmsiMapEditor.OMSI
             {
                 layout.IsTransition = true;
                 layout.BuildTransition(sections, roadTexture);
-                // A transition between two cross-sections has no corners to put a crossing by.
-                layout.CrossingProblems = new string[layout.Arms.Count];
-                for (var index = 0; index < layout.Arms.Count; index++)
-                    if (layout.Arms[index].Crossing != null)
-                    {
-                        layout.CrossingProblems[index] = "Arm " + (index + 1) + " belongs to a transition between two cross-sections, which has no crossing.";
-                        layout.Arms[index].Crossing = null;
-                    }
                 return layout;
             }
             var through = layout.TakeNearHalf(sections);
@@ -699,18 +697,55 @@ namespace OmsiMapEditor.OMSI
             var first = sections[0];
             var second = sections[1];
             var length = TransitionLength(first, second);
+            // A crossing piece (ADR 086, step 5): a plain stretch of road with a crossing in its middle, on the arm that asks for it.
+            CrossingProblems = new string[Arms.Count];
+            crossingPlans = new CrossingPlan[Arms.Count];
+            OmsiCrossing asked = null;
+            for (var index = 0; index < Arms.Count; index++)
+                if (Arms[index].Crossing != null)
+                {
+                    asked = asked ?? Arms[index].Crossing;
+                    if (index != 0)
+                        Arms[index].Crossing = null;
+                }
+            if (asked != null)
+            {
+                Arms[0].Crossing = asked;
+                string problem = null;
+                if (EdgeChange(first, second) > 0.01)
+                    problem = "A crossing goes only over a plain stretch of road, not over a change of cross-section.";
+                else if (PavementLane(0, sections, true) == null || PavementLane(0, sections, false) == null)
+                    problem = "The road needs a pavement on both sides for a crossing.";
+                else if (Arms[0].Profile.Lanes.Exists(lane => lane.Kind == OmsiSplineCategories.RailLane))
+                    problem = "A crossing cannot be laid over rails yet.";
+                if (problem != null)
+                {
+                    CrossingProblems[0] = problem;
+                    Arms[0].Crossing = null;
+                    asked = null;
+                }
+                else
+                {
+                    var width = OmsiCrossing.ClampWidth(asked.WidthMeters);
+                    crossingPlans[0] = new CrossingPlan { Centre = 0.0, Width = width };
+                    length = Math.Max(length, width + 2.0 * ArmExtension + 4.0);
+                }
+            }
             Arms[0].Length = length / 2.0;
             Arms[1].Length = length / 2.0;
             Arms[0].Mouth = Math.Max(0.0, Arms[0].Length - ArmExtension);
             Arms[1].Mouth = Math.Max(0.0, Arms[1].Length - ArmExtension);
-            // Along the first arm, from the second arm's end (share 0) to the first's (share 1); right is the first arm's right.
-            const int steps = 16;
+            // Along the first arm, from the second arm's end (share 0) to the first's (share 1); right is the first arm's right. A
+            // crossing needs finer steps for the ramps of its lowered kerb.
+            var steps = crossingPlans[0] != null ? 2 * (int)Math.Ceiling(length / 0.5) : 16;
             var roadLeft = new List<Point>();
             var roadRight = new List<Point>();
             var outerLeft = new List<Point>();
             var outerRight = new List<Point>();
             var roadHeights = new List<double>();
             var pavementHeights = new List<double>();
+            // The height of the pavement at the kerb: lowered at a crossing, so the pavement slopes up from the kerb to its outer edge.
+            var kerbHeights = new List<double>();
             for (var step = 0; step <= steps; step++)
             {
                 var share = (double)step / steps;
@@ -722,6 +757,9 @@ namespace OmsiMapEditor.OMSI
                 outerRight.Add(Point.Along(Arms[0], along, Lerp(second.OuterLeft, first.OuterRight, ease)));
                 roadHeights.Add(Lerp(second.RoadHeight, first.RoadHeight, ease));
                 pavementHeights.Add(Lerp(second.PavementHeight, first.PavementHeight, ease));
+                kerbHeights.Add(crossingPlans[0] == null
+                    ? pavementHeights[step]
+                    : Lerp(pavementHeights[step], roadHeights[step] + KerbLipMeters, LoweredKerb(Math.Abs(along), crossingPlans[0].Width / 2.0)));
             }
 
             // The carriageway: each half in its own road's surface, or one piece when both are alike.
@@ -740,14 +778,38 @@ namespace OmsiMapEditor.OMSI
             {
                 var pavement = MeshFor(profile.Textures[section.PavementTexture].Path, "pavement");
                 var kerb = section.KerbTexture >= 0 ? MeshFor(profile.Textures[section.KerbTexture].Path, "kerb") : null;
-                Strip(pavement, kerb, section, roadLeft, outerLeft, roadHeights, pavementHeights);
-                Strip(pavement, kerb, section, roadRight, outerRight, roadHeights, pavementHeights);
+                Strip(pavement, kerb, section, roadLeft, outerLeft, roadHeights, pavementHeights, kerbHeights);
+                Strip(pavement, kerb, section, roadRight, outerRight, roadHeights, pavementHeights, kerbHeights);
             }
 
             // Lanes and footpaths both ways, each to the nearest on the other side, and every one on the other side reached.
             Connect(Arms[0], Arms[1], 0);
             Connect(Arms[1], Arms[0], 0);
-            Connect(Arms[0], Arms[1], 1);
+            if (crossingPlans[0] == null)
+            {
+                Connect(Arms[0], Arms[1], 1);
+                return;
+            }
+            // With a crossing the footpaths run straight on, cut in the middle where the crossing's path joins them.
+            var plan = crossingPlans[0];
+            foreach (var lane in Arms[0].Profile.Lanes.FindAll(each => each.Kind == 1 && Within(each, first, true)))
+            {
+                AddStraight(Arms[0], length / 2.0, 0.0, lane, 2);
+                AddStraight(Arms[0], 0.0, -length / 2.0, lane, 2);
+            }
+            var right = PavementLane(0, sections, true);
+            var left = PavementLane(0, sections, false);
+            var start = Point.Along(Arms[0], 0.0, right.X);
+            var end = Point.Along(Arms[0], 0.0, left.X);
+            var across = end.Minus(start);
+            Paths.Add(new OmsiJunctionPath
+            {
+                X = start.X, Y = start.Y, Height = first.RoadHeight + KerbLipMeters, HeadingDegrees = Normalize360(Math.Atan2(across.X, across.Y) * 180.0 / Math.PI),
+                RadiusMeters = 0.0, LengthMeters = start.DistanceTo(end), Kind = 1, Width = plan.Width, Direction = 2,
+                WayThrough = OmsiCrossing.WayKey(0), StartsWay = true
+            });
+            CrossingWays.Add(OmsiCrossing.WayKey(0));
+            AddCrosswalkBars(Arms[0], first, 0.0, plan.Width);
         }
 
         private static List<Point> Outline(List<Point> left, List<Point> right, int from, int to)
@@ -760,10 +822,28 @@ namespace OmsiMapEditor.OMSI
             return ring;
         }
 
-        /// <summary>A pavement band between a kerb line and an outer edge, with its kerb face, along a transition.</summary>
-        private static void Strip(OmsiGeneratedMesh pavement, OmsiGeneratedMesh kerb, OmsiProfileSections section, List<Point> inner, List<Point> outer,
-            List<double> roadHeights, List<double> pavementHeights)
+        /// <summary>
+        /// How far a kerb is lowered at a distance from the middle of a crossing: wholly (1) over the crossing's half width, then
+        /// back to its full height (0) over <see cref="KerbRampMeters"/>, smoothly.
+        /// </summary>
+        private static double LoweredKerb(double distanceFromMiddle, double halfWidth)
         {
+            if (distanceFromMiddle <= halfWidth)
+                return 1.0;
+            if (distanceFromMiddle >= halfWidth + KerbRampMeters)
+                return 0.0;
+            var share = (distanceFromMiddle - halfWidth) / KerbRampMeters;
+            return 1.0 - share * share * (3.0 - 2.0 * share);
+        }
+
+        /// <summary>
+        /// A pavement band between a kerb line and an outer edge, with its kerb face, along a transition. The edge at the kerb
+        /// may lie lower than the outer edge (a lowered kerb): <paramref name="kerbHeights"/>, else the pavement's height.
+        /// </summary>
+        private static void Strip(OmsiGeneratedMesh pavement, OmsiGeneratedMesh kerb, OmsiProfileSections section, List<Point> inner, List<Point> outer,
+            List<double> roadHeights, List<double> pavementHeights, List<double> kerbHeights = null)
+        {
+            kerbHeights = kerbHeights ?? pavementHeights;
             var along = 0.0;
             for (var point = 0; point < inner.Count; point++)
             {
@@ -772,7 +852,7 @@ namespace OmsiMapEditor.OMSI
                 // Where a side has no pavement the band has no width; such triangles are left out when added.
                 var start = pavement.Positions.Count / 3;
                 Add(pavement, outer[point], pavementHeights[point], section.PavementU1, along * section.PavementVPerMeter);
-                Add(pavement, inner[point], pavementHeights[point], section.PavementU0, along * section.PavementVPerMeter);
+                Add(pavement, inner[point], kerbHeights[point], section.PavementU0, along * section.PavementVPerMeter);
                 if (point > 0)
                 {
                     AddUpward(pavement, start - 2, start - 1, start);
@@ -781,7 +861,7 @@ namespace OmsiMapEditor.OMSI
                 if (kerb != null)
                 {
                     var kerbStart = kerb.Positions.Count / 3;
-                    Add(kerb, inner[point], pavementHeights[point], section.KerbU0, along * section.KerbVPerMeter);
+                    Add(kerb, inner[point], kerbHeights[point], section.KerbU0, along * section.KerbVPerMeter);
                     Add(kerb, inner[point], roadHeights[point], section.KerbU1, along * section.KerbVPerMeter);
                     if (point > 0)
                     {

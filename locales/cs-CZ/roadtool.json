@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Tato mapa zatím nepoužívá žádné profily spline.",
   "roadtool.empty.favorites": "Označte profily hvězdičkou, abyste je našli zde.",
   "roadtool.empty.mine": "Typy silnic, které vytvoříte pomocí Nový typ silnice... zobrazit zde.",
-  "roadtool.empty.none": "Žádný profil tohoto druhu v instalaci."
+  "roadtool.empty.none": "Žádný profil tohoto druhu v instalaci.",
+  "roadtool.crossing": "Vložit přechod",
+  "roadtool.crossing.tooltip": "Zapnuto: kliknutí na silnici tam vloží přechod pro chodce místo stavby silnice. Do silnice se vloží krátký kus téže silnice se zebrou a pěší cestou přes ni v jednom objektu, takže auta dávají chodcům přednost. Uloží se pod Sceneryobjects\\Mapforge ve tvé instalaci OMSI."
 }

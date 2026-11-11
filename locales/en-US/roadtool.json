@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "This map uses no spline profiles yet.",
   "roadtool.empty.favorites": "Mark profiles with the star to find them here.",
   "roadtool.empty.mine": "Road types you make with New road type... show here.",
-  "roadtool.empty.none": "No profile of this kind in the installation."
+  "roadtool.empty.none": "No profile of this kind in the installation.",
+  "roadtool.crossing": "Insert crossing",
+  "roadtool.crossing.tooltip": "On: a click on a road puts a pedestrian crossing into it instead of building a road. A short piece of the same road is cut in with zebra bars and a footpath across it, in one object, so cars give way to people on it. Stored under Sceneryobjects\\Mapforge in your OMSI installation."
 }

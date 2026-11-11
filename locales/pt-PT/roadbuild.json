@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Clique no ponto de controlo um pouco afastado do início.",
   "roadbuild.status.control_set": "Conjunto de pontos de controlo. Clique onde termina a curva; Esc recupera o ponto de controlo.",
   "roadbuild.status.corner_failed": "O canto não pôde ser arredondado: {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Modo de caminhos: traça um caminho pedonal pela rua, as pontas ajustam-se aos caminhos do passeio e a outros caminhos de peões. A vista de caminhos está ligada.",
+  "roadbuild.path_mode.road": "Modo de caminhos: traça um caminho para veículos, as pontas ajustam-se aos caminhos de estrada existentes; traça-o no sentido do trânsito. A vista de caminhos está ligada.",
+  "roadbuild.crossing.plan": "Clica numa estrada para lá inserir uma passadeira; desliga «Inserir passadeira» para voltar a construir estradas.",
+  "roadbuild.crossing.no_road": "Aqui não há estrada com faixa de rodagem: clica na faixa de rodagem de uma estrada.",
+  "roadbuild.crossing.refused": "Sem passadeira aqui: {reason}",
+  "roadbuild.crossing.variant": "Numa variante cronológica não se pode inserir um troço com passadeira nas estradas.",
+  "roadbuild.crossing.step": "Passadeira na estrada #{id}",
+  "roadbuild.crossing.done": "Passadeira inserida na estrada (cruzamento #{id}). Ctrl+Z desfaz."
 }

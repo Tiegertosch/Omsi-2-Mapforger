@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Cette carte n'utilise pas encore de profils spline.",
   "roadtool.empty.favorites": "Marquez les profils avec l’étoile pour les retrouver ici.",
   "roadtool.empty.mine": "Types de routes que vous créez avec Nouveau type de route... afficher ici.",
-  "roadtool.empty.none": "Aucun profil de ce genre dans l'installation."
+  "roadtool.empty.none": "Aucun profil de ce genre dans l'installation.",
+  "roadtool.crossing": "Insérer un passage",
+  "roadtool.crossing.tooltip": "Activé : un clic sur une route y insère un passage piéton au lieu de construire une route. Un court tronçon de la même route est inséré avec des bandes de zèbre et un chemin piéton qui le traverse, dans un seul objet, pour que les voitures cèdent le passage. Enregistré sous Sceneryobjects\\Mapforge dans ton installation OMSI."
 }

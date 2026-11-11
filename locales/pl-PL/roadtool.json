@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Ta mapa nie używa jeszcze profili spline.",
   "roadtool.empty.favorites": "Oznacz profile gwiazdką, aby je tutaj znaleźć.",
   "roadtool.empty.mine": "Typy dróg tworzone za pomocą opcji Nowy typ drogi... pokaż tutaj.",
-  "roadtool.empty.none": "Brak tego typu profilu w instalacji."
+  "roadtool.empty.none": "Brak tego typu profilu w instalacji.",
+  "roadtool.crossing": "Wstaw przejście",
+  "roadtool.crossing.tooltip": "Włączone: kliknięcie na drodze wstawia tam przejście dla pieszych zamiast budować drogę. Krótki odcinek tej samej drogi zostaje wstawiony z pasami i ścieżką dla pieszych przez nią, w jednym obiekcie, więc samochody ustępują pieszym. Zapisane w Sceneryobjects\\Mapforge w twojej instalacji OMSI."
 }

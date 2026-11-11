@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Questa mappa non utilizza ancora profili spline.",
   "roadtool.empty.favorites": "Contrassegna i profili con la stella per trovarli qui.",
   "roadtool.empty.mine": "Tipi di strade creati con Nuovo tipo di strada... mostra qui.",
-  "roadtool.empty.none": "Nessun profilo di questo tipo nell'installazione."
+  "roadtool.empty.none": "Nessun profilo di questo tipo nell'installazione.",
+  "roadtool.crossing": "Inserisci attraversamento",
+  "roadtool.crossing.tooltip": "Attivo: un clic su una strada vi inserisce un attraversamento pedonale invece di costruire una strada. Un breve tratto della stessa strada viene inserito con strisce zebrate e un percorso pedonale che lo attraversa, in un unico oggetto, così le auto danno la precedenza. Salvato in Sceneryobjects\\Mapforge nella tua installazione di OMSI."
 }

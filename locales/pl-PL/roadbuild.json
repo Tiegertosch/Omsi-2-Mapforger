@@ -73,5 +73,13 @@
   "roadbuild.status.control_far": "Kliknij punkt kontrolny nieco oddalony od początku.",
   "roadbuild.status.control_set": "Ustawiono punkt kontrolny. Kliknij miejsce, w którym kończy się krzywa; Esc przejmuje punkt kontrolny z powrotem.",
   "roadbuild.status.corner_failed": "Nie można zaokrąglić narożnika: {reason}",
-  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English"
+  "@roadbuild.status.corner_failed": "{reason} is a message from the system, in English",
+  "roadbuild.path_mode.foot": "Tryb ścieżek: narysuj ścieżkę dla pieszych przez ulicę, jej końce przyciągają się do ścieżek chodnikowych i innych ścieżek pieszych. Widok ścieżek jest włączony.",
+  "roadbuild.path_mode.road": "Tryb ścieżek: narysuj ścieżkę dla pojazdów, jej końce przyciągają się do istniejących ścieżek drogowych; rysuj ją w kierunku ruchu. Widok ścieżek jest włączony.",
+  "roadbuild.crossing.plan": "Kliknij drogę, aby wstawić na niej przejście dla pieszych; wyłącz „Wstaw przejście”, aby znów budować drogi.",
+  "roadbuild.crossing.no_road": "Tu nie ma drogi z jezdnią: kliknij jezdnię drogi.",
+  "roadbuild.crossing.refused": "Tu nie będzie przejścia: {reason}",
+  "roadbuild.crossing.variant": "W wariancie chrono nie można wstawić do dróg odcinka z przejściem.",
+  "roadbuild.crossing.step": "Przejście dla pieszych na drodze #{id}",
+  "roadbuild.crossing.done": "Wstawiono przejście dla pieszych w drogę (skrzyżowanie #{id}). Ctrl+Z cofa."
 }

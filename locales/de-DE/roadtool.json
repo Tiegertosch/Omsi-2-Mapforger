@@ -85,5 +85,7 @@
   "roadtool.empty.in_map": "Diese Karte nutzt noch keine Spline-Profile.",
   "roadtool.empty.favorites": "Markiere Profile mit dem Stern, um sie hier zu finden.",
   "roadtool.empty.mine": "Straßentypen, die du mit „Neuer Straßentyp...“ anlegst, erscheinen hier.",
-  "roadtool.empty.none": "Kein Profil dieser Art in der Installation."
+  "roadtool.empty.none": "Kein Profil dieser Art in der Installation.",
+  "roadtool.crossing": "Überweg einfügen",
+  "roadtool.crossing.tooltip": "An: Ein Klick auf eine Straße fügt dort einen Fußgängerüberweg ein, statt eine Straße zu bauen. Ein kurzes Stück derselben Straße wird mit Zebrabalken und einem Fußweg darüber eingesetzt, in einem Objekt, damit Autos Fußgängern darauf Vorrang geben. Es wird unter Sceneryobjects\\Mapforge in deiner OMSI-Installation gespeichert."
 }
