@@ -1411,6 +1411,8 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Prüfung** (`OmsiSignalCheck`, §10): Fehler bei kreuzenden Fahrwegen unverträglicher Gruppen gleichzeitig grün und bei Köpfen mit einer Gruppe, die es nicht gibt; Warnungen bei zusammenführendem Verkehr oder Geradeausverkehr gegen Fußweg gleichzeitig grün, bei Zwischenzeit unter 4 s (Ende der Freigabe bis Freigabe einer unverträglichen Gruppe; Assistent ergibt 6 s), bei Gruppen ohne Kopf und Kreuzungen ohne Köpfe; Hinweise bei wartenden Abbiegern, bei sich treffenden Bewegungen einer Gruppe ohne Wartepflicht, bei Fahrzeugbewegungen ohne Gruppe und bei „aus“ (dann gelten die Schilder; ein dunkles Licht zählt nicht als Konflikt). Dazu die Zeitprüfung der Zeitleiste.
 - **Oberfläche:** vierter Reiter „Prüfung“ mit Zusammenfassung, Matrix (Zellen farbig mit Tooltip: Konfliktzahl, gemeinsame Grünzeit; bei erzeugten Kreuzungen Klick auf eine unverträgliche Zelle setzt oder nimmt eine Ausnahme, „M“), Legende und Befunden; in der Karte Kreuze an den Treffpunkten der gemeldeten Konflikte. Köpfe stehen immer als Editor-Markierungen in der Karte (2D und 3D, angehängte Köpfe am Anhängepunkt ihres Mastes wie im Renderer, Höhe über Gelände), in Gruppenfarbe. In der Zeitleiste eine Vorschauleiste: Abspielen/Pause, Neustart, Sekunde zurück/vor, Sekunde zum Springen, Geschwindigkeit 0,5–10×, Endlos, Anforderung je Gruppe mit Halte-/Sprungpunkten. Während der Vorschau zeigen Fahrbewegungen und Köpfe ihren Zustand (rot, gelb, grün, grau für aus), die Zeitleiste eine Abspielmarke; Änderungen am Entwurf wirken sofort; Kreuzungswechsel, Werkzeugwechsel und Rückgängig beenden sie. Sie schreibt nichts. Getaktet wird in `LateUpdate`. Auch OMSIs eigene Kreuzungen lassen sich prüfen und abspielen. Nach dem Nutzertest behoben: Das Objekt-Menü (3) beendete nur Straßen- und Reihenwerkzeug; bei Ampeln, Gelände, Spuren, Markierungen und Vorfahrt standen dann zwei Panels übereinander und Esc schloss nur eines. Jetzt beendet es jedes Werkzeug mit eigenem Panel (Wechsel zu „Ziehen“).
 
+**Meilenstein 5 ist vom Nutzer in openOMSI getestet (11. November 2026).**
+
 **Prüfung Meilenstein 5:** `OmsiSignalClockTests` (8, davon 6 openOMSI-Fälle und Fall 14 des Auftrags: ein ganzer Umlauf), `OmsiSignalCheckTests` (7: Matrix gegenüber/kreuzend, Fall 10 des Auftrags – unverträgliches gleichzeitiges Grün als Fehler –, Assistentenprogramm ohne Fehler und Warnungen, Ausnahme macht Warnung, kurze Zwischenzeit, Köpfe, Ausnahmen über den Neubau); Unity 576 Tests grün, Player gebaut, 8 Sprachen ohne Fehler. Im Player auf Grundorf: erzeugte Kreuzung mit Assistent, Reiter „Prüfung“ ohne Fehler/Warnungen, Matrix 2 × 2 unverträglich, Kopf- und Konfliktmarkierungen in 2D; Ausnahme gesetzt („M“, Hinweis); Vorschau bei 10 s (2D) und 35 s (3D: Fahrbewegungen und Köpfe auf den Masten rot/grün); echtes Abspielen über Bildschirmbilder mit 5× (Log 1,1 → 8,1 s); OMSIs Kreuzung #4174 lesend geprüft (keine Fehler, Warnung VecArrow ohne Gelb) und in 3D abgespielt, angehängte Köpfe über der Fahrbahn markiert. Mausbedienung (Klick auf Matrixzellen, Knöpfe der Vorschau) nicht selbst geprüft, nur über dieselben Funktionen.
 
 **Meilenstein 6 (10. November 2026, Vorlagen, Leistung, Rundreise):**
@@ -1427,7 +1429,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 086: Fußgängerüberwege an erzeugten Kreuzungen (Schritt 1: nur Pfade)
 
-**Status:** Angenommen, 11. November 2026, Wunsch des Nutzers (Zweig `feature/pedestrian-crossings`). Bisher hatten erzeugte Kreuzungen Fußwege nur um die Ecken; über die Fahrbahn eines Arms führte kein Pfad, Menschen und KI konnten die Straßenseite nicht wechseln.
+**Status:** Angenommen, 11. November 2026, Wunsch des Nutzers (Zweig `feature/pedestrian-crossings`). Bisher hatten erzeugte Kreuzungen Fußwege nur um die Ecken; über die Fahrbahn eines Arms führte kein Pfad, Menschen und KI konnten die Straßenseite nicht wechseln. Schritte 1 bis 5 sind vom Nutzer in openOMSI getestet (11. November 2026).
 
 **Befund aus openOMSIs Quelltext** (`omsi-sim/src/people/pednet.rs`, `walk_path.rs`, `traffic/lights.rs`):
 - Fußgängerpfade (Art 1) bilden ein eigenes Netz: Pfadenden näher als 1,2 m sind **ein Knoten, gleich welche Richtung** (Fahrzeugpfade verbinden nur bei gleicher Richtung); ein Pfadende kann auch mitten in einen anderen Pfad münden (Abstand zu dessen Enden mindestens 0,3 m).
@@ -1565,7 +1567,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 092: Fahrplan bearbeiten (Abfahrten, Umläufe, Fahrzeiten)
 
-**Datum:** 11. November 2026 · **Status:** gebaut, wartet auf den Nutzertest in openOMSI
+**Datum:** 11. November 2026 · **Status:** gebaut, vom Nutzer in openOMSI getestet
 
 **Befund:** Der Editor las TTData (Haltestellen, Stationsverbindungen, Fahrwege, Fahrten, Linien) und zeigte die Linien auf der Karte, schrieb aber nichts. Ein vollständiger Fahrplan-Editor besteht aus zwei sehr verschieden schweren Teilen: dem Ändern vorhandener Zeiten und Umläufe (reine Textarbeit an `.ttl` und `.ttp`) und dem Anlegen neuer Linien (Wegsuche über die KI-Pfade für Stationsverbindungen, `.ttr`, Haltestellenliste). Der Nutzer wählte, mit dem ersten zu beginnen.
 
@@ -1579,7 +1581,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 093: Neue Fahrten und Linien mit Wegsuche; Pfadnummern von Profilen mit auskommentiertem [path]
 
-**Datum:** 11. November 2026 · **Status:** gebaut, in openOMSI headless geprüft (die Fahrt startet, auf dem Weg keine Lücke); Test durch den Nutzer steht aus
+**Datum:** 11. November 2026 · **Status:** gebaut, in openOMSI headless geprüft (die Fahrt startet, auf dem Weg keine Lücke); vom Nutzer in openOMSI getestet
 
 **Befund (an den Fahrplänen von Grundorf und Berlin-Spandau):** Eine Stationsverbindung (`StnLinks.cfg`) ist eine Kette befahrener Pfade von der Haltestelle A zur Haltestelle B. Einträge nennen Element, Pfadnummer, Kachelindex und die Pfadlänge, wie OMSI sie zählt (Länge des Splines, Länge des Pfads im .sco), nicht die Geometrie. Länge der Verbindung = Rest der ersten Spur ab der Haltestelle + volle Längen der Spuren dazwischen + Anfang der letzten bis zur Haltestelle (Grundorf: 51,4 = 55 − 10,3 + 6,74). Die Position der Haltestelle ist der Weg entlang ihrer Spur **in Fahrtrichtung** (bei einer Spur mit Richtung 1 vom Ende her), skaliert auf die OMSI-Länge; der Abstand ist der seitliche Abstand des Objekts zur Spur. openOMSI nutzt von einer Verbindung die Haltestellen-IDs und die Einträge (`omsi-sim/.../route.rs`, `steps_of`); die Fahrtrichtung je Spur wählt es selbst. Die dritte Zahl von `[newtour]` ist eine Tagesmaske (ADR 092).
 
@@ -1594,7 +1596,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 094: Linien-Werkzeug – Linien auf der Karte anklicken
 
-**Datum:** 11. November 2026 · **Status:** gebaut; in openOMSI headless geprüft (der Bus der neuen Linie startet an der ersten Haltestelle); Test durch den Nutzer steht aus
+**Datum:** 11. November 2026 · **Status:** gebaut; in openOMSI headless geprüft (der Bus der neuen Linie startet an der ersten Haltestelle); vom Nutzer in openOMSI getestet
 
 **Anlass:** Der Nutzer hat den Ablauf „Haltestellen anklicken → Strecke prüfen → Linie speichern“ vorgeschlagen (Hinfahrt und Rückfahrt getrennt, Ringlinie, Wegpunkte). Der Dialog „New trip…“ aus ADR 093 entfällt dafür: Auf der Karte lässt sich nichts wählen, solange ein Dialog darüber liegt.
 
@@ -1609,7 +1611,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 095: Fahrzeuggruppen und Depots bearbeiten (`ailists.cfg`)
 
-**Datum:** 11. November 2026 · **Status:** gebaut; Test durch den Nutzer in openOMSI steht aus
+**Datum:** 11. November 2026 · **Status:** gebaut; vom Nutzer in openOMSI getestet
 
 **Befund (an `ailists.cfg` von Grundorf und Berlin-Spandau und an openOMSIs `crates/omsi-map/src/ailists.rs` und `omsi-sim/.../choice.rs`):** Ein Umlauf (`[newtour]`) nennt eine Fahrzeuggruppe, ohne Beachtung der Groß- und Kleinschreibung. Eine Gruppe ist entweder ein Depot (`[aigroup_depot]`: Gruppenname, Name der Depotdatei; danach je Fahrzeugtyp ein `[aigroup_depot_typgroup_2]` mit der Fahrzeugdatei und einer Zeile je Bus aus Wagennummer, Kennzeichen, Lackierung, erstem und letztem Tag, mit Tabulatoren und leeren Feldern, und einem eigenen `[end]`) oder ein einfacher Pool (`[aigroup_2]`: Name, eine Depotzeile, die leer oder ganz fehlen darf, Fahrzeugdateien mit Gewicht, `[end]`). openOMSI nimmt für einen Umlauf zuerst das Depot und fällt auf den Pool zurück; die Depotdatei sucht es neben dem Fahrzeug (Dateiname oder `[name]` darin).
 
@@ -1623,7 +1625,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 096: Fahrplan abschließen – Löschen, Umbenennen, Halte vorhandener Fahrten, Zeiten je Halt
 
-**Datum:** 11. November 2026 · **Status:** gebaut, Tests grün; Test durch den Nutzer in openOMSI steht aus
+**Datum:** 11. November 2026 · **Status:** gebaut, Tests grün; vom Nutzer in openOMSI getestet
 
 **Befund (an openOMSIs `omsi-sim/src/timetable_run/times.rs` und an den Fahrplänen von Berlin-Spandau):** `[profile_man_arr_time]`, `[profile_man_dep_time]` und `[profile_otherstopping]` stehen nach dem `[profile]`, zu dem sie gehören, und nennen den Halt mit seinem Index ab 0 in der Fahrt. Arrival und Departure sind Minuten nach Fahrtbeginn; ein Halt mit Zeit ist ein Zeitpunkt, an dem der Bus wartet, die anderen Halte ergeben sich aus der Fahrzeit und den Längen der Stationsverbindungen. `otherstopping` 1 und 4 halten für Fahrgäste, 2 wird durchfahren, 3 wird bedient, wenn der Bus mehr als 20 s früh ist. In Spandau haben 14 Fahrtdateien Ankunftszeiten, 38 Abfahrtszeiten und 45 Haltemodi.
 
@@ -1637,7 +1639,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 097: Fahrwege (`.ttr`) und Fahrten mit `[station]` für Züge und Straßenbahnen
 
-**Datum:** 11. November 2026 · **Status:** gebaut, Zahlen unten an den Karten gemessen; in openOMSI headless geprüft (Grundorf: eine zweite Haltestelle am Gleis von `RB`, Linie `RT` mit Hin- und Rückfahrt; der Zug BR218 startet, die Fahrt hat 2 Stationen, 3 Spuren, 400 m, die Haltestelle liegt bei 89,277 m und 0,208 m neben dem Gleis, wie in `RB`); Test durch den Nutzer steht aus
+**Datum:** 11. November 2026 · **Status:** gebaut, Zahlen unten an den Karten gemessen; in openOMSI headless geprüft (Grundorf: eine zweite Haltestelle am Gleis von `RB`, Linie `RT` mit Hin- und Rückfahrt; der Zug BR218 startet, die Fahrt hat 2 Stationen, 3 Spuren, 400 m, die Haltestelle liegt bei 89,277 m und 0,208 m neben dem Gleis, wie in `RB`); vom Nutzer in openOMSI getestet
 
 **Befund (an Grundorf, Berlin-Spandau und openOMSIs `omsi-timetable` und `timetable_run/times.rs`):**
 - **Was openOMSI liest:** Aus einem `[track_entry]` Element-ID, Pfadnummer, Kachelindex und Länge; aus einem `[station]` die Objekt-ID und den Eintragsindex, der **ab 0** zählt (das Inventar sagte ab 1; der Index 4 von `RB` ist der Eintrag, auf dem die Haltestelle liegt). Die Lage der Haltestelle sucht es zur Laufzeit selbst auf dem Pfad. Feld 4 und das letzte Feld des Eintrags und die übrigen Zahlen des `[station]` liest openOMSI nicht.

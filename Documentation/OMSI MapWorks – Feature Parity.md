@@ -91,14 +91,14 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 ## F. Tracks, Trips und Fahrpläne
 - [x] Vorhandene Linien und Haltestellen anzeigen — Vorhanden
 - [x] Vorhandene Trips und Routen anzeigen — Vorhanden
-- [x] Tracks erstellen und bearbeiten — Vorhanden (Schalter „Rail“ im Linien-Werkzeug schreibt Fahrweg und Fahrt; Bearbeiten über neu anlegen und löschen, ADR 097; Test in openOMSI steht aus)
+- [x] Tracks erstellen und bearbeiten — Vorhanden (Schalter „Rail“ im Linien-Werkzeug schreibt Fahrweg und Fahrt; Bearbeiten über neu anlegen und löschen, ADR 097; vom Nutzer in openOMSI getestet)
 - [x] Haltestellenreihenfolge definieren — Vorhanden (Dialog „New trip…“, ADR 093)
-- [x] Trips erstellen und bearbeiten — Vorhanden (Linien-Werkzeug für neue Fahrten, auch auf Schienen; Halte vorhandener Fahrten ändern, Löschen und Umbenennen, ADR 093/096/097; Test in openOMSI steht aus) (früher: Teilweise)
+- [x] Trips erstellen und bearbeiten — Vorhanden (Linien-Werkzeug für neue Fahrten, auch auf Schienen; Halte vorhandener Fahrten ändern, Löschen und Umbenennen, ADR 093/096/097; vom Nutzer in openOMSI getestet) (früher: Teilweise)
 - [x] Fahrzeiten zwischen Haltestellen festlegen — Vorhanden (Fahrzeit je Profil, dazu Ankunft, Abfahrt und Haltemodus je Halt, ADR 092/096) (früher: Teilweise)
-- [x] Tours und Umläufe erstellen — Vorhanden (anlegen, umbenennen, verschieben, Fahrten im Takt, ADR 092; Test in openOMSI steht aus)
+- [x] Tours und Umläufe erstellen — Vorhanden (anlegen, umbenennen, verschieben, Fahrten im Takt, ADR 092; vom Nutzer in openOMSI getestet)
 - [x] Abfahrtszeiten und Fahrplantabellen bearbeiten — Vorhanden (Dialog im Reiter Lines, ADR 092)
-- [x] Betriebstage und Kalenderzuordnung bearbeiten — Vorhanden (Tagesmaske je Umlauf: Wochentage, Feiertage, Schulzeit/Schulferien, ADR 092; Test in openOMSI steht aus)
-- [x] Depots und Fahrzeugzuordnung bearbeiten — Vorhanden (Dialog „Vehicles…“: Depots mit Typen und Bussen, einfache Gruppen, Umbenennen mit den Umläufen, ADR 095; Test in openOMSI steht aus)
+- [x] Betriebstage und Kalenderzuordnung bearbeiten — Vorhanden (Tagesmaske je Umlauf: Wochentage, Feiertage, Schulzeit/Schulferien, ADR 092; vom Nutzer in openOMSI getestet)
+- [x] Depots und Fahrzeugzuordnung bearbeiten — Vorhanden (Dialog „Vehicles…“: Depots mit Typen und Bussen, einfache Gruppen, Umbenennen mit den Umläufen, ADR 095; vom Nutzer in openOMSI getestet)
 - [x] TTData vollständig schreiben und validieren — Vorhanden (Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
 
 ## G. Signalrouten, Prioritäten und Bahnverkehr
