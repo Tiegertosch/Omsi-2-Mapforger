@@ -81,5 +81,22 @@
   "roadbuild.crossing.refused": "No hay paso aquí: {reason}",
   "roadbuild.crossing.variant": "En una variante crono no se puede insertar un tramo con paso en las calles.",
   "roadbuild.crossing.step": "Paso de peatones en la calle #{id}",
-  "roadbuild.crossing.done": "Paso de peatones insertado en la calle (cruce #{id}). Ctrl+Z lo deshace."
+  "roadbuild.crossing.done": "Paso de peatones insertado en la calle (cruce #{id}). Ctrl+Z lo deshace.",
+  "roadbuild.parking.plan_first": "Haz clic en una calle donde empieza la fila; el lado en que haces clic recibe las plazas.",
+  "roadbuild.parking.plan_second": "Haz clic en la misma calle donde termina la fila.",
+  "roadbuild.parking.variant": "En una variante crono no se pueden poner plazas de aparcamiento junto a las calles.",
+  "roadbuild.parking.no_road": "Aquí no hay una calle con calzada: haz clic en la calzada de una calle.",
+  "roadbuild.parking.first_right": "Inicio fijado; las plazas van a la derecha de la calle. Haz clic donde termina la fila.",
+  "roadbuild.parking.first_left": "Inicio fijado; las plazas van a la izquierda de la calle. Haz clic donde termina la fila.",
+  "roadbuild.parking.other_road": "Eso no está en la misma calle. Haz clic más adelante en la calle donde empezaste.",
+  "roadbuild.parking.problem": "Sin fila: {reason}",
+  "roadbuild.parking.problem.short": "el tramo es más corto que una plaza",
+  "roadbuild.parking.problem.no_lane": "en ese lado ningún carril tiene tráfico que pase",
+  "roadbuild.parking.problem.wide": "el carril ahí es demasiado ancho para aparcar a su lado",
+  "roadbuild.parking.no_object": "Falta el objeto de aparcamiento del juego base en la instalación de OMSI.",
+  "roadbuild.parking.failed": "La fila ha fallado: {reason}",
+  "roadbuild.parking.no_tile": "Ninguna de las plazas está en una tesela de este mapa.",
+  "roadbuild.parking.step": "{n} plazas de aparcamiento",
+  "roadbuild.parking.done": "{n} plazas puestas junto a la calle; los coches pueden aparcar en {in} (las demás están demasiado cerca del final de un tramo). Ctrl+Z las quita.",
+  "roadbuild.parking.done_list": "{n} plazas puestas junto a la calle; los coches pueden aparcar en {in} (las demás están demasiado cerca del final de un tramo). El mapa no tenía lista de coches aparcados, así que se escribió una."
 }

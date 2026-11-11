@@ -87,5 +87,7 @@
   "roadtool.empty.mine": "Tipos de estrada que cria com Novo tipo de estrada... mostre aqui.",
   "roadtool.empty.none": "Sem perfil deste tipo na instalação.",
   "roadtool.crossing": "Inserir passadeira",
-  "roadtool.crossing.tooltip": "Ligado: um clique numa estrada insere lá uma passadeira em vez de construir uma estrada. Um troço curto da mesma estrada é inserido com faixas de zebra e um caminho pedonal que o atravessa, num só objeto, para os carros darem prioridade. Guardado em Sceneryobjects\\Mapforge na tua instalação do OMSI."
+  "roadtool.crossing.tooltip": "Ligado: um clique numa estrada insere lá uma passadeira em vez de construir uma estrada. Um troço curto da mesma estrada é inserido com faixas de zebra e um caminho pedonal que o atravessa, num só objeto, para os carros darem prioridade. Guardado em Sceneryobjects\\Mapforge na tua instalação do OMSI.",
+  "roadtool.parking": "Fila de estacionamento",
+  "roadtool.parking.tooltip": "Ligado: dois cliques numa estrada colocam ao lado dela uma fila de lugares de estacionamento. O primeiro clique escolhe o início e o lado, o segundo o fim. Os lugares são objetos de parque junto à faixa mais exterior, no seu sentido, para os carros do openOMSI estacionarem e saírem. Um mapa sem lista de carros estacionados recebe uma."
 }

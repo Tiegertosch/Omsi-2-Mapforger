@@ -81,5 +81,22 @@
   "roadbuild.crossing.refused": "Sem passadeira aqui: {reason}",
   "roadbuild.crossing.variant": "Numa variante cronológica não se pode inserir um troço com passadeira nas estradas.",
   "roadbuild.crossing.step": "Passadeira na estrada #{id}",
-  "roadbuild.crossing.done": "Passadeira inserida na estrada (cruzamento #{id}). Ctrl+Z desfaz."
+  "roadbuild.crossing.done": "Passadeira inserida na estrada (cruzamento #{id}). Ctrl+Z desfaz.",
+  "roadbuild.parking.plan_first": "Clica numa estrada onde a fila começa; o lado em que clicas recebe os lugares.",
+  "roadbuild.parking.plan_second": "Clica na mesma estrada onde a fila termina.",
+  "roadbuild.parking.variant": "Numa variante cronológica não se podem pôr lugares de estacionamento junto às estradas.",
+  "roadbuild.parking.no_road": "Aqui não há estrada com faixa de rodagem: clica na faixa de rodagem de uma estrada.",
+  "roadbuild.parking.first_right": "Início definido; os lugares ficam à direita da estrada. Clica onde a fila termina.",
+  "roadbuild.parking.first_left": "Início definido; os lugares ficam à esquerda da estrada. Clica onde a fila termina.",
+  "roadbuild.parking.other_road": "Isso não está na mesma estrada. Clica mais à frente na estrada onde começaste.",
+  "roadbuild.parking.problem": "Sem fila: {reason}",
+  "roadbuild.parking.problem.short": "o troço é mais curto do que um lugar",
+  "roadbuild.parking.problem.no_lane": "nesse lado nenhuma faixa tem trânsito a passar",
+  "roadbuild.parking.problem.wide": "a faixa aí é demasiado larga para estacionar ao lado",
+  "roadbuild.parking.no_object": "Falta na instalação do OMSI o objeto de parque de estacionamento do jogo base.",
+  "roadbuild.parking.failed": "A fila falhou: {reason}",
+  "roadbuild.parking.no_tile": "Nenhum dos lugares fica numa tesela deste mapa.",
+  "roadbuild.parking.step": "{n} lugares de estacionamento",
+  "roadbuild.parking.done": "{n} lugares postos ao longo da estrada; os carros podem estacionar em {in} (os outros ficam demasiado perto do fim de um troço). Ctrl+Z desfaz.",
+  "roadbuild.parking.done_list": "{n} lugares postos ao longo da estrada; os carros podem estacionar em {in} (os outros ficam demasiado perto do fim de um troço). O mapa não tinha lista de carros estacionados, por isso foi escrita uma."
 }

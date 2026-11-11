@@ -81,5 +81,22 @@
   "roadbuild.crossing.refused": "Tady žádný přechod: {reason}",
   "roadbuild.crossing.variant": "Do chrono varianty nelze do silnic vložit kus s přechodem.",
   "roadbuild.crossing.step": "Přechod pro chodce v silnici #{id}",
-  "roadbuild.crossing.done": "Přechod pro chodce vložen do silnice (křižovatka #{id}). Ctrl+Z ho vrátí zpět."
+  "roadbuild.crossing.done": "Přechod pro chodce vložen do silnice (křižovatka #{id}). Ctrl+Z ho vrátí zpět.",
+  "roadbuild.parking.plan_first": "Klikni na silnici tam, kde řada parkovacích míst začíná; místa dostane strana, na kterou klikneš.",
+  "roadbuild.parking.plan_second": "Klikni na stejnou silnici tam, kde řada končí.",
+  "roadbuild.parking.variant": "Do chrono varianty nelze podél silnic vkládat parkovací místa.",
+  "roadbuild.parking.no_road": "Tady není silnice s vozovkou: klikni na vozovku silnice.",
+  "roadbuild.parking.first_right": "Začátek nastaven; místa budou vpravo od silnice. Klikni, kde řada končí.",
+  "roadbuild.parking.first_left": "Začátek nastaven; místa budou vlevo od silnice. Klikni, kde řada končí.",
+  "roadbuild.parking.other_road": "To není na stejné silnici. Klikni dál na silnici, na které jsi začal.",
+  "roadbuild.parking.problem": "Žádná řada míst: {reason}",
+  "roadbuild.parking.problem.short": "úsek je kratší než jedno místo",
+  "roadbuild.parking.problem.no_lane": "na té straně nejede žádným pruhem provoz",
+  "roadbuild.parking.problem.wide": "pruh je tam příliš široký, než aby vedle něj auta parkovala",
+  "roadbuild.parking.no_object": "V instalaci OMSI chybí objekt parkoviště ze základní hry.",
+  "roadbuild.parking.failed": "Řada míst selhala: {reason}",
+  "roadbuild.parking.no_tile": "Žádné z míst neleží v dlaždici této mapy.",
+  "roadbuild.parking.step": "Parkovacích míst: {n}",
+  "roadbuild.parking.done": "U silnice je {n} parkovacích míst; auta mohou zaparkovat v {in} z nich (ostatní leží příliš blízko konce kusu silnice). Ctrl+Z je vrátí zpět.",
+  "roadbuild.parking.done_list": "U silnice je {n} parkovacích míst; auta mohou zaparkovat v {in} z nich (ostatní leží příliš blízko konce kusu silnice). Mapa neměla seznam zaparkovaných aut, proto byl napsán."
 }

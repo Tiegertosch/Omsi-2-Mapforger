@@ -81,5 +81,22 @@
   "roadbuild.crossing.refused": "Pas de passage ici : {reason}",
   "roadbuild.crossing.variant": "On ne peut pas insérer de tronçon de passage dans les routes d'une variante chrono.",
   "roadbuild.crossing.step": "Passage piéton dans la route #{id}",
-  "roadbuild.crossing.done": "Passage piéton inséré dans la route (carrefour #{id}). Ctrl+Z l'annule."
+  "roadbuild.crossing.done": "Passage piéton inséré dans la route (carrefour #{id}). Ctrl+Z l'annule.",
+  "roadbuild.parking.plan_first": "Clique sur une route là où la rangée commence ; le côté sur lequel tu cliques reçoit les places.",
+  "roadbuild.parking.plan_second": "Clique sur la même route là où la rangée se termine.",
+  "roadbuild.parking.variant": "On ne peut pas placer de places de stationnement le long des routes d'une variante chrono.",
+  "roadbuild.parking.no_road": "Pas de route avec chaussée ici : clique sur la chaussée d'une route.",
+  "roadbuild.parking.first_right": "Début fixé ; les places vont à droite de la route. Clique là où la rangée se termine.",
+  "roadbuild.parking.first_left": "Début fixé ; les places vont à gauche de la route. Clique là où la rangée se termine.",
+  "roadbuild.parking.other_road": "Ce n'est pas sur la même route. Clique plus loin sur la route où tu as commencé.",
+  "roadbuild.parking.problem": "Pas de rangée : {reason}",
+  "roadbuild.parking.problem.short": "le tronçon est plus court qu'une place",
+  "roadbuild.parking.problem.no_lane": "aucune voie de ce côté n'a de circulation qui passe",
+  "roadbuild.parking.problem.wide": "la voie y est trop large pour qu'on stationne à côté",
+  "roadbuild.parking.no_object": "L'objet de parking du jeu de base manque dans l'installation d'OMSI.",
+  "roadbuild.parking.failed": "La rangée a échoué : {reason}",
+  "roadbuild.parking.no_tile": "Aucune des places ne se trouve dans une tuile de cette carte.",
+  "roadbuild.parking.step": "{n} places de stationnement",
+  "roadbuild.parking.done": "{n} places placées le long de la route ; les voitures peuvent se garer dans {in} d'entre elles (les autres sont trop près de la fin d'un tronçon). Ctrl+Z les retire.",
+  "roadbuild.parking.done_list": "{n} places placées le long de la route ; les voitures peuvent se garer dans {in} d'entre elles (les autres sont trop près de la fin d'un tronçon). La carte n'avait pas de liste de voitures garées, une a été écrite."
 }

@@ -2919,6 +2919,50 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ParkingSpacesStandBesideTheOutermostLaneOfASideInLineWithItAsOpenOmsiWantsThem()
+        {
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            // A lane each way, 3.5 m wide, at 2 m: the right one runs along the spline, the left one against it.
+            File.WriteAllText(Path.Combine(installation, "Splines", "road.sli"),
+                "[texture]\r\nroad.bmp\r\n\r\n[profile]\r\n0\r\n\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n" +
+                "[path]\r\n0\r\n-2\r\n0.15\r\n3.5\r\n1\r\n[path]\r\n0\r\n2\r\n0.15\r\n3.5\r\n0\r\n");
+            var profiles = new OmsiSplineProfileCatalog(installation);
+            var summary = OmsiMapReader.Read(Path.Combine(mapFolder, "global.cfg"));
+            var tile = summary.Tiles.First(each => each.Splines.Any(spline => spline.Id == 10));
+            var chain = OmsiSplineChain.Around(summary, tile, tile.Splines.First(spline => spline.Id == 10), 0.0);
+
+            // On the right: beside the right lane (1.75 + 0.1 + 1 m from its middle), heading with it, whole spaces only.
+            var right = OmsiParkingRow.Plan(chain, profiles, 0.0, 50.0, true);
+            Assert.IsNull(right.Problem);
+            Assert.AreEqual(8, right.Spaces.Count);
+            Assert.AreEqual(104.85, right.Spaces[1].Position.X, 1e-6);
+            Assert.AreEqual(100.0 + 2.75 + 5.5, right.Spaces[1].Position.Y, 1e-6);
+            Assert.AreEqual(0.0, right.Spaces[1].HeadingDegrees, 1e-9);
+            // The side bounds openOMSI checks: 1.2 to 4.2 m right of the lane's middle.
+            var beside = right.Spaces[1].Position.X - 102.0;
+            Assert.That(beside, Is.InRange(OmsiParkingRow.NearestBesideLane, OmsiParkingRow.FarthestBesideLane));
+            // A car parks in only from 8 m after the lane's start: not in the first space, in the second.
+            Assert.IsFalse(right.Spaces[0].ParkInPossible);
+            Assert.IsTrue(right.Spaces[1].ParkInPossible);
+            Assert.IsTrue(right.Spaces[right.Spaces.Count - 1].ParkInPossible);
+
+            // On the left: beside the left lane, which runs the other way, so the spaces face south.
+            var left = OmsiParkingRow.Plan(chain, profiles, 0.0, 50.0, false);
+            Assert.AreEqual(95.15, left.Spaces[1].Position.X, 1e-6);
+            Assert.AreEqual(180.0, left.Spaces[1].HeadingDegrees, 1e-9);
+            // Its lane starts at the spline's end, so the first space (near the spline's start) is the one too near the lane's end.
+            Assert.IsFalse(left.Spaces[0].ParkInPossible);
+            Assert.IsTrue(left.Spaces[left.Spaces.Count - 1].ParkInPossible);
+
+            // A stretch shorter than a space, or a side with no lane for traffic that way, makes no row.
+            Assert.AreEqual("short", OmsiParkingRow.Plan(chain, profiles, 10.0, 12.0, true).Problem);
+            File.WriteAllText(Path.Combine(installation, "Splines", "road.sli"),
+                "[texture]\r\nroad.bmp\r\n\r\n[profile]\r\n0\r\n\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n" +
+                "[path]\r\n0\r\n2\r\n0.15\r\n3.5\r\n0\r\n");
+            Assert.AreEqual("no_lane", OmsiParkingRow.Plan(chain, new OmsiSplineProfileCatalog(installation), 0.0, 50.0, false).Problem);
+        }
+
+        [Test]
         public void TerrainCanBeFittedToABuiltRoadLaterAndReleasedAgain()
         {
             var session = OpenProject();

@@ -74,6 +74,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor): Bindung des Überwegs, Zufahrt vor dem Überweg gebunden, Assistent mit Überweggruppen, Fußgängerköpfe, Warnung zu kurzes Grün (wartet auf den Nutzertest)
 - [x] Schritt 4 – Pfade mit OMSIs unsichtbaren Splines (`invis_sidewalk`, `invis_street`) im Straßen-Werkzeug, Einrasten auf vorhandene Pfadlinien, auf jeder Karte (wartet auf den Nutzertest; Zebra-Optik auf gewöhnlichen Straßen offen)
 - [x] Schritt 5 – Überweg-Stück in eine gewöhnliche Straße einfügen (Straßen-Werkzeug, Schalter „Insert crossing“): Fußpfad und Fahrspuren im selben Objekt, damit Autos Fußgängern auf dem Zebra Vorrang geben (wartet auf den Nutzertest; ohne Haltelinie und Ampel)
+- [x] Parkreihen – zwei Klicks im Straßen-Werkzeug (Schalter „Parking row“) setzen Parkplatz-Objekte neben die äußerste Fahrspur, in Fahrtrichtung, im Abstand, den openOMSI zum Ein- und Ausparken braucht; eine Karte ohne Parkliste bekommt eine (ADR 087; wartet auf den Nutzertest)
 
 ## Später
 

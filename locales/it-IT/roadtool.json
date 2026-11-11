@@ -87,5 +87,7 @@
   "roadtool.empty.mine": "Tipi di strade creati con Nuovo tipo di strada... mostra qui.",
   "roadtool.empty.none": "Nessun profilo di questo tipo nell'installazione.",
   "roadtool.crossing": "Inserisci attraversamento",
-  "roadtool.crossing.tooltip": "Attivo: un clic su una strada vi inserisce un attraversamento pedonale invece di costruire una strada. Un breve tratto della stessa strada viene inserito con strisce zebrate e un percorso pedonale che lo attraversa, in un unico oggetto, così le auto danno la precedenza. Salvato in Sceneryobjects\\Mapforge nella tua installazione di OMSI."
+  "roadtool.crossing.tooltip": "Attivo: un clic su una strada vi inserisce un attraversamento pedonale invece di costruire una strada. Un breve tratto della stessa strada viene inserito con strisce zebrate e un percorso pedonale che lo attraversa, in un unico oggetto, così le auto danno la precedenza. Salvato in Sceneryobjects\\Mapforge nella tua installazione di OMSI.",
+  "roadtool.parking": "Fila di parcheggi",
+  "roadtool.parking.tooltip": "Attivo: due clic su una strada vi mettono accanto una fila di posti auto. Il primo clic sceglie inizio e lato, il secondo la fine. I posti sono oggetti parcheggio accanto alla corsia più esterna, nella sua direzione, così le auto di openOMSI possono entrare e uscire. Una mappa senza elenco di auto parcheggiate ne riceve uno."
 }

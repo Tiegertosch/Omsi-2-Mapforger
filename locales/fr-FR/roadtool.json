@@ -87,5 +87,7 @@
   "roadtool.empty.mine": "Types de routes que vous créez avec Nouveau type de route... afficher ici.",
   "roadtool.empty.none": "Aucun profil de ce genre dans l'installation.",
   "roadtool.crossing": "Insérer un passage",
-  "roadtool.crossing.tooltip": "Activé : un clic sur une route y insère un passage piéton au lieu de construire une route. Un court tronçon de la même route est inséré avec des bandes de zèbre et un chemin piéton qui le traverse, dans un seul objet, pour que les voitures cèdent le passage. Enregistré sous Sceneryobjects\\Mapforge dans ton installation OMSI."
+  "roadtool.crossing.tooltip": "Activé : un clic sur une route y insère un passage piéton au lieu de construire une route. Un court tronçon de la même route est inséré avec des bandes de zèbre et un chemin piéton qui le traverse, dans un seul objet, pour que les voitures cèdent le passage. Enregistré sous Sceneryobjects\\Mapforge dans ton installation OMSI.",
+  "roadtool.parking": "Rangée de stationnement",
+  "roadtool.parking.tooltip": "Activé : deux clics sur une route y placent une rangée de places de stationnement. Le premier clic choisit le début et le côté, le second la fin. Les places sont des objets de parking à côté de la voie extérieure, dans son sens, pour que les voitures d'openOMSI puissent se garer et repartir. Une carte sans liste de voitures garées en reçoit une."
 }

@@ -51,6 +51,7 @@ namespace OmsiMapEditor.UI
         private readonly Toggle fitTerrainToggle;
         private readonly Toggle junctionsToggle;
         private readonly Toggle crossingToggle;
+        private readonly Toggle parkingToggle;
         private readonly Label planLabel;
         private readonly List<string> profiles = new List<string>();
         private readonly HashSet<string> favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -168,8 +169,25 @@ namespace OmsiMapEditor.UI
             crossingToggle = new Toggle { value = false };
             LocBindings.Tooltip(crossingToggle, "roadtool.crossing.tooltip");
             crossingToggle.AddToClassList("picker-option-toggle");
-            crossingToggle.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
+            crossingToggle.RegisterValueChangedCallback(change =>
+            {
+                if (change.newValue)
+                    parkingToggle.SetValueWithoutNotify(false);
+                SettingsChanged?.Invoke();
+            });
             Row(options, "roadtool.crossing").Add(crossingToggle);
+
+            // Two clicks on a road put a row of parking spaces along it (ADR 087).
+            parkingToggle = new Toggle { value = false };
+            LocBindings.Tooltip(parkingToggle, "roadtool.parking.tooltip");
+            parkingToggle.AddToClassList("picker-option-toggle");
+            parkingToggle.RegisterValueChangedCallback(change =>
+            {
+                if (change.newValue)
+                    crossingToggle.SetValueWithoutNotify(false);
+                SettingsChanged?.Invoke();
+            });
+            Row(options, "roadtool.parking").Add(parkingToggle);
             Add(options);
 
             // The picker beside them.
@@ -382,6 +400,13 @@ namespace OmsiMapEditor.UI
         {
             get => crossingToggle.value;
             set => crossingToggle.value = value;
+        }
+
+        /// <summary>True when two clicks on a road put a row of parking spaces along it.</summary>
+        public bool ParkingMode
+        {
+            get => parkingToggle.value;
+            set => parkingToggle.value = value;
         }
 
         /// <summary>The end height for manual mode, or null while the field holds no number.</summary>

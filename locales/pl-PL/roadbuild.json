@@ -81,5 +81,22 @@
   "roadbuild.crossing.refused": "Tu nie będzie przejścia: {reason}",
   "roadbuild.crossing.variant": "W wariancie chrono nie można wstawić do dróg odcinka z przejściem.",
   "roadbuild.crossing.step": "Przejście dla pieszych na drodze #{id}",
-  "roadbuild.crossing.done": "Wstawiono przejście dla pieszych w drogę (skrzyżowanie #{id}). Ctrl+Z cofa."
+  "roadbuild.crossing.done": "Wstawiono przejście dla pieszych w drogę (skrzyżowanie #{id}). Ctrl+Z cofa.",
+  "roadbuild.parking.plan_first": "Kliknij drogę tam, gdzie zaczyna się rząd; strona, na którą klikasz, dostaje miejsca.",
+  "roadbuild.parking.plan_second": "Kliknij tę samą drogę tam, gdzie rząd się kończy.",
+  "roadbuild.parking.variant": "W wariancie chrono nie można stawiać miejsc parkingowych przy drogach.",
+  "roadbuild.parking.no_road": "Tu nie ma drogi z jezdnią: kliknij jezdnię drogi.",
+  "roadbuild.parking.first_right": "Początek ustawiony; miejsca będą po prawej stronie drogi. Kliknij, gdzie rząd się kończy.",
+  "roadbuild.parking.first_left": "Początek ustawiony; miejsca będą po lewej stronie drogi. Kliknij, gdzie rząd się kończy.",
+  "roadbuild.parking.other_road": "To nie ta sama droga. Kliknij dalej na drodze, od której zacząłeś.",
+  "roadbuild.parking.problem": "Brak rzędu: {reason}",
+  "roadbuild.parking.problem.short": "odcinek jest krótszy niż jedno miejsce",
+  "roadbuild.parking.problem.no_lane": "po tej stronie żadnym pasem nie jedzie ruch",
+  "roadbuild.parking.problem.wide": "pas jest tam za szeroki, żeby obok niego parkować",
+  "roadbuild.parking.no_object": "W instalacji OMSI brakuje obiektu parkingu z gry podstawowej.",
+  "roadbuild.parking.failed": "Rząd się nie udał: {reason}",
+  "roadbuild.parking.no_tile": "Żadne z miejsc nie leży w kafelku tej mapy.",
+  "roadbuild.parking.step": "Miejsc parkingowych: {n}",
+  "roadbuild.parking.done": "Przy drodze postawiono {n} miejsc; auta mogą parkować w {in} z nich (reszta leży zbyt blisko końca kawałka drogi). Ctrl+Z je cofa.",
+  "roadbuild.parking.done_list": "Przy drodze postawiono {n} miejsc; auta mogą parkować w {in} z nich (reszta leży zbyt blisko końca kawałka drogi). Mapa nie miała listy zaparkowanych aut, więc ją zapisano."
 }

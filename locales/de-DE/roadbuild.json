@@ -68,5 +68,22 @@
   "roadbuild.crossing.refused": "Kein Überweg hier: {reason}",
   "roadbuild.crossing.variant": "In eine Chrono-Variante lässt sich kein Überweg-Stück in die Straßen schneiden.",
   "roadbuild.crossing.step": "Fußgängerüberweg in Straße #{id}",
-  "roadbuild.crossing.done": "Fußgängerüberweg in die Straße gesetzt (Kreuzung #{id}). Strg+Z nimmt ihn zurück."
+  "roadbuild.crossing.done": "Fußgängerüberweg in die Straße gesetzt (Kreuzung #{id}). Strg+Z nimmt ihn zurück.",
+  "roadbuild.parking.plan_first": "Klicke auf eine Straße, wo die Parkreihe beginnt; die Seite, auf die du klickst, bekommt die Plätze.",
+  "roadbuild.parking.plan_second": "Klicke auf dieselbe Straße, wo die Reihe endet.",
+  "roadbuild.parking.variant": "In einer Chrono-Variante lassen sich keine Parkplätze an Straßen setzen.",
+  "roadbuild.parking.no_road": "Hier ist keine Straße mit Fahrbahn: Klicke auf die Fahrbahn einer Straße.",
+  "roadbuild.parking.first_right": "Anfang gesetzt; die Plätze kommen rechts der Straße. Klicke dort, wo die Reihe endet.",
+  "roadbuild.parking.first_left": "Anfang gesetzt; die Plätze kommen links der Straße. Klicke dort, wo die Reihe endet.",
+  "roadbuild.parking.other_road": "Das liegt nicht an derselben Straße. Klicke weiter vorn an der Straße, an der du angefangen hast.",
+  "roadbuild.parking.problem": "Keine Parkreihe: {reason}",
+  "roadbuild.parking.problem.short": "das Stück ist kürzer als ein Platz",
+  "roadbuild.parking.problem.no_lane": "auf dieser Seite fährt auf keiner Fahrspur Verkehr vorbei",
+  "roadbuild.parking.problem.wide": "die Fahrspur ist dort zu breit, als dass Autos daneben parken könnten",
+  "roadbuild.parking.no_object": "Das Parkplatz-Objekt des Basisspiels fehlt in der OMSI-Installation.",
+  "roadbuild.parking.failed": "Die Parkreihe ist fehlgeschlagen: {reason}",
+  "roadbuild.parking.no_tile": "Keiner der Plätze liegt in einer Kachel dieser Karte.",
+  "roadbuild.parking.step": "{n} Parkplätze",
+  "roadbuild.parking.done": "{n} Parkplätze an die Straße gesetzt; Autos können in {in} davon einparken (die übrigen liegen zu nah am Ende eines Straßenstücks). Strg+Z nimmt sie zurück.",
+  "roadbuild.parking.done_list": "{n} Parkplätze an die Straße gesetzt; Autos können in {in} davon einparken (die übrigen liegen zu nah am Ende eines Straßenstücks). Die Karte hatte keine Parkliste, deshalb wurde eine geschrieben."
 }

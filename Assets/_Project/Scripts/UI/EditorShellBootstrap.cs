@@ -1364,6 +1364,9 @@ namespace OmsiMapEditor.UI
                 // -roadCrossing: a click on a road puts a pedestrian crossing piece into it (ADR 086, step 5).
                 if (roadPanel != null && Array.IndexOf(args, "-roadCrossing") >= 0)
                     roadPanel.CrossingMode = true;
+                // -roadParking: two clicks on a road put a row of parking spaces along it (ADR 087).
+                if (roadPanel != null && Array.IndexOf(args, "-roadParking") >= 0)
+                    roadPanel.ParkingMode = true;
                 if (roadPanel != null && Enum.TryParse<OmsiRoadShape>(Argument("-roadShape", 1) ?? string.Empty, true, out var roadShape))
                     roadPanel.SetShape(roadShape);
                 var roadSnap = Argument("-roadSnap", 1);
@@ -4044,6 +4047,12 @@ namespace OmsiMapEditor.UI
                 roadPanel.ShowPlan(Loc.T("roadbuild.crossing.plan"), false);
                 return;
             }
+            if (roadPanel.ParkingMode)
+            {
+                mapCanvas.ClearRoadPreview();
+                roadPanel.ShowPlan(Loc.T(parkingChain == null ? "roadbuild.parking.plan_first" : "roadbuild.parking.plan_second"), false); // i18n:keys
+                return;
+            }
             if (!roadStarted)
             {
                 Snap(roadPointer.Value, out var join, out var port);
@@ -4177,6 +4186,12 @@ namespace OmsiMapEditor.UI
                 InsertCrossingPiece(point);
                 return;
             }
+            if (roadPanel.ParkingMode)
+            {
+                ClickParkingRow(point);
+                return;
+            }
+            ResetParkingRow();
             if (!roadStarted)
             {
                 Snap(point, out var join, out var port);

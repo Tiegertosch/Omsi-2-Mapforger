@@ -80,12 +80,12 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Pkw-Verbote konfigurieren — Vorhanden
 - [x] Verkehrsdichte pro Pfad festlegen — Vorhanden
 - [x] Vorfahrtsregeln an Kreuzungen — Vorhanden
-- [ ] KI-Fahrpfade manuell erstellen und bearbeiten — Teilweise
+- [ ] KI-Fahrpfade manuell erstellen und bearbeiten — Teilweise (Zeichnen mit `invis_street` im Pfadmodus samt Einrasten, seit 11. November 2026; offen: Breite und Richtung wählen, Richtung beim Einrasten übernehmen, Punkte vorhandener Pfade ändern)
 - [x] Fahrstreifenverbindungen definieren — Vorhanden
-- [ ] Fußgängerpfade erstellen und verbinden — Teilweise (seit 11. November 2026: Überwege über die Arme erzeugter Kreuzungen, ADR 086; freie Pfade fehlen)
+- [x] Fußgängerpfade erstellen und verbinden — Vorhanden (Überwege an Kreuzungen mit Zebra, Ampeln und Köpfen, Überweg-Stück mit abgesenktem Bordstein in jede Straße, Pfadmodus mit `invis_sidewalk` und Einrasten auf Pfadlinien; ADR 086, seit 11. November 2026; offen: Ampel am Überweg-Stück)
 - [ ] Ampeln und Signalphasen bearbeiten — Offen (Ampeln nur als Objekte platzierbar)
 - [ ] Ampelgruppen und Kreuzungszuordnung — Offen
-- [ ] Parkplätze / KI-Parkpfade konfigurieren — Offen (nur Parkstreifen im Straßenbauer, KI-Parkpfade nicht nachgewiesen)
+- [ ] Parkplätze / KI-Parkpfade konfigurieren — Teilweise: Es gibt keine KI-Parkpfade; ein Parkplatz ist ein Objekt (`car_park.sco`, ADR 087). Parkreihen entlang von Straßen sind da, offen: Parkliste bearbeiten, Listennummer am Platz, Prüfung
 - [x] Verkehrsregeln auf vorhandenen OMSI-Pfaden ändern — Vorhanden (Tempo, Dichte, Pkw, Busse, Lkw)
 
 ## F. Tracks, Trips und Fahrpläne

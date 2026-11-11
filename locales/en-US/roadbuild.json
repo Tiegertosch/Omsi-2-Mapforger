@@ -81,5 +81,22 @@
   "roadbuild.crossing.refused": "No crossing here: {reason}",
   "roadbuild.crossing.variant": "A chrono variant cannot have a crossing piece cut into its roads.",
   "roadbuild.crossing.step": "Pedestrian crossing in road #{id}",
-  "roadbuild.crossing.done": "Put a pedestrian crossing into the road (junction #{id}). Ctrl+Z takes it back."
+  "roadbuild.crossing.done": "Put a pedestrian crossing into the road (junction #{id}). Ctrl+Z takes it back.",
+  "roadbuild.parking.plan_first": "Click a road where the row of parking spaces begins; the side you click on gets the spaces.",
+  "roadbuild.parking.plan_second": "Click the same road where the row ends.",
+  "roadbuild.parking.variant": "A chrono variant cannot have parking spaces put along its roads.",
+  "roadbuild.parking.no_road": "No road with a carriageway here: click on the carriageway of a road.",
+  "roadbuild.parking.first_right": "Start set; the spaces go on the right of the road. Click where the row ends.",
+  "roadbuild.parking.first_left": "Start set; the spaces go on the left of the road. Click where the row ends.",
+  "roadbuild.parking.other_road": "That is not on the same road. Click further along the road you started on.",
+  "roadbuild.parking.problem": "No parking row: {reason}",
+  "roadbuild.parking.problem.short": "the stretch is shorter than one space",
+  "roadbuild.parking.problem.no_lane": "that side has no lane with traffic driving past it",
+  "roadbuild.parking.problem.wide": "the lane there is too wide for cars to park beside it",
+  "roadbuild.parking.no_object": "The car park object of the base game is missing in the OMSI installation.",
+  "roadbuild.parking.failed": "The parking row failed: {reason}",
+  "roadbuild.parking.no_tile": "None of the spaces lie in a tile of this map.",
+  "roadbuild.parking.step": "{n} parking spaces",
+  "roadbuild.parking.done": "{n} parking spaces put along the road; cars can park in {in} of them (the others lie too near the end of a road piece). Ctrl+Z takes them back.",
+  "roadbuild.parking.done_list": "{n} parking spaces put along the road; cars can park in {in} of them (the others lie too near the end of a road piece). The map had no parking list, so one was written."
 }
