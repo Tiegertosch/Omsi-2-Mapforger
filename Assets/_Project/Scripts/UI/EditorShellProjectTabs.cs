@@ -34,7 +34,8 @@ namespace OmsiMapEditor.UI
                 case ProjectTab.Chrono:
                     return chronoVariants.Count > 0 || session != null && session.CanEdit;
                 case ProjectTab.Lines:
-                    return routes != null && routes.Lines.Count > 0;
+                    // A map without lines still offers the tab in a project: the timetable editor makes the first one.
+                    return routes != null && routes.Lines.Count > 0 || session != null && session.CanEdit && !EditingVariant;
                 case ProjectTab.Paths:
                     return pathsShown;
                 default:
@@ -110,13 +111,20 @@ namespace OmsiMapEditor.UI
         {
             var section = new VisualElement();
             section.AddToClassList("browser-lines");
-            var heading = new Label(Loc.T("project.lines", ("count", routes.Lines.Count)));
+            var lineCount = routes?.Lines.Count ?? 0;
+            var heading = new Label(Loc.T("project.lines", ("count", lineCount)));
             heading.AddToClassList("inspector-group-title");
             heading.style.marginBottom = 4;
             section.Add(heading);
             if (session != null && session.CanEdit && !EditingVariant)
                 section.Add(TimetableButton());
-            var sorted = new List<OmsiRouteLine>(routes.Lines);
+            if (lineCount == 0)
+            {
+                var none = new Label(Loc.T("project.lines.none"));
+                none.AddToClassList("panel-info");
+                section.Add(none);
+            }
+            var sorted = new List<OmsiRouteLine>(routes?.Lines ?? new List<OmsiRouteLine>());
             sorted.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
             foreach (var line in sorted)
             {

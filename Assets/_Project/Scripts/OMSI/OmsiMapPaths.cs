@@ -31,6 +31,9 @@ namespace OmsiMapEditor.OMSI
 
         public double Width { get; internal set; }
 
+        /// <summary>The path's length as OMSI counts it: the length of the spline for a spline's lane, the one in the .sco for an object's path.</summary>
+        public double LengthMeters { get; internal set; }
+
         /// <summary>The path in world metres.</summary>
         public OmsiMapPoint[] Points { get; internal set; }
 
@@ -90,7 +93,7 @@ namespace OmsiMapEditor.OMSI
                     var path = new OmsiMapPath
                     {
                         TileX = tile.X, TileY = tile.Y, ElementId = spline.Id, OnSpline = true, PathIndex = index, Kind = lane.Kind, Direction = direction,
-                        Width = lane.Width, Points = SplineLane(tile, spline, lane.X * (spline.IsMirrored ? -1.0 : 1.0), summary.TileSizeMeters)
+                        Width = lane.Width, LengthMeters = spline.LengthMeters, Points = SplineLane(tile, spline, lane.X * (spline.IsMirrored ? -1.0 : 1.0), summary.TileSizeMeters)
                     };
                     path.Rules.AddRange(spline.Rules.FindAll(rule => rule.PathIndex == index));
                     paths.Add(path);
@@ -109,7 +112,7 @@ namespace OmsiMapEditor.OMSI
                     var path = new OmsiMapPath
                     {
                         TileX = tile.X, TileY = tile.Y, ElementId = record.Id, PathIndex = index, Kind = objectPath.Kind, Direction = objectPath.Direction,
-                        Blinker = objectPath.Blinker, Width = objectPath.WidthMeters, Points = ObjectLane(tile, record, objectPath, summary.TileSizeMeters)
+                        Blinker = objectPath.Blinker, Width = objectPath.WidthMeters, LengthMeters = objectPath.LengthMeters, Points = ObjectLane(tile, record, objectPath, summary.TileSizeMeters)
                     };
                     path.Rules.AddRange(record.Rules.FindAll(rule => rule.PathIndex == index));
                     paths.Add(path);

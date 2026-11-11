@@ -92,8 +92,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Vorhandene Linien und Haltestellen anzeigen — Vorhanden
 - [x] Vorhandene Trips und Routen anzeigen — Vorhanden
 - [ ] Tracks erstellen und bearbeiten — Offen
-- [ ] Haltestellenreihenfolge definieren — Offen
-- [ ] Trips erstellen und bearbeiten — Offen
+- [x] Haltestellenreihenfolge definieren — Vorhanden (Dialog „New trip…“, ADR 093)
+- [ ] Trips erstellen und bearbeiten — Teilweise (neue Fahrt über Haltestellen mit Wegsuche, Fahrzeit und Abfahrten änderbar, ADR 092/093; Halte einer vorhandenen Fahrt nicht)
 - [ ] Fahrzeiten zwischen Haltestellen festlegen — Teilweise (Fahrzeit je Profil einer Fahrt, ADR 092; nicht je Halt)
 - [x] Tours und Umläufe erstellen — Vorhanden (anlegen, umbenennen, verschieben, Fahrten im Takt, ADR 092; Test in openOMSI steht aus)
 - [x] Abfahrtszeiten und Fahrplantabellen bearbeiten — Vorhanden (Dialog im Reiter Lines, ADR 092)

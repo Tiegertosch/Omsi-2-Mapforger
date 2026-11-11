@@ -33,6 +33,9 @@ namespace OmsiMapEditor.UI
         private string seriesTo = "20:00";
         private double seriesEvery = 15.0;
         private double shiftMinutes = 5.0;
+        private bool timetableNewLineOpen;
+        private string timetableNewLineName = string.Empty;
+        private string timetableNewLineGroup;
 
         private void SetUpTimetable(VisualElement root)
         {
@@ -142,6 +145,7 @@ namespace OmsiMapEditor.UI
         {
             var scroll = timetableBody.scrollOffset;
             timetableBody.Clear();
+            AddNewLineAndTripRow();
             if (timetableLine == null)
             {
                 var empty = new Label(Loc.T("timetable.empty"));
@@ -273,6 +277,77 @@ namespace OmsiMapEditor.UI
 
             AddRunningTimes(current);
             timetableBody.schedule.Execute(() => timetableBody.scrollOffset = scroll);
+        }
+
+        /// <summary>The buttons for a new line and a new trip above the tours, and the small form of a new line.</summary>
+        private void AddNewLineAndTripRow()
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.marginBottom = 6;
+            var line = SmallButton("timetable.newline", "timetable.newline.tooltip", () =>
+            {
+                timetableNewLineOpen = !timetableNewLineOpen;
+                RefreshTimetable();
+            });
+            line.style.marginLeft = 0;
+            row.Add(line);
+            row.Add(SmallButton("timetable.newtrip", "timetable.newtrip.tooltip", OpenNewTrip));
+            timetableBody.Add(row);
+            if (!timetableNewLineOpen)
+                return;
+            var name = new TextField { value = timetableNewLineName, isDelayed = true };
+            name.AddToClassList("picker-field");
+            name.style.width = StyleKeyword.Auto;
+            name.RegisterValueChangedCallback(change => timetableNewLineName = change.newValue);
+            AddTimetableRow("timetable.newline.name", name);
+            var groups = session.ReadAiGroups();
+            if (groups.Count > 0)
+            {
+                if (timetableNewLineGroup == null || !groups.Contains(timetableNewLineGroup))
+                    timetableNewLineGroup = groups.Find(each => each.IndexOf("bus", StringComparison.OrdinalIgnoreCase) >= 0) ?? groups[0];
+                var group = new DropdownField(groups, groups.IndexOf(timetableNewLineGroup));
+                group.AddToClassList("new-map-dropdown");
+                group.RegisterValueChangedCallback(change => timetableNewLineGroup = change.newValue);
+                AddTimetableRow("timetable.newline.group", group);
+            }
+            else
+            {
+                var group = new TextField { value = timetableNewLineGroup ?? string.Empty, isDelayed = true };
+                group.AddToClassList("picker-field");
+                group.style.width = StyleKeyword.Auto;
+                group.RegisterValueChangedCallback(change => timetableNewLineGroup = change.newValue);
+                AddTimetableRow("timetable.newline.group", group);
+            }
+            var create = SmallButton("timetable.newline.create", "timetable.newline.create.tooltip", () =>
+            {
+                var lineName = (timetableNewLineName ?? string.Empty).Trim();
+                if (lineName.Length == 0)
+                {
+                    SetStatusT("timetable.status.need_line_name");
+                    return;
+                }
+                try
+                {
+                    session.CreateLineFile(lineName, timetableNewLineGroup ?? string.Empty);
+                    timetableLineNames = session.TimetableLineNames();
+                }
+                catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+                {
+                    Debug.LogException(exception);
+                    SetStatusT("timetable.status.failed", ("reason", exception.Message));
+                    return;
+                }
+                timetableLine = timetableLineNames.Find(each => string.Equals(each, lineName, StringComparison.OrdinalIgnoreCase)) ?? timetableLine;
+                timetableTour = 0;
+                timetableNewLineOpen = false;
+                timetableNewLineName = string.Empty;
+                StartRoutesBuild(currentSummary);
+                SetStatusT("timetable.status.line_created", ("name", lineName));
+                RefreshTimetable();
+            });
+            create.style.marginLeft = 0;
+            timetableBody.Add(create);
         }
 
         private void AddSeriesRow(OmsiLineFile file)

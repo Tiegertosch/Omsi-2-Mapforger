@@ -226,6 +226,10 @@ namespace OmsiMapEditor.OMSI
             double heightLow = 0.0, heightHigh = 0.0;
             foreach (var record in file.Records)
             {
+                // A keyword stands at the start of its line; an indented "[path]" in a commented explanation is no keyword (as openOMSI reads
+                // profiles, and as the timetables of Berlin-Spandau number the lanes, ADR 093).
+                if (record.Header.Text.Length > 0 && char.IsWhiteSpace(record.Header.Text[0]))
+                    continue;
                 // Keywords are followed by their values; comments come after them and are ignored.
                 var values = record.AllValues();
                 switch (record.Name.ToLowerInvariant())
@@ -293,17 +297,13 @@ namespace OmsiMapEditor.OMSI
                     case "path":
                     case "path_2":
                         // [path_2] has one more number than [path], which OMSI keeps beside it; the first five are the same.
-                        // Kind, x, height, width and direction. A lane that cannot be read, such as the [path] that opens a
-                        // commented explanation in some rail profiles, keeps the index of the next with a kind of its own.
-                        var lane = new OmsiSplineLane { Kind = UnreadableLane };
-                        if (values.Count >= 5 && TryNumbers(values, out var laneValues))
-                        {
-                            lane.Kind = (int)laneValues[0];
-                            lane.X = laneValues[1];
-                            lane.Height = laneValues[2];
-                            lane.Width = laneValues[3];
-                        }
-                        if (values.Count >= 5 && int.TryParse(values[4].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var direction))
+                        // Kind, x, height, width and direction. A [path] that cannot be read, such as the one that opens a commented
+                        // explanation in some profiles, is no lane and takes no number: the timetables of Berlin-Spandau name the
+                        // first real lane of those profiles "path 0" (539 of 559 entries on them, ADR 093).
+                        if (!(values.Count >= 5 && TryNumbers(values, out var laneValues)))
+                            break;
+                        var lane = new OmsiSplineLane { Kind = (int)laneValues[0], X = laneValues[1], Height = laneValues[2], Width = laneValues[3] };
+                        if (int.TryParse(values[4].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var direction))
                             lane.Direction = direction;
                         result.Lanes.Add(lane);
                         break;

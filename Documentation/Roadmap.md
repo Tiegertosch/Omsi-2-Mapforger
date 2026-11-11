@@ -82,6 +82,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Straßenprofile vollständig lesen und zeichnen – `[path_2]`, Texturversatz der Kette, Skew, gespiegeltes v, `[scaleTexByLength]`, `[patchwork_chain]`; `[rail_enh]` und `[third_rail]` gelesen (ADR 090; wartet auf den Nutzertest)
 - [x] Geländetexturen malen – Modus „Malen“ im Geländewerkzeug: Texturen der Karte wählen oder neue hinzufügen, malen, radieren, weichzeichnen, Härte, Kachel füllen/leeren (ADR 091; wartet auf den Nutzertest)
 - [x] Fahrplan bearbeiten – Dialog im Reiter Lines: Abfahrten, Umläufe (Tours) mit Betriebstagen (Tagesmaske), Fahrten im Takt, Fahrzeiten je Profil; ohne neue Linien (ADR 092; wartet auf den Nutzertest)
+- [x] Neue Fahrten und Linien – Haltestellen wählen, Wegsuche über die Fahrspuren, Stationsverbindungen und Fahrt schreiben, neue Linie anlegen; Pfadnummern von Profilen mit auskommentiertem `[path]` korrigiert (ADR 093; wartet auf den Nutzertest)
 
 ## Später
 

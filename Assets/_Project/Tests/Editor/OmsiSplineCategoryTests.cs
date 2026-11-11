@@ -61,15 +61,27 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
-        public void AnUnreadablePathKeepsItsPlaceWithoutCountingAsALaneForVehicles()
+        public void AnUnreadablePathIsNoLaneAndTakesNoNumber()
         {
-            // A commented explanation opens with [path] in some rail profiles; the rail path follows.
+            // A commented explanation opens with [path] in some rail profiles; the rail path follows and is path 0 (as the timetables of Berlin-Spandau name it).
             var rail = Profile("[path]\r\n{type}\r\n{offsetX}\r\n{offsetZ}\r\n{width}\r\n\r\n[path]\r\n2\r\n0\r\n0.449\r\n0\r\n2\r\n");
 
-            Assert.AreEqual(2, rail.Lanes.Count);
-            Assert.AreEqual(OmsiSplineProfile.UnreadableLane, rail.Lanes[0].Kind);
+            Assert.AreEqual(1, rail.Lanes.Count);
+            Assert.AreEqual(2, rail.Lanes[0].Kind);
             Assert.AreEqual(OmsiSplineCategory.Rail, OmsiSplineCategories.Of(rail));
             Assert.IsFalse(OmsiRoadJunctions.IsRoad(rail));
+        }
+
+        [Test]
+        public void AnIndentedKeywordIsNoKeywordAndAPathNeedsItsNumbers()
+        {
+            // The commented explanation of the road profiles: an indented [path] and its explanation, then the real ones.
+            var road = Profile("\t[path]\r\n{type}\t\tTyp:\r\n\t\t\t0:\tAI\r\n\r\n[path]\r\n0\r\n-2\r\n0.1\r\n3\r\n1\r\n[path]\r\n0\r\n2\r\n0.1\r\n3\r\n0\r\n");
+            Assert.AreEqual(2, road.Lanes.Count);
+            Assert.AreEqual(-2.0, road.Lanes[0].X, 1e-9);
+            // A [path] at the start of a line whose numbers cannot be read takes no number either.
+            var broken = Profile("[path]\r\n{type}\r\n{offsetX}\r\n\r\n[path]\r\n0\r\n2\r\n0.1\r\n3\r\n0\r\n");
+            Assert.AreEqual(1, broken.Lanes.Count);
         }
 
         [Test]

@@ -241,6 +241,27 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void OnlyBusStopObjectsAreOfferedAsStopsUntilTheTimetableHasThem()
+        {
+            // The fixture's tile gets a bus stop, a tree and a shelter-like file (not a stop); the first is known to Busstops.cfg afterwards.
+            WriteUtf16("tile_0_0.map", "[version]", "14", "",
+                "[object]", "0", @"Sceneryobjects\Generic\bus_stop.sco", "5", "10", "20", "0", "0", "0", "0", "0", "",
+                "[object]", "0", @"Sceneryobjects\Generic\tree.sco", "6", "30", "40", "0", "0", "0", "0", "0", "",
+                "[object]", "0", @"Sceneryobjects\Generic\Haltestelle_2.sco", "7", "50", "60", "0", "0", "0", "0", "0", "");
+            var session = Open(out var summary);
+            var found = session.FindStopObjects(summary);
+            CollectionAssert.AreEqual(new[] { 5 }, found.Select(stop => stop.ObjectId).ToArray());
+            Assert.IsTrue(found.All(stop => stop.IsNew));
+            Assert.AreEqual(10.0, found[0].World.X, 1e-6);
+            Assert.AreEqual(20.0, found[0].World.Y, 1e-6);
+            Directory.CreateDirectory(Path.Combine(mapFolder, "TTData"));
+            File.WriteAllBytes(Path.Combine(mapFolder, "TTData", "Busstops.cfg"), Encoding.UTF8.GetBytes("[busstop]\r\nOne\r\n0\r\n5\r\n0.0\r\n0\r\n0\r\n\r\n"));
+            session = Open(out summary);
+            CollectionAssert.IsEmpty(session.FindStopObjects(summary).Select(stop => stop.ObjectId).ToArray());
+            CollectionAssert.AreEqual(new[] { 5 }, session.ReadStopChoices(summary).Select(stop => stop.ObjectId).ToArray());
+        }
+
+        [Test]
         public void ANewGroundTextureIsAppendedAfterTheLastAndUndoTakesItAway()
         {
             var session = Open(out var summary);
