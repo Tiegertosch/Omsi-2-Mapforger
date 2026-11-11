@@ -343,6 +343,7 @@ namespace OmsiMapEditor.UI
             SetUpLocalization(root);
             SetUpSettings(root);
             SetUpContentFolders(root);
+            SetUpParkList(root);
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
             root.style.height = Length.Percent(100f);
@@ -1160,6 +1161,7 @@ namespace OmsiMapEditor.UI
             RunClipboardArguments(args);
             RunMapSettingsArguments(args);
             RunContentFolderArguments(args);
+            RunParkListArguments(args);
             RunSignalArguments(args);
             RunProjectTabArguments(args);
             RunEntryPointArguments(args);

@@ -15,5 +15,18 @@
   "mapsettings.status.failed": "Nastavení mapy se nepodařilo změnit: {reason}",
   "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
   "mapsettings.status.changed": "Nastavení mapy {name} změněno. Dostane se do exportu mapy.",
-  "mapsettings.status.unchanged": "Nastavení mapy {name} zůstalo beze změny."
+  "mapsettings.status.unchanged": "Nastavení mapy {name} zůstalo beze změny.",
+  "parklist.open": "Seznam zaparkovaných aut...",
+  "parklist.open.tooltip": "Vyber, která zaparkovaná auta zaplní objekty parkovišť této mapy.",
+  "parklist.title": "Seznam zaparkovaných aut",
+  "parklist.description": "openOMSI zaplní každý objekt parkoviště mapy náhodným autem z tohoto seznamu a asi čtvrtinu nechá prázdnou. Zaškrtni auta, která se mají použít; auto uvedené už vícekrát si váhu ponechá. Vyjíždět a znovu zajíždět mohou jen auta, která mají ve stejné složce AI auto.",
+  "parklist.cancel": "Zrušit",
+  "parklist.apply": "Použít",
+  "parklist.empty": "V instalaci OMSI nebyla nalezena žádná zaparkovaná auta.",
+  "parklist.entry_weight": "{name} (v seznamu {count}x)",
+  "parklist.status.failed": "Seznam zaparkovaných aut nelze zapsat: {reason}",
+  "parklist.status.changed": "Seznam zapsán s {count} typy aut.",
+  "parklist.status.unchanged": "Seznam zůstává, jak je.",
+  "parklist.number": "Číslo seznamu",
+  "parklist.number.tooltip": "0 je parklist_p.txt; n je parklist_p_n.txt, který parkoviště uvádějí s n jako prvním popiskem svého objektu."
 }

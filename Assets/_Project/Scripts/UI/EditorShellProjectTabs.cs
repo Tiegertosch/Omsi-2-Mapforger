@@ -89,6 +89,7 @@ namespace OmsiMapEditor.UI
             var content = new VisualElement();
             if (session != null && session.CanEdit)
                 content.Add(MapSettingsButton());
+                content.Add(ParkListButton());
             if (!string.IsNullOrWhiteSpace(currentSummary.Description))
             {
                 var heading = new Label(Loc.T("project.about"));

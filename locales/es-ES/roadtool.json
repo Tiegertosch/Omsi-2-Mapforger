@@ -89,5 +89,7 @@
   "roadtool.crossing": "Insertar paso de peatones",
   "roadtool.crossing.tooltip": "Activado: un clic en una calle inserta allí un paso de peatones en vez de construir una calle. Se corta un tramo corto de la misma calle con franjas de cebra y un camino peatonal que la cruza, en un solo objeto, para que los coches cedan el paso. Se guarda en Sceneryobjects\\Mapforge de tu instalación de OMSI.",
   "roadtool.parking": "Fila de aparcamiento",
-  "roadtool.parking.tooltip": "Activado: dos clics en una calle ponen a su lado una fila de plazas de aparcamiento. El primer clic elige el inicio y el lado, el segundo el final. Las plazas son objetos de aparcamiento junto al carril exterior, en su sentido, para que los coches de openOMSI puedan aparcar y salir. Un mapa sin lista de coches aparcados recibe una."
+  "roadtool.parking.tooltip": "Activado: dos clics en una calle ponen a su lado una fila de plazas de aparcamiento. El primer clic elige el inicio y el lado, el segundo el final. Las plazas son objetos de aparcamiento junto al carril exterior, en su sentido, para que los coches de openOMSI puedan aparcar y salir. Un mapa sin lista de coches aparcados recibe una.",
+  "roadtool.parking.list": "Lista de coches",
+  "roadtool.parking.list.tooltip": "La lista de coches aparcados de la que las plazas toman sus coches: 0 es el parklist_p.txt del mapa, n es parklist_p_n.txt (se edita en Project > Map > Parking list)."
 }

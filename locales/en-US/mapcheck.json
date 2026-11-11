@@ -65,5 +65,15 @@
   "mapcheck.dlc.reading": "The origin of the objects is still being read; run the check again in a moment.",
   "mapcheck.dlc.unknown": "DLC objects cannot be told apart without Steam's file lists or folders marked as DLC.",
   "mapcheck.dlc.none": "No DLC objects: the map needs only the base game and freeware.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# DLC object} other {# DLC objects}} in {placements, plural, one {# placement} other {# placements}}, such as {example}; players without that DLC miss them."
+  "mapcheck.dlc.some": "{kinds, plural, one {# DLC object} other {# DLC objects}} in {placements, plural, one {# placement} other {# placements}}, such as {example}; players without that DLC miss them.",
+  "mapcheck.title.parking": "Parking",
+  "mapcheck.parking.none": "The map has no parking spaces.",
+  "mapcheck.parking.summary": "{count, plural, one {# parking space} other {# parking spaces}}, {usable} where cars can park in{problems, plural, =0 {} one {; # problem with a parking list} other {; # problems with parking lists}}.",
+  "mapcheck.parking.nolane": "parking space {id} in tile {x}, {y} has no road lane within 30 m",
+  "mapcheck.parking.side": "parking space {id} in tile {x}, {y} lies {value, number, 0.0} m to the right of its lane; cars park in from 1.2 to 4.2 m",
+  "mapcheck.parking.heading": "parking space {id} in tile {x}, {y} is turned {value, number, 0}° against its lane (at most 12°)",
+  "mapcheck.parking.laneend": "parking space {id} in tile {x}, {y} is too near the end of its lane ({value, number, 0.0} m; 8 m before and 4 m after are needed)",
+  "mapcheck.parking.no_list": "The map has no {file}, so its car parks (for example space {id}) stay empty in openOMSI.",
+  "mapcheck.parking.list_missing": "A car park (space {id}) names a parking list that does not exist: {file}.",
+  "mapcheck.parking.car": "{file} names {car}, which is not in the OMSI installation."
 }

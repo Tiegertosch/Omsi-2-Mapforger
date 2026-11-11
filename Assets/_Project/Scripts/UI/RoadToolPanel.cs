@@ -52,6 +52,7 @@ namespace OmsiMapEditor.UI
         private readonly Toggle junctionsToggle;
         private readonly Toggle crossingToggle;
         private readonly Toggle parkingToggle;
+        private readonly IntegerField parkingListField;
         private readonly Label planLabel;
         private readonly List<string> profiles = new List<string>();
         private readonly HashSet<string> favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -188,6 +189,16 @@ namespace OmsiMapEditor.UI
                 SettingsChanged?.Invoke();
             });
             Row(options, "roadtool.parking").Add(parkingToggle);
+
+            // The parking list the spaces draw their cars from: 0 is parklist_p.txt, n is parklist_p_n.txt.
+            parkingListField = new IntegerField { value = 0 };
+            LocBindings.Tooltip(parkingListField, "roadtool.parking.list.tooltip");
+            parkingListField.RegisterValueChangedCallback(change =>
+            {
+                if (change.newValue < 0 || change.newValue > 99)
+                    parkingListField.SetValueWithoutNotify(Mathf.Clamp(change.newValue, 0, 99));
+            });
+            Row(options, "roadtool.parking.list").Add(parkingListField);
             Add(options);
 
             // The picker beside them.
@@ -403,6 +414,13 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>True when two clicks on a road put a row of parking spaces along it.</summary>
+        /// <summary>The number of the parking list new spaces use (0 is the map's own list).</summary>
+        public int ParkingList
+        {
+            get => Mathf.Clamp(parkingListField.value, 0, 99);
+            set => parkingListField.value = Mathf.Clamp(value, 0, 99);
+        }
+
         public bool ParkingMode
         {
             get => parkingToggle.value;

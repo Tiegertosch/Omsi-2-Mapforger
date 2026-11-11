@@ -15,5 +15,18 @@
   "mapsettings.status.failed": "No se pudieron cambiar los ajustes del mapa: {reason}",
   "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
   "mapsettings.status.changed": "Ajustes de {name} cambiados. Pasan a la exportación del mapa.",
-  "mapsettings.status.unchanged": "Los ajustes de {name} no han cambiado."
+  "mapsettings.status.unchanged": "Los ajustes de {name} no han cambiado.",
+  "parklist.open": "Lista de coches aparcados...",
+  "parklist.open.tooltip": "Elige qué coches aparcados llenan los objetos de aparcamiento de este mapa.",
+  "parklist.title": "Lista de coches aparcados",
+  "parklist.description": "openOMSI llena cada objeto de aparcamiento del mapa con un coche al azar de esta lista y deja vacío alrededor de una cuarta parte. Marca los coches que se usarán; un coche que ya aparece varias veces conserva ese peso. Solo los coches con un coche IA en la misma carpeta pueden salir y volver a aparcar.",
+  "parklist.cancel": "Cancelar",
+  "parklist.apply": "Aplicar",
+  "parklist.empty": "No se encontraron coches aparcados en la instalación de OMSI.",
+  "parklist.entry_weight": "{name} (listado {count} veces)",
+  "parklist.status.failed": "No se pudo escribir la lista: {reason}",
+  "parklist.status.changed": "Lista escrita con {count} tipos de coche.",
+  "parklist.status.unchanged": "La lista se queda como está.",
+  "parklist.number": "Número de lista",
+  "parklist.number.tooltip": "0 es parklist_p.txt; n es parklist_p_n.txt, que los aparcamientos nombran con n como primera etiqueta de su objeto."
 }

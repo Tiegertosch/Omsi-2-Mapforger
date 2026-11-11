@@ -89,5 +89,7 @@
   "roadtool.crossing": "Wstaw przejście",
   "roadtool.crossing.tooltip": "Włączone: kliknięcie na drodze wstawia tam przejście dla pieszych zamiast budować drogę. Krótki odcinek tej samej drogi zostaje wstawiony z pasami i ścieżką dla pieszych przez nią, w jednym obiekcie, więc samochody ustępują pieszym. Zapisane w Sceneryobjects\\Mapforge w twojej instalacji OMSI.",
   "roadtool.parking": "Rząd miejsc parkingowych",
-  "roadtool.parking.tooltip": "Włączone: dwa kliknięcia na drodze stawiają wzdłuż niej rząd miejsc parkingowych. Pierwsze kliknięcie wybiera początek i stronę, drugie koniec. Miejsca to obiekty parkingu obok skrajnego pasa, zgodnie z jego kierunkiem, aby auta w openOMSI mogły parkować i odjeżdżać. Mapa bez listy zaparkowanych aut dostaje ją."
+  "roadtool.parking.tooltip": "Włączone: dwa kliknięcia na drodze stawiają wzdłuż niej rząd miejsc parkingowych. Pierwsze kliknięcie wybiera początek i stronę, drugie koniec. Miejsca to obiekty parkingu obok skrajnego pasa, zgodnie z jego kierunkiem, aby auta w openOMSI mogły parkować i odjeżdżać. Mapa bez listy zaparkowanych aut dostaje ją.",
+  "roadtool.parking.list": "Lista aut",
+  "roadtool.parking.list.tooltip": "Lista zaparkowanych aut, z której miejsca biorą auta: 0 to własny parklist_p.txt mapy, n to parklist_p_n.txt (edycja w Project > Map > Parking list)."
 }

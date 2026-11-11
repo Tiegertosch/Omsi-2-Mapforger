@@ -64,5 +64,15 @@
   "mapcheck.dlc.reading": "Die Herkunft der Objekte wird noch gelesen; führe die Prüfung in einem Moment noch einmal aus.",
   "mapcheck.dlc.unknown": "DLC-Objekte lassen sich ohne die Dateilisten von Steam oder als DLC markierte Ordner nicht unterscheiden.",
   "mapcheck.dlc.none": "Keine DLC-Objekte: Die Karte braucht nur das Basisspiel und Freeware.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# DLC-Objekt} other {# DLC-Objekte}} in {placements, plural, one {# Platzierung} other {# Platzierungen}}, etwa {example}; Spieler ohne dieses DLC vermissen sie."
+  "mapcheck.dlc.some": "{kinds, plural, one {# DLC-Objekt} other {# DLC-Objekte}} in {placements, plural, one {# Platzierung} other {# Platzierungen}}, etwa {example}; Spieler ohne dieses DLC vermissen sie.",
+  "mapcheck.title.parking": "Parkplätze",
+  "mapcheck.parking.none": "Die Karte hat keine Parkplätze.",
+  "mapcheck.parking.summary": "{count, plural, one {# Parkplatz} other {# Parkplätze}}, {usable} davon zum Einparken geeignet{problems, plural, =0 {} one {; # Problem mit einer Parkliste} other {; # Probleme mit Parklisten}}.",
+  "mapcheck.parking.nolane": "Parkplatz {id} in Kachel {x}, {y} hat keine Straßenspur im Umkreis von 30 m",
+  "mapcheck.parking.side": "Parkplatz {id} in Kachel {x}, {y} liegt {value, number, 0.0} m rechts seiner Spur; Autos parken von 1,2 bis 4,2 m ein",
+  "mapcheck.parking.heading": "Parkplatz {id} in Kachel {x}, {y} ist {value, number, 0}° gegen seine Spur gedreht (höchstens 12°)",
+  "mapcheck.parking.laneend": "Parkplatz {id} in Kachel {x}, {y} liegt zu nah am Ende seiner Spur ({value, number, 0.0} m; 8 m davor und 4 m danach sind nötig)",
+  "mapcheck.parking.no_list": "Die Karte hat keine {file}, deshalb bleiben ihre Parkplätze (zum Beispiel {id}) in openOMSI leer.",
+  "mapcheck.parking.list_missing": "Ein Parkplatz (Platz {id}) nennt eine Parkliste, die es nicht gibt: {file}.",
+  "mapcheck.parking.car": "{file} nennt {car}, das in der OMSI-Installation fehlt."
 }

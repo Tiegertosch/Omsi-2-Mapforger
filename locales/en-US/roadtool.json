@@ -89,5 +89,7 @@
   "roadtool.crossing": "Insert crossing",
   "roadtool.crossing.tooltip": "On: a click on a road puts a pedestrian crossing into it instead of building a road. A short piece of the same road is cut in with zebra bars and a footpath across it, in one object, so cars give way to people on it. Stored under Sceneryobjects\\Mapforge in your OMSI installation.",
   "roadtool.parking": "Parking row",
-  "roadtool.parking.tooltip": "On: two clicks on a road put a row of parking spaces along it. The first click picks the start and the side, the second the end. The spaces are car park objects beside the outermost lane, in line with it, so openOMSI's cars can park in and pull out. A map without a parking list gets one."
+  "roadtool.parking.tooltip": "On: two clicks on a road put a row of parking spaces along it. The first click picks the start and the side, the second the end. The spaces are car park objects beside the outermost lane, in line with it, so openOMSI's cars can park in and pull out. A map without a parking list gets one.",
+  "roadtool.parking.list": "Parking list",
+  "roadtool.parking.list.tooltip": "The parking list the spaces draw their cars from: 0 is the map's own parklist_p.txt, n is parklist_p_n.txt (edit them under Project > Map > Parking list)."
 }

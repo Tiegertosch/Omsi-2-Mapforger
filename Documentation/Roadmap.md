@@ -75,6 +75,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Schritt 4 – Pfade mit OMSIs unsichtbaren Splines (`invis_sidewalk`, `invis_street`) im Straßen-Werkzeug, Einrasten auf vorhandene Pfadlinien, auf jeder Karte (wartet auf den Nutzertest; Zebra-Optik auf gewöhnlichen Straßen offen)
 - [x] Schritt 5 – Überweg-Stück in eine gewöhnliche Straße einfügen (Straßen-Werkzeug, Schalter „Insert crossing“): Fußpfad und Fahrspuren im selben Objekt, damit Autos Fußgängern auf dem Zebra Vorrang geben (wartet auf den Nutzertest; ohne Haltelinie und Ampel)
 - [x] Parkreihen – zwei Klicks im Straßen-Werkzeug (Schalter „Parking row“) setzen Parkplatz-Objekte neben die äußerste Fahrspur, in Fahrtrichtung, im Abstand, den openOMSI zum Ein- und Ausparken braucht; eine Karte ohne Parkliste bekommt eine (ADR 087; wartet auf den Nutzertest)
+- [x] Parkliste bearbeiten – Dialog „Parking list...“ im Map-Reiter: Haken je geparktem Auto der Installation, schreibt `parklist_p.txt` der Karte, Gewichte bleiben (ADR 087; wartet auf den Nutzertest)
+- [x] Parken fertig – Listennummer je Parkreihe und Listen `parklist_p_n.txt` im Dialog, Abschnitt „Parking“ in der Kartenprüfung (Platz zu weit von der Spur, schief, zu nah am Spurende, fehlende Listen und Autos; ADR 087; wartet auf den Nutzertest)
 
 ## Später
 

@@ -65,5 +65,15 @@
   "mapcheck.dlc.reading": "L'origine des objets est toujours en cours de lecture ; relancez la vérification dans un instant.",
   "mapcheck.dlc.unknown": "Les objets DLC ne peuvent pas être distingués sans les listes de fichiers ou les dossiers de Steam marqués comme DLC.",
   "mapcheck.dlc.none": "Pas d'objets DLC : la carte n'a besoin que du jeu de base et du freeware.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# objet DLC} other {# objets DLC}} dans {placements, plural, one {# emplacement} other {# emplacements}}, tel que {example} ; les joueurs sans que DLC les manquent."
+  "mapcheck.dlc.some": "{kinds, plural, one {# objet DLC} other {# objets DLC}} dans {placements, plural, one {# emplacement} other {# emplacements}}, tel que {example} ; les joueurs sans que DLC les manquent.",
+  "mapcheck.title.parking": "Stationnement",
+  "mapcheck.parking.none": "La carte n'a aucune place de stationnement.",
+  "mapcheck.parking.summary": "{count, plural, one {# place} other {# places}}, {usable} où des voitures peuvent se garer{problems, plural, =0 {} one {; # problème avec une liste} other {; # problèmes avec des listes}}.",
+  "mapcheck.parking.nolane": "la place {id} de la tuile {x}, {y} n'a aucune voie à moins de 30 m",
+  "mapcheck.parking.side": "la place {id} de la tuile {x}, {y} est à {value, number, 0.0} m à droite de sa voie ; les voitures se garent de 1,2 à 4,2 m",
+  "mapcheck.parking.heading": "la place {id} de la tuile {x}, {y} est tournée de {value, number, 0}° contre sa voie (12° au plus)",
+  "mapcheck.parking.laneend": "la place {id} de la tuile {x}, {y} est trop près de la fin de sa voie ({value, number, 0.0} m ; il faut 8 m avant et 4 m après)",
+  "mapcheck.parking.no_list": "La carte n'a pas de {file}, donc ses parkings (par exemple la place {id}) restent vides dans openOMSI.",
+  "mapcheck.parking.list_missing": "Un parking (place {id}) nomme une liste qui n'existe pas : {file}.",
+  "mapcheck.parking.car": "{file} nomme {car}, qui manque dans l'installation d'OMSI."
 }

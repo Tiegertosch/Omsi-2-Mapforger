@@ -15,5 +15,18 @@
   "mapsettings.status.failed": "Nie udało się zmienić ustawień mapy: {reason}",
   "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
   "mapsettings.status.changed": "Zmieniono ustawienia mapy {name}. Trafią do eksportu mapy.",
-  "mapsettings.status.unchanged": "Ustawienia mapy {name} bez zmian."
+  "mapsettings.status.unchanged": "Ustawienia mapy {name} bez zmian.",
+  "parklist.open": "Lista zaparkowanych aut...",
+  "parklist.open.tooltip": "Wybierz, które zaparkowane auta wypełniają obiekty parkingów tej mapy.",
+  "parklist.title": "Lista zaparkowanych aut",
+  "parklist.description": "openOMSI wypełnia każdy obiekt parkingu na mapie losowym autem z tej listy i zostawia około jednej czwartej pustych. Zaznacz auta do użycia; auto już wpisane kilka razy zachowuje tę wagę. Wyjeżdżać i znów parkować mogą tylko auta, które mają auto AI w tym samym folderze.",
+  "parklist.cancel": "Anuluj",
+  "parklist.apply": "Zastosuj",
+  "parklist.empty": "W instalacji OMSI nie znaleziono zaparkowanych aut.",
+  "parklist.entry_weight": "{name} (na liście {count}x)",
+  "parklist.status.failed": "Nie udało się zapisać listy: {reason}",
+  "parklist.status.changed": "Zapisano listę z {count} typami aut.",
+  "parklist.status.unchanged": "Lista pozostaje bez zmian.",
+  "parklist.number": "Numer listy",
+  "parklist.number.tooltip": "0 to parklist_p.txt; n to parklist_p_n.txt, który parkingi wskazują przez n jako pierwszy opis swojego obiektu."
 }

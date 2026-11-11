@@ -15,5 +15,18 @@
   "mapsettings.status.failed": "Les réglages de la carte n'ont pas pu être modifiés : {reason}",
   "@mapsettings.status.failed": "{reason} is a message of MapWorks in English",
   "mapsettings.status.changed": "Réglages de {name} modifiés. Ils vont dans l'export de la carte.",
-  "mapsettings.status.unchanged": "Les réglages de {name} sont inchangés."
+  "mapsettings.status.unchanged": "Les réglages de {name} sont inchangés.",
+  "parklist.open": "Liste de voitures garées...",
+  "parklist.open.tooltip": "Choisis quelles voitures garées remplissent les objets de parking de cette carte.",
+  "parklist.title": "Liste de voitures garées",
+  "parklist.description": "openOMSI remplit chaque objet de parking de la carte avec une voiture au hasard de cette liste et en laisse environ un quart vide. Coche les voitures à utiliser ; une voiture déjà listée plusieurs fois garde ce poids. Seules les voitures qui ont une voiture IA dans le même dossier peuvent repartir et se garer à nouveau.",
+  "parklist.cancel": "Annuler",
+  "parklist.apply": "Appliquer",
+  "parklist.empty": "Aucune voiture garée trouvée dans l'installation d'OMSI.",
+  "parklist.entry_weight": "{name} (listée {count} fois)",
+  "parklist.status.failed": "La liste n'a pas pu être écrite : {reason}",
+  "parklist.status.changed": "Liste écrite avec {count} types de voitures.",
+  "parklist.status.unchanged": "La liste reste telle quelle.",
+  "parklist.number": "Numéro de liste",
+  "parklist.number.tooltip": "0 est parklist_p.txt ; n est parklist_p_n.txt, que les parkings nomment avec n comme premier libellé de leur objet."
 }

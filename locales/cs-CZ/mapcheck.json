@@ -65,5 +65,15 @@
   "mapcheck.dlc.reading": "Původ objektů se stále čte; za chvíli spusťte kontrolu znovu.",
   "mapcheck.dlc.unknown": "Objekty DLC nelze oddělit bez seznamů souborů nebo složek Steam označených jako DLC.",
   "mapcheck.dlc.none": "Žádné DLC objekty: mapa potřebuje pouze základní hru a freeware.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# DLC objekt} few {# DLC objekty} many {# DLC objektů} other {# DLC objektů}} v {placements, plural, one {# umístění} few {# umístění} many {# umístění} other {# umístění}}, jako je {example}; hráčům bez toho DLC chybí."
+  "mapcheck.dlc.some": "{kinds, plural, one {# DLC objekt} few {# DLC objekty} many {# DLC objektů} other {# DLC objektů}} v {placements, plural, one {# umístění} few {# umístění} many {# umístění} other {# umístění}}, jako je {example}; hráčům bez toho DLC chybí.",
+  "mapcheck.title.parking": "Parkování",
+  "mapcheck.parking.none": "Mapa nemá žádná parkovací místa.",
+  "mapcheck.parking.summary": "{count, plural, one {# parkovací místo} few {# parkovací místa} many {# parkovacího místa} other {# parkovacích míst}}, {usable} vhodných k zajíždění{problems, plural, =0 {} one {; # problém se seznamem aut} few {; # problémy se seznamy aut} many {; # problému se seznamy aut} other {; # problémů se seznamy aut}}.",
+  "mapcheck.parking.nolane": "parkovací místo {id} v dlaždici {x}, {y} nemá do 30 m žádný jízdní pruh",
+  "mapcheck.parking.side": "parkovací místo {id} v dlaždici {x}, {y} leží {value, number, 0.0} m vpravo od svého pruhu; auta zajíždějí od 1,2 do 4,2 m",
+  "mapcheck.parking.heading": "parkovací místo {id} v dlaždici {x}, {y} je natočeno o {value, number, 0}° proti svému pruhu (nejvýše 12°)",
+  "mapcheck.parking.laneend": "parkovací místo {id} v dlaždici {x}, {y} leží příliš blízko konce svého pruhu ({value, number, 0.0} m; potřeba je 8 m před a 4 m za)",
+  "mapcheck.parking.no_list": "Mapa nemá {file}, proto parkoviště (například místo {id}) zůstanou v openOMSI prázdná.",
+  "mapcheck.parking.list_missing": "Parkoviště (místo {id}) uvádí seznam, který neexistuje: {file}.",
+  "mapcheck.parking.car": "{file} uvádí {car}, které v instalaci OMSI chybí."
 }

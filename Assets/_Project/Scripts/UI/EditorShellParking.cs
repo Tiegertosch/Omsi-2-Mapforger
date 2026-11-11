@@ -95,8 +95,10 @@ namespace OmsiMapEditor.UI
                         skipped++;
                         continue;
                     }
+                    // The first label of a car park names its parking list.
+                    var labels = roadPanel.ParkingList > 0 ? new List<string> { roadPanel.ParkingList.ToString(System.Globalization.CultureInfo.InvariantCulture) } : null;
                     steps.Add(session.PlaceObject(currentSummary, tile, OmsiParkingRow.SpaceObject, space.Position.X - tile.X * size, space.Position.Y - tile.Y * size,
-                        0.0, space.HeadingDegrees));
+                        0.0, space.HeadingDegrees, 0.0, 0.0, labels));
                     if (space.ParkInPossible)
                         parkIn++;
                 }
@@ -113,7 +115,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             // Without a parking list the spaces show no cars in openOMSI, so a map that has none gets one.
-            var listed = session.EnsureParkList(OmsiParkingRow.DefaultParkList(root));
+            var listed = roadPanel.ParkingList == 0 && session.EnsureParkList(OmsiParkingRow.DefaultParkList(root));
             PushSteps(steps, Loc.T("roadbuild.parking.step", ("n", steps.Count)));
             ResetParkingRow();
             SetStatusT(listed ? "roadbuild.parking.done_list" : "roadbuild.parking.done", ("n", steps.Count), ("in", parkIn), ("skipped", skipped)); // i18n:keys

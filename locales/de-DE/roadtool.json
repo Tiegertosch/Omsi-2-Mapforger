@@ -89,5 +89,7 @@
   "roadtool.crossing": "Überweg einfügen",
   "roadtool.crossing.tooltip": "An: Ein Klick auf eine Straße fügt dort einen Fußgängerüberweg ein, statt eine Straße zu bauen. Ein kurzes Stück derselben Straße wird mit Zebrabalken und einem Fußweg darüber eingesetzt, in einem Objekt, damit Autos Fußgängern darauf Vorrang geben. Es wird unter Sceneryobjects\\Mapforge in deiner OMSI-Installation gespeichert.",
   "roadtool.parking": "Parkreihe",
-  "roadtool.parking.tooltip": "An: Zwei Klicks auf eine Straße setzen eine Reihe Parkplätze daran. Der erste Klick wählt Anfang und Seite, der zweite das Ende. Die Plätze sind Parkplatz-Objekte neben der äußersten Fahrspur, in ihrer Richtung, damit openOMSIs Autos ein- und ausparken können. Eine Karte ohne Parkliste bekommt eine."
+  "roadtool.parking.tooltip": "An: Zwei Klicks auf eine Straße setzen eine Reihe Parkplätze daran. Der erste Klick wählt Anfang und Seite, der zweite das Ende. Die Plätze sind Parkplatz-Objekte neben der äußersten Fahrspur, in ihrer Richtung, damit openOMSIs Autos ein- und ausparken können. Eine Karte ohne Parkliste bekommt eine.",
+  "roadtool.parking.list": "Parkliste",
+  "roadtool.parking.list.tooltip": "Die Parkliste, aus der die Plätze ihre Autos bekommen: 0 ist die eigene parklist_p.txt der Karte, n ist parklist_p_n.txt (bearbeiten unter Project > Map > Parking list)."
 }

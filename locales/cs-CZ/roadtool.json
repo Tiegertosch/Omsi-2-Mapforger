@@ -89,5 +89,7 @@
   "roadtool.crossing": "Vložit přechod",
   "roadtool.crossing.tooltip": "Zapnuto: kliknutí na silnici tam vloží přechod pro chodce místo stavby silnice. Do silnice se vloží krátký kus téže silnice se zebrou a pěší cestou přes ni v jednom objektu, takže auta dávají chodcům přednost. Uloží se pod Sceneryobjects\\Mapforge ve tvé instalaci OMSI.",
   "roadtool.parking": "Řada parkovacích míst",
-  "roadtool.parking.tooltip": "Zapnuto: dvě kliknutí na silnici vloží podél ní řadu parkovacích míst. První kliknutí vybere začátek a stranu, druhé konec. Místa jsou objekty parkoviště vedle krajního pruhu, ve stejném směru, aby auta v openOMSI mohla zajíždět a vyjíždět. Mapa bez seznamu zaparkovaných aut ho dostane."
+  "roadtool.parking.tooltip": "Zapnuto: dvě kliknutí na silnici vloží podél ní řadu parkovacích míst. První kliknutí vybere začátek a stranu, druhé konec. Místa jsou objekty parkoviště vedle krajního pruhu, ve stejném směru, aby auta v openOMSI mohla zajíždět a vyjíždět. Mapa bez seznamu zaparkovaných aut ho dostane.",
+  "roadtool.parking.list": "Seznam aut",
+  "roadtool.parking.list.tooltip": "Seznam zaparkovaných aut, ze kterého místa berou auta: 0 je vlastní parklist_p.txt mapy, n je parklist_p_n.txt (úprava v Project > Map > Parking list)."
 }

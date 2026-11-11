@@ -65,5 +65,15 @@
   "mapcheck.dlc.reading": "Si sta ancora leggendo la provenienza degli oggetti; esegui di nuovo il controllo tra un attimo.",
   "mapcheck.dlc.unknown": "Gli oggetti DLC non possono essere distinti senza gli elenchi di file o le cartelle di Steam contrassegnati come DLC.",
   "mapcheck.dlc.none": "Nessun oggetto DLC: la mappa necessita solo del gioco base e del freeware.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# oggetto DLC} other {# oggetti DLC}} in {placements, plural, one {# posizionamento} other {# posizionamenti}}, come {example}; i giocatori senza che DLC li manchino."
+  "mapcheck.dlc.some": "{kinds, plural, one {# oggetto DLC} other {# oggetti DLC}} in {placements, plural, one {# posizionamento} other {# posizionamenti}}, come {example}; i giocatori senza che DLC li manchino.",
+  "mapcheck.title.parking": "Parcheggi",
+  "mapcheck.parking.none": "La mappa non ha posti auto.",
+  "mapcheck.parking.summary": "{count, plural, one {# posto auto} other {# posti auto}}, {usable} dove le auto possono entrare{problems, plural, =0 {} one {; # problema con un elenco} other {; # problemi con elenchi}}.",
+  "mapcheck.parking.nolane": "il posto {id} nella tessera {x}, {y} non ha corsie entro 30 m",
+  "mapcheck.parking.side": "il posto {id} nella tessera {x}, {y} sta a {value, number, 0.0} m a destra della sua corsia; le auto entrano da 1,2 a 4,2 m",
+  "mapcheck.parking.heading": "il posto {id} nella tessera {x}, {y} è ruotato di {value, number, 0}° contro la sua corsia (al massimo 12°)",
+  "mapcheck.parking.laneend": "il posto {id} nella tessera {x}, {y} è troppo vicino alla fine della sua corsia ({value, number, 0.0} m; servono 8 m prima e 4 m dopo)",
+  "mapcheck.parking.no_list": "La mappa non ha {file}, quindi i suoi parcheggi (per esempio il posto {id}) restano vuoti in openOMSI.",
+  "mapcheck.parking.list_missing": "Un parcheggio (posto {id}) nomina un elenco che non esiste: {file}.",
+  "mapcheck.parking.car": "{file} nomina {car}, che manca nell'installazione di OMSI."
 }

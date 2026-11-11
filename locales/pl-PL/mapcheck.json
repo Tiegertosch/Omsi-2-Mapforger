@@ -65,5 +65,15 @@
   "mapcheck.dlc.reading": "Nadal badane jest pochodzenie przedmiotów; za chwilę ponownie uruchom sprawdzanie.",
   "mapcheck.dlc.unknown": "Obiektów DLC nie można rozróżnić bez list plików lub folderów Steam oznaczonych jako DLC.",
   "mapcheck.dlc.none": "Brak obiektów DLC: mapa wymaga jedynie gry podstawowej i darmowego oprogramowania.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# obiekt DLC} few {# obiekty DLC} many {# obiektów DLC} other {# Obiekty DLC}} w {placements, plural, one {# miejsce} few {# miejsca docelowe} many {# miejsc docelowych} other {# miejsca docelowego}}, na przykład {example}; gracze bez tego DLC za nimi tęsknią."
+  "mapcheck.dlc.some": "{kinds, plural, one {# obiekt DLC} few {# obiekty DLC} many {# obiektów DLC} other {# Obiekty DLC}} w {placements, plural, one {# miejsce} few {# miejsca docelowe} many {# miejsc docelowych} other {# miejsca docelowego}}, na przykład {example}; gracze bez tego DLC za nimi tęsknią.",
+  "mapcheck.title.parking": "Parkowanie",
+  "mapcheck.parking.none": "Mapa nie ma miejsc parkingowych.",
+  "mapcheck.parking.summary": "{count, plural, one {# miejsce} few {# miejsca} many {# miejsc} other {# miejsca}}, {usable} nadających się do parkowania{problems, plural, =0 {} one {; # problem z listą} few {; # problemy z listami} many {; # problemów z listami} other {; # problemu z listami}}.",
+  "mapcheck.parking.nolane": "miejsce {id} w kafelku {x}, {y} nie ma pasa w promieniu 30 m",
+  "mapcheck.parking.side": "miejsce {id} w kafelku {x}, {y} leży {value, number, 0.0} m na prawo od swojego pasa; auta parkują od 1,2 do 4,2 m",
+  "mapcheck.parking.heading": "miejsce {id} w kafelku {x}, {y} jest obrócone o {value, number, 0}° przeciw swojemu pasowi (najwyżej 12°)",
+  "mapcheck.parking.laneend": "miejsce {id} w kafelku {x}, {y} leży zbyt blisko końca swojego pasa ({value, number, 0.0} m; potrzeba 8 m przed i 4 m za)",
+  "mapcheck.parking.no_list": "Mapa nie ma {file}, więc jej parkingi (np. miejsce {id}) zostają w openOMSI puste.",
+  "mapcheck.parking.list_missing": "Parking (miejsce {id}) wskazuje listę, która nie istnieje: {file}.",
+  "mapcheck.parking.car": "{file} wskazuje {car}, którego brakuje w instalacji OMSI."
 }

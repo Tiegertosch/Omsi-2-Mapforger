@@ -65,5 +65,15 @@
   "mapcheck.dlc.reading": "A origem dos objetos ainda está a ser lida; execute novamente a verificação em alguns instantes.",
   "mapcheck.dlc.unknown": "Os objetos DLC não podem ser diferenciados sem as listas de ficheiros ou pastas do Steam marcadas como DLC.",
   "mapcheck.dlc.none": "Sem objetos DLC: o mapa apenas necessita do jogo base e do freeware.",
-  "mapcheck.dlc.some": "{kinds, plural, one {# objeto DLC} other {# objetos DLC}} em {placements, plural, one {# canal} other {# canais}}, como {example}; jogadores sem este DLC sentem a sua falta."
+  "mapcheck.dlc.some": "{kinds, plural, one {# objeto DLC} other {# objetos DLC}} em {placements, plural, one {# canal} other {# canais}}, como {example}; jogadores sem este DLC sentem a sua falta.",
+  "mapcheck.title.parking": "Estacionamento",
+  "mapcheck.parking.none": "O mapa não tem lugares de estacionamento.",
+  "mapcheck.parking.summary": "{count, plural, one {# lugar} other {# lugares}}, {usable} onde os carros podem estacionar{problems, plural, =0 {} one {; # problema com uma lista} other {; # problemas com listas}}.",
+  "mapcheck.parking.nolane": "o lugar {id} na tesela {x}, {y} não tem faixa a menos de 30 m",
+  "mapcheck.parking.side": "o lugar {id} na tesela {x}, {y} fica a {value, number, 0.0} m à direita da sua faixa; os carros estacionam de 1,2 a 4,2 m",
+  "mapcheck.parking.heading": "o lugar {id} na tesela {x}, {y} está rodado {value, number, 0}° contra a sua faixa (no máximo 12°)",
+  "mapcheck.parking.laneend": "o lugar {id} na tesela {x}, {y} fica demasiado perto do fim da sua faixa ({value, number, 0.0} m; são precisos 8 m antes e 4 m depois)",
+  "mapcheck.parking.no_list": "O mapa não tem {file}, por isso os seus parques (por exemplo o lugar {id}) ficam vazios no openOMSI.",
+  "mapcheck.parking.list_missing": "Um parque (lugar {id}) nomeia uma lista que não existe: {file}.",
+  "mapcheck.parking.car": "{file} nomeia {car}, que falta na instalação do OMSI."
 }

@@ -117,6 +117,7 @@ namespace OmsiMapEditor.OMSI
             {
                 report.Sections.Add(Files(summary, installationRoot));
                 report.Sections.Add(Junctions(summary, installationRoot));
+                report.Sections.Add(Parking(summary, source, installationRoot));
             }
             var variants = OmsiChrono.ReadVariants(source);
             report.Sections.Add(Timetable(summary, source, variants));
@@ -460,6 +461,139 @@ namespace OmsiMapEditor.OMSI
                 ? Loc.T("mapcheck.junctions.none")
                 : Loc.T("mapcheck.junctions.summary", ("connected", counts[OmsiJunctionPortState.Connected]), ("count", checks.Count), ("objects", objects.Count),
                     ("review", counts[OmsiJunctionPortState.NeedsReview]), ("invalid", counts[OmsiJunctionPortState.Invalid]), ("free", counts[OmsiJunctionPortState.Unconnected]));
+            return section;
+        }
+
+        /// <summary>
+        /// The car park objects of the map, each judged as openOMSI does before a car parks in it (<see cref="OmsiParkingCheck"/>), and
+        /// the parking lists they draw their cars from.
+        /// </summary>
+        private static OmsiCheckSection Parking(OmsiMapSummary summary, IOmsiFileSource source, string installationRoot)
+        {
+            var section = new OmsiCheckSection("Parking", Loc.T("mapcheck.title.parking"));
+            var size = summary.TileSizeMeters;
+            var isCarPark = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            var spaces = new List<KeyValuePair<OmsiTileSummary, OmsiObjectRecord>>();
+            foreach (var tile in summary.Tiles)
+                foreach (var record in tile.Objects)
+                {
+                    if (string.IsNullOrEmpty(record.AssetPath))
+                        continue;
+                    if (!isCarPark.TryGetValue(record.AssetPath, out var park))
+                    {
+                        park = false;
+                        try
+                        {
+                            var file = OmsiRelativePath.Resolve(installationRoot, record.AssetPath);
+                            park = File.Exists(file) && OmsiTextFile.Decode(File.ReadAllBytes(file)).IndexOf("[carpark_p]", StringComparison.OrdinalIgnoreCase) >= 0;
+                        }
+                        catch (Exception exception) when (exception is IOException || exception is ArgumentException || exception is UnauthorizedAccessException)
+                        {
+                            // A file that cannot be read is no car park here; the files section names it.
+                        }
+                        isCarPark[record.AssetPath] = park;
+                    }
+                    if (park)
+                        spaces.Add(new KeyValuePair<OmsiTileSummary, OmsiObjectRecord>(tile, record));
+                }
+            if (spaces.Count == 0)
+            {
+                section.Status = OmsiCheckStatus.Passed;
+                section.Summary = Loc.T("mapcheck.parking.none");
+                return section;
+            }
+
+            // The road paths of the tiles with spaces and their neighbours.
+            var scenery = new Dictionary<string, OmsiSceneryObject>(StringComparer.OrdinalIgnoreCase);
+            var profiles = new OmsiSplineProfileCatalog(installationRoot);
+            Func<string, OmsiSceneryObject> sceneryOf = asset =>
+            {
+                if (string.IsNullOrEmpty(asset))
+                    return null;
+                if (!scenery.TryGetValue(asset, out var found))
+                {
+                    found = null;
+                    try
+                    {
+                        var file = OmsiRelativePath.Resolve(installationRoot, asset);
+                        if (File.Exists(file))
+                            found = OmsiSceneryObject.Parse(File.ReadAllBytes(file));
+                    }
+                    catch (Exception exception) when (exception is IOException || exception is ArgumentException || exception is UnauthorizedAccessException ||
+                                                      exception is FormatException)
+                    {
+                        // Unreadable objects have no paths.
+                    }
+                    scenery[asset] = found;
+                }
+                return found;
+            };
+            var pathsOfTile = new Dictionary<OmsiTileSummary, List<OmsiMapPath>>();
+            Func<OmsiTileSummary, List<OmsiMapPath>> pathsOf = tile =>
+            {
+                if (!pathsOfTile.TryGetValue(tile, out var paths))
+                {
+                    paths = tile.IsAvailable ? OmsiMapPaths.OfTile(summary, tile, sceneryOf, profiles.Get) : new List<OmsiMapPath>();
+                    pathsOfTile[tile] = paths;
+                }
+                return paths;
+            };
+
+            var usable = 0;
+            var alongRoads = 0;
+            var lists = new Dictionary<int, int>();
+            foreach (var pair in spaces)
+            {
+                var tile = pair.Key;
+                var record = pair.Value;
+                var world = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, record.LocalX, record.LocalY, size);
+                var near = new List<OmsiMapPath>();
+                foreach (var other in summary.Tiles)
+                    if (Math.Abs(other.X - tile.X) <= 1 && Math.Abs(other.Y - tile.Y) <= 1)
+                        near.AddRange(pathsOf(other));
+                var verdict = OmsiParkingCheck.Judge(world.X, world.Y, record.HeadingDegrees, near);
+                // A space far from every road lane belongs to a car park of its own, where no car is meant to park in: not judged.
+                if (verdict.Fault == OmsiParkingFault.NoLane || (verdict.Fault == OmsiParkingFault.Side && Math.Abs(verdict.Value) > OmsiParkingCheck.RoadsideMeters))
+                    continue;
+                alongRoads++;
+                if (verdict.Fault == OmsiParkingFault.None)
+                {
+                    usable++;
+                }
+                else
+                {
+                    section.Tile = section.Tile ?? tile;
+                    Add(section, Loc.T("mapcheck.parking." + verdict.Fault.ToString().ToLowerInvariant(), ("id", record.Id), ("x", tile.X), ("y", tile.Y), // i18n:keys
+                        ("value", verdict.Value)));
+                }
+                var list = 0;
+                if (record.Labels.Count > 0 && int.TryParse(record.Labels[0].Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var number) &&
+                    number > 0)
+                    list = number;
+                if (!lists.ContainsKey(list))
+                    lists[list] = record.Id;
+            }
+
+            // Every list the spaces name must exist and name cars that have AI cars beside them.
+            var listProblems = 0;
+            foreach (var pair in lists)
+            {
+                var file = OmsiParkList.FileName(pair.Key);
+                if (!source.FileExists(file))
+                {
+                    listProblems++;
+                    Add(section, Loc.T(pair.Key == 0 ? "mapcheck.parking.no_list" : "mapcheck.parking.list_missing", ("file", file), ("id", pair.Value))); // i18n:keys
+                    continue;
+                }
+                foreach (var entry in OmsiParkList.Parse(source.ReadAllBytes(file)))
+                    if (!File.Exists(OmsiRelativePath.Resolve(installationRoot, entry)))
+                    {
+                        listProblems++;
+                        Add(section, Loc.T("mapcheck.parking.car", ("file", file), ("car", entry)));
+                    }
+            }
+            section.Status = alongRoads - usable > 0 || listProblems > 0 ? OmsiCheckStatus.Note : OmsiCheckStatus.Passed;
+            section.Summary = Loc.T("mapcheck.parking.summary", ("count", alongRoads), ("usable", usable), ("problems", listProblems));
             return section;
         }
 

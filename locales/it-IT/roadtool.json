@@ -89,5 +89,7 @@
   "roadtool.crossing": "Inserisci attraversamento",
   "roadtool.crossing.tooltip": "Attivo: un clic su una strada vi inserisce un attraversamento pedonale invece di costruire una strada. Un breve tratto della stessa strada viene inserito con strisce zebrate e un percorso pedonale che lo attraversa, in un unico oggetto, così le auto danno la precedenza. Salvato in Sceneryobjects\\Mapforge nella tua installazione di OMSI.",
   "roadtool.parking": "Fila di parcheggi",
-  "roadtool.parking.tooltip": "Attivo: due clic su una strada vi mettono accanto una fila di posti auto. Il primo clic sceglie inizio e lato, il secondo la fine. I posti sono oggetti parcheggio accanto alla corsia più esterna, nella sua direzione, così le auto di openOMSI possono entrare e uscire. Una mappa senza elenco di auto parcheggiate ne riceve uno."
+  "roadtool.parking.tooltip": "Attivo: due clic su una strada vi mettono accanto una fila di posti auto. Il primo clic sceglie inizio e lato, il secondo la fine. I posti sono oggetti parcheggio accanto alla corsia più esterna, nella sua direzione, così le auto di openOMSI possono entrare e uscire. Una mappa senza elenco di auto parcheggiate ne riceve uno.",
+  "roadtool.parking.list": "Elenco auto",
+  "roadtool.parking.list.tooltip": "L'elenco di auto parcheggiate da cui i posti prendono le auto: 0 è il parklist_p.txt della mappa, n è parklist_p_n.txt (si modifica in Project > Map > Parking list)."
 }
