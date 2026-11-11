@@ -63,7 +63,7 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 - [x] Terrain-Höhenkarten importieren — Vorhanden
 - [x] Terrain-Höhenkarten exportieren — Vorhanden
 - [x] DEM-Höhendaten importieren — Vorhanden
-- [x] Geländetexturen auswählen und aufmalen — Vorhanden (Modus „Malen“, neue Texturen aus dem Texture-Ordner, ADR 091); Test in openOMSI steht aus
+- [x] Geländetexturen auswählen und aufmalen — Vorhanden (Modus „Malen“, neue Texturen aus dem Texture-Ordner, ADR 091); vom Nutzer in openOMSI getestet
 - [x] Texturmasken und Übergänge bearbeiten — Vorhanden (Pinselhärte = weicher Übergang, Radieren, Weichzeichnen, Kachel füllen/leeren; kein Import eigener Masken)
 - [x] Terrainlöcher durch Objekte und Splines — Vorhanden
 - [x] Wasserflächen und Wasserhöhe bearbeiten — Vorhanden

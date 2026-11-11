@@ -1423,6 +1423,8 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Leistung** (§15): Die Konfliktanalyse (`OmsiSignalConflicts.Of`) berechnete die Kästen der Linien für jedes Paar neu; jetzt einmal je Linie (`LineBox`, Ganzes und Stücke), ohne Zuteilung je Paar. Alle 110 Programme der Installation (Analyse, Konflikte, Matrix, Prüfung): 6,9 s auf 0,78 s, größte Kreuzung (248 Bewegungen) 2,1 s auf 0,14 s, gleiche 118 Konflikte. Das Ergebnis wird je Kreuzung gemerkt und nur bei Änderung neu berechnet (seit Meilenstein 4).
 - **Export:** wie entschieden schreiben nur von MapWorks erzeugte Kreuzungen; Programme und Ausnahmen stehen in deren `.sco` (Meilenstein 2 bis 5) und der Export der Karte nimmt sie mit.
 
+**Meilenstein 6 und die lokalen Move-Pfeile sind vom Nutzer in openOMSI getestet (11. November 2026).**
+
 **Prüfung Meilenstein 6:** `OmsiSignalTemplateTests` (13: Text-Rundreise aller mitgelieferten Vorlagen, Passung auf Kreuzung mit vier und drei Armen, Korrektur vor dem Anwenden, eigene Linksabbiegespuren, Vorlage aus Kreuzung gibt dieselben Gruppen zurück, ungenaue Rollen, Anforderungsvorlage mit der Uhr, Vorlage → `.sco` → Lesen (Fall 9 des Auftrags), Speichern/Laden/Löschen, kaputte Dateien, ungültige Vorlagen); Unity 589 Tests grün, Player gebaut. Probe über die 110 Programme der Installation: Vorlage aus der Kreuzung, Text, Lesen, Passung gibt in allen 110 dieselben Gruppen zurück (14 mit ungenauen Rollen, dort gezählt). Im Player auf Grundorf: Vorlagenseite, „Zwei Phasen“ auf erzeugter Kreuzung (Passung ohne Beanstandung), angewendet und gespeichert, Prüfung danach nur „keine Köpfe“. Mausbedienung nicht selbst geprüft, nur über dieselben Funktionen.
 
 **Prüfung:** `OmsiTrafficSignalsTests` (Lesen nach dem Polizei-Programm, Zeitlogik und Zyklusregel, Deutung der Rohwerte, byte-gleiches Zurückschreiben in drei Kodierungen, eine Phase ändert eine Zeile, Bindungen mit `[path_2]` und `[crossingproblem]` dazwischen, neues Licht samt Sprungpunkt, Programm hinzufügen und wieder entfernen, Ablehnungen ohne Schreiben, Kopf-Erkennung und Kopfsuche über Nachbarkacheln); Probe gegen die Installation: alle 85 Programme exakt gelesen, unverändert byte-gleich geschrieben, Änderung zurückgelesen, Pfadzählung gleich.
@@ -1522,7 +1524,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 089: Breite und Richtung der Pfade im Pfadmodus
 
-**Datum:** 11. November 2026 · **Status:** gebaut, wartet auf den Nutzertest in openOMSI
+**Datum:** 11. November 2026 · **Status:** gebaut, vom Nutzer in openOMSI getestet
 
 **Befund:** Der Pfadmodus (ADR 086, Schritt 4) zeichnet Splines der unsichtbaren Profile `invis_street` und `invis_sidewalk`. Ein Profil legt Breite und Richtung seines einen `[path]` fest (`invis_street`: 3 m, nur mit dem Spline; `invis_sidewalk`: 2 m, beide Richtungen). Wer anders breite Pfade oder einen Fahrzeugpfad in beide Richtungen wollte, musste ein eigenes Profil schreiben. Außerdem verband ein Pfad, der mitten auf einer Fahrspur anfing, nur dann, wenn er in deren Richtung losfuhr (openOMSI verbindet Fahrzeugpfade bis 1,5 m Abstand und 40° Richtungsunterschied).
 
@@ -1537,7 +1539,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 090: Straßenprofile vollständig lesen und zeichnen ([path_2], Texturversatz, Skew, [patchwork_chain])
 
-**Datum:** 11. November 2026 · **Status:** gebaut, wartet auf den Nutzertest in openOMSI
+**Datum:** 11. November 2026 · **Status:** gebaut, vom Nutzer in openOMSI getestet
 
 **Befund (Vergleich unserer Spline-Datensätze mit denen des Original-Editors und der Profile der Installation):** Die Datensätze stimmen überein: `[spline]` (18 Felder), `[spline_h]` (19/20), `[splineAttachement]`, `[splineAttachement_repeater]`, `[spline_terrain_align]`, `[spline_terrain_align_2]`, `[rule]`, `[kill_rule]` kennt und schreibt der Editor; Winkel außerhalb 0 bis 360° kommen in den Originalkarten häufig vor (1.747 von 5.495 negativ). Lücken fanden sich im Lesen der Profile (`.sli`): `[path_2]` (5 Profile, z. B. DDR-Straßen), `[patchwork_chain]` (28), `[scaleTexByLength]` (5), `[rail_enh]` (31), `[third_rail]` (9) und `[length]` (38) kannte der Parser nicht. Außerdem zeichnete die Oberfläche der Splines weder den Texturversatz der Kette noch den Skew noch die Umkehr von v bei gespiegelten Splines, die openOMSI umsetzt.
 
@@ -1551,7 +1553,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 091: Geländetexturen malen (Masken, Übergänge, neue Texturen)
 
-**Datum:** 11. November 2026 · **Status:** gebaut, wartet auf den Nutzertest in openOMSI
+**Datum:** 11. November 2026 · **Status:** gebaut, vom Nutzer in openOMSI getestet
 
 **Befund:** Der Editor las und zeichnete Bodentexturen (`[groundtex]` in global.cfg, Masken `texture\map\tile_x_y.map.N.dds`), konnte aber nichts malen. Die Masken der drei Testkarten sind 8-Bit-Alpha-DDS (`DDPF_ALPHA`, Maske `0xff`, Caps `0x1002`), quadratisch, 128 bis 512 Pixel, erste Zeile am Nordrand; 167 von 586 Dateien (Stadtückheim, Spandau) tragen zusätzlich 10 Mip-Stufen, die übrigen keine, ihr Kopf (Flags `0x1007`) ist byte-gleich zu dem, den wir schreiben. Die Zeichenfolge steht fest: der Index in der Liste ist die Maskennummer, später definierte Texturen werden über früheren gezeichnet (`renderQueue = 3000 + Index`, wie openOMSIs Malschichten nach der Basis).
 
