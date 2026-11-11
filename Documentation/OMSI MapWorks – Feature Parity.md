@@ -51,7 +51,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Kreuzungsobjekte mit Splines verbinden — Vorhanden
 - [x] Straßenprofile selbst erstellen — Vorhanden
 - [x] Schienen und Straßenbahnsplines verlegen — Vorhanden
-- [ ] Spline-Export und OMSI-Kompatibilität prüfen — Teilweise
+- [x] Spline-Export und OMSI-Kompatibilität prüfen — Vorhanden (Datensätze mit denen des Original-Editors verglichen, Profile vollständig gelesen und gezeichnet, ADR 090); ein Test einer exportierten Karte in OMSI 2 selbst steht aus
 
 ## D. Gelände und Kacheln
 - [x] Gelände anheben und absenken — Vorhanden

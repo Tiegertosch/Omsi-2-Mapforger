@@ -79,6 +79,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Parken fertig – Listennummer je Parkreihe und Listen `parklist_p_n.txt` im Dialog, Abschnitt „Parking“ in der Kartenprüfung (Platz zu weit von der Spur, schief, zu nah am Spurende, fehlende Listen und Autos; ADR 087; vom Nutzer in openOMSI bestätigt)
 - [x] Tageskurven – Dialog „Traffic curves...“ im Map-Reiter: Diagramm mit Griff je Stunde für KI-Autos und Fahrgäste, schreibt `[trafficdensity_road]` und `[trafficdensity_passenger]` (ADR 088; mit openOMSI ohne Fenster geprüft)
 - [x] Pfade mit Breite und Richtung – im Pfadmodus „Path width (m)“ und „Both ways“ (eigener Pfadtyp unter Splines\Mapforge), Fahrzeugpfade starten und enden mit der Fahrtrichtung der Spur, auf der sie einrasten (ADR 089; wartet auf den Nutzertest)
+- [x] Straßenprofile vollständig lesen und zeichnen – `[path_2]`, Texturversatz der Kette, Skew, gespiegeltes v, `[scaleTexByLength]`, `[patchwork_chain]`; `[rail_enh]` und `[third_rail]` gelesen (ADR 090; wartet auf den Nutzertest)
 
 ## Später
 

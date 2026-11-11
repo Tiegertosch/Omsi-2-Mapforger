@@ -13,6 +13,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True when [matl_alpha] follows the texture, so its alpha channel cuts or blends.</summary>
         public bool UsesAlpha { get; internal set; }
+
+        /// <summary>True when [scaleTexByLength] follows the texture: its v runs from 0 to the point's scale over the whole spline, not per metre.</summary>
+        public bool ScaleByLength { get; internal set; }
+
+        /// <summary>The [patchwork_chain] that follows the texture, or null.</summary>
+        public OmsiPatchworkChain Patchwork { get; internal set; }
     }
 
     /// <summary>How a spline without a surface seen from above is shown there.</summary>
@@ -106,6 +112,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The lanes in the order of the file; timetables name them by this index.</summary>
         public List<OmsiSplineLane> Lanes { get; } = new List<OmsiSplineLane>();
+
+        /// <summary>The eight numbers of each [rail_enh] (enhanced rail: length of a single rail, track position, waves); kept as written.</summary>
+        public List<double[]> RailEnhancements { get; } = new List<double[]>();
+
+        /// <summary>The six numbers of each [third_rail]; kept as written.</summary>
+        public List<double[]> ThirdRails { get; } = new List<double[]>();
 
         /// <summary>
         /// The cross-section turned over, as a spline with "mirror" or one running the other way shows it: left and right
@@ -258,7 +270,29 @@ namespace OmsiMapEditor.OMSI
                             double.TryParse(values[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var holeX))
                             result.TerrainHoles[result.TerrainHoles.Count - 1].Add(holeX);
                         break;
+                    case "scaletexbylength":
+                        if (result.Textures.Count > 0)
+                            result.Textures[result.Textures.Count - 1].ScaleByLength = true;
+                        break;
+                    case "patchwork_chain":
+                        if (result.Textures.Count > 0 && values.Count >= 4 &&
+                            double.TryParse(values[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var segmentLength))
+                            result.Textures[result.Textures.Count - 1].Patchwork = new OmsiPatchworkChain
+                            {
+                                SegmentLength = segmentLength, Chain = values[1].Trim(), Weights = values[2].Trim(), Invertable = values[3].Trim()
+                            };
+                        break;
+                    case "rail_enh":
+                        if (TryNumbers(values, 8, out var railValues))
+                            result.RailEnhancements.Add(railValues);
+                        break;
+                    case "third_rail":
+                        if (TryNumbers(values, 6, out var thirdValues))
+                            result.ThirdRails.Add(thirdValues);
+                        break;
                     case "path":
+                    case "path_2":
+                        // [path_2] has one more number than [path], which OMSI keeps beside it; the first five are the same.
                         // Kind, x, height, width and direction. A lane that cannot be read, such as the [path] that opens a
                         // commented explanation in some rail profiles, keeps the index of the next with a kind of its own.
                         var lane = new OmsiSplineLane { Kind = UnreadableLane };
@@ -336,6 +370,17 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Narrow profiles at least this high count as fences or walls.</summary>
         public const double FenceHeight = 1.0;
 
+        private static bool TryNumbers(List<string> values, int count, out double[] numbers)
+        {
+            numbers = new double[count];
+            if (values.Count < count)
+                return false;
+            for (var index = 0; index < count; index++)
+                if (!double.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out numbers[index]))
+                    return false;
+            return true;
+        }
+
         private static bool TryNumbers(List<string> values, out double[] numbers)
         {
             numbers = new double[4];
@@ -389,6 +434,8 @@ namespace OmsiMapEditor.OMSI
             var turn = Math.Abs(spline.RadiusMeters) > 0.001 ? length / Math.Abs(spline.RadiusMeters) : 0.0;
             var steps = Math.Max(1, Math.Min(512, (int)Math.Ceiling(turn / MaximumStepRadians)));
             var mirror = spline.IsMirrored ? -1.0 : 1.0;
+            // A patchwork chain lays the texture of one slot part by part; the others run as usual.
+            var patchwork = OmsiSplinePatchwork.For(profile, spline, steps);
 
             foreach (var strip in profile.Strips)
             {
@@ -405,7 +452,10 @@ namespace OmsiMapEditor.OMSI
                     var right = strip.Points[point + 1];
                     if (Math.Abs(right.X - left.X) < MinimumWidth && (!includeUpright || Math.Abs(right.Height - left.Height) < MinimumWidth))
                         continue;
-                    AddRibbon(mesh, spline, left, right, mirror, steps);
+                    if (patchwork != null && patchwork.Texture == strip.TextureIndex)
+                        AddPatchworkRibbon(mesh, spline, left, right, mirror, patchwork);
+                    else
+                        AddRibbon(mesh, spline, left, right, mirror, steps, profile.Textures[strip.TextureIndex].ScaleByLength);
                 }
             }
 
@@ -481,25 +531,21 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>One piece of the cross-section swept along the spline as a band of quads.</summary>
         private static void AddRibbon(OmsiSurfaceMesh mesh, OmsiSplineRecord spline, OmsiProfilePoint left, OmsiProfilePoint right,
-            double mirror, int steps)
+            double mirror, int steps, bool scaleByLength = false)
         {
             var first = mesh.VertexCount;
+            var offset = spline.ChainOffset ?? 0.0;
+            // Whole repeats of the texture change nothing where both points share one scale: leaving them out keeps v small on a long chain.
+            var whole = !scaleByLength && left.VPerMeter == right.VPerMeter ? Math.Floor(left.VPerMeter * offset * mirror) : 0.0;
             for (var step = 0; step <= steps; step++)
             {
-                var distance = spline.LengthMeters * step / steps;
-                var height = spline.Height + (spline.EndHeight - spline.Height) * step / steps;
-                OmsiMapGeometry.GetLocalFrameAt(spline, distance, out var position, out var heading);
-                // The right-hand side of the travel direction: heading 0 runs north, so right is east.
-                var rightX = Math.Cos(heading);
-                var rightY = -Math.Sin(heading);
+                var nominal = spline.LengthMeters * step / steps;
                 foreach (var point in new[] { left, right })
                 {
-                    var offset = point.X * mirror;
-                    mesh.Positions.Add(position.X + rightX * offset);
-                    mesh.Positions.Add(height + point.Height);
-                    mesh.Positions.Add(position.Y + rightY * offset);
-                    mesh.Uvs.Add(point.U);
-                    mesh.Uvs.Add(distance * point.VPerMeter);
+                    var across = point.X * mirror;
+                    var distance = Skewed(spline, nominal, across);
+                    AddVertex(mesh, spline, distance, across, point,
+                        scaleByLength ? (double)step / steps * point.VPerMeter * mirror : point.VPerMeter * (distance + offset) * mirror - whole);
                 }
             }
             for (var step = 0; step < steps; step++)
@@ -507,6 +553,66 @@ namespace OmsiMapEditor.OMSI
                 var a = first + step * 2;
                 mesh.Triangles.AddRange(new[] { a, a + 2, a + 1, a + 1, a + 2, a + 3 });
             }
+        }
+
+        /// <summary>
+        /// A strip laid with the parts of a patchwork chain: every stretch has vertices of its own, so the texture part changes where one
+        /// stretch ends and the next begins (a part laid backwards runs its v the other way).
+        /// </summary>
+        private static void AddPatchworkRibbon(OmsiSurfaceMesh mesh, OmsiSplineRecord spline, OmsiProfilePoint left, OmsiProfilePoint right, double mirror,
+            OmsiSplinePatchwork patchwork)
+        {
+            var stations = patchwork.Stations;
+            for (var index = 0; index < stations; index++)
+            {
+                var block = index / patchwork.PerStretch;
+                var part = patchwork.Order[Math.Min(block, patchwork.Order.Length - 1)];
+                var partStart = (Math.Abs(part) - 1) / (double)patchwork.Parts;
+                var first = mesh.VertexCount;
+                for (var end = 0; end < 2; end++)
+                {
+                    var nominal = spline.LengthMeters * (index + end) / stations;
+                    var run = (double)(index + end - block * patchwork.PerStretch);
+                    if (part < 0)
+                        run = patchwork.PerStretch - run;
+                    var v = run / (patchwork.PerStretch * patchwork.Parts) + partStart;
+                    foreach (var point in new[] { left, right })
+                    {
+                        var across = point.X * mirror;
+                        AddVertex(mesh, spline, Skewed(spline, nominal, across), across, point, v * mirror);
+                    }
+                }
+                mesh.Triangles.AddRange(new[] { first, first + 2, first + 1, first + 1, first + 2, first + 3 });
+            }
+        }
+
+        /// <summary>
+        /// The distance along the spline a cross-section point lies at: a cross-section is shifted along the spline by its lateral
+        /// distance times the skew, which runs evenly from its value at the start to the one at the end (Omsi.exe sub_5aaef4).
+        /// </summary>
+        private static double Skewed(OmsiSplineRecord spline, double distance, double across)
+        {
+            var start = spline.SkewStart ?? 0.0;
+            var end = spline.SkewEnd ?? 0.0;
+            if (start == 0.0 && end == 0.0)
+                return distance;
+            var share = spline.LengthMeters > 0.0 ? distance / spline.LengthMeters : 0.0;
+            var skew = start * (1.0 - share) + end * share;
+            return double.IsNaN(skew) || double.IsInfinity(skew) ? distance : distance + across * Math.Max(-32.0, Math.Min(32.0, skew));
+        }
+
+        /// <summary>A vertex of a ribbon at a distance along the spline and across it; the height follows the spline's ends linearly.</summary>
+        private static void AddVertex(OmsiSurfaceMesh mesh, OmsiSplineRecord spline, double distance, double across, OmsiProfilePoint point, double v)
+        {
+            var share = spline.LengthMeters > 0.0 ? distance / spline.LengthMeters : 0.0;
+            var height = spline.Height + (spline.EndHeight - spline.Height) * share;
+            OmsiMapGeometry.GetLocalFrameAt(spline, distance, out var position, out var heading);
+            // The right-hand side of the travel direction: heading 0 runs north, so right is east.
+            mesh.Positions.Add(position.X + Math.Cos(heading) * across);
+            mesh.Positions.Add(height + point.Height);
+            mesh.Positions.Add(position.Y - Math.Sin(heading) * across);
+            mesh.Uvs.Add(point.U);
+            mesh.Uvs.Add(v);
         }
     }
 

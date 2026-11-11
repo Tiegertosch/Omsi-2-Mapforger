@@ -63,3 +63,5 @@ The user interface font in `Assets/_Project/UI/Resources/Fonts/` is Inter 4.1 (R
 ## OMSI
 
 OMSI and its content are not part of this project. Mapforge reads OMSI files from the user's own installation and does not ship them.
+
+The patchwork order of spline textures in `Assets/_Project/Scripts/OMSI/OmsiSplinePatchwork.cs` (which part of a texture each stretch of a spline shows, from `[patchwork_chain]` of a profile) is ported from openOMSI's `patchwork` in `crates/omsi-geometry/src/lib.rs`, same copyright and license; the chain validity test follows `PatchworkChain::valid` in `crates/omsi-scenery/src/sli.rs`.
