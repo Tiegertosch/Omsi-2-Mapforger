@@ -469,6 +469,7 @@ namespace OmsiMapEditor.UI
                 terrainOptions.ExportRequested += () => ExportHeightMap(null);
                 terrainOptions.ImportRequested += () => ChooseHeightMap(null);
                 terrainOptions.ImportConfirmed += LayHeightMap;
+                ConnectGroundPaint();
                 objectsPanelHost.Add(terrainOptions);
                 CreateMarkingOptions();
                 CreatePriorityOptions();
@@ -1587,6 +1588,7 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 SetTool(EditorTool.Terrain);
                 terrainOptions?.Apply(terrainMode, Argument("-terrainRadius", 1), Argument("-terrainStrength", 1));
+                ApplyPaintArguments(Argument);
                 var terrainTileSize = currentSummary.TileSizeMeters;
                 var terrainAt = OmsiMapGeometry.TileLocalToWorld(terrainTileX, terrainTileY, terrainX, terrainY, terrainTileSize);
                 roadPointer = terrainAt;
@@ -4975,6 +4977,8 @@ namespace OmsiMapEditor.UI
             objectsPanelHost.style.display = DisplayStyle.Flex;
             mapCanvas.BeginRoad();
             terrainRampStart = null;
+            if (terrainOptions.Painting)
+                RefreshPaintTextures();
             ShowTerrainBrush();
             SetStatusT("terrain.status.start");
         }
@@ -5006,7 +5010,7 @@ namespace OmsiMapEditor.UI
             var marks = new List<OmsiMapPoint[]> { Circle(pointer, radius) };
             var sampler = new OmsiTerrainSampler(currentSummary, session.Source);
             var here = sampler.TryGetHeight(pointer.X, pointer.Y, out var height) ? Loc.T("terrain.here_height", ("height", height)) : Loc.T("terrain.no_terrain");
-            if (terrainOptions.Mode.HasValue)
+            if (terrainOptions.Mode.HasValue || terrainOptions.Painting)
             {
                 mapCanvas.SetRoadPreview(marks, true, null, null, null);
                 terrainOptions.ShowPlan(Loc.T("terrain.here", ("here", here)), false);
@@ -5046,6 +5050,11 @@ namespace OmsiMapEditor.UI
             if (!CanEdit || currentSummary == null || terrainOptions == null)
                 return;
             roadPointer = new OmsiMapPoint(x, y);
+            if (terrainOptions.Painting)
+            {
+                PressPaint();
+                return;
+            }
             if (!terrainOptions.Mode.HasValue)
             {
                 ClickRamp(x, y);
@@ -5076,6 +5085,11 @@ namespace OmsiMapEditor.UI
         /// <summary>While the button is held, the brush works where the pointer is, a step at a time.</summary>
         private void TickTerrain()
         {
+            if (paintStroke != null)
+            {
+                TickPaint();
+                return;
+            }
             if (terrainStroke == null || !roadPointer.HasValue || activeTool != EditorTool.Terrain || !terrainOptions.Mode.HasValue)
                 return;
             terrainSince += Time.unscaledDeltaTime;
@@ -5103,6 +5117,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The button let go: the stroke is kept as one step.</summary>
         private void ReleaseTerrain()
         {
+            ReleasePaint();
             var stroke = terrainStroke;
             terrainStroke = null;
             if (stroke == null)
@@ -6258,7 +6273,10 @@ namespace OmsiMapEditor.UI
                     session.Undo(currentSummary, step.TerrainChange);
                 else
                     session.Redo(currentSummary, step.TerrainChange);
-                RefreshGround(step.TerrainChange.Tiles);
+                if (step.TerrainChange.Painted)
+                    RefreshAfterPaintStep(step.TerrainChange);
+                else
+                    RefreshGround(step.TerrainChange.Tiles);
                 return;
             }
 

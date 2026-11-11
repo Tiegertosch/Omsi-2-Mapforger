@@ -121,12 +121,19 @@ namespace OmsiMapEditor.World
             public bool MasksLoaded;
             public bool MasksLoading;
             public float LastWanted;
+
+            /// <summary>Counts how often the masks changed on disk (painting); a read that began before the last change is dropped.</summary>
+            public int MaskVersion;
+
+            /// <summary>The version the masks being read were asked for at.</summary>
+            public int RequestedVersion;
         }
 
         /// <summary>Decoded masks of a tile, waiting to be uploaded.</summary>
         private sealed class DecodedMasks
         {
             public long Key;
+            public int Version;
             public readonly List<KeyValuePair<int, OmsiImage>> Masks = new List<KeyValuePair<int, OmsiImage>>();
         }
 
@@ -747,7 +754,10 @@ namespace OmsiMapEditor.World
                     Debug.LogException(task.Exception);
                 else
                     foreach (var decoded in task.Result)
+                    {
+                        decoded.Version = tileStates.TryGetValue(decoded.Key, out var asked) ? asked.RequestedVersion : 0;
                         decodedMasks.Enqueue(decoded);
+                    }
                 lock (maskProblems)
                 {
                     if (maskProblems.Count > 0)
@@ -775,6 +785,7 @@ namespace OmsiMapEditor.World
                 foreach (var state in toRead)
                 {
                     state.MasksLoading = true;
+                    state.RequestedVersion = state.MaskVersion;
                     requests.Add(new KeyValuePair<long, List<KeyValuePair<int, string>>>(state.Key, state.MaskPaths));
                 }
                 var source = maskSource;
@@ -885,6 +896,12 @@ namespace OmsiMapEditor.World
             if (!tileStates.TryGetValue(decoded.Key, out var state) || groundRoot == null)
                 return;
             state.MasksLoading = false;
+            // Painted since the read began: this is stale, and the tile is read again.
+            if (decoded.Version != state.MaskVersion)
+                return;
+            // A tile read again replaces its layers, so the old ones show until the new are there.
+            if (state.MaskLayers.Count > 0)
+                RemoveMaskLayers(state);
             state.MasksLoaded = true;
             tileMaterials.TryGetValue(state.Key, out var renderers);
             holeTextures.TryGetValue(state.Key, out var holeTexture);
@@ -1134,6 +1151,40 @@ namespace OmsiMapEditor.World
                 owned.Add(material);
                 layerMaterials[layer.Definition.Index] = material;
             }
+            maskDefinitions = data.Layers.ConvertAll(layer => layer.Definition);
+        }
+
+        private List<OmsiGroundTexture> maskDefinitions = new List<OmsiGroundTexture>();
+
+        /// <summary>
+        /// Reads the masks of some tiles again after they were painted (or the painting undone): the mask files of the tile are listed anew
+        /// and the layers are replaced as soon as the new masks are decoded, so painting shows while the brush moves.
+        /// </summary>
+        public void RefreshMasks(IEnumerable<OmsiTileSummary> tiles)
+        {
+            if (tiles == null || maskSource == null)
+                return;
+            foreach (var tile in tiles)
+            {
+                if (!tileStates.TryGetValue(TileKey(tile.X, tile.Y), out var state))
+                    continue;
+                state.MaskPaths.Clear();
+                foreach (var definition in maskDefinitions)
+                {
+                    if (!definition.HasMask)
+                        continue;
+                    var path = definition.MaskPath(tile.FileName);
+                    if (maskSource.FileExists(path))
+                        state.MaskPaths.Add(new KeyValuePair<int, string>(definition.Index, path));
+                }
+                state.MaskVersion++;
+                state.MasksLoaded = false;
+                state.MasksLoading = false;
+                // Nothing left to read: the layers go at once.
+                if (state.MaskPaths.Count == 0 && state.MaskLayers.Count > 0)
+                    RemoveMaskLayers(state);
+            }
+            nextMaskCheck = 0f;
         }
 
         /// <summary>Creates the tiles a few at a time; mask uploads are the expensive part.</summary>

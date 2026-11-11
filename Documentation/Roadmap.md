@@ -80,6 +80,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Tageskurven – Dialog „Traffic curves...“ im Map-Reiter: Diagramm mit Griff je Stunde für KI-Autos und Fahrgäste, schreibt `[trafficdensity_road]` und `[trafficdensity_passenger]` (ADR 088; mit openOMSI ohne Fenster geprüft)
 - [x] Pfade mit Breite und Richtung – im Pfadmodus „Path width (m)“ und „Both ways“ (eigener Pfadtyp unter Splines\Mapforge), Fahrzeugpfade starten und enden mit der Fahrtrichtung der Spur, auf der sie einrasten (ADR 089; wartet auf den Nutzertest)
 - [x] Straßenprofile vollständig lesen und zeichnen – `[path_2]`, Texturversatz der Kette, Skew, gespiegeltes v, `[scaleTexByLength]`, `[patchwork_chain]`; `[rail_enh]` und `[third_rail]` gelesen (ADR 090; wartet auf den Nutzertest)
+- [x] Geländetexturen malen – Modus „Malen“ im Geländewerkzeug: Texturen der Karte wählen oder neue hinzufügen, malen, radieren, weichzeichnen, Härte, Kachel füllen/leeren (ADR 091; wartet auf den Nutzertest)
 
 ## Später
 

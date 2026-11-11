@@ -22,6 +22,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField flattenField;
         private readonly TextField depthField;
         private readonly Label planLabel;
+        private readonly Button paintButton;
 
         // The height map: export and import, and the settings of a picture about to be laid on the map.
         private readonly VisualElement importBox;
@@ -62,6 +63,14 @@ namespace OmsiMapEditor.UI
                 new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.water", OmsiTerrainBrushMode.Water)
             });
 
+            var paintGroup = new VisualElement();
+            paintGroup.AddToClassList("panel-tabs");
+            paintGroup.AddToClassList("picker-segmented");
+            paintButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.mode.paint", () => SetPainting()), "terrain.mode.paint.tooltip");
+            paintButton.AddToClassList("panel-tab");
+            paintGroup.Add(paintButton);
+            Row(string.Empty).Add(paintGroup);
+
             radiusSlider = new Slider(0f, 1f);
             LocBindings.Tooltip(radiusSlider, "terrain.radius.tooltip");
             radiusLabel = new Label();
@@ -79,6 +88,11 @@ namespace OmsiMapEditor.UI
             LocBindings.Tooltip(depthField, "terrain.depth.tooltip");
             depthField.AddToClassList("picker-field");
             Row("terrain.depth").Add(depthField);
+
+            Paint = new GroundPaintOptions();
+            Paint.style.display = DisplayStyle.None;
+            Paint.TextureChosen += () => SettingsChanged?.Invoke();
+            Add(Paint);
 
             planLabel = new Label();
             planLabel.AddToClassList("panel-info");
@@ -259,9 +273,40 @@ namespace OmsiMapEditor.UI
                 ? value
                 : 1.5;
 
+        /// <summary>The ground painting options (ADR 091), shown while <see cref="Painting"/>.</summary>
+        public GroundPaintOptions Paint { get; }
+
+        /// <summary>True while the brush paints ground textures instead of shaping the ground.</summary>
+        public bool Painting { get; private set; }
+
+        /// <summary>Switches the brush to painting ground textures.</summary>
+        public void SetPainting()
+        {
+            Painting = true;
+            Mode = null;
+            foreach (var pair in modeButtons)
+                pair.Key.EnableInClassList("panel-tab-active", false);
+            paintButton.EnableInClassList("panel-tab-active", true);
+            Paint.style.display = DisplayStyle.Flex;
+            flattenField.SetEnabled(false);
+            depthField?.SetEnabled(false);
+            PaintingChanged?.Invoke();
+            SettingsChanged?.Invoke();
+        }
+
+        /// <summary>The brush changed between shaping and painting; the shell reads the map's textures when painting starts.</summary>
+        public event Action PaintingChanged;
+
         public void SetMode(OmsiTerrainBrushMode? mode)
         {
+            var wasPainting = Painting;
+            Painting = false;
             Mode = mode;
+            paintButton?.EnableInClassList("panel-tab-active", false);
+            if (Paint != null)
+                Paint.style.display = DisplayStyle.None;
+            if (wasPainting)
+                PaintingChanged?.Invoke();
             foreach (var pair in modeButtons)
                 pair.Key.EnableInClassList("panel-tab-active", pair.Value == mode);
             flattenField.SetEnabled(mode == OmsiTerrainBrushMode.Flatten);
@@ -272,7 +317,9 @@ namespace OmsiMapEditor.UI
         /// <summary>Sets mode, radius and strength as a user would; for command-line checks.</summary>
         public void Apply(string mode, string radius, string strength)
         {
-            if (mode != null)
+            if (string.Equals(mode, "paint", StringComparison.OrdinalIgnoreCase))
+                SetPainting();
+            else if (mode != null)
                 SetMode(string.Equals(mode, "ramp", StringComparison.OrdinalIgnoreCase) ? (OmsiTerrainBrushMode?)null
                     : Enum.TryParse<OmsiTerrainBrushMode>(mode, true, out var parsed) ? parsed : Mode);
             if (double.TryParse(radius, NumberStyles.Float, CultureInfo.InvariantCulture, out var metres))

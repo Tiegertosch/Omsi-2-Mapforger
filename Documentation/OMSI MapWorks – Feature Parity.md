@@ -63,8 +63,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Terrain-Höhenkarten importieren — Vorhanden
 - [x] Terrain-Höhenkarten exportieren — Vorhanden
 - [x] DEM-Höhendaten importieren — Vorhanden
-- [ ] Geländetexturen auswählen und aufmalen — Teilweise
-- [ ] Texturmasken und Übergänge bearbeiten — Offen
+- [x] Geländetexturen auswählen und aufmalen — Vorhanden (Modus „Malen“, neue Texturen aus dem Texture-Ordner, ADR 091); Test in openOMSI steht aus
+- [x] Texturmasken und Übergänge bearbeiten — Vorhanden (Pinselhärte = weicher Übergang, Radieren, Weichzeichnen, Kachel füllen/leeren; kein Import eigener Masken)
 - [x] Terrainlöcher durch Objekte und Splines — Vorhanden
 - [x] Wasserflächen und Wasserhöhe bearbeiten — Vorhanden
 - [x] Gelände unter Objekten anpassen — Vorhanden

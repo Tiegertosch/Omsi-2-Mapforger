@@ -58,6 +58,12 @@ namespace OmsiMapEditor.OMSI
 
         public bool IsApplied { get; internal set; } = true;
 
+        /// <summary>True for a step that painted ground masks (ADR 091): the tiles' masks are read again, the heights stay as they are.</summary>
+        public bool Painted { get; internal set; }
+
+        /// <summary>True when the step added a ground texture to global.cfg, so the map's ground is built anew.</summary>
+        public bool TexturesChanged { get; internal set; }
+
         /// <summary>The tiles whose ground changed, to draw again.</summary>
         public List<OmsiTileSummary> Tiles { get; } = new List<OmsiTileSummary>();
 
@@ -699,8 +705,11 @@ namespace OmsiMapEditor.OMSI
             if (!change.IsApplied)
                 throw new InvalidOperationException("The change has already been undone.");
             ApplyFiles(change.Files, true);
-            FitTerrainToRoads(summary, change);
-            ReadWaterOf(change.Tiles);
+            if (!change.Painted)
+            {
+                FitTerrainToRoads(summary, change);
+                ReadWaterOf(change.Tiles);
+            }
             change.IsApplied = false;
         }
 
@@ -712,8 +721,11 @@ namespace OmsiMapEditor.OMSI
             if (change.IsApplied)
                 throw new InvalidOperationException("The change is already applied.");
             ApplyFiles(change.Files, false);
-            FitTerrainToRoads(summary, change);
-            ReadWaterOf(change.Tiles);
+            if (!change.Painted)
+            {
+                FitTerrainToRoads(summary, change);
+                ReadWaterOf(change.Tiles);
+            }
             change.IsApplied = true;
         }
 
