@@ -64,7 +64,8 @@ namespace OmsiMapEditor.UI
             Phases,
             Timeline,
             Check,
-            Wizard
+            Wizard,
+            Templates
         }
 
         private bool signalTimelineShown => signalTab == SignalTab.Timeline;
@@ -227,6 +228,8 @@ namespace OmsiMapEditor.UI
             Show(signalCheckPage, SignalTab.Check);
             Show(signalWizardPage, SignalTab.Wizard);
             Show(signalWizardButtons, SignalTab.Wizard);
+            Show(signalTemplatesPage, SignalTab.Templates);
+            Show(signalTemplatesButtons, SignalTab.Templates);
             signalMovementsTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Movements);
             signalPhasesTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Phases);
             signalTimelineTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Timeline);
@@ -239,6 +242,10 @@ namespace OmsiMapEditor.UI
                 RenderSignalPhases();
             if (tab == SignalTab.Check)
                 RenderSignalCheck();
+            if (tab == SignalTab.Templates)
+                RenderSignalTemplates();
+            else
+                signalTemplateLights = null;
             UpdateSignalDraftRow();
             UpdateSignalPreview();
             UpdateSignalMarkers();

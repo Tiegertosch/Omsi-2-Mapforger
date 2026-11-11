@@ -63,8 +63,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Meilenstein 3 – Zeitleiste je Gruppe mit Malen, Kanten ziehen, Entfernen, Wiederholen, Umlaufzeit, Zeitprüfungen; Entwurf mit *Apply*/*Discard* als ein Rückgängig-Schritt (einfacher Modus §8 kommt mit Meilenstein 4; vom Nutzer getestet)
 - [x] Meilenstein 4 – Assistent (Gruppen vorschlagen, Grundschaltung, Prüfung auf Konflikte aus den Pfaden, Köpfe setzen), einfacher Modus als Reiter „Phasen“, Köpfe einer Kreuzung umstellen (auch an OMSIs Kreuzungen), Köpfe mit Mast setzen (vom Nutzer in openOMSI getestet)
 - [x] Meilenstein 5 – Konfliktmatrix mit manuellen Ausnahmen, Prüfung (Fehler/Warnung/Hinweis, Zwischenzeiten, Köpfe), Vorschau wie openOMSI mit Anforderungsschalter in 2D und 3D, Köpfe und Konfliktpunkte als Markierungen
-- [ ] Meilenstein 6 – Export (vom Nutzer entschieden: zuerst nur erzeugte Kreuzungen schreiben, ADR 085), Vorlagen, Rundreise-Tests, Doku
-- Testfälle des Auftrags: 8 (Import) und 15 (verlustfrei) sind mit Meilenstein 1 abgedeckt (Probe über die Installation); 1–6 und 7 (fehlende Köpfe) folgen mit Meilenstein 2, 9 und 11–12 mit 3 und 6, 10 und 14 mit 5, 13 mit 5.
+- [x] Meilenstein 6 – Vorlagenbibliothek (fünf mitgelieferte und eigene Vorlagen ohne Objekt-IDs, Passungsprüfung mit Korrektur vor dem Anwenden), schnellere Konfliktanalyse, Rundreise-Tests über die ganze Installation, Fehlerbehandlung beim Lesen von Vorlagen, Doku; Export schreibt wie entschieden nur erzeugte Kreuzungen (seit Meilenstein 2)
+- [x] Nachtrag zu Meilenstein 6 (11. November 2026, wartet auf Nutzertest): Move-Werkzeug mit lokalen Pfeilen – W bei aktivem Move schaltet die Pfeile zwischen Kachelachsen und Heading des Objekts um (Ziehen seitlich/vorwärts, 2D und 3D), damit sich Ampelköpfe an schrägen Straßen entlang und quer verschieben lassen
+- Testfälle des Auftrags: 8 (Import) und 15 (verlustfrei) sind mit Meilenstein 1 abgedeckt (Probe über die Installation); 1–6 und 7 (fehlende Köpfe) folgen mit Meilenstein 2, 9 und 11–12 mit 3 und 6, 10 und 14 mit 5, 13 mit 5; 9 mit Vorlagen und 12 (Projekt speichern und wieder öffnen) zusätzlich mit Meilenstein 6.
 
 ## Später
 

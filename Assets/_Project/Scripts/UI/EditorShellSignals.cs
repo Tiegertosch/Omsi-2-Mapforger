@@ -94,6 +94,8 @@ namespace OmsiMapEditor.UI
             signalOptions.Add(CreateSignalCheckPage());
             signalOptions.Add(CreateSignalWizardPage());
             signalOptions.Add(signalWizardButtons);
+            signalOptions.Add(CreateSignalTemplatesPage());
+            signalOptions.Add(signalTemplatesButtons);
             signalOptions.Add(signalDraftRow);
             ShowSignalTab(SignalTab.Movements);
             objectsPanelHost.Add(signalOptions);
@@ -224,6 +226,8 @@ namespace OmsiMapEditor.UI
                 ShowSignalTab(SignalTab.Movements);
             else if (signalTab == SignalTab.Wizard)
                 RenderSignalWizard();
+            else if (signalTab == SignalTab.Templates)
+                RenderSignalTemplates();
             RenderSignalDraft();
             UpdateSignalPreview();
             SetStatusT("signals.status.target", ("id", record.Id), ("approaches", crossing.Approaches.Count), ("movements", crossing.Movements.Count),
@@ -280,10 +284,11 @@ namespace OmsiMapEditor.UI
             var colours = new List<Color?>();
             var selected = new List<bool>();
             // While the assistant is open, the map shows the groups it proposes; in the preview, what each movement is shown.
-            var proposed = signalTab == SignalTab.Wizard ? signalProposal : null;
+            var proposed = signalTab == SignalTab.Wizard && signalProposal != null ? signalProposal.MovementLights
+                : signalTab == SignalTab.Templates ? signalTemplateLights : null;
             foreach (var movement in signalCrossing.Movements)
             {
-                var light = proposed != null ? proposed.MovementLights[movement.Index] : movement.Light;
+                var light = proposed != null ? proposed[movement.Index] : movement.Light;
                 if (SignalPreviewActive && proposed == null)
                     colours.Add(light >= 0 ? SignalStateColour(signalClockProgram.StateAt(light, signalClock.Time)) : (Color?)null);
                 else
@@ -326,9 +331,18 @@ namespace OmsiMapEditor.UI
                 var buttons = new VisualElement();
                 buttons.AddToClassList("signal-group-row");
                 buttons.Add(SignalWizardButton());
+                buttons.Add(SignalTemplatesButton());
                 var add = LocBindings.WithTooltip(LocBindings.NewButton("signals.group.add", AddSignalGroup), "signals.group.add.tooltip");
                 add.AddToClassList("map-control-button");
                 buttons.Add(add);
+                signalGroupsBox.Add(buttons);
+            }
+            else if (signalProgram.Lights.Count > 0)
+            {
+                // A crossing that is only read: its program can still be kept as a template.
+                var buttons = new VisualElement();
+                buttons.AddToClassList("signal-group-row");
+                buttons.Add(SignalTemplatesButton());
                 signalGroupsBox.Add(buttons);
             }
 
@@ -750,6 +764,9 @@ namespace OmsiMapEditor.UI
             if (signalCrossing == null)
                 return;
             RunSignalWizardArguments(args);
+            if (signalCrossing == null)
+                return;
+            RunSignalTemplateArguments(args);
             if (signalCrossing == null)
                 return;
             RunSignalTimelineArguments(args);

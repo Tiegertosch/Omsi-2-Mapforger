@@ -48,7 +48,10 @@ namespace OmsiMapEditor.UI
             {
                 signalPhasesInfo.text = Loc.T(editable ? "signals.phases.empty" : "signals.timeline.empty"); // i18n:keys
                 if (editable)
+                {
                     signalPhasesBox.Add(SignalWizardButton());
+                    signalPhasesBox.Add(SignalTemplatesButton());
+                }
                 return;
             }
             var plan = OmsiSignalPhasePlan.Detect(shown);

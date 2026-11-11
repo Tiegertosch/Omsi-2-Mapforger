@@ -90,7 +90,7 @@ namespace OmsiMapEditor.OMSI
             if (crossing == null)
                 throw new ArgumentNullException(nameof(crossing));
             var governed = crossing.Movements.Select(movement => Governed(movement, pathLights)).ToList();
-            var lines = governed.Select(paths => Line(sceneryObject, paths)).ToList();
+            var lines = governed.Select(paths => new LineBox(Line(sceneryObject, paths))).ToList();
             var conflicts = new List<OmsiSignalConflict>();
             for (var first = 0; first < crossing.Movements.Count; first++)
             for (var second = first + 1; second < crossing.Movements.Count; second++)
@@ -119,9 +119,9 @@ namespace OmsiMapEditor.OMSI
                 OmsiConflictKind kind;
                 OmsiMapPoint meet;
                 // Movements that run on in a path they share have joined one lane (in OMSI's own crossings chains often do).
-                var endA = lines[first].Count > 0 ? lines[first][lines[first].Count - 1] : new OmsiMapPoint(a.ExitX, a.ExitY);
-                var endB = lines[second].Count > 0 ? lines[second][lines[second].Count - 1] : new OmsiMapPoint(b.ExitX, b.ExitY);
-                if (Distance(endA.X, endA.Y, endB.X, endB.Y) <= SameLaneMeters || governed[first].Intersect(governed[second]).Any())
+                var endA = lines[first].Points.Count > 0 ? lines[first].Points[lines[first].Points.Count - 1] : new OmsiMapPoint(a.ExitX, a.ExitY);
+                var endB = lines[second].Points.Count > 0 ? lines[second].Points[lines[second].Points.Count - 1] : new OmsiMapPoint(b.ExitX, b.ExitY);
+                if (Distance(endA.X, endA.Y, endB.X, endB.Y) <= SameLaneMeters || SharePath(governed[first], governed[second]))
                 {
                     kind = OmsiConflictKind.Merging;
                     meet = MergePoint(sceneryObject, governed[first], governed[second], endA);
@@ -241,6 +241,14 @@ namespace OmsiMapEditor.OMSI
         /// <summary>
         /// True when two lines cross away from their ends (a footpath may be crossed anywhere: its ends lie on the pavement).
         /// </summary>
+        private static bool SharePath(List<int> first, List<int> second)
+        {
+            foreach (var path in first)
+                if (second.Contains(path))
+                    return true;
+            return false;
+        }
+
         /// <summary>Where two merging movements meet: the start of the first path they share, or else where the first ends.</summary>
         private static OmsiMapPoint MergePoint(OmsiSceneryObject sceneryObject, List<int> first, List<int> second, OmsiMapPoint end)
         {
@@ -253,19 +261,39 @@ namespace OmsiMapEditor.OMSI
             return end;
         }
 
-        private static bool Cross(List<OmsiMapPoint> first, List<OmsiMapPoint> second, bool firstAnywhere, bool secondAnywhere, out OmsiMapPoint at)
+        /// <summary>A line with its boxes found once: the whole line's, and those of pieces of a few steps each, so pairs of lines pass over what cannot meet.</summary>
+        private sealed class LineBox
+        {
+            /// <summary>Steps in a piece; pieces whose boxes do not meet are passed over at once.</summary>
+            public const int Piece = 8;
+
+            public LineBox(List<OmsiMapPoint> points)
+            {
+                Points = points;
+                Whole = Bounds(points, 0, points.Count);
+                for (var from = 0; from + 1 < points.Count; from += Piece)
+                    Pieces.Add(Bounds(points, from, Math.Min(points.Count, from + Piece + 1)));
+            }
+
+            public List<OmsiMapPoint> Points { get; }
+            public (double MinX, double MinY, double MaxX, double MaxY) Whole { get; }
+            public List<(double MinX, double MinY, double MaxX, double MaxY)> Pieces { get; } = new List<(double, double, double, double)>();
+        }
+
+        private static bool Cross(LineBox firstLine, LineBox secondLine, bool firstAnywhere, bool secondAnywhere, out OmsiMapPoint at)
         {
             at = default;
-            if (first.Count < 2 || second.Count < 2 || !Overlap(Bounds(first, 0, first.Count), Bounds(second, 0, second.Count)))
+            var first = firstLine.Points;
+            var second = secondLine.Points;
+            const int Piece = LineBox.Piece;
+            if (first.Count < 2 || second.Count < 2 || !Overlap(firstLine.Whole, secondLine.Whole))
                 return false;
-            // Pieces of a few steps each are passed over at once when their boxes do not meet.
-            const int Piece = 8;
             for (var i0 = 0; i0 + 1 < first.Count; i0 += Piece)
             {
-                var firstBox = Bounds(first, i0, Math.Min(first.Count, i0 + Piece + 1));
+                var firstBox = firstLine.Pieces[i0 / Piece];
                 for (var j0 = 0; j0 + 1 < second.Count; j0 += Piece)
                 {
-                    if (!Overlap(firstBox, Bounds(second, j0, Math.Min(second.Count, j0 + Piece + 1))))
+                    if (!Overlap(firstBox, secondLine.Pieces[j0 / Piece]))
                         continue;
                     for (var i = i0; i + 1 < first.Count && i < i0 + Piece; i++)
                     for (var j = j0; j + 1 < second.Count && j < j0 + Piece; j++)
