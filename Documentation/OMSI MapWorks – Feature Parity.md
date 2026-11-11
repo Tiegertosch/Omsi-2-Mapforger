@@ -99,7 +99,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Abfahrtszeiten und Fahrplantabellen bearbeiten — Vorhanden (Dialog im Reiter Lines, ADR 092)
 - [x] Betriebstage und Kalenderzuordnung bearbeiten — Vorhanden (Tagesmaske je Umlauf: Wochentage, Feiertage, Schulzeit/Schulferien, ADR 092; Test in openOMSI steht aus)
 - [ ] Depots und Fahrzeugzuordnung bearbeiten — Offen
-- [ ] TTData vollständig schreiben und validieren — Offen
+- [x] TTData vollständig schreiben und validieren — Vorhanden (Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
 
 ## G. Signalrouten, Prioritäten und Bahnverkehr
 - [ ] Signalrouten erstellen — Offen

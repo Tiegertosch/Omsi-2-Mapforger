@@ -43,6 +43,7 @@
   "line.status.need_name": "Dá um nome à linha.",
   "line.status.need_route": "Cada paragem de um sentido precisa de um caminho; vê o resultado.",
   "line.status.saved": "Linha {name} escrita com {count} viagens.",
+  "line.status.saved_findings": "Linha {name} escrita com {count} viagens, mas a verificação de horários indica {findings} resultados (veja a verificação do mapa).",
   "inspector.busstop.group": "Paragem de autocarro",
   "inspector.busstop.unnamed": "Este objeto ainda não é uma paragem do horário; um nome torna-o uma.",
   "inspector.busstop.hint": "O nome que o horário e a ferramenta Linha mostram para esta paragem. Fica na lista de paragens do mapa (TTData\\Busstops.cfg).",

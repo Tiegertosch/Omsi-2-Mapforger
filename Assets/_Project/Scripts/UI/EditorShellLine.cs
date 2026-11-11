@@ -427,7 +427,25 @@ namespace OmsiMapEditor.UI
                 return;
             PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("line.step", ("name", line)) });
             StartRoutesBuild(currentSummary);
-            SetStatusT("line.status.saved", ("name", line), ("count", specs.Count));
+            // The files just written are checked as the map check does: a line that OMSI would not run is reported now, not in the game.
+            var findings = new List<string>();
+            try
+            {
+                foreach (var problem in OmsiTimetableCheck.Check(OmsiTimetable.Read(session.Workspace), currentSummary).Problems)
+                    findings.Add(problem.ToString());
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+            {
+                Debug.LogException(exception);
+            }
+            if (findings.Count == 0)
+                SetStatusT("line.status.saved", ("name", line), ("count", specs.Count));
+            else
+            {
+                SetStatusT("line.status.saved_findings", ("name", line), ("count", specs.Count), ("findings", findings.Count));
+                foreach (var finding in findings)
+                    Debug.LogWarning("Timetable check: " + finding);
+            }
             Debug.Log("Line: " + statusLabel?.text);
             lineOut.Clear();
             lineBack.Clear();

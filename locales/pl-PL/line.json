@@ -43,6 +43,7 @@
   "line.status.need_name": "Nadaj linii nazwę.",
   "line.status.need_route": "Każdy przystanek kierunku potrzebuje drogi; zobacz wynik.",
   "line.status.saved": "Linia {name} zapisana, kursów: {count}.",
+  "line.status.saved_findings": "Linia {name} zapisana, kursów: {count}, ale kontrola rozkładu zgłasza uwagi: {findings} (zobacz kontrolę mapy).",
   "inspector.busstop.group": "Przystanek autobusowy",
   "inspector.busstop.unnamed": "Ten obiekt nie jest jeszcze przystankiem rozkładu; nazwa robi z niego przystanek.",
   "inspector.busstop.hint": "Nazwa, którą rozkład i narzędzie Linia pokazują dla tego przystanku. Jest zapisana na liście przystanków mapy (TTData\\Busstops.cfg).",

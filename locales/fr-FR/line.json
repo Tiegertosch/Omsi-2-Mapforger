@@ -43,6 +43,7 @@
   "line.status.need_name": "Donne un nom à la ligne.",
   "line.status.need_route": "Chaque arrêt d'un sens a besoin d'un chemin ; voir le résultat.",
   "line.status.saved": "Ligne {name} écrite avec {count} courses.",
+  "line.status.saved_findings": "Ligne {name} écrite avec {count} courses, mais la vérification des horaires signale {findings} constats (voir la vérification de la carte).",
   "inspector.busstop.group": "Arrêt de bus",
   "inspector.busstop.unnamed": "Cet objet n'est pas encore un arrêt de l'horaire ; un nom en fait un.",
   "inspector.busstop.hint": "Le nom que l'horaire et l'outil Ligne montrent pour cet arrêt. Il est gardé dans la liste des arrêts de la carte (TTData\\Busstops.cfg).",

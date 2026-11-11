@@ -43,6 +43,7 @@
   "line.status.need_name": "Dai un nome alla linea.",
   "line.status.need_route": "Ogni fermata di una direzione ha bisogno di un percorso; vedi il risultato.",
   "line.status.saved": "Linea {name} scritta con {count} corse.",
+  "line.status.saved_findings": "Linea {name} scritta con {count} corse, ma il controllo degli orari segnala {findings} rilievi (vedi il controllo della mappa).",
   "inspector.busstop.group": "Fermata",
   "inspector.busstop.unnamed": "Questo oggetto non è ancora una fermata dell'orario; un nome lo rende tale.",
   "inspector.busstop.hint": "Il nome che l'orario e lo strumento Linea mostrano per questa fermata. È conservato nell'elenco delle fermate della mappa (TTData\\Busstops.cfg).",

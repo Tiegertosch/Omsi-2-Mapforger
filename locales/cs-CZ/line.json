@@ -43,6 +43,7 @@
   "line.status.need_name": "Dej lince název.",
   "line.status.need_route": "Každá zastávka směru potřebuje cestu; viz výsledek.",
   "line.status.saved": "Linka {name} zapsána se spoji: {count}.",
+  "line.status.saved_findings": "Linka {name} zapsána se spoji: {count}, kontrola jízdního řádu ale hlásí nálezy: {findings} (viz kontrola mapy).",
   "inspector.busstop.group": "Autobusová zastávka",
   "inspector.busstop.unnamed": "Tento objekt ještě není zastávkou jízdního řádu; název z něj zastávku udělá.",
   "inspector.busstop.hint": "Název, který pro tuto zastávku ukazuje jízdní řád a nástroj Linka. Uložen je v seznamu zastávek mapy (TTData\\Busstops.cfg).",

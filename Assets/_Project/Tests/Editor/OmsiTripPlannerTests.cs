@@ -273,6 +273,10 @@ namespace OmsiMapEditor.Tests
                 File.WriteAllBytes(Path.Combine(folder, "TTData", "1.ttl"), OmsiTimetableWriter.CreateLine("Busses"));
 
                 var timetable = OmsiTimetable.Read(new OmsiFolderSource(folder));
+                // Every file the planner wrote is one the timetable check can read; what it lists is only what the test left out (the objects are no part of a map here).
+                var findings = OmsiTimetableCheck.Check(timetable, new OmsiMapSummary()).Problems.Select(problem => problem.ToString()).ToList();
+                Assert.IsFalse(findings.Any(text => text.Contains("could not be read") || text.Contains("no station link") || text.Contains("no [profile]") ||
+                                                    text.Contains("no .ttp file") || text.Contains("no .ttr file")), string.Join("\n", findings));
                 CollectionAssert.AreEqual(new[] { "Old", "One", "Two" }, timetable.BusStops.Select(stop => stop.Name).ToArray());
                 StringAssert.StartsWith(original, Encoding.UTF8.GetString(busStops));
                 var link = timetable.StationLinks.Single();

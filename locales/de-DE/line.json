@@ -43,6 +43,7 @@
   "line.status.need_name": "Gib der Linie einen Namen.",
   "line.status.need_route": "Jede Haltestelle einer Richtung braucht einen Weg; siehe das Ergebnis.",
   "line.status.saved": "Linie {name} mit {count} Fahrten geschrieben.",
+  "line.status.saved_findings": "Linie {name} mit {count} Fahrten geschrieben, die Fahrplanprüfung meldet aber {findings} Befunde (siehe Kartenprüfung).",
   "inspector.busstop.group": "Haltestelle",
   "inspector.busstop.unnamed": "Dieses Objekt ist noch keine Haltestelle des Fahrplans; ein Name macht es dazu.",
   "inspector.busstop.hint": "Der Name, den Fahrplan und Linien-Werkzeug für diese Haltestelle zeigen. Er steht in der Haltestellenliste der Karte (TTData\\Busstops.cfg).",

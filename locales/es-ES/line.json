@@ -43,6 +43,7 @@
   "line.status.need_name": "Dale un nombre a la línea.",
   "line.status.need_route": "Cada parada de un sentido necesita un camino; mira el resultado.",
   "line.status.saved": "Línea {name} escrita con {count} viajes.",
+  "line.status.saved_findings": "Línea {name} escrita con {count} viajes, pero la comprobación de horarios indica {findings} hallazgos (véase la comprobación del mapa).",
   "inspector.busstop.group": "Parada de autobús",
   "inspector.busstop.unnamed": "Este objeto aún no es una parada del horario; un nombre lo convierte en una.",
   "inspector.busstop.hint": "El nombre que el horario y la herramienta Línea muestran para esta parada. Se guarda en la lista de paradas del mapa (TTData\\Busstops.cfg).",

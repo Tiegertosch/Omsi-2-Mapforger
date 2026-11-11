@@ -43,6 +43,7 @@
   "line.status.need_name": "Give the line a name.",
   "line.status.need_route": "Every stop of a direction needs a way; see the result.",
   "line.status.saved": "Line {name} written with {count} trips.",
+  "line.status.saved_findings": "Line {name} written with {count} trips, but the timetable check reports {findings} findings (see the map check).",
   "inspector.busstop.group": "Bus stop",
   "inspector.busstop.unnamed": "This object is not a stop of the timetable yet; a name makes it one.",
   "inspector.busstop.hint": "The name the timetable and the line tool show for this stop. It is kept in the map's stop list (TTData\\Busstops.cfg).",
