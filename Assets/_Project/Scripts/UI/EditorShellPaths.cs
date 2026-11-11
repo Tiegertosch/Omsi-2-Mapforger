@@ -156,6 +156,51 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>The project browser's list of paths by kind, each shown or hidden by a click, and a way to the open ends.</summary>
+        /// <summary>The splines built here with a path profile (invisible street or sidewalk) that the terrain is fitted to.</summary>
+        private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> PathSplinesFitting()
+        {
+            var result = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            if (currentSummary == null || session == null || !session.CanEdit)
+                return result;
+            var profiles = RoadProfiles();
+            var isPath = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            foreach (var tile in currentSummary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (!spline.AlignsTerrain || !session.IsBuiltHere(spline))
+                        continue;
+                    if (!isPath.TryGetValue(spline.AssetPath, out var path))
+                        isPath[spline.AssetPath] = path = OmsiPathSnapping.PathToolKind(profiles.Get(spline.AssetPath)).HasValue;
+                    if (path)
+                        result.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(tile, spline));
+                }
+            return result;
+        }
+
+        /// <summary>Stops fitting the terrain to path splines built before paths were left out of it, which left holes along them; one undo step.</summary>
+        private void ReleasePathTerrain(List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> splines)
+        {
+            if (!CanEdit || splines.Count == 0)
+                return;
+            OmsiSplineChange change;
+            try
+            {
+                change = session.SetTerrainAlignment(currentSummary, splines, false);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                SetStatusT("paths.release.failed", ("reason", exception.Message));
+                return;
+            }
+            if (change == null)
+                return;
+            PushHistory(new ObjectEditStep { SplineChange = change });
+            RefreshSplineViews(change);
+            RenderProjectBrowser();
+            SetStatusT("paths.release.done", ("count", change.SplineIds.Count));
+        }
+
         private VisualElement PathsSection()
         {
             var section = new VisualElement();
@@ -188,6 +233,17 @@ namespace OmsiMapEditor.UI
                 entry.AddToClassList("browser-tile-entry");
                 entry.EnableInClassList("browser-tile-entry-selected", shownPathKinds[kind]);
                 section.Add(entry);
+            }
+            var aligned = PathSplinesFitting();
+            if (aligned.Count > 0)
+            {
+                var release = new Button(() => ReleasePathTerrain(aligned))
+                {
+                    text = Loc.T("paths.release", ("count", aligned.Count)),
+                    tooltip = Loc.T("paths.release.tooltip")
+                };
+                release.AddToClassList("browser-tile-entry");
+                section.Add(release);
             }
             var ends = OpenEnds();
             var next = new Button(NextOpenEnd)

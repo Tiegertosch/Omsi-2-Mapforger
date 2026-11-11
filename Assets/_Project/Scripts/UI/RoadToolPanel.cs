@@ -53,6 +53,11 @@ namespace OmsiMapEditor.UI
         private readonly Toggle crossingToggle;
         private readonly Toggle parkingToggle;
         private readonly IntegerField parkingListField;
+        private readonly FloatField pathWidthField;
+        private bool? fitBeforePaths;
+        private readonly Toggle pathBothWaysToggle;
+        private readonly VisualElement pathWidthRow;
+        private readonly VisualElement pathBothWaysRow;
         private readonly Label planLabel;
         private readonly List<string> profiles = new List<string>();
         private readonly HashSet<string> favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -77,6 +82,8 @@ namespace OmsiMapEditor.UI
         public RoadToolPanel()
         {
             AddToClassList("picker-tool");
+            // The row is as tall as its tallest panel and the shorter ones stand at its bottom: the empty part above them must not catch clicks meant for the map.
+            pickingMode = PickingMode.Ignore;
             LoadFavorites();
 
             // The options on the left.
@@ -192,6 +199,7 @@ namespace OmsiMapEditor.UI
 
             // The parking list the spaces draw their cars from: 0 is parklist_p.txt, n is parklist_p_n.txt.
             parkingListField = new IntegerField { value = 0 };
+            parkingListField.AddToClassList("picker-field");
             LocBindings.Tooltip(parkingListField, "roadtool.parking.list.tooltip");
             parkingListField.RegisterValueChangedCallback(change =>
             {
@@ -199,6 +207,27 @@ namespace OmsiMapEditor.UI
                     parkingListField.SetValueWithoutNotify(Mathf.Clamp(change.newValue, 0, 99));
             });
             Row(options, "roadtool.parking.list").Add(parkingListField);
+
+            // The width, and for vehicle paths the direction, of the paths the path tool draws (ADR 089); shown while a path profile is chosen.
+            pathWidthField = new FloatField { value = 3f };
+            pathWidthField.AddToClassList("picker-field");
+            LocBindings.Tooltip(pathWidthField, "roadtool.path_width.tooltip");
+            pathWidthField.RegisterCallback<BlurEvent>(_ => PathOptionsChanged?.Invoke());
+            pathWidthField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    PathOptionsChanged?.Invoke();
+            });
+            pathWidthRow = Row(options, "roadtool.path_width");
+            pathWidthRow.Add(pathWidthField);
+            pathBothWaysToggle = new Toggle { value = false };
+            LocBindings.Tooltip(pathBothWaysToggle, "roadtool.path_both.tooltip");
+            pathBothWaysToggle.AddToClassList("picker-option-toggle");
+            pathBothWaysToggle.RegisterValueChangedCallback(_ => PathOptionsChanged?.Invoke());
+            pathBothWaysRow = Row(options, "roadtool.path_both");
+            pathBothWaysRow.Add(pathBothWaysToggle);
+            pathWidthRow.style.display = DisplayStyle.None;
+            pathBothWaysRow.style.display = DisplayStyle.None;
             Add(options);
 
             // The picker beside them.
@@ -419,6 +448,46 @@ namespace OmsiMapEditor.UI
         {
             get => Mathf.Clamp(parkingListField.value, 0, 99);
             set => parkingListField.value = Mathf.Clamp(value, 0, 99);
+        }
+
+        /// <summary>Raised when the width or direction of the paths to draw was changed.</summary>
+        public event Action PathOptionsChanged;
+
+        /// <summary>The width chosen for the paths the path tool draws, in metres.</summary>
+        public double PathWidth => Mathf.Clamp(pathWidthField.value, (float)OmsiPathProfiles.MinimumWidth, (float)OmsiPathProfiles.MaximumWidth);
+
+        /// <summary>True when a path for vehicles runs both ways.</summary>
+        public bool PathBothWays => pathBothWaysToggle.value;
+
+        /// <summary>Shows the width (and, for vehicles, direction) rows while a path profile is chosen, with the profile's own values; hides them for null.</summary>
+        public void ShowPathOptions(int? kind, double width, bool bothWays)
+        {
+            // Paths never fit the terrain: the switch shows off and cannot be set while a path profile is chosen, and comes back after.
+            fitTerrainToggle.SetEnabled(!kind.HasValue);
+            if (kind.HasValue)
+            {
+                if (!fitBeforePaths.HasValue)
+                    fitBeforePaths = fitTerrainToggle.value;
+                fitTerrainToggle.SetValueWithoutNotify(false);
+            }
+            else if (fitBeforePaths.HasValue)
+            {
+                fitTerrainToggle.SetValueWithoutNotify(fitBeforePaths.Value);
+                fitBeforePaths = null;
+            }
+            pathWidthRow.style.display = kind.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
+            pathBothWaysRow.style.display = kind == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!kind.HasValue)
+                return;
+            pathWidthField.SetValueWithoutNotify((float)Math.Round(width, 2));
+            pathBothWaysToggle.SetValueWithoutNotify(bothWays);
+        }
+
+        /// <summary>Sets the width and direction fields, as typing them does; for command-line checks.</summary>
+        public void SetPathOptions(double width, bool bothWays)
+        {
+            pathWidthField.SetValueWithoutNotify((float)width);
+            pathBothWaysToggle.SetValueWithoutNotify(bothWays);
         }
 
         public bool ParkingMode

@@ -86,6 +86,8 @@ namespace OmsiMapEditor.UI
         public ObjectLibraryPanel()
         {
             AddToClassList("picker-tool");
+            // The row is as tall as its tallest panel and the shorter ones stand at its bottom: the empty part above them must not catch clicks meant for the map.
+            pickingMode = PickingMode.Ignore;
             LoadFavorites();
             LoadDlcFolders();
 

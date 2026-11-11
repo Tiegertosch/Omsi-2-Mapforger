@@ -98,5 +98,7 @@
   "roadbuild.parking.no_tile": "Žádné z míst neleží v dlaždici této mapy.",
   "roadbuild.parking.step": "Parkovacích míst: {n}",
   "roadbuild.parking.done": "U silnice je {n} parkovacích míst; auta mohou zaparkovat v {in} z nich (ostatní leží příliš blízko konce kusu silnice). Ctrl+Z je vrátí zpět.",
-  "roadbuild.parking.done_list": "U silnice je {n} parkovacích míst; auta mohou zaparkovat v {in} z nich (ostatní leží příliš blízko konce kusu silnice). Mapa neměla seznam zaparkovaných aut, proto byl napsán."
+  "roadbuild.parking.done_list": "U silnice je {n} parkovacích míst; auta mohou zaparkovat v {in} z nich (ostatní leží příliš blízko konce kusu silnice). Mapa neměla seznam zaparkovaných aut, proto byl napsán.",
+  "roadbuild.path_type.chosen": "Typ cesty {name} vybrán, široký {width, number, 0.##} m.",
+  "roadbuild.path_type.failed": "Typ cesty nelze vytvořit: {reason}"
 }

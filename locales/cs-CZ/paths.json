@@ -65,5 +65,9 @@
   "paths.status.write_failed": "Pravidla provozu nelze zapsat: {reason}",
   "@paths.status.write_failed": "{reason} is a message from the system, in English",
   "paths.status.written": "Pravidla provozu {what}: {limit, select, none {žádné omezení rychlosti} other {{limit} km/h}}, {density, select, none {normální provoz} other {provoz {density}}}{cars, select, yes {} other {, žádná AI auta}}{buses, select, yes {, AI autobusy} other {}}{trucks, select, yes {, AI nákladní vozy} other {}}{overtaking, select, yes {, zákaz předjíždění} other {}}. Ctrl+Z to zruší.",
-  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English"
+  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English",
+  "paths.release": "Uvolnit terén od {count, plural, one {# cestní spline} few {# cestních splines} many {# cestního splinu} other {# cestních splines}}",
+  "paths.release.tooltip": "Cesty postavené před touto změnou měly k sobě přizpůsobený terén, což vyřezalo díry do země podél nich. Tohle přizpůsobení ukončí; Ctrl+Z ho vrátí.",
+  "paths.release.done": "Terén je uvolněn od {count, plural, one {# cestní spline} few {# cestních splines} many {# cestního splinu} other {# cestních splines}}.",
+  "paths.release.failed": "Terén nelze uvolnit: {reason}"
 }

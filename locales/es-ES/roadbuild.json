@@ -98,5 +98,7 @@
   "roadbuild.parking.no_tile": "Ninguna de las plazas está en una tesela de este mapa.",
   "roadbuild.parking.step": "{n} plazas de aparcamiento",
   "roadbuild.parking.done": "{n} plazas puestas junto a la calle; los coches pueden aparcar en {in} (las demás están demasiado cerca del final de un tramo). Ctrl+Z las quita.",
-  "roadbuild.parking.done_list": "{n} plazas puestas junto a la calle; los coches pueden aparcar en {in} (las demás están demasiado cerca del final de un tramo). El mapa no tenía lista de coches aparcados, así que se escribió una."
+  "roadbuild.parking.done_list": "{n} plazas puestas junto a la calle; los coches pueden aparcar en {in} (las demás están demasiado cerca del final de un tramo). El mapa no tenía lista de coches aparcados, así que se escribió una.",
+  "roadbuild.path_type.chosen": "Tipo de camino {name} elegido, de {width, number, 0.##} m de ancho.",
+  "roadbuild.path_type.failed": "No se pudo crear el tipo de camino: {reason}"
 }

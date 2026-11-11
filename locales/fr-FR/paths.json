@@ -65,5 +65,9 @@
   "paths.status.write_failed": "Les règles de circulation n'ont pas pu être écrites : {reason}",
   "@paths.status.write_failed": "{reason} is a message from the system, in English",
   "paths.status.written": "Règles de circulation de {what} : {limit, select, none {pas de limite de vitesse} other {{limit} km/h}}, {density, select, none {trafic normal} other {trafic {density}}}{cars, select, yes {} other {, pas de voitures IA}}{buses, select, yes {, bus IA} other {}}{trucks, select, yes {, camions IA} other {}}{overtaking, select, yes {, dépassement interdit} other {}}. Ctrl+Z l'annule.",
-  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English"
+  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English",
+  "paths.release": "Libérer le terrain de {count, plural, one {# spline de chemin} other {# splines de chemin}}",
+  "paths.release.tooltip": "Les chemins construits avant ce changement avaient le terrain ajusté à eux, ce qui a creusé des trous dans le sol le long d'eux. Cela arrête l'ajustement ; Ctrl+Z l'annule.",
+  "paths.release.done": "Le terrain est libéré de {count, plural, one {# spline de chemin} other {# splines de chemin}}.",
+  "paths.release.failed": "Le terrain n'a pas pu être libéré : {reason}"
 }

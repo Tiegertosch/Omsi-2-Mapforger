@@ -98,5 +98,7 @@
   "roadbuild.parking.no_tile": "None of the spaces lie in a tile of this map.",
   "roadbuild.parking.step": "{n} parking spaces",
   "roadbuild.parking.done": "{n} parking spaces put along the road; cars can park in {in} of them (the others lie too near the end of a road piece). Ctrl+Z takes them back.",
-  "roadbuild.parking.done_list": "{n} parking spaces put along the road; cars can park in {in} of them (the others lie too near the end of a road piece). The map had no parking list, so one was written."
+  "roadbuild.parking.done_list": "{n} parking spaces put along the road; cars can park in {in} of them (the others lie too near the end of a road piece). The map had no parking list, so one was written.",
+  "roadbuild.path_type.chosen": "Path type {name} chosen, {width, number, 0.##} m wide.",
+  "roadbuild.path_type.failed": "The path type could not be made: {reason}"
 }

@@ -80,7 +80,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Pkw-Verbote konfigurieren — Vorhanden
 - [x] Verkehrsdichte pro Pfad festlegen — Vorhanden
 - [x] Vorfahrtsregeln an Kreuzungen — Vorhanden
-- [ ] KI-Fahrpfade manuell erstellen und bearbeiten — Teilweise (Zeichnen mit `invis_street` im Pfadmodus samt Einrasten, seit 11. November 2026; offen: Breite und Richtung wählen, Richtung beim Einrasten übernehmen, Punkte vorhandener Pfade ändern)
+- [x] KI-Fahrpfade manuell erstellen und bearbeiten — Vorhanden (Zeichnen mit `invis_street` im Pfadmodus samt Einrasten, Breite und Richtung als eigener Pfadtyp, Start und Ende mit der Fahrtrichtung der Spur, ADR 086 und 089; Punkte eines vorhandenen Pfades nur wie bei einem Spline)
 - [x] Fahrstreifenverbindungen definieren — Vorhanden
 - [x] Fußgängerpfade erstellen und verbinden — Vorhanden (Überwege an Kreuzungen mit Zebra, Ampeln und Köpfen, Überweg-Stück mit abgesenktem Bordstein in jede Straße, Pfadmodus mit `invis_sidewalk` und Einrasten auf Pfadlinien; ADR 086, seit 11. November 2026; offen: Ampel am Überweg-Stück)
 - [x] Ampeln und Signalphasen bearbeiten — Vorhanden für im Editor erzeugte Kreuzungen (Werkzeug „Signals“: Zeitleiste, Phasen, Assistent, Vorlagen, Prüfung, ADR 085; Fußgängerampeln ADR 086); an OMSIs eigenen Kreuzungen nur Gruppen der Köpfe

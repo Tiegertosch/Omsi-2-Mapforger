@@ -113,6 +113,8 @@ namespace OmsiMapEditor.UI
         public MarkingToolOptions()
         {
             AddToClassList("picker-tool");
+            // The row is as tall as its tallest panel and the shorter ones stand at its bottom: the empty part above them must not catch clicks meant for the map.
+            pickingMode = PickingMode.Ignore;
             foreach (var info in OmsiMarkingStyleInfo.All)
                 items.Add(new Item { Kind = Kind.Line, Style = info.Style });
             foreach (var info in OmsiMarkingFillInfo.All)

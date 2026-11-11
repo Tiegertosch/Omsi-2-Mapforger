@@ -91,5 +91,9 @@
   "roadtool.parking": "Rząd miejsc parkingowych",
   "roadtool.parking.tooltip": "Włączone: dwa kliknięcia na drodze stawiają wzdłuż niej rząd miejsc parkingowych. Pierwsze kliknięcie wybiera początek i stronę, drugie koniec. Miejsca to obiekty parkingu obok skrajnego pasa, zgodnie z jego kierunkiem, aby auta w openOMSI mogły parkować i odjeżdżać. Mapa bez listy zaparkowanych aut dostaje ją.",
   "roadtool.parking.list": "Lista aut",
-  "roadtool.parking.list.tooltip": "Lista zaparkowanych aut, z której miejsca biorą auta: 0 to własny parklist_p.txt mapy, n to parklist_p_n.txt (edycja w Project > Map > Parking list)."
+  "roadtool.parking.list.tooltip": "Lista zaparkowanych aut, z której miejsca biorą auta: 0 to własny parklist_p.txt mapy, n to parklist_p_n.txt (edycja w Project > Map > Parking list).",
+  "roadtool.path_width": "Szerokość ścieżki (m)",
+  "roadtool.path_width.tooltip": "Jak szerokie są rysowane ścieżki, w metrach: pas, którym chodzą ludzie lub który zamiata pojazd. Nowy typ ścieżki powstaje z wybranego i jest zapisany w twoim projekcie.",
+  "roadtool.path_both": "W obu kierunkach",
+  "roadtool.path_both.tooltip": "Ścieżka pojazdów prowadząca w obu kierunkach zamiast tylko w kierunku, w którym ją narysowano."
 }

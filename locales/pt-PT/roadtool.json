@@ -91,5 +91,9 @@
   "roadtool.parking": "Fila de estacionamento",
   "roadtool.parking.tooltip": "Ligado: dois cliques numa estrada colocam ao lado dela uma fila de lugares de estacionamento. O primeiro clique escolhe o início e o lado, o segundo o fim. Os lugares são objetos de parque junto à faixa mais exterior, no seu sentido, para os carros do openOMSI estacionarem e saírem. Um mapa sem lista de carros estacionados recebe uma.",
   "roadtool.parking.list": "Lista de carros",
-  "roadtool.parking.list.tooltip": "A lista de carros estacionados de onde os lugares tiram os carros: 0 é o parklist_p.txt do mapa, n é parklist_p_n.txt (edita-se em Project > Map > Parking list)."
+  "roadtool.parking.list.tooltip": "A lista de carros estacionados de onde os lugares tiram os carros: 0 é o parklist_p.txt do mapa, n é parklist_p_n.txt (edita-se em Project > Map > Parking list).",
+  "roadtool.path_width": "Largura do caminho (m)",
+  "roadtool.path_width.tooltip": "Que largura têm os caminhos que desenhas, em metros: o corredor por onde as pessoas andam ou a faixa que um veículo varre. Um novo tipo de caminho é feito a partir do escolhido e guardado no teu projeto.",
+  "roadtool.path_both": "Nos dois sentidos",
+  "roadtool.path_both.tooltip": "Um caminho de veículos que vai nos dois sentidos em vez de só no sentido em que é desenhado."
 }

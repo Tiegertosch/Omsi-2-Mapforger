@@ -98,5 +98,7 @@
   "roadbuild.parking.no_tile": "Żadne z miejsc nie leży w kafelku tej mapy.",
   "roadbuild.parking.step": "Miejsc parkingowych: {n}",
   "roadbuild.parking.done": "Przy drodze postawiono {n} miejsc; auta mogą parkować w {in} z nich (reszta leży zbyt blisko końca kawałka drogi). Ctrl+Z je cofa.",
-  "roadbuild.parking.done_list": "Przy drodze postawiono {n} miejsc; auta mogą parkować w {in} z nich (reszta leży zbyt blisko końca kawałka drogi). Mapa nie miała listy zaparkowanych aut, więc ją zapisano."
+  "roadbuild.parking.done_list": "Przy drodze postawiono {n} miejsc; auta mogą parkować w {in} z nich (reszta leży zbyt blisko końca kawałka drogi). Mapa nie miała listy zaparkowanych aut, więc ją zapisano.",
+  "roadbuild.path_type.chosen": "Wybrano typ ścieżki {name}, szeroki na {width, number, 0.##} m.",
+  "roadbuild.path_type.failed": "Nie udało się utworzyć typu ścieżki: {reason}"
 }

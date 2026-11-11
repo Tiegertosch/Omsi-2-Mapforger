@@ -98,5 +98,7 @@
   "roadbuild.parking.no_tile": "Aucune des places ne se trouve dans une tuile de cette carte.",
   "roadbuild.parking.step": "{n} places de stationnement",
   "roadbuild.parking.done": "{n} places placées le long de la route ; les voitures peuvent se garer dans {in} d'entre elles (les autres sont trop près de la fin d'un tronçon). Ctrl+Z les retire.",
-  "roadbuild.parking.done_list": "{n} places placées le long de la route ; les voitures peuvent se garer dans {in} d'entre elles (les autres sont trop près de la fin d'un tronçon). La carte n'avait pas de liste de voitures garées, une a été écrite."
+  "roadbuild.parking.done_list": "{n} places placées le long de la route ; les voitures peuvent se garer dans {in} d'entre elles (les autres sont trop près de la fin d'un tronçon). La carte n'avait pas de liste de voitures garées, une a été écrite.",
+  "roadbuild.path_type.chosen": "Type de chemin {name} choisi, large de {width, number, 0.##} m.",
+  "roadbuild.path_type.failed": "Le type de chemin n'a pas pu être créé : {reason}"
 }

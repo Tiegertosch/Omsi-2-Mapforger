@@ -91,5 +91,9 @@
   "roadtool.parking": "Fila de aparcamiento",
   "roadtool.parking.tooltip": "Activado: dos clics en una calle ponen a su lado una fila de plazas de aparcamiento. El primer clic elige el inicio y el lado, el segundo el final. Las plazas son objetos de aparcamiento junto al carril exterior, en su sentido, para que los coches de openOMSI puedan aparcar y salir. Un mapa sin lista de coches aparcados recibe una.",
   "roadtool.parking.list": "Lista de coches",
-  "roadtool.parking.list.tooltip": "La lista de coches aparcados de la que las plazas toman sus coches: 0 es el parklist_p.txt del mapa, n es parklist_p_n.txt (se edita en Project > Map > Parking list)."
+  "roadtool.parking.list.tooltip": "La lista de coches aparcados de la que las plazas toman sus coches: 0 es el parklist_p.txt del mapa, n es parklist_p_n.txt (se edita en Project > Map > Parking list).",
+  "roadtool.path_width": "Ancho del camino (m)",
+  "roadtool.path_width.tooltip": "Qué ancho tienen los caminos que dibujas, en metros: el pasillo por el que camina la gente o la franja que barre un vehículo. Un nuevo tipo de camino se crea a partir del elegido y se guarda en tu proyecto.",
+  "roadtool.path_both": "En ambos sentidos",
+  "roadtool.path_both.tooltip": "Un camino de vehículos que va en ambos sentidos en lugar de solo en el sentido en que se dibuja."
 }

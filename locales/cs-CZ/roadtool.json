@@ -91,5 +91,9 @@
   "roadtool.parking": "Řada parkovacích míst",
   "roadtool.parking.tooltip": "Zapnuto: dvě kliknutí na silnici vloží podél ní řadu parkovacích míst. První kliknutí vybere začátek a stranu, druhé konec. Místa jsou objekty parkoviště vedle krajního pruhu, ve stejném směru, aby auta v openOMSI mohla zajíždět a vyjíždět. Mapa bez seznamu zaparkovaných aut ho dostane.",
   "roadtool.parking.list": "Seznam aut",
-  "roadtool.parking.list.tooltip": "Seznam zaparkovaných aut, ze kterého místa berou auta: 0 je vlastní parklist_p.txt mapy, n je parklist_p_n.txt (úprava v Project > Map > Parking list)."
+  "roadtool.parking.list.tooltip": "Seznam zaparkovaných aut, ze kterého místa berou auta: 0 je vlastní parklist_p.txt mapy, n je parklist_p_n.txt (úprava v Project > Map > Parking list).",
+  "roadtool.path_width": "Šířka cesty (m)",
+  "roadtool.path_width.tooltip": "Jak široké jsou cesty, které kreslíš, v metrech: pás, kterým chodí lidé nebo který vozidlo zabírá. Nový typ cesty se vytvoří z vybraného a uloží do tvého projektu.",
+  "roadtool.path_both": "Oběma směry",
+  "roadtool.path_both.tooltip": "Cesta vozidel vedoucí oběma směry místo jen směru, ve kterém je nakreslena."
 }

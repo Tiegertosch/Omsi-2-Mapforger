@@ -91,5 +91,9 @@
   "roadtool.parking": "Rangée de stationnement",
   "roadtool.parking.tooltip": "Activé : deux clics sur une route y placent une rangée de places de stationnement. Le premier clic choisit le début et le côté, le second la fin. Les places sont des objets de parking à côté de la voie extérieure, dans son sens, pour que les voitures d'openOMSI puissent se garer et repartir. Une carte sans liste de voitures garées en reçoit une.",
   "roadtool.parking.list": "Liste de garage",
-  "roadtool.parking.list.tooltip": "La liste de voitures garées dont les places tirent leurs voitures : 0 est le parklist_p.txt de la carte, n est parklist_p_n.txt (à modifier sous Project > Map > Parking list)."
+  "roadtool.parking.list.tooltip": "La liste de voitures garées dont les places tirent leurs voitures : 0 est le parklist_p.txt de la carte, n est parklist_p_n.txt (à modifier sous Project > Map > Parking list).",
+  "roadtool.path_width": "Largeur du chemin (m)",
+  "roadtool.path_width.tooltip": "La largeur des chemins que tu traces, en mètres : le couloir où marchent les gens ou la bande que balaie un véhicule. Un nouveau type de chemin est fait à partir de celui choisi et gardé dans ton projet.",
+  "roadtool.path_both": "Dans les deux sens",
+  "roadtool.path_both.tooltip": "Un chemin de véhicules qui va dans les deux sens au lieu du seul sens dans lequel il est tracé."
 }

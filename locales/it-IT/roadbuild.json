@@ -98,5 +98,7 @@
   "roadbuild.parking.no_tile": "Nessuno dei posti si trova in una tessera di questa mappa.",
   "roadbuild.parking.step": "{n} posti auto",
   "roadbuild.parking.done": "{n} posti messi lungo la strada; le auto possono parcheggiare in {in} (gli altri sono troppo vicini alla fine di un pezzo di strada). Ctrl+Z li toglie.",
-  "roadbuild.parking.done_list": "{n} posti messi lungo la strada; le auto possono parcheggiare in {in} (gli altri sono troppo vicini alla fine di un pezzo di strada). La mappa non aveva un elenco di auto parcheggiate, ne è stato scritto uno."
+  "roadbuild.parking.done_list": "{n} posti messi lungo la strada; le auto possono parcheggiare in {in} (gli altri sono troppo vicini alla fine di un pezzo di strada). La mappa non aveva un elenco di auto parcheggiate, ne è stato scritto uno.",
+  "roadbuild.path_type.chosen": "Tipo di percorso {name} scelto, largo {width, number, 0.##} m.",
+  "roadbuild.path_type.failed": "Impossibile creare il tipo di percorso: {reason}"
 }

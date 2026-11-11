@@ -85,5 +85,7 @@
   "roadbuild.parking.no_tile": "Keiner der Plätze liegt in einer Kachel dieser Karte.",
   "roadbuild.parking.step": "{n} Parkplätze",
   "roadbuild.parking.done": "{n} Parkplätze an die Straße gesetzt; Autos können in {in} davon einparken (die übrigen liegen zu nah am Ende eines Straßenstücks). Strg+Z nimmt sie zurück.",
-  "roadbuild.parking.done_list": "{n} Parkplätze an die Straße gesetzt; Autos können in {in} davon einparken (die übrigen liegen zu nah am Ende eines Straßenstücks). Die Karte hatte keine Parkliste, deshalb wurde eine geschrieben."
+  "roadbuild.parking.done_list": "{n} Parkplätze an die Straße gesetzt; Autos können in {in} davon einparken (die übrigen liegen zu nah am Ende eines Straßenstücks). Die Karte hatte keine Parkliste, deshalb wurde eine geschrieben.",
+  "roadbuild.path_type.chosen": "Pfadtyp {name} gewählt, {width, number, 0.##} m breit.",
+  "roadbuild.path_type.failed": "Der Pfadtyp konnte nicht angelegt werden: {reason}"
 }

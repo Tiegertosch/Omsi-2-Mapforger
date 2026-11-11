@@ -454,6 +454,7 @@ namespace OmsiMapEditor.UI
                 roadPanel.ProfilePicked += path => EndSplineTypePick(path);
                 roadPanel.FoldersRequested += OpenContentFolders;
                 roadPanel.SettingsChanged += UpdateRoadPreview;
+                roadPanel.PathOptionsChanged += ApplyPathOptions;
                 // Another mode starts the next part anew; a control point belongs to Curved.
                 roadPanel.ShapeChanged += () => roadControl = null;
                 objectsPanelHost.Add(roadPanel);
@@ -1395,6 +1396,14 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 yield return null;
                 roadPanel?.ChooseProfile(Argument("-roadProfile", 1));
+                // -roadPathWidth metres [-roadPathBoth]: the width and direction of the path type to draw (ADR 089).
+                if (roadPanel != null && double.TryParse(Argument("-roadPathWidth", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var pathWidth))
+                {
+                    yield return null;
+                    roadPanel.SetPathOptions(pathWidth, Array.IndexOf(args, "-roadPathBoth") >= 0);
+                    ApplyPathOptions();
+                    Debug.Log("Path type: " + statusLabel?.text);
+                }
                 var roadTab = Argument("-roadTab", 1);
                 if (roadTab != null)
                     roadPanel?.ShowTab(roadTab);
@@ -1690,6 +1699,7 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
+                RunPickArguments(args);
                 // -inspectorFind <text> opens the tile tab and types the text into its search.
                 var inspectorFind = Argument("-inspectorFind", 1);
                 if (inspectorFind != null && selectedTile != null)
@@ -3224,6 +3234,30 @@ namespace OmsiMapEditor.UI
             return OmsiPathSnapping.Nearest(mapPaths, kind.Value, pointer.X, pointer.Y, RoadSnapReach() * 1.6);
         }
 
+        /// <summary>
+        /// The way traffic goes on the vehicle path under a point the path tool snapped to: along its points, or against them for a
+        /// path that runs the other way; null for other profiles and points off any path. A path drawn from or to the point leaves
+        /// or reaches it with this heading, so that it joins the lane (ADR 089).
+        /// </summary>
+        private double? PathTrafficHeadingAt(OmsiMapPoint point)
+        {
+            if (RoadPathKind() != 0)
+                return null;
+            var snap = SnapToPath(point);
+            if (snap == null || snap.DistanceMeters > 0.05)
+                return null;
+            return snap.Path.Direction == 1 ? (snap.HeadingDegrees + 180.0) % 360.0 : snap.HeadingDegrees;
+        }
+
+        /// <summary>
+        /// Whether a road built now fits the terrain: as the road tool's switch says, never for the path tool's invisible splines, whose
+        /// terrain alignment would cut holes into the ground along them (ADR 089).
+        /// </summary>
+        private bool FitTerrainForRoad()
+        {
+            return roadPanel.FitTerrain && RoadPathKind() == null;
+        }
+
         private string pathModeProfile;
 
         /// <summary>
@@ -3237,6 +3271,7 @@ namespace OmsiMapEditor.UI
             if (string.Equals(profile, pathModeProfile, StringComparison.Ordinal))
                 return;
             pathModeProfile = profile;
+            ShowPathOptions();
             if (!kind.HasValue)
                 return;
             if (!pathsShown)
@@ -3244,6 +3279,50 @@ namespace OmsiMapEditor.UI
             else if (mapPaths == null && pathsTask == null)
                 StartPathsBuild(currentSummary, false);
             SetStatusT(kind.Value == 1 ? "roadbuild.path_mode.foot" : "roadbuild.path_mode.road"); // i18n:keys
+        }
+
+        /// <summary>
+        /// Shows the width and direction of the chosen path profile in the road panel, or hides them for other profiles; the panel
+        /// reports a change through <see cref="ApplyPathOptions"/>.
+        /// </summary>
+        private void ShowPathOptions()
+        {
+            if (roadPanel == null || currentSummary == null)
+                return;
+            var kind = RoadPathKind();
+            var profile = kind.HasValue ? RoadProfiles().Get(roadPanel.Profile) : null;
+            roadPanel.ShowPathOptions(kind, OmsiPathProfiles.WidthOf(profile) ?? 3.0, OmsiPathProfiles.IsBothWays(profile));
+        }
+
+        /// <summary>
+        /// A new width or direction chosen for the paths: a path type with them is made from the chosen one (written below the project's
+        /// Splines\Mapforge folder once) and chosen, so the splines the tool draws next have it.
+        /// </summary>
+        private void ApplyPathOptions()
+        {
+            var kind = RoadPathKind();
+            if (!kind.HasValue || currentSummary == null || !CanEdit)
+                return;
+            string path;
+            try
+            {
+                path = OmsiPathProfiles.Create(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath), currentProjectName, roadPanel.Profile,
+                    roadPanel.PathWidth, kind == 0 && roadPanel.PathBothWays);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                Debug.LogException(exception);
+                SetStatusT("roadbuild.path_type.failed", ("reason", exception.Message));
+                return;
+            }
+            if (!string.Equals(path, roadPanel.Profile, StringComparison.OrdinalIgnoreCase))
+            {
+                madeRoadTypes.Add(path);
+                UpdateRoadProfiles();
+                roadPanel.ChooseProfile(path);
+            }
+            ShowPathOptions();
+            SetStatusT("roadbuild.path_type.chosen", ("name", Path.GetFileNameWithoutExtension(path)), ("width", roadPanel.PathWidth)); // i18n:keys
         }
 
         /// <summary>How far from the pointer a road snaps, in metres: a few pixels from above, more in 3D the further the camera is.</summary>
@@ -3328,7 +3407,7 @@ namespace OmsiMapEditor.UI
                 EndHeight = endJoin?.Height ?? endPort?.Height ?? (roadPanel.HeightMode == OmsiRoadHeightMode.Manual ? roadPanel.EndHeight : null),
                 // Driving into the joined spline or junction continues opposite to the way a road would leave it.
                 EndJoinHeadingDegrees = endJoin != null ? endJoin.OutwardHeadingDegrees + 180.0
-                    : endPort != null ? endPort.OutwardHeadingDegrees + 180.0 : (double?)null,
+                    : endPort != null ? endPort.OutwardHeadingDegrees + 180.0 : PathTrafficHeadingAt(end),
                 HalfWidthMeters = RoadProfileHalfWidth()
             };
             return OmsiRoadPlanner.Plan(request, roadTerrain);
@@ -3509,7 +3588,7 @@ namespace OmsiMapEditor.UI
             }
             try
             {
-                var change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, startJoin, endJoin, roadPanel.FitTerrain);
+                var change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, startJoin, endJoin, FitTerrainForRoad());
                 steps.Add(change);
                 RefreshSplineViews(change);
                 if (roadTerrain != null)
@@ -4202,7 +4281,8 @@ namespace OmsiMapEditor.UI
                 roadStartJoin = join;
                 roadStartPort = port;
                 roadStart = join?.Position(currentSummary.TileSizeMeters) ?? port?.Position ?? SnapRoadPointer(point);
-                roadStartHeading = join?.OutwardHeadingDegrees ?? port?.OutwardHeadingDegrees;
+                // A vehicle path started on a lane leaves it the way the traffic goes there (ADR 089).
+                roadStartHeading = join?.OutwardHeadingDegrees ?? port?.OutwardHeadingDegrees ?? (join == null && port == null ? PathTrafficHeadingAt(roadStart) : null);
                 roadStartHeight = join?.Height ?? port?.Height;
                 if (join == null && port == null && roadPanel.HeightMode == OmsiRoadHeightMode.Manual)
                     roadStartHeight = roadTerrain != null && roadTerrain.TryGetHeight(point.X, point.Y, out var ground) ? ground : roadPanel.EndHeight;
@@ -4312,7 +4392,7 @@ namespace OmsiMapEditor.UI
                     if (startJoin == null)
                         throw new InvalidOperationException("the road before could not be found again after cutting it back.");
                 }
-                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, startJoin, endJoin, roadPanel.FitTerrain);
+                change = session.CreateRoad(currentSummary, plan, roadPanel.Profile, startJoin, endJoin, FitTerrainForRoad());
                 steps.Add(change);
                 parallelNote = BuildParallels(plan, parallels, steps);
             }
@@ -4372,7 +4452,7 @@ namespace OmsiMapEditor.UI
                 var startJoin = RefindStartJoin(joinId);
                 if (startJoin == null)
                     throw new InvalidOperationException("the road before could not be found again after cutting it back.");
-                var change = session.CreateRoad(currentSummary, arc, roadPanel.Profile, startJoin, null, roadPanel.FitTerrain);
+                var change = session.CreateRoad(currentSummary, arc, roadPanel.Profile, startJoin, null, FitTerrainForRoad());
                 steps.Add(change);
                 RefreshSplineViews(change);
                 ContinueRoadFrom(change);
@@ -4440,7 +4520,7 @@ namespace OmsiMapEditor.UI
                 }
                 if (join != null && (!join.IsFree || Distance(join.Position(currentSummary.TileSizeMeters), joint) > 0.5))
                     join = null;
-                var change = session.CreateRoad(currentSummary, parallel, roadPanel.Profile, opposite ? null : join, opposite ? join : null, roadPanel.FitTerrain);
+                var change = session.CreateRoad(currentSummary, parallel, roadPanel.Profile, opposite ? null : join, opposite ? join : null, FitTerrainForRoad());
                 steps.Add(change);
                 RefreshSplineViews(change);
                 parallelSplineIds.UnionWith(change.SplineIds);

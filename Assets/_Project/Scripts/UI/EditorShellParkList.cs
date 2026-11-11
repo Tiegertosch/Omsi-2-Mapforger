@@ -45,6 +45,7 @@ namespace OmsiMapEditor.UI
             numberLabel.style.marginRight = 8;
             numberRow.Add(numberLabel);
             parkListNumber = new IntegerField { value = 0 };
+            parkListNumber.AddToClassList("picker-field");
             LocBindings.Tooltip(parkListNumber, "parklist.number.tooltip");
             parkListNumber.RegisterValueChangedCallback(change =>
             {
@@ -148,6 +149,22 @@ namespace OmsiMapEditor.UI
             HidePopup(parkListDialog);
             UpdateMapStateLabel();
             SetStatusT(changed ? "parklist.status.changed" : "parklist.status.unchanged", ("count", chosen.Count)); // i18n:keys
+        }
+
+        /// <summary>
+        /// Command line: <c>-pickAt x y</c> (panel pixels from the top left) writes the element of the interface under that point to the
+        /// log as "Pick at:", so that a screenshot check can show whether a transparent part of a panel catches clicks meant for the map.
+        /// </summary>
+        private void RunPickArguments(string[] args)
+        {
+            var index = Array.IndexOf(args, "-pickAt");
+            if (index < 0 || index + 2 >= args.Length || rootElement?.panel == null)
+                return;
+            if (!float.TryParse(args[index + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var x) ||
+                !float.TryParse(args[index + 2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var y))
+                return;
+            var picked = rootElement.panel.Pick(new Vector2(x, y));
+            Debug.Log("Pick at: " + (picked == null ? "nothing" : picked.GetType().Name + " " + (picked.name ?? string.Empty) + " [" + string.Join(" ", picked.GetClasses()) + "]"));
         }
 
         /// <summary>Command line, with a project: <c>-parkList</c> opens the dialog (for a screenshot).</summary>

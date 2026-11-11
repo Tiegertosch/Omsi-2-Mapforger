@@ -65,5 +65,9 @@
   "paths.status.write_failed": "Traffic rules could not be written: {reason}",
   "@paths.status.write_failed": "{reason} is a message from the system, in English",
   "paths.status.written": "Traffic rules of {what}: {limit, select, none {no speed limit} other {{limit} km/h}}, {density, select, none {normal traffic} other {traffic {density}}}{cars, select, yes {} other {, no AI cars}}{buses, select, yes {, AI buses} other {}}{trucks, select, yes {, AI trucks} other {}}{overtaking, select, yes {, no overtaking} other {}}. Ctrl+Z undoes it.",
-  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English"
+  "@paths.status.written": "{limit} and {density} are none or a number; {cars}, {buses}, {trucks} and {overtaking} are yes or no: they choose the words, keep them in English",
+  "paths.release": "Release the terrain from {count, plural, one {# path spline} other {# path splines}}",
+  "paths.release.tooltip": "Paths built before this change had the terrain fitted to them, which cut holes into the ground along them. This stops the fitting; Ctrl+Z takes it back.",
+  "paths.release.done": "The terrain is released from {count, plural, one {# path spline} other {# path splines}}.",
+  "paths.release.failed": "The terrain could not be released: {reason}"
 }

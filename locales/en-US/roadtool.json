@@ -91,5 +91,9 @@
   "roadtool.parking": "Parking row",
   "roadtool.parking.tooltip": "On: two clicks on a road put a row of parking spaces along it. The first click picks the start and the side, the second the end. The spaces are car park objects beside the outermost lane, in line with it, so openOMSI's cars can park in and pull out. A map without a parking list gets one.",
   "roadtool.parking.list": "Parking list",
-  "roadtool.parking.list.tooltip": "The parking list the spaces draw their cars from: 0 is the map's own parklist_p.txt, n is parklist_p_n.txt (edit them under Project > Map > Parking list)."
+  "roadtool.parking.list.tooltip": "The parking list the spaces draw their cars from: 0 is the map's own parklist_p.txt, n is parklist_p_n.txt (edit them under Project > Map > Parking list).",
+  "roadtool.path_width": "Path width (m)",
+  "roadtool.path_width.tooltip": "How wide the paths you draw are, in metres: the corridor people walk in or the strip a vehicle sweeps. A new path type is made from the chosen one and kept in your project.",
+  "roadtool.path_both": "Both ways",
+  "roadtool.path_both.tooltip": "A vehicle path that runs both ways instead of only the way it is drawn."
 }
