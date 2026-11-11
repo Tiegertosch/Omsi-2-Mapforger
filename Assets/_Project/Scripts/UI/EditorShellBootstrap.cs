@@ -1216,6 +1216,16 @@ namespace OmsiMapEditor.UI
                 RunTurnLaneArgument(words);
             }
 
+            // -crossing n [distance width|off] gives arm n of the selected junction a pedestrian crossing or takes it away.
+            var crossingAt = Array.IndexOf(args, "-crossing");
+            if (crossingAt >= 0)
+            {
+                var words = new List<string>();
+                for (var index = crossingAt + 1; index < args.Length && !args[index].StartsWith("-", StringComparison.Ordinal); index++)
+                    words.Add(args[index]);
+                RunCrossingArgument(words);
+            }
+
             // -exportMap exports the map as the export dialog suggests (ADR 052); the status goes to the log as "Export:".
             if (Array.IndexOf(args, "-exportMap") >= 0)
             {

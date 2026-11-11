@@ -82,7 +82,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Vorfahrtsregeln an Kreuzungen — Vorhanden
 - [ ] KI-Fahrpfade manuell erstellen und bearbeiten — Teilweise
 - [x] Fahrstreifenverbindungen definieren — Vorhanden
-- [ ] Fußgängerpfade erstellen und verbinden — Teilweise
+- [ ] Fußgängerpfade erstellen und verbinden — Teilweise (seit 11. November 2026: Überwege über die Arme erzeugter Kreuzungen, ADR 086; freie Pfade fehlen)
 - [ ] Ampeln und Signalphasen bearbeiten — Offen (Ampeln nur als Objekte platzierbar)
 - [ ] Ampelgruppen und Kreuzungszuordnung — Offen
 - [ ] Parkplätze / KI-Parkpfade konfigurieren — Offen (nur Parkstreifen im Straßenbauer, KI-Parkpfade nicht nachgewiesen)

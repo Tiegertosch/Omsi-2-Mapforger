@@ -67,6 +67,13 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Nachtrag zu Meilenstein 6 (11. November 2026, wartet auf Nutzertest): Move-Werkzeug mit lokalen Pfeilen – W bei aktivem Move schaltet die Pfeile zwischen Kachelachsen und Heading des Objekts um (Ziehen seitlich/vorwärts, 2D und 3D), damit sich Ampelköpfe an schrägen Straßen entlang und quer verschieben lassen
 - Testfälle des Auftrags: 8 (Import) und 15 (verlustfrei) sind mit Meilenstein 1 abgedeckt (Probe über die Installation); 1–6 und 7 (fehlende Köpfe) folgen mit Meilenstein 2, 9 und 11–12 mit 3 und 6, 10 und 14 mit 5, 13 mit 5; 9 mit Vorlagen und 12 (Projekt speichern und wieder öffnen) zusätzlich mit Meilenstein 6.
 
+## Fußgängerüberwege und freie Pfade (ADR 086, Wunsch des Nutzers vom 11. November 2026)
+
+- [x] Schritt 1 – Überwege an erzeugten Kreuzungen: Pfade quer über einen Arm, Gehwegpfade geteilt, Werkzeug „Lanes“ (wartet auf den Nutzertest in openOMSI)
+- [ ] Schritt 2 – Zebrastreifen-Markierung mit dem Überweg, Haltelinie vor dem Überweg
+- [ ] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor)
+- [ ] Schritt 4 – freies Pfad-Werkzeug (Fahrzeuge, Fußgänger, Schienen) mit eigenem Pfad-Objekt, auf jeder Karte
+
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen

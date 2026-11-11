@@ -70,6 +70,7 @@ namespace OmsiMapEditor.UI
             laneStorageField = LaneNumberRow("lanes.storage", OmsiTurnLane.DefaultStorageMeters, "lanes.storage.tooltip");
             laneTurnRows = new VisualElement();
             laneOptions.Add(laneTurnRows);
+            CreateLaneCrossingOptions();
 
             lanePlanLabel = new Label();
             lanePlanLabel.AddToClassList("panel-info");
@@ -135,6 +136,7 @@ namespace OmsiMapEditor.UI
                 }
                 toggle.AddToClassList("map-control-button");
                 toggle.style.whiteSpace = WhiteSpace.Normal;
+                HighlightArmOnHover(toggle, layout.Arms[arm]);
                 laneTurnRows.Add(toggle);
                 if (lane == null)
                     continue;
@@ -143,6 +145,7 @@ namespace OmsiMapEditor.UI
                 LocBindings.Tooltip(lengths, "lanes.turn.lengths.tooltip");
                 lengths.AddToClassList("map-control-button");
                 lengths.style.whiteSpace = WhiteSpace.Normal;
+                HighlightArmOnHover(lengths, layout.Arms[arm]);
                 laneTurnRows.Add(lengths);
             }
         }
@@ -335,6 +338,7 @@ namespace OmsiMapEditor.UI
             LocBindings.Text(laneJunctionLabel, "lanes.junction", ("id", record.Id), ("arms", made.Arms.Count), ("count", laneConnections.Count),
                 ("total", OmsiLaneConnections.All(laneEnds).Count));
             RefreshLaneTurnRows(layout);
+            RefreshLaneCrossingRows(layout);
             if (selection.Count != 1 || !ReferenceEquals(selection[0].Record, record))
             {
                 selection.Clear();
@@ -443,6 +447,7 @@ namespace OmsiMapEditor.UI
             else
                 plan = Loc.T("lanes.plan.pick_out");
             mapCanvas.SetLaneEnds(laneEndPoints, states, laneHover, laneEndHeights);
+            KeepPinnedArmHighlight();
             mapCanvas.SetRoadGuides(guides, false, guideHeights);
             mapCanvas.SetRoadPreview(shown, true, null, null, null, shownHeights);
             lanePlanLabel.text = plan;

@@ -68,5 +68,20 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "pasy skrzyżowania #{id}",
   "lanes.status.done": "{done} (skrzyżowanie #{id}); teraz {count, plural, one {# sposób} few {# sposoby} many {# sposobów} other {# sposobu}}, wykonane ponownie jako {name}. Ctrl+Z zabiera to z powrotem.",
-  "lanes.status.follow": "Pasy: kliknij pas, aby zobaczyć, dokąd prowadzi; Esc opuszcza narzędzie."
+  "lanes.status.follow": "Pasy: kliknij pas, aby zobaczyć, dokąd prowadzi; Esc opuszcza narzędzie.",
+  "lanes.crossing.title": "Przejścia dla pieszych",
+  "lanes.crossing.distance": "Odległość od rogu (m)",
+  "lanes.crossing.distance.tooltip": "Jak daleko wzdłuż ramienia leży środek nowego przejścia, mierząc od początku rogu skrzyżowania",
+  "lanes.crossing.width": "Szerokość (m)",
+  "lanes.crossing.width.tooltip": "Jak szerokie jest nowe przejście",
+  "lanes.crossing.add": "Dodaj przejście na ramieniu {n} ({direction})",
+  "lanes.crossing.add.tooltip": "Układa ścieżkę dla pieszych w poprzek tego ramienia i dzieli jego ścieżki chodnikowe tam, gdzie je łączy, aby piesi mogli przejść na drugą stronę ulicy; ramię sięga dalej, by zrobić miejsce, a podłączona droga jest skracana",
+  "lanes.crossing.remove": "Usuń przejście z ramienia {n} ({direction}), {distance, number, 0.#} m dalej, szerokie na {width, number, 0.#} m",
+  "lanes.crossing.remove.tooltip": "Usuwa przejście i przywraca ramieniu zwykłą długość",
+  "lanes.crossing.values": "Wartości powyżej dla ramienia {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Przesuwa i poszerza przejście tego ramienia według odległości i szerokości powyżej",
+  "lanes.done.crossing_removed": "Usunięto przejście z ramienia {n}",
+  "lanes.done.crossing_added": "Dodano przejście do ramienia {n}, {distance, number, 0.#} m dalej i szerokie na {width, number, 0.#} m",
+  "lanes.done.crossing_changed": "Przejście ramienia {n} ustawiono na {distance, number, 0.#} m odległości i {width, number, 0.#} m szerokości",
+  "lanes.status.no_crossing": "Brak przejścia: {reason}"
 }

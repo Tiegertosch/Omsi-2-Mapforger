@@ -54,6 +54,10 @@ namespace OmsiMapEditor.UI
         private readonly List<float> laneEndHeights = new List<float>();
         private readonly List<int> laneEndStates = new List<int>();
         private int laneEndHovered = -1;
+        private bool armHighlighted;
+        private Vector2 armHighlightFrom;
+        private Vector2 armHighlightTo;
+        private float armHighlightHeight;
         private readonly bool[] pathKinds = { true, true, true };
         private bool showPaths;
 
@@ -234,12 +238,50 @@ namespace OmsiMapEditor.UI
                     laneEndStates.Add(states[index]);
                 }
             laneEndHovered = hovered;
+            if (points == null)
+                armHighlighted = false;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// Marks one arm of a junction in the lanes tool, from its centre out to its end, as a button that acts on the arm
+        /// is pointed at; null clears it.
+        /// </summary>
+        public void SetArmHighlight(OmsiMapPoint? from, OmsiMapPoint to, double height)
+        {
+            armHighlighted = from.HasValue;
+            if (from.HasValue)
+            {
+                armHighlightFrom = WorldToMap(from.Value);
+                armHighlightTo = WorldToMap(to);
+                armHighlightHeight = (float)height;
+            }
             MarkDirtyRepaint();
         }
 
         /// <summary>Lanes in as filled dots, lanes out as rings; the chosen lane in orange, the lanes out it leads to green.</summary>
         private void DrawLaneEnds(Painter2D painter, MapOrbitCamera? camera = null)
         {
+            if (armHighlighted && HandleScreen(armHighlightFrom, armHighlightHeight, camera, out var armFrom) &&
+                HandleScreen(armHighlightTo, armHighlightHeight, camera, out var armTo))
+            {
+                var glow = (Color)splineColor;
+                glow.a = 0.45f;
+                painter.strokeColor = glow;
+                painter.lineWidth = 22f;
+                painter.lineCap = LineCap.Round;
+                painter.BeginPath();
+                painter.MoveTo(armFrom);
+                painter.LineTo(armTo);
+                painter.Stroke();
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 3f;
+                painter.BeginPath();
+                painter.MoveTo(armFrom);
+                painter.LineTo(armTo);
+                painter.Stroke();
+                painter.lineCap = LineCap.Butt;
+            }
             for (var index = 0; index < laneEnds.Count; index++)
             {
                 if (!HandleScreen(laneEnds[index], laneEndHeights[index], camera, out var at))

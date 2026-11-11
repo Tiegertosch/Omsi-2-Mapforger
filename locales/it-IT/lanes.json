@@ -68,5 +68,20 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "le corsie dello svincolo #{id}",
   "lanes.status.done": "{done} (incrocio #{id}); ora {count, plural, one {# modo} other {# modi}} passa, rifatto come {name}. Ctrl+Z lo riprende.",
-  "lanes.status.follow": "Corsie: fare clic su una corsia per vedere dove porta; Esc lascia lo strumento."
+  "lanes.status.follow": "Corsie: fare clic su una corsia per vedere dove porta; Esc lascia lo strumento.",
+  "lanes.crossing.title": "Attraversamenti pedonali",
+  "lanes.crossing.distance": "Distanza dall'angolo (m)",
+  "lanes.crossing.distance.tooltip": "A che distanza lungo il braccio si trova il centro di un nuovo attraversamento, misurata dall'inizio dell'angolo dell'incrocio",
+  "lanes.crossing.width": "Larghezza (m)",
+  "lanes.crossing.width.tooltip": "La larghezza di un nuovo attraversamento",
+  "lanes.crossing.add": "Aggiungi attraversamento sul braccio {n} ({direction})",
+  "lanes.crossing.add.tooltip": "Posa un percorso pedonale attraverso questo braccio e taglia i suoi percorsi del marciapiede dove li collega, così i pedoni possono cambiare lato della strada; il braccio si allunga per fare spazio e la strada collegata viene accorciata",
+  "lanes.crossing.remove": "Rimuovi attraversamento dal braccio {n} ({direction}), a {distance, number, 0.#} m, largo {width, number, 0.#} m",
+  "lanes.crossing.remove.tooltip": "Toglie l'attraversamento e ridà al braccio la lunghezza consueta",
+  "lanes.crossing.values": "Valori sopra per il braccio {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Sposta e allarga l'attraversamento di questo braccio secondo distanza e larghezza sopra",
+  "lanes.done.crossing_removed": "Attraversamento del braccio {n} rimosso",
+  "lanes.done.crossing_added": "Aggiunto un attraversamento al braccio {n}, a {distance, number, 0.#} m e largo {width, number, 0.#} m",
+  "lanes.done.crossing_changed": "Attraversamento del braccio {n} impostato a {distance, number, 0.#} m di distanza e {width, number, 0.#} m di larghezza",
+  "lanes.status.no_crossing": "Nessun attraversamento: {reason}"
 }

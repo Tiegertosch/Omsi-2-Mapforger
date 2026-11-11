@@ -310,6 +310,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>A left-turn lane taken out of the arm's median (ADR 051, stage 2), or null for none.</summary>
         public OmsiTurnLane TurnLane { get; set; }
+
+        /// <summary>A pedestrian crossing over the arm, or null for none; the arm reaches out far enough for it.</summary>
+        public OmsiCrossing Crossing { get; set; }
     }
 
     /// <summary>
@@ -472,6 +475,18 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Why each arm's left-turn lane cannot be laid out, or null where it is laid out or none is asked for.</summary>
         public string[] TurnLaneProblems { get; private set; } = new string[0];
 
+        /// <summary>Why each arm's crossing cannot be laid out, or null where it is laid out or none is asked for.</summary>
+        public string[] CrossingProblems { get; private set; } = new string[0];
+
+        /// <summary>Where the crossing of an arm lies and how wide it is, or null for an arm without one.</summary>
+        private sealed class CrossingPlan
+        {
+            public double Centre;
+            public double Width;
+        }
+
+        private CrossingPlan[] crossingPlans = new CrossingPlan[0];
+
         /// <summary>The ways through built as lanes, by <see cref="OmsiLaneConnections.Key"/>.</summary>
         public HashSet<string> WaysThrough { get; } = new HashSet<string>(StringComparer.Ordinal);
 
@@ -494,7 +509,8 @@ namespace OmsiMapEditor.OMSI
                 layout.Arms.Add(new OmsiJunctionArm
                 {
                     HeadingDegrees = arm.HeadingDegrees, ProfilePath = arm.ProfilePath, Main = arm.Main, Mirrored = arm.Mirrored,
-                    Profile = arm.Mirrored && arm.Profile != null ? arm.Profile.Mirrored() : arm.Profile, TurnLane = arm.TurnLane?.Copy()
+                    Profile = arm.Mirrored && arm.Profile != null ? arm.Profile.Mirrored() : arm.Profile, TurnLane = arm.TurnLane?.Copy(),
+                    Crossing = arm.Crossing?.Copy()
                 });
             if (layout.Arms.Count < 2)
                 throw new ArgumentException("A junction needs at least two arms.", nameof(arms));
@@ -515,6 +531,14 @@ namespace OmsiMapEditor.OMSI
             {
                 layout.IsTransition = true;
                 layout.BuildTransition(sections, roadTexture);
+                // A transition between two cross-sections has no corners to put a crossing by.
+                layout.CrossingProblems = new string[layout.Arms.Count];
+                for (var index = 0; index < layout.Arms.Count; index++)
+                    if (layout.Arms[index].Crossing != null)
+                    {
+                        layout.CrossingProblems[index] = "Arm " + (index + 1) + " belongs to a transition between two cross-sections, which has no crossing.";
+                        layout.Arms[index].Crossing = null;
+                    }
                 return layout;
             }
             var through = layout.TakeNearHalf(sections);
@@ -1072,6 +1096,8 @@ namespace OmsiMapEditor.OMSI
             bases = new double[Arms.Count];
             turnLanes = new TurnLanePlan[Arms.Count];
             TurnLaneProblems = new string[Arms.Count];
+            CrossingProblems = new string[Arms.Count];
+            crossingPlans = new CrossingPlan[Arms.Count];
             for (var index = 0; index < Arms.Count; index++)
             {
                 var arm = Arms[index];
@@ -1083,7 +1109,13 @@ namespace OmsiMapEditor.OMSI
                 {
                     // Only turn lanes laid out are kept with the junction.
                     arm.TurnLane = null;
+                    PlanCrossing(index, sections);
                     continue;
+                }
+                if (arm.Crossing != null)
+                {
+                    CrossingProblems[index] = "Arm " + (index + 1) + " has a left-turn lane, which a crossing cannot be combined with yet.";
+                    arm.Crossing = null;
                 }
                 turnLanes[index] = plan;
                 var from = arm.Length;
@@ -1112,6 +1144,39 @@ namespace OmsiMapEditor.OMSI
                 Surface(ring, index, section, roadTexture);
                 AddTurnLaneMarkings(arm, section, plan);
             }
+        }
+
+        /// <summary>
+        /// Lays out the crossing an arm asks for, or drops it with a problem: the arm reaches out past the corner by the
+        /// crossing's distance and half its width (and the usual extension), carrying its own cross-section there, and the
+        /// vehicle lanes run straight on to where the corner starts. It needs pavements on both sides of the arm that join
+        /// the footpaths round both of its corners, and no median island.
+        /// </summary>
+        private void PlanCrossing(int index, List<OmsiProfileSections> sections)
+        {
+            var arm = Arms[index];
+            var asked = arm.Crossing;
+            if (asked == null)
+                return;
+            string problem = null;
+            if (arm.Profile.Lanes.Exists(lane => lane.Kind == OmsiSplineCategories.RailLane))
+                problem = "Arm " + (index + 1) + " carries rails, which a crossing cannot be laid over yet.";
+            else if (IslandOf(arm, sections[index]) != null)
+                problem = "Arm " + (index + 1) + " has a median island, which a crossing cannot be laid over yet.";
+            else if (!HasFootpathCorner(index, sections) || !HasFootpathCorner((index - 1 + Arms.Count) % Arms.Count, sections))
+                problem = "Arm " + (index + 1) + " needs a pavement on both sides, joined round both corners, for a crossing.";
+            if (problem != null)
+            {
+                CrossingProblems[index] = problem;
+                arm.Crossing = null;
+                return;
+            }
+            var from = arm.Length;
+            var centre = from + OmsiCrossing.ClampDistance(asked.DistanceMeters);
+            var width = OmsiCrossing.ClampWidth(asked.WidthMeters);
+            crossingPlans[index] = new CrossingPlan { Centre = centre, Width = width };
+            arm.Length = centre + width / 2.0 + ArmExtension;
+            AddStraightProfile(arm, arm.Profile, from, arm.Length, "approach");
         }
 
         /// <summary>A profile laid straight along an arm from one distance out to another, upright strips included, as a part of the junction.</summary>
@@ -1254,7 +1319,8 @@ namespace OmsiMapEditor.OMSI
             {
                 var arm = Arms[index];
                 var section = sections[index];
-                turnsAt[index] = arm.Length;
+                // An arm with a crossing runs on straight to where its corner starts.
+                turnsAt[index] = crossingPlans[index] != null ? bases[index] : arm.Length;
                 IslandNoses[index] = double.NaN;
                 var island = IslandOf(arm, section);
                 if (island == null)
@@ -1660,27 +1726,70 @@ namespace OmsiMapEditor.OMSI
         private void BuildFootpaths(List<OmsiProfileSections> sections, Corner[] corners)
         {
             var approaches = new HashSet<KeyValuePair<int, OmsiSplineLane>>();
+            var rightLanes = new OmsiSplineLane[Arms.Count];
+            var leftLanes = new OmsiSplineLane[Arms.Count];
             for (var index = 0; index < Arms.Count; index++)
             {
+                var next = (index + 1) % Arms.Count;
                 var first = Arms[index];
-                var second = Arms[(index + 1) % Arms.Count];
-                OmsiSplineLane right = null, left = null;
-                foreach (var lane in first.Profile.Lanes)
-                    if (lane.Kind == 1 && lane.X > 0.0 && Within(lane, sections[index], true) && (right == null || lane.X > right.X))
-                        right = lane;
-                foreach (var lane in second.Profile.Lanes)
-                    if (lane.Kind == 1 && lane.X < 0.0 && Within(lane, sections[(index + 1) % Arms.Count], true) && (left == null || lane.X < left.X))
-                        left = lane;
+                var second = Arms[next];
+                var right = PavementLane(index, sections, true);
+                var left = PavementLane(next, sections, false);
                 if (right == null || left == null)
                     continue;
-                var next = (index + 1) % Arms.Count;
                 AddArcs(Point.Along(first, bases[index], right.X), first.HeadingDegrees + 180.0, Point.Along(second, bases[next], left.X), second.HeadingDegrees,
                     right.Height, 1, right.Width, 2, 0);
                 approaches.Add(new KeyValuePair<int, OmsiSplineLane>(index, right));
                 approaches.Add(new KeyValuePair<int, OmsiSplineLane>(next, left));
+                rightLanes[index] = right;
+                leftLanes[next] = left;
             }
             foreach (var footpath in approaches)
-                AddStraight(Arms[footpath.Key], Arms[footpath.Key].Length, bases[footpath.Key], footpath.Value, 2);
+            {
+                var plan = crossingPlans[footpath.Key];
+                if (plan == null)
+                {
+                    AddStraight(Arms[footpath.Key], Arms[footpath.Key].Length, bases[footpath.Key], footpath.Value, 2);
+                    continue;
+                }
+                // The pavement path of an arm with a crossing is cut at the crossing's centre, where the crossing's path joins it.
+                AddStraight(Arms[footpath.Key], Arms[footpath.Key].Length, plan.Centre, footpath.Value, 2);
+                AddStraight(Arms[footpath.Key], plan.Centre, bases[footpath.Key], footpath.Value, 2);
+            }
+            for (var index = 0; index < Arms.Count; index++)
+            {
+                var plan = crossingPlans[index];
+                if (plan == null || rightLanes[index] == null || leftLanes[index] == null)
+                    continue;
+                var start = Point.Along(Arms[index], plan.Centre, rightLanes[index].X);
+                var end = Point.Along(Arms[index], plan.Centre, leftLanes[index].X);
+                var across = end.Minus(start);
+                Paths.Add(new OmsiJunctionPath
+                {
+                    X = start.X, Y = start.Y, Height = rightLanes[index].Height, HeadingDegrees = Normalize360(Math.Atan2(across.X, across.Y) * 180.0 / Math.PI),
+                    RadiusMeters = 0.0, LengthMeters = start.DistanceTo(end), Kind = 1, Width = plan.Width, Direction = 2
+                });
+            }
+        }
+
+        /// <summary>
+        /// The pavement path an arm offers a footpath round a corner: the outermost footpath lane on its right (for the
+        /// corner to the next arm) or its left (for the corner from the previous arm), within its profile; null for none.
+        /// </summary>
+        private OmsiSplineLane PavementLane(int index, List<OmsiProfileSections> sections, bool right)
+        {
+            OmsiSplineLane found = null;
+            foreach (var lane in Arms[index].Profile.Lanes)
+                if (lane.Kind == 1 && (right ? lane.X > 0.0 : lane.X < 0.0) && Within(lane, sections[index], true) &&
+                    (found == null || (right ? lane.X > found.X : lane.X < found.X)))
+                    found = lane;
+            return found;
+        }
+
+        /// <summary>Whether a footpath leads round the corner between an arm and the next, from the one's right pavement to the other's left.</summary>
+        private bool HasFootpathCorner(int index, List<OmsiProfileSections> sections)
+        {
+            return PavementLane(index, sections, true) != null && PavementLane((index + 1) % Arms.Count, sections, false) != null;
         }
 
         /// <summary>A road lane on the arm's carriageway that leads into the junction; one used both ways leads in and out. On a dual road the far one runs through.</summary>

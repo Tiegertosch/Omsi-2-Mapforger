@@ -68,5 +68,22 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "the lanes of junction #{id}",
   "lanes.status.done": "{done} (junction #{id}); now {count, plural, one {# way} other {# ways}} through, made again as {name}. Ctrl+Z takes it back.",
-  "lanes.status.follow": "Lanes: click a lane in to see where it leads; Esc leaves the tool."
+  "lanes.status.follow": "Lanes: click a lane in to see where it leads; Esc leaves the tool.",
+  "lanes.crossing.title": "Pedestrian crossings",
+  "lanes.crossing.distance": "Distance from corner (m)",
+  "lanes.crossing.distance.tooltip": "How far out along the arm the centre of a new crossing lies, measured from where the corner of the junction starts",
+  "lanes.crossing.width": "Width (m)",
+  "lanes.crossing.width.tooltip": "How wide a new crossing is",
+  "lanes.crossing.add": "Add crossing on arm {n} ({direction})",
+  "@lanes.crossing.add": "{direction} is a compass direction (lanes.dir.*)",
+  "lanes.crossing.add.tooltip": "Lays a footpath across this arm and cuts its pavement paths where it joins them, so people can change the side of the street; the arm reaches out further to make room and the road joined to it is cut back",
+  "lanes.crossing.remove": "Remove crossing from arm {n} ({direction}), {distance, number, 0.#} m out, {width, number, 0.#} m wide",
+  "lanes.crossing.remove.tooltip": "Takes the crossing away and gives the arm its usual length again",
+  "lanes.crossing.values": "Values above for arm {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Moves and widens this arm's crossing to the distance and width above",
+  "lanes.done.crossing_removed": "Took the crossing of arm {n} away",
+  "lanes.done.crossing_added": "Added a crossing to arm {n}, {distance, number, 0.#} m out and {width, number, 0.#} m wide",
+  "lanes.done.crossing_changed": "Gave the crossing of arm {n} {distance, number, 0.#} m of distance and {width, number, 0.#} m of width",
+  "lanes.status.no_crossing": "No crossing: {reason}",
+  "@lanes.status.no_crossing": "{reason} is a message from the layout, in English"
 }

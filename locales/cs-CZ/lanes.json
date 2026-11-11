@@ -68,5 +68,20 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "jízdní pruhy křižovatky #{id}",
   "lanes.status.done": "{done} (křižovatka #{id}); nyní {count, plural, one {# způsob} few {# způsoby} many {# způsoby} other {# způsobů}} skrz, vyrobené znovu jako {name}. Ctrl+Z to bere zpět.",
-  "lanes.status.follow": "Pruhy: klikněte na pruh a uvidíte, kam vede; Esc opouští nástroj."
+  "lanes.status.follow": "Pruhy: klikněte na pruh a uvidíte, kam vede; Esc opouští nástroj.",
+  "lanes.crossing.title": "Přechody pro chodce",
+  "lanes.crossing.distance": "Vzdálenost od rohu (m)",
+  "lanes.crossing.distance.tooltip": "Jak daleko po rameni leží střed nového přechodu, měřeno od začátku rohu křižovatky",
+  "lanes.crossing.width": "Šířka (m)",
+  "lanes.crossing.width.tooltip": "Jak široký je nový přechod",
+  "lanes.crossing.add": "Přidat přechod na rameno {n} ({direction})",
+  "lanes.crossing.add.tooltip": "Položí chodník přes toto rameno a rozdělí jeho chodníkové cesty tam, kde je spojuje, aby chodci mohli přejít na druhou stranu ulice; rameno kvůli tomu sahá dál a navazující silnice se zkrátí",
+  "lanes.crossing.remove": "Odebrat přechod z ramene {n} ({direction}), {distance, number, 0.#} m daleko, {width, number, 0.#} m široký",
+  "lanes.crossing.remove.tooltip": "Odebere přechod a vrátí rameni obvyklou délku",
+  "lanes.crossing.values": "Hodnoty výše pro rameno {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Posune a rozšíří přechod tohoto ramene podle vzdálenosti a šířky výše",
+  "lanes.done.crossing_removed": "Přechod ramene {n} byl odebrán",
+  "lanes.done.crossing_added": "Rameno {n} dostalo přechod, {distance, number, 0.#} m daleko a {width, number, 0.#} m široký",
+  "lanes.done.crossing_changed": "Přechod ramene {n} má vzdálenost {distance, number, 0.#} m a šířku {width, number, 0.#} m",
+  "lanes.status.no_crossing": "Žádný přechod: {reason}"
 }

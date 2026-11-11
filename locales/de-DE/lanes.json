@@ -60,5 +60,20 @@
   "lanes.status.stays_refs": "Kreuzung #{id} bleibt: {references} brauchen sie noch so, wie sie ist.",
   "lanes.step": "Fahrstreifen von Kreuzung #{id}",
   "lanes.status.done": "{done} (Kreuzung #{id}); jetzt {count, plural, one {# Weg} other {# Wege}} hindurch, neu erzeugt als {name}. Strg+Z nimmt es zurück.",
-  "lanes.status.follow": "Fahrstreifen: Klicke einen Fahrstreifen hinein an, um zu sehen, wohin er führt; Esc verlässt das Werkzeug."
+  "lanes.status.follow": "Fahrstreifen: Klicke einen Fahrstreifen hinein an, um zu sehen, wohin er führt; Esc verlässt das Werkzeug.",
+  "lanes.crossing.title": "Fußgängerüberwege",
+  "lanes.crossing.distance": "Abstand zur Ecke (m)",
+  "lanes.crossing.distance.tooltip": "Wie weit draußen auf dem Arm die Mitte eines neuen Überwegs liegt, gemessen ab dem Beginn der Kreuzungsecke",
+  "lanes.crossing.width": "Breite (m)",
+  "lanes.crossing.width.tooltip": "Wie breit ein neuer Überweg ist",
+  "lanes.crossing.add": "Überweg auf Arm {n} ({direction}) hinzufügen",
+  "lanes.crossing.add.tooltip": "Legt einen Fußweg quer über diesen Arm und trennt dessen Gehwegpfade dort, wo er sie verbindet, damit Fußgänger die Straßenseite wechseln können; der Arm reicht dafür weiter hinaus und die angeschlossene Straße wird zurückgeschnitten",
+  "lanes.crossing.remove": "Überweg von Arm {n} ({direction}) entfernen, {distance, number, 0.#} m draußen, {width, number, 0.#} m breit",
+  "lanes.crossing.remove.tooltip": "Nimmt den Überweg weg und gibt dem Arm wieder seine übliche Länge",
+  "lanes.crossing.values": "Obige Werte für Arm {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Verschiebt und verbreitert den Überweg dieses Arms auf Abstand und Breite oben",
+  "lanes.done.crossing_removed": "Überweg von Arm {n} entfernt",
+  "lanes.done.crossing_added": "Überweg an Arm {n} hinzugefügt, {distance, number, 0.#} m draußen und {width, number, 0.#} m breit",
+  "lanes.done.crossing_changed": "Überweg von Arm {n} auf {distance, number, 0.#} m Abstand und {width, number, 0.#} m Breite gesetzt",
+  "lanes.status.no_crossing": "Kein Überweg: {reason}"
 }

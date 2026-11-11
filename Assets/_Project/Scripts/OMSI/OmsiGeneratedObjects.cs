@@ -273,6 +273,9 @@ namespace OmsiMapEditor.OMSI
             var turnLanes = OmsiTurnLane.Write(layout.Arms);
             if (turnLanes != null)
                 sco.Append(turnLanes).Append("\r\n");
+            var crossings = OmsiCrossing.Write(layout.Arms);
+            if (crossings != null)
+                sco.Append(crossings).Append("\r\n");
             sco.Append("\r\n");
             Section(sco, "friendlyname", friendlyName);
             Section(sco, "groups", "1", "Mapforge");

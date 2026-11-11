@@ -68,5 +68,20 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "les voies du carrefour #{id}",
   "lanes.status.done": "{done} (jonction #{id}); maintenant {count, plural, one {# façon} other {# façons}}, refait sous le nom de {name}. Ctrl+Z le reprend.",
-  "lanes.status.follow": "Voies : cliquez sur une voie pour voir où elle mène ; Esc quitte l'outil."
+  "lanes.status.follow": "Voies : cliquez sur une voie pour voir où elle mène ; Esc quitte l'outil.",
+  "lanes.crossing.title": "Passages piétons",
+  "lanes.crossing.distance": "Distance du coin (m)",
+  "lanes.crossing.distance.tooltip": "À quelle distance le long de la branche se trouve le centre d'un nouveau passage, mesurée depuis le début du coin du carrefour",
+  "lanes.crossing.width": "Largeur (m)",
+  "lanes.crossing.width.tooltip": "La largeur d'un nouveau passage",
+  "lanes.crossing.add": "Ajouter un passage sur la branche {n} ({direction})",
+  "lanes.crossing.add.tooltip": "Pose un chemin piéton en travers de cette branche et coupe ses chemins de trottoir là où il les rejoint, pour que les piétons puissent changer de côté de la rue ; la branche s'allonge pour faire de la place et la route qui la rejoint est raccourcie",
+  "lanes.crossing.remove": "Retirer le passage de la branche {n} ({direction}), à {distance, number, 0.#} m, large de {width, number, 0.#} m",
+  "lanes.crossing.remove.tooltip": "Retire le passage et rend à la branche sa longueur habituelle",
+  "lanes.crossing.values": "Valeurs ci-dessus pour la branche {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Déplace et élargit le passage de cette branche selon la distance et la largeur ci-dessus",
+  "lanes.done.crossing_removed": "Passage de la branche {n} retiré",
+  "lanes.done.crossing_added": "Passage ajouté à la branche {n}, à {distance, number, 0.#} m et large de {width, number, 0.#} m",
+  "lanes.done.crossing_changed": "Passage de la branche {n} réglé sur {distance, number, 0.#} m de distance et {width, number, 0.#} m de largeur",
+  "lanes.status.no_crossing": "Pas de passage : {reason}"
 }

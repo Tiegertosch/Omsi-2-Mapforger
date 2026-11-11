@@ -95,6 +95,9 @@ namespace OmsiMapEditor.OMSI
             foreach (var pair in OmsiTurnLane.Read(text))
                 if (pair.Key >= 0 && pair.Key < junction.Arms.Count)
                     junction.Arms[pair.Key].TurnLane = pair.Value;
+            foreach (var pair in OmsiCrossing.Read(text))
+                if (pair.Key >= 0 && pair.Key < junction.Arms.Count)
+                    junction.Arms[pair.Key].Crossing = pair.Value;
             var sides = ReadSides(text, helpers.Count);
             if (sides != null)
             {
@@ -317,7 +320,7 @@ namespace OmsiMapEditor.OMSI
                 turn.Arms.Add(new OmsiJunctionArm
                 {
                     HeadingDegrees = index == arm ? turn.HeadingDegrees : source.HeadingDegrees, ProfilePath = source.ProfilePath, Profile = source.Profile,
-                    Main = source.Main, Mirrored = mirrored, TurnLane = source.TurnLane?.Copy()
+                    Main = source.Main, Mirrored = mirrored, TurnLane = source.TurnLane?.Copy(), Crossing = source.Crossing?.Copy()
                 });
             }
 

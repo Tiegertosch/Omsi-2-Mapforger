@@ -68,5 +68,20 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "as vias do cruzamento #{id}",
   "lanes.status.done": "{done} (junção #{id}); agora {count, plural, one {# maneira} other {# maneiras}}, feito novamente como {name}. Ctrl+Z leva de volta.",
-  "lanes.status.follow": "Vias de trânsito: clique numa via para ver aonde leva; Esc fecha a ferramenta."
+  "lanes.status.follow": "Vias de trânsito: clique numa via para ver aonde leva; Esc fecha a ferramenta.",
+  "lanes.crossing.title": "Passadeiras",
+  "lanes.crossing.distance": "Distância à esquina (m)",
+  "lanes.crossing.distance.tooltip": "A que distância ao longo do braço fica o centro de uma passadeira nova, medida desde o início da esquina do cruzamento",
+  "lanes.crossing.width": "Largura (m)",
+  "lanes.crossing.width.tooltip": "A largura de uma passadeira nova",
+  "lanes.crossing.add": "Adicionar passadeira no braço {n} ({direction})",
+  "lanes.crossing.add.tooltip": "Coloca um caminho pedonal através deste braço e corta os caminhos do passeio onde os liga, para que os peões possam mudar de lado da rua; o braço alonga-se para dar espaço e a estrada ligada é encurtada",
+  "lanes.crossing.remove": "Remover a passadeira do braço {n} ({direction}), a {distance, number, 0.#} m, com {width, number, 0.#} m de largura",
+  "lanes.crossing.remove.tooltip": "Retira a passadeira e devolve ao braço o comprimento habitual",
+  "lanes.crossing.values": "Valores acima para o braço {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Move e alarga a passadeira deste braço conforme a distância e a largura acima",
+  "lanes.done.crossing_removed": "Passadeira do braço {n} removida",
+  "lanes.done.crossing_added": "Passadeira adicionada ao braço {n}, a {distance, number, 0.#} m e com {width, number, 0.#} m de largura",
+  "lanes.done.crossing_changed": "Passadeira do braço {n} definida com {distance, number, 0.#} m de distância e {width, number, 0.#} m de largura",
+  "lanes.status.no_crossing": "Sem passadeira: {reason}"
 }

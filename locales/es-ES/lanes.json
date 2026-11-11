@@ -68,5 +68,20 @@
   "@lanes.status.stays_refs": "{references} is a list of what names the junction, written by the program",
   "lanes.step": "los carriles del cruce #{id}",
   "lanes.status.done": "{done} (cruce #{id}); ahora {count, plural, one {# vía} other {# maneras}}, hecho nuevamente como {name}. Ctrl+Z lo recupera.",
-  "lanes.status.follow": "Carriles: haga clic en un carril para ver adónde conduce; Esc abandona la herramienta."
+  "lanes.status.follow": "Carriles: haga clic en un carril para ver adónde conduce; Esc abandona la herramienta.",
+  "lanes.crossing.title": "Pasos de peatones",
+  "lanes.crossing.distance": "Distancia a la esquina (m)",
+  "lanes.crossing.distance.tooltip": "A qué distancia a lo largo del brazo queda el centro de un paso nuevo, medida desde donde empieza la esquina del cruce",
+  "lanes.crossing.width": "Anchura (m)",
+  "lanes.crossing.width.tooltip": "La anchura de un paso nuevo",
+  "lanes.crossing.add": "Añadir paso en el brazo {n} ({direction})",
+  "lanes.crossing.add.tooltip": "Coloca un camino peatonal a través de este brazo y corta sus caminos de acera donde los une, para que los peatones puedan cambiar de lado de la calle; el brazo se alarga para hacer sitio y la carretera conectada se acorta",
+  "lanes.crossing.remove": "Quitar el paso del brazo {n} ({direction}), a {distance, number, 0.#} m, de {width, number, 0.#} m de ancho",
+  "lanes.crossing.remove.tooltip": "Quita el paso y devuelve al brazo su longitud habitual",
+  "lanes.crossing.values": "Valores de arriba para el brazo {n} ({direction})",
+  "lanes.crossing.values.tooltip": "Mueve y ensancha el paso de este brazo según la distancia y la anchura de arriba",
+  "lanes.done.crossing_removed": "Paso del brazo {n} quitado",
+  "lanes.done.crossing_added": "Paso añadido al brazo {n}, a {distance, number, 0.#} m y de {width, number, 0.#} m de ancho",
+  "lanes.done.crossing_changed": "Paso del brazo {n} fijado a {distance, number, 0.#} m de distancia y {width, number, 0.#} m de anchura",
+  "lanes.status.no_crossing": "Sin paso: {reason}"
 }

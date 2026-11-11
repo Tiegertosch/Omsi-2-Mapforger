@@ -260,7 +260,7 @@ namespace OmsiMapEditor.OMSI
             list.Add(end);
         }
 
-        /// <summary>True when another path's end of the same kind lies within reach and heads the same way.</summary>
+        /// <summary>True when another path's end of the same kind lies within reach and heads the same way (pedestrian paths: within reach).</summary>
         private static bool Joined(Dictionary<long, List<End>> grid, End end)
         {
             var cellX = (long)Math.Floor(end.X / LinkMeters);
@@ -276,7 +276,9 @@ namespace OmsiMapEditor.OMSI
                             continue;
                         var distance = Math.Sqrt((other.X - end.X) * (other.X - end.X) + (other.Y - end.Y) * (other.Y - end.Y));
                         var turn = Math.Abs(OmsiRoadPlanner.Normalize(other.Heading - end.Heading));
-                        if (distance <= LinkMeters && turn < LinkDegrees)
+                        // openOMSI joins the ends of pedestrian paths by place alone, whatever their heading, as pavement corners and
+                        // crossings meet at an angle (people/pednet.rs); vehicles and trains need to go on the same way.
+                        if (distance <= LinkMeters && (end.Kind == 1 || turn < LinkDegrees))
                             return true;
                     }
                 }
