@@ -1,0 +1,4 @@
+{
+  "line.rail": "Tor (pociąg lub tramwaj)",
+  "line.rail.tooltip": "Linia jedzie po szynach: droga podąża za ścieżkami szynowymi, a każdy kurs dostaje plik toru i plik kursu. Przystanki to te same obiekty bus_stop.sco, ustawione obok szyny."
+}

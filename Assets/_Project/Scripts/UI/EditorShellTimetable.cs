@@ -99,6 +99,15 @@ namespace OmsiMapEditor.UI
                 SetStatusT("timetable.status.failed", ("reason", exception.Message));
                 return;
             }
+            try
+            {
+                timetableStopNames = OmsiTimetable.Read(session.Workspace).BusStops.GroupBy(stop => stop.ObjectId).ToDictionary(group => group.Key, group => group.First().Name);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+            {
+                Debug.LogException(exception);
+                timetableStopNames = new Dictionary<int, string>();
+            }
             timetableLine = timetableLineNames.Find(name => string.Equals(name, line, StringComparison.OrdinalIgnoreCase)) ??
                             (timetableLineNames.Count > 0 ? timetableLineNames[0] : null);
             timetableTour = 0;
@@ -146,6 +155,7 @@ namespace OmsiMapEditor.UI
             var scroll = timetableBody.scrollOffset;
             timetableBody.Clear();
             AddNewLineAndTripRow();
+            AddManageRows();
             if (timetableLine == null)
             {
                 var empty = new Label(Loc.T("timetable.empty"));
@@ -504,6 +514,7 @@ namespace OmsiMapEditor.UI
                     row.Add(label);
                     timetableBody.Add(row);
                 }
+                AddStopTimes(tripFile, tripName);
             }
         }
 

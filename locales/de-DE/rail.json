@@ -1,0 +1,4 @@
+{
+  "line.rail": "Schiene (Zug oder Straßenbahn)",
+  "line.rail.tooltip": "Die Linie fährt über Schienen: der Weg folgt den Schienenpfaden, und jede Fahrt bekommt eine Fahrwegdatei und eine Fahrtdatei darauf. Haltestellen sind dieselben bus_stop.sco-Objekte, neben das Gleis gesetzt."
+}

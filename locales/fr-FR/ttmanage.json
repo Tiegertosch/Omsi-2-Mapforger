@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Renommer et supprimer des lignes et des courses",
+  "timetable.manage.line": "Fichier de ligne",
+  "timetable.manage.trip": "Fichier de course",
+  "timetable.manage.name": "Nouveau nom",
+  "timetable.manage.rename": "Renommer",
+  "timetable.manage.rename.tooltip": "Renommer le fichier de ligne. Impossible tant qu'une variante chrono désactive la ligne.",
+  "timetable.manage.rename.trip.tooltip": "Renommer le fichier de course et les services qui la font.",
+  "timetable.manage.delete": "Supprimer",
+  "timetable.manage.delete.line.tooltip": "Supprimer le fichier de ligne ; ses courses restent. Impossible tant qu'une variante chrono désactive la ligne.",
+  "timetable.manage.delete.trip.tooltip": "Supprimer le fichier de course. Impossible tant qu'un service fait la course.",
+  "timetable.manage.step": "Lignes et courses",
+  "timetable.status.line_renamed": "La ligne {old} s'appelle maintenant {name}.",
+  "timetable.status.line_deleted": "Ligne {name} supprimée.",
+  "timetable.status.trip_renamed": "La course {old} s'appelle maintenant {name}.",
+  "timetable.status.trip_deleted": "Course {name} supprimée.",
+  "timetable.status.manage_failed": "Cela n'a pas pu être fait : {reason}",
+  "busstop.remove": "Retirer de l'horaire",
+  "busstop.remove.tooltip": "Retirer l'arrêt de Busstops.cfg et ses liaisons. L'objet reste sur la carte. Impossible tant qu'une course s'y arrête.",
+  "busstop.remove.step": "Retirer l'arrêt {id} de l'horaire",
+  "busstop.status.removed": "L'arrêt {id} ne fait plus partie de l'horaire.",
+  "busstop.status.remove_failed": "L'arrêt n'a pas pu être retiré : {reason}"
+}

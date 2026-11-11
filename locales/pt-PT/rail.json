@@ -1,0 +1,4 @@
+{
+  "line.rail": "Via férrea (comboio ou elétrico)",
+  "line.rail.tooltip": "A linha circula sobre carris: o caminho segue os percursos de carril e cada viagem recebe um ficheiro de via e um ficheiro de viagem. As paragens são os mesmos objetos bus_stop.sco, colocados junto ao carril."
+}

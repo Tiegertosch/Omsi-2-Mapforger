@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Rinomina ed elimina linee e corse",
+  "timetable.manage.line": "File della linea",
+  "timetable.manage.trip": "File della corsa",
+  "timetable.manage.name": "Nuovo nome",
+  "timetable.manage.rename": "Rinomina",
+  "timetable.manage.rename.tooltip": "Rinomina il file della linea. Non è possibile finché una variante chrono disattiva la linea.",
+  "timetable.manage.rename.trip.tooltip": "Rinomina il file della corsa e i turni che la eseguono.",
+  "timetable.manage.delete": "Elimina",
+  "timetable.manage.delete.line.tooltip": "Elimina il file della linea; le sue corse restano. Non è possibile finché una variante chrono disattiva la linea.",
+  "timetable.manage.delete.trip.tooltip": "Elimina il file della corsa. Non è possibile finché un turno esegue la corsa.",
+  "timetable.manage.step": "Linee e corse",
+  "timetable.status.line_renamed": "La linea {old} ora si chiama {name}.",
+  "timetable.status.line_deleted": "Linea {name} eliminata.",
+  "timetable.status.trip_renamed": "La corsa {old} ora si chiama {name}.",
+  "timetable.status.trip_deleted": "Corsa {name} eliminata.",
+  "timetable.status.manage_failed": "Non è stato possibile: {reason}",
+  "busstop.remove": "Togli dall'orario",
+  "busstop.remove.tooltip": "Toglie la fermata da Busstops.cfg e i suoi collegamenti. L'oggetto resta sulla mappa. Non è possibile finché una corsa si ferma qui.",
+  "busstop.remove.step": "Togli la fermata {id} dall'orario",
+  "busstop.status.removed": "La fermata {id} non fa più parte dell'orario.",
+  "busstop.status.remove_failed": "Impossibile togliere la fermata: {reason}"
+}

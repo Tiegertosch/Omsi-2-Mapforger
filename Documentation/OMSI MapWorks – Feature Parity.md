@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 85 · Teilweise 10 · Prüfen 0 · Offen 20 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 102 · Teilweise 6 · Prüfen 0 · Offen 7 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -91,15 +91,15 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 ## F. Tracks, Trips und Fahrpläne
 - [x] Vorhandene Linien und Haltestellen anzeigen — Vorhanden
 - [x] Vorhandene Trips und Routen anzeigen — Vorhanden
-- [ ] Tracks erstellen und bearbeiten — Offen
+- [x] Tracks erstellen und bearbeiten — Vorhanden (Schalter „Rail“ im Linien-Werkzeug schreibt Fahrweg und Fahrt; Bearbeiten über neu anlegen und löschen, ADR 097; Test in openOMSI steht aus)
 - [x] Haltestellenreihenfolge definieren — Vorhanden (Dialog „New trip…“, ADR 093)
-- [ ] Trips erstellen und bearbeiten — Teilweise (neue Fahrt über Haltestellen mit Wegsuche, Fahrzeit und Abfahrten änderbar, ADR 092/093; Halte einer vorhandenen Fahrt nicht)
-- [ ] Fahrzeiten zwischen Haltestellen festlegen — Teilweise (Fahrzeit je Profil einer Fahrt, ADR 092; nicht je Halt)
+- [x] Trips erstellen und bearbeiten — Vorhanden (Linien-Werkzeug für neue Fahrten, auch auf Schienen; Halte vorhandener Fahrten ändern, Löschen und Umbenennen, ADR 093/096/097; Test in openOMSI steht aus) (früher: Teilweise)
+- [x] Fahrzeiten zwischen Haltestellen festlegen — Vorhanden (Fahrzeit je Profil, dazu Ankunft, Abfahrt und Haltemodus je Halt, ADR 092/096) (früher: Teilweise)
 - [x] Tours und Umläufe erstellen — Vorhanden (anlegen, umbenennen, verschieben, Fahrten im Takt, ADR 092; Test in openOMSI steht aus)
 - [x] Abfahrtszeiten und Fahrplantabellen bearbeiten — Vorhanden (Dialog im Reiter Lines, ADR 092)
 - [x] Betriebstage und Kalenderzuordnung bearbeiten — Vorhanden (Tagesmaske je Umlauf: Wochentage, Feiertage, Schulzeit/Schulferien, ADR 092; Test in openOMSI steht aus)
 - [x] Depots und Fahrzeugzuordnung bearbeiten — Vorhanden (Dialog „Vehicles…“: Depots mit Typen und Bussen, einfache Gruppen, Umbenennen mit den Umläufen, ADR 095; Test in openOMSI steht aus)
-- [ ] TTData vollständig schreiben und validieren — Teilweise (Fahrwege `.ttr` werden nicht geschrieben; Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
+- [x] TTData vollständig schreiben und validieren — Vorhanden (Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
 
 ## G. Signalrouten, Prioritäten und Bahnverkehr
 - [ ] Signalrouten erstellen — Offen

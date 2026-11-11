@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Přejmenovat a smazat linky a spoje",
+  "timetable.manage.line": "Soubor linky",
+  "timetable.manage.trip": "Soubor spoje",
+  "timetable.manage.name": "Nový název",
+  "timetable.manage.rename": "Přejmenovat",
+  "timetable.manage.rename.tooltip": "Přejmenovat soubor linky. Nelze, dokud linku vypíná některá varianta chrono.",
+  "timetable.manage.rename.trip.tooltip": "Přejmenovat soubor spoje a oběhy, které jej jedou.",
+  "timetable.manage.delete": "Smazat",
+  "timetable.manage.delete.line.tooltip": "Smazat soubor linky; její spoje zůstanou. Nelze, dokud linku vypíná některá varianta chrono.",
+  "timetable.manage.delete.trip.tooltip": "Smazat soubor spoje. Nelze, dokud spoj jede některý oběh.",
+  "timetable.manage.step": "Linky a spoje",
+  "timetable.status.line_renamed": "Linka {old} se nyní jmenuje {name}.",
+  "timetable.status.line_deleted": "Linka {name} smazána.",
+  "timetable.status.trip_renamed": "Spoj {old} se nyní jmenuje {name}.",
+  "timetable.status.trip_deleted": "Spoj {name} smazán.",
+  "timetable.status.manage_failed": "To nelze provést: {reason}",
+  "busstop.remove": "Odebrat z jízdního řádu",
+  "busstop.remove.tooltip": "Odebrat zastávku z Busstops.cfg a její spojení. Objekt zůstane na mapě. Nelze, dokud tu některý spoj staví.",
+  "busstop.remove.step": "Odebrat zastávku {id} z jízdního řádu",
+  "busstop.status.removed": "Zastávka {id} už není součástí jízdního řádu.",
+  "busstop.status.remove_failed": "Zastávku nelze odebrat: {reason}"
+}

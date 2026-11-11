@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Edycja przystanków kursu {trip}. Klikaj przystanki, przesuwaj je lub usuwaj z listy, potem zapisz. Czasy, obiegi i linia zostają.",
+  "line.save_trip": "Zapisz przystanki",
+  "line.status.trip_saved": "Przystanki kursu {name} zapisane.",
+  "line.status.trip_track": "Kurs {name} jedzie własnym torem lub nie istnieje; jego przystanków nie można tu edytować.",
+  "line.status.trip_missing": "Kurs {name} zatrzymuje się przy obiekcie {id}, który nie jest obiektem przystanku mapy.",
+  "line.trip.step": "Przystanki kursu {name}",
+  "timetable.manage.stops": "Przystanki kursu",
+  "timetable.manage.stops.button": "Edytuj przystanki…",
+  "timetable.manage.stops.tooltip": "Otwórz narzędzie Linia na przystankach tego kursu: dodaj, przesuń lub usuń przystanki, a droga między nimi zostanie znaleziona od nowa.",
+  "timetable.stoptimes": "Czasy na przystankach: {trip}, profil {name}",
+  "timetable.stoptimes.hint": "Minuty po rozpoczęciu kursu. Przystanek z czasem to taki, na którym autobus czeka; przystanki bez czasu wynikają z czasu przejazdu i długości połączeń.",
+  "timetable.stoptimes.arrival": "Przyjazd",
+  "timetable.stoptimes.departure": "Odjazd",
+  "timetable.stoptimes.stopping": "Zatrzymanie",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Czas to minuty po rozpoczęciu kursu, na przykład 2,5.",
+  "timetable.stopping.0": "Domyślnie",
+  "timetable.stopping.1": "Na żądanie",
+  "timetable.stopping.2": "Bez zatrzymania",
+  "timetable.stopping.3": "Gdy przed czasem",
+  "timetable.stopping.4": "Na żądanie (4)"
+}

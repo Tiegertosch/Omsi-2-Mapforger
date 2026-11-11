@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Mudar o nome e eliminar linhas e viagens",
+  "timetable.manage.line": "Ficheiro da linha",
+  "timetable.manage.trip": "Ficheiro da viagem",
+  "timetable.manage.name": "Novo nome",
+  "timetable.manage.rename": "Mudar nome",
+  "timetable.manage.rename.tooltip": "Mudar o nome do ficheiro da linha. Não é possível enquanto uma variante chrono desativar a linha.",
+  "timetable.manage.rename.trip.tooltip": "Mudar o nome do ficheiro da viagem e das circulações que a fazem.",
+  "timetable.manage.delete": "Eliminar",
+  "timetable.manage.delete.line.tooltip": "Eliminar o ficheiro da linha; as suas viagens ficam. Não é possível enquanto uma variante chrono desativar a linha.",
+  "timetable.manage.delete.trip.tooltip": "Eliminar o ficheiro da viagem. Não é possível enquanto uma circulação fizer a viagem.",
+  "timetable.manage.step": "Linhas e viagens",
+  "timetable.status.line_renamed": "A linha {old} chama-se agora {name}.",
+  "timetable.status.line_deleted": "Linha {name} eliminada.",
+  "timetable.status.trip_renamed": "A viagem {old} chama-se agora {name}.",
+  "timetable.status.trip_deleted": "Viagem {name} eliminada.",
+  "timetable.status.manage_failed": "Não foi possível: {reason}",
+  "busstop.remove": "Retirar do horário",
+  "busstop.remove.tooltip": "Retirar a paragem de Busstops.cfg e as suas ligações. O objeto fica no mapa. Não é possível enquanto uma viagem parar aqui.",
+  "busstop.remove.step": "Retirar a paragem {id} do horário",
+  "busstop.status.removed": "A paragem {id} já não faz parte do horário.",
+  "busstop.status.remove_failed": "Não foi possível retirar a paragem: {reason}"
+}

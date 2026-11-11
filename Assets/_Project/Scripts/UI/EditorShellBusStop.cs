@@ -30,6 +30,16 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
                 return;
             }
+            bool listed;
+            try
+            {
+                listed = session.BusStopName(currentSummary, tile, record) != null;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+            {
+                Debug.LogException(exception);
+                listed = false;
+            }
             AddInspectorGroup(editor, "bus-stop", Loc.T("inspector.busstop.group"), true, body =>
             {
                 var hint = new Label(current == null ? Loc.T("inspector.busstop.unnamed") : Loc.T("inspector.busstop.hint"));
@@ -45,6 +55,13 @@ namespace OmsiMapEditor.UI
                 set.AddToClassList("map-control-button");
                 set.SetEnabled(CanEdit);
                 body.Add(set);
+                if (listed)
+                {
+                    var remove = new Button(() => RemoveBusStopFromInspector(tile, record)) { text = Loc.T("busstop.remove"), tooltip = Loc.T("busstop.remove.tooltip") };
+                    remove.AddToClassList("map-control-button");
+                    remove.SetEnabled(CanEdit);
+                    body.Add(remove);
+                }
             });
         }
 

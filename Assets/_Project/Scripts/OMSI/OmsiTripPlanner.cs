@@ -298,6 +298,27 @@ namespace OmsiMapEditor.OMSI
             return Append(existing, text.ToString(), "---------------------------\r\nTime Table BusStopList File\r\n---------------------------\r\n\r\n" + Header + "\r\n\r\n");
         }
 
+        /// <summary>Busstops.cfg without the entry of a stop; unchanged when it lists none for that object.</summary>
+        public static byte[] RemoveBusStop(byte[] existing, int tileIndex, int objectId)
+        {
+            if (existing == null)
+                return null;
+            var file = OmsiRecordFile.Parse(existing, null);
+            foreach (var record in file.Records)
+            {
+                if (!string.Equals(record.Name, "busstop", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var values = record.AllValues();
+                if (values.Count >= 3 && int.TryParse(values[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tile) &&
+                    int.TryParse(values[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && tile == tileIndex && id == objectId)
+                {
+                    file.RemoveRecord(record);
+                    return file.ToBytes();
+                }
+            }
+            return existing;
+        }
+
         /// <summary>
         /// <c>Busstops.cfg</c> with the name of a stop set: the stop of the object is renamed where it is listed, else added behind the others.
         /// </summary>
@@ -353,7 +374,7 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>Cuts the links of some stop pairs out of <c>StnLinks.cfg</c>: from the line that names them ("A ==> B") to the one that names the next.</summary>
-        private static byte[] RemoveStationLinks(byte[] bytes, IList<KeyValuePair<int, int>> pairs)
+        internal static byte[] RemoveStationLinks(byte[] bytes, IList<KeyValuePair<int, int>> pairs)
         {
             var text = OmsiTextFile.Decode(bytes, out var encoding);
             var lines = new List<string>(text.Split('\n'));

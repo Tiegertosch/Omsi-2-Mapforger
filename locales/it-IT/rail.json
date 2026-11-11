@@ -1,0 +1,4 @@
+{
+  "line.rail": "Rotaia (treno o tram)",
+  "line.rail.tooltip": "La linea corre su rotaia: il percorso segue i percorsi ferroviari e ogni corsa riceve un file del tracciato e un file della corsa. Le fermate sono gli stessi oggetti bus_stop.sco, posti accanto alla rotaia."
+}

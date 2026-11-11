@@ -85,6 +85,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Neue Fahrten und Linien – Haltestellen wählen, Wegsuche über die Fahrspuren, Stationsverbindungen und Fahrt schreiben, neue Linie anlegen; Pfadnummern von Profilen mit auskommentiertem `[path]` korrigiert (ADR 093; wartet auf den Nutzertest)
 - [x] Linien-Werkzeug – Haltestellen auf der Karte anklicken (Taste B): Hin- und Rückfahrt, Ringlinie, Wegpunkte, Vorschau des Wegs, Speichern als ein Undo-Schritt (ADR 094; vom Nutzer in openOMSI bestätigt)
 - [x] Fahrzeuggruppen und Depots bearbeiten – Dialog „Vehicles…“ im Reiter Lines: Depots mit Fahrzeugtypen und Bussen (Nummer, Kennzeichen, Lackierung, Tage), einfache Gruppen mit Gewicht, Umbenennen mit den Umläufen (ADR 095; wartet auf den Nutzertest)
+- [x] Fahrplan abschließen – Linien, Fahrten und Haltestellen umbenennen und löschen, Halte vorhandener Fahrten ändern, Zeiten und Haltemodus je Halt (ADR 096; wartet auf den Nutzertest)
+- [x] Fahrwege (`.ttr`) und Fahrten mit `[station]` für Züge und Straßenbahnen – Schalter „Rail“ im Linien-Werkzeug (ADR 097; wartet auf den Nutzertest)
 
 ## Später
 

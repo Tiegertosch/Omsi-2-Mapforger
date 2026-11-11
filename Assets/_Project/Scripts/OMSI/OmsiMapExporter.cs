@@ -103,6 +103,14 @@ namespace OmsiMapEditor.OMSI
                     if (relative.Replace('/', '\\').StartsWith(ProjectDataFolder + "\\", StringComparison.OrdinalIgnoreCase))
                         continue;
                     var destination = Path.Combine(temporary, relative);
+                    if (workspace.IsDeleted(relative))
+                    {
+                        // A file of the original map that the project took away is not in the exported map.
+                        if (File.Exists(destination))
+                            File.Delete(destination);
+                        report.EditedFiles.Add(relative);
+                        continue;
+                    }
                     Directory.CreateDirectory(Path.GetDirectoryName(destination));
                     File.WriteAllBytes(destination, workspace.ReadAllBytes(relative));
                     report.EditedFiles.Add(relative);

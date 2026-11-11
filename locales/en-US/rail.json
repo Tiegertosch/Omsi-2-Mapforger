@@ -1,0 +1,4 @@
+{
+  "line.rail": "Rail (train or tram)",
+  "line.rail.tooltip": "The line runs over rails: the way follows the rail paths, and each trip gets a track file and a trip file on it. Stations are the same bus_stop.sco objects, placed beside the rail."
+}

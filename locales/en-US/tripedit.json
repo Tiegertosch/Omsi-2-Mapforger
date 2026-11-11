@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Editing the stops of the trip {trip}. Click stops to add them, move or remove them in the list, then save. Times, tours and the line stay.",
+  "line.save_trip": "Save stops",
+  "line.status.trip_saved": "Stops of the trip {name} saved.",
+  "line.status.trip_track": "The trip {name} runs on a track of its own or does not exist; its stops cannot be edited here.",
+  "line.status.trip_missing": "The trip {name} stops at the object {id}, which is not a stop object of the map.",
+  "line.trip.step": "Stops of trip {name}",
+  "timetable.manage.stops": "Stops of the trip",
+  "timetable.manage.stops.button": "Edit stops…",
+  "timetable.manage.stops.tooltip": "Open the line tool on the stops of this trip: add, move or remove stops, and the way between them is found again.",
+  "timetable.stoptimes": "Times at the stops: {trip}, profile {name}",
+  "timetable.stoptimes.hint": "Minutes after the trip began. A stop with a time is one the bus waits at; stops without one are timed from the running time and the lengths of the station links.",
+  "timetable.stoptimes.arrival": "Arrives",
+  "timetable.stoptimes.departure": "Leaves",
+  "timetable.stoptimes.stopping": "Stopping",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "A time is minutes after the trip began, such as 2.5.",
+  "timetable.stopping.0": "Default",
+  "timetable.stopping.1": "If wanted",
+  "timetable.stopping.2": "Passed",
+  "timetable.stopping.3": "If early",
+  "timetable.stopping.4": "If wanted (4)"
+}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -64,8 +65,11 @@ namespace OmsiMapEditor.OMSI
     {
         public int ObjectId { get; internal set; }
 
-        /// <summary>Entry of the trip's track, from 1, for the older [station] form; 0 for [station_typ2].</summary>
+        /// <summary>Entry of the trip's track the stop lies on, counted from 0 (the way openOMSI reads it); 0 for [station_typ2], which has none.</summary>
         public int TrackEntry { get; internal set; }
+
+        /// <summary>True for the older [station] form with its own track; false for [station_typ2], which goes by the station links.</summary>
+        public bool IsLegacy { get; internal set; }
 
         public int TileIndex { get; internal set; } = -1;
         public string Name { get; internal set; }
@@ -85,6 +89,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Profile names with their running time in minutes.</summary>
         public List<KeyValuePair<string, double>> Profiles { get; } = new List<KeyValuePair<string, double>>();
+
+        /// <summary>Per profile, the time points it sets itself: (stop index from 0, minutes after the trip began), arrivals and departures in file order.</summary>
+        public List<List<KeyValuePair<int, double>>> StopTimes { get; } = new List<List<KeyValuePair<int, double>>>();
+
+        /// <summary>The stop indexes the profiles' stopping records (<c>[profile_otherstopping]</c>) name.</summary>
+        public List<int> StoppingIndexes { get; } = new List<int>();
     }
 
     /// <summary>A trip a tour runs: the trip, its profile and the departure in minutes after midnight.</summary>
@@ -288,11 +298,21 @@ namespace OmsiMapEditor.OMSI
                 else if (Is(record, "station") && values.Count >= 4 && TryInt(values[0], out var stationId) && TryInt(values[1], out var entry) &&
                          TryInt(values[3], out var tile))
                 {
-                    trip.Stops.Add(new OmsiTripStop { ObjectId = stationId, TrackEntry = entry, Name = values[2], TileIndex = tile });
+                    trip.Stops.Add(new OmsiTripStop { ObjectId = stationId, TrackEntry = entry, Name = values[2], TileIndex = tile, IsLegacy = true });
                 }
                 else if (Is(record, "profile") && values.Count >= 2 && TryDouble(values[1], out var minutes))
                 {
                     trip.Profiles.Add(new KeyValuePair<string, double>(values[0], minutes));
+                    trip.StopTimes.Add(new List<KeyValuePair<int, double>>());
+                }
+                else if ((Is(record, "profile_man_arr_time") || Is(record, "profile_man_dep_time")) && values.Count >= 2 && TryInt(values[0], out var timedStop) &&
+                         TryDouble(values[1], out var timedMinutes) && trip.StopTimes.Count > 0)
+                {
+                    trip.StopTimes[trip.StopTimes.Count - 1].Add(new KeyValuePair<int, double>(timedStop, timedMinutes));
+                }
+                else if (Is(record, "profile_otherstopping") && values.Count >= 1 && TryInt(values[0], out var stoppingStop))
+                {
+                    trip.StoppingIndexes.Add(stoppingStop);
                 }
             }
             return trip;
@@ -420,19 +440,38 @@ namespace OmsiMapEditor.OMSI
                     report.Problems.Add(new OmsiTimetableProblem(file, "drives track \"" + trip.Track + "\", which has no .ttr file"));
                 if (trip.Profiles.Count == 0)
                     report.Problems.Add(new OmsiTimetableProblem(file, "has no [profile]"));
+                foreach (var index in trip.StoppingIndexes)
+                    if (index < 0 || index >= trip.Stops.Count)
+                        report.Problems.Add(new OmsiTimetableProblem(file, "sets how the bus stops at stop " + index + ", but the trip has " + trip.Stops.Count + " stops"));
+                foreach (var times in trip.StopTimes)
+                {
+                    var last = double.NegativeInfinity;
+                    foreach (var point in times.OrderBy(each => each.Key))
+                    {
+                        if (point.Key < 0 || point.Key >= trip.Stops.Count)
+                            report.Problems.Add(new OmsiTimetableProblem(file, "times stop " + point.Key + ", but the trip has " + trip.Stops.Count + " stops"));
+                        else if (point.Value < last - 1e-9)
+                            report.Problems.Add(new OmsiTimetableProblem(file, "has a time at stop " + point.Key + " that is before the time of an earlier stop"));
+                        last = Math.Max(last, point.Value);
+                    }
+                }
                 OmsiTripStop previous = null;
                 foreach (var stop in trip.Stops)
                 {
-                    if (stop.TrackEntry == 0)
+                    if (!stop.IsLegacy)
                     {
                         if (!stops.Contains(stop.ObjectId))
                             report.Problems.Add(new OmsiTimetableProblem(file, "stops at object " + stop.ObjectId + ", which is no stop of Busstops.cfg"));
-                        if (previous != null && previous.TrackEntry == 0 && !links.Contains(Pair(previous.ObjectId, stop.ObjectId)))
+                        if (previous != null && !previous.IsLegacy && !links.Contains(Pair(previous.ObjectId, stop.ObjectId)))
                             report.Problems.Add(new OmsiTimetableProblem(file, "has no station link from " + previous.ObjectId + " to " + stop.ObjectId));
                     }
-                    else if (!Contains(elements, stop.TileIndex, stop.ObjectId, out var tile))
+                    else
                     {
-                        report.Problems.Add(new OmsiTimetableProblem(file, "stops at object " + stop.ObjectId + ", " + Missing(stop.ObjectId, tile)));
+                        if (!Contains(elements, stop.TileIndex, stop.ObjectId, out var tile))
+                            report.Problems.Add(new OmsiTimetableProblem(file, "stops at object " + stop.ObjectId + ", " + Missing(stop.ObjectId, tile)));
+                        if (trip.Track.Length > 0 && timetable.Tracks.TryGetValue(trip.Track, out var stopTrack) && (stop.TrackEntry < 0 || stop.TrackEntry >= stopTrack.Entries.Count))
+                            report.Problems.Add(new OmsiTimetableProblem(file, "puts the stop at object " + stop.ObjectId + " on entry " + stop.TrackEntry + " of a track with " +
+                                                                               stopTrack.Entries.Count + " entries"));
                     }
                     previous = stop;
                 }

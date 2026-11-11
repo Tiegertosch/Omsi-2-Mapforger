@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Zmień nazwę i usuń linie i kursy",
+  "timetable.manage.line": "Plik linii",
+  "timetable.manage.trip": "Plik kursu",
+  "timetable.manage.name": "Nowa nazwa",
+  "timetable.manage.rename": "Zmień nazwę",
+  "timetable.manage.rename.tooltip": "Zmień nazwę pliku linii. Niemożliwe, dopóki wariant chrono wyłącza tę linię.",
+  "timetable.manage.rename.trip.tooltip": "Zmień nazwę pliku kursu i obiegów, które go wykonują.",
+  "timetable.manage.delete": "Usuń",
+  "timetable.manage.delete.line.tooltip": "Usuń plik linii; jej kursy zostają. Niemożliwe, dopóki wariant chrono wyłącza tę linię.",
+  "timetable.manage.delete.trip.tooltip": "Usuń plik kursu. Niemożliwe, dopóki obieg wykonuje ten kurs.",
+  "timetable.manage.step": "Linie i kursy",
+  "timetable.status.line_renamed": "Linia {old} nazywa się teraz {name}.",
+  "timetable.status.line_deleted": "Linia {name} usunięta.",
+  "timetable.status.trip_renamed": "Kurs {old} nazywa się teraz {name}.",
+  "timetable.status.trip_deleted": "Kurs {name} usunięty.",
+  "timetable.status.manage_failed": "Nie udało się: {reason}",
+  "busstop.remove": "Usuń z rozkładu",
+  "busstop.remove.tooltip": "Usuń przystanek z Busstops.cfg i jego połączenia. Obiekt zostaje na mapie. Niemożliwe, dopóki zatrzymuje się tu jakiś kurs.",
+  "busstop.remove.step": "Usuń przystanek {id} z rozkładu",
+  "busstop.status.removed": "Przystanek {id} nie należy już do rozkładu.",
+  "busstop.status.remove_failed": "Nie udało się usunąć przystanku: {reason}"
+}

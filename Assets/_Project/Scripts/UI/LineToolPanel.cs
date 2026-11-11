@@ -18,6 +18,10 @@ namespace OmsiMapEditor.UI
         private readonly VisualElement list = new VisualElement();
         private readonly Label resultLabel = new Label();
         private readonly Label hintLabel;
+        private readonly Label editLabel = new Label();
+        private readonly List<VisualElement> newLineOnly = new List<VisualElement>();
+        private Button saveButton;
+        private Toggle railToggle;
         private DropdownField groupField;
         private TextField groupText;
 
@@ -31,14 +35,18 @@ namespace OmsiMapEditor.UI
             hintLabel = LocBindings.NewLabel("line.hint");
             hintLabel.AddToClassList("panel-info");
             Add(hintLabel);
+            editLabel.AddToClassList("panel-info");
+            editLabel.style.whiteSpace = WhiteSpace.Normal;
+            editLabel.style.display = DisplayStyle.None;
+            Add(editLabel);
 
             nameField.AddToClassList("picker-field");
             nameField.style.width = StyleKeyword.Auto;
             nameField.style.flexGrow = 1;
             nameField.RegisterValueChangedCallback(change => NameChanged?.Invoke(change.newValue));
-            Row("line.name", nameField);
+            newLineOnly.Add(Row("line.name", nameField));
             groupHost.style.flexGrow = 1;
-            Row("line.group", groupHost);
+            newLineOnly.Add(Row("line.group", groupHost));
 
             var directions = new VisualElement();
             directions.AddToClassList("panel-tabs");
@@ -51,11 +59,18 @@ namespace OmsiMapEditor.UI
                 directions.Add(button);
             }
             Add(directions);
+            newLineOnly.Add(directions);
 
             ringToggle = new Toggle(Loc.T("line.ring")) { tooltip = Loc.T("line.ring.tooltip") };
             ringToggle.AddToClassList("content-folders-toggle");
             ringToggle.RegisterValueChangedCallback(change => RingChanged?.Invoke(change.newValue));
             Add(ringToggle);
+            newLineOnly.Add(ringToggle);
+            railToggle = new Toggle(Loc.T("line.rail")) { tooltip = Loc.T("line.rail.tooltip") };
+            railToggle.AddToClassList("content-folders-toggle");
+            railToggle.RegisterValueChangedCallback(change => RailChanged?.Invoke(change.newValue));
+            Add(railToggle);
+            newLineOnly.Add(railToggle);
             waypointToggle = new Toggle(Loc.T("line.waypoint")) { tooltip = Loc.T("line.waypoint.tooltip") };
             waypointToggle.AddToClassList("content-folders-toggle");
             waypointToggle.RegisterValueChangedCallback(change => WaypointModeChanged?.Invoke(change.newValue));
@@ -68,11 +83,9 @@ namespace OmsiMapEditor.UI
             var actions = new VisualElement();
             actions.AddToClassList("panel-tabs");
             actions.AddToClassList("picker-segmented");
-            foreach (var button in new[]
-                     {
-                         LocBindings.WithTooltip(LocBindings.NewButton("line.copy", () => CopyReversedRequested?.Invoke()), "line.copy.tooltip"),
-                         LocBindings.WithTooltip(LocBindings.NewButton("line.clear", () => ClearRequested?.Invoke()), "line.clear.tooltip")
-                     })
+            var copy = LocBindings.WithTooltip(LocBindings.NewButton("line.copy", () => CopyReversedRequested?.Invoke()), "line.copy.tooltip");
+            newLineOnly.Add(copy);
+            foreach (var button in new[] { copy, LocBindings.WithTooltip(LocBindings.NewButton("line.clear", () => ClearRequested?.Invoke()), "line.clear.tooltip") })
             {
                 button.AddToClassList("panel-tab");
                 actions.Add(button);
@@ -83,10 +96,10 @@ namespace OmsiMapEditor.UI
             resultLabel.style.whiteSpace = WhiteSpace.Normal;
             Add(resultLabel);
 
-            var save = LocBindings.WithTooltip(LocBindings.NewButton("line.save", () => SaveRequested?.Invoke()), "line.save.tooltip");
-            save.AddToClassList("map-control-button");
-            save.AddToClassList("dialog-primary");
-            Add(save);
+            saveButton = LocBindings.WithTooltip(LocBindings.NewButton("line.save", () => SaveRequested?.Invoke()), "line.save.tooltip");
+            saveButton.AddToClassList("map-control-button");
+            saveButton.AddToClassList("dialog-primary");
+            Add(saveButton);
         }
 
         public event Action<string> NameChanged;
@@ -94,6 +107,9 @@ namespace OmsiMapEditor.UI
         public event Action<bool> DirectionChosen;
         public event Action<bool> RingChanged;
         public event Action<bool> WaypointModeChanged;
+
+        /// <summary>The line runs on rails (train or tram) instead of roads.</summary>
+        public event Action<bool> RailChanged;
         public event Action CopyReversedRequested;
         public event Action ClearRequested;
         public event Action SaveRequested;
@@ -108,6 +124,20 @@ namespace OmsiMapEditor.UI
         public string Group => groupField != null ? groupField.value ?? string.Empty : groupText?.value ?? string.Empty;
 
         public bool WaypointMode => waypointToggle.value;
+
+        /// <summary>
+        /// Shows the tool for the stops of a trip that exists (a text about it), or as the tool for new lines (null): without the line's name and group,
+        /// the return trip and the ring, and with a button that saves the stops into the trip.
+        /// </summary>
+        public void SetEditing(string text)
+        {
+            var editing = text != null;
+            editLabel.text = text ?? string.Empty;
+            editLabel.style.display = editing ? DisplayStyle.Flex : DisplayStyle.None;
+            foreach (var element in newLineOnly)
+                element.style.display = editing ? DisplayStyle.None : DisplayStyle.Flex;
+            saveButton.text = editing ? Loc.T("line.save_trip") : Loc.T("line.save");
+        }
 
         public void SetName(string name)
         {
@@ -201,7 +231,7 @@ namespace OmsiMapEditor.UI
             resultLabel.EnableInClassList("panel-info-warning", problem);
         }
 
-        private void Row(string labelKey, VisualElement control)
+        private VisualElement Row(string labelKey, VisualElement control)
         {
             var row = new VisualElement();
             row.AddToClassList("picker-option");
@@ -210,6 +240,7 @@ namespace OmsiMapEditor.UI
             row.Add(label);
             row.Add(control);
             Add(row);
+            return row;
         }
 
         private static Button RowButton(string text, string tooltipKey, Action clicked)

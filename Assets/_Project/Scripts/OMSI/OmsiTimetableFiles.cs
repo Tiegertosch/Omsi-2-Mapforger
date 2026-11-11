@@ -341,6 +341,252 @@ namespace OmsiMapEditor.OMSI
             return file.Records.Where(record => string.Equals(record.Name, "profile", StringComparison.OrdinalIgnoreCase)).ToList();
         }
 
+        // ---- stops ----
+
+        private const string StopRecord = "station_typ2";
+        private const string ArrivalRecord = "profile_man_arr_time";
+        private const string DepartureRecord = "profile_man_dep_time";
+        private const string StoppingRecord = "profile_otherstopping";
+
+        /// <summary>True for a trip that runs on a track of its own (a <c>.ttr</c>) or lists its stops as <c>[station]</c> records; the stops of such a trip are not edited here.</summary>
+        public bool HasTrack => Trip(0).Length > 0 || file.Records.Any(record => string.Equals(record.Name, "station", StringComparison.OrdinalIgnoreCase));
+
+        private List<OmsiRecord> StopRecords()
+        {
+            return file.Records.Where(record => string.Equals(record.Name, StopRecord, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        /// <summary>The object IDs of the stops in the order the trip serves them.</summary>
+        public List<int> StopIds
+        {
+            get
+            {
+                var result = new List<int>();
+                foreach (var record in StopRecords())
+                {
+                    var values = record.AllValues();
+                    result.Add(values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : -1);
+                }
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Puts other stops into the trip. What the profiles say of single stops (times, stopping) follows each stop that stays and goes with each that is
+        /// dropped; the lines around the stops stay as they are.
+        /// </summary>
+        public void SetStops(IList<int> ids)
+        {
+            if (ids == null)
+                throw new ArgumentNullException(nameof(ids));
+            if (ids.Count < 2)
+                throw new ArgumentException("A trip needs at least two stops.", nameof(ids));
+            if (HasTrack)
+                throw new InvalidOperationException("The trip runs on a track of its own; its stops are not edited here.");
+            var records = StopRecords();
+            if (records.Count == 0)
+                throw new InvalidOperationException("The trip lists no stops to replace.");
+            var before = StopIds;
+            // Where each old stop goes: the same object, counted in order of appearance.
+            var map = new int?[before.Count];
+            var used = new HashSet<int>();
+            for (var index = 0; index < before.Count; index++)
+                for (var target = 0; target < ids.Count; target++)
+                    if (ids[target] == before[index] && used.Add(target))
+                    {
+                        map[index] = target;
+                        break;
+                    }
+            RemapProfiles(map);
+
+            var lastOld = records[records.Count - 1];
+            var tail = lastOld.Trailer.Skip(1).ToList();
+            var position = file.Records.IndexOf(lastOld) + 1;
+            for (var index = 0; index < ids.Count; index++)
+            {
+                var text = ids[index].ToString(CultureInfo.InvariantCulture);
+                if (index < records.Count)
+                {
+                    if (records[index].Trailer.Count == 0)
+                        records[index].Trailer.Add(new OmsiLine(text, file.DefaultLineEnding));
+                    else
+                        records[index].Trailer[0].Text = text;
+                }
+                else
+                {
+                    var record = file.CreateRecord(StopRecord, new string[0], 0);
+                    record.Trailer.Add(new OmsiLine(text, file.DefaultLineEnding));
+                    record.Trailer.Add(new OmsiLine(string.Empty, file.DefaultLineEnding));
+                    file.InsertRecord(position++, record);
+                    records.Add(record);
+                }
+            }
+            for (var index = records.Count - 1; index >= ids.Count; index--)
+                file.RemoveRecord(records[index]);
+            records.RemoveRange(ids.Count, records.Count - ids.Count);
+            // What followed the last stop (the comment block above the profiles) follows the new last one.
+            var newLast = records[records.Count - 1];
+            if (!ReferenceEquals(newLast, lastOld))
+            {
+                if (records.Count > 0 && lastOld.Trailer.Count > 1 && file.Records.Contains(lastOld))
+                    lastOld.Trailer.RemoveRange(1, lastOld.Trailer.Count - 1);
+                if (file.Records.Contains(lastOld))
+                    lastOld.Trailer.Add(new OmsiLine(string.Empty, file.DefaultLineEnding));
+                var keep = newLast.Trailer.Count > 0 ? newLast.Trailer[0] : new OmsiLine(string.Empty, file.DefaultLineEnding);
+                newLast.Trailer.Clear();
+                newLast.Trailer.Add(keep);
+                foreach (var line in tail)
+                    newLast.Trailer.Add(line);
+            }
+        }
+
+        /// <summary>Sets the place the bus is going to, the first of the lines under <c>[trip]</c> after the track.</summary>
+        public void SetDestination(string destination)
+        {
+            var record = file.Records.FirstOrDefault(candidate => string.Equals(candidate.Name, "trip", StringComparison.OrdinalIgnoreCase));
+            if (record == null)
+                throw new InvalidOperationException("The trip file has no [trip].");
+            var line = record.Fields.Count > 1 ? record.Fields[1] : record.Trailer.Count > 1 - record.Fields.Count ? record.Trailer[1 - record.Fields.Count] : null;
+            if (line == null)
+                throw new InvalidOperationException("The trip file has no destination line.");
+            line.Text = OneLine(destination);
+        }
+
+        // ---- the times and stopping of single stops (per profile) ----
+
+        /// <summary>How a profile times and stops at single stops; stops it does not mention follow from the running time and the lengths of the station links.</summary>
+        public sealed class StopSettings
+        {
+            /// <summary>Minutes after the start the bus is at the stop (arrival, departure); a stop that has one is a time point the bus waits at.</summary>
+            public Dictionary<int, double> Arrivals { get; } = new Dictionary<int, double>();
+            public Dictionary<int, double> Departures { get; } = new Dictionary<int, double>();
+            /// <summary>1 and 4 stop for whoever wants to get on or off, 2 is passed, 3 is served when the bus is more than 20 seconds early.</summary>
+            public Dictionary<int, int> Stopping { get; } = new Dictionary<int, int>();
+        }
+
+        private IEnumerable<OmsiRecord> DetailRecords(int profile)
+        {
+            var records = ProfileRecords();
+            if (profile < 0 || profile >= records.Count)
+                throw new ArgumentOutOfRangeException(nameof(profile), "The trip has no profile " + profile + ".");
+            for (var index = file.Records.IndexOf(records[profile]) + 1; index < file.Records.Count; index++)
+            {
+                var name = file.Records[index].Name;
+                if (!name.StartsWith("profile_", StringComparison.OrdinalIgnoreCase))
+                    yield break;
+                yield return file.Records[index];
+            }
+        }
+
+        private static bool IsDetail(OmsiRecord record, string name)
+        {
+            return string.Equals(record.Name, name, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public StopSettings GetStopSettings(int profile)
+        {
+            var result = new StopSettings();
+            foreach (var record in DetailRecords(profile))
+            {
+                var values = record.AllValues();
+                if (values.Count < 2 || !int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var stop))
+                    continue;
+                if (IsDetail(record, StoppingRecord))
+                {
+                    if (int.TryParse(values[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var kind))
+                        result.Stopping[stop] = kind;
+                }
+                else if ((IsDetail(record, ArrivalRecord) || IsDetail(record, DepartureRecord)) &&
+                         double.TryParse(values[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var minutes))
+                {
+                    (IsDetail(record, ArrivalRecord) ? result.Arrivals : result.Departures)[stop] = minutes;
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Sets (or, with null, takes away) the minute the bus arrives at a stop after the trip began.</summary>
+        public void SetArrival(int profile, int stop, double? minutes)
+        {
+            SetDetail(profile, ArrivalRecord, stop, minutes.HasValue ? minutes.Value.ToString("0.000", CultureInfo.InvariantCulture) : null);
+        }
+
+        /// <summary>Sets (or, with null, takes away) the minute the bus leaves a stop after the trip began.</summary>
+        public void SetDeparture(int profile, int stop, double? minutes)
+        {
+            SetDetail(profile, DepartureRecord, stop, minutes.HasValue ? minutes.Value.ToString("0.000", CultureInfo.InvariantCulture) : null);
+        }
+
+        /// <summary>Sets (or, with null, takes away) how the bus stops at a stop; see <see cref="StopSettings.Stopping"/>.</summary>
+        public void SetStopping(int profile, int stop, int? kind)
+        {
+            if (kind.HasValue && (kind.Value < 0 || kind.Value > 4))
+                throw new ArgumentOutOfRangeException(nameof(kind), "Stopping is 0 to 4.");
+            SetDetail(profile, StoppingRecord, stop, kind.HasValue ? kind.Value.ToString(CultureInfo.InvariantCulture) : null);
+        }
+
+        private void SetDetail(int profile, string name, int stop, string value)
+        {
+            if (stop < 0 || stop >= Math.Max(StopRecords().Count, StopIds.Count))
+                throw new ArgumentOutOfRangeException(nameof(stop), "The trip has no stop " + stop + ".");
+            var details = DetailRecords(profile).ToList();
+            var existing = details.FirstOrDefault(record =>
+            {
+                var values = record.AllValues();
+                return IsDetail(record, name) && values.Count > 0 && int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) && index == stop;
+            });
+            if (value == null)
+            {
+                if (existing != null)
+                    file.RemoveRecord(existing);
+                return;
+            }
+            if (existing != null)
+            {
+                var line = existing.Fields.Count > 1 ? existing.Fields[1] : existing.Trailer.Count > 1 - existing.Fields.Count ? existing.Trailer[1 - existing.Fields.Count] : null;
+                if (line == null)
+                    throw new InvalidOperationException("The record has no value.");
+                line.Text = value;
+                return;
+            }
+            // New records go behind the others of their kind, in the order the editor writes them: arrivals, departures, stopping.
+            var order = new[] { ArrivalRecord, DepartureRecord, StoppingRecord };
+            var rank = Array.IndexOf(order, name);
+            var profileRecord = ProfileRecords()[profile];
+            var insertAt = file.Records.IndexOf(profileRecord) + 1;
+            foreach (var record in details)
+                if (Array.FindIndex(order, each => IsDetail(record, each)) <= rank)
+                    insertAt = file.Records.IndexOf(record) + 1;
+            var created = file.CreateRecord(name, new string[0], 0);
+            created.Trailer.Add(new OmsiLine(stop.ToString(CultureInfo.InvariantCulture), file.DefaultLineEnding));
+            created.Trailer.Add(new OmsiLine(value, file.DefaultLineEnding));
+            created.Trailer.Add(new OmsiLine(string.Empty, file.DefaultLineEnding));
+            file.InsertRecord(insertAt, created);
+        }
+
+        /// <summary>Gives the per-stop records of every profile their stop's new place; a record whose stop is gone goes.</summary>
+        private void RemapProfiles(int?[] map)
+        {
+            foreach (var record in file.Records.ToList())
+            {
+                var kind = new[] { ArrivalRecord, DepartureRecord, StoppingRecord }.Any(name => IsDetail(record, name));
+                if (!kind)
+                    continue;
+                var line = record.Fields.Count > 0 ? record.Fields[0] : record.Trailer.Count > 0 ? record.Trailer[0] : null;
+                if (line == null || !int.TryParse(line.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+                    continue;
+                if (index < 0 || index >= map.Length || !map[index].HasValue)
+                    file.RemoveRecord(record);
+                else if (map[index].Value != index)
+                    line.Text = map[index].Value.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        private static string OneLine(string text)
+        {
+            return (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
+        }
+
         private string Trip(int index)
         {
             var record = file.Records.FirstOrDefault(candidate => string.Equals(candidate.Name, "trip", StringComparison.OrdinalIgnoreCase));

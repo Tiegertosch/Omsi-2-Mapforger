@@ -1,0 +1,4 @@
+{
+  "line.rail": "Rail (train ou tramway)",
+  "line.rail.tooltip": "La ligne circule sur des rails : le chemin suit les chemins de rail, et chaque course reçoit un fichier de voie et un fichier de course. Les arrêts sont les mêmes objets bus_stop.sco, placés à côté du rail."
+}

@@ -33,6 +33,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Metres between the stop's object and the lane.</summary>
         public double Distance { get; internal set; }
+
+        /// <summary>True when the stop's object lies on the right of the lane in its way of travel; set where places are found for rails.</summary>
+        public bool Right { get; internal set; }
     }
 
     /// <summary>The way between two stops: the lanes from the first stop's to the second's, and its length counted as OMSI does for a station link.</summary>
@@ -65,7 +68,7 @@ namespace OmsiMapEditor.OMSI
         public IReadOnlyList<OmsiLane> Lanes => lanes;
 
         /// <summary>The vehicle lanes of all tiles of a map, read with the object and spline files of the installation at <paramref name="installationRoot"/>.</summary>
-        public static OmsiPathNetwork ForMap(OmsiMapSummary summary, string installationRoot)
+        public static OmsiPathNetwork ForMap(OmsiMapSummary summary, string installationRoot, int kind = 0)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -96,7 +99,7 @@ namespace OmsiMapEditor.OMSI
             foreach (var tile in summary.Tiles)
                 if (tile.IsAvailable)
                     paths.AddRange(OmsiMapPaths.OfTile(summary, tile, scenery, profiles.Get));
-            return Build(paths);
+            return Build(paths, kind);
         }
 
         /// <summary>The lanes of the paths that are of <paramref name="kind"/> (0: vehicles) with their links.</summary>
@@ -242,11 +245,11 @@ namespace OmsiMapEditor.OMSI
                         if (!tried.Add(index))
                             continue;
                         var lane = lanes[index];
-                        Project(lane, position, out var along, out var distance, out _);
+                        Project(lane, position, out var along, out var distance, out var onTheRight);
                         if (distance > maxDistance)
                             continue;
                         var scale = lane.PolylineLength > 0.0 ? lane.LengthMeters / lane.PolylineLength : 1.0;
-                        result.Add(new OmsiStopPlace { Lane = lane, Position = along * scale, Distance = distance });
+                        result.Add(new OmsiStopPlace { Lane = lane, Position = along * scale, Distance = distance, Right = onTheRight });
                     }
                 }
             result.Sort((first, second) => first.Distance.CompareTo(second.Distance));

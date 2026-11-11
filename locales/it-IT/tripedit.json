@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Modifica delle fermate della corsa {trip}. Clicca sulle fermate, spostale o rimuovile nell'elenco, poi salva. Orari, turni e linea restano.",
+  "line.save_trip": "Salva le fermate",
+  "line.status.trip_saved": "Fermate della corsa {name} salvate.",
+  "line.status.trip_track": "La corsa {name} circola su un percorso proprio o non esiste; le sue fermate non si possono modificare qui.",
+  "line.status.trip_missing": "La corsa {name} si ferma all'oggetto {id}, che non è un oggetto fermata della mappa.",
+  "line.trip.step": "Fermate della corsa {name}",
+  "timetable.manage.stops": "Fermate della corsa",
+  "timetable.manage.stops.button": "Modifica fermate…",
+  "timetable.manage.stops.tooltip": "Apri lo strumento Linea sulle fermate di questa corsa: aggiungi, sposta o rimuovi fermate; il percorso fra di esse viene cercato di nuovo.",
+  "timetable.stoptimes": "Orari alle fermate: {trip}, profilo {name}",
+  "timetable.stoptimes.hint": "Minuti dopo l'inizio della corsa. Una fermata con un orario è una dove l'autobus attende; le fermate senza orario derivano dalla durata e dalle lunghezze dei collegamenti.",
+  "timetable.stoptimes.arrival": "Arrivo",
+  "timetable.stoptimes.departure": "Partenza",
+  "timetable.stoptimes.stopping": "Sosta",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Un orario è in minuti dopo l'inizio della corsa, per esempio 2,5.",
+  "timetable.stopping.0": "Predefinito",
+  "timetable.stopping.1": "A richiesta",
+  "timetable.stopping.2": "Senza sosta",
+  "timetable.stopping.3": "Se in anticipo",
+  "timetable.stopping.4": "A richiesta (4)"
+}

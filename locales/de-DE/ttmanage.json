@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Linien und Fahrten umbenennen und löschen",
+  "timetable.manage.line": "Liniendatei",
+  "timetable.manage.trip": "Fahrtdatei",
+  "timetable.manage.name": "Neuer Name",
+  "timetable.manage.rename": "Umbenennen",
+  "timetable.manage.rename.tooltip": "Die Liniendatei umbenennen. Nicht möglich, solange eine Chrono-Variante die Linie abschaltet.",
+  "timetable.manage.rename.trip.tooltip": "Die Fahrtdatei und die Umläufe, die sie fahren, umbenennen.",
+  "timetable.manage.delete": "Löschen",
+  "timetable.manage.delete.line.tooltip": "Die Liniendatei löschen; ihre Fahrten bleiben. Nicht möglich, solange eine Chrono-Variante die Linie abschaltet.",
+  "timetable.manage.delete.trip.tooltip": "Die Fahrtdatei löschen. Nicht möglich, solange ein Umlauf die Fahrt fährt.",
+  "timetable.manage.step": "Linien und Fahrten",
+  "timetable.status.line_renamed": "Linie {old} heißt jetzt {name}.",
+  "timetable.status.line_deleted": "Linie {name} gelöscht.",
+  "timetable.status.trip_renamed": "Fahrt {old} heißt jetzt {name}.",
+  "timetable.status.trip_deleted": "Fahrt {name} gelöscht.",
+  "timetable.status.manage_failed": "Das ging nicht: {reason}",
+  "busstop.remove": "Aus dem Fahrplan nehmen",
+  "busstop.remove.tooltip": "Die Haltestelle aus Busstops.cfg und ihre Stationsverbindungen nehmen. Das Objekt bleibt auf der Karte. Nicht möglich, solange eine Fahrt hier hält.",
+  "busstop.remove.step": "Haltestelle {id} aus dem Fahrplan nehmen",
+  "busstop.status.removed": "Haltestelle {id} gehört nicht mehr zum Fahrplan.",
+  "busstop.status.remove_failed": "Die Haltestelle ließ sich nicht herausnehmen: {reason}"
+}

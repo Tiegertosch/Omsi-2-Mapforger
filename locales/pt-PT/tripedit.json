@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "A editar as paragens da viagem {trip}. Clica em paragens, move-as ou remove-as da lista e guarda. Os tempos, as circulações e a linha ficam.",
+  "line.save_trip": "Guardar paragens",
+  "line.status.trip_saved": "Paragens da viagem {name} guardadas.",
+  "line.status.trip_track": "A viagem {name} circula numa via própria ou não existe; as suas paragens não podem ser editadas aqui.",
+  "line.status.trip_missing": "A viagem {name} para no objeto {id}, que não é um objeto de paragem do mapa.",
+  "line.trip.step": "Paragens da viagem {name}",
+  "timetable.manage.stops": "Paragens da viagem",
+  "timetable.manage.stops.button": "Editar paragens…",
+  "timetable.manage.stops.tooltip": "Abrir a ferramenta Linha com as paragens desta viagem: adicionar, mover ou remover paragens; o caminho entre elas é procurado de novo.",
+  "timetable.stoptimes": "Tempos nas paragens: {trip}, perfil {name}",
+  "timetable.stoptimes.hint": "Minutos após o início da viagem. Uma paragem com hora é uma onde o autocarro espera; as paragens sem hora calculam-se pela duração e pelos comprimentos das ligações.",
+  "timetable.stoptimes.arrival": "Chegada",
+  "timetable.stoptimes.departure": "Partida",
+  "timetable.stoptimes.stopping": "Paragem",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Um tempo são minutos após o início da viagem, por exemplo 2,5.",
+  "timetable.stopping.0": "Predefinido",
+  "timetable.stopping.1": "Se pedido",
+  "timetable.stopping.2": "Sem parar",
+  "timetable.stopping.3": "Se adiantado",
+  "timetable.stopping.4": "Se pedido (4)"
+}

@@ -1,0 +1,23 @@
+{
+  "timetable.manage": "Rename and delete lines and trips",
+  "timetable.manage.line": "Line file",
+  "timetable.manage.trip": "Trip file",
+  "timetable.manage.name": "New name",
+  "timetable.manage.rename": "Rename",
+  "timetable.manage.rename.tooltip": "Rename the line file. Not possible while a chrono variant switches the line off.",
+  "timetable.manage.rename.trip.tooltip": "Rename the trip file and the tours that run it.",
+  "timetable.manage.delete": "Delete",
+  "timetable.manage.delete.line.tooltip": "Delete the line file; its trips stay. Not possible while a chrono variant switches the line off.",
+  "timetable.manage.delete.trip.tooltip": "Delete the trip file. Not possible while a tour runs the trip.",
+  "timetable.manage.step": "Lines and trips",
+  "timetable.status.line_renamed": "Line {old} is now {name}.",
+  "timetable.status.line_deleted": "Line {name} deleted.",
+  "timetable.status.trip_renamed": "Trip {old} is now {name}.",
+  "timetable.status.trip_deleted": "Trip {name} deleted.",
+  "timetable.status.manage_failed": "That could not be done: {reason}",
+  "busstop.remove": "Remove from timetable",
+  "busstop.remove.tooltip": "Take the stop out of Busstops.cfg and its station links. The object stays on the map. Not possible while a trip stops here.",
+  "busstop.remove.step": "Remove stop {id} from the timetable",
+  "busstop.status.removed": "Stop {id} is no stop of the timetable any more.",
+  "busstop.status.remove_failed": "The stop could not be taken out: {reason}"
+}

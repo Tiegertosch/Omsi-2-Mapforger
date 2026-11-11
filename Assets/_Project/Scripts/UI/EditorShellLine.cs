@@ -32,6 +32,11 @@ namespace OmsiMapEditor.UI
         private string lineGroup;
         private OmsiTripPlan linePlanOut;
         private OmsiTripPlan linePlanBack;
+        private bool lineRail;
+        private OmsiPathNetwork lineRailNetwork;
+        private Task<OmsiPathNetwork> lineRailTask;
+        private OmsiTrackPlan lineTrackOut;
+        private OmsiTrackPlan lineTrackBack;
         private List<OmsiMapPoint[]> lineHoverLines = new List<OmsiMapPoint[]>();
         private string lineHoverText = string.Empty;
         private int lineHoverKey = -1;
@@ -58,6 +63,16 @@ namespace OmsiMapEditor.UI
                 LineChanged(true);
             };
             lineOptions.WaypointModeChanged += on => lineWaypointMode = on;
+            lineOptions.RailChanged += on =>
+            {
+                lineRail = on;
+                if (on)
+                {
+                    StartRailNetwork();
+                    ChooseRailGroup();
+                }
+                LineChanged(true);
+            };
             lineOptions.CopyReversedRequested += () =>
             {
                 lineBack.Clear();
@@ -153,6 +168,7 @@ namespace OmsiMapEditor.UI
                 lineGroup = groups.Find(each => each.IndexOf("bus", StringComparison.OrdinalIgnoreCase) >= 0) ?? (groups.Count > 0 ? groups[0] : string.Empty);
             lineOptions.SetGroups(groups, lineGroup);
             lineOptions.SetName(lineName);
+            ApplyTripEditDraft();
             lineNetwork = null;
             StartLineNetwork();
             LineChanged(true);
@@ -203,11 +219,63 @@ namespace OmsiMapEditor.UI
             }).Every(150);
         }
 
+        /// <summary>Reads the rails of the map in the background the first time a line on rails is made.</summary>
+        private void StartRailNetwork()
+        {
+            if (lineRailNetwork != null || lineRailTask != null || currentSummary == null)
+                return;
+            var summary = currentSummary;
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
+            var task = Task.Run(() => OmsiPathNetwork.ForMap(summary, root, 2));
+            lineRailTask = task;
+            IVisualElementScheduledItem poll = null;
+            poll = mapCanvas.schedule.Execute(() =>
+            {
+                if (!task.IsCompleted)
+                    return;
+                poll.Pause();
+                if (lineRailTask != task)
+                    return;
+                lineRailTask = null;
+                if (task.IsFaulted)
+                {
+                    Debug.LogException(task.Exception);
+                    SetStatusT("line.status.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
+                    return;
+                }
+                lineRailNetwork = task.Result;
+                if (activeTool == EditorTool.Line && lineRail)
+                    LineChanged(true);
+            }).Every(150);
+        }
+
+        /// <summary>A line on rails runs with trains or trams: the first vehicle group that sounds like one is chosen, unless the group already does.</summary>
+        private void ChooseRailGroup()
+        {
+            var groups = session.ReadAiGroups();
+            Func<string, bool> sounds = name => new[] { "bahn", "tram", "rail", "zug", "train", "metro", "tren", "tramv" }.Any(word => name.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (lineGroup != null && sounds(lineGroup))
+                return;
+            var rail = groups.Find(name => sounds(name));
+            if (rail == null)
+                return;
+            lineGroup = rail;
+            lineOptions.SetGroups(groups, lineGroup);
+        }
+
+        private OmsiTrackPlan TrackPlanOf(List<OmsiTripStopChoice> items)
+        {
+            if (lineRailNetwork == null || items.Count(item => !item.IsWaypoint) < 2)
+                return null;
+            return session.PlanTrack(currentSummary, items, lineRailNetwork);
+        }
+
         private void EndLineTool()
         {
             mapCanvas?.EndRoad();
             mapCanvas?.ClearRoadPreview();
             lineNetworkTask = null;
+            LeaveTripEdit();
             if (lineOptions != null)
                 lineOptions.style.display = DisplayStyle.None;
             if (objectsPanelHost != null && !objectsPanelOpen)
@@ -282,7 +350,13 @@ namespace OmsiMapEditor.UI
             lineHoverKey = key;
             lineHoverLines = new List<OmsiMapPoint[]>();
             lineHoverText = string.Empty;
-            if (hover != null && last != null && hover != last && lineNetwork != null && !lineWaypointMode)
+            if (hover != null && last != null && hover != last && lineRail && lineRailNetwork != null && !lineWaypointMode)
+            {
+                var track = session.PlanTrack(currentSummary, new List<OmsiTripStopChoice> { last, hover }, lineRailNetwork);
+                lineHoverLines = track.Lines.ToList();
+                lineHoverText = track.IsValid ? Loc.T("line.hover", ("name", hover.Name), ("length", Math.Round(track.LengthMeters))) : Loc.T("line.hover.none", ("name", hover.Name));
+            }
+            else if (hover != null && last != null && hover != last && !lineRail && lineNetwork != null && !lineWaypointMode)
             {
                 var plan = session.PlanTrip(currentSummary, lineTimetable, new List<OmsiTripStopChoice> { last, hover }, lineNetwork, lineRightHand);
                 lineHoverLines = plan.Legs.SelectMany(leg => leg.Lines).ToList();
@@ -300,8 +374,10 @@ namespace OmsiMapEditor.UI
             {
                 lineHoverKey = -1;
                 lineHoverLines = new List<OmsiMapPoint[]>();
-                linePlanOut = PlanOf(lineOut);
-                linePlanBack = lineRing ? null : PlanOf(lineBack);
+                linePlanOut = lineRail ? null : PlanOf(lineOut);
+                linePlanBack = lineRing || lineRail ? null : PlanOf(lineBack);
+                lineTrackOut = lineRail ? TrackPlanOf(lineOut) : null;
+                lineTrackBack = lineRail && !lineRing ? TrackPlanOf(lineBack) : null;
             }
             lineOptions.ShowDirection(lineBackMode, lineRing, lineWaypointMode, CurrentLineList);
             ShowLineResult();
@@ -317,13 +393,31 @@ namespace OmsiMapEditor.UI
 
         private void ShowLineResult()
         {
-            if (lineNetwork == null)
+            if (lineRail ? lineRailNetwork == null : lineNetwork == null)
             {
                 lineOptions.ShowResult(Loc.T("line.network"), false);
                 return;
             }
             var text = new List<string>();
             var problem = false;
+            if (lineRail)
+            {
+                foreach (var pair in new[] { new KeyValuePair<string, OmsiTrackPlan>(lineRing ? "line.result.ring" : "line.result.out", lineTrackOut),
+                                             new KeyValuePair<string, OmsiTrackPlan>("line.result.back", lineTrackBack) })
+                {
+                    if (pair.Value == null)
+                        continue;
+                    if (pair.Value.IsValid)
+                        text.Add(Loc.T(pair.Key, ("count", pair.Value.Stations.Count), ("length", Math.Round(pair.Value.LengthMeters)))); // i18n:keys
+                    else
+                    {
+                        problem = true;
+                        text.Add(Loc.T(pair.Key + ".problem", ("problems", string.Join(" ", pair.Value.Problems)))); // i18n:keys
+                    }
+                }
+                lineOptions.ShowResult(string.Join("\n", text), problem);
+                return;
+            }
             foreach (var pair in new[] { new KeyValuePair<string, OmsiTripPlan>(lineRing ? "line.result.ring" : "line.result.out", linePlanOut),
                                          new KeyValuePair<string, OmsiTripPlan>("line.result.back", linePlanBack) })
             {
@@ -357,8 +451,12 @@ namespace OmsiMapEditor.UI
                 if (plan != null)
                     foreach (var leg in plan.Legs)
                         marks.AddRange(leg.Lines);
+            foreach (var track in new[] { lineTrackOut, lineTrackBack })
+                if (track != null)
+                    marks.AddRange(track.Lines);
             marks.AddRange(lineHoverLines);
-            var valid = (linePlanOut == null || linePlanOut.IsValid) && (linePlanBack == null || linePlanBack.IsValid);
+            var valid = (linePlanOut == null || linePlanOut.IsValid) && (linePlanBack == null || linePlanBack.IsValid) &&
+                        (lineTrackOut == null || lineTrackOut.IsValid) && (lineTrackBack == null || lineTrackBack.IsValid);
             mapCanvas.SetRoadPreview(marks, valid, null, null, null);
         }
 
@@ -380,10 +478,20 @@ namespace OmsiMapEditor.UI
         {
             if (!CanEdit || session == null || lineOptions == null)
                 return;
+            if (lineEditTrip != null)
+            {
+                SaveTripStops();
+                return;
+            }
             var line = FileName(lineOptions.LineName);
             if (line.Length == 0)
             {
                 SetStatusT("line.status.need_name");
+                return;
+            }
+            if (lineRail)
+            {
+                SaveRailLine(line);
                 return;
             }
             var specs = new List<OmsiTripSpec>();
@@ -467,6 +575,24 @@ namespace OmsiMapEditor.UI
             if (lineNetworkTask != null)
                 lineNetworkTask.Wait();
             lineNetwork = lineNetworkTask?.Result ?? lineNetwork ?? OmsiPathNetwork.ForMap(currentSummary, OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath));
+            if (Array.IndexOf(args, "-lineRail") >= 0)
+            {
+                lineRail = true;
+                StartRailNetwork();
+                if (lineRailTask != null)
+                    lineRailTask.Wait();
+                lineRailNetwork = lineRailTask?.Result ?? lineRailNetwork ?? OmsiPathNetwork.ForMap(currentSummary, OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath), 2);
+            }
+            var groupArgument = argument("-lineGroup", 1);
+            if (groupArgument != null)
+            {
+                lineGroup = groupArgument;
+                lineOptions.SetGroups(session.ReadAiGroups(), groupArgument);
+            }
+            else if (lineRail)
+            {
+                ChooseRailGroup();
+            }
             var name = argument("-lineName", 1);
             if (name != null)
             {
@@ -496,6 +622,8 @@ namespace OmsiMapEditor.UI
             LineChanged(true);
             Debug.Log("Line plan: out " + (linePlanOut == null ? "none" : linePlanOut.IsValid ? Math.Round(linePlanOut.LengthMeters) + " m" : string.Join(" ", linePlanOut.Problems)) +
                       ", back " + (linePlanBack == null ? "none" : linePlanBack.IsValid ? Math.Round(linePlanBack.LengthMeters) + " m" : string.Join(" ", linePlanBack.Problems)));
+            if (lineRail)
+                Debug.Log("Track plan: out " + (lineTrackOut == null ? "none" : lineTrackOut.IsValid ? Math.Round(lineTrackOut.LengthMeters) + " m, " + lineTrackOut.Entries.Count + " entries" : string.Join(" ", lineTrackOut.Problems)));
             if (Array.IndexOf(args, "-lineSave") >= 0)
                 SaveLine();
         }

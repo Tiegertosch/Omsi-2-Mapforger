@@ -92,6 +92,44 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AFileOfTheOriginalMapCanBeTakenAwayWithoutTouchingTheOriginal()
+        {
+            var workspace = new OmsiMapWorkspace(original, workspaceFolder);
+            workspace.Delete("texture/gras.bmp");
+
+            Assert.IsFalse(workspace.FileExists("texture/gras.bmp"));
+            Assert.IsTrue(workspace.IsModified("texture/gras.bmp"));
+            Assert.IsNull(workspace.Stamp("texture/gras.bmp"));
+            Assert.Throws<FileNotFoundException>(() => workspace.ReadAllBytes("texture/gras.bmp"));
+            CollectionAssert.DoesNotContain(workspace.EnumerateFiles("texture", "*.bmp", false).Select(path => path.Replace('/', '\\')), "texture\\gras.bmp");
+            CollectionAssert.Contains(workspace.ModifiedFiles(), Path.Combine("texture", "gras.bmp"));
+            Assert.IsTrue(File.Exists(Path.Combine(original, "texture", "gras.bmp")));
+            // The project remembers it.
+            var again = new OmsiMapWorkspace(original, workspaceFolder);
+            Assert.IsFalse(again.FileExists("texture/gras.bmp"));
+
+            // The export leaves the file out.
+            var target = OmsiMapExporter.SuggestTargetFolder(workspace);
+            var report = OmsiMapExporter.Export(workspace, target, "Test Map (MapWorks)");
+            Assert.IsFalse(File.Exists(Path.Combine(target, "texture", "gras.bmp")));
+            CollectionAssert.Contains(report.EditedFiles, Path.Combine("texture", "gras.bmp"));
+
+            // Saving the file brings it back; so does reverting.
+            workspace.Save("texture/gras.bmp", new byte[] { 9 });
+            Assert.IsTrue(workspace.FileExists("texture/gras.bmp"));
+            CollectionAssert.AreEqual(new byte[] { 9 }, workspace.ReadAllBytes("texture/gras.bmp"));
+            workspace.Delete("texture/gras.bmp");
+            workspace.Revert("texture/gras.bmp");
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, workspace.ReadAllBytes("texture/gras.bmp"));
+            Assert.IsFalse(workspace.IsModified("texture/gras.bmp"));
+            // A file only the project made simply goes.
+            workspace.Save("texture/new.bmp", new byte[] { 4 });
+            workspace.Delete("texture/new.bmp");
+            Assert.IsFalse(workspace.FileExists("texture/new.bmp"));
+            Assert.IsFalse(workspace.IsDeleted("texture/new.bmp"));
+        }
+
+        [Test]
         public void ExportsOriginalPlusEditsAsASeparateMap()
         {
             var workspace = new OmsiMapWorkspace(original, workspaceFolder);

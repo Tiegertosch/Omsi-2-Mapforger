@@ -387,7 +387,7 @@ namespace OmsiMapEditor.OMSI
                 else if (workspace.ReadOriginalBytes(file.RelativePath) == null)
                     workspace.Revert(file.RelativePath);
                 else
-                    throw new InvalidOperationException(file.RelativePath + " belongs to the original map and cannot be removed.");
+                    workspace.Delete(file.RelativePath);
             }
         }
 

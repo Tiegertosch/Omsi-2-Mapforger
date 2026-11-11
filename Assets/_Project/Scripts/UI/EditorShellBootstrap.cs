@@ -1176,6 +1176,7 @@ namespace OmsiMapEditor.UI
             RunBusStopArguments(Argument, args);
             RunVehicleArguments(Argument, args);
             RunLineArguments(Argument, args);
+            RunEditTripArguments(Argument, args);
             RunTrafficCurveArguments(args);
             RunSignalArguments(args);
             RunProjectTabArguments(args);

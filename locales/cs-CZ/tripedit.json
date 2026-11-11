@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Upravují se zastávky spoje {trip}. Klikni na zastávky, přesuň je nebo odeber v seznamu a ulož. Časy, oběhy a linka zůstanou.",
+  "line.save_trip": "Uložit zastávky",
+  "line.status.trip_saved": "Zastávky spoje {name} uloženy.",
+  "line.status.trip_track": "Spoj {name} jede po vlastní trati nebo neexistuje; jeho zastávky se zde nedají upravit.",
+  "line.status.trip_missing": "Spoj {name} staví u objektu {id}, který není objektem zastávky mapy.",
+  "line.trip.step": "Zastávky spoje {name}",
+  "timetable.manage.stops": "Zastávky spoje",
+  "timetable.manage.stops.button": "Upravit zastávky…",
+  "timetable.manage.stops.tooltip": "Otevřít nástroj Linka na zastávkách tohoto spoje: přidat, přesunout nebo odebrat zastávky, cesta mezi nimi se najde znovu.",
+  "timetable.stoptimes": "Časy na zastávkách: {trip}, profil {name}",
+  "timetable.stoptimes.hint": "Minuty po začátku spoje. Zastávka s časem je taková, na které autobus čeká; zastávky bez času se počítají z jízdní doby a délek spojení.",
+  "timetable.stoptimes.arrival": "Příjezd",
+  "timetable.stoptimes.departure": "Odjezd",
+  "timetable.stoptimes.stopping": "Zastavení",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Čas jsou minuty po začátku spoje, například 2,5.",
+  "timetable.stopping.0": "Výchozí",
+  "timetable.stopping.1": "Na znamení",
+  "timetable.stopping.2": "Projet",
+  "timetable.stopping.3": "Při předstihu",
+  "timetable.stopping.4": "Na znamení (4)"
+}

@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Modification des arrêts de la course {trip}. Clique sur des arrêts, déplace-les ou retire-les dans la liste, puis enregistre. Les temps, les services et la ligne restent.",
+  "line.save_trip": "Enregistrer les arrêts",
+  "line.status.trip_saved": "Arrêts de la course {name} enregistrés.",
+  "line.status.trip_track": "La course {name} circule sur une voie propre ou n'existe pas ; ses arrêts ne peuvent pas être modifiés ici.",
+  "line.status.trip_missing": "La course {name} s'arrête à l'objet {id}, qui n'est pas un objet d'arrêt de la carte.",
+  "line.trip.step": "Arrêts de la course {name}",
+  "timetable.manage.stops": "Arrêts de la course",
+  "timetable.manage.stops.button": "Modifier les arrêts…",
+  "timetable.manage.stops.tooltip": "Ouvrir l'outil Ligne sur les arrêts de cette course : ajouter, déplacer ou retirer des arrêts ; le chemin entre eux est cherché de nouveau.",
+  "timetable.stoptimes": "Heures aux arrêts : {trip}, profil {name}",
+  "timetable.stoptimes.hint": "Minutes après le début de la course. Un arrêt avec une heure est un arrêt où le bus attend ; les arrêts sans heure sont calés sur la durée et les longueurs des liaisons.",
+  "timetable.stoptimes.arrival": "Arrivée",
+  "timetable.stoptimes.departure": "Départ",
+  "timetable.stoptimes.stopping": "Arrêt",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Une heure est en minutes après le début de la course, par exemple 2,5.",
+  "timetable.stopping.0": "Par défaut",
+  "timetable.stopping.1": "Sur demande",
+  "timetable.stopping.2": "Sans arrêt",
+  "timetable.stopping.3": "Si en avance",
+  "timetable.stopping.4": "Sur demande (4)"
+}

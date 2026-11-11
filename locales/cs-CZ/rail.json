@@ -1,0 +1,4 @@
+{
+  "line.rail": "Kolej (vlak nebo tramvaj)",
+  "line.rail.tooltip": "Linka jede po kolejích: cesta sleduje kolejové cesty a každý spoj dostane soubor trati a soubor spoje na ní. Stanice jsou stejné objekty bus_stop.sco umístěné vedle koleje."
+}

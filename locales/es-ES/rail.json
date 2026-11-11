@@ -1,0 +1,4 @@
+{
+  "line.rail": "Ferrocarril (tren o tranvía)",
+  "line.rail.tooltip": "La línea circula por carriles: el camino sigue las rutas de carril y cada viaje recibe un archivo de vía y un archivo de viaje. Las paradas son los mismos objetos bus_stop.sco, colocados junto al carril."
+}

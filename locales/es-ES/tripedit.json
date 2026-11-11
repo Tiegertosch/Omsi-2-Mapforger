@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Editando las paradas del viaje {trip}. Haz clic en paradas, muévelas o quítalas de la lista y guarda. Los tiempos, los servicios y la línea se quedan.",
+  "line.save_trip": "Guardar paradas",
+  "line.status.trip_saved": "Paradas del viaje {name} guardadas.",
+  "line.status.trip_track": "El viaje {name} circula por una vía propia o no existe; sus paradas no se pueden editar aquí.",
+  "line.status.trip_missing": "El viaje {name} para en el objeto {id}, que no es un objeto de parada del mapa.",
+  "line.trip.step": "Paradas del viaje {name}",
+  "timetable.manage.stops": "Paradas del viaje",
+  "timetable.manage.stops.button": "Editar paradas…",
+  "timetable.manage.stops.tooltip": "Abrir la herramienta Línea con las paradas de este viaje: añadir, mover o quitar paradas; el camino entre ellas se busca de nuevo.",
+  "timetable.stoptimes": "Tiempos en las paradas: {trip}, perfil {name}",
+  "timetable.stoptimes.hint": "Minutos desde el inicio del viaje. Una parada con hora es una donde el autobús espera; las paradas sin hora se calculan con la duración y las longitudes de los enlaces.",
+  "timetable.stoptimes.arrival": "Llegada",
+  "timetable.stoptimes.departure": "Salida",
+  "timetable.stoptimes.stopping": "Parada",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Un tiempo son minutos desde el inicio del viaje, por ejemplo 2,5.",
+  "timetable.stopping.0": "Predeterminado",
+  "timetable.stopping.1": "Si se pide",
+  "timetable.stopping.2": "Sin parar",
+  "timetable.stopping.3": "Si va pronto",
+  "timetable.stopping.4": "Si se pide (4)"
+}

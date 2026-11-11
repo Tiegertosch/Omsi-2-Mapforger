@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -13,6 +14,8 @@ namespace OmsiMapEditor.OMSI
         // Counts the saves and reverts of each file, as file times may not tell two quick saves apart.
         private readonly Dictionary<string, long> versions = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         private long lastVersion;
+        // Files of the original map this project takes away (a deleted line): listed in the project data folder, the original stays as it is.
+        private HashSet<string> deleted;
 
         public OmsiMapWorkspace(string sourceMapFolder, string workspaceFolder)
         {
@@ -40,13 +43,76 @@ namespace OmsiMapEditor.OMSI
             return Path.Combine(Path.GetDirectoryName(fullPath), Path.GetFileNameWithoutExtension(fullPath) + ".workspace");
         }
 
+        private string DeletedListPath => Path.Combine(WorkspacePath, OmsiMapExporter.ProjectDataFolder, "deleted.txt");
+
+        private HashSet<string> Deleted()
+        {
+            if (deleted != null)
+                return deleted;
+            deleted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (File.Exists(DeletedListPath))
+                foreach (var line in File.ReadAllLines(DeletedListPath))
+                    if (line.Trim().Length > 0)
+                        deleted.Add(OmsiRelativePath.Normalize(line));
+            return deleted;
+        }
+
+        private void SaveDeleted()
+        {
+            var path = DeletedListPath;
+            if (Deleted().Count == 0)
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+                return;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllLines(path, Deleted().OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase));
+        }
+
+        /// <summary>True when the project takes this file of the original map away.</summary>
+        public bool IsDeleted(string relativePath)
+        {
+            return Deleted().Contains(OmsiRelativePath.Normalize(relativePath));
+        }
+
+        /// <summary>Relative paths of the original map's files this project takes away, sorted.</summary>
+        public List<string> DeletedFiles()
+        {
+            return Deleted().OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        /// <summary>
+        /// Takes a file away: an edited or made copy goes, and a file the original map has is no longer read or exported. The original is not touched.
+        /// A later <see cref="Save(string, byte[])"/> brings the file back.
+        /// </summary>
+        public void Delete(string relativePath)
+        {
+            var edited = WorkspaceFile(relativePath);
+            Count(edited);
+            if (File.Exists(edited))
+                File.Delete(edited);
+            if (File.Exists(OmsiRelativePath.Resolve(RootPath, relativePath)) && Deleted().Add(OmsiRelativePath.Normalize(relativePath)))
+                SaveDeleted();
+        }
+
+        private void Restore(string relativePath)
+        {
+            if (Deleted().Remove(OmsiRelativePath.Normalize(relativePath)))
+                SaveDeleted();
+        }
+
         public bool FileExists(string relativePath)
         {
+            if (IsDeleted(relativePath))
+                return false;
             return File.Exists(WorkspaceFile(relativePath)) || File.Exists(OmsiRelativePath.Resolve(RootPath, relativePath));
         }
 
         public byte[] ReadAllBytes(string relativePath)
         {
+            if (IsDeleted(relativePath))
+                throw new FileNotFoundException("The project took this file away.", relativePath);
             var edited = WorkspaceFile(relativePath);
             return File.ReadAllBytes(File.Exists(edited) ? edited : OmsiRelativePath.Resolve(RootPath, relativePath));
         }
@@ -58,6 +124,8 @@ namespace OmsiMapEditor.OMSI
             OmsiRelativePath.AddFiles(RootPath, relativeFolder, searchPattern, recursive, result);
             OmsiRelativePath.AddFiles(WorkspacePath, relativeFolder, searchPattern, recursive, result);
             result.RemoveWhere(path => path.EndsWith(".mapforge-tmp", StringComparison.OrdinalIgnoreCase));
+            if (Deleted().Count > 0)
+                result.RemoveWhere(path => Deleted().Contains(OmsiRelativePath.Normalize(path)));
             return new List<string>(result);
         }
 
@@ -74,6 +142,8 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public string Stamp(string relativePath)
         {
+            if (IsDeleted(relativePath))
+                return null;
             var edited = WorkspaceFile(relativePath);
             var inWorkspace = File.Exists(edited);
             var file = new FileInfo(inWorkspace ? edited : OmsiRelativePath.Resolve(RootPath, relativePath));
@@ -89,7 +159,7 @@ namespace OmsiMapEditor.OMSI
 
         public bool IsModified(string relativePath)
         {
-            return File.Exists(WorkspaceFile(relativePath));
+            return File.Exists(WorkspaceFile(relativePath)) || IsDeleted(relativePath);
         }
 
         /// <summary>Relative paths of all edited files, sorted.</summary>
@@ -101,10 +171,11 @@ namespace OmsiMapEditor.OMSI
 
             foreach (var path in Directory.GetFiles(WorkspacePath, "*", SearchOption.AllDirectories))
             {
-                if (path.EndsWith(".mapforge-tmp", StringComparison.OrdinalIgnoreCase))
+                if (path.EndsWith(".mapforge-tmp", StringComparison.OrdinalIgnoreCase) || string.Equals(path, DeletedListPath, StringComparison.OrdinalIgnoreCase))
                     continue;
                 result.Add(path.Substring(WorkspacePath.Length).TrimStart(Path.DirectorySeparatorChar));
             }
+            result.AddRange(Deleted().Where(path => !result.Contains(path, StringComparer.OrdinalIgnoreCase)));
 
             result.Sort(StringComparer.OrdinalIgnoreCase);
             return result;
@@ -119,6 +190,7 @@ namespace OmsiMapEditor.OMSI
             if (bytes == null)
                 throw new ArgumentNullException(nameof(bytes));
 
+            Restore(relativePath);
             var original = OmsiRelativePath.Resolve(RootPath, relativePath);
             if (File.Exists(original) && SameBytes(File.ReadAllBytes(original), bytes))
             {
@@ -149,6 +221,7 @@ namespace OmsiMapEditor.OMSI
         {
             var edited = WorkspaceFile(relativePath);
             Count(edited);
+            Restore(relativePath);
             if (File.Exists(edited))
                 File.Delete(edited);
         }

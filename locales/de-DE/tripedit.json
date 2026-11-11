@@ -1,0 +1,23 @@
+{
+  "line.edit.banner": "Die Halte der Fahrt {trip} werden bearbeitet. Klicke Haltestellen an, verschiebe oder entferne sie in der Liste und speichere dann. Zeiten, Umläufe und die Linie bleiben.",
+  "line.save_trip": "Halte speichern",
+  "line.status.trip_saved": "Halte der Fahrt {name} gespeichert.",
+  "line.status.trip_track": "Die Fahrt {name} fährt auf einem eigenen Fahrweg oder gibt es nicht; ihre Halte lassen sich hier nicht bearbeiten.",
+  "line.status.trip_missing": "Die Fahrt {name} hält am Objekt {id}, das kein Haltestellenobjekt der Karte ist.",
+  "line.trip.step": "Halte der Fahrt {name}",
+  "timetable.manage.stops": "Halte der Fahrt",
+  "timetable.manage.stops.button": "Halte bearbeiten…",
+  "timetable.manage.stops.tooltip": "Das Linien-Werkzeug auf den Halten dieser Fahrt öffnen: Halte hinzufügen, verschieben oder entfernen; der Weg dazwischen wird neu gesucht.",
+  "timetable.stoptimes": "Zeiten an den Halten: {trip}, Profil {name}",
+  "timetable.stoptimes.hint": "Minuten nach Fahrtbeginn. Ein Halt mit Zeit ist einer, an dem der Bus wartet; Halte ohne Zeit ergeben sich aus der Fahrzeit und den Längen der Stationsverbindungen.",
+  "timetable.stoptimes.arrival": "Ankunft",
+  "timetable.stoptimes.departure": "Abfahrt",
+  "timetable.stoptimes.stopping": "Halten",
+  "timetable.stoptimes.stop": "{number}. {name}",
+  "timetable.stoptimes.invalid": "Eine Zeit sind Minuten nach Fahrtbeginn, zum Beispiel 2,5.",
+  "timetable.stopping.0": "Standard",
+  "timetable.stopping.1": "Bei Bedarf",
+  "timetable.stopping.2": "Durchfahren",
+  "timetable.stopping.3": "Wenn früh",
+  "timetable.stopping.4": "Bei Bedarf (4)"
+}
