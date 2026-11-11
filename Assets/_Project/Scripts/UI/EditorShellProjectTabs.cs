@@ -114,6 +114,8 @@ namespace OmsiMapEditor.UI
             heading.AddToClassList("inspector-group-title");
             heading.style.marginBottom = 4;
             section.Add(heading);
+            if (session != null && session.CanEdit && !EditingVariant)
+                section.Add(TimetableButton());
             var sorted = new List<OmsiRouteLine>(routes.Lines);
             sorted.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
             foreach (var line in sorted)

@@ -94,10 +94,10 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [ ] Tracks erstellen und bearbeiten — Offen
 - [ ] Haltestellenreihenfolge definieren — Offen
 - [ ] Trips erstellen und bearbeiten — Offen
-- [ ] Fahrzeiten zwischen Haltestellen festlegen — Offen
-- [ ] Tours und Umläufe erstellen — Offen
-- [ ] Abfahrtszeiten und Fahrplantabellen bearbeiten — Offen
-- [ ] Betriebstage und Kalenderzuordnung bearbeiten — Offen
+- [ ] Fahrzeiten zwischen Haltestellen festlegen — Teilweise (Fahrzeit je Profil einer Fahrt, ADR 092; nicht je Halt)
+- [x] Tours und Umläufe erstellen — Vorhanden (anlegen, umbenennen, verschieben, Fahrten im Takt, ADR 092; Test in openOMSI steht aus)
+- [x] Abfahrtszeiten und Fahrplantabellen bearbeiten — Vorhanden (Dialog im Reiter Lines, ADR 092)
+- [x] Betriebstage und Kalenderzuordnung bearbeiten — Vorhanden (Tagesmaske je Umlauf: Wochentage, Feiertage, Schulzeit/Schulferien, ADR 092; Test in openOMSI steht aus)
 - [ ] Depots und Fahrzeugzuordnung bearbeiten — Offen
 - [ ] TTData vollständig schreiben und validieren — Offen
 

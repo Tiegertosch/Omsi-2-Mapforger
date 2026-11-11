@@ -81,6 +81,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Pfade mit Breite und Richtung – im Pfadmodus „Path width (m)“ und „Both ways“ (eigener Pfadtyp unter Splines\Mapforge), Fahrzeugpfade starten und enden mit der Fahrtrichtung der Spur, auf der sie einrasten (ADR 089; wartet auf den Nutzertest)
 - [x] Straßenprofile vollständig lesen und zeichnen – `[path_2]`, Texturversatz der Kette, Skew, gespiegeltes v, `[scaleTexByLength]`, `[patchwork_chain]`; `[rail_enh]` und `[third_rail]` gelesen (ADR 090; wartet auf den Nutzertest)
 - [x] Geländetexturen malen – Modus „Malen“ im Geländewerkzeug: Texturen der Karte wählen oder neue hinzufügen, malen, radieren, weichzeichnen, Härte, Kachel füllen/leeren (ADR 091; wartet auf den Nutzertest)
+- [x] Fahrplan bearbeiten – Dialog im Reiter Lines: Abfahrten, Umläufe (Tours) mit Betriebstagen (Tagesmaske), Fahrten im Takt, Fahrzeiten je Profil; ohne neue Linien (ADR 092; wartet auf den Nutzertest)
 
 ## Später
 

@@ -40,6 +40,11 @@ namespace OmsiMapEditor.OMSI
 
         public double ToPosition { get; internal set; }
 
+        /// <summary>How far the stops lie from the paths of their entries, in metres.</summary>
+        public double FromDistance { get; internal set; }
+
+        public double ToDistance { get; internal set; }
+
         /// <summary>The entries the stops lie on.</summary>
         public int FromEntry { get; internal set; }
 
@@ -225,13 +230,13 @@ namespace OmsiMapEditor.OMSI
                 {
                     link = null;
                     if (values.Count >= 9 && TryDouble(values[0], out var length) && TryInt(values[1], out var from) && TryInt(values[2], out var to) &&
-                        TryDouble(values[5], out var fromPosition) && TryDouble(values[6], out var toPosition) && TryInt(values[7], out var fromEntry) &&
+                        TryDouble(values[3], out var fromDistance) && TryDouble(values[4], out var toDistance) && TryDouble(values[5], out var fromPosition) && TryDouble(values[6], out var toPosition) && TryInt(values[7], out var fromEntry) &&
                         TryInt(values[8], out var toEntry))
                     {
                         link = new OmsiStationLink
                         {
                             LengthMeters = length, FromStopId = from, ToStopId = to, FromPosition = fromPosition, ToPosition = toPosition,
-                            FromEntry = fromEntry, ToEntry = toEntry
+                            FromEntry = fromEntry, ToEntry = toEntry, FromDistance = fromDistance, ToDistance = toDistance
                         };
                         StationLinks.Add(link);
                     }
