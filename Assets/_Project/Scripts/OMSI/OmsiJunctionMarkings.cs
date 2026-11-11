@@ -484,7 +484,8 @@ namespace OmsiMapEditor.OMSI
                 var heading = junctionArm.HeadingDegrees * Math.PI / 180.0;
                 for (var row = 0; row < 2; row++)
                 {
-                    var along = row == 0 ? junctionArm.Mouth + OmsiJunctionLayout.ArmExtension : junctionArm.Mouth;
+                    // The stop line of an arm with a crossing lies before the crossing, not at the mouth.
+                    var along = row == 0 ? junctionArm.Mouth + OmsiJunctionLayout.ArmExtension : junctionArm.StopLineAlong > 0.0 ? junctionArm.StopLineAlong : junctionArm.Mouth;
                     for (var index = 0; index < across.Count; index++)
                         anchors.Add(new OmsiMarkingAnchor
                         {

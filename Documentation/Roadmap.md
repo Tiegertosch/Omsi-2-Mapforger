@@ -70,7 +70,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 ## Fußgängerüberwege und freie Pfade (ADR 086, Wunsch des Nutzers vom 11. November 2026)
 
 - [x] Schritt 1 – Überwege an erzeugten Kreuzungen: Pfade quer über einen Arm, Gehwegpfade geteilt, Werkzeug „Lanes“ (wartet auf den Nutzertest in openOMSI)
-- [ ] Schritt 2 – Zebrastreifen-Markierung mit dem Überweg, Haltelinie vor dem Überweg
+- [x] Schritt 2 – Zebrastreifen-Markierung mit dem Überweg, Haltelinie vor dem Überweg (wartet auf den Nutzertest; der Haltepunkt der Fahrzeuge an Ampeln folgt mit Schritt 3)
 - [ ] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor)
 - [ ] Schritt 4 – freies Pfad-Werkzeug (Fahrzeuge, Fußgänger, Schienen) mit eigenem Pfad-Objekt, auf jeder Karte
 

@@ -158,6 +158,34 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AZebraCrossingIsPaintedAcrossTheCarriagewayAndTheStopLineMovesBeforeIt()
+        {
+            var layout = Tee(Profile, new OmsiCrossing());
+            var bars = layout.Meshes.Single(mesh => mesh.Texture == OmsiJunctionMarkings.WhiteTexture);
+            // An 8 m carriageway takes eight bars of 0.5 m with 0.5 m between, each two triangles.
+            Assert.AreEqual(8 * 4, bars.Positions.Count / 3);
+            Assert.AreEqual(8 * 6, bars.Triangles.Count);
+            for (var vertex = 0; vertex < bars.Positions.Count / 3; vertex++)
+            {
+                var x = bars.Positions[vertex * 3];
+                var y = bars.Positions[vertex * 3 + 2];
+                Assert.That(x, Is.InRange(-4.0 - 1e-9, 4.0 + 1e-9));
+                // The crossing's centre lies 15 m out and it is 3 m wide.
+                Assert.That(y, Is.InRange(13.5 - 1e-9, 16.5 + 1e-9));
+            }
+
+            // The stop line of the arm lies 1.5 m before the bars, 18 m out; the anchors at its end stay at 12 m.
+            var index = layout.Arms.FindIndex(arm => Math.Abs(arm.HeadingDegrees) < 1e-9);
+            var anchors = OmsiJunctionMarkings.Anchors(layout).Where(anchor => anchor.Arm == index).ToList();
+            Assert.IsTrue(anchors.Where(anchor => anchor.Row == 1).All(anchor => Math.Abs(anchor.Y - 18.0) < 1e-9));
+            Assert.IsTrue(anchors.Where(anchor => anchor.Row == 0).All(anchor => Math.Abs(anchor.Y - 12.0) < 1e-9));
+            // Another arm keeps its stop line at its mouth.
+            var other = OmsiJunctionMarkings.Anchors(layout).First(anchor => anchor.Arm != index && anchor.Row == 1);
+            Assert.AreEqual(10.0, Math.Sqrt(other.X * other.X + other.Y * other.Y) - Math.Abs(other.Lateral) * 0.0, 2.0);
+            Assert.IsFalse(Tee(Profile, null).Meshes.Any(mesh => mesh.Texture == OmsiJunctionMarkings.WhiteTexture));
+        }
+
+        [Test]
         public void FootpathsJoinByPlaceWhateverTheirHeadingButVehiclePathsNeedTheSameWay()
         {
             OmsiMapPath Make(int kind, double x0, double y0, double x1, double y1) =>

@@ -313,6 +313,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>A pedestrian crossing over the arm, or null for none; the arm reaches out far enough for it.</summary>
         public OmsiCrossing Crossing { get; set; }
+
+        /// <summary>
+        /// Distance from the centre where the stop line of an arm with a crossing lies, before the crossing; 0 for an arm
+        /// without one, whose stop line lies at the mouth. Set by the layout.
+        /// </summary>
+        public double StopLineAlong { get; internal set; }
     }
 
     /// <summary>
@@ -429,6 +435,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Each arm reaches this far past where its corners end, so its cross-section is the road's at the point.</summary>
         public const double ArmExtension = 2.0;
+
+        /// <summary>Vehicles stop this far before the bars of a crossing.</summary>
+        public const double StopLineGap = 1.5;
 
         /// <summary>The nose of a median island is rounded with half its width, or at most this radius at its two corners.</summary>
         public const double NoseRadius = 2.0;
@@ -1176,7 +1185,38 @@ namespace OmsiMapEditor.OMSI
             var width = OmsiCrossing.ClampWidth(asked.WidthMeters);
             crossingPlans[index] = new CrossingPlan { Centre = centre, Width = width };
             arm.Length = centre + width / 2.0 + ArmExtension;
+            arm.StopLineAlong = centre + width / 2.0 + StopLineGap;
             AddStraightProfile(arm, arm.Profile, from, arm.Length, "approach");
+            AddCrosswalkBars(arm, sections[index], centre, width);
+        }
+
+        /// <summary>
+        /// The bars of a zebra crossing (sign 293) over the carriageway of an arm: bars 0.5 m wide and 0.5 m apart, running
+        /// along the arm for the crossing's width, from edge to edge of the carriageway and centred on it.
+        /// </summary>
+        private void AddCrosswalkBars(OmsiJunctionArm arm, OmsiProfileSections section, double centre, double width)
+        {
+            const double barWidth = 0.5;
+            const double barGap = 0.5;
+            var mesh = new OmsiGeneratedMesh { Texture = OmsiJunctionMarkings.WhiteTexture };
+            var height = section.RoadHeight + OmsiJunctionMarkings.Lift;
+            var span = section.RoadLeft + section.RoadRight;
+            var count = (int)Math.Floor((span + barGap) / (barWidth + barGap));
+            if (count < 1)
+                return;
+            var first = -section.RoadLeft + (span - (count * barWidth + (count - 1) * barGap)) / 2.0;
+            for (var bar = 0; bar < count; bar++)
+            {
+                var left = first + bar * (barWidth + barGap);
+                var at = mesh.Positions.Count / 3;
+                Add(mesh, Point.Along(arm, centre - width / 2.0, left), height, 0.0, 0.0);
+                Add(mesh, Point.Along(arm, centre - width / 2.0, left + barWidth), height, 1.0, 0.0);
+                Add(mesh, Point.Along(arm, centre + width / 2.0, left), height, 0.0, 0.0);
+                Add(mesh, Point.Along(arm, centre + width / 2.0, left + barWidth), height, 1.0, 0.0);
+                AddUpward(mesh, at, at + 1, at + 2);
+                AddUpward(mesh, at + 1, at + 3, at + 2);
+            }
+            Meshes.Add(mesh);
         }
 
         /// <summary>A profile laid straight along an arm from one distance out to another, upright strips included, as a part of the junction.</summary>

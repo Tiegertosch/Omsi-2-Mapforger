@@ -1443,6 +1443,12 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 **Grenzen in Schritt 1:** Schienenarme und Übergangsstücke zwischen zwei Querschnitten lehnen den Überweg ebenfalls ab (die Schienenbögen beginnen am Armende).
 
-**Offen (nächste Schritte):** Haltelinie der Fahrzeuge liegt noch an der Mündung, also hinter dem Überweg; Zebrastreifen-Markierung kommt noch nicht mit; Fußgängerampeln: der Gehwegpfad des Überwegs müsste eine Ampel nennen (Regel am Pfad) und der Ampel-Editor eine Signalgruppe dafür bekommen; Überweg über Mittelinseln; freies Pfad-Werkzeug für Überwege auf beliebigen Karten.
+**Offen (nächste Schritte):** Haltelinie der Fahrzeuge liegt noch an der Mündung, also hinter dem Überweg; Fußgängerampeln: der Gehwegpfad des Überwegs müsste eine Ampel nennen (Regel am Pfad) und der Ampel-Editor eine Signalgruppe dafür bekommen; Überweg über Mittelinseln; freies Pfad-Werkzeug für Überwege auf beliebigen Karten.
 
 **Prüfung:** `OmsiCrossingTests` (10, darunter Übergangsstück und Schienenarm lehnen ab und das Verbinden von Fußpfaden nach Ort allein: Arm bleibt ohne Überweg unverändert, Armlänge und Fußpfad quer, Gehwegpfade geteilt, beide Enden verbunden, Fahrstreifen gerade bis zur Ecke, Arm ohne Gehweg lehnt ab, Zeile schreiben und lesen, Grenzen); 597 Unity-Tests grün; Screenshot der Pfadansicht an einer T-Kreuzung im Testprojekt.
+
+**Ergänzung vom 11. November 2026 (Schritt 2: Zebrastreifen und Haltelinie):**
+- Der Überweg bringt seine Markierung selbst mit (`AddCrosswalkBars` in `OmsiJunctionLayout`, nicht über die Markierungslinien, damit nichts an Ankern hängt): Zebrabalken (Zeichen 293) 0,5 m breit mit 0,5 m Abstand, längs des Arms über die Breite des Überwegs, von Fahrbahnrand zu Fahrbahnrand und mittig; eigenes weißes Netz, die Textur legt `OmsiJunctionLayout`-Markierungen wie bei der Linksabbiegespur an.
+- Die **Haltelinie** des Arms (Anker der Reihe 1, `OmsiJunctionArm.StopLineAlong`) liegt `StopLineGap` = 1,5 m vor den Balken statt an der Mündung; Haltlinien und Wartelinien, die an diesen Ankern hängen, wandern mit.
+- Noch offen: Der **Fahrzeugpfad** hält an einer Ampel weiter an der Mündung (Beginn des Weges `turnsAt`), also hinter dem Überweg. Das gehört zu Schritt 3 (Ampeln), weil die Bindung des Lichts dann auf ein Stück vor dem Überweg gelegt werden muss.
+- Prüfung: `OmsiCrossingTests` (11, neu: Balken über die Fahrbahn, Haltelinie 1,5 m vor den Balken), 600 Unity-Tests grün; Screenshot der Pfadansicht an einer Kreuzung mit zwei Überwegen.
