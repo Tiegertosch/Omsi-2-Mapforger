@@ -345,6 +345,7 @@ namespace OmsiMapEditor.UI
             SetUpContentFolders(root);
             SetUpParkList(root);
             SetUpTimetable(root);
+            SetUpVehicles(root);
             SetUpTrafficCurves(root);
             root.style.flexGrow = 1f;
             root.style.width = Length.Percent(100f);
@@ -1173,6 +1174,7 @@ namespace OmsiMapEditor.UI
             RunParkListArguments(args);
             RunTimetableArguments(Argument, args);
             RunBusStopArguments(Argument, args);
+            RunVehicleArguments(Argument, args);
             RunLineArguments(Argument, args);
             RunTrafficCurveArguments(args);
             RunSignalArguments(args);

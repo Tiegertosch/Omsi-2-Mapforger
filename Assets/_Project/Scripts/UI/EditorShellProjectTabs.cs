@@ -118,6 +118,8 @@ namespace OmsiMapEditor.UI
             section.Add(heading);
             if (session != null && session.CanEdit && !EditingVariant)
                 section.Add(TimetableButton());
+            if (session != null && session.CanEdit && !EditingVariant)
+                section.Add(VehiclesButton());
             if (lineCount == 0)
             {
                 var none = new Label(Loc.T("project.lines.none"));

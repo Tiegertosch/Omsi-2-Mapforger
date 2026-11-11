@@ -242,7 +242,10 @@ namespace OmsiMapEditor.UI
                     RefreshPaintTextures();
             }
             else if (change.TimetableFiles)
+            {
                 StartRoutesBuild(currentSummary);
+                RefreshVehiclesIfOpen();
+            }
             else
                 groundRenderer?.RefreshMasks(change.Tiles);
         }

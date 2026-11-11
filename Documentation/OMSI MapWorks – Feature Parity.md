@@ -98,8 +98,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Tours und Umläufe erstellen — Vorhanden (anlegen, umbenennen, verschieben, Fahrten im Takt, ADR 092; Test in openOMSI steht aus)
 - [x] Abfahrtszeiten und Fahrplantabellen bearbeiten — Vorhanden (Dialog im Reiter Lines, ADR 092)
 - [x] Betriebstage und Kalenderzuordnung bearbeiten — Vorhanden (Tagesmaske je Umlauf: Wochentage, Feiertage, Schulzeit/Schulferien, ADR 092; Test in openOMSI steht aus)
-- [ ] Depots und Fahrzeugzuordnung bearbeiten — Offen
-- [x] TTData vollständig schreiben und validieren — Vorhanden (Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
+- [x] Depots und Fahrzeugzuordnung bearbeiten — Vorhanden (Dialog „Vehicles…“: Depots mit Typen und Bussen, einfache Gruppen, Umbenennen mit den Umläufen, ADR 095; Test in openOMSI steht aus)
+- [ ] TTData vollständig schreiben und validieren — Teilweise (Fahrwege `.ttr` werden nicht geschrieben; Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
 
 ## G. Signalrouten, Prioritäten und Bahnverkehr
 - [ ] Signalrouten erstellen — Offen
