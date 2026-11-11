@@ -23,12 +23,16 @@ namespace OmsiMapEditor.UI
         /// <summary>Heads are hung this high above the junction when no head of the type stands in the map yet, as OMSI's own do.</summary>
         private const double DefaultHeadHeight = 2.8;
 
+        /// <summary>The most a mast stands below its head to count when masts are learnt from a map.</summary>
+        private const double MaxMastDrop = 9.0;
+
         /// <summary>Head files of each installation, by the root: the object files with [trafficlight].</summary>
         private static readonly Dictionary<string, List<string>> HeadTypesByRoot = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         private VisualElement signalWizardPage;
         private Label signalWizardInfo;
         private Toggle signalWizardLeftToggle;
+        private Toggle signalWizardFootToggle;
         private VisualElement signalWizardTimes;
         private VisualElement signalWizardGroups;
         private SignalTimelineElement signalWizardTimeline;
@@ -120,6 +124,17 @@ namespace OmsiMapEditor.UI
                 RenderSignalWizard();
             });
             signalWizardPage.Add(signalWizardLeftToggle);
+
+            signalWizardFootToggle = new Toggle();
+            LocBindings.Text(signalWizardFootToggle, "signals.wizard.foot");
+            LocBindings.Tooltip(signalWizardFootToggle, "signals.wizard.foot.tooltip");
+            signalWizardFootToggle.value = signalWizardOptions.PedestrianLights;
+            signalWizardFootToggle.RegisterValueChangedCallback(evt =>
+            {
+                signalWizardOptions.PedestrianLights = evt.newValue;
+                RenderSignalWizard();
+            });
+            signalWizardPage.Add(signalWizardFootToggle);
 
             signalWizardTimes = new VisualElement();
             signalWizardTimes.AddToClassList("signal-phase-groups");
@@ -215,9 +230,17 @@ namespace OmsiMapEditor.UI
             if (signalWizardPage == null || signalCrossing == null || !SignalsEditable)
                 return;
             var crossing = signalCrossing;
-            var proposal = OmsiSignalWizard.Propose(crossing, SignalConflicts(), signalWizardOptions, OmsiSignalWizard.TurnLaneMovements(crossing, signalLayout));
+            // The footpaths over the arms of a junction made here can follow a light: those with a way to bind them by.
+            var bindableFootpaths = crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && WayOf(movement) != null).Select(movement => movement.Index).ToList();
+            var proposal = OmsiSignalWizard.Propose(crossing, SignalConflicts(), signalWizardOptions, OmsiSignalWizard.TurnLaneMovements(crossing, signalLayout), bindableFootpaths);
+            var footNumber = 0;
             foreach (var group in proposal.Groups)
             {
+                if (group.Pedestrian)
+                {
+                    group.Name = Loc.T("signals.wizard.group_foot", ("n", ++footNumber));
+                    continue;
+                }
                 var arms = string.Join("+", group.Approaches.Select(approach => (approach + 1).ToString(CultureInfo.InvariantCulture)));
                 group.Name = Loc.T(group.LeftTurns ? "signals.wizard.group_left" : "signals.wizard.group", ("arms", arms)); // i18n:keys
             }
@@ -231,6 +254,7 @@ namespace OmsiMapEditor.UI
                 ("lanes", crossing.Approaches.Sum(approach => approach.Lanes.Count)), ("movements", vehicles), ("groups", signalProgram.Lights.Count),
                 ("heads", heads.Count));
             signalWizardLeftToggle.style.display = proposal.LeftLanes > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            signalWizardFootToggle.style.display = bindableFootpaths.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
             signalWizardTimes.Clear();
             signalWizardTimes.Add(SignalWizardField("signals.wizard.green", signalWizardOptions.GreenSeconds, false, value => signalWizardOptions.GreenSeconds = value));
@@ -383,9 +407,63 @@ namespace OmsiMapEditor.UI
             }
             // Without a mast to learn from, a mast stands on the junction's pavement, the height of its footpaths.
             var pavement = sceneryObject.Paths.Where(path => path.Kind == 1).Select(path => path.Height).DefaultIfEmpty(0.0).Max();
+            var footType = PedestrianHeadType();
             foreach (var light in forLights)
             {
                 var left = leftLights.Contains(light);
+                // A crossing's light: a head at each end of the footpath, beside it, facing the people who wait there.
+                foreach (var foot in crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movementLights[movement.Index] == light))
+                {
+                    if (footType == null)
+                        break;
+                    var footPath = sceneryObject.Paths[foot.ControlPath < sceneryObject.Paths.Count ? foot.ControlPath : foot.Paths[0]];
+                    var half = Math.Max(1.0, footPath.WidthMeters / 2.0);
+                    var dx = foot.ExitX - foot.EntryX;
+                    var dy = foot.ExitY - foot.EntryY;
+                    var walk = Math.Sqrt(dx * dx + dy * dy);
+                    if (walk < 0.5)
+                        continue;
+                    for (var end = 0; end < 2; end++)
+                    {
+                        // People wait at one end and read the head at the other: it stands just past the far end, beside the way,
+                        // facing back across the crossing to them.
+                        var sign = end == 0 ? 1.0 : -1.0;
+                        double forwardX = dx / walk * sign, forwardY = dy / walk * sign;
+                        double rightX = forwardY, rightY = -forwardX;
+                        var baseX = end == 0 ? foot.ExitX : foot.EntryX;
+                        var baseY = end == 0 ? foot.ExitY : foot.EntryY;
+                        var localX = baseX + rightX * (half + 0.7) + forwardX * 0.4;
+                        var localY = baseY + rightY * (half + 0.7) + forwardY * 0.4;
+                        var world = ObjectToWorld(tile, record, localX, localY);
+                        var heading = OmsiRoadPlanner.Normalize(record.HeadingDegrees + Math.Atan2(forwardX, forwardY) * 180.0 / Math.PI + 180.0);
+                        if (heading < 0)
+                            heading += 360.0;
+                        // Not lower than the mast's top, or the mast would start below the surface.
+                        var footHeight = mast != null && mast.Count > 0 ? Math.Max(PedestrianHeadHeight, mast.Drop) : PedestrianHeadHeight;
+                        try
+                        {
+                            var change = session.PlaceObject(currentSummary, tile, footType, world.X - tile.X * size, world.Y - tile.Y * size,
+                                FileHeight(footType, world, footHeight), heading, 0.0, 0.0, new List<string> { light.ToString(CultureInfo.InvariantCulture) });
+                            steps.Add(change);
+                            var parent = session.SetVarParent(currentSummary, tile, change.Record, record.Id);
+                            if (parent != null)
+                                steps.Add(parent);
+                            if (mast != null)
+                            {
+                                var mastHeading = OmsiRoadPlanner.Normalize(heading + mast.Turn);
+                                if (mastHeading < 0)
+                                    mastHeading += 360.0;
+                                var mastHeight = FileHeight(mast.AssetPath, world, mast.Count > 0 ? footHeight - mast.Drop : pavement);
+                                steps.Add(session.PlaceObject(currentSummary, tile, mast.AssetPath, world.X - tile.X * size, world.Y - tile.Y * size, mastHeight, mastHeading));
+                            }
+                        }
+                        catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
+                        {
+                            Debug.LogException(exception);
+                            signalHeadFailures++;
+                        }
+                    }
+                }
                 foreach (var approachGroup in crossing.Movements.Where(movement => movement.Approach >= 0 && movementLights[movement.Index] == light &&
                                                                                    movement.Turn != OmsiMovementTurn.Pedestrian).GroupBy(movement => movement.Approach))
                 {
@@ -395,7 +473,9 @@ namespace OmsiMapEditor.UI
                     // The stop line of each movement: where its way starts (after a turn lane's lead-in).
                     var stops = approachGroup.Select(movement =>
                     {
-                        var stopPath = movement.Paths.FirstOrDefault(index => signalLayout != null && index < signalLayout.Paths.Count && signalLayout.Paths[index].StartsWay);
+                        // Before a crossing the stop is the start of the lane's lead-in, else the first arc of the way.
+                        var stopPath = movement.Paths.FirstOrDefault(index => signalLayout != null && index < signalLayout.Paths.Count &&
+                                                                              (signalLayout.Paths[index].LeadInLane != null || signalLayout.Paths[index].StartsWay));
                         var path = sceneryObject.Paths[stopPath < sceneryObject.Paths.Count ? stopPath : movement.ControlPath];
                         var entry = OmsiSignalWizard.EntryOf(path);
                         return (X: entry.X, Y: entry.Y, Half: Math.Max(1.0, entry.HalfWidth));
@@ -627,7 +707,9 @@ namespace OmsiMapEditor.UI
                     {
                         var dx = item.X - head.X;
                         var dy = item.Y - head.Y;
-                        if (dx * dx + dy * dy > 0.64 || item.Z > head.Z - 1.0)
+                        // A head more than MaxMastDrop above the thing beside it is no pair: such heads (bus heads at absolute heights in
+                        // a hilly map) would give every mast a drop of tens of metres.
+                        if (dx * dx + dy * dy > 0.64 || item.Z > head.Z - 1.0 || head.Z - item.Z > MaxMastDrop)
                             continue;
                         if (!pairs.TryGetValue(item.Path, out var list))
                             pairs[item.Path] = list = new List<(double, double)>();
@@ -762,6 +844,36 @@ namespace OmsiMapEditor.UI
                 return false;
             return leftArrow == (text.IndexOf("_L_", StringComparison.OrdinalIgnoreCase) >= 0);
         }
+
+        /// <summary>True for a head running the pedestrian head script (ampel2): red and green only.</summary>
+        private static bool PedestrianHeadScript(string root, string relative)
+        {
+            if (root == null)
+                return false;
+            if (!HeadTexts.TryGetValue(relative, out var text))
+            {
+                HeadScript(root, relative, false);
+                HeadTexts.TryGetValue(relative, out text);
+            }
+            return text != null && text.IndexOf("ampel2", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>The pedestrian head to place: the one most used in the map (or the map learnt from), else the first of the installation; null without any.</summary>
+        private string PedestrianHeadType()
+        {
+            var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
+            if (!HeadTypesByRoot.TryGetValue(root ?? string.Empty, out var all))
+            {
+                all = FindSignalHeadTypes(root);
+                HeadTypesByRoot[root ?? string.Empty] = all;
+            }
+            var used = SignalUsageOfMap().Heads;
+            return all.Where(path => PedestrianHeadScript(root, path))
+                .OrderByDescending(path => used.TryGetValue(path, out var count) ? count : 0).ThenBy(path => path, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        }
+
+        /// <summary>Pedestrian heads stand lower than car heads, at about eye height of a walker looking up.</summary>
+        private const double PedestrianHeadHeight = 2.3;
 
         private static List<string> FindSignalHeadTypes(string root)
         {

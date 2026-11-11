@@ -133,14 +133,34 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         internal List<string> WriteInto(ref string sco, OmsiJunctionLayout layout)
         {
-            var lost = WayLights.Keys.Where(key => !layout.WaysThrough.Contains(key)).OrderBy(key => key, StringComparer.Ordinal).ToList();
+            var lost = WayLights.Keys.Where(key => !layout.WaysThrough.Contains(key) && !layout.CrossingWays.Contains(key)).OrderBy(key => key, StringComparer.Ordinal).ToList();
             foreach (var key in lost)
                 WayLights.Remove(key);
             var file = OmsiRecordFile.Parse(OmsiTextFile.Encode(sco, OmsiTextEncoding.Windows1252), OmsiSceneryRecordLayouts.Instance);
             var program = Program.Copy();
             program.PathLights.Clear();
+            // On an arm with a crossing, vehicles stop before it, at the lead-in of their lane: when all the lane's ways obey
+            // one light, the lead-in is bound to it and the arcs are not (a second hold inside the junction would stop them again).
+            var leadIns = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var lane in layout.Paths.Where(path => path.LeadInLane != null).Select(path => path.LeadInLane).Distinct())
+            {
+                var lights = layout.WaysThrough.Where(way => way.StartsWith(lane + ">", StringComparison.Ordinal))
+                    .Select(way => WayLights.TryGetValue(way, out var bound) ? bound : -1).Distinct().ToList();
+                if (lights.Count == 1 && lights[0] >= 0)
+                    leadIns[lane] = lights[0];
+            }
             foreach (var path in layout.Paths)
-                program.PathLights.Add(path.StartsWay && path.WayThrough != null && WayLights.TryGetValue(path.WayThrough, out var light) ? light : -1);
+            {
+                if (path.LeadInLane != null)
+                {
+                    program.PathLights.Add(leadIns.TryGetValue(path.LeadInLane, out var leadInLight) ? leadInLight : -1);
+                    continue;
+                }
+                var lane = path.WayThrough != null ? path.WayThrough.Split('>')[0] : null;
+                var light = -1;
+                var obeys = path.StartsWay && path.WayThrough != null && WayLights.TryGetValue(path.WayThrough, out light) && (lane == null || !leadIns.ContainsKey(lane));
+                program.PathLights.Add(obeys ? light : -1);
+            }
             program.WriteTo(file);
             sco = OmsiTextFile.Decode(file.ToBytes());
             return lost;

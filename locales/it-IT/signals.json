@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Attraversamento a richiesta",
   "signals.template.pedestrian_request.desc": "Due bracci: verde finché qualcuno lo chiede (un punto di richiesta), poi giallo, rosso per attraversare e di nuovo verde. I percorsi pedonali non si possono legare a una luce.",
   "signals.templates.heads": "Posiziona teste per i gruppi senza",
-  "signals.templates.heads.tooltip": "Posiziona una testa per ogni gruppo che ne è privo, con tipo, altezza e palo dell’assistente. Disattivato: le teste non cambiano."
+  "signals.templates.heads.tooltip": "Posiziona una testa per ogni gruppo che ne è privo, con tipo, altezza e palo dell’assistente. Disattivato: le teste non cambiano.",
+  "signals.wizard.group_foot": "Attraversamento {n}",
+  "signals.wizard.foot": "Gli attraversamenti hanno un semaforo proprio",
+  "signals.wizard.foot.tooltip": "Attivo: ogni percorso pedonale su un braccio che i veicoli incrociano ottiene un semaforo, verde nelle fasi in cui nessun veicolo lo incrocia e i veicoli che svoltano danno la precedenza, oppure in una fase a sé. Disattivo: gli attraversamenti non hanno semaforo.",
+  "signals.finding.pedestrian_window": "{group}: verde solo {seconds}, ma servono circa {needed} s per attraversare; nessuno parte"
 }

@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Crossing on request",
   "signals.template.pedestrian_request.desc": "Two arms: green until somebody asks (a request point), then yellow, red for people to cross, and green again. Footpaths cannot be bound to a light.",
   "signals.templates.heads": "Place heads for groups without",
-  "signals.templates.heads.tooltip": "Places a head for each group that has none, with the head type, height and mast of the assistant. Off: heads stay as they are."
+  "signals.templates.heads.tooltip": "Places a head for each group that has none, with the head type, height and mast of the assistant. Off: heads stay as they are.",
+  "signals.wizard.group_foot": "Crossing {n}",
+  "signals.wizard.foot": "Crossings get a light of their own",
+  "signals.wizard.foot.tooltip": "On: each footpath over an arm that vehicles cross gets a light, green with the phases where no vehicle crosses it and turning vehicles give way, or in a phase of its own. Off: crossings get no light.",
+  "signals.finding.pedestrian_window": "{group}: green for only {seconds}, but people need about {needed} s to cross; nobody starts across it"
 }

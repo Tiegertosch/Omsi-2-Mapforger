@@ -109,10 +109,24 @@ namespace OmsiMapEditor.OMSI
                     if (!Cross(lines[first], lines[second], false, false, out var at))
                         continue;
                     var vehicle = footA ? b : a;
+                    // A turn gives way to a footpath it crosses on its way out; the footpath over its own arm it crosses first, before
+                    // it turns, which is no turn against a footpath (a crossing over an arm is crossed by everything coming from it).
+                    var nearest = -1;
+                    var nearestDistance = double.MaxValue;
+                    foreach (var approach in crossing.Approaches)
+                    {
+                        var distance = Distance(approach.X, approach.Y, at.X, at.Y);
+                        if (distance < nearestDistance)
+                        {
+                            nearestDistance = distance;
+                            nearest = approach.Index;
+                        }
+                    }
+                    var onEntry = vehicle.Approach >= 0 && nearest == vehicle.Approach;
                     conflicts.Add(new OmsiSignalConflict
                     {
                         First = first, Second = second, Kind = OmsiConflictKind.Pedestrian, X = at.X, Y = at.Y,
-                        Permitted = vehicle.Turn == OmsiMovementTurn.Left || vehicle.Turn == OmsiMovementTurn.Right
+                        Permitted = !onEntry && (vehicle.Turn == OmsiMovementTurn.Left || vehicle.Turn == OmsiMovementTurn.Right)
                     });
                     continue;
                 }

@@ -279,7 +279,9 @@ namespace OmsiMapEditor.OMSI
                     var aspect = OmsiSignalAspects.Of(segments[index].State);
                     if (pedestrian)
                     {
-                        if (aspect != OmsiSignalAspect.Red && aspect != OmsiSignalAspect.Green)
+                        // A pedestrian head (ampel2) shows red for every state but 6 to 8; red and yellow and yellow are red there, as the
+                        // phase plan writes them for every light. Only a state such as dark, which lets people go, is not meant.
+                        if (aspect != OmsiSignalAspect.Red && aspect != OmsiSignalAspect.Green && aspect != OmsiSignalAspect.RedYellow && aspect != OmsiSignalAspect.Yellow)
                             issues.Add(new OmsiSignalIssue
                             {
                                 Level = OmsiSignalIssueLevel.Warning, Kind = OmsiSignalIssueKind.PedestrianAspect, Light = light, Seconds = segments[index].Start

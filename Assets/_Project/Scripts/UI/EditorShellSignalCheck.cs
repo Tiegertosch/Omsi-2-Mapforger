@@ -280,6 +280,9 @@ namespace OmsiMapEditor.UI
                 case OmsiSignalFindingKind.DarkPhase:
                     text = Loc.T("signals.finding.dark", ("group", Name(finding.First)), ("seconds", Seconds(finding.Seconds)));
                     break;
+                case OmsiSignalFindingKind.PedestrianWindow:
+                    text = Loc.T("signals.finding.pedestrian_window", ("group", Name(finding.First)), ("seconds", Seconds(finding.Seconds)), ("needed", (int)finding.Amount));
+                    break;
                 default:
                     return DescribeSignalIssues(new List<OmsiSignalIssue> { finding.Timing }, program);
             }

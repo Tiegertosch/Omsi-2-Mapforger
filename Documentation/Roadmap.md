@@ -71,7 +71,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 
 - [x] Schritt 1 – Überwege an erzeugten Kreuzungen: Pfade quer über einen Arm, Gehwegpfade geteilt, Werkzeug „Lanes“ (wartet auf den Nutzertest in openOMSI)
 - [x] Schritt 2 – Zebrastreifen-Markierung mit dem Überweg, Haltelinie vor dem Überweg (wartet auf den Nutzertest; der Haltepunkt der Fahrzeuge an Ampeln folgt mit Schritt 3)
-- [ ] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor)
+- [x] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor): Bindung des Überwegs, Zufahrt vor dem Überweg gebunden, Assistent mit Überweggruppen, Fußgängerköpfe, Warnung zu kurzes Grün (wartet auf den Nutzertest)
 - [ ] Schritt 4 – freies Pfad-Werkzeug (Fahrzeuge, Fußgänger, Schienen) mit eigenem Pfad-Objekt, auf jeder Karte
 
 ## Später

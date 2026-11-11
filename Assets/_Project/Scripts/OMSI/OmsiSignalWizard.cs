@@ -15,6 +15,15 @@ namespace OmsiMapEditor.OMSI
         public double RedYellowSeconds { get; set; } = 1;
         public double YellowSeconds { get; set; } = 3;
         public double ClearanceSeconds { get; set; } = 2;
+
+        /// <summary>Give the footpaths over the arms a light of their own, green where no vehicle crosses them.</summary>
+        public bool PedestrianLights { get; set; } = true;
+
+        /// <summary>The least green a crossing's light shows, when it has a phase of its own.</summary>
+        public double PedestrianGreenSeconds { get; set; } = 8;
+
+        /// <summary>How fast people are taken to cross, in metres a second; a walker starts only when the green lasts until the far side.</summary>
+        public double PedestrianPace { get; set; } = 1.2;
     }
 
     /// <summary>A signal group the assistant proposes: movements that may go together.</summary>
@@ -25,6 +34,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True for a group of left turns from lanes of their own.</summary>
         public bool LeftTurns { get; internal set; }
+
+        /// <summary>True for the light of a footpath over an arm (its movement is in <see cref="Movements"/>).</summary>
+        public bool Pedestrian { get; internal set; }
 
         public List<int> Movements { get; } = new List<int>();
 
@@ -108,8 +120,12 @@ namespace OmsiMapEditor.OMSI
         /// Movements known to start in a left-turn lane (<see cref="TurnLaneMovements"/>); without, lanes of the crossing
         /// with nothing but left turns count.
         /// </param>
+        /// <param name="pedestrianMovements">
+        /// Footpath movements that can be given a light (the footpaths over the arms of a junction made here), or null for none;
+        /// those no vehicle crosses get none.
+        /// </param>
         public static OmsiSignalProposal Propose(OmsiSignalIntersection crossing, IList<OmsiSignalConflict> conflicts, OmsiSignalWizardOptions options,
-            ICollection<int> turnLaneMovements = null)
+            ICollection<int> turnLaneMovements = null, ICollection<int> pedestrianMovements = null)
         {
             if (crossing == null)
                 throw new ArgumentNullException(nameof(crossing));
@@ -196,11 +212,44 @@ namespace OmsiMapEditor.OMSI
             }
             proposal.SeparateLeftLanes = phases.SelectMany(phase => phase).Where(group => group.LeftTurns).Sum(group => group.Approaches.Count);
 
-            // Groups, names and the movements' lights.
-            foreach (var group in phases.SelectMany(phase => phase))
+            // The footpaths over arms: green with the vehicle phases no vehicle crosses them in, vehicles that turn across them
+            // giving way (openOMSI's cars stop for people in their path); one that every phase crosses has a phase of its own.
+            var vehiclePhases = phases.Count;
+            var pedestrianGroups = new List<KeyValuePair<OmsiProposedGroup, List<int>>>();
+            double CrossingGreen(OmsiProposedGroup group)
             {
-                group.Name = "Arm " + string.Join("+", group.Approaches.Select(approach => (approach + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))) +
-                             (group.LeftTurns ? " left" : string.Empty);
+                var movement = crossing.Movements[group.Movements[0]];
+                var length = Math.Sqrt((movement.ExitX - movement.EntryX) * (movement.ExitX - movement.EntryX) + (movement.ExitY - movement.EntryY) * (movement.ExitY - movement.EntryY));
+                return Math.Max(options.PedestrianGreenSeconds, Math.Ceiling(length / Math.Max(0.3, options.PedestrianPace) + 2.0));
+            }
+            if (options.PedestrianLights && pedestrianMovements != null)
+                foreach (var index in pedestrianMovements.Distinct().OrderBy(movement => movement))
+                {
+                    if (index < 0 || index >= crossing.Movements.Count || crossing.Movements[index].Turn != OmsiMovementTurn.Pedestrian)
+                        continue;
+                    var others = conflicts.Where(conflict => conflict.First == index || conflict.Second == index).ToList();
+                    if (others.Count == 0)
+                        continue;
+                    var blockers = new HashSet<int>(others.Where(conflict => !conflict.Permitted).Select(conflict => conflict.First == index ? conflict.Second : conflict.First));
+                    var group = new OmsiProposedGroup { Pedestrian = true };
+                    group.Movements.Add(index);
+                    var allowed = Enumerable.Range(0, vehiclePhases).Where(phase => phases[phase].All(member => member.Movements.All(movement => !blockers.Contains(movement)))).ToList();
+                    if (allowed.Count == 0)
+                    {
+                        phases.Add(new List<OmsiProposedGroup> { group });
+                        continue;
+                    }
+                    pedestrianGroups.Add(new KeyValuePair<OmsiProposedGroup, List<int>>(group, allowed));
+                }
+
+            // Groups, names and the movements' lights.
+            var footNumber = 0;
+            foreach (var group in phases.SelectMany(phase => phase).Concat(pedestrianGroups.Select(pair => pair.Key)))
+            {
+                group.Name = group.Pedestrian
+                    ? "Crossing " + (++footNumber).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : "Arm " + string.Join("+", group.Approaches.Select(approach => (approach + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))) +
+                      (group.LeftTurns ? " left" : string.Empty);
                 proposal.Groups.Add(group);
             }
             proposal.MovementLights = Enumerable.Repeat(-1, crossing.Movements.Count).ToArray();
@@ -215,9 +264,22 @@ namespace OmsiMapEditor.OMSI
             };
             foreach (var phase in phases)
             {
-                var planPhase = new OmsiSignalPlanPhase { GreenSeconds = phase.All(group => group.LeftTurns) ? options.LeftGreenSeconds : options.GreenSeconds };
+                var planPhase = new OmsiSignalPlanPhase
+                {
+                    GreenSeconds = phase.All(group => group.Pedestrian) ? CrossingGreen(phase[0]) : phase.All(group => group.LeftTurns) ? options.LeftGreenSeconds : options.GreenSeconds
+                };
                 planPhase.Lights.AddRange(phase.Select(group => proposal.Groups.IndexOf(group)));
                 plan.Phases.Add(planPhase);
+            }
+            // Crossings that go with vehicle phases: their light joins the phases, which last until the far side is reached.
+            foreach (var pair in pedestrianGroups)
+            {
+                var light = proposal.Groups.IndexOf(pair.Key);
+                foreach (var phase in pair.Value)
+                {
+                    plan.Phases[phase].Lights.Add(light);
+                    plan.Phases[phase].GreenSeconds = Math.Max(plan.Phases[phase].GreenSeconds, CrossingGreen(pair.Key));
+                }
             }
             proposal.Plan = plan;
             var program = new OmsiSignalProgram { CycleSeconds = 60 };
@@ -228,7 +290,8 @@ namespace OmsiMapEditor.OMSI
             proposal.Program = program;
 
             proposal.CrossingFootpaths = conflicts.Where(conflict => conflict.Kind == OmsiConflictKind.Pedestrian)
-                .Select(conflict => crossing.Movements[conflict.First].Turn == OmsiMovementTurn.Pedestrian ? conflict.First : conflict.Second).Distinct().Count();
+                .Select(conflict => crossing.Movements[conflict.First].Turn == OmsiMovementTurn.Pedestrian ? conflict.First : conflict.Second)
+                .Where(movement => proposal.MovementLights[movement] < 0).Distinct().Count();
             foreach (var clash in OmsiSignalConflicts.Clashes(program, conflicts, movement => proposal.MovementLights[movement]))
                 (clash.Conflict.Permitted ? proposal.PermittedClashes : proposal.HardClashes).Add(clash);
             return proposal;

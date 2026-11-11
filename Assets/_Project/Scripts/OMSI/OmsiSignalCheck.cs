@@ -108,6 +108,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A finding of the timeline's timing check (<see cref="OmsiSignalTimeline.CheckTiming"/>).</summary>
         Timing,
 
+        /// <summary>A pedestrian light shows green for less time than people need to cross: openOMSI's walkers do not start then.</summary>
+        PedestrianWindow,
+
         /// <summary>Incompatible groups go together, allowed by a manual exception.</summary>
         AllowedByException
     }
@@ -250,10 +253,33 @@ namespace OmsiMapEditor.OMSI
                 if (dark != null && program.Lights[light].Phases.Count > 0)
                     findings.Add(new OmsiSignalFinding { Level = OmsiSignalIssueLevel.Hint, Kind = OmsiSignalFindingKind.DarkPhase, First = light, Seconds = dark.Start });
             }
+            // A walker starts across only when the green lasts until the far side (openOMSI: the length over the pace, and a second).
+            if (pedestrianLights != null)
+                foreach (var light in pedestrianLights.Where(each => each >= 0 && each < lights).OrderBy(each => each))
+                {
+                    var needed = crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movement.Index < lightOf.Count && lightOf[movement.Index] == light)
+                        .Select(movement => Math.Sqrt((movement.ExitX - movement.EntryX) * (movement.ExitX - movement.EntryX) + (movement.ExitY - movement.EntryY) * (movement.ExitY - movement.EntryY)) /
+                                            PedestrianPace + 1.0).DefaultIfEmpty(0.0).Max();
+                    if (needed <= 0.0 || program.Lights[light].Phases.Count == 0)
+                        continue;
+                    // The longest run of green (the shades of green count as one).
+                    var longest = 0.0;
+                    var run = 0.0;
+                    foreach (var segment in OmsiSignalTimeline.Segments(program, light))
+                    {
+                        run = OmsiSignalAspects.Of(segment.State) == OmsiSignalAspect.Green ? run + segment.Seconds : 0.0;
+                        longest = Math.Max(longest, run);
+                    }
+                    if (longest + 1e-6 < needed)
+                        findings.Add(new OmsiSignalFinding { Level = OmsiSignalIssueLevel.Warning, Kind = OmsiSignalFindingKind.PedestrianWindow, First = light, Seconds = longest, Amount = Math.Ceiling(needed) });
+                }
             foreach (var issue in OmsiSignalTimeline.CheckTiming(program, pedestrianLights))
                 findings.Add(new OmsiSignalFinding { Level = issue.Level, Kind = OmsiSignalFindingKind.Timing, First = issue.Light, Seconds = issue.Seconds, Timing = issue });
             return findings.OrderBy(finding => finding.Level).ThenBy(finding => finding.First).ThenBy(finding => finding.Second).ToList();
         }
+
+        /// <summary>How fast people are taken to cross, in metres a second (the assistant uses the same).</summary>
+        public const double PedestrianPace = 1.2;
 
         private static (int, int) Pair(int first, int second) => first < second ? (first, second) : (second, first);
 

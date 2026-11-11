@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Überweg auf Anforderung",
   "signals.template.pedestrian_request.desc": "Zwei Arme: Grün, bis jemand anfordert (Anforderungspunkt), dann Gelb, Rot zum Überqueren und wieder Grün. Fußwege lassen sich an kein Licht binden.",
   "signals.templates.heads": "Köpfe für Gruppen ohne setzen",
-  "signals.templates.heads.tooltip": "Setzt für jede Gruppe ohne Kopf einen Ampelkopf, mit Kopftyp, Höhe und Mast des Assistenten. Aus: Köpfe bleiben, wie sie sind."
+  "signals.templates.heads.tooltip": "Setzt für jede Gruppe ohne Kopf einen Ampelkopf, mit Kopftyp, Höhe und Mast des Assistenten. Aus: Köpfe bleiben, wie sie sind.",
+  "signals.wizard.group_foot": "Überweg {n}",
+  "signals.wizard.foot": "Überwege bekommen eine eigene Ampel",
+  "signals.wizard.foot.tooltip": "An: Jeder Fußweg über einen Arm, den Fahrzeuge kreuzen, bekommt eine Ampel, grün in den Phasen, in denen ihn kein Fahrzeug kreuzt und abbiegende Fahrzeuge warten, oder in einer eigenen Phase. Aus: Überwege bekommen keine Ampel.",
+  "signals.finding.pedestrian_window": "{group}: nur {seconds} Grün, Fußgänger brauchen aber etwa {needed} s zum Queren; niemand geht los"
 }

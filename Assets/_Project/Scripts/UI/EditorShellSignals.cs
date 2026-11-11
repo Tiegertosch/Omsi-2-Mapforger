@@ -635,10 +635,17 @@ namespace OmsiMapEditor.UI
             if (way == null || movement.Light == light)
                 return;
             var signals = CurrentSignals();
-            if (light < 0)
-                signals.WayLights.Remove(way);
-            else
-                signals.WayLights[way] = light;
+            // Movements that start on one lead-in (a lane before a crossing) obey one light: every way of the lane follows.
+            foreach (var shared in signalCrossing.SharingControl(movement))
+            {
+                var sharedWay = WayOf(shared);
+                if (sharedWay == null)
+                    continue;
+                if (light < 0)
+                    signals.WayLights.Remove(sharedWay);
+                else
+                    signals.WayLights[sharedWay] = light;
+            }
             signalSelected = movementIndex;
             ApplySignals(signals, null, Loc.T(light < 0 ? "signals.done.unassigned" : "signals.done.assigned", // i18n:keys
                 ("text", MovementText(new List<OmsiSignalMovement> { movement }, null)),

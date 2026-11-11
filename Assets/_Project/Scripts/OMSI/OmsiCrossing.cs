@@ -72,6 +72,16 @@ namespace OmsiMapEditor.OMSI
             return crossings;
         }
 
+        /// <summary>
+        /// The key a crossing's footpath is bound to a light by, such as <c>x2>x2</c> for the crossing over arm 3. It has the
+        /// look of a way through (the line of bindings needs the <c>></c>) but is no lane connection: it never counts as one.
+        /// </summary>
+        public static string WayKey(int arm)
+        {
+            var text = "x" + arm.ToString(CultureInfo.InvariantCulture);
+            return text + ">" + text;
+        }
+
         public static double ClampDistance(double meters)
         {
             return Math.Max(ClosestMeters, Math.Min(FarthestMeters, meters));

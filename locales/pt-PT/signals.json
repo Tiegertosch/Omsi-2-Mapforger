@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Passagem a pedido",
   "signals.template.pedestrian_request.desc": "Dois braços: verde até alguém pedir (um ponto de pedido), depois amarelo, vermelho para atravessar e verde outra vez. Os caminhos de peões não se ligam a uma luz.",
   "signals.templates.heads": "Colocar cabeças para grupos sem elas",
-  "signals.templates.heads.tooltip": "Coloca uma cabeça para cada grupo que não tenha, com o tipo, a altura e o poste do assistente. Desligado: as cabeças não mudam."
+  "signals.templates.heads.tooltip": "Coloca uma cabeça para cada grupo que não tenha, com o tipo, a altura e o poste do assistente. Desligado: as cabeças não mudam.",
+  "signals.wizard.group_foot": "Passadeira {n}",
+  "signals.wizard.foot": "As passadeiras têm um semáforo próprio",
+  "signals.wizard.foot.tooltip": "Ligado: cada caminho pedonal sobre um braço que veículos cruzam recebe um semáforo, verde nas fases em que nenhum veículo o cruza e os que viram dão prioridade, ou numa fase própria. Desligado: as passadeiras não têm semáforo.",
+  "signals.finding.pedestrian_window": "{group}: verde apenas {seconds}, mas são precisos cerca de {needed} s para atravessar; ninguém começa a atravessar"
 }

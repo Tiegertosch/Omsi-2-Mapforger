@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Przejście na żądanie",
   "signals.template.pedestrian_request.desc": "Dwa wloty: zielone, dopóki ktoś nie zażąda (punkt żądania), potem żółte, czerwone na przejście i znów zielone. Ścieżek dla pieszych nie można powiązać ze światłem.",
   "signals.templates.heads": "Ustaw głowice dla grup bez nich",
-  "signals.templates.heads.tooltip": "Ustawia głowicę dla każdej grupy, która jej nie ma, z typem, wysokością i słupem z asystenta. Wyłączone: głowice zostają bez zmian."
+  "signals.templates.heads.tooltip": "Ustawia głowicę dla każdej grupy, która jej nie ma, z typem, wysokością i słupem z asystenta. Wyłączone: głowice zostają bez zmian.",
+  "signals.wizard.group_foot": "Przejście {n}",
+  "signals.wizard.foot": "Przejścia dostają własną sygnalizację",
+  "signals.wizard.foot.tooltip": "Włączone: każda ścieżka dla pieszych przez ramię, które krzyżują pojazdy, dostaje sygnalizator, zielony w fazach, w których żaden pojazd jej nie krzyżuje, a skręcające pojazdy ustępują, albo we własnej fazie. Wyłączone: przejścia nie dostają sygnalizacji.",
+  "signals.finding.pedestrian_window": "{group}: zielone tylko {seconds}, a przejście zajmuje około {needed} s; nikt nie wyrusza"
 }

@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Traversée sur demande",
   "signals.template.pedestrian_request.desc": "Deux branches : vert jusqu’à ce que quelqu’un demande (un point de demande), puis jaune, rouge pour traverser et vert à nouveau. Les chemins piétons ne peuvent pas être liés à un feu.",
   "signals.templates.heads": "Placer des têtes pour les groupes sans",
-  "signals.templates.heads.tooltip": "Place une tête pour chaque groupe qui n’en a pas, avec le type, la hauteur et le mât de l’assistant. Désactivé : les têtes ne changent pas."
+  "signals.templates.heads.tooltip": "Place une tête pour chaque groupe qui n’en a pas, avec le type, la hauteur et le mât de l’assistant. Désactivé : les têtes ne changent pas.",
+  "signals.wizard.group_foot": "Passage {n}",
+  "signals.wizard.foot": "Les passages piétons ont leur propre feu",
+  "signals.wizard.foot.tooltip": "Activé : chaque chemin piéton sur une branche que des véhicules croisent reçoit un feu, vert avec les phases où aucun véhicule ne le croise et où les véhicules qui tournent cèdent le passage, ou dans une phase à part. Désactivé : les passages n'ont pas de feu.",
+  "signals.finding.pedestrian_window": "{group} : vert seulement {seconds}, mais il faut environ {needed} s pour traverser ; personne ne s'engage"
 }

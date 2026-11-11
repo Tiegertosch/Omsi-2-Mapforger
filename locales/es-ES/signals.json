@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Cruce a petición",
   "signals.template.pedestrian_request.desc": "Dos brazos: verde hasta que alguien lo pide (un punto de petición), luego amarillo, rojo para cruzar y verde otra vez. Los pasos de peatones no se pueden asignar a una luz.",
   "signals.templates.heads": "Colocar cabezales para grupos sin ellos",
-  "signals.templates.heads.tooltip": "Coloca un cabezal para cada grupo que no lo tenga, con el tipo, la altura y el mástil del asistente. Desactivado: los cabezales no cambian."
+  "signals.templates.heads.tooltip": "Coloca un cabezal para cada grupo que no lo tenga, con el tipo, la altura y el mástil del asistente. Desactivado: los cabezales no cambian.",
+  "signals.wizard.group_foot": "Paso {n}",
+  "signals.wizard.foot": "Los pasos de peatones tienen su propio semáforo",
+  "signals.wizard.foot.tooltip": "Activado: cada camino peatonal sobre un brazo que cruzan vehículos recibe un semáforo, verde en las fases en que ningún vehículo lo cruza y los que giran ceden el paso, o en una fase propia. Desactivado: los pasos no tienen semáforo.",
+  "signals.finding.pedestrian_window": "{group}: verde solo {seconds}, pero hacen falta unos {needed} s para cruzar; nadie empieza a cruzar"
 }

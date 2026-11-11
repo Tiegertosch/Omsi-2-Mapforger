@@ -421,6 +421,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>True for the first arc of its way through: where its vehicles stop at a light (ADR 085).</summary>
         public bool StartsWay;
+
+        /// <summary>
+        /// For the straight lead-in of a lane on an arm with a crossing, the lane as <c>arm.lane</c>; else null. Vehicles of
+        /// all the lane's ways stop at its start, before the crossing, so one light binds it (ADR 086, step 3).
+        /// </summary>
+        public string LeadInLane;
     }
 
     /// <summary>
@@ -495,6 +501,9 @@ namespace OmsiMapEditor.OMSI
         }
 
         private CrossingPlan[] crossingPlans = new CrossingPlan[0];
+
+        /// <summary>The keys the footpaths of crossings are bound to lights by (<see cref="OmsiCrossing.WayKey"/>); not ways through.</summary>
+        public HashSet<string> CrossingWays { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>The ways through built as lanes, by <see cref="OmsiLaneConnections.Key"/>.</summary>
         public HashSet<string> WaysThrough { get; } = new HashSet<string>(StringComparer.Ordinal);
@@ -1601,7 +1610,12 @@ namespace OmsiMapEditor.OMSI
                 var plan = turnLanes[lane.Key];
                 if (plan != null && (lane.Value == plan.Inner || lane.Value == plan.Lane))
                     continue;
+                var before = Paths.Count;
                 AddStraight(Arms[lane.Key], Arms[lane.Key].Length, turnsAt[lane.Key], lane.Value);
+                // On an arm with a crossing the lead-in starts before it, so a light holds vehicles there.
+                if (Paths.Count > before && crossingPlans[lane.Key] != null)
+                    Paths[before].LeadInLane = lane.Key.ToString(CultureInfo.InvariantCulture) + "." +
+                                               Arms[lane.Key].Profile.Lanes.IndexOf(lane.Value).ToString(CultureInfo.InvariantCulture);
             }
             for (var arm = 0; arm < Arms.Count; arm++)
             {
@@ -1807,8 +1821,10 @@ namespace OmsiMapEditor.OMSI
                 Paths.Add(new OmsiJunctionPath
                 {
                     X = start.X, Y = start.Y, Height = rightLanes[index].Height, HeadingDegrees = Normalize360(Math.Atan2(across.X, across.Y) * 180.0 / Math.PI),
-                    RadiusMeters = 0.0, LengthMeters = start.DistanceTo(end), Kind = 1, Width = plan.Width, Direction = 2
+                    RadiusMeters = 0.0, LengthMeters = start.DistanceTo(end), Kind = 1, Width = plan.Width, Direction = 2,
+                    WayThrough = OmsiCrossing.WayKey(index), StartsWay = true
                 });
+                CrossingWays.Add(OmsiCrossing.WayKey(index));
             }
         }
 

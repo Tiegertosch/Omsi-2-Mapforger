@@ -185,6 +185,182 @@ namespace OmsiMapEditor.Tests
             Assert.IsFalse(Tee(Profile, null).Meshes.Any(mesh => mesh.Texture == OmsiJunctionMarkings.WhiteTexture));
         }
 
+        private static List<OmsiJunctionArm> TeeArms(OmsiCrossing crossingOnSideArm)
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Profile), ProfilePath);
+            var arms = new[] { 90.0, 270.0, 0.0 }.Select(heading => new OmsiJunctionArm { HeadingDegrees = heading, ProfilePath = ProfilePath, Profile = profile }).ToList();
+            arms[2].Crossing = crossingOnSideArm;
+            return arms;
+        }
+
+        [Test]
+        public void TheCrossingFootpathIsBoundToALightUnderAKeyOfItsOwn()
+        {
+            var layout = OmsiJunctionLayout.Build(TeeArms(new OmsiCrossing()), Texture);
+            var index = layout.Arms.FindIndex(arm => Math.Abs(arm.HeadingDegrees) < 1e-9);
+            var key = OmsiCrossing.WayKey(index);
+            CollectionAssert.AreEquivalent(new[] { key }, layout.CrossingWays);
+            Assert.IsFalse(layout.WaysThrough.Contains(key));
+            var across = layout.Paths.Single(path => path.WayThrough == key);
+            Assert.IsTrue(across.StartsWay);
+            Assert.AreEqual(1, across.Kind);
+            // Without a crossing there is no such key.
+            Assert.AreEqual(0, OmsiJunctionLayout.Build(TeeArms(null), Texture).CrossingWays.Count);
+        }
+
+        [Test]
+        public void VehiclesAreHeldBeforeTheCrossingByTheLeadInOfTheirLaneAndTheCrossingFollowsItsOwnLight()
+        {
+            var layout = OmsiJunctionLayout.Build(TeeArms(new OmsiCrossing()), Texture);
+            var index = layout.Arms.FindIndex(arm => Math.Abs(arm.HeadingDegrees) < 1e-9);
+            var signals = new OmsiJunctionSignals();
+            signals.Program.CycleSeconds = 60;
+            var vehicles = signals.Program.AddLight("Side");
+            var feet = signals.Program.AddLight("Foot");
+            var sideWays = layout.WaysThrough.Where(way => way.StartsWith(index + ".")).ToList();
+            Assert.Greater(sideWays.Count, 0);
+            foreach (var way in sideWays)
+                signals.WayLights[way] = vehicles;
+            signals.WayLights[OmsiCrossing.WayKey(index)] = feet;
+
+            var made = OmsiJunctionGenerator.Junction(TeeArms(new OmsiCrossing()), Texture, "Crossing", signals: signals);
+
+            var bytes = OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252);
+            var program = OmsiSignalProgram.Read(bytes);
+            for (var path = 0; path < layout.Paths.Count; path++)
+            {
+                var each = layout.Paths[path];
+                var expected = each.LeadInLane != null && each.LeadInLane.StartsWith(index + ".") ? vehicles
+                    : each.WayThrough == OmsiCrossing.WayKey(index) ? feet
+                    : -1;
+                Assert.AreEqual(expected, program.PathLights[path], "path " + path + " " + each.WayThrough + " " + each.LeadInLane);
+            }
+            // The arcs of the ways of the lane are not bound again inside the junction.
+            Assert.IsFalse(layout.Paths.Where(path => path.StartsWay && path.WayThrough != null && sideWays.Contains(path.WayThrough))
+                .Any(path => program.PathLights[layout.Paths.IndexOf(path)] >= 0));
+            StringAssert.Contains(OmsiCrossing.WayKey(index) + "=" + feet, made.Sco);
+
+            // Analysed again, the movements from the arm obey the light of the lead-in, and the crossing is a footpath of its own light.
+            var crossing = OmsiSignalIntersection.Analyse(OmsiSceneryObject.Parse(bytes), program);
+            var foot = crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movement.Light == feet).ToList();
+            Assert.AreEqual(1, foot.Count);
+            Assert.Greater(crossing.Movements.Count(movement => movement.Light == vehicles), 0);
+        }
+
+        [Test]
+        public void WaysThatObeyDifferentLightsKeepTheirOwnArcsAndNoLeadInIsBound()
+        {
+            var layout = OmsiJunctionLayout.Build(TeeArms(new OmsiCrossing()), Texture);
+            var index = layout.Arms.FindIndex(arm => Math.Abs(arm.HeadingDegrees) < 1e-9);
+            var signals = new OmsiJunctionSignals();
+            signals.Program.CycleSeconds = 60;
+            signals.Program.AddLight("A");
+            signals.Program.AddLight("B");
+            var sideWays = layout.WaysThrough.Where(way => way.StartsWith(index + ".")).OrderBy(way => way, StringComparer.Ordinal).ToList();
+            Assert.GreaterOrEqual(sideWays.Count, 2);
+            signals.WayLights[sideWays[0]] = 0;
+            signals.WayLights[sideWays[1]] = 1;
+
+            var made = OmsiJunctionGenerator.Junction(TeeArms(new OmsiCrossing()), Texture, "Split", signals: signals);
+
+            var program = OmsiSignalProgram.Read(OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252));
+            foreach (var path in layout.Paths.Where(path => path.LeadInLane != null))
+                Assert.AreEqual(-1, program.PathLights[layout.Paths.IndexOf(path)]);
+            foreach (var way in new[] { sideWays[0], sideWays[1] })
+                Assert.AreEqual(signals.WayLights[way], program.PathLights[layout.Paths.FindIndex(path => path.StartsWay && path.WayThrough == way)]);
+        }
+
+        [Test]
+        public void ATurnGivesWayToTheFootpathItCrossesOnTheExitButNotToTheOneOverItsOwnArm()
+        {
+            var layout = OmsiJunctionLayout.Build(TeeArms(new OmsiCrossing()), Texture);
+            var made = OmsiJunctionGenerator.Junction(TeeArms(new OmsiCrossing()), Texture, "Conflicts");
+            var bytes = OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252);
+            var scenery = OmsiSceneryObject.Parse(bytes);
+            var crossing = OmsiSignalIntersection.Analyse(scenery, OmsiSignalProgram.Read(bytes));
+            var foot = crossing.Movements.Single(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movement.Paths.Any(path =>
+                path < layout.Paths.Count && layout.Paths[path].WayThrough != null && layout.Paths[path].WayThrough.StartsWith("x")));
+            var conflicts = OmsiSignalConflicts.Of(scenery, crossing).Where(conflict => conflict.Kind == OmsiConflictKind.Pedestrian &&
+                (conflict.First == foot.Index || conflict.Second == foot.Index)).ToList();
+            Assert.IsTrue(conflicts.Any(conflict => !conflict.Permitted), "traffic from the arm itself must stop for it");
+            Assert.IsTrue(conflicts.Any(conflict => conflict.Permitted), "turns into the arm give way to it");
+        }
+
+        [Test]
+        public void TheAssistantGivesACrossingALightGreenWithTheTrafficThatDoesNotCrossItAndKeepsItConflictFree()
+        {
+            var layout = OmsiJunctionLayout.Build(TeeArms(new OmsiCrossing()), Texture);
+            var made = OmsiJunctionGenerator.Junction(TeeArms(new OmsiCrossing()), Texture, "Wizard");
+            var bytes = OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252);
+            var scenery = OmsiSceneryObject.Parse(bytes);
+            var crossing = OmsiSignalIntersection.Analyse(scenery, OmsiSignalProgram.Read(bytes));
+            var conflicts = OmsiSignalConflicts.Of(scenery, crossing);
+            var foot = crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movement.Paths.Any(path =>
+                path < layout.Paths.Count && layout.Paths[path].WayThrough != null && layout.Paths[path].WayThrough.StartsWith("x"))).Select(movement => movement.Index).ToList();
+            Assert.AreEqual(1, foot.Count);
+
+            var proposal = OmsiSignalWizard.Propose(crossing, conflicts, new OmsiSignalWizardOptions(), null, foot);
+
+            var light = proposal.MovementLights[foot[0]];
+            Assert.GreaterOrEqual(light, 0);
+            Assert.IsTrue(proposal.Groups[light].Pedestrian);
+            Assert.IsTrue(proposal.ConflictFree, string.Join("; ", proposal.HardClashes.Select(clash => clash.Conflict.First + "-" + clash.Conflict.Second)));
+            Assert.AreEqual(0, proposal.CrossingFootpaths);
+            // The check finds nothing wrong with the light the assistant wrote: its red and yellow and yellow show red on a pedestrian head.
+            var checkedProgram = OmsiSignalCheck.Run(proposal.Program, crossing, conflicts, proposal.MovementLights, null, null, new HashSet<int> { light });
+            Assert.IsFalse(checkedProgram.Any(finding => finding.Kind == OmsiSignalFindingKind.Timing && finding.First == light),
+                string.Join("; ", checkedProgram.Where(finding => finding.First == light).Select(finding => finding.Kind + " " + finding.Level)));
+            Assert.IsFalse(checkedProgram.Any(finding => finding.Kind == OmsiSignalFindingKind.PedestrianWindow));
+            // It goes with the phase of the through road, not with the side arm it crosses.
+            var phasesWithIt = proposal.Plan.Phases.Where(phase => phase.Lights.Contains(light)).ToList();
+            Assert.AreEqual(1, phasesWithIt.Count);
+            // The approaches whose traffic crosses it for certain are in none of its phases.
+            var blocking = conflicts.Where(conflict => !conflict.Permitted && (conflict.First == foot[0] || conflict.Second == foot[0]))
+                .Select(conflict => crossing.Movements[conflict.First == foot[0] ? conflict.Second : conflict.First].Approach).Distinct().ToList();
+            Assert.Greater(blocking.Count, 0);
+            Assert.IsFalse(phasesWithIt[0].Lights.Any(each => blocking.Any(approach => proposal.Groups[each].Approaches.Contains(approach))),
+                "phases " + string.Join(" | ", proposal.Plan.Phases.Select(phase => string.Join(",", phase.Lights.Select(each => proposal.Groups[each].Name)))) +
+                "; blocking approaches " + string.Join(",", blocking));
+            // Long enough to reach the far side at the walking pace.
+            Assert.GreaterOrEqual(phasesWithIt[0].GreenSeconds, Math.Ceiling(11.0 / 1.2 + 2.0));
+
+            // Off, the footpath gets no light and is counted as one the assistant leaves out.
+            var without = OmsiSignalWizard.Propose(crossing, conflicts, new OmsiSignalWizardOptions { PedestrianLights = false }, null, foot);
+            Assert.AreEqual(-1, without.MovementLights[foot[0]]);
+            Assert.AreEqual(1, without.CrossingFootpaths);
+        }
+
+        [Test]
+        public void ACrossingLightWhoseGreenIsTooShortToCrossIsWarnedAbout()
+        {
+            var layout = OmsiJunctionLayout.Build(TeeArms(new OmsiCrossing()), Texture);
+            var made = OmsiJunctionGenerator.Junction(TeeArms(new OmsiCrossing()), Texture, "Window");
+            var bytes = OmsiTextFile.Encode(made.Sco, OmsiTextEncoding.Windows1252);
+            var scenery = OmsiSceneryObject.Parse(bytes);
+            var crossing = OmsiSignalIntersection.Analyse(scenery, OmsiSignalProgram.Read(bytes));
+            var conflicts = OmsiSignalConflicts.Of(scenery, crossing);
+            var foot = crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movement.Paths.Any(path =>
+                path < layout.Paths.Count && layout.Paths[path].WayThrough != null && layout.Paths[path].WayThrough.StartsWith("x"))).Select(movement => movement.Index).ToList();
+            var proposal = OmsiSignalWizard.Propose(crossing, conflicts, new OmsiSignalWizardOptions(), null, foot);
+            var light = proposal.MovementLights[foot[0]];
+            var lights = proposal.MovementLights;
+
+            Assert.IsFalse(OmsiSignalCheck.Run(proposal.Program, crossing, conflicts, lights, null, null, new HashSet<int> { light })
+                .Any(finding => finding.Kind == OmsiSignalFindingKind.PedestrianWindow));
+
+            // The same program with the crossing's green cut to 5 s: nobody would start across 11 m.
+            var short5 = proposal.Plan.Copy();
+            foreach (var phase in short5.Phases.Where(phase => phase.Lights.Contains(light)))
+                phase.GreenSeconds = 5;
+            var program = proposal.Program.Copy();
+            short5.WriteTo(program);
+            var findings = OmsiSignalCheck.Run(program, crossing, conflicts, lights, null, null, new HashSet<int> { light });
+            var window = findings.Single(finding => finding.Kind == OmsiSignalFindingKind.PedestrianWindow);
+            Assert.AreEqual(light, window.First);
+            Assert.AreEqual(OmsiSignalIssueLevel.Warning, window.Level);
+            Assert.AreEqual(Math.Ceiling(11.0 / 1.2 + 1.0), window.Amount);
+        }
+
         [Test]
         public void FootpathsJoinByPlaceWhateverTheirHeadingButVehiclePathsNeedTheSameWay()
         {

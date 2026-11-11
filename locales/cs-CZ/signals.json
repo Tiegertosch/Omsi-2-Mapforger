@@ -261,5 +261,9 @@
   "signals.template.pedestrian_request": "Přechod na požádání",
   "signals.template.pedestrian_request.desc": "Dvě větve: zelená, dokud někdo nepožádá (bod požadavku), pak žlutá, červená pro přechod a znovu zelená. Chodníky nelze vázat na světlo.",
   "signals.templates.heads": "Umístit hlavice pro skupiny bez nich",
-  "signals.templates.heads.tooltip": "Umístí hlavici pro každou skupinu, která žádnou nemá, s typem, výškou a stožárem z asistenta. Vypnuto: hlavice se nemění."
+  "signals.templates.heads.tooltip": "Umístí hlavici pro každou skupinu, která žádnou nemá, s typem, výškou a stožárem z asistenta. Vypnuto: hlavice se nemění.",
+  "signals.wizard.group_foot": "Přechod {n}",
+  "signals.wizard.foot": "Přechody dostanou vlastní semafor",
+  "signals.wizard.foot.tooltip": "Zapnuto: každá pěší cesta přes rameno, kterou vozidla kříží, dostane semafor, zelený ve fázích, kdy ji žádné vozidlo nekříží a odbočující vozidla dávají přednost, nebo ve vlastní fázi. Vypnuto: přechody semafor nedostanou.",
+  "signals.finding.pedestrian_window": "{group}: zelená jen {seconds}, chodci ale potřebují asi {needed} s na přechod; nikdo nevyrazí"
 }

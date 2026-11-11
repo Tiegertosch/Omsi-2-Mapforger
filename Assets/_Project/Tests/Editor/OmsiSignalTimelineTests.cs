@@ -152,9 +152,12 @@ namespace OmsiMapEditor.Tests
             Assert.IsTrue(clean.Any(issue => issue.Light == 1 && issue.Kind == OmsiSignalIssueKind.GreenToRed && issue.Level == OmsiSignalIssueLevel.Warning));
             Assert.IsFalse(clean.Any(issue => issue.Light == 0));
 
-            // As a pedestrian light the same light is fine, but a yellow is not.
+            // As a pedestrian light the same light is fine, its red and yellow and yellow showing red on the head; a dark state is not.
             Assert.IsFalse(OmsiSignalTimeline.CheckTiming(program, new[] { 1 }).Any(issue => issue.Light == 1));
-            Assert.IsTrue(OmsiSignalTimeline.CheckTiming(program, new[] { 0 }).Any(issue => issue.Light == 0 && issue.Kind == OmsiSignalIssueKind.PedestrianAspect));
+            Assert.IsFalse(OmsiSignalTimeline.CheckTiming(program, new[] { 0 }).Any(issue => issue.Light == 0 && issue.Kind == OmsiSignalIssueKind.PedestrianAspect));
+            var dark = Program();
+            dark.Lights[0].Phases[2] = new OmsiSignalPhase(12, 3);
+            Assert.IsTrue(OmsiSignalTimeline.CheckTiming(dark, new[] { 0 }).Any(issue => issue.Light == 0 && issue.Kind == OmsiSignalIssueKind.PedestrianAspect));
 
             program.Holds.Add(new OmsiSignalHold { Light = 1, Seconds = 75 });
             Assert.IsTrue(OmsiSignalTimeline.CheckTiming(program).Any(issue => issue.Kind == OmsiSignalIssueKind.HoldOutOfRange && issue.Level == OmsiSignalIssueLevel.Error));
