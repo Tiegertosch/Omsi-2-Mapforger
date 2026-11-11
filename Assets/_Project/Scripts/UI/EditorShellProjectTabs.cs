@@ -90,6 +90,7 @@ namespace OmsiMapEditor.UI
             if (session != null && session.CanEdit)
                 content.Add(MapSettingsButton());
                 content.Add(ParkListButton());
+                content.Add(TrafficCurvesButton());
             if (!string.IsNullOrWhiteSpace(currentSummary.Description))
             {
                 var heading = new Label(Loc.T("project.about"));

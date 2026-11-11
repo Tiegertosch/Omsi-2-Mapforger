@@ -28,5 +28,20 @@
   "parklist.status.changed": "Seznam zapsán s {count} typy aut.",
   "parklist.status.unchanged": "Seznam zůstává, jak je.",
   "parklist.number": "Číslo seznamu",
-  "parklist.number.tooltip": "0 je parklist_p.txt; n je parklist_p_n.txt, který parkoviště uvádějí s n jako prvním popiskem svého objektu."
+  "parklist.number.tooltip": "0 je parklist_p.txt; n je parklist_p_n.txt, který parkoviště uvádějí s n jako prvním popiskem svého objektu.",
+  "trafficcurves.open": "Křivky provozu...",
+  "trafficcurves.open.tooltip": "Nastav, kolik je provozu a cestujících v kterou hodinu dne.",
+  "trafficcurves.title": "Křivky provozu",
+  "trafficcurves.description": "Kolik AI provozu a cestujících openOMSI v každou hodinu vytváří, jako násobek běžného množství (1 je běžné). Kliknutím nebo tažením bodu nastavíš hodinu; hodiny mezi nimi spojuje přímka.",
+  "trafficcurves.cars": "Auta",
+  "trafficcurves.cars.tooltip": "Hustota AI aut na silnicích během dne.",
+  "trafficcurves.passengers": "Cestující",
+  "trafficcurves.passengers.tooltip": "Hustota cestujících čekajících na zastávkách během dne.",
+  "trafficcurves.reset": "Vrátit",
+  "trafficcurves.apply": "Použít",
+  "trafficcurves.cancel": "Zrušit",
+  "trafficcurves.readout": "{hour}:00 - faktor {value, number, 0.00}",
+  "trafficcurves.status.changed": "Křivky provozu byly zapsány.",
+  "trafficcurves.status.unchanged": "Křivky provozu zůstávají, jak jsou.",
+  "trafficcurves.status.failed": "Křivky provozu nelze zapsat: {reason}"
 }

@@ -13,7 +13,7 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [x] Einstiegspunkte erstellen und verwalten — Vorhanden (Reiter „Entries“ im Project-Fenster, Gruppe „Entry point“ im Inspector; seit 9. November 2026)
 - [x] Kachel als DirectX-X-Terrain exportieren — Vorhanden (Knopf „Export terrain as .x...“ im Kachel-Reiter des Inspectors; seit 9. November 2026)
 - [x] Links- und Rechtsverkehr konfigurieren — Vorhanden (beim Anlegen und danach unter „Map settings...“; bestehende Straßen ändern sich nicht)
-- [ ] KI-Verkehrsdichte und Fahrgastdichte konfigurieren — Teilweise (Faktor auf die Tageskurve unter „Map settings...“, einzelne Stunden der Kurve nicht)
+- [x] KI-Verkehrsdichte und Fahrgastdichte konfigurieren — Vorhanden (Faktor auf die Tageskurve unter „Map settings...“, einzelne Stunden im Dialog „Traffic curves...“, ADR 088)
 
 ## B. Objekte und Szenerie
 - [x] Objekte aus der OMSI-Bibliothek platzieren — Vorhanden
@@ -83,8 +83,8 @@ Stand: 9. November 2026, abgeglichen mit dem Code nach Release 1.1.1. Vorhanden 
 - [ ] KI-Fahrpfade manuell erstellen und bearbeiten — Teilweise (Zeichnen mit `invis_street` im Pfadmodus samt Einrasten, seit 11. November 2026; offen: Breite und Richtung wählen, Richtung beim Einrasten übernehmen, Punkte vorhandener Pfade ändern)
 - [x] Fahrstreifenverbindungen definieren — Vorhanden
 - [x] Fußgängerpfade erstellen und verbinden — Vorhanden (Überwege an Kreuzungen mit Zebra, Ampeln und Köpfen, Überweg-Stück mit abgesenktem Bordstein in jede Straße, Pfadmodus mit `invis_sidewalk` und Einrasten auf Pfadlinien; ADR 086, seit 11. November 2026; offen: Ampel am Überweg-Stück)
-- [ ] Ampeln und Signalphasen bearbeiten — Offen (Ampeln nur als Objekte platzierbar)
-- [ ] Ampelgruppen und Kreuzungszuordnung — Offen
+- [x] Ampeln und Signalphasen bearbeiten — Vorhanden für im Editor erzeugte Kreuzungen (Werkzeug „Signals“: Zeitleiste, Phasen, Assistent, Vorlagen, Prüfung, ADR 085; Fußgängerampeln ADR 086); an OMSIs eigenen Kreuzungen nur Gruppen der Köpfe
+- [x] Ampelgruppen und Kreuzungszuordnung — Vorhanden (Bewegungen und Köpfe den Gruppen zuordnen, ADR 085)
 - [ ] Parkplätze / KI-Parkpfade konfigurieren — Teilweise: Es gibt keine KI-Parkpfade; ein Parkplatz ist ein Objekt (`car_park.sco`, ADR 087). Parkreihen entlang von Straßen und die Parkliste der Karte (Dialog) sind da, dazu Listennummern und die Prüfung unbrauchbarer Plätze in der Kartenprüfung
 - [x] Verkehrsregeln auf vorhandenen OMSI-Pfaden ändern — Vorhanden (Tempo, Dichte, Pkw, Busse, Lkw)
 

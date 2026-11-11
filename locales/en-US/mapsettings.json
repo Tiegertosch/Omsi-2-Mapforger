@@ -28,5 +28,20 @@
   "parklist.status.changed": "Parking list written with {count} car types.",
   "parklist.status.unchanged": "The parking list stays as it is.",
   "parklist.number": "List number",
-  "parklist.number.tooltip": "0 is parklist_p.txt; n is parklist_p_n.txt, which car parks name with n as the first label of their object."
+  "parklist.number.tooltip": "0 is parklist_p.txt; n is parklist_p_n.txt, which car parks name with n as the first label of their object.",
+  "trafficcurves.open": "Traffic curves...",
+  "trafficcurves.open.tooltip": "Set how much traffic and how many passengers there are at each hour of the day.",
+  "trafficcurves.title": "Traffic curves",
+  "trafficcurves.description": "How much AI traffic and how many passengers openOMSI makes at each hour, as a factor on the normal amount (1 is normal). Click or drag a handle to set an hour; the hours between are joined by straight lines.",
+  "trafficcurves.cars": "Cars",
+  "trafficcurves.cars.tooltip": "Density of the AI cars on the roads over the day.",
+  "trafficcurves.passengers": "Passengers",
+  "trafficcurves.passengers.tooltip": "Density of the passengers waiting at stops over the day.",
+  "trafficcurves.reset": "Reset",
+  "trafficcurves.apply": "Apply",
+  "trafficcurves.cancel": "Cancel",
+  "trafficcurves.readout": "{hour}:00 - factor {value, number, 0.00}",
+  "trafficcurves.status.changed": "The traffic curves are written.",
+  "trafficcurves.status.unchanged": "The traffic curves stay as they are.",
+  "trafficcurves.status.failed": "The traffic curves could not be written: {reason}"
 }

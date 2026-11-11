@@ -28,5 +28,20 @@
   "parklist.status.changed": "Liste écrite avec {count} types de voitures.",
   "parklist.status.unchanged": "La liste reste telle quelle.",
   "parklist.number": "Numéro de liste",
-  "parklist.number.tooltip": "0 est parklist_p.txt ; n est parklist_p_n.txt, que les parkings nomment avec n comme premier libellé de leur objet."
+  "parklist.number.tooltip": "0 est parklist_p.txt ; n est parklist_p_n.txt, que les parkings nomment avec n comme premier libellé de leur objet.",
+  "trafficcurves.open": "Courbes de trafic...",
+  "trafficcurves.open.tooltip": "Règle la quantité de trafic et de passagers à chaque heure de la journée.",
+  "trafficcurves.title": "Courbes de trafic",
+  "trafficcurves.description": "La quantité de trafic IA et de passagers qu'openOMSI produit à chaque heure, comme facteur sur la quantité normale (1 est normal). Clique ou fais glisser un point pour régler une heure ; les heures entre deux sont reliées par une droite.",
+  "trafficcurves.cars": "Voitures",
+  "trafficcurves.cars.tooltip": "Densité des voitures IA sur les routes au fil de la journée.",
+  "trafficcurves.passengers": "Passagers",
+  "trafficcurves.passengers.tooltip": "Densité des passagers qui attendent aux arrêts au fil de la journée.",
+  "trafficcurves.reset": "Réinitialiser",
+  "trafficcurves.apply": "Appliquer",
+  "trafficcurves.cancel": "Annuler",
+  "trafficcurves.readout": "{hour} h - facteur {value, number, 0.00}",
+  "trafficcurves.status.changed": "Les courbes de trafic sont écrites.",
+  "trafficcurves.status.unchanged": "Les courbes de trafic restent telles quelles.",
+  "trafficcurves.status.failed": "Les courbes de trafic n'ont pas pu être écrites : {reason}"
 }

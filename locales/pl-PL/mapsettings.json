@@ -28,5 +28,20 @@
   "parklist.status.changed": "Zapisano listę z {count} typami aut.",
   "parklist.status.unchanged": "Lista pozostaje bez zmian.",
   "parklist.number": "Numer listy",
-  "parklist.number.tooltip": "0 to parklist_p.txt; n to parklist_p_n.txt, który parkingi wskazują przez n jako pierwszy opis swojego obiektu."
+  "parklist.number.tooltip": "0 to parklist_p.txt; n to parklist_p_n.txt, który parkingi wskazują przez n jako pierwszy opis swojego obiektu.",
+  "trafficcurves.open": "Krzywe ruchu...",
+  "trafficcurves.open.tooltip": "Ustaw, ile jest ruchu i pasażerów o każdej porze dnia.",
+  "trafficcurves.title": "Krzywe ruchu",
+  "trafficcurves.description": "Ile ruchu AI i pasażerów openOMSI tworzy o każdej godzinie, jako współczynnik normalnej ilości (1 to normalnie). Kliknij lub przeciągnij punkt, aby ustawić godzinę; godziny pomiędzy łączy prosta.",
+  "trafficcurves.cars": "Auta",
+  "trafficcurves.cars.tooltip": "Gęstość aut AI na drogach w ciągu dnia.",
+  "trafficcurves.passengers": "Pasażerowie",
+  "trafficcurves.passengers.tooltip": "Gęstość pasażerów czekających na przystankach w ciągu dnia.",
+  "trafficcurves.reset": "Przywróć",
+  "trafficcurves.apply": "Zastosuj",
+  "trafficcurves.cancel": "Anuluj",
+  "trafficcurves.readout": "{hour}:00 - współczynnik {value, number, 0.00}",
+  "trafficcurves.status.changed": "Krzywe ruchu zapisano.",
+  "trafficcurves.status.unchanged": "Krzywe ruchu pozostają bez zmian.",
+  "trafficcurves.status.failed": "Nie udało się zapisać krzywych ruchu: {reason}"
 }

@@ -28,5 +28,20 @@
   "parklist.status.changed": "Parkliste mit {count} Autotypen geschrieben.",
   "parklist.status.unchanged": "Die Parkliste bleibt, wie sie ist.",
   "parklist.number": "Listennummer",
-  "parklist.number.tooltip": "0 ist parklist_p.txt; n ist parklist_p_n.txt, die Parkplätze mit n als erster Beschriftung ihres Objekts nennen."
+  "parklist.number.tooltip": "0 ist parklist_p.txt; n ist parklist_p_n.txt, die Parkplätze mit n als erster Beschriftung ihres Objekts nennen.",
+  "trafficcurves.open": "Verkehrskurven...",
+  "trafficcurves.open.tooltip": "Lege fest, wie viel Verkehr und wie viele Fahrgäste zu jeder Tagesstunde unterwegs sind.",
+  "trafficcurves.title": "Verkehrskurven",
+  "trafficcurves.description": "Wie viel KI-Verkehr und wie viele Fahrgäste openOMSI zu jeder Stunde erzeugt, als Faktor auf die normale Menge (1 ist normal). Klicke oder ziehe einen Punkt, um eine Stunde zu setzen; die Stunden dazwischen verbindet eine gerade Linie.",
+  "trafficcurves.cars": "Autos",
+  "trafficcurves.cars.tooltip": "Dichte der KI-Autos auf den Straßen im Tagesverlauf.",
+  "trafficcurves.passengers": "Fahrgäste",
+  "trafficcurves.passengers.tooltip": "Dichte der wartenden Fahrgäste an den Haltestellen im Tagesverlauf.",
+  "trafficcurves.reset": "Zurücksetzen",
+  "trafficcurves.apply": "Übernehmen",
+  "trafficcurves.cancel": "Abbrechen",
+  "trafficcurves.readout": "{hour}:00 Uhr - Faktor {value, number, 0.00}",
+  "trafficcurves.status.changed": "Die Verkehrskurven sind geschrieben.",
+  "trafficcurves.status.unchanged": "Die Verkehrskurven bleiben, wie sie sind.",
+  "trafficcurves.status.failed": "Die Verkehrskurven konnten nicht geschrieben werden: {reason}"
 }
