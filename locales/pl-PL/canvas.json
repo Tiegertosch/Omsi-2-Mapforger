@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Nachylenie wzdłużne {degrees, number, 0.0}°",
   "canvas.angle.bank": "Przechył {degrees, number, 0.0}°",
   "canvas.angle.heading": "Kierunek {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Wysokość"
+  "canvas.arrow.height": "Wysokość",
+  "canvas.arrow.side": "Na bok",
+  "canvas.arrow.forward": "Do przodu",
+  "move.axes.local": "Strzałki podążają za obrotem obiektu",
+  "move.axes.global": "Strzałki podążają za osiami kafla"
 }

@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Podélný sklon {degrees, number, 0.0}°",
   "canvas.angle.bank": "Příčný sklon {degrees, number, 0.0}°",
   "canvas.angle.heading": "Okruh {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Výška"
+  "canvas.arrow.height": "Výška",
+  "canvas.arrow.side": "Do strany",
+  "canvas.arrow.forward": "Vpřed",
+  "move.axes.local": "Šipky sledují natočení objektu",
+  "move.axes.global": "Šipky sledují osy dlaždic"
 }

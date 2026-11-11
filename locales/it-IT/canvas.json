@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Inclinazione longitudinale {degrees, number, 0.0}°",
   "canvas.angle.bank": "Inclinazione trasversale {degrees, number, 0.0}°",
   "canvas.angle.heading": "Direzione {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Altezza"
+  "canvas.arrow.height": "Altezza",
+  "canvas.arrow.side": "Laterale",
+  "canvas.arrow.forward": "Avanti",
+  "move.axes.local": "Le frecce seguono l'orientamento dell'oggetto",
+  "move.axes.global": "Le frecce seguono gli assi della tessera"
 }

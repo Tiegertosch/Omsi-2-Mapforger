@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Tangage {degrees, number, 0.0}°",
   "canvas.angle.bank": "Roulis {degrees, number, 0.0}°",
   "canvas.angle.heading": "Rubrique {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Hauteur"
+  "canvas.arrow.height": "Hauteur",
+  "canvas.arrow.side": "Latéral",
+  "canvas.arrow.forward": "Avant",
+  "move.axes.local": "Les flèches suivent l'orientation de l'objet",
+  "move.axes.global": "Les flèches suivent les axes de la tuile"
 }

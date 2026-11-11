@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Pitch {degrees, number, 0.0}°",
   "canvas.angle.bank": "Bank {degrees, number, 0.0}°",
   "canvas.angle.heading": "Heading {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Height"
+  "canvas.arrow.height": "Height",
+  "canvas.arrow.side": "Sideways",
+  "canvas.arrow.forward": "Forward",
+  "move.axes.local": "Arrows follow the object's heading",
+  "move.axes.global": "Arrows follow the tile axes"
 }

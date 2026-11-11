@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Inclinação longitudinal {degrees, number, 0.0}°",
   "canvas.angle.bank": "Inclinação transversal {degrees, number, 0.0}°",
   "canvas.angle.heading": "Rumo {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Altura"
+  "canvas.arrow.height": "Altura",
+  "canvas.arrow.side": "Lateral",
+  "canvas.arrow.forward": "Em frente",
+  "move.axes.local": "As setas seguem a orientação do objeto",
+  "move.axes.global": "As setas seguem os eixos do mosaico"
 }

@@ -582,6 +582,25 @@ namespace OmsiMapEditor.UI
 
         private EditorTool tool;
 
+        /// <summary>
+        /// When true, the east and north arrows of the move tool follow the heading of the selected object instead of
+        /// the tile axes, so an object turned off the grid can slide along and across its own direction.
+        /// </summary>
+        public bool LocalArrowAxes
+        {
+            get => localArrowAxes;
+            set
+            {
+                if (localArrowAxes == value)
+                    return;
+                localArrowAxes = value;
+                MarkDirtyRepaint();
+            }
+        }
+
+        private bool localArrowAxes;
+        private double arrowHeadingDegrees;
+
         private bool CanMove => AllowEditing && (tool == EditorTool.Drag || tool == EditorTool.Move);
 
         private bool HasArrows => AllowEditing && tool == EditorTool.Move && selection.Count > 0 && selectedObject != null;
@@ -2989,9 +3008,38 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
-        private static Vector3 ArrowDirection(MoveAxis axis)
+        /// <summary>
+        /// The heading the horizontal arrows follow: that of the selected object when the arrows are local, frozen for
+        /// the length of a drag so the axis does not turn under the pointer; otherwise 0, the tile axes.
+        /// </summary>
+        private double ArrowHeading()
         {
-            return axis == MoveAxis.East ? Vector3.right : axis == MoveAxis.North ? Vector3.forward : Vector3.up;
+            if (!localArrowAxes || selectedObject == null)
+                return 0.0;
+            return activeArrow != MoveAxis.None ? arrowHeadingDegrees : DrawnHeading(selectedObject);
+        }
+
+        /// <summary>The east and north share of the direction an arrow moves along: object right and forward when local.</summary>
+        private Vector2 ArrowEastNorth(MoveAxis axis)
+        {
+            var heading = (float)(ArrowHeading() * Math.PI / 180.0);
+            switch (axis)
+            {
+                case MoveAxis.East:
+                    return new Vector2(Mathf.Cos(heading), -Mathf.Sin(heading));
+                case MoveAxis.North:
+                    return new Vector2(Mathf.Sin(heading), Mathf.Cos(heading));
+                default:
+                    return Vector2.zero;
+            }
+        }
+
+        private Vector3 ArrowDirection(MoveAxis axis)
+        {
+            if (axis == MoveAxis.Up)
+                return Vector3.up;
+            var eastNorth = ArrowEastNorth(axis);
+            return new Vector3(eastNorth.x, 0f, eastNorth.y);
         }
 
         private static Color ArrowColor(MoveAxis axis)
@@ -3000,9 +3048,13 @@ namespace OmsiMapEditor.UI
             return axis == MoveAxis.East ? PitchRingColor : axis == MoveAxis.North ? BankRingColor : HeadingRingColor;
         }
 
-        private static string ArrowName(MoveAxis axis)
+        private string ArrowName(MoveAxis axis)
         {
-            return axis == MoveAxis.East ? "X" : axis == MoveAxis.North ? "Y" : Loc.T("canvas.arrow.height");
+            if (axis == MoveAxis.Up)
+                return Loc.T("canvas.arrow.height");
+            if (localArrowAxes)
+                return Loc.T(axis == MoveAxis.East ? "canvas.arrow.side" : "canvas.arrow.forward"); // i18n:keys
+            return axis == MoveAxis.East ? "X" : "Y";
         }
 
         /// <summary>
@@ -3018,8 +3070,11 @@ namespace OmsiMapEditor.UI
             if (!ThreeDimensional)
             {
                 origin = MapToScreen(DrawnPosition(PrimaryTile(), selectedObject));
-                arrows.Add(new KeyValuePair<MoveAxis, Vector2>(MoveAxis.East, origin + new Vector2(ArrowPixels, 0f)));
-                arrows.Add(new KeyValuePair<MoveAxis, Vector2>(MoveAxis.North, origin + new Vector2(0f, -ArrowPixels)));
+                // Screen y runs down while north runs up.
+                var east = ArrowEastNorth(MoveAxis.East);
+                var north = ArrowEastNorth(MoveAxis.North);
+                arrows.Add(new KeyValuePair<MoveAxis, Vector2>(MoveAxis.East, origin + new Vector2(east.x, -east.y) * ArrowPixels));
+                arrows.Add(new KeyValuePair<MoveAxis, Vector2>(MoveAxis.North, origin + new Vector2(north.x, -north.y) * ArrowPixels));
                 return arrows;
             }
 
@@ -3058,6 +3113,8 @@ namespace OmsiMapEditor.UI
         private void StartArrowDrag(MoveAxis axis, int pointerId, Vector2 position)
         {
             StartObjectDrag(DragMode.Move, selectedObject, pointerId, position);
+            // Freeze the heading before the arrow becomes active: ArrowHeading reads the live one until then.
+            arrowHeadingDegrees = ArrowHeading();
             activeArrow = axis;
             if (ThreeDimensional)
             {
@@ -3097,13 +3154,16 @@ namespace OmsiMapEditor.UI
             }
             else
             {
-                var direction = activeArrow == MoveAxis.East ? Vector2.right : Vector2.down;
+                var eastNorth = ArrowEastNorth(activeArrow);
+                // Screen y runs down while north runs up.
+                var direction = new Vector2(eastNorth.x, -eastNorth.y);
                 offset = Vector2.Dot(position - dragStartPointer, direction) * metersPerPixel;
             }
             if (snap)
                 offset = Math.Round(offset);
-            previewLocalX = dragStartLocalX + (activeArrow == MoveAxis.East ? offset : 0.0);
-            previewLocalY = dragStartLocalY + (activeArrow == MoveAxis.North ? offset : 0.0);
+            var along = ArrowEastNorth(activeArrow);
+            previewLocalX = dragStartLocalX + offset * along.x;
+            previewLocalY = dragStartLocalY + offset * along.y;
             previewHeightOffset = activeArrow == MoveAxis.Up ? offset : 0.0;
             ShowDragLabel(position, ArrowName(activeArrow) + " " + offset.ToString("+0.00;-0.00") + " m");
         }

@@ -3,7 +3,7 @@
   "toolbar.drag.tooltip": "Drag (Q): Click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.",
   "@toolbar.drag.tooltip": "The shortcut key in the tooltip is the same in every language",
   "toolbar.move": "Move",
-  "toolbar.move.tooltip": "Move (W): Move the selection along axis arrows: east, north and in 3D up. Shift moves in whole metres.",
+  "toolbar.move.tooltip": "Move (W): Move the selection along axis arrows: east, north and in 3D up. Shift moves in whole metres. Press W again to let the arrows follow the object's heading.",
   "toolbar.rotate": "Rotate",
   "toolbar.rotate.tooltip": "Rotate (E): Turn the selected object: the round handle from above, the rings in 3D. Shift snaps to 15°.",
   "toolbar.delete": "Delete",

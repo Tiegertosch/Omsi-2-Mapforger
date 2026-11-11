@@ -15,5 +15,9 @@
   "canvas.angle.pitch": "Inclinación longitudinal {degrees, number, 0.0}°",
   "canvas.angle.bank": "Inclinación transversal {degrees, number, 0.0}°",
   "canvas.angle.heading": "Rumbo {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Altura"
+  "canvas.arrow.height": "Altura",
+  "canvas.arrow.side": "Lateral",
+  "canvas.arrow.forward": "Adelante",
+  "move.axes.local": "Las flechas siguen la orientación del objeto",
+  "move.axes.global": "Las flechas siguen los ejes de la tesela"
 }

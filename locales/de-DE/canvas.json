@@ -13,5 +13,9 @@
   "canvas.angle.pitch": "Neigung {degrees, number, 0.0}°",
   "canvas.angle.bank": "Querneigung {degrees, number, 0.0}°",
   "canvas.angle.heading": "Richtung {degrees, number, 0.0}°",
-  "canvas.arrow.height": "Höhe"
+  "canvas.arrow.height": "Höhe",
+  "canvas.arrow.side": "Seitlich",
+  "canvas.arrow.forward": "Vorwärts",
+  "move.axes.local": "Pfeile folgen der Drehung des Objekts",
+  "move.axes.global": "Pfeile folgen den Kachelachsen"
 }

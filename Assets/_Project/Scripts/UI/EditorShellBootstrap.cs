@@ -1132,6 +1132,8 @@ namespace OmsiMapEditor.UI
             var toolName = Argument("-tool", 1);
             if (toolName != null && Enum.TryParse<EditorTool>(toolName, true, out var chosenTool))
                 SetTool(chosenTool);
+            if (mapCanvas != null && Argument("-localArrows", 0) != null)
+                mapCanvas.LocalArrowAxes = true;
 
             RunRandomHeadingArguments(args, true);
 
@@ -5923,6 +5925,13 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.Delete && selectedSpline != null)
                 {
                     DeleteSelectedSpline();
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.W && activeTool == EditorTool.Move && mapCanvas != null)
+                {
+                    // W again while the move tool is active switches the arrows between the tile axes and the object's own.
+                    mapCanvas.LocalArrowAxes = !mapCanvas.LocalArrowAxes;
+                    SetStatusT(mapCanvas.LocalArrowAxes ? "move.axes.local" : "move.axes.global") /* i18n:keys */;
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Q || evt.keyCode == KeyCode.W || evt.keyCode == KeyCode.E)
