@@ -16,7 +16,7 @@ Vorschlag auf Grundlage von [ui-rework-audit.md](ui-rework-audit.md), [ui-rework
 6. **Einspaltige Werkzeuge bekommen Icon-Optionen**, in der Reihenfolge Linie, Vorfahrt, Spuren, Ampeln (M4). Das ändert die Festlegung in ADR 098, wonach sie einspaltig im alten Stil bleiben.
 7. **Dokumente:** `Roadmap.md`, `ProjectStatus.md`, `DevelopmentSetup.md` und `CLAUDE.md` dürfen nachgezogen werden.
 
-Offen bleibt aus der Liste nur das Modus-Abzeichen an der Projektpille (Teil von Frage 3, in der Antwort nicht eigens genannt); es wird vor M2 noch einmal gefragt.
+**Modus-Abzeichen (12. November 2026, nach einem Entwurf als Screenshot):** genehmigt und vor M2 eingebaut. Die Projektpille zeigt in der Pille ein Abzeichen: gelb mit dem Namen der Variante, die bearbeitet wird; grau mit dem Datum, wenn die Karte an einem Chrono-Datum gezeigt wird; grau „read-only“ bei einer Karte ohne Projekt; nichts bei einer bearbeitbaren Karte. Unter 1400 px bleibt nur der Punkt. Die Pille ist seitdem reine Anzeige: Der Klick, der das Fenster „Karte“ öffnete, ist entfernt, weil der Knopf ganz rechts dasselbe tut. Für M2 bleibt vom Abzeichen nur die Zahl geänderter Dateien im Tooltip.
 
 ## Übersicht
 
@@ -69,7 +69,7 @@ M2 und M3 berühren verschiedene Stellen (Statuszeile und Pille gegen `SetTool`,
 - **Ziel:** Meldungen bleiben lesbar, Hinweise gehören dem offenen Werkzeug, und man sieht jederzeit, ob man eine Variante bearbeitet oder nur liest.
 - **Bereiche:** Statusstreifen, Projektpille, alle Kataloge, Objekt- und Straßenmenü.
 - **Aufgaben:** eigener Platz für den Werkzeug-Hinweis, der beim Schließen leer wird; `ToolCatalog` merkt sich den letzten Hinweis und zeigt ihn beim Einblenden; Hinweise mit Schlüssel, damit sie die Sprache wechseln; Modus als Abzeichen an der Pille (Variante gelb, nur lesen grau, Zahl geänderter Dateien im Tooltip); Titel der Typwahl sichtbar; Hinweis „N Ordner ausgelassen“ im Leer-Text oder `ShowFoldersLeftOut` entfernen; Esc im aufgeklappten Suchfeld klappt zuerst die Suche zu; voller Statustext im Tooltip (Design-Review 8).
-- **Abhängigkeiten:** M1. Der Hinweis-Platz ist genehmigt; das Abzeichen an der Pille ist noch zu bestätigen.
+- **Abhängigkeiten:** M1. Der Hinweis-Platz ist genehmigt; das Abzeichen an der Pille ist genehmigt und schon eingebaut (siehe oben).
 - **Zuständig:** frontend; reviewer.
 - **Risiken:** Platz bei 1100 px; die Statuszeile ist 28 px hoch und einzeilig.
 - **Tests:** Screenshots Straße mit Fehlermeldung nach Zeigerbewegung (`-road …`), Variante, Karte ohne Projekt, 1100 px, de-DE; Handtest Esc in beiden Suchfeldern.

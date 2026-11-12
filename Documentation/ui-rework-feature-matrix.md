@@ -20,7 +20,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Menü Edit | Place object, Delete selection, Fit terrain to built roads again, Test-/T-/Kreuzung aus Profil, Undo, Redo | `EditorShell.uxml:79–89` |
 | Menü Tools | Inspector, Satellite and terrain, Road builder, Check map | `EditorShell.uxml:90–96` |
 | Menü Help | Bedienhilfe, Check for updates, Report a bug | `EditorShell.uxml:97–111` |
-| Leiste links | Routes, Textures, 3D, Einpassen, Zoom, Zentrieren; Kachelknopf; Projektpille (öffnet „Karte“) | `EditorShell.uxml:37–52`, `EditorShellBottomBar.cs:43–56` |
+| Leiste links | Routes, Textures, 3D, Einpassen, Zoom, Zentrieren; Kachelknopf; Projektpille (nur Anzeige: Name und Modus-Abzeichen, seit 12. November ohne Klick) | `EditorShell.uxml:37–52`, `EditorShellBottomBar.cs:43–56` |
 | Leiste Mitte | Drag Q, Move W, Rotate E, Delete Entf, Road R, Rows T, Terrain G, Markings M, Priorities V, Lanes L, Signals A, Line B, Objects 3 | `MapToolbar.cs:27–43` |
 | Leiste rechts | Popups Pfade, Einstiegspunkte, Linien, Chrono, Karte | `EditorShellBottomBar.cs:26–30` |
 | Kontextmenü | Objekt, Mehrfachauswahl, Spline, Kachel | `EditorShellContextMenu.cs:149–241` |

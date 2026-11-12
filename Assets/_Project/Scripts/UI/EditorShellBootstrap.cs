@@ -7293,6 +7293,7 @@ namespace OmsiMapEditor.UI
 
         private void UpdateMapStateLabel()
         {
+            UpdateProjectModeBadge();
             if (mapStateLabel == null || currentSummary == null)
                 return;
 

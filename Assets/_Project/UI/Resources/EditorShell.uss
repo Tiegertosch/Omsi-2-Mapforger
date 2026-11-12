@@ -160,12 +160,22 @@
 .bar-badge { position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); -unity-text-align: middle-center; color: var(--mf-color-bg); background-color: var(--mf-color-success); border-radius: 9px; }
 /* The project name: a wide dark pill with the name in the middle */
 .bar-pill { flex-basis: 240px; flex-grow: 0; height: 30px; margin: 0 var(--mf-space-3) 0 var(--mf-space-1); flex-shrink: 1000; min-width: 70px; flex-direction: row; align-items: center; justify-content: center; color: var(--mf-color-text-primary); background-color: rgba(20, 25, 32, 0.7); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: 15px; overflow: hidden; }
-.bar-pill:hover { background-color: var(--mf-color-panel-raised); border-color: var(--mf-color-border); }
 .bar-pill > Label { margin: 0; padding: 0 12px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -unity-text-align: middle-center; -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
-.bar-pill.bar-button-active, .bar-pill.bar-button-active:hover { color: var(--mf-color-accent); border-color: var(--mf-color-accent); }
+
+/* Mode badge inside the project pill: grey for read-only and a chrono date, yellow while a variant is edited */
+.bar-pill-with-mode > Label { padding-right: 6px; }
+.bar-mode { flex-direction: row; align-items: center; flex-shrink: 0; max-width: 120px; height: 18px; margin: 0 8px 0 0; padding: 0 7px 0 6px; border-width: 1px; border-color: var(--mf-color-text-muted); border-radius: 9px; overflow: hidden; }
+.bar-mode-dot { flex-shrink: 0; width: 6px; height: 6px; margin-right: 5px; border-radius: 3px; background-color: var(--mf-color-text-muted); }
+.bar-mode-text { margin: 0; padding: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--mf-color-text-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.bar-mode-variant { border-color: var(--mf-color-warning); }
+.bar-mode-variant > .bar-mode-dot { background-color: var(--mf-color-warning); }
+.bar-mode-variant > .bar-mode-text { color: var(--mf-color-warning); }
 
 /* Compact bar for windows narrower than 1400 px */
 .bar-compact .bar-pill { flex-basis: 110px; min-width: 60px; margin-right: var(--mf-space-1); }
+.bar-compact .bar-mode { padding: 0 5px; }
+.bar-compact .bar-mode-dot { margin-right: 0; }
+.bar-compact .bar-mode-text { display: none; }
 .bar-compact .bar-round-button { width: 32px; height: 32px; margin: 0 3px; padding: 7px; border-radius: 16px; }
 .bar-compact .view-controls { width: 180px; padding: 4px 6px; }
 .bar-compact .view-controls-row > .view-control-button { padding-left: 4px; padding-right: 4px; }

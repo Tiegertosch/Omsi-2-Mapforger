@@ -1,6 +1,6 @@
 {
   "bar.tiles.tooltip": "Casillas: la lista de casillas del mapa, con búsqueda; un clic selecciona una.",
-  "bar.project.tooltip": "El proyecto y el mapa que edita. Clic para los ajustes, la descripción y las cifras del mapa.",
+  "bar.project.tooltip": "El proyecto y el mapa que edita.",
   "bar.paths.tooltip": "Rutas de IA: mostrar las rutas por tipo e ir a los extremos abiertos. El botón «Rutas» a la izquierda las muestra en el mapa.",
   "bar.entries.tooltip": "Puntos de entrada: donde arrancan los autobuses; colocarlos, renombrarlos y eliminarlos.",
   "bar.lines.tooltip": "Líneas: las líneas del horario, el editor de horarios y los grupos de vehículos.",

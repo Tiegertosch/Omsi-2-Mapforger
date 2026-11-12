@@ -1,6 +1,6 @@
 {
   "bar.tiles.tooltip": "Mosaicos: a lista de mosaicos do mapa, com pesquisa; um clique seleciona um.",
-  "bar.project.tooltip": "O projeto e o mapa que edita. Clique para as definições, a descrição e os números do mapa.",
+  "bar.project.tooltip": "O projeto e o mapa que edita.",
   "bar.paths.tooltip": "Caminhos de IA: mostrar os caminhos por tipo e ir às extremidades abertas. O botão «Caminhos» à esquerda mostra-os no mapa.",
   "bar.entries.tooltip": "Pontos de entrada: onde os autocarros arrancam; colocar, renomear e eliminar.",
   "bar.lines.tooltip": "Linhas: as linhas do horário, o editor de horários e os grupos de veículos.",

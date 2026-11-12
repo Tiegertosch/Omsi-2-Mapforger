@@ -1,6 +1,6 @@
 {
   "bar.tiles.tooltip": "Tuiles : la liste des tuiles de la carte, avec une recherche ; un clic en sélectionne une.",
-  "bar.project.tooltip": "Le projet et la carte qu'il modifie. Cliquer pour les réglages, la description et les chiffres de la carte.",
+  "bar.project.tooltip": "Le projet et la carte qu'il modifie.",
   "bar.paths.tooltip": "Chemins IA : afficher les chemins par type et aller aux extrémités ouvertes. Le bouton « Chemins » à gauche les affiche sur la carte.",
   "bar.entries.tooltip": "Points d'entrée : où les bus démarrent ; les placer, les renommer et les supprimer.",
   "bar.lines.tooltip": "Lignes : les lignes de l'horaire, l'éditeur d'horaire et les groupes de véhicules.",

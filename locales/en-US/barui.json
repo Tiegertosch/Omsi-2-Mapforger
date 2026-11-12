@@ -1,6 +1,6 @@
 {
   "bar.tiles.tooltip": "Tiles: the list of the map's tiles, with a search; click one to select it.",
-  "bar.project.tooltip": "The project and the map it edits. Click for the map's settings, description and counts.",
+  "bar.project.tooltip": "The project and the map it edits.",
   "bar.paths.tooltip": "AI paths: show the paths by kind and go to the open ends. The Paths switch at the left shows them on the map.",
   "bar.entries.tooltip": "Entry points: where buses start; place, rename and delete them.",
   "bar.lines.tooltip": "Lines: the lines of the timetable, the timetable editor and the vehicle groups.",

@@ -15,8 +15,10 @@ namespace OmsiMapEditor.UI
         private VisualElement barPopup;
         private Label barPopupTitle;
         private Label tileCountBadge;
-        private Button projectPill;
+        private VisualElement projectPill;
         private Label projectPillLabel;
+        private VisualElement projectModeBadge;
+        private Label projectModeLabel;
         private readonly Dictionary<ProjectTab, Button> barButtons = new Dictionary<ProjectTab, Button>();
         private bool barPopupOpen;
 
@@ -48,11 +50,21 @@ namespace OmsiMapEditor.UI
             tiles.Add(tileCountBadge);
             left.Add(tiles);
 
-            projectPill = new Button(() => ToggleBarPopup(ProjectTab.Map));
+            // The pill only shows the name and the mode; the map's settings open from the Map button at the right.
+            projectPill = new VisualElement();
             projectPill.AddToClassList("bar-pill");
             LocBindings.Tooltip(projectPill, "bar.project.tooltip");
             projectPillLabel = new Label { pickingMode = PickingMode.Ignore };
             projectPill.Add(projectPillLabel);
+            projectModeBadge = new VisualElement { pickingMode = PickingMode.Ignore };
+            projectModeBadge.AddToClassList("bar-mode");
+            var modeDot = new VisualElement { pickingMode = PickingMode.Ignore };
+            modeDot.AddToClassList("bar-mode-dot");
+            projectModeBadge.Add(modeDot);
+            projectModeLabel = new Label { pickingMode = PickingMode.Ignore };
+            projectModeLabel.AddToClassList("bar-mode-text");
+            projectModeBadge.Add(projectModeLabel);
+            projectPill.Add(projectModeBadge);
             left.Add(projectPill);
 
             foreach (var (tab, icon, tooltipKey) in RightBarButtons)
@@ -125,12 +137,32 @@ namespace OmsiMapEditor.UI
                 projectPillLabel.text = !loaded ? string.Empty
                     : !string.IsNullOrWhiteSpace(currentProjectName) ? currentProjectName
                     : string.IsNullOrEmpty(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName;
-            projectPill?.EnableInClassList("bar-button-active", barPopupOpen && projectTab == ProjectTab.Map);
+            UpdateProjectModeBadge();
             foreach (var pair in barButtons)
             {
                 pair.Value.SetEnabled(loaded && ProjectTabAvailable(pair.Key));
                 pair.Value.EnableInClassList("bar-button-active", barPopupOpen && projectTab == pair.Key);
             }
+        }
+
+        /// <summary>
+        /// The badge on the project pill says what the map is open as when that is not plain editing: the variant being edited
+        /// (yellow), the date the map is shown on, or read-only (both grey). An editable map shows no badge.
+        /// </summary>
+        private void UpdateProjectModeBadge()
+        {
+            if (projectModeBadge == null)
+                return;
+            var loaded = currentSummary != null;
+            var text = !loaded ? null
+                : EditingVariant ? editedVariant.Title
+                : chronoDate != null ? chronoDate.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                : session != null && session.CanEdit ? null
+                : Loc.T("status.mode.readonly");
+            projectModeBadge.style.display = text == null ? DisplayStyle.None : DisplayStyle.Flex;
+            projectModeBadge.EnableInClassList("bar-mode-variant", loaded && EditingVariant);
+            projectPill.EnableInClassList("bar-pill-with-mode", text != null);
+            projectModeLabel.text = text ?? string.Empty;
         }
 
         private static string ProjectTabTitleKey(ProjectTab tab)

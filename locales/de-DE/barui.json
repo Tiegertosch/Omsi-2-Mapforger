@@ -1,6 +1,6 @@
 {
   "bar.tiles.tooltip": "Kacheln: die Liste der Kacheln der Karte mit Suche; ein Klick wählt eine Kachel.",
-  "bar.project.tooltip": "Das Projekt und die Karte, die es bearbeitet. Klick für Einstellungen, Beschreibung und Zahlen der Karte.",
+  "bar.project.tooltip": "Das Projekt und die Karte, die es bearbeitet.",
   "bar.paths.tooltip": "KI-Pfade: Pfade nach Art zeigen und zu den offenen Enden springen. Der Schalter „Pfade“ links zeigt sie in der Karte.",
   "bar.entries.tooltip": "Einstiegspunkte: wo Busse starten; setzen, umbenennen und löschen.",
   "bar.lines.tooltip": "Linien: die Linien des Fahrplans, der Fahrplan-Editor und die Fahrzeuggruppen.",
