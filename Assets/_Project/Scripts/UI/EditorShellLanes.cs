@@ -39,13 +39,8 @@ namespace OmsiMapEditor.UI
 
         private void CreateLaneOptions()
         {
-            laneOptions = new VisualElement();
-            laneOptions.AddToClassList("tool-panel");
-            laneOptions.AddToClassList("picker-options");
+            laneOptions = ToolCatalog.Options();
             laneOptions.style.display = DisplayStyle.None;
-            var title = LocBindings.NewLabel("lanes.title");
-            title.AddToClassList("picker-options-title");
-            laneOptions.Add(title);
             laneJunctionLabel = new Label();
             laneJunctionLabel.AddToClassList("panel-info");
             laneJunctionLabel.style.marginTop = 0f;

@@ -2,7 +2,6 @@
   "toolbar.line": "Linha",
   "toolbar.line.tooltip": "Linha (B): Clica nas paragens de uma linha pela ordem em que o autocarro as serve; o caminho pelas ruas do mapa aparece logo. Faz a volta por outras paragens, fecha um anel, leva o caminho por outra rua com pontos de passagem e guarda a linha.",
   "readonly.action.make_lines": "criar linhas",
-  "line.title": "Linha",
   "line.hint": "Clica nas paragens (bus_stop.sco) do mapa pela ordem em que o autocarro as serve. O caminho pelas faixas vai sendo mostrado.",
   "line.name": "Nome da linha",
   "line.group": "Grupo de veículos",

@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Propojení jízdních pruhů",
   "lanes.legend": "Tečky jsou pruhy vedoucí dovnitř, kruhové pruhy vedoucí ven. Kliknutím na pruh dovnitř a poté na pruh ven přidáte cestu mezi ně nebo ji odeberete.",
   "lanes.every": "Každou cestu skrz",
   "lanes.every.tooltip": "Dává křižovatce jízdní pruh pro každý průjezd znovu, jak byl vytvořen",

@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "fila de objetos",
   "roadbuilder.row.hint": "Elija el objeto que se encuentra en una fila a lo largo del carril, como un árbol o una farola. Se coloca siempre que se construye el tipo de carretera.",
   "roadbuilder.row.back": "Volver al constructor de carreteras",
   "roadbuilder.row.back.tooltip": "Volver sin elegir objeto (Esc)",

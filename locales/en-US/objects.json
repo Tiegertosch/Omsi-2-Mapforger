@@ -1,5 +1,4 @@
 {
-  "objects.options": "Options",
   "@settings.hide_dlc.hint": "{origin} is a sentence about where the files come from",
   "objects.origin.reading": "The origin of the files is still being read.",
   "objects.origin.no_steam": "{description} Without Steam's lists only folders marked as DLC can be told apart.",

@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Połączenia pasów ruchu",
   "lanes.legend": "Kropki oznaczają pasy prowadzące do środka, pierścienie to pasy prowadzące na zewnątrz. Kliknij pas wejściowy, a następnie pas wyjściowy, aby dodać drogę między nimi lub ją usunąć.",
   "lanes.every": "Każde przejście",
   "lanes.every.tooltip": "Przywraca na skrzyżowaniu pas ruchu dla każdego przejazdu w takiej formie, w jakiej został utworzony",

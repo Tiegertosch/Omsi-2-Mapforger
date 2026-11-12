@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Řada objektů",
   "roadbuilder.row.hint": "Vyberte objekt, který stojí v řadě podél pruhu, například strom nebo pouliční osvětlení. Pokládá se vždy, když se staví typ komunikace.",
   "roadbuilder.row.back": "Zpět ke staviteli silnic",
   "roadbuilder.row.back.tooltip": "Zpět bez výběru objektu (Esc)",

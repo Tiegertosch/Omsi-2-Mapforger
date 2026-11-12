@@ -42,12 +42,7 @@ namespace OmsiMapEditor.UI
             objectsPanelHost.Add(roadBuilder);
             roadPanel.EditRoadTypeRequested += EditRoadType;
 
-            rowPickOptions = new VisualElement();
-            rowPickOptions.AddToClassList("tool-panel");
-            rowPickOptions.AddToClassList("picker-options");
-            var title = LocBindings.NewLabel("roadbuilder.row.title");
-            title.AddToClassList("picker-options-title");
-            rowPickOptions.Add(title);
+            rowPickOptions = ToolCatalog.Options();
             var hint = LocBindings.NewLabel("roadbuilder.row.hint");
             hint.AddToClassList("panel-info");
             rowPickOptions.Add(hint);

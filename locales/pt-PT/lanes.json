@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Ligações entre vias",
   "lanes.legend": "Os pontos indicam vias de entrada e os anéis vias de saída. Clique numa via de entrada e depois numa via de saída para adicionar ou remover a ligação entre elas.",
   "lanes.every": "Cada caminho através",
   "lanes.every.tooltip": "Dá ao cruzamento uma via para todos os caminhos novamente, como foi feito",

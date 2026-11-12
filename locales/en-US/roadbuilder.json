@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Row of objects",
   "roadbuilder.row.hint": "Choose the object that stands in a row along the lane, such as a tree or a street light. It is laid whenever the road type is built.",
   "roadbuilder.row.back": "Back to the road builder",
   "roadbuilder.row.back.tooltip": "Back without choosing an object (Esc)",

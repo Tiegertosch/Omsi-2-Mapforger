@@ -92,6 +92,15 @@ namespace OmsiMapEditor.UI
             Apply(element, binding);
         }
 
+        /// <summary>Separates title and text in a tooltip made by <see cref="CardTooltip"/>; the tooltip card splits it again.</summary>
+        public const char TooltipSeparator = '\u001F';
+
+        /// <summary>A tooltip with an explicit title of any length and a text below it, for the tooltip card; no key cap.</summary>
+        public static string CardTooltip(string title, string text)
+        {
+            return string.IsNullOrEmpty(title) ? text : title + TooltipSeparator + text;
+        }
+
         /// <summary>A tooltip "Name: description" from two keys, which the tooltip card shows with the name as its title; without a description only the name.</summary>
         public static void TitledTooltip(VisualElement element, string titleKey, string key)
         {
@@ -165,7 +174,7 @@ namespace OmsiMapEditor.UI
                 }
             }
             if (binding.TooltipTitleKey != null)
-                element.tooltip = binding.TooltipKey == null ? Loc.T(binding.TooltipTitleKey) : Loc.T(binding.TooltipTitleKey) + ": " + Loc.T(binding.TooltipKey);
+                element.tooltip = CardTooltip(Loc.T(binding.TooltipTitleKey), binding.TooltipKey == null ? string.Empty : Loc.T(binding.TooltipKey));
             else if (binding.TooltipKey != null)
                 element.tooltip = binding.TooltipArguments == null || binding.TooltipArguments.Length == 0 ? Loc.T(binding.TooltipKey) : Loc.T(binding.TooltipKey, binding.TooltipArguments);
             binding.Generation = Loc.Manager != null ? Loc.Manager.Generation : -1;

@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Fila di oggetti",
   "roadbuilder.row.hint": "Scegli l'oggetto che si trova in fila lungo la corsia, come un albero o un lampione. Viene posato ogni volta che viene costruito il tipo di strada.",
   "roadbuilder.row.back": "Torniamo al costruttore di strade",
   "roadbuilder.row.back.tooltip": "Indietro senza scegliere un oggetto (Esc)",

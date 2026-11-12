@@ -52,14 +52,9 @@ namespace OmsiMapEditor.UI
 
         private void CreateSignalOptions()
         {
-            signalOptions = new VisualElement();
-            signalOptions.AddToClassList("tool-panel");
-            signalOptions.AddToClassList("picker-options");
+            signalOptions = ToolCatalog.Options();
             signalOptions.AddToClassList("signal-options");
             signalOptions.style.display = DisplayStyle.None;
-            var title = LocBindings.NewLabel("signals.title");
-            title.AddToClassList("picker-options-title");
-            signalOptions.Add(title);
             signalJunctionLabel = new Label();
             signalJunctionLabel.AddToClassList("panel-info");
             signalJunctionLabel.style.marginTop = 0f;

@@ -29,9 +29,6 @@ namespace OmsiMapEditor.UI
         {
             AddToClassList("tool-panel");
             AddToClassList("picker-options");
-            var title = LocBindings.NewLabel("line.title");
-            title.AddToClassList("picker-options-title");
-            Add(title);
             hintLabel = LocBindings.NewLabel("line.hint");
             hintLabel.AddToClassList("panel-info");
             Add(hintLabel);

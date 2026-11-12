@@ -2,7 +2,6 @@
   "toolbar.signals": "Semáforos",
   "toolbar.signals.tooltip": "Semáforos (A): clique num cruzamento para ver os acessos, vias e movimentos nas cores dos seus grupos de sinais. Num cruzamento criado neste projeto, adicione, renomeie e remova grupos e atribua a cada movimento o seu grupo.",
   "readonly.action.edit_signals": "editar semáforos",
-  "signals.title": "Semáforos",
   "signals.click_junction": "Clique num cruzamento no mapa.",
   "signals.groups": "Grupos de sinais",
   "signals.movements": "Movimentos",

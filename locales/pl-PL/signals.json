@@ -2,7 +2,6 @@
   "toolbar.signals": "Sygnalizacja",
   "toolbar.signals.tooltip": "Sygnalizacja (A): kliknij skrzyżowanie, aby zobaczyć wloty, pasy i relacje w kolorach ich grup sygnałowych. Na skrzyżowaniu utworzonym w tym projekcie dodawaj, zmieniaj nazwy i usuwaj grupy oraz przypisuj każdej relacji jej grupę.",
   "readonly.action.edit_signals": "edytować sygnalizację",
-  "signals.title": "Sygnalizacja świetlna",
   "signals.click_junction": "Kliknij skrzyżowanie na mapie.",
   "signals.groups": "Grupy sygnałowe",
   "signals.movements": "Relacje",

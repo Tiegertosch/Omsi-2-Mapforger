@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Lane connections",
   "lanes.legend": "Dots are lanes leading in, rings lanes leading out. Click a lane in, then a lane out to add the way between them or take it away.",
   "lanes.every": "Every way through",
   "lanes.every.tooltip": "Gives the junction a lane for every way through again, as it was made",

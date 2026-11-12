@@ -11,7 +11,6 @@
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "A new type or new labels are written into {variant} ([selobject] with [typ] or [relabel]); the {origin, select, variant {variant that adds it} other {base map}} keeps its own.",
   "@labels.note.other": "{origin} is variant or base and chooses the words: keep it in English",
-  "labels.pick.title": "New object file",
   "labels.pick.cancel": "Cancel",
   "labels.pick.cancel.tooltip": "Leave the type as it is (Esc)",
   "labels.pick.hint": "Choose the object that {element} becomes. It keeps its place, orientation and labels.",

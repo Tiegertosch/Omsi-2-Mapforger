@@ -2,7 +2,6 @@
   "toolbar.signals": "Feux",
   "toolbar.signals.tooltip": "Feux (A) : cliquez sur un carrefour pour voir ses approches, voies et mouvements aux couleurs de leurs groupes de signaux. Sur un carrefour créé dans ce projet, ajoutez, renommez et supprimez des groupes et attribuez à chaque mouvement son groupe.",
   "readonly.action.edit_signals": "modifier les feux",
-  "signals.title": "Feux de circulation",
   "signals.click_junction": "Cliquez sur un carrefour dans la carte.",
   "signals.groups": "Groupes de signaux",
   "signals.movements": "Mouvements",

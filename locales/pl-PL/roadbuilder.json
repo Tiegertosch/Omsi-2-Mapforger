@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Rząd obiektów",
   "roadbuilder.row.hint": "Wybierz obiekt stojący w rzędzie wzdłuż pasa, na przykład drzewo lub latarnię. Układa się go zawsze, gdy budowany jest dany typ drogi.",
   "roadbuilder.row.back": "Wracając do budowniczego dróg",
   "roadbuilder.row.back.tooltip": "Powrót bez wybierania obiektu (Esc)",

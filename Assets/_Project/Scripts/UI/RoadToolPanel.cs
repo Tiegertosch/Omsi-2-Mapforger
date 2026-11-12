@@ -25,7 +25,7 @@ namespace OmsiMapEditor.UI
         private const int PreviewHeight = 64;
 
         private readonly TextField search;
-        private readonly VisualElement tabRow;
+        private readonly ToolCatalog catalog;
         private readonly ScrollView tiles;
         private readonly Label emptyLabel;
         private readonly Button straightButton;
@@ -158,7 +158,7 @@ namespace OmsiMapEditor.UI
                 if (change.newValue < 0 || change.newValue > 99)
                     parkingListField.SetValueWithoutNotify(Mathf.Clamp(change.newValue, 0, 99));
             });
-            ValueBox(buildRow, "hash", parkingListField, null, "roadtool.parking.list", "roadtool.parking.list.tooltip");
+            OptionControls.ValueBox(buildRow, "hash", parkingListField, null, "roadtool.parking.list", "roadtool.parking.list.tooltip");
 
             // The width, and for vehicle paths the direction, of the paths the path tool draws (ADR 089); in place of the row above
             // while a path profile is chosen.
@@ -170,7 +170,7 @@ namespace OmsiMapEditor.UI
                 if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
                     PathOptionsChanged?.Invoke();
             });
-            ValueBox(pathWidthRow, "move-horizontal", pathWidthField, "m", "roadtool.path_width", "roadtool.path_width.tooltip");
+            OptionControls.ValueBox(pathWidthRow, "move-horizontal", pathWidthField, "m", "roadtool.path_width", "roadtool.path_width.tooltip");
             pathBothWaysToggle = OptionControls.Switch(pathWidthRow, "arrow-left-right", "roadtool.path_both", "roadtool.path_both.tooltip", false);
             pathBothWaysToggle.RegisterValueChangedCallback(_ => PathOptionsChanged?.Invoke());
             pathBothWaysRow = pathBothWaysToggle;
@@ -183,48 +183,20 @@ namespace OmsiMapEditor.UI
             gradientField.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             Add(options);
 
-            // The picker beside them.
-            var picker = new VisualElement();
-            picker.AddToClassList("tool-panel");
-            picker.AddToClassList("picker-panel");
-            var header = PickerHeader.Row();
-            tabRow = new VisualElement();
-            tabRow.AddToClassList("panel-tabs");
-            tabRow.AddToClassList("picker-tabs");
+            // The catalog beside them.
+            catalog = new ToolCatalog("roadtool.close.tooltip", () => CloseRequested?.Invoke(), "roadtool.search");
             AddTab(Tab.InMap, OmsiSplineCategory.Other, "In map", "map-pin", "roadtool.tab.in_map", "roadtool.tab.in_map.tooltip");
             AddTab(Tab.Favorites, OmsiSplineCategory.Other, "Favorites", "star", "roadtool.tab.favorites", "roadtool.tab.favorites.tooltip");
             AddTab(Tab.MyRoads, OmsiSplineCategory.Other, "My roads", "user", "roadtool.tab.mine", "roadtool.tab.mine.tooltip");
             foreach (OmsiSplineCategory each in Enum.GetValues(typeof(OmsiSplineCategory)))
                 AddTab(Tab.Category, each, OmsiSplineCategories.Name(each), CategoryIcon(each), CategoryTexts.SplineNameKey(each), CategoryTexts.SplineTooltipKey(each));
-            header.Add(tabRow);
-            var searchRow = new VisualElement();
-            searchRow.AddToClassList("panel-search");
-            searchRow.AddToClassList("picker-search");
-            search = new TextField();
-            search.AddToClassList("panel-search-field");
-            search.textEdition.placeholder = Loc.T("roadtool.search");
+            search = catalog.Search;
             search.RegisterValueChangedCallback(_ => Refresh());
-            searchRow.Add(search);
-            header.Add(searchRow);
-            header.Add(PickerHeader.SearchToggle(searchRow, search, "roadtool.search"));
-            header.Add(PickerHeader.Close("roadtool.close.tooltip", () => CloseRequested?.Invoke()));
-            picker.Add(header);
+            tiles = catalog.Tiles;
+            emptyLabel = catalog.Empty;
+            Add(catalog.Panel);
             lastDefaultHint = Loc.T("roadtool.hint");
             planText = lastDefaultHint;
-
-            // The scroll bar always shows, so the tiles keep their places whatever the tab holds.
-            tiles = new ScrollView(ScrollViewMode.Vertical)
-            {
-                verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible, horizontalScrollerVisibility = ScrollerVisibility.Hidden
-            };
-            tiles.AddToClassList("picker-tiles");
-            tiles.contentContainer.AddToClassList("picker-tiles-content");
-            picker.Add(tiles);
-            emptyLabel = new Label();
-            emptyLabel.AddToClassList("panel-info");
-            emptyLabel.AddToClassList("picker-empty");
-            picker.Add(emptyLabel);
-            Add(picker);
 
             SetHeightMode(OmsiRoadHeightMode.FollowTerrain);
             SetShape(OmsiRoadShape.Free);
@@ -237,12 +209,16 @@ namespace OmsiMapEditor.UI
         public event Action CloseRequested;
 
         /// <summary>What the road under the pointer would be, or the next step; the shell shows it in the status bar, a problem in the warning colour.</summary>
-        public event Action<string, bool> HintChanged;
+        public event Action<string, bool> HintChanged
+        {
+            add => catalog.HintChanged += value;
+            remove => catalog.HintChanged -= value;
+        }
 
         private void ShowHint(string text, bool problem)
         {
             planText = text;
-            HintChanged?.Invoke(text, problem);
+            catalog.ShowHint(text, problem);
         }
 
         private string lastDefaultHint;
@@ -580,26 +556,6 @@ namespace OmsiMapEditor.UI
             SettingsChanged?.Invoke();
         }
 
-        /// <summary>A number field of another kind than text (whole numbers, decimals) in the same small box as <see cref="OptionControls.Value"/>.</summary>
-        private static void ValueBox(VisualElement row, string icon, VisualElement field, string unit, string nameKey, string tooltipKey)
-        {
-            var box = new VisualElement();
-            box.AddToClassList("option-value");
-            LocBindings.TitledTooltip(box, nameKey, tooltipKey); // i18n:keys
-            var mark = new IconElement(icon) { pickingMode = PickingMode.Ignore };
-            mark.AddToClassList("option-value-icon");
-            box.Add(mark);
-            field.AddToClassList("picker-field");
-            field.AddToClassList("option-value-field");
-            box.Add(field);
-            if (unit != null)
-            {
-                var unitLabel = new Label(unit) { pickingMode = PickingMode.Ignore };
-                unitLabel.AddToClassList("option-value-unit");
-                box.Add(unitLabel);
-            }
-            row.Add(box);
-        }
 
         private static double? Number(TextField field, double minimum)
         {
@@ -611,10 +567,9 @@ namespace OmsiMapEditor.UI
 
         private void AddTab(Tab kind, OmsiSplineCategory each, string englishName, string icon, string textKey, string tooltipKey)
         {
-            var button = PickerHeader.IconTab(icon, textKey, tooltipKey, () => ChooseTab(kind, each));
+            var button = catalog.AddTab(icon, textKey, tooltipKey, () => ChooseTab(kind, each));
             button.userData = englishName;
             tabButtons.Add(button, new KeyValuePair<Tab, OmsiSplineCategory>(kind, each));
-            tabRow.Add(button);
         }
 
         private static string CategoryIcon(OmsiSplineCategory category)
@@ -738,7 +693,7 @@ namespace OmsiMapEditor.UI
 
         private VisualElement MakeTile(string path)
         {
-            var tile = new VisualElement { tooltip = path };
+            var tile = new VisualElement { tooltip = LocBindings.CardTooltip(Path.GetFileNameWithoutExtension(path), path) };
             tile.AddToClassList("picker-tile");
             if (string.Equals(path, Profile, StringComparison.OrdinalIgnoreCase))
                 tile.AddToClassList("picker-tile-selected");

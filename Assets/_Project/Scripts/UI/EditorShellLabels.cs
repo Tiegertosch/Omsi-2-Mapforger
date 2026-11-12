@@ -125,12 +125,7 @@ namespace OmsiMapEditor.UI
             StopPlacement();
             if (typePickOptions == null)
             {
-                typePickOptions = new VisualElement();
-                typePickOptions.AddToClassList("tool-panel");
-                typePickOptions.AddToClassList("picker-options");
-                var title = LocBindings.NewLabel("labels.pick.title");
-                title.AddToClassList("picker-options-title");
-                typePickOptions.Add(title);
+                typePickOptions = ToolCatalog.Options();
                 typePickHint = new Label();
                 typePickHint.AddToClassList("panel-info");
                 typePickOptions.Add(typePickHint);

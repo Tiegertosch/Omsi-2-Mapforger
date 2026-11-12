@@ -16,6 +16,7 @@
     --mf-color-text-muted: #7E8A99;
     --mf-color-accent: #F08A32;
     --mf-color-accent-hover: #FF9B45;
+    --mf-color-selection: rgba(240, 138, 50, 0.4);
     --mf-color-success: #55B887;
     --mf-color-warning: #E6B450;
     --mf-color-error: #E06464;
@@ -344,7 +345,8 @@
 .panel-info { margin-top: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .panel-info-warning { color: var(--mf-color-warning); }
 .panel-toggle { margin: 0 0 var(--mf-space-2); }
-.picker-tool { flex-direction: row; align-items: flex-end; }
+/* Options column and catalog stand side by side with the same top and bottom edge; a tool without a catalog is not a picker-tool and keeps the height of its content. */
+.picker-tool { flex-direction: row; align-items: stretch; }
 .picker-options { width: 236px; min-width: 236px; max-width: 236px; height: auto; margin-right: var(--mf-space-2); flex-shrink: 0; flex-grow: 0; }
 .picker-options-title { margin: 0 0 var(--mf-space-2); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .picker-option { flex-direction: row; align-items: center; justify-content: space-between; min-height: 30px; margin-bottom: var(--mf-space-1); }
@@ -404,12 +406,12 @@
 .tool-options-scroll { max-height: 210px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); }
 .tool-options-scroll .picker-option { min-height: 26px; margin-bottom: 2px; }
 /* Option columns of icons (ADR 098, stage 2): rows of a short label and icons, all in view without scrolling. */
-.icon-options { width: 300px; min-width: 300px; max-width: 300px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
+.icon-options { width: 312px; min-width: 312px; max-width: 312px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
 .option-row { flex-direction: row; align-items: center; height: 30px; margin-bottom: 2px; }
 .option-row:disabled { opacity: 0.45; }
 .option-row-label { width: 64px; flex-shrink: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.option-icons { flex-direction: row; margin-right: var(--mf-space-1); padding: 0; background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); }
-.option-icon { width: 28px; height: 28px; margin: 0; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
+.option-icons { flex-direction: row; margin: 0 2px 0 0; padding: 0; }
+.option-icon { width: 28px; height: 28px; margin: 0 2px 0 0; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-field); border-width: 0; border-radius: var(--mf-radius-md); }
 .option-icon:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
 .option-icon.panel-tab-active, .option-icon.panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
 /* Every icon of an option column is 16 x 16 px in a box of 28 x 28 px, whatever kind of control holds it. */
@@ -703,3 +705,9 @@
 .ground-texture-chosen { border-color: var(--mf-color-accent); background-color: rgba(240, 138, 50, 0.18); }
 .ground-texture-swatch { width: 20px; height: 20px; margin: 0 8px 0 0; border-radius: 3px; border-color: var(--mf-color-border); border-width: 1px; flex-shrink: 0; }
 .ground-texture-name { flex-grow: 1; flex-shrink: 1; overflow: hidden; color: var(--mf-color-text-primary); -unity-text-align: middle-left; font-size: 12px; }
+
+/* Every text input of the app, also Integer/Float/DoubleField (their input is a .unity-base-text-field__input as well): a light caret,
+   a visible selection and an accent border while focused. The class is doubled to outrank the default theme. The border colour changes
+   only, so nothing moves. Keep this at the end: it must come after the per-field rules above. Unity 6.6 has no caret blink for UI Toolkit. */
+.unity-base-text-field__input.unity-base-text-field__input, .unity-base-text-field__input.unity-base-text-field__input .unity-text-element { --unity-cursor-color: var(--mf-color-text-primary); --unity-selection-color: var(--mf-color-selection); }
+.unity-base-text-field__input.unity-base-text-field__input:focus { border-color: var(--mf-color-accent-hover); }

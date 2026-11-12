@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Collegamenti delle corsie",
   "lanes.legend": "I punti sono le corsie che portano all'interno, gli anelli le corsie che portano all'esterno. Fare clic su una corsia in entrata, quindi su una corsia in uscita per aggiungere o togliere la strada tra di loro.",
   "lanes.every": "In ogni caso",
   "lanes.every.tooltip": "Fornisce nuovamente all'incrocio una corsia per ogni senso di attraversamento, come è stato realizzato",

@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Fahrstreifenverbindungen",
   "lanes.legend": "Punkte sind Fahrstreifen, die hineinführen, Ringe Fahrstreifen, die hinausführen. Klicke einen Fahrstreifen hinein, dann einen hinaus, um den Weg dazwischen hinzuzufügen oder zu entfernen.",
   "lanes.every": "Jeder Weg hindurch",
   "lanes.every.tooltip": "Gibt der Kreuzung wieder einen Fahrstreifen für jeden Weg hindurch, wie sie erzeugt wurde",

@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Connexions des voies",
   "lanes.legend": "Les points sont des voies menant à l'entrée, des voies circulaires menant à la sortie. Cliquez sur une voie d'entrée, puis sur une voie de sortie pour ajouter ou supprimer un chemin entre elles.",
   "lanes.every": "Partout",
   "lanes.every.tooltip": "Donne au carrefour une voie pour chaque passage, comme cela a été fait",

@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Fila de objetos",
   "roadbuilder.row.hint": "Escolha o objeto que está alinhado ao longo da via, como uma árvore ou um poste de iluminação. É colocado sempre que o tipo de estrada é construído.",
   "roadbuilder.row.back": "De volta ao construtor de estradas",
   "roadbuilder.row.back.tooltip": "Voltar sem escolher um objeto (Esc)",

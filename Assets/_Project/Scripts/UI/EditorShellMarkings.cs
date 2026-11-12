@@ -166,6 +166,7 @@ namespace OmsiMapEditor.UI
             };
             markingOptions.DeleteRequested += DeleteSelectedMarking;
             markingOptions.CloseRequested += () => SetTool(EditorTool.Drag);
+            markingOptions.HintChanged += (text, warning) => ShowToolHint(markingOptions, text, warning);
             objectsPanelHost.Add(markingOptions);
         }
 

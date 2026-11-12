@@ -54,6 +54,14 @@ namespace OmsiMapEditor.UI
             root.RegisterCallback<KeyDownEvent>(_ => HideTooltip(true), TrickleDown.TrickleDown);
         }
 
+        private static bool SplitCardTooltip(string tooltip, out string title, out string text)
+        {
+            var at = tooltip.IndexOf(LocBindings.TooltipSeparator);
+            title = at < 0 ? string.Empty : tooltip.Substring(0, at);
+            text = at < 0 ? string.Empty : tooltip.Substring(at + 1);
+            return at >= 0;
+        }
+
         private static VisualElement TooltipOwner(VisualElement element)
         {
             for (var current = element; current != null; current = current.parent)
@@ -82,14 +90,28 @@ namespace OmsiMapEditor.UI
             if (tooltipCard == null || tooltipSuppressed || owner.panel == null || string.IsNullOrEmpty(owner.tooltip))
                 return;
             tooltipTarget = owner;
-            var match = TooltipHeading.Match(owner.tooltip);
-            // A longer head is the start of a sentence, not a name.
-            var titled = match.Success && match.Groups[1].Value.Trim().Split(' ').Length <= 3;
-            tooltipTitle.text = titled ? match.Groups[1].Value.Trim().ToUpper(CultureInfo.CurrentCulture) : string.Empty;
-            tooltipTitle.style.display = titled ? DisplayStyle.Flex : DisplayStyle.None;
-            tooltipKey.text = titled ? match.Groups[2].Value : string.Empty;
-            tooltipKey.style.display = titled && match.Groups[2].Success ? DisplayStyle.Flex : DisplayStyle.None;
-            tooltipText.text = titled ? match.Groups[3].Value : owner.tooltip;
+            if (SplitCardTooltip(owner.tooltip, out var cardTitle, out var cardText))
+            {
+                // An explicit title (LocBindings.CardTooltip): any length, no key cap.
+                tooltipTitle.text = cardTitle.ToUpper(CultureInfo.CurrentCulture);
+                tooltipTitle.style.display = DisplayStyle.Flex;
+                tooltipKey.text = string.Empty;
+                tooltipKey.style.display = DisplayStyle.None;
+                tooltipText.text = cardText;
+                tooltipText.style.display = cardText.Length > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            else
+            {
+                var match = TooltipHeading.Match(owner.tooltip);
+                // A longer head is the start of a sentence, not a name.
+                var titled = match.Success && match.Groups[1].Value.Trim().Split(' ').Length <= 3;
+                tooltipTitle.text = titled ? match.Groups[1].Value.Trim().ToUpper(CultureInfo.CurrentCulture) : string.Empty;
+                tooltipTitle.style.display = titled ? DisplayStyle.Flex : DisplayStyle.None;
+                tooltipKey.text = titled ? match.Groups[2].Value : string.Empty;
+                tooltipKey.style.display = titled && match.Groups[2].Success ? DisplayStyle.Flex : DisplayStyle.None;
+                tooltipText.text = titled ? match.Groups[3].Value : owner.tooltip;
+                tooltipText.style.display = DisplayStyle.Flex;
+            }
             // Hidden until placed, so it never flashes at its old place.
             tooltipCard.style.visibility = Visibility.Hidden;
             tooltipCard.style.display = DisplayStyle.Flex;
@@ -115,12 +137,32 @@ namespace OmsiMapEditor.UI
             var bounds = root.layout;
             const float gap = 6f;
             var x = Mathf.Clamp(target.xMin, 4f, Mathf.Max(4f, bounds.width - size.x - 4f));
-            var y = target.yMin - size.y - gap;
+            var y = TooltipTopEdge(target.yMin, root) - size.y - gap;
             if (y < 4f)
                 y = Mathf.Min(target.yMax + gap, bounds.height - size.y - 4f);
             tooltipCard.style.left = x;
             tooltipCard.style.top = y;
             tooltipCard.style.visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// The edge the card sits above: the top of the element, or, inside a tool catalog (<c>picker-panel</c>) but outside its
+        /// header row, the top of that panel, so the card never covers the tabs.
+        /// </summary>
+        private float TooltipTopEdge(float elementTop, VisualElement root)
+        {
+            VisualElement panel = null;
+            for (var current = tooltipTarget; current != null; current = current.parent)
+            {
+                if (current.ClassListContains("picker-header"))
+                    return elementTop;
+                if (current.ClassListContains("picker-panel"))
+                {
+                    panel = current;
+                    break;
+                }
+            }
+            return panel == null ? elementTop : Mathf.Min(elementTop, root.WorldToLocal(panel.worldBound).yMin);
         }
 
         private void HideTooltip(bool suppress)
@@ -147,7 +189,7 @@ namespace OmsiMapEditor.UI
                 !float.TryParse(args[index + 2], NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
                 return;
             var owner = TooltipOwner(rootElement.panel.Pick(new Vector2(x, y)));
-            Debug.Log("Tooltip: " + (owner == null ? "none" : owner.tooltip));
+            Debug.Log("Tooltip: " + (owner == null ? "none" : owner.tooltip.Replace(LocBindings.TooltipSeparator.ToString(), " | ")));
             if (owner != null)
                 ShowTooltip(owner);
         }

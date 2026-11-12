@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Rangée d'objets",
   "roadbuilder.row.hint": "Choisissez l'objet qui se trouve en rangée le long de la voie, comme un arbre ou un lampadaire. Il est posé chaque fois que le type de route est construit.",
   "roadbuilder.row.back": "Retour au constructeur de route",
   "roadbuilder.row.back.tooltip": "Retour sans choisir d'objet (Esc)",

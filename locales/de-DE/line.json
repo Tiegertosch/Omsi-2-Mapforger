@@ -2,7 +2,6 @@
   "toolbar.line": "Linie",
   "toolbar.line.tooltip": "Linie (B): Klicke die Haltestellen einer Linie in der Reihenfolge an, in der der Bus sie bedient; der Weg über die Straßen der Karte erscheint sofort. Lege die Rückfahrt über andere Haltestellen an, schließe einen Ring, führe den Weg mit Wegpunkten über eine andere Straße und speichere die Linie.",
   "readonly.action.make_lines": "Linien anzulegen",
-  "line.title": "Linie",
   "line.hint": "Klicke die Haltestellen (bus_stop.sco) auf der Karte in der Reihenfolge an, in der der Bus sie bedient. Der Weg über die Fahrspuren wird laufend gezeigt.",
   "line.name": "Linienname",
   "line.group": "Fahrzeuggruppe",

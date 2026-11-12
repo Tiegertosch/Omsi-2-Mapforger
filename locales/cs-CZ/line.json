@@ -2,7 +2,6 @@
   "toolbar.line": "Linka",
   "toolbar.line.tooltip": "Linka (B): Klikej na zastávky linky v pořadí, v jakém je autobus obsluhuje; cesta po silnicích mapy se ukáže hned. Zpáteční spoj udělej z jiných zastávek, uzavři okruh, veď cestu přes jinou silnici body trasy a ulož linku.",
   "readonly.action.make_lines": "vytvářet linky",
-  "line.title": "Linka",
   "line.hint": "Klikej na zastávky (bus_stop.sco) na mapě v pořadí, v jakém je autobus obsluhuje. Cesta po jízdních pruzích se ukazuje průběžně.",
   "line.name": "Název linky",
   "line.group": "Skupina vozidel",

@@ -1,5 +1,4 @@
 {
-  "roadbuilder.row.title": "Objektreihe",
   "roadbuilder.row.hint": "Wähle das Objekt, das in einer Reihe entlang des Fahrstreifens steht, etwa einen Baum oder eine Straßenlaterne. Es wird jedes Mal gelegt, wenn der Straßentyp gebaut wird.",
   "roadbuilder.row.back": "Zurück zum Straßenbauer",
   "roadbuilder.row.back.tooltip": "Zurück, ohne ein Objekt zu wählen (Esc)",

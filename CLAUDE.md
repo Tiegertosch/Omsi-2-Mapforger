@@ -129,6 +129,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 - `Documentation/CommandLine.md` – alle Player-Argumente für Prüfläufe und Screenshots
 - `Documentation/TileRecordInventory.md`, `GrundorfFormatInventory.md`, `SceneryObjectInventory.md`, `TimetableChronoInventory.md`, `TrafficSignalInventory.md` – OMSI-Formatbefunde
 - `Documentation/RefactoringAudit.md`, `PerformanceBaseline.md`, `RefactoringSummary.md` – Stabilisierung nach 1.0: Befunde, Messverfahren und -werte, umgesetzte Änderungen
+- `Documentation/ui-rework-audit.md`, `ui-rework-architecture-review.md`, `ui-rework-feature-matrix.md`, `ui-rework-roadmap.md`, `ui-rework-next-milestone.md` – Bestandsaufnahme des UI-Reworks (ADR 098) vom 12. November 2026: Stand, Fehler, Funktionsmatrix, Meilensteine M0–M8 mit den Entscheidungen des Nutzers, Plan des nächsten Meilensteins
 - `Documentation/DesignReview-2026-10-28.md` – Design-Review der Hauptansicht (9 Befunde, offen; Skalierung und Kontraste kritisch)
 
 ## Oberfläche

@@ -1,5 +1,4 @@
 {
-  "objects.options": "Možnosti",
   "@settings.hide_dlc.hint": "{origin} is a sentence about where the files come from",
   "objects.origin.reading": "Původ souborů se stále čte.",
   "objects.origin.no_steam": "{description} Bez seznamů Steam lze oddělit pouze složky označené jako DLC.",

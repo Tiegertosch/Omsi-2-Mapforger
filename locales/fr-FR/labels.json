@@ -11,7 +11,6 @@
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "Un nouveau type ou de nouvelles étiquettes sont écrits dans {variant} ([selobject] avec [typ] ou [relabel]) ; le {origin, select, variant {variante qui l'ajoute} other {carte de base}} garde le sien.",
   "@labels.note.other": "{origin} is variant or base and chooses the words: keep it in English",
-  "labels.pick.title": "Nouveau fichier objet",
   "labels.pick.cancel": "Annuler",
   "labels.pick.cancel.tooltip": "Laissez le type tel quel (Esc)",
   "labels.pick.hint": "Choisissez l'objet que devient {element}. Il garde sa place, son orientation et ses étiquettes.",

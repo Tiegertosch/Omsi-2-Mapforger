@@ -1,5 +1,4 @@
 {
-  "lanes.title": "Conexiones de carriles",
   "lanes.legend": "Los puntos son carriles que conducen hacia adentro y carriles circulares que conducen hacia afuera. Haga clic en un carril de entrada y luego en un carril de salida para agregar el camino entre ellos o eliminarlo.",
   "lanes.every": "En todos los sentidos",
   "lanes.every.tooltip": "Le da al cruce un carril para todos los sentidos nuevamente, tal como estaba hecho",

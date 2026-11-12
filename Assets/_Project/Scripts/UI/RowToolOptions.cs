@@ -37,8 +37,9 @@ namespace OmsiMapEditor.UI
             AddToClassList("tool-options-scroll");
             AddToClassList("tool-panel");
             AddToClassList("picker-options");
-            title = LocBindings.NewLabel("rows.title");
+            title = LocBindings.NewLabel("rows.selected");
             title.AddToClassList("picker-options-title");
+            title.style.display = DisplayStyle.None;
             Add(title);
 
             objectLabel = LocBindings.NewLabel("rows.choose");
@@ -135,7 +136,7 @@ namespace OmsiMapEditor.UI
                 layingTilt = tiltToggle.value;
             laying = laying ?? new[] { intervalField.value, offsetField.value, heightField.value, headingField.value };
             tiltToggle.SetValueWithoutNotify(tilt);
-            LocBindings.Text(title, "rows.selected");
+            title.style.display = DisplayStyle.Flex;
             intervalField.SetValueWithoutNotify(Format(interval));
             offsetField.SetValueWithoutNotify(Format(offset));
             heightField.SetValueWithoutNotify(Format(height));
@@ -154,7 +155,7 @@ namespace OmsiMapEditor.UI
             headingField.SetValueWithoutNotify(laying[3]);
             tiltToggle.SetValueWithoutNotify(layingTilt);
             laying = null;
-            LocBindings.Text(title, "rows.title");
+            title.style.display = DisplayStyle.None;
             bothSidesToggle.SetEnabled(true);
             wholeRoadToggle.SetEnabled(true);
         }

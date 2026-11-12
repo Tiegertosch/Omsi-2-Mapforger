@@ -59,8 +59,7 @@ namespace OmsiMapEditor.UI
         private readonly Label emptyLabel;
         private string hint;
         private bool hintWarning;
-        private readonly VisualElement searchRow;
-        private readonly Button searchToggle;
+        private readonly ToolCatalog catalog;
         private bool hideDlc;
         private readonly TextField headingField;
         private readonly Toggle randomHeading;
@@ -128,38 +127,22 @@ namespace OmsiMapEditor.UI
             placingOptions = options;
             shownOptions = options;
 
-            // The picker beside them.
-            var picker = new VisualElement();
-            picker.AddToClassList("tool-panel");
-            picker.AddToClassList("picker-panel");
-            var header = PickerHeader.Row();
-            var tabRow = new VisualElement();
-            tabRow.AddToClassList("panel-tabs");
-            tabRow.AddToClassList("picker-tabs");
-            AddTab(tabRow, Tab.InMap, OmsiObjectCategory.Other, "map-pin", "objects.tab.in_map", "objects.tab.in_map.tooltip");
-            AddTab(tabRow, Tab.Favorites, OmsiObjectCategory.Other, "star", "objects.tab.favorites", "objects.tab.favorites.tooltip");
-            AddTab(tabRow, Tab.Library, OmsiObjectCategory.Other, "library", "objects.tab.library", "objects.tab.library.tooltip");
+            // The catalog beside them.
+            catalog = new ToolCatalog("objects.close.tooltip", () => CloseRequested?.Invoke(), "objects.search");
+            AddTab(Tab.InMap, OmsiObjectCategory.Other, "map-pin", "objects.tab.in_map", "objects.tab.in_map.tooltip");
+            AddTab(Tab.Favorites, OmsiObjectCategory.Other, "star", "objects.tab.favorites", "objects.tab.favorites.tooltip");
+            AddTab(Tab.Library, OmsiObjectCategory.Other, "library", "objects.tab.library", "objects.tab.library.tooltip");
             foreach (OmsiObjectCategory each in Enum.GetValues(typeof(OmsiObjectCategory)))
-                AddTab(tabRow, Tab.Category, each, CategoryIcon(each), CategoryTexts.ObjectNameKey(each), CategoryTexts.ObjectTooltipKey(each));
-            header.Add(tabRow);
-            searchRow = new VisualElement();
-            searchRow.AddToClassList("panel-search");
-            searchRow.AddToClassList("picker-search");
-            search = new TextField();
-            search.AddToClassList("panel-search-field");
-            search.textEdition.placeholder = Loc.T("objects.search");
+                AddTab(Tab.Category, each, CategoryIcon(each), CategoryTexts.ObjectNameKey(each), CategoryTexts.ObjectTooltipKey(each));
+            search = catalog.Search;
             search.RegisterValueChangedCallback(_ =>
             {
                 shownPages = 1;
                 searchRefresh?.Pause();
                 searchRefresh = schedule.Execute(Refresh).StartingIn(SearchDelayMilliseconds);
             });
-            searchRow.Add(search);
-            header.Add(searchRow);
-            searchToggle = PickerHeader.SearchToggle(searchRow, search, "objects.search");
-            header.Add(searchToggle);
-            header.Add(PickerHeader.Close("objects.close.tooltip", () => CloseRequested?.Invoke()));
-            picker.Add(header);
+            tiles = catalog.Tiles;
+            emptyLabel = catalog.Empty;
 
             folderBar = new VisualElement();
             folderBar.AddToClassList("panel-folder-bar");
@@ -170,21 +153,9 @@ namespace OmsiMapEditor.UI
             folderLabel = new Label();
             folderLabel.AddToClassList("panel-folder-label");
             folderBar.Add(folderLabel);
-            picker.Add(folderBar);
-
-            // The scroll bar always shows, so the tiles keep their places whatever the tab holds.
-            tiles = new ScrollView(ScrollViewMode.Vertical)
-            {
-                verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible, horizontalScrollerVisibility = ScrollerVisibility.Hidden
-            };
-            tiles.AddToClassList("picker-tiles");
-            tiles.contentContainer.AddToClassList("picker-tiles-content");
-            picker.Add(tiles);
-            emptyLabel = new Label();
-            emptyLabel.AddToClassList("panel-info");
-            emptyLabel.AddToClassList("picker-empty");
-            picker.Add(emptyLabel);
-            Add(picker);
+            // Between the header and the tiles.
+            catalog.Panel.Insert(1, folderBar);
+            Add(catalog.Panel);
 
             ShowTab(Tab.InMap, OmsiObjectCategory.Buildings);
         }
@@ -214,7 +185,11 @@ namespace OmsiMapEditor.UI
         public event Action CloseRequested;
 
         /// <summary>The line about the list or the chosen object changed; the shell shows it in the status bar, a warning in its colour.</summary>
-        public event Action<string, bool> HintChanged;
+        public event Action<string, bool> HintChanged
+        {
+            add => catalog.HintChanged += value;
+            remove => catalog.HintChanged -= value;
+        }
 
         /// <summary>A tile shows an object whose preview is not drawn yet; the shell has the object renderer draw it.</summary>
         public event Action<string> PreviewRequested;
@@ -304,9 +279,11 @@ namespace OmsiMapEditor.UI
             UpdateInfo();
         }
 
+        /// <summary>Puts the cursor in the search while it is unfolded; a folded search takes no keys, so the map's shortcuts keep working.</summary>
         public void FocusSearch()
         {
-            search.Focus();
+            if (catalog.SearchOpen)
+                search.Focus();
         }
 
         /// <summary>
@@ -333,7 +310,7 @@ namespace OmsiMapEditor.UI
             if (searchText != null)
             {
                 search.SetValueWithoutNotify(searchText);
-                PickerHeader.ShowSearch(searchRow, searchToggle, searchText.Length > 0);
+                catalog.ShowSearch(searchText.Length > 0);
             }
             ShowTab(kind, each);
         }
@@ -349,15 +326,14 @@ namespace OmsiMapEditor.UI
             return row;
         }
 
-        private void AddTab(VisualElement row, Tab kind, OmsiObjectCategory each, string icon, string textKey, string tooltipKey)
+        private void AddTab(Tab kind, OmsiObjectCategory each, string icon, string textKey, string tooltipKey)
         {
-            var button = PickerHeader.IconTab(icon, textKey, tooltipKey, () =>
+            var button = catalog.AddTab(icon, textKey, tooltipKey, () =>
             {
                 search.SetValueWithoutNotify(string.Empty);
                 ShowTab(kind, each);
             });
             tabButtons.Add(button, new KeyValuePair<Tab, OmsiObjectCategory>(kind, each));
-            row.Add(button);
         }
 
         private static string CategoryIcon(OmsiObjectCategory category)
@@ -578,7 +554,8 @@ namespace OmsiMapEditor.UI
             var path = entry.Path;
             var tile = new VisualElement
             {
-                tooltip = objectGroups.TryGetValue(path, out var names) ? Loc.T("objects.tile.groups", ("path", path), ("groups", string.Join(", ", names))) : path
+                tooltip = LocBindings.CardTooltip(entry.Name,
+                    objectGroups.TryGetValue(path, out var names) ? Loc.T("objects.tile.groups", ("path", path), ("groups", string.Join(", ", names))) : path)
             };
             tile.AddToClassList("picker-tile");
             tile.AddToClassList("object-tile");
@@ -751,7 +728,7 @@ namespace OmsiMapEditor.UI
             {
                 hint = text;
                 hintWarning = dlcWarning;
-                HintChanged?.Invoke(text, dlcWarning);
+                catalog.ShowHint(text, dlcWarning);
             }
             emptyLabel.text = Loc.T(library == null && tab != Tab.InMap ? "objects.empty.listing" // i18n:keys
                 : tab == Tab.Favorites && favorites.Count == 0 ? "objects.empty.favorites"

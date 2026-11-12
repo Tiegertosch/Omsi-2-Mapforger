@@ -24,6 +24,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField depthField;
         private readonly Button paintButton;
         private readonly VisualElement options;
+        private readonly ToolCatalog catalog;
         private readonly VisualElement brushPage;
         private readonly VisualElement heightMapPage;
         private readonly Button brushTab;
@@ -54,30 +55,20 @@ namespace OmsiMapEditor.UI
             options.AddToClassList("picker-options");
             Add(options);
 
-            // The brushes beside the options, as tiles.
-            var picker = new VisualElement();
-            picker.AddToClassList("tool-panel");
-            picker.AddToClassList("picker-panel");
-            picker.AddToClassList("terrain-picker");
-            Add(picker);
-            var header = PickerHeader.Row();
-            var tabs = new VisualElement();
-            tabs.AddToClassList("panel-tabs");
-            tabs.AddToClassList("picker-tabs");
-            brushTab = PickerHeader.IconTab("mountain", "terrain.brushes", null, () => ShowPage(false));
-            heightMapTab = PickerHeader.IconTab("image", "terrain.heightmap", "terrain.heightmap.hint", () => ShowPage(true));
-            tabs.Add(brushTab);
-            tabs.Add(heightMapTab);
-            header.Add(tabs);
-            header.Add(PickerHeader.Close("terrain.close.tooltip", () => CloseRequested?.Invoke()));
-            picker.Add(header);
+            // The brushes beside the options, as tiles, and the height map on the second tab.
+            catalog = new ToolCatalog("terrain.close.tooltip", () => CloseRequested?.Invoke(), scrollingTiles: false);
+            catalog.Panel.AddToClassList("terrain-picker");
+            catalog.Empty.style.display = DisplayStyle.None;
+            brushTab = catalog.AddTab("mountain", "terrain.brushes", null, () => ShowPage(false));
+            heightMapTab = catalog.AddTab("image", "terrain.heightmap", "terrain.heightmap.hint", () => ShowPage(true));
             brushPage = new VisualElement();
             brushPage.AddToClassList("picker-tiles-content");
             brushPage.AddToClassList("terrain-page");
-            picker.Add(brushPage);
+            catalog.Panel.Insert(1, brushPage);
             heightMapPage = new VisualElement();
             heightMapPage.AddToClassList("terrain-page");
-            picker.Add(heightMapPage);
+            catalog.Panel.Insert(2, heightMapPage);
+            Add(catalog.Panel);
 
             AddMode("terrain.mode.raise", OmsiTerrainBrushMode.Raise, "arrow-up");
             AddMode("terrain.mode.lower", OmsiTerrainBrushMode.Lower, "arrow-down");
@@ -195,7 +186,11 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>The height under the pointer or the ramp; the shell shows it in the status bar.</summary>
-        public event Action<string, bool> HintChanged;
+        public event Action<string, bool> HintChanged
+        {
+            add => catalog.HintChanged += value;
+            remove => catalog.HintChanged -= value;
+        }
 
         /// <summary>The X of the panel was pressed; the shell ends the tool.</summary>
         public event Action CloseRequested;
@@ -358,7 +353,7 @@ namespace OmsiMapEditor.UI
 
         public void ShowPlan(string text, bool problem)
         {
-            HintChanged?.Invoke(text, problem);
+            catalog.ShowHint(text, problem);
         }
 
         private void AddMode(string nameKey, OmsiTerrainBrushMode? mode, string icon)
@@ -369,7 +364,8 @@ namespace OmsiMapEditor.UI
         /// <summary>A brush as a tile of the picker: its icon over its name.</summary>
         private Button Tile(string nameKey, string tooltipKey, string icon, Action clicked)
         {
-            var tile = LocBindings.WithTooltip(new Button(clicked), tooltipKey); // i18n:keys
+            var tile = new Button(clicked);
+            LocBindings.TitledTooltip(tile, nameKey, tooltipKey); // i18n:keys
             tile.AddToClassList("picker-tile");
             tile.AddToClassList("terrain-brush-tile");
             var preview = new VisualElement { pickingMode = PickingMode.Ignore };

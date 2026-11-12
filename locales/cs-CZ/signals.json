@@ -2,7 +2,6 @@
   "toolbar.signals": "Semafory",
   "toolbar.signals.tooltip": "Semafory (A): kliknutím na křižovatku zobrazíte její vjezdy, pruhy a pohyby v barvách jejich signálních skupin. Na křižovatce vytvořené v tomto projektu přidávejte, přejmenovávejte a odebírejte skupiny a přiřaďte každému pohybu jeho skupinu.",
   "readonly.action.edit_signals": "upravovat semafory",
-  "signals.title": "Světelná signalizace",
   "signals.click_junction": "Klikněte na křižovatku v mapě.",
   "signals.groups": "Signální skupiny",
   "signals.movements": "Pohyby",

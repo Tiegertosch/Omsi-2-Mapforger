@@ -55,13 +55,20 @@ namespace OmsiMapEditor.UI
         /// <summary>A small number field with an icon before it and its unit after it; the element returned is the field.</summary>
         public static TextField Value(VisualElement row, string icon, string value, string unit, string nameKey, string tooltipKey)
         {
+            var field = new TextField { value = value };
+            ValueBox(row, icon, field, unit, nameKey, tooltipKey);
+            return field;
+        }
+
+        /// <summary>Puts any field (text, whole numbers, decimals) in the small box with an icon and a unit.</summary>
+        public static void ValueBox(VisualElement row, string icon, VisualElement field, string unit, string nameKey, string tooltipKey)
+        {
             var box = new VisualElement();
             box.AddToClassList("option-value");
             LocBindings.TitledTooltip(box, nameKey, tooltipKey); // i18n:keys
             var mark = new IconElement(icon) { pickingMode = PickingMode.Ignore };
             mark.AddToClassList("option-value-icon");
             box.Add(mark);
-            var field = new TextField { value = value };
             field.AddToClassList("picker-field");
             field.AddToClassList("option-value-field");
             box.Add(field);
@@ -72,7 +79,6 @@ namespace OmsiMapEditor.UI
                 box.Add(unitLabel);
             }
             row.Add(box);
-            return field;
         }
     }
 }

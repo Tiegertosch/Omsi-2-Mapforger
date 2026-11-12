@@ -11,7 +11,6 @@
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "Do {variant} se zapíše nový typ nebo nové štítky ([selobject] s [typ] nebo [relabel]); {origin, select, variant {varianta, která to přidává} other {základní mapa}} si zachovává svou vlastní.",
   "@labels.note.other": "{origin} is variant or base and chooses the words: keep it in English",
-  "labels.pick.title": "Nový objektový soubor",
   "labels.pick.cancel": "Zrušit",
   "labels.pick.cancel.tooltip": "Ponechte typ tak, jak je (Esc)",
   "labels.pick.hint": "Vyberte objekt, kterým se {element} stane. Drží si své místo, orientaci a štítky.",

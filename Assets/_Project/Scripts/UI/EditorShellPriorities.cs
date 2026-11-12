@@ -46,13 +46,8 @@ namespace OmsiMapEditor.UI
 
         private void CreatePriorityOptions()
         {
-            priorityOptions = new VisualElement();
-            priorityOptions.AddToClassList("tool-panel");
-            priorityOptions.AddToClassList("picker-options");
+            priorityOptions = ToolCatalog.Options();
             priorityOptions.style.display = DisplayStyle.None;
-            var title = LocBindings.NewLabel("priorities.title");
-            title.AddToClassList("picker-options-title");
-            priorityOptions.Add(title);
             priorityJunctionLabel = new Label();
             priorityJunctionLabel.AddToClassList("panel-info");
             priorityJunctionLabel.style.marginTop = 0f;

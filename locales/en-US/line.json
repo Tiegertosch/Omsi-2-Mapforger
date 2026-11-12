@@ -2,7 +2,6 @@
   "toolbar.line": "Line",
   "toolbar.line.tooltip": "Line (B): Click the bus stops of a line in the order the bus serves them; the way over the map's roads shows at once. Make the return trip from other stops, close a ring, lead the way over another road with waypoints, and save the line.",
   "readonly.action.make_lines": "make lines",
-  "line.title": "Line",
   "line.hint": "Click the bus stops (bus_stop.sco) on the map in the order the bus serves them. The way over the vehicle lanes is shown as you go.",
   "line.name": "Line name",
   "line.group": "Vehicle group",

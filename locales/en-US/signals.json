@@ -2,7 +2,6 @@
   "toolbar.signals": "Signals",
   "toolbar.signals.tooltip": "Signals (A): Click a crossing to see its approaches, lanes and movements in the colours of their signal groups. On a junction made in this project, add, rename and remove signal groups and give each movement its group.",
   "readonly.action.edit_signals": "edit traffic signals",
-  "signals.title": "Traffic signals",
   "signals.click_junction": "Click a crossing in the map.",
   "signals.groups": "Signal groups",
   "signals.movements": "Movements",

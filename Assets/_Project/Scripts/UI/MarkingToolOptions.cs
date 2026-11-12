@@ -82,7 +82,6 @@ namespace OmsiMapEditor.UI
         private readonly List<Item> items = new List<Item>();
         private readonly HashSet<string> favorites = new HashSet<string>();
 
-        private readonly Label optionsTitle;
         private readonly Label junctionLabel;
         private readonly Label contextTitle;
         private readonly VisualElement scopeRow;
@@ -97,8 +96,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField distanceField;
         private readonly Button deleteButton;
 
-        private readonly Label choiceLabel;
-        private readonly Label planLabel;
+        private readonly ToolCatalog catalog;
         private readonly Dictionary<Button, Tab> tabButtons = new Dictionary<Button, Tab>();
         private readonly ScrollView tiles;
         private readonly Label emptyLabel;
@@ -124,12 +122,7 @@ namespace OmsiMapEditor.UI
             LoadFavorites();
 
             // The options on the left.
-            var options = new VisualElement();
-            options.AddToClassList("tool-panel");
-            options.AddToClassList("picker-options");
-            optionsTitle = LocBindings.NewLabel("markings.options");
-            optionsTitle.AddToClassList("picker-options-title");
-            options.Add(optionsTitle);
+            var options = ToolCatalog.Options();
             junctionLabel = new Label(Loc.T("markings.click_junction"));
             junctionLabel.AddToClassList("panel-info");
             junctionLabel.style.marginTop = 0f;
@@ -178,55 +171,15 @@ namespace OmsiMapEditor.UI
             Add(options);
 
             // The library beside them.
-            var picker = new VisualElement();
-            picker.AddToClassList("tool-panel");
-            picker.AddToClassList("picker-panel");
-            // Lower and narrower than the road library, so the junction above stays in view.
-            picker.style.width = picker.style.minWidth = picker.style.maxWidth = 560f;
-            picker.style.height = 300f;
-            var header = new VisualElement();
-            header.AddToClassList("tool-panel-header");
-            header.AddToClassList("picker-header");
-            var badge = new VisualElement();
-            badge.AddToClassList("tool-panel-badge");
-            badge.Add(new IconElement("brush"));
-            header.Add(badge);
-            var titles = new VisualElement();
-            titles.AddToClassList("tool-panel-titles");
-            choiceLabel = new Label();
-            choiceLabel.AddToClassList("tool-panel-title");
-            choiceLabel.AddToClassList("picker-title");
-            titles.Add(choiceLabel);
-            planLabel = new Label();
-            planLabel.AddToClassList("tool-panel-subtitle");
-            planLabel.AddToClassList("picker-subtitle");
-            titles.Add(planLabel);
-            header.Add(titles);
-            var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "markings.close.tooltip");
-            close.AddToClassList("panel-icon-button");
-            close.Add(new IconElement("x"));
-            header.Add(close);
-            picker.Add(header);
-
-            var tabRow = new VisualElement();
-            tabRow.AddToClassList("panel-tabs");
-            tabRow.AddToClassList("picker-tabs");
-            AddTab(tabRow, Tab.Lines, "markings.tab.lines", "markings.tab.lines.tooltip");
-            AddTab(tabRow, Tab.Areas, "markings.tab.areas", "markings.tab.areas.tooltip");
-            AddTab(tabRow, Tab.Arrows, "markings.tab.arrows", "markings.tab.arrows.tooltip");
-            AddTab(tabRow, Tab.Favorites, "markings.tab.favorites", "markings.tab.favorites.tooltip");
-            picker.Add(tabRow);
-
-            tiles = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
-            tiles.AddToClassList("picker-tiles");
-            tiles.contentContainer.AddToClassList("picker-tiles-content");
-            picker.Add(tiles);
-            emptyLabel = LocBindings.NewLabel("markings.favorites_empty");
-            emptyLabel.AddToClassList("panel-info");
-            emptyLabel.AddToClassList("picker-empty");
-            emptyLabel.style.top = 110f;
-            picker.Add(emptyLabel);
-            Add(picker);
+            catalog = new ToolCatalog("markings.close.tooltip", () => CloseRequested?.Invoke());
+            AddTab(Tab.Lines, "equal", "markings.tab.lines", "markings.tab.lines.tooltip");
+            AddTab(Tab.Areas, "square-dashed", "markings.tab.areas", "markings.tab.areas.tooltip");
+            AddTab(Tab.Arrows, "arrow-up", "markings.tab.arrows", "markings.tab.arrows.tooltip");
+            AddTab(Tab.Favorites, "star", "markings.tab.favorites", "markings.tab.favorites.tooltip");
+            tiles = catalog.Tiles;
+            emptyLabel = catalog.Empty;
+            LocBindings.Text(emptyLabel, "markings.favorites_empty");
+            Add(catalog.Panel);
 
             SetPieceScope(false);
             ShowChoice(choice);
@@ -256,6 +209,13 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The menu wants to close the markings tool.</summary>
         public event Action CloseRequested;
+
+        /// <summary>What the next click does with the chosen marking; the shell shows it in the status bar.</summary>
+        public event Action<string, bool> HintChanged
+        {
+            add => catalog.HintChanged += value;
+            remove => catalog.HintChanged -= value;
+        }
 
         /// <summary>The style of the next line, or the last one chosen while an area or arrow is.</summary>
         public OmsiMarkingStyle Style { get; private set; } = OmsiMarkingStyle.LaneLine;
@@ -393,9 +353,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Shows what the next click does, under the name of the chosen marking.</summary>
         public void ShowPlan(string text, bool problem)
         {
-            planLabel.text = text;
-            planLabel.tooltip = text;
-            planLabel.EnableInClassList("panel-info-warning", problem);
+            catalog.ShowHint(text, problem);
         }
 
         private void Choose(Item item)
@@ -415,8 +373,6 @@ namespace OmsiMapEditor.UI
             choice = item;
             if (item.Kind == Kind.Line)
                 Style = item.Style;
-            choiceLabel.text = item.Name;
-            choiceLabel.tooltip = item.Description;
             // The tab of its kind opens, unless it stands among the favourites shown.
             var own = item.Kind == Kind.Line ? Tab.Lines : item.Kind == Kind.Area ? Tab.Areas : Tab.Arrows;
             if (tab != own && !(tab == Tab.Favorites && favorites.Contains(item.Key)))
@@ -455,17 +411,14 @@ namespace OmsiMapEditor.UI
                 ShowContext();
         }
 
-        private void AddTab(VisualElement row, Tab kind, string textKey, string tooltipKey)
+        private void AddTab(Tab kind, string icon, string textKey, string tooltipKey)
         {
-            var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => // i18n:keys
+            var button = catalog.AddTab(icon, textKey, tooltipKey, () =>
             {
                 tab = kind;
                 Refresh();
-            }), tooltipKey); // i18n:keys
-            button.AddToClassList("panel-tab");
-            button.AddToClassList("picker-tab");
+            });
             tabButtons.Add(button, kind);
-            row.Add(button);
         }
 
         /// <summary>Builds the tiles of the open tab, favourites first in each.</summary>
@@ -490,16 +443,11 @@ namespace OmsiMapEditor.UI
 
         private VisualElement MakeTile(Item item)
         {
-            var tile = new VisualElement { tooltip = item.Description };
+            var tile = new VisualElement { tooltip = LocBindings.CardTooltip(item.Name, item.Description) };
             tile.AddToClassList("picker-tile");
-            // Smaller than road tiles: a marking needs no more to be told apart.
-            tile.style.width = 96f;
-            tile.style.height = 76f;
             tile.EnableInClassList("picker-tile-selected", item.Equals(choice));
             var preview = new MarkingPreview(item);
             preview.AddToClassList("picker-tile-preview");
-            preview.style.width = 84f;
-            preview.style.height = 44f;
             tile.Add(preview);
             var name = new Label(item.TileName);
             name.AddToClassList("picker-tile-name");
