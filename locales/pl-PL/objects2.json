@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "Pokazano {stops, plural, one {# przystanek} few {# przystanki} many {# przystanków} other {# przystanku}} i {lines, plural, one {# linia} few {# linie} many {# linii} other {# linii}} {missing, plural, one {; # ścieżki prowadzącej nie ma na mapie} few {; # przejechanych ścieżek nie ma na mapie} many {; # przejechanych ścieżek nie znajduje się na mapie} other {; Ścieżek # nie ma na mapie} =0 {}}. Kliknij linię w przeglądarce projektu, aby ją podświetlić.",
+  "routes.status.shown": "Pokazano {stops, plural, one {# przystanek} few {# przystanki} many {# przystanków} other {# przystanku}} i {lines, plural, one {# linia} few {# linie} many {# linii} other {# linii}} {missing, plural, one {; # ścieżki prowadzącej nie ma na mapie} few {; # przejechanych ścieżek nie ma na mapie} many {; # przejechanych ścieżek nie znajduje się na mapie} other {; Ścieżek # nie ma na mapie} =0 {}}. Kliknij linię na liście linii na dolnym pasku, aby ją podświetlić.",
   "selection.status.object": "Wybrany obiekt #{id} ({path}){mode, select, edit {} chrono { - Widok chrono, tylko do odczytu} other { - tylko do odczytu; zapisz projekt do edycji}}",
   "@selection.status.object": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "selection.status.none_in_box": "W pudełku nie ma żadnych obiektów.",

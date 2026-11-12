@@ -132,6 +132,5 @@
   "status.mode.readonly": "só de leitura",
   "tool.status.move": "Mover: arraste uma seta para mover a seleção para leste, norte ou, em 3D, para cima; Shift move-se em metros inteiros.",
   "tool.status.rotate": "Rodar: arraste a pega redonda de cima ou um anel em 3D para rodar o objeto selecionado; Shift ajusta-se a 15°.",
-  "tool.status.drag": "Arrastar: clique nos objetos para os selecionar e arraste-os para os mover livremente; Ctrl+clique e Ctrl+arraste seleccione vários.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Abra o} other {Recolher o}} {panel, select, inspector {inspetor} other {navegador do projeto}}"
+  "tool.status.drag": "Arrastar: clique nos objetos para os selecionar e arraste-os para os mover livremente; Ctrl+clique e Ctrl+arraste seleccione vários."
 }

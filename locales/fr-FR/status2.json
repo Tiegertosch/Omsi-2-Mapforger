@@ -132,6 +132,5 @@
   "status.mode.readonly": "lecture seule",
   "tool.status.move": "Déplacer : faites glisser une flèche pour déplacer la sélection vers l'est, le nord ou, en 3D, vers le haut ; Shift se déplace en mètres entiers.",
   "tool.status.rotate": "Rotation : faites glisser la poignée ronde du dessus ou un anneau en 3D pour faire pivoter l'objet sélectionné ; Shift s'enclenche à 15°.",
-  "tool.status.drag": "Glisser : cliquez sur les objets pour les sélectionner et faites-les glisser pour les déplacer librement ; Ctrl+clic et Ctrl+glisser en sélectionnent plusieurs.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Ouvrez le} other {Réduire le}} {panel, select, inspector {inspecteur} other {navigateur de projet}}"
+  "tool.status.drag": "Glisser : cliquez sur les objets pour les sélectionner et faites-les glisser pour les déplacer librement ; Ctrl+clic et Ctrl+glisser en sélectionnent plusieurs."
 }

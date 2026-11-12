@@ -1,9 +1,9 @@
 {
   "readonly.reading": "The map is being read for the map check or a chrono date; {action} again in a moment.",
   "@readonly.reading": "{action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.variant": "The chrono variant {title} is being edited; it takes objects, their types and labels, traffic rules and the right of way, the road types, new roads and deletion of splines, and the lines it switches off only. Choose Base map in the project browser to {action}.",
+  "readonly.variant": "The chrono variant {title} is being edited; it takes objects, their types and labels, traffic rules and the right of way, the road types, new roads and deletion of splines, and the lines it switches off only. Choose Base map in the Chrono list of the bottom bar to {action}.",
   "@readonly.variant": "{title} is the name of the variant, shown unchanged; {action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.chrono": "The map shows {date} with its chrono variants and is read-only. Choose Base map in the project browser to {action}.",
+  "readonly.chrono": "The map shows {date} with its chrono variants and is read-only. Choose Base map in the Chrono list of the bottom bar to {action}.",
   "@readonly.chrono": "{date} is a date like 2026-11-07, shown unchanged",
   "readonly.map": "The map is read-only. Save a MapWorks project (File > Save map project as...) to {action}.",
   "readonly.action.load_heights": "load terrain heights",

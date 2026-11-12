@@ -132,6 +132,5 @@
   "status.mode.readonly": "tylko do odczytu",
   "tool.status.move": "Przesuń: przeciągnij strzałkę, aby przesunąć zaznaczenie na wschód, północ lub w 3D w górę; Shift porusza się w pełnych metrach.",
   "tool.status.rotate": "Obróć: przeciągnij okrągły uchwyt z góry lub pierścień w 3D, aby obrócić wybrany obiekt; Shift zatrzaskuje się pod kątem 15°.",
-  "tool.status.drag": "Przeciągnij: kliknij obiekty, aby je zaznaczyć i przeciągnij, aby je swobodnie przesuwać; Ctrl+kliknij i Ctrl+przeciągnij wybierz kilka.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Otwórz} other {Zwiń}} {panel, select, inspector {inspektor} other {przeglądarka projektów}}"
+  "tool.status.drag": "Przeciągnij: kliknij obiekty, aby je zaznaczyć i przeciągnij, aby je swobodnie przesuwać; Ctrl+kliknij i Ctrl+przeciągnij wybierz kilka."
 }

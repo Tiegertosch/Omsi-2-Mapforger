@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "{stops, plural, one {# arrêt} other {# arrêts}} et {lines, plural, one {# ligne} other {# lignes}} illustrés{missing, plural, =0 {} one {; # chemin parcouru n'est pas sur la carte} other {; # chemins carrossables ne sont pas sur la carte}}. Cliquez sur une ligne dans le navigateur du projet pour la mettre en surbrillance.",
+  "routes.status.shown": "{stops, plural, one {# arrêt} other {# arrêts}} et {lines, plural, one {# ligne} other {# lignes}} illustrés{missing, plural, =0 {} one {; # chemin parcouru n'est pas sur la carte} other {; # chemins carrossables ne sont pas sur la carte}}. Cliquez sur une ligne dans la liste des lignes de la barre du bas pour la mettre en surbrillance.",
   "selection.status.object": "Objet sélectionné #{id} ({path}){mode, select, edit {} chrono { - Vue chrono, en lecture seule} other { - en lecture seule ; enregistrer un projet à modifier}}",
   "@selection.status.object": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "selection.status.none_in_box": "Il n'y a aucun objet dans la boîte.",

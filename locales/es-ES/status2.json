@@ -132,6 +132,5 @@
   "status.mode.readonly": "solo lectura",
   "tool.status.move": "Mover: arrastre una flecha para mover la selección hacia el este, el norte o, en 3D, hacia arriba; Shift se mueve en metros enteros.",
   "tool.status.rotate": "Girar: arrastre el mango redondo desde arriba o un anillo en 3D para girar el objeto seleccionado; Shift se ajusta a 15°.",
-  "tool.status.drag": "Arrastrar: haga clic en los objetos para seleccionarlos y arrástrelos para moverlos libremente; Ctrl+clic y Ctrl+arrastrar selecciona varios.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Abre el} other {Contraer el}} {panel, select, inspector {inspector} other {navegador de proyectos}}"
+  "tool.status.drag": "Arrastrar: haga clic en los objetos para seleccionarlos y arrástrelos para moverlos libremente; Ctrl+clic y Ctrl+arrastrar selecciona varios."
 }

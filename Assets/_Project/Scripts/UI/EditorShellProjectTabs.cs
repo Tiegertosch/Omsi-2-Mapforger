@@ -43,36 +43,11 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>Shows a tab of the project browser; one that is not available (no lines, paths hidden) falls back to the tiles.</summary>
+        /// <summary>Opens the popup of the bar with one of the map's lists; one that is not available (no lines, paths hidden) falls back to the tiles.</summary>
         private void ShowProjectTab(ProjectTab tab)
         {
             projectTab = ProjectTabAvailable(tab) ? tab : ProjectTab.Tiles;
-            RenderProjectBrowser();
-        }
-
-        /// <summary>The strip of tabs; only the tabs that have something to show are drawn.</summary>
-        private VisualElement ProjectTabStrip(ProjectTab current)
-        {
-            var strip = new VisualElement();
-            strip.AddToClassList("panel-tabs");
-            strip.AddToClassList("project-tabs");
-            var tabs = new[]
-            {
-                (ProjectTab.Tiles, "project.tab.tiles"), (ProjectTab.Map, "project.tab.map"), (ProjectTab.Entries, "project.tab.entries"), (ProjectTab.Chrono, "project.tab.chrono"),
-                (ProjectTab.Lines, "project.tab.lines"), (ProjectTab.Paths, "project.tab.paths")
-            };
-            foreach (var (tab, key) in tabs)
-            {
-                if (!ProjectTabAvailable(tab))
-                    continue;
-                var captured = tab;
-                var button = new Button(() => ShowProjectTab(captured));
-                LocBindings.Text(button, key); // i18n:keys
-                button.AddToClassList("panel-tab");
-                button.EnableInClassList("panel-tab-active", tab == current);
-                strip.Add(button);
-            }
-            return strip;
+            ShowBarPopup(true);
         }
 
         /// <summary>A tab that is not the tile list: a scrolling page.</summary>
@@ -84,14 +59,39 @@ namespace OmsiMapEditor.UI
             return page;
         }
 
-        /// <summary>The map tab: the button for its settings and what its author wrote about it.</summary>
+        /// <summary>The map popup: the project's and the map's name, its counts and warnings, the buttons for its settings and what its author wrote about it.</summary>
         private VisualElement MapTab()
         {
             var content = new VisualElement();
+            if (!string.IsNullOrWhiteSpace(currentProjectName))
+            {
+                var projectLabel = new Label(Loc.T("project.name", ("name", currentProjectName)));
+                projectLabel.AddToClassList("browser-project-name");
+                content.Add(projectLabel);
+            }
+            var mapName = new Label(string.IsNullOrEmpty(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName);
+            mapName.AddToClassList("browser-map-name");
+            content.Add(mapName);
+            browserCountsLabel = new Label();
+            browserCountsLabel.AddToClassList("browser-map-counts");
+            content.Add(browserCountsLabel);
+            UpdateCounts();
+            var warnings = currentSummary.Warnings;
+            if (warnings.Count > 0)
+            {
+                var warningLabel = new Label(Loc.T("project.warnings", ("count", warnings.Count), ("first", warnings[0]), ("more", warnings.Count > 1 ? "yes" : "no")))
+                {
+                    tooltip = string.Join("\n", warnings.GetRange(0, Math.Min(warnings.Count, 40)))
+                };
+                warningLabel.AddToClassList("browser-map-warnings");
+                content.Add(warningLabel);
+            }
             if (session != null && session.CanEdit)
+            {
                 content.Add(MapSettingsButton());
                 content.Add(ParkListButton());
                 content.Add(TrafficCurvesButton());
+            }
             if (!string.IsNullOrWhiteSpace(currentSummary.Description))
             {
                 var heading = new Label(Loc.T("project.about"));

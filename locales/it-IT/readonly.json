@@ -1,9 +1,9 @@
 {
   "readonly.reading": "La mappa è in fase di lettura per il controllo della mappa o per una data chrono; {action} di nuovo tra un attimo.",
   "@readonly.reading": "{action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.variant": "La variante chrono {title} è in fase di modifica; prende oggetti, i loro tipi ed etichette, le regole del traffico e il diritto di precedenza, i tipi di strade, le nuove strade e la cancellazione di splines e solo le linee che disattiva. Scegli la mappa di base nel browser del progetto su {action}.",
+  "readonly.variant": "La variante chrono {title} è in fase di modifica; prende oggetti, i loro tipi ed etichette, le regole del traffico e il diritto di precedenza, i tipi di strade, le nuove strade e la cancellazione di splines e solo le linee che disattiva. Scegli la mappa di base nell'elenco Chrono della barra inferiore su {action}.",
   "@readonly.variant": "{title} is the name of the variant, shown unchanged; {action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.chrono": "La mappa mostra {date} con le sue varianti chrono ed è di sola lettura. Scegli la mappa di base nel browser del progetto su {action}.",
+  "readonly.chrono": "La mappa mostra {date} con le sue varianti chrono ed è di sola lettura. Scegli la mappa di base nell'elenco Chrono della barra inferiore su {action}.",
   "@readonly.chrono": "{date} is a date like 2026-11-07, shown unchanged",
   "readonly.map": "La mappa è di sola lettura. Salva un progetto MapWorks (File > Salva progetto mappa con nome...) su {action}.",
   "readonly.action.load_heights": "caricare le altezze del terreno",

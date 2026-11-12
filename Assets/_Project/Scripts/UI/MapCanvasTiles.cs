@@ -21,8 +21,8 @@ namespace OmsiMapEditor.UI
         /// <summary>The plus of a free place beside a tile was clicked; the arguments are the new tile's grid numbers.</summary>
         public event Action<int, int> TileAddRequested;
 
-        /// <summary>Pluses show with editing allowed in the Drag tool, while nothing is placed or built.</summary>
-        private bool ShowsTileAdders => AllowEditing && tool == EditorTool.Drag && placementAsset == null && !roadMode && summary != null;
+        /// <summary>Pluses show with editing allowed in the Drag, Move and Rotate tools, while nothing is placed or built.</summary>
+        private bool ShowsTileAdders => AllowEditing && (tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate) && placementAsset == null && !roadMode && summary != null;
 
         /// <summary>The free places of the grid beside a tile, left, right, below or above it.</summary>
         private List<Vector2Int> FreeTilePlaces()

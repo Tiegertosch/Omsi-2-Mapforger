@@ -122,7 +122,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 - `Documentation/Architecture.md` – Module und Datenfluss im Detail
 - `Documentation/Internationalisierung.md` – Abschluss der Mehrsprachigkeit: Technik, Architektur, Ausnahmen, neue Sprache anlegen
-- `Documentation/Decisions.md` – ADR 001–068
+- `Documentation/Decisions.md` – ADR 001–098
 - `Documentation/DevelopmentSetup.md` – Werkzeuge, Kommandozeile, Validierungsstand
 - `Documentation/Roadmap.md` – erledigt `[x]` und offen
 - `Documentation/ProjectStatus.md` – laufender Stand, Releases, Zweige, offene Nutzertests
@@ -133,7 +133,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 ## Oberfläche
 
-Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015): Karte randlos, Panels schweben und sind einklappbar, Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Werkzeuge sind Modi (Q Drag = wählen und frei ziehen, W Move = Achsenpfeile inkl. Höhe, E Rotate = Griff/Ringe). Programm-Icon „MW“ aus dem Logo (`Assets/_Project/UI/Branding/Icon.png` und `Tools/Icon/MapWorks.ico`, beide von `Tools/Icon/MakeIcon.ps1`, ADR 056). Lucide-Icons als SVG-Pfade in `LucideIcons.cs`, gezeichnet von `IconElement` (neue Icons dort eintragen, Lizenz steht in THIRD_PARTY_NOTICES); Inter (OFL) ist freigegeben, sichtbarer Name ist „OMSI MapWorks“ (ADR 034), Startbild-Logo in `Assets/_Project/UI/Branding/Logo.png`. Etappen stehen in der Roadmap. Herkunft von Objekten (Basisspiel/DLC/User-Content) kommt aus Steams Manifesten (`OmsiContentOrigins`, ADR 016); Steam liegt hier unter `C:\Program Files (x86)\Steam`, keine DLCs installiert.
+Nach `Documentation/CorporateDesign.md` (vom Nutzer, ADR 015) und dem Community-Feedback (ADR 098): Karte randlos, unten eine Leiste mit Ansichten/Zoom, Kachelknopf, Projektname, Werkzeugleiste und runden Knöpfen für die Listen der Karte (Popups über der Leiste, `EditorShellBottomBar.cs`); der Inspector öffnet nur auf Abruf, ein Rechtsklick zeigt ein Kontextmenü zum Element (`EditorShellContextMenu.cs`). Farben nur über `--mf-*`-Tokens in `EditorShell.uss`. Orange = aktiv/Hauptaktion, Rot = Löschen/Fehler, Gelb = bearbeitet/Warnung. Untere Werkzeugleiste zeigt nur fertige Werkzeuge. Werkzeuge sind Modi (Q Drag = wählen und frei ziehen, W Move = Achsenpfeile inkl. Höhe, E Rotate = Griff/Ringe). Programm-Icon „MW“ aus dem Logo (`Assets/_Project/UI/Branding/Icon.png` und `Tools/Icon/MapWorks.ico`, beide von `Tools/Icon/MakeIcon.ps1`, ADR 056). Lucide-Icons als SVG-Pfade in `LucideIcons.cs`, gezeichnet von `IconElement` (neue Icons dort eintragen, Lizenz steht in THIRD_PARTY_NOTICES); Inter (OFL) ist freigegeben, sichtbarer Name ist „OMSI MapWorks“ (ADR 034), Startbild-Logo in `Assets/_Project/UI/Branding/Logo.png`. Etappen stehen in der Roadmap. Herkunft von Objekten (Basisspiel/DLC/User-Content) kommt aus Steams Manifesten (`OmsiContentOrigins`, ADR 016); Steam liegt hier unter `C:\Program Files (x86)\Steam`, keine DLCs installiert.
 
 ## Aktueller Stand
 

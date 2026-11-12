@@ -31,3 +31,6 @@ Thumbs.db
 *.tmp
 *.bak
 Tools/LocaleCheck/bin/
+
+# Reference screenshots and sketches for the UI rework (not part of the project)
+/UI Research/

@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "{stops, plural, one {# stop} other {# stops}} and {lines, plural, one {# line} other {# lines}} shown{missing, plural, =0 {} one {; # driven path is not on the map} other {; # driven paths are not on the map}}. Click a line in the project browser to highlight it.",
+  "routes.status.shown": "{stops, plural, one {# stop} other {# stops}} and {lines, plural, one {# line} other {# lines}} shown{missing, plural, =0 {} one {; # driven path is not on the map} other {; # driven paths are not on the map}}. Click a line in the Lines list of the bottom bar to highlight it.",
   "selection.status.object": "Selected object #{id} ({path}){mode, select, edit {} chrono { - chrono view, read-only} other { - read-only; save a project to edit}}",
   "@selection.status.object": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "selection.status.none_in_box": "There are no objects in the box.",

@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "{stops, plural, one {# Haltestelle} other {# Haltestellen}} und {lines, plural, one {# Linie} other {# Linien}} angezeigt{missing, plural, =0 {} one {; # gefahrener Pfad liegt nicht auf der Karte} other {; # gefahrene Pfade liegen nicht auf der Karte}}. Klicke im Projektbrowser eine Linie an, um sie hervorzuheben.",
+  "routes.status.shown": "{stops, plural, one {# Haltestelle} other {# Haltestellen}} und {lines, plural, one {# Linie} other {# Linien}} angezeigt{missing, plural, =0 {} one {; # gefahrener Pfad liegt nicht auf der Karte} other {; # gefahrene Pfade liegen nicht auf der Karte}}. Klicke in der Linienliste der unteren Leiste eine Linie an, um sie hervorzuheben.",
   "selection.status.object": "Objekt #{id} gewählt ({path}){mode, select, edit {} chrono { - Chrono-Ansicht, schreibgeschützt} other { - schreibgeschützt; speichere ein Projekt, um zu bearbeiten}}",
   "selection.status.none_in_box": "Im Rahmen sind keine Objekte.",
   "selection.status.tile": "Kachel {x}, {y} gewählt",

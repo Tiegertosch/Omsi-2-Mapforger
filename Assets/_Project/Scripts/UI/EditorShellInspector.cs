@@ -120,7 +120,7 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private VisualElement AddInspectorGroup(VisualElement parent, string id, string title, bool defaultOpen, Action<VisualElement> fill)
         {
-            var root = new VisualElement();
+            var root = new VisualElement { name = "group-" + id };
             root.AddToClassList("inspector-group");
             var header = new VisualElement();
             header.AddToClassList("inspector-group-header");

@@ -1,9 +1,9 @@
 {
   "readonly.reading": "Mapa se čte pro kontrolu mapy nebo datum chrono; Za chvíli zase {action}.",
   "@readonly.reading": "{action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.variant": "Varianta chrono {title} se upravuje; bere pouze objekty, jejich typy a štítky, pravidla provozu a přednost v jízdě, typy silnic, nové silnice a smazání splines a čáry, které vypíná. Vyberte Základní mapu v prohlížeči projektu na {action}.",
+  "readonly.variant": "Varianta chrono {title} se upravuje; bere pouze objekty, jejich typy a štítky, pravidla provozu a přednost v jízdě, typy silnic, nové silnice a smazání splines a čáry, které vypíná. Vyberte Základní mapu v seznamu Chrono ve spodní liště na {action}.",
   "@readonly.variant": "{title} is the name of the variant, shown unchanged; {action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.chrono": "Mapa zobrazuje {date} s jeho variantami chrono a je pouze pro čtení. Vyberte Základní mapu v prohlížeči projektu na {action}.",
+  "readonly.chrono": "Mapa zobrazuje {date} s jeho variantami chrono a je pouze pro čtení. Vyberte Základní mapu v seznamu Chrono ve spodní liště na {action}.",
   "@readonly.chrono": "{date} is a date like 2026-11-07, shown unchanged",
   "readonly.map": "Mapa je pouze pro čtení. Uložte projekt MapWorks (Soubor > Uložit projekt mapy jako...) do {action}.",
   "readonly.action.load_heights": "výšky zatížení terénu",

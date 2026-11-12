@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "Se muestran {stops, plural, one {# parada} other {# paradas}} y {lines, plural, one {# linea} other {# lineas}}{missing, plural, =0 {} one {; # camino recorrido no está en el mapa} other {; # caminos conducidos no están en el mapa}}. Haga clic en una línea en el navegador de proyectos para resaltarla.",
+  "routes.status.shown": "Se muestran {stops, plural, one {# parada} other {# paradas}} y {lines, plural, one {# linea} other {# lineas}}{missing, plural, =0 {} one {; # camino recorrido no está en el mapa} other {; # caminos conducidos no están en el mapa}}. Haga clic en una línea en la lista de líneas de la barra inferior para resaltarla.",
   "selection.status.object": "Objeto seleccionado #{id} ({path}){mode, select, edit {} chrono { - Vista chrono, solo lectura} other { - sólo lectura; guardar un proyecto para editar}}",
   "@selection.status.object": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "selection.status.none_in_box": "No hay objetos en la caja.",

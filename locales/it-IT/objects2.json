@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "{stops, plural, one {# fermata} other {# fermate}} e {lines, plural, one {# riga} other {# righe}} mostrati{missing, plural, =0 {} one {; # percorso guidato non è sulla mappa} other {; # percorsi guidati non sono sulla mappa}}. Fare clic su una riga nel browser del progetto per evidenziarla.",
+  "routes.status.shown": "{stops, plural, one {# fermata} other {# fermate}} e {lines, plural, one {# riga} other {# righe}} mostrati{missing, plural, =0 {} one {; # percorso guidato non è sulla mappa} other {; # percorsi guidati non sono sulla mappa}}. Fare clic su una riga nell'elenco delle linee della barra inferiore per evidenziarla.",
   "selection.status.object": "Oggetto selezionato #{id} ({path}){mode, select, edit {} chrono { - Vista chrono, di sola lettura} other { - sola lettura; salvare un progetto da modificare}}",
   "@selection.status.object": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "selection.status.none_in_box": "Non ci sono oggetti nella scatola.",

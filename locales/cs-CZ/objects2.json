@@ -1,5 +1,5 @@
 {
-  "routes.status.shown": "{stops, plural, one {# zastávka} few {# zastávky} many {# zastávky} other {# zastávek}} a {lines, plural, one {# čára} few {# čáry} many {# čáry} other {# čar}} zobrazeny{missing, plural, one {; # ujetá cesta není na mapě} few {; # ujeté cesty nejsou na mapě} many {; # ujeté cesty nejsou na mapě} other {; # projetých cest není na mapě} =0 {}}. Klepnutím na řádek v prohlížeči projektu jej zvýrazněte.",
+  "routes.status.shown": "{stops, plural, one {# zastávka} few {# zastávky} many {# zastávky} other {# zastávek}} a {lines, plural, one {# čára} few {# čáry} many {# čáry} other {# čar}} zobrazeny{missing, plural, one {; # ujetá cesta není na mapě} few {; # ujeté cesty nejsou na mapě} many {; # ujeté cesty nejsou na mapě} other {; # projetých cest není na mapě} =0 {}}. Klepnutím na řádek v seznamu linek ve spodní liště jej zvýrazněte.",
   "selection.status.object": "Vybraný objekt #{id} ({path}){mode, select, edit {} chrono { - Zobrazení chrono, pouze pro čtení} other { - pouze pro čtení; uložit projekt k úpravě}}",
   "@selection.status.object": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "selection.status.none_in_box": "V krabici nejsou žádné předměty.",

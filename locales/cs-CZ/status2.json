@@ -132,6 +132,5 @@
   "status.mode.readonly": "pouze pro čtení",
   "tool.status.move": "Přesunout: přetažením šipky přesunete výběr na východ, sever nebo ve 3D nahoru; Shift se pohybuje v celých metrech.",
   "tool.status.rotate": "Otočit: přetažením kulaté rukojeti shora nebo prstence ve 3D otočíte vybraný objekt; Shift zaklapne do 15°.",
-  "tool.status.drag": "Přetažení: kliknutím na objekty je vyberte a přetažením je můžete volně pohybovat; Ctrl+kliknutí a Ctrl+tažení vyberte několik.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Otevřete} other {Sbalit}} {panel, select, inspector {inspektor} other {prohlížeč projektu}}"
+  "tool.status.drag": "Přetažení: kliknutím na objekty je vyberte a přetažením je můžete volně pohybovat; Ctrl+kliknutí a Ctrl+tažení vyberte několik."
 }

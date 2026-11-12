@@ -55,6 +55,20 @@ namespace OmsiMapEditor.UI
         public bool Snapped;
     }
 
+    /// <summary>
+    /// A right-click in the map (ADR 098): what lies under the pointer, the object first, else the spline, else the tile, with the
+    /// tile-local position and where on the screen the pointer was, in panel coordinates.
+    /// </summary>
+    internal sealed class MapContextHit
+    {
+        public OmsiTileSummary Tile;
+        public OmsiObjectRecord Object;
+        public OmsiSplineRecord Spline;
+        public double LocalX;
+        public double LocalY;
+        public Vector2 ScreenPosition;
+    }
+
     /// <summary>Where a placement snaps to: the object's origin in world metres, its heading and absolute height.</summary>
     internal sealed class PlacementSnap
     {
@@ -321,6 +335,11 @@ namespace OmsiMapEditor.UI
         private DragMode dragMode;
         private int dragPointerId = -1;
         private Vector2 dragStartPointer;
+
+        // A right button press that may end as a right-click: it opens the context menu if the pointer barely moves until release.
+        private bool rightClickCandidate;
+        private Vector2 rightDownPosition;
+        private const float RightClickSlack = 4f;
         private Vector2 dragLastPointer;
         private double dragStartLocalX;
         private double dragStartLocalY;
@@ -475,6 +494,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>A spline was clicked where no object is.</summary>
         public event Action<OmsiTileSummary, OmsiSplineRecord> SplineClicked;
+
+        /// <summary>The right button was pressed and released without dragging: the shell shows a context menu for what is there.</summary>
+        public event Action<MapContextHit> ContextRequested;
 
         /// <summary>While building roads: the pointer moved to a world position, east and north in metres.</summary>
         public event Action<double, double> RoadPointerMoved;
@@ -2658,7 +2680,10 @@ namespace OmsiMapEditor.UI
             {
                 // Right button turns the camera, the middle one moves it; the left one edits.
                 if (evt.button == 1 || evt.button == 2)
+                {
+                    NoteRightPress(evt.button, position);
                     BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                }
                 else if (evt.button == 0 && pickingPoint)
                 {
                     var ground = GroundPoint(OrbitCamera().RayThrough(position));
@@ -2678,6 +2703,7 @@ namespace OmsiMapEditor.UI
             }
             if (evt.button == 1 || evt.button == 2)
             {
+                NoteRightPress(evt.button, position);
                 BeginDrag(DragMode.Pan, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
@@ -3875,6 +3901,10 @@ namespace OmsiMapEditor.UI
                 : ThreeDimensional ? ObjectsInBox3D(dragStartPointer, dragLastPointer)
                 : ObjectsInBox(dragStartPointer, dragLastPointer);
             var member = finished == DragMode.MovePending ? clickedMember : null;
+            var position = (Vector2)evt.localPosition;
+            var rightClick = evt.button == 1 && rightClickCandidate && (finished == DragMode.Pan || finished == DragMode.Orbit) &&
+                             Vector2.Distance(position, rightDownPosition) <= RightClickSlack;
+            rightClickCandidate = false;
             EndDrag();
 
             if (edits != null)
@@ -3883,8 +3913,76 @@ namespace OmsiMapEditor.UI
                 ObjectsBoxSelected?.Invoke(boxed);
             if (member != null)
                 ObjectSelected?.Invoke(member.Tile, member.Record);
+            if (rightClick)
+                RequestContext(position);
             MarkDirtyRepaint();
             evt.StopPropagation();
+        }
+
+        /// <summary>Remembers a right button press as a possible right-click; tools that use the map's clicks (roads, placing, picking a point) get none.</summary>
+        private void NoteRightPress(int button, Vector2 position)
+        {
+            rightClickCandidate = button == 1 && !roadMode && placementAsset == null && !pickingPoint;
+            rightDownPosition = position;
+        }
+
+        /// <summary>Finds what lies under a right-click, from above or in 3D, and asks the shell for its context menu.</summary>
+        private void RequestContext(Vector2 position)
+        {
+            if (summary == null || !hasView)
+                return;
+            var hit = new MapContextHit { ScreenPosition = this.LocalToWorld(position) };
+            Vector2 map;
+            if (ThreeDimensional)
+            {
+                var camera = OrbitCamera();
+                var ground = GroundPoint(camera.RayThrough(position));
+                if (TryPick3D(camera, position, out var tile3D, out var item3D, out _))
+                {
+                    hit.Tile = tile3D;
+                    hit.Object = item3D;
+                }
+                if (!ground.HasValue)
+                {
+                    if (hit.Object == null)
+                        return;
+                    map = ToMap(hit.Tile, hit.Object.LocalX, hit.Object.LocalY);
+                }
+                else
+                    map = new Vector2(ground.Value.x, ground.Value.z);
+            }
+            else
+            {
+                map = ScreenToMap(position);
+                if (TryPickObject(position, out var tile, out var item))
+                {
+                    hit.Tile = tile;
+                    hit.Object = item;
+                }
+                else if (TryPickSpline(position, out var splineTile, out var spline))
+                {
+                    hit.Tile = splineTile;
+                    hit.Spline = spline;
+                }
+            }
+            if (hit.Tile == null)
+                hit.Tile = TileAt(map);
+            if (hit.Tile == null)
+                return;
+            var rect = TileRect(hit.Tile);
+            hit.LocalX = Math.Round(map.x - rect.xMin, 2);
+            hit.LocalY = Math.Round(map.y - rect.yMin, 2);
+            ContextRequested?.Invoke(hit);
+        }
+
+        /// <summary>Where an object stands on the screen in the view from above, in panel coordinates; false in 3D or before the first view.</summary>
+        public bool TryScreenPosition(OmsiTileSummary tile, OmsiObjectRecord item, out Vector2 screen)
+        {
+            screen = default;
+            if (summary == null || !hasView || ThreeDimensional || tile == null || item == null)
+                return false;
+            screen = this.LocalToWorld(MapToScreen(ToMap(tile, item.LocalX, item.LocalY)));
+            return true;
         }
 
         /// <summary>Objects whose position lies inside the box between two screen points.</summary>

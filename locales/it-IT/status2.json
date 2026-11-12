@@ -132,6 +132,5 @@
   "status.mode.readonly": "sola lettura",
   "tool.status.move": "Sposta: trascina una freccia per spostare la selezione verso est, nord o, in 3D, verso l'alto; Shift si muove in metri interi.",
   "tool.status.rotate": "Ruota: trascina la maniglia rotonda dall'alto o un anello in 3D per ruotare l'oggetto selezionato; Shift scatta a 15°.",
-  "tool.status.drag": "Trascina: clicca sugli oggetti per selezionarli e trascinali per spostarli liberamente; Ctrl+clic e Ctrl+trascina selezionane diversi.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Apri il} other {Comprimi il}} {panel, select, inspector {ispettore} other {browser del progetto}}"
+  "tool.status.drag": "Trascina: clicca sugli oggetti per selezionarli e trascinali per spostarli liberamente; Ctrl+clic e Ctrl+trascina selezionane diversi."
 }

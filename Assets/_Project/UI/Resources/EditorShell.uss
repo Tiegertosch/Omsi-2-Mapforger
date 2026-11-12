@@ -118,8 +118,12 @@
 
 /* Floating panels */
 .floating-panel { position: absolute; top: var(--mf-space-2); bottom: var(--mf-space-2); padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
-.project-frame { left: var(--mf-space-2); width: 270px; }
-.inspector-frame { right: var(--mf-space-2); width: 300px; }
+/* The inspector opens on demand (right-click, Properties...) and leaves room for the bottom bar. */
+.inspector-frame { right: var(--mf-space-2); bottom: 106px; width: 300px; }
+/* The popups of the bottom bar (tiles, map, entries, chrono, lines, paths) open above the bar, at its left or right end (ADR 098). */
+.bar-popup { top: auto; bottom: 106px; left: var(--mf-space-2); width: 320px; max-height: 70%; }
+.bar-popup-right { left: auto; right: var(--mf-space-2); }
+.bar-popup-tall { height: 480px; }
 .floating-panel-header { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
 .floating-panel-title { flex-grow: 1; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .floating-panel-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-accent); }
@@ -132,8 +136,45 @@
 .floating-panel-collapsed .floating-panel-title { margin-right: var(--mf-space-2); }
 .floating-panel-collapsed > .floating-panel-content { display: none; }
 
-/* View controls, top right of the map next to the inspector */
-.view-controls { position: absolute; top: var(--mf-space-2); right: 316px; flex-direction: row; align-items: center; padding: var(--mf-space-1); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
+/* The bottom bar (ADR 098): view and zoom at the left, the tile button and the project name, the tools in the middle, the map's
+   lists as round buttons at the right. The status bar runs below it. */
+.bottom-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 94px; flex-direction: row; align-items: stretch; background-color: rgba(23, 28, 35, 0.5); border-top-width: 1px; border-top-color: rgba(65, 75, 89, 0.6); }
+.bottom-bar-empty { height: 34px; }
+.bar-main { flex-grow: 1; flex-shrink: 1; min-width: 0; justify-content: flex-end; }
+.bar-row { flex-direction: row; align-items: center; height: 54px; flex-shrink: 0; padding: 0 var(--mf-space-3) 0 var(--mf-space-2); }
+.bar-group { flex-direction: row; align-items: center; flex-shrink: 0; }
+/* The tile button: the icon alone, with the number of tiles on it */
+.bar-tile-button { width: 42px; height: 42px; margin: 0 3px 0 0; padding: 8px; color: var(--mf-color-success); background-color: rgba(32, 38, 48, 0.62); border-width: 1px; border-color: rgba(65, 75, 89, 0.7); border-radius: 21px; }
+.bar-tile-button > .icon { flex-grow: 1; }
+.bar-tile-button:hover { background-color: var(--mf-color-panel-hover); border-color: var(--mf-color-border); }
+.bar-tile-button:disabled { color: var(--mf-color-text-muted); }
+.bar-tile-button.bar-button-active, .bar-tile-button.bar-button-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); }
+/* The round buttons at the right end, dark like the icons of the Cities: Skylines bar */
+.bar-round-button { width: 38px; height: 38px; margin: 0 4px; padding: 9px; color: var(--mf-color-text-primary); background-color: rgba(32, 38, 48, 0.62); border-width: 1px; border-color: rgba(65, 75, 89, 0.7); border-radius: 19px; }
+.bar-round-button > .icon { flex-grow: 1; }
+.bar-round-button:hover { background-color: var(--mf-color-panel-hover); border-color: var(--mf-color-border); }
+.bar-round-button:disabled { color: var(--mf-color-text-muted); }
+.bar-round-button.bar-button-active, .bar-round-button.bar-button-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); }
+.bar-badge { position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); -unity-text-align: middle-center; color: var(--mf-color-bg); background-color: var(--mf-color-success); border-radius: 9px; }
+/* The project name: a wide dark pill with the name in the middle */
+.bar-pill { flex-basis: 240px; flex-grow: 0; height: 30px; margin: 0 var(--mf-space-3) 0 var(--mf-space-1); flex-shrink: 1000; min-width: 70px; flex-direction: row; align-items: center; justify-content: center; color: var(--mf-color-text-primary); background-color: rgba(20, 25, 32, 0.7); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: 15px; overflow: hidden; }
+.bar-pill:hover { background-color: var(--mf-color-panel-raised); border-color: var(--mf-color-border); }
+.bar-pill > Label { margin: 0; padding: 0 12px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -unity-text-align: middle-center; -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.bar-pill.bar-button-active, .bar-pill.bar-button-active:hover { color: var(--mf-color-accent); border-color: var(--mf-color-accent); }
+
+/* Compact bar for windows narrower than 1400 px */
+.bar-compact .bar-pill { flex-basis: 110px; min-width: 60px; margin-right: var(--mf-space-1); }
+.bar-compact .bar-round-button { width: 32px; height: 32px; margin: 0 3px; padding: 7px; border-radius: 16px; }
+.bar-compact .view-controls { width: 180px; padding: 4px 6px; }
+.bar-compact .view-controls-row > .view-control-button { padding-left: 4px; padding-right: 4px; }
+.bar-compact .bar-row { padding-right: var(--mf-space-1); }
+.bar-compact .tool-button { flex-basis: 32px; min-width: 26px; height: 32px; margin: 0 2px; border-radius: 16px; }
+.bar-compact .tool-icon { width: 18px; height: 18px; }
+
+/* View controls: three short rows at the left end of the bottom bar */
+.view-controls { flex-direction: column; justify-content: center; align-items: stretch; flex-shrink: 0; width: 192px; margin: 0; padding: 4px 8px; background-color: rgba(32, 38, 48, 0.62); border-right-width: 1px; border-right-color: rgba(65, 75, 89, 0.6); border-top-right-radius: var(--mf-radius-lg); }
+.view-controls-row { flex-direction: row; align-items: center; }
+.view-controls-row > .view-control-button { flex-grow: 1; height: 24px; margin: 1px; font-size: 11px; justify-content: center; }
 .view-control-button { height: 28px; margin: 0 2px; padding-left: var(--mf-space-2); padding-right: var(--mf-space-2); color: var(--mf-color-text-primary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .view-control-button:hover { background-color: var(--mf-color-panel-hover); }
 .view-control-button:disabled { color: var(--mf-color-text-muted); }
@@ -141,27 +182,38 @@
 .view-control-button > .icon { width: 16px; height: 16px; margin-right: 6px; }
 .view-control-button > Label { margin: 0; padding: 0; }
 .view-control-icon-only { width: 30px; padding-left: 0; padding-right: 0; justify-content: center; }
+.view-controls-row > .view-control-icon-only { flex-grow: 0; width: 26px; }
 .view-control-icon-only > .icon { margin-right: 0; }
 .view-control-active, .view-control-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
 .view-control-active:disabled { color: var(--mf-color-bg); background-color: var(--mf-color-accent); opacity: 0.5; }
 .view-control-separator { width: 1px; height: 18px; margin: 0 var(--mf-space-1); background-color: var(--mf-color-border); }
 .zoom-label { min-width: 52px; -unity-text-align: middle-center; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 
-/* Tool bar at the bottom of the map */
-.tool-bar-host { position: absolute; left: 0; right: 0; bottom: var(--mf-space-3); flex-direction: row; justify-content: center; }
-.tool-bar { flex-direction: row; align-items: stretch; padding: 6px; background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
-.tool-group { flex-direction: row; }
-.tool-separator { width: 1px; margin: 6px var(--mf-space-2); background-color: var(--mf-color-border); }
-.tool-button { width: 66px; height: 70px; margin: 0 2px; padding: 6px 2px 4px; flex-direction: column; align-items: center; justify-content: space-between; color: var(--mf-color-text-primary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-md); }
-.tool-button:hover { background-color: var(--mf-color-panel-hover); }
+/* Tool bar in the middle of the bottom bar: the icons alone, as in the sketch; name and key stand in the tooltip */
+.tool-bar-host { flex-grow: 1; flex-shrink: 1; min-width: 0; flex-direction: row; justify-content: center; overflow: hidden; }
+.tool-bar { flex-direction: row; align-items: stretch; flex-shrink: 1; min-width: 0; padding: 0 4px; }
+.tool-group { flex-direction: row; flex-shrink: 1; min-width: 0; }
+.tool-separator { width: 1px; flex-shrink: 0; margin: 12px 8px; background-color: rgba(65, 75, 89, 0.8); }
+/* In a narrow window the buttons give up width down to 34 px before the bar clips. */
+.tool-button { flex-basis: 40px; flex-shrink: 1; min-width: 28px; height: 40px; margin: 0 4px; padding: 0; flex-direction: column; align-items: center; justify-content: center; color: var(--mf-color-text-primary); background-color: rgba(32, 38, 48, 0.62); border-width: 1px; border-color: rgba(65, 75, 89, 0.7); border-radius: 20px; }
+.tool-button:hover { background-color: var(--mf-color-panel-hover); border-color: var(--mf-color-border); }
 .tool-button:disabled { color: var(--mf-color-text-muted); }
-.tool-button-active, .tool-button-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
+.tool-button-active, .tool-button-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); }
 .tool-icon { width: 22px; height: 22px; flex-shrink: 0; }
-.tool-label { font-size: var(--mf-font-secondary); margin: 0; padding: 0; }
-.tool-keycap { min-width: 18px; margin: 0; padding: 0 4px; font-size: 10px; -unity-text-align: middle-center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-sm); }
-.tool-button-active .tool-keycap { color: var(--mf-color-bg); background-color: rgba(23, 28, 35, 0.18); }
+.tool-label { display: none; }
+.tool-keycap { display: none; }
 
-/* Tool panels open above the tool bar */
+/* Context menu on a right-click in the map (ADR 098): an overlay catches the click outside, the menu stands at the pointer */
+.context-menu-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.context-menu { position: absolute; min-width: 220px; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); }
+.context-menu-header { margin: 2px 10px 6px; font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-menu-item { flex-direction: row; align-items: center; padding-right: 10px; }
+.context-menu-item > Label { margin: 0; padding: 0; }
+.context-menu-text { flex-grow: 1; -unity-text-align: middle-left; }
+.context-menu-key { margin-left: var(--mf-space-3); font-size: 10px; color: var(--mf-color-text-muted); }
+.context-menu-danger { color: var(--mf-color-error); }
+
+/* Tool panels open above the bottom bar */
 .tool-panel-host { position: absolute; left: 0; right: 0; bottom: 104px; flex-direction: row; justify-content: center; }
 .tool-panel { width: 420px; height: 470px; padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .tool-panel-header { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-3); }
@@ -335,7 +387,7 @@
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
 .panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }
 
-/* Project browser */
+/* Project popups (the former project browser) */
 .panel-heading { margin-bottom: var(--mf-space-3); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .browser-project-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-secondary); color: var(--mf-color-info); white-space: normal; }
 .browser-map-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); white-space: normal; }
@@ -446,12 +498,14 @@
 .dialog-primary:hover { background-color: var(--mf-color-accent-hover); }
 
 /* Status bar */
-.status-bar { height: 24px; min-height: 24px; flex-shrink: 0; flex-direction: row; align-items: center; padding-left: var(--mf-space-3); padding-right: var(--mf-space-3); background-color: var(--mf-color-panel); border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
+/* The status line is a dark strip in the lower row of the bottom bar */
+.status-bar { height: 28px; min-height: 28px; flex-shrink: 0; flex-direction: row; align-items: center; justify-content: center; margin: 0 var(--mf-space-3) 6px var(--mf-space-3); padding-left: var(--mf-space-3); padding-right: var(--mf-space-3); background-color: rgba(41, 49, 61, 0.7); border-width: 1px; border-color: rgba(65, 75, 89, 0.7); border-radius: 14px; color: var(--mf-color-text-secondary); font-size: 12px; }
+.bottom-bar-empty .status-bar { margin-bottom: 3px; height: 26px; }
 .status-bar > Label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status-pointer { width: 360px; flex-shrink: 0; }
-.status-selection { width: 130px; flex-shrink: 0; color: var(--mf-color-accent); }
-.status-message { flex-grow: 1; flex-shrink: 1; color: var(--mf-color-text-primary); }
-.status-map-state { flex-shrink: 0; margin-left: var(--mf-space-3); }
+.status-pointer { display: none; }
+.status-selection { flex-shrink: 0; margin-right: var(--mf-space-3); color: var(--mf-color-accent); }
+.status-message { flex-grow: 1; flex-shrink: 1; -unity-text-align: middle-center; color: var(--mf-color-text-primary); }
+.status-map-state { display: none; }
 
 /* New map dialog (ADR 032) */
 .new-map-dialog { width: 880px; max-height: 94%; }
@@ -511,7 +565,7 @@
 .update-hint { margin: 4px 8px; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
 .update-toggle { margin: 8px 8px 0; color: var(--mf-color-text-secondary); }
 .update-skip { margin-right: auto; }
-.satellite-frame { left: 290px; bottom: auto; width: 480px; max-height: 98%; }
+.satellite-frame { left: var(--mf-space-2); bottom: auto; width: 480px; max-height: 86%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }
 .satellite-columns { flex-direction: row; }
 .satellite-tab { margin: 0 var(--mf-space-2); }
@@ -546,7 +600,7 @@
 .satellite-foldout .unity-foldout__checkmark { -unity-background-image-tint-color: var(--mf-color-text-secondary); }
 .satellite-foldout > .unity-foldout__content { margin-left: 0; }
 .satellite-result-chosen, .satellite-result-chosen:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
-.imagery-attribution { position: absolute; right: 310px; bottom: var(--mf-space-1); padding: 2px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
+.imagery-attribution { position: absolute; right: var(--mf-space-2); bottom: 104px; padding: 2px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 
 /* Road builder (ADR 049): a cross-section of lanes above the lane settings, in place of the road picker */
 .road-picker-new { flex-direction: row; align-items: center; flex-shrink: 0; margin: 0 0 0 var(--mf-space-2); }

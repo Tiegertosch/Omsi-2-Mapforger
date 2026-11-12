@@ -132,6 +132,5 @@
   "status.mode.readonly": "read-only",
   "tool.status.move": "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres.",
   "tool.status.rotate": "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°.",
-  "tool.status.drag": "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.",
-  "panel.collapse.tooltip": "{collapsed, select, yes {Open the} other {Collapse the}} {panel, select, inspector {inspector} other {project browser}}"
+  "tool.status.drag": "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several."
 }

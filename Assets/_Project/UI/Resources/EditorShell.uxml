@@ -15,36 +15,55 @@
         <ui:VisualElement name="workspace" class="workspace">
             <ui:VisualElement name="map-view" class="map-view" />
             <ui:VisualElement name="empty-state" class="empty-state" />
-            <ui:VisualElement name="project-frame" class="floating-panel project-frame">
-                <ui:VisualElement class="floating-panel-header">
-                    <ui:Label name="project-title" text="Project" class="floating-panel-title" />
-                    <ui:Button name="project-collapse-button" class="panel-collapse-button" tooltip="Collapse the project browser" />
-                </ui:VisualElement>
-                <ui:VisualElement name="project-panel" class="floating-panel-content">
-                    <ui:Label name="project-empty" text="No map loaded" class="muted" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:VisualElement name="inspector-frame" class="floating-panel inspector-frame">
+            <ui:VisualElement name="inspector-frame" class="floating-panel inspector-frame" style="display: none;">
                 <ui:VisualElement class="floating-panel-header">
                     <ui:Label name="inspector-title" text="Inspector" class="floating-panel-title" />
-                    <ui:Button name="inspector-collapse-button" class="panel-collapse-button" tooltip="Collapse the inspector" />
+                    <ui:Button name="inspector-collapse-button" class="panel-collapse-button" tooltip="Close the inspector" />
                 </ui:VisualElement>
                 <ui:VisualElement name="inspector-panel" class="floating-panel-content">
                     <ui:Label name="inspector-empty" text="Select an item to inspect its properties." class="muted" />
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement name="tool-panel-host" class="tool-panel-host" picking-mode="Ignore" style="display: none;" />
-            <ui:VisualElement name="tool-bar-host" class="tool-bar-host" picking-mode="Ignore" style="display: none;" />
-            <ui:VisualElement name="map-controls" class="view-controls" style="display: none;">
-                <ui:Button name="fit-map-button" class="view-control-button view-control-icon-only" tooltip="Fit map: show the whole map" />
-                <ui:Button name="zoom-out-button" class="view-control-button view-control-icon-only" tooltip="Zoom out (mouse wheel)" />
-                <ui:Label name="zoom-label" text="Fit" class="zoom-label" />
-                <ui:Button name="zoom-in-button" class="view-control-button view-control-icon-only" tooltip="Zoom in (mouse wheel)" />
-                <ui:Button name="center-selection-button" class="view-control-button view-control-icon-only" tooltip="Center selection: move the view to the selected object or tile" />
-                <ui:VisualElement class="view-control-separator" />
-                <ui:Button name="ground-toggle-button" text="Textures" class="view-control-button view-control-active" tooltip="Show the ground and objects textured, or plain tiles with outlines. The 3D view always shows textures." />
-                <ui:Button name="view3d-button" text="3D" class="view-control-button" tooltip="Look at and edit the map in 3D: right drag turns, middle drag moves, the wheel zooms." />
-                <ui:Button name="routes-toggle-button" text="Routes" class="view-control-button" tooltip="Show the bus stops and the routes of the timetable lines in the view from above. Lines are listed in the project browser." />
+            <ui:VisualElement name="bar-popup" class="floating-panel bar-popup" style="display: none;">
+                <ui:VisualElement class="floating-panel-header">
+                    <ui:Label name="project-title" text="Project" class="floating-panel-title" />
+                    <ui:Button name="project-collapse-button" class="panel-collapse-button" tooltip="Close" />
+                </ui:VisualElement>
+                <ui:VisualElement name="project-panel" class="floating-panel-content">
+                    <ui:Label name="project-empty" text="No map loaded" class="muted" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="bottom-bar" class="bottom-bar bottom-bar-empty">
+                <ui:VisualElement name="map-controls" class="view-controls" style="display: none;">
+                    <ui:VisualElement class="view-controls-row">
+                        <ui:Button name="routes-toggle-button" text="Routes" class="view-control-button" tooltip="Show the bus stops and the routes of the timetable lines in the view from above. Lines are listed in the project browser." />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="view-controls-row">
+                        <ui:Button name="ground-toggle-button" text="Textures" class="view-control-button view-control-active" tooltip="Show the ground and objects textured, or plain tiles with outlines. The 3D view always shows textures." />
+                        <ui:Button name="view3d-button" text="3D" class="view-control-button" tooltip="Look at and edit the map in 3D: right drag turns, middle drag moves, the wheel zooms." />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="view-controls-row">
+                        <ui:Button name="fit-map-button" class="view-control-button view-control-icon-only" tooltip="Fit map: show the whole map" />
+                        <ui:Button name="zoom-out-button" class="view-control-button view-control-icon-only" tooltip="Zoom out (mouse wheel)" />
+                        <ui:Label name="zoom-label" text="Fit" class="zoom-label" />
+                        <ui:Button name="zoom-in-button" class="view-control-button view-control-icon-only" tooltip="Zoom in (mouse wheel)" />
+                        <ui:Button name="center-selection-button" class="view-control-button view-control-icon-only" tooltip="Center selection: move the view to the selected object or tile" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="bar-main">
+                    <ui:VisualElement name="bar-row" class="bar-row" style="display: none;">
+                        <ui:VisualElement name="bar-left" class="bar-group" />
+                        <ui:VisualElement name="tool-bar-host" class="tool-bar-host" />
+                        <ui:VisualElement name="bar-right" class="bar-group" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="status-bar">
+                        <ui:Label name="pointer-info" class="status-pointer" />
+                        <ui:Label name="selection-info" class="status-selection" />
+                        <ui:Label name="status-message" text="Ready" class="status-message" />
+                        <ui:Label name="map-state" text="No map loaded" class="status-map-state" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="file-menu" class="menu-popup file-menu">
@@ -70,7 +89,6 @@
             <ui:Button name="redo-menu-item" text="Redo    Ctrl+Y" class="menu-popup-item" />
         </ui:VisualElement>
         <ui:VisualElement name="view-menu" class="menu-popup view-menu">
-            <ui:Button name="project-panel-menu-item" text="Project browser" class="menu-popup-item" />
             <ui:Button name="inspector-menu-item" text="Inspector" class="menu-popup-item" />
             <ui:Button name="satellite-menu-item" text="Satellite and terrain..." class="menu-popup-item" tooltip="Place the map on the Earth and load pictures from the air and terrain heights for its tiles, without any key, as openMapper does." />
             <ui:Label class="menu-divider" />
@@ -141,11 +159,5 @@
         <ui:VisualElement name="new-map-dialog" class="dialog-overlay" style="display: none;" />
         <ui:VisualElement name="bug-report-dialog" class="dialog-overlay" style="display: none;" />
         <ui:VisualElement name="update-dialog" class="dialog-overlay" style="display: none;" />
-        <ui:VisualElement class="status-bar">
-            <ui:Label name="pointer-info" class="status-pointer" />
-            <ui:Label name="selection-info" class="status-selection" />
-            <ui:Label name="status-message" text="Ready" class="status-message" />
-            <ui:Label name="map-state" text="No map loaded" class="status-map-state" />
-        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>
