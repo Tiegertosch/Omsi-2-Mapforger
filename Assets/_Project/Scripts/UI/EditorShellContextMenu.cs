@@ -20,6 +20,9 @@ namespace OmsiMapEditor.UI
 
         private bool ContextMenuOpen => contextMenuOverlay != null;
 
+        /// <summary>Whether the inspector has the group of paths that "AI paths and rules..." opens: only once the paths are read.</summary>
+        private bool PathsGroupShown => pathsShown && mapPaths != null;
+
         /// <summary>Shows or hides the inspector; it is drawn for the selection either way.</summary>
         private void ShowInspector(bool show)
         {
@@ -179,7 +182,7 @@ namespace OmsiMapEditor.UI
                 AddContextItem(menu, "context.change_type", () => PickElementType(holdingTile, item));
                 AddContextItem(menu, "context.labels", () => OpenInspector(InspectorTab.Selection, "object-type"));
             }
-            if (pathsShown)
+            if (PathsGroupShown)
                 AddContextItem(menu, "context.paths", () => OpenInspector(InspectorTab.Selection, "paths"));
             if (!CanEditObjects)
             {
@@ -204,7 +207,7 @@ namespace OmsiMapEditor.UI
             AddContextItem(menu, "context.properties", () => OpenInspector(InspectorTab.Selection));
             if (CanEdit)
                 AddContextItem(menu, "context.spline_heights", () => OpenInspector(InspectorTab.Selection, "spline-heights"));
-            if (pathsShown)
+            if (PathsGroupShown)
                 AddContextItem(menu, "context.paths", () => OpenInspector(InspectorTab.Selection, "paths"));
             if (CanEdit)
             {
@@ -232,7 +235,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             if (clipboard != null && clipboard.Items.Count > 0)
-                AddContextItem(menu, "context.paste", () => PlaceClipboardAt(new MapPlacement { Tile = tile, LocalX = hit.LocalX, LocalY = hit.LocalY }), "Ctrl+V");
+                AddContextItem(menu, "context.paste", () => PasteHere(new MapPlacement { Tile = tile, LocalX = hit.LocalX, LocalY = hit.LocalY }), "Ctrl+V");
             if (CanEdit && IsTileEdited(tile) && !session.IsTileAdded(tile.FileName))
             {
                 AddContextDivider(menu);

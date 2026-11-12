@@ -49,12 +49,18 @@ namespace OmsiMapEditor.UI
         /// <summary>New random turns for the group held at the pointer (or none when the option is off).</summary>
         private void RollPasteOffsets()
         {
-            pasteHeadingOffsets = null;
-            if (clipboard == null || !RandomHeadingOn)
-                return;
-            pasteHeadingOffsets = new List<double>(clipboard.Items.Count);
-            for (var index = 0; index < clipboard.Items.Count; index++)
-                pasteHeadingOffsets.Add(RollHeading());
+            pasteHeadingOffsets = clipboard == null ? null : PasteTurns(clipboard.Items.Count, RandomHeadingOn, RollHeading);
+        }
+
+        /// <summary>One turn from <paramref name="roll"/> for each of <paramref name="count"/> copies, or null when random headings are off.</summary>
+        internal static List<double> PasteTurns(int count, bool randomHeading, Func<double> roll)
+        {
+            if (!randomHeading)
+                return null;
+            var turns = new List<double>(count);
+            for (var index = 0; index < count; index++)
+                turns.Add(roll());
+            return turns;
         }
 
         /// <summary>Rolls new turns after a paste that keeps the group in hand, and shows them at the pointer.</summary>

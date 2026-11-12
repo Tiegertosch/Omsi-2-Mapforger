@@ -1,6 +1,6 @@
 # UI-Rework: Meilensteine bis zum Abschluss (12. November 2026)
 
-Vorschlag auf Grundlage von [ui-rework-audit.md](ui-rework-audit.md), [ui-rework-architecture-review.md](ui-rework-architecture-review.md) und [ui-rework-feature-matrix.md](ui-rework-feature-matrix.md). Er ergänzt den Abschnitt „Aufgeräumte Oberfläche“ in [Roadmap.md](Roadmap.md) und ersetzt ihn nicht; Häkchen werden weiter dort gesetzt. Nichts hiervon ist begonnen.
+Vorschlag auf Grundlage von [ui-rework-audit.md](ui-rework-audit.md), [ui-rework-architecture-review.md](ui-rework-architecture-review.md) und [ui-rework-feature-matrix.md](ui-rework-feature-matrix.md). Er ergänzt den Abschnitt „Aufgeräumte Oberfläche“ in [Roadmap.md](Roadmap.md) und ersetzt ihn nicht; Häkchen werden weiter dort gesetzt. M0 und M1 sind abgeschlossen (siehe Übersicht).
 
 **Prioritäten:** P0 Abstürze, Datenverlust, nicht erreichbare Kernfunktionen · P1 Architektur, unvollständige Migration, zentrale Bedienprobleme · P2 Konsistenz, Komfort, Wiederverwendung · P3 Feinheiten.
 **Komplexität:** S bis ein Tag · M wenige Tage · L eine bis zwei Wochen · XL länger. Schätzung ohne Gewähr; sie misst Arbeit der Agenten plus einen Nutzertest je Meilenstein.
@@ -22,8 +22,8 @@ Offen bleibt aus der Liste nur das Modus-Abzeichen an der Projektpille (Teil von
 
 | Nr. | Meilenstein | Priorität | Komplexität | Hängt ab von | Führend |
 |---|---|---|---|---|---|
-| M0 | Arbeitsstand sichern | P0 | S | – | testing |
-| M1 | Fehler der neuen Einstiege beheben | P0 | M | M0 | backend |
+| M0 | Arbeitsstand sichern (**erledigt**, 12. November 2026) | P0 | S | – | testing |
+| M1 | Fehler der neuen Einstiege beheben (**erledigt**, 12. November 2026) | P0 | M | M0 | backend |
 | M2 | Statuszeile und Modusanzeige | P1 | M | M1 | frontend |
 | M3 | Modus- und Überlagerungsgerüst, erste Shell-Tests | P1 | L | M1 | backend |
 | M4 | Werkzeug-Fenster fertig migrieren | P1 | L | M2 | frontend |

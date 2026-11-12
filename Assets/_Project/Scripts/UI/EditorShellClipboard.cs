@@ -82,6 +82,14 @@ namespace OmsiMapEditor.UI
                 return false;
             }
             clipboard = data;
+            // Turns rolled before belong to the old copies. Copies still held at the pointer (Shift+click) become the new ones.
+            if (clipboardPlacing && mapCanvas != null)
+            {
+                placementAsset = clipboard.Items[0].AssetPath;
+                RestartPasteGroup(mapCanvas.PlacementHeading);
+            }
+            else
+                pasteHeadingOffsets = null;
             SetStatusT("copy.done", ("count", data.Items.Count), ("attached", data.AttachedCount), ("left", data.GeneratedLeftOut));
             return true;
         }
@@ -101,9 +109,7 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.place_objects"));
                 return;
             }
-            if (placementAsset != null)
-                StopPlacement();
-            RollPasteOffsets();
+            PreparePaste();
             placementAsset = clipboard.Items[0].AssetPath;
             clipboardPlacing = true;
             StartPasteGroup(0.0);
@@ -151,8 +157,49 @@ namespace OmsiMapEditor.UI
             objectRenderer.SetGroupPreview(objects);
         }
 
+        /// <summary>
+        /// Gets the clipboard ready to be put down, the same way for Ctrl+V, "Paste here" and the command line: an object being placed is let
+        /// go, and every copy gets a random turn of its own when the option is on (none otherwise).
+        /// </summary>
+        private void PreparePaste()
+        {
+            if (placementAsset != null)
+                StopPlacement();
+            RollPasteOffsets();
+        }
+
+        /// <summary>
+        /// "Paste here" in the context menu: the middle of the clipboard goes to the point clicked, prepared as Ctrl+V prepares it and not
+        /// turned. Copies already held at the pointer keep their turns.
+        /// </summary>
+        private void PasteHere(MapPlacement placement)
+        {
+            if (clipboard == null || clipboard.Items.Count == 0)
+            {
+                SetStatusT("paste.copy_first");
+                return;
+            }
+            if (!CanEditObjects)
+            {
+                SetStatus(ReadOnlyMessage("readonly.action.place_objects"));
+                return;
+            }
+            if (clipboardPlacing && mapCanvas != null)
+            {
+                PlaceClipboardAt(placement, mapCanvas.PlacementHeading);
+                return;
+            }
+            PreparePaste();
+            PlaceClipboardAt(placement, 0.0);
+        }
+
         /// <summary>A click while the copies are held: the middle of the group goes where the pointer is.</summary>
         private void PlaceClipboardAt(MapPlacement placement)
+        {
+            PlaceClipboardAt(placement, mapCanvas.PlacementHeading);
+        }
+
+        private void PlaceClipboardAt(MapPlacement placement, double turn)
         {
             if (clipboard == null || !CanEditObjects)
             {
@@ -165,9 +212,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var size = currentSummary.TileSizeMeters;
-            var turn = mapCanvas.PlacementHeading;
-            var targets = clipboard.PlaceAt(placement.Tile.X * size + placement.LocalX, placement.Tile.Y * size + placement.LocalY, turn, pasteHeadingOffsets);
-            if (!RunPaste(targets))
+            if (!RunPaste(clipboard, placement.Tile.X * size + placement.LocalX, placement.Tile.Y * size + placement.LocalY, turn, pasteHeadingOffsets))
                 return;
             if (!placement.KeepPlacing)
                 StopPlacement();
@@ -196,16 +241,19 @@ namespace OmsiMapEditor.UI
                 SetStatusT("copy.only_generated");
                 return;
             }
-            RunPaste(data.PlaceAt(data.CentreX + DuplicateOffsetMeters, data.CentreY - DuplicateOffsetMeters, 0.0));
+            RunPaste(data, data.CentreX + DuplicateOffsetMeters, data.CentreY - DuplicateOffsetMeters, 0.0, null);
         }
 
-        /// <summary>Puts copies down as one undo step and selects them; false, with the reason shown, when nothing could be written.</summary>
-        private bool RunPaste(List<OmsiPasteTarget> targets)
+        /// <summary>
+        /// Puts copies down with the middle of the group at a world position, turned clockwise, as one undo step, and selects them; false,
+        /// with the reason shown, when nothing could be written (also when the turns do not fit the copies).
+        /// </summary>
+        private bool RunPaste(OmsiClipboardData data, double centreX, double centreY, double turn, IReadOnlyList<double> headingOffsets)
         {
             OmsiPasteResult result;
             try
             {
-                result = session.PasteObjects(currentSummary, targets, HasAbsoluteHeight, GroundAtWorld());
+                result = session.PasteObjects(currentSummary, data.PlaceAt(centreX, centreY, turn, headingOffsets), HasAbsoluteHeight, GroundAtWorld());
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {
@@ -257,8 +305,8 @@ namespace OmsiMapEditor.UI
                 else
                 {
                     var size = currentSummary.TileSizeMeters;
-                    RollPasteOffsets();
-                    RunPaste(clipboard.PlaceAt(tileX * size + x, tileY * size + y, degrees, pasteHeadingOffsets));
+                    PreparePaste();
+                    RunPaste(clipboard, tileX * size + x, tileY * size + y, degrees, pasteHeadingOffsets);
                     Debug.Log("Paste: " + statusLabel?.text);
                 }
             }

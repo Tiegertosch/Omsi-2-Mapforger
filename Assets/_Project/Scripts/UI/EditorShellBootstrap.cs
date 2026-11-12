@@ -1903,6 +1903,9 @@ namespace OmsiMapEditor.UI
         private void ShowMap(MapReading reading, string projectName, bool keepView)
         {
             var summary = reading.Summary;
+            // A terrain or paint stroke still held belongs to the session that is leaving: it is finished there, before the new one takes over.
+            if (session != null && currentSummary != null && activeTool == EditorTool.Terrain)
+                ReleaseTerrain();
             session = reading.Session;
             junctionTerrainState = null;
             baseSummary = summary;
@@ -1939,6 +1942,8 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void PresentSummary(OmsiMapSummary summary, bool keepView)
         {
+            // Picks waiting for a click and the context menu hold records of the summary shown, which is replaced now.
+            LeaveTransientModes();
             // Roads are drawn on the summary shown; another map or a chrono view ends the road tool and the spline selection.
             if (activeTool == EditorTool.Road)
             {
@@ -1967,6 +1972,22 @@ namespace OmsiMapEditor.UI
                 activeTool = EditorTool.Drag;
                 EndLaneTool();
             }
+            // Rows, terrain and line keep panels and previews of their own; a view where they cannot be used ends them too.
+            if (mapCanvas != null && activeTool != EditorTool.Drag && OnlySelectingWith(activeTool))
+            {
+                var leaving = activeTool;
+                activeTool = EditorTool.Drag;
+                if (leaving == EditorTool.Rows)
+                    EndRowTool();
+                else if (leaving == EditorTool.Terrain)
+                {
+                    // A stroke still held has saved the heights it showed with every tick: ending the tool finishes it on the summary
+                    // it was begun on, which is still the current one here, so that the files are whole and the step can be undone.
+                    EndTerrainTool();
+                }
+                else if (leaving == EditorTool.Line)
+                    EndLineTool();
+            }
             ClearSelectedSpline();
             var previousTile = selectedTile;
             var previousObjectId = selectedObject?.Id;
@@ -1989,8 +2010,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.AllowSplineEditing = CanEdit;
                 // A map without a project or a chrono view can only be looked at; selecting is the only tool then. A
                 // variant being edited keeps the object tools.
-                if (!CanEditObjects || !CanEdit && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate && activeTool != EditorTool.Priorities &&
-                    activeTool != EditorTool.Road)
+                if (OnlySelectingWith(activeTool))
                     activeTool = EditorTool.Drag;
                 mapCanvas.Tool = activeTool;
                 mapCanvas.SetMap(summary, keepView);
@@ -2004,6 +2024,15 @@ namespace OmsiMapEditor.UI
             }
             StartOutlineBuild(summary);
             UpdateToolbar();
+        }
+
+        /// <summary>
+        /// Whether the view shown leaves only selecting with this tool: a map without a project or a chrono view; a variant being edited
+        /// keeps the object tools.
+        /// </summary>
+        private bool OnlySelectingWith(EditorTool tool)
+        {
+            return !CanEditObjects || !CanEdit && tool != EditorTool.Move && tool != EditorTool.Rotate && tool != EditorTool.Priorities && tool != EditorTool.Road;
         }
 
         private static List<OmsiChronoVariant> ReadChronoVariants(IOmsiFileSource source)
@@ -4726,6 +4755,8 @@ namespace OmsiMapEditor.UI
         /// <summary>Makes the last selected object the primary one, highlights the tile and refreshes the views.</summary>
         private void ApplySelection(OmsiTileSummary tile)
         {
+            // A menu open for the selection before would act on it. A right-click selects before its menu opens, so its own menu stays.
+            CloseContextMenu();
             var previousTile = selectedTile;
             selectedTile = tile;
             selectedObject = selection.Count > 0 ? selection[selection.Count - 1].Record : null;
@@ -6016,6 +6047,34 @@ namespace OmsiMapEditor.UI
             return false;
         }
 
+        /// <summary>
+        /// Whether a dialog that takes the keys is open: every dialog but the window for pictures from the air, which floats beside the map
+        /// while it is edited.
+        /// </summary>
+        private bool AnyModalDialogShown()
+        {
+            foreach (var dialog in Dialogs())
+                if (!ReferenceEquals(dialog, satelliteWindow) && IsShown(dialog))
+                    return true;
+            return false;
+        }
+
+        /// <summary>Whether the element is, or lies in, a field that takes typed text or numbers, where keys are typing.</summary>
+        internal static bool InTextInput(VisualElement element)
+        {
+            for (var current = element; current != null; current = current.parent)
+                if (current is TextField || current is IntegerField || current is FloatField || current.ClassListContains(TextInputBaseField<string>.ussClassName))
+                    return true;
+            return false;
+        }
+
+        /// <summary>Keys that leave an open context menu open: none (the character half of a key), arrows, Enter and the modifier keys alone.</summary>
+        internal static bool KeepsContextMenu(KeyCode key)
+        {
+            return key == KeyCode.None || key == KeyCode.UpArrow || key == KeyCode.DownArrow || key == KeyCode.LeftArrow || key == KeyCode.RightArrow ||
+                   key == KeyCode.Return || key == KeyCode.KeypadEnter || key >= KeyCode.RightShift && key <= KeyCode.AltGr;
+        }
+
         private void OnShortcut(KeyDownEvent evt)
         {
             if (evt.keyCode == KeyCode.Escape && ContextMenuOpen)
@@ -6024,6 +6083,9 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
+            // Any other key closes the menu first, as its entries were made for the state before, and then does what it always does.
+            if (ContextMenuOpen && !KeepsContextMenu(evt.keyCode))
+                CloseContextMenu();
             if (evt.keyCode == KeyCode.Escape && CloseTopOverlay())
             {
                 evt.StopPropagation();
@@ -6042,7 +6104,9 @@ namespace OmsiMapEditor.UI
                 evt.StopPropagation();
                 return;
             }
-            if (focused is TextField || focused?.GetFirstAncestorOfType<TextField>() != null || AnyDialogShown())
+            // Keys are typing in a field, and a modal dialog takes them all. The window for pictures from the air leaves them to the map,
+            // except while it waits for a point to be clicked in the map.
+            if (InTextInput(focused) || AnyModalDialogShown() || IsShown(satelliteWindow) && (placementPickFor >= 0 || mapCanvas != null && mapCanvas.IsPickingPoint))
                 return;
 
             if (evt.keyCode == KeyCode.Escape && PickingVarParent && !(evt.ctrlKey || evt.commandKey))
@@ -7279,6 +7343,19 @@ namespace OmsiMapEditor.UI
                 popup.style.display = DisplayStyle.None;
         }
 
+        /// <summary>
+        /// Ends what waits for one click and would act on a record of the view shown: a new type for an object or a spline, a variable
+        /// parent, the object of a road type's row; and closes the context menu. Each ends as its Cancel does; nothing is written.
+        /// </summary>
+        private void LeaveTransientModes()
+        {
+            CloseContextMenu();
+            EndElementTypePick(null);
+            EndSplineTypePick(null);
+            EndVarParentPick(false);
+            EndRowObjectPick(null);
+        }
+
         /// <summary>Makes a tool active; choosing one ends placing. Without a project only selecting is possible.</summary>
         private void SetTool(EditorTool tool)
         {
@@ -7293,9 +7370,13 @@ namespace OmsiMapEditor.UI
                     : tool == EditorTool.Signals ? "readonly.action.edit_signals" : tool == EditorTool.Line ? "readonly.action.make_lines" : "readonly.action.move_rotate"));
                 return;
             }
-            // Another tool ends placing and closes the object library and the list above the bottom bar.
+            // Another tool ends placing and the picks waiting for a click, and closes the object library, the list above the bottom bar and the
+            // context menu.
             if (tool != activeTool)
+            {
                 ShowBarPopup(false);
+                LeaveTransientModes();
+            }
             EndSplineTypePick(null);
             ShowObjectsPanel(false);
             var wasRoad = activeTool == EditorTool.Road;

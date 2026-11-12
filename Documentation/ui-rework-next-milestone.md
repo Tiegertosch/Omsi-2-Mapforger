@@ -1,6 +1,6 @@
 # UI-Rework: nächster Schritt – M0 und M1 (12. November 2026)
 
-Empfehlung aus [ui-rework-roadmap.md](ui-rework-roadmap.md). **Nichts hiervon ist begonnen; die Umsetzung startet erst nach ausdrücklicher Freigabe des Nutzers.**
+Empfehlung aus [ui-rework-roadmap.md](ui-rework-roadmap.md). **Stand 12. November 2026: M0 und M1 sind abgeschlossen, vom Nutzer getestet und committet (ADR 098, „M1“). Dieses Dokument bleibt als Plan und Nachweis; der nächste Meilenstein ist M2 in [ui-rework-roadmap.md](ui-rework-roadmap.md).**
 
 ## Empfehlung
 
