@@ -71,6 +71,12 @@ namespace OmsiMapEditor.UI
             var index = Array.IndexOf(args, "-mapSettingsApply");
             if (index < 0 || index + 6 >= args.Length || session == null || currentSummary == null)
                 return;
+            if (session.Workspace == null)
+            {
+                // The settings are written to the project copy; a map opened without a project has none.
+                Debug.LogWarning("Map settings: -mapSettingsApply needs a project (-openProject); the map is open read-only.");
+                return;
+            }
             var options = OmsiNewMapOptions.FromTemplate(OmsiRecordFile.Parse(session.Workspace.ReadAllBytes(Path.GetFileName(currentSummary.GlobalConfigPath)),
                 OmsiGlobalConfigLayouts.Instance));
             options.Description = (currentSummary.Description ?? string.Empty).Trim();
