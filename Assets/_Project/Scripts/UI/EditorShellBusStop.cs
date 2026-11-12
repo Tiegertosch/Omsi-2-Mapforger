@@ -17,8 +17,19 @@ namespace OmsiMapEditor.UI
         private void AddBusStopGroup(VisualElement editor, OmsiTileSummary tile, object element)
         {
             var record = element as OmsiObjectRecord;
-            if (record == null || session == null || currentSummary == null || !session.IsBusStop(currentSummary, tile, record))
+            if (record == null || session == null || currentSummary == null)
                 return;
+            try
+            {
+                if (!session.IsBusStop(currentSummary, tile, record))
+                    return;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException)
+            {
+                // A stop list that cannot be read must not stop the rest of the inspector.
+                Debug.LogException(exception);
+                return;
+            }
             string current;
             try
             {

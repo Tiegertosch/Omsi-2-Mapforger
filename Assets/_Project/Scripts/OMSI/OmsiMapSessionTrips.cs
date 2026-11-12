@@ -111,13 +111,18 @@ namespace OmsiMapEditor.OMSI
             return labels;
         }
 
-        /// <summary>The name Busstops.cfg gives the stop of an object, or null when it does not list it.</summary>
+        /// <summary>
+        /// The name Busstops.cfg gives the stop of an object, or null when it does not list it. Only reads, so it works without a project too:
+        /// the map's own files are read then, the project copy otherwise.
+        /// </summary>
         public string BusStopName(OmsiMapSummary summary, OmsiTileSummary tile, OmsiObjectRecord record)
         {
-            var index = summary.Tiles.IndexOf(tile);
-            if (index < 0 || record == null)
+            if (summary == null || tile == null || record == null)
                 return null;
-            var stop = OmsiTimetable.Read(RequireWorkspace()).BusStops.Find(each => each.TileIndex == index && each.ObjectId == record.Id);
+            var index = summary.Tiles.IndexOf(tile);
+            if (index < 0)
+                return null;
+            var stop = OmsiTimetable.Read(Source).BusStops.Find(each => each.TileIndex == index && each.ObjectId == record.Id);
             return stop?.Name;
         }
 
