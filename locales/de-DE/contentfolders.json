@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "Die Ordner bleiben, wie sie sind.",
   "contentfolders.status.applied": "{objects, plural, =0 {Alle Objektordner werden gelesen} one {# Objektordner wird weggelassen} other {# Objektordner werden weggelassen}}, {splines, plural, =0 {alle Spline-Ordner werden gelesen} one {# Spline-Ordner wird weggelassen} other {# Spline-Ordner werden weggelassen}}. Die Menüs werden neu eingelesen.",
   "contentfolders.status.failed": "Die Menüs folgen der neuen Auswahl, aber sie ließ sich nicht für den nächsten Start speichern: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Wählen, welche Ordner aus Sceneryobjects das Objektmenü zeigt} one {# Ordner aus Sceneryobjects ist weggelassen. Klicken, um die Ordner zu wählen} other {# Ordner aus Sceneryobjects sind weggelassen. Klicken, um die Ordner zu wählen}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Wählen, welche Ordner aus Splines das Straßenmenü zeigt} one {# Ordner aus Splines ist weggelassen. Klicken, um die Ordner zu wählen} other {# Ordner aus Splines sind weggelassen. Klicken, um die Ordner zu wählen}}",
   "contentfolders.this_project": "{name} (offenes Projekt)",
   "contentfolders.this_project.tooltip": "Der Ordner des offenen Projekts bleibt drin: Dort legt MapWorks die Kreuzungen und Straßentypen ab, die es für dieses Projekt erstellt."
 }

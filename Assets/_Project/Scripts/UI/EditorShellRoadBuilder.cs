@@ -40,7 +40,6 @@ namespace OmsiMapEditor.UI
             roadBuilder.RowObjectRequested += PickRowObject;
             roadBuilder.CloseRequested += () => ShowRoadBuilder(false);
             objectsPanelHost.Add(roadBuilder);
-            roadPanel.NewRoadTypeRequested += () => ShowRoadBuilder(true);
             roadPanel.EditRoadTypeRequested += EditRoadType;
 
             rowPickOptions = new VisualElement();
@@ -369,6 +368,9 @@ namespace OmsiMapEditor.UI
                 return;
             if (show && activeTool != EditorTool.Road)
                 SetTool(EditorTool.Road);
+            // A read-only map keeps the road tool off, and the builder with it.
+            if (show && activeTool != EditorTool.Road)
+                return;
             if (show && currentSummary != null)
             {
                 var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);

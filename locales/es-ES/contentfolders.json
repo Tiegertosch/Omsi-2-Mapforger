@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "Las carpetas quedan como están.",
   "contentfolders.status.applied": "{objects, plural, =0 {Se leen todas las carpetas de objetos} one {Se omite # carpeta de objetos} other {Se omiten # carpetas de objetos}}, {splines, plural, =0 {se leen todas las carpetas de splines} one {se omite # carpeta de splines} other {se omiten # carpetas de splines}}. Los menús se vuelven a leer.",
   "contentfolders.status.failed": "Los menús siguen la nueva elección, pero no se pudo guardar para el próximo inicio: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Elegir qué carpetas de Sceneryobjects muestra el menú de objetos} one {Se omite # carpeta de Sceneryobjects. Haz clic para elegir las carpetas} other {Se omiten # carpetas de Sceneryobjects. Haz clic para elegir las carpetas}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Elegir qué carpetas de Splines muestra el menú de carreteras} one {Se omite # carpeta de Splines. Haz clic para elegir las carpetas} other {Se omiten # carpetas de Splines. Haz clic para elegir las carpetas}}",
   "contentfolders.this_project": "{name} (proyecto abierto)",
   "contentfolders.this_project.tooltip": "La carpeta del proyecto abierto siempre se incluye: MapWorks guarda allí los cruces y tipos de carretera que crea para este proyecto."
 }

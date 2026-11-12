@@ -9,7 +9,7 @@ namespace OmsiMapEditor.UI
     /// <summary>
     /// Shows the <see cref="VisualElement.tooltip"/> of the element under the pointer as a card above it, in the style of the
     /// references in <c>UI Research/</c> (ADR 098, stage 2). The player draws no tooltips of its own. A text shaped like
-    /// "Name (Key): text" gets the name as an upper-case title and the key as a key cap; any other text shows as it is.
+    /// "Name (Key): text" with a name of up to three words gets it as an upper-case title and the key as a key cap; any other text shows as it is.
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
@@ -83,7 +83,8 @@ namespace OmsiMapEditor.UI
                 return;
             tooltipTarget = owner;
             var match = TooltipHeading.Match(owner.tooltip);
-            var titled = match.Success;
+            // A longer head is the start of a sentence, not a name.
+            var titled = match.Success && match.Groups[1].Value.Trim().Split(' ').Length <= 3;
             tooltipTitle.text = titled ? match.Groups[1].Value.Trim().ToUpper(CultureInfo.CurrentCulture) : string.Empty;
             tooltipTitle.style.display = titled ? DisplayStyle.Flex : DisplayStyle.None;
             tooltipKey.text = titled ? match.Groups[2].Value : string.Empty;

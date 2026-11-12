@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "Les dossiers restent tels quels.",
   "contentfolders.status.applied": "{objects, plural, =0 {Tous les dossiers d'objets sont lus} one {# dossier d'objets est laissé de côté} other {# dossiers d'objets sont laissés de côté}}, {splines, plural, =0 {tous les dossiers de splines sont lus} one {# dossier de splines est laissé de côté} other {# dossiers de splines sont laissés de côté}}. Les menus sont relus.",
   "contentfolders.status.failed": "Les menus suivent le nouveau choix, mais il n'a pas pu être gardé pour le prochain démarrage : {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Choisir les dossiers de Sceneryobjects que montre le menu des objets} one {# dossier de Sceneryobjects est laissé de côté. Cliquez pour choisir les dossiers} other {# dossiers de Sceneryobjects sont laissés de côté. Cliquez pour choisir les dossiers}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Choisir les dossiers de Splines que montre le menu des routes} one {# dossier de Splines est laissé de côté. Cliquez pour choisir les dossiers} other {# dossiers de Splines sont laissés de côté. Cliquez pour choisir les dossiers}}",
   "contentfolders.this_project": "{name} (projet ouvert)",
   "contentfolders.this_project.tooltip": "Le dossier du projet ouvert reste inclus : MapWorks y range les carrefours et types de route qu'il crée pour ce projet."
 }

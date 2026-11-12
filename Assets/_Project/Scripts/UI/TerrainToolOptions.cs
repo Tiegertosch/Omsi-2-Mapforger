@@ -10,7 +10,8 @@ namespace OmsiMapEditor.UI
     /// <summary>
     /// The options of the terrain tool (ADR 040), as openMapper's Terrain tool has them: the brush (raise, lower, smooth,
     /// flatten, roughen) or a ramp, the brush's radius and strength, and the height Flatten works towards. The shell
-    /// shapes the ground; the options only hold the settings.
+    /// shapes the ground; the options only hold the settings. Laid out like the road tool and the references of ADR 098:
+    /// the settings in a column at the left, the brushes as tiles in a panel beside it, the height map on its second tab.
     /// </summary>
     internal sealed class TerrainToolOptions : VisualElement
     {
@@ -21,8 +22,12 @@ namespace OmsiMapEditor.UI
         private readonly Label strengthLabel;
         private readonly TextField flattenField;
         private readonly TextField depthField;
-        private readonly Label planLabel;
         private readonly Button paintButton;
+        private readonly VisualElement options;
+        private readonly VisualElement brushPage;
+        private readonly VisualElement heightMapPage;
+        private readonly Button brushTab;
+        private readonly Button heightMapTab;
 
         // The height map: export and import, and the settings of a picture about to be laid on the map.
         private readonly VisualElement importBox;
@@ -40,36 +45,48 @@ namespace OmsiMapEditor.UI
 
         public TerrainToolOptions()
         {
-            AddToClassList("tool-panel");
-            AddToClassList("picker-options");
-            var title = LocBindings.NewLabel("terrain.title");
-            title.AddToClassList("picker-options-title");
-            Add(title);
+            AddToClassList("picker-tool");
+            // The row is as tall as its taller panel; the empty part above the shorter one must not catch clicks meant for the map.
+            pickingMode = PickingMode.Ignore;
+            options = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            options.AddToClassList("tool-options-scroll");
+            options.AddToClassList("tool-panel");
+            options.AddToClassList("picker-options");
+            Add(options);
 
-            AddModes(Row("terrain.brush"), new[]
-            {
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.raise", OmsiTerrainBrushMode.Raise),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.lower", OmsiTerrainBrushMode.Lower),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.smooth", OmsiTerrainBrushMode.Smooth)
-            });
-            AddModes(Row(string.Empty), new[]
-            {
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.flatten", OmsiTerrainBrushMode.Flatten),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.roughen", OmsiTerrainBrushMode.Roughen),
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.ramp", null)
-            });
-            AddModes(Row(string.Empty), new[]
-            {
-                new KeyValuePair<string, OmsiTerrainBrushMode?>("terrain.mode.water", OmsiTerrainBrushMode.Water)
-            });
+            // The brushes beside the options, as tiles.
+            var picker = new VisualElement();
+            picker.AddToClassList("tool-panel");
+            picker.AddToClassList("picker-panel");
+            picker.AddToClassList("terrain-picker");
+            Add(picker);
+            var header = PickerHeader.Row();
+            var tabs = new VisualElement();
+            tabs.AddToClassList("panel-tabs");
+            tabs.AddToClassList("picker-tabs");
+            brushTab = PickerHeader.IconTab("mountain", "terrain.brushes", null, () => ShowPage(false));
+            heightMapTab = PickerHeader.IconTab("image", "terrain.heightmap", "terrain.heightmap.hint", () => ShowPage(true));
+            tabs.Add(brushTab);
+            tabs.Add(heightMapTab);
+            header.Add(tabs);
+            header.Add(PickerHeader.Close("terrain.close.tooltip", () => CloseRequested?.Invoke()));
+            picker.Add(header);
+            brushPage = new VisualElement();
+            brushPage.AddToClassList("picker-tiles-content");
+            brushPage.AddToClassList("terrain-page");
+            picker.Add(brushPage);
+            heightMapPage = new VisualElement();
+            heightMapPage.AddToClassList("terrain-page");
+            picker.Add(heightMapPage);
 
-            var paintGroup = new VisualElement();
-            paintGroup.AddToClassList("panel-tabs");
-            paintGroup.AddToClassList("picker-segmented");
-            paintButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.mode.paint", () => SetPainting()), "terrain.mode.paint.tooltip");
-            paintButton.AddToClassList("panel-tab");
-            paintGroup.Add(paintButton);
-            Row(string.Empty).Add(paintGroup);
+            AddMode("terrain.mode.raise", OmsiTerrainBrushMode.Raise, "arrow-up");
+            AddMode("terrain.mode.lower", OmsiTerrainBrushMode.Lower, "arrow-down");
+            AddMode("terrain.mode.smooth", OmsiTerrainBrushMode.Smooth, "waves");
+            AddMode("terrain.mode.flatten", OmsiTerrainBrushMode.Flatten, "equal");
+            AddMode("terrain.mode.roughen", OmsiTerrainBrushMode.Roughen, "activity");
+            AddMode("terrain.mode.ramp", null, "trending-up");
+            AddMode("terrain.mode.water", OmsiTerrainBrushMode.Water, "droplets");
+            paintButton = Tile("terrain.mode.paint", "terrain.mode.paint.tooltip", "paintbrush", () => SetPainting());
 
             radiusSlider = new Slider(0f, 1f);
             LocBindings.Tooltip(radiusSlider, "terrain.radius.tooltip");
@@ -92,21 +109,15 @@ namespace OmsiMapEditor.UI
             Paint = new GroundPaintOptions();
             Paint.style.display = DisplayStyle.None;
             Paint.TextureChosen += () => SettingsChanged?.Invoke();
-            Add(Paint);
+            options.Add(Paint);
 
-            planLabel = new Label();
-            planLabel.AddToClassList("panel-info");
-            Add(planLabel);
             var hint = LocBindings.NewLabel("terrain.hint");
             hint.AddToClassList("panel-info");
-            Add(hint);
+            options.Add(hint);
 
-            var heightMapTitle = LocBindings.NewLabel("terrain.heightmap");
-            heightMapTitle.AddToClassList("picker-options-title");
-            Add(heightMapTitle);
             var heightMapHint = LocBindings.NewLabel("terrain.heightmap.hint");
             heightMapHint.AddToClassList("panel-info");
-            Add(heightMapHint);
+            heightMapPage.Add(heightMapHint);
             var buttons = new VisualElement();
             buttons.AddToClassList("panel-tabs");
             buttons.AddToClassList("picker-segmented");
@@ -117,11 +128,11 @@ namespace OmsiMapEditor.UI
                 button.AddToClassList("panel-tab");
                 buttons.Add(button);
             }
-            Add(buttons);
+            heightMapPage.Add(buttons);
 
             importBox = new VisualElement();
             importBox.style.display = DisplayStyle.None;
-            Add(importBox);
+            heightMapPage.Add(importBox);
             importName = new Label();
             importName.AddToClassList("picker-options-title");
             importBox.Add(importName);
@@ -180,6 +191,22 @@ namespace OmsiMapEditor.UI
             strengthSlider.SetValueWithoutNotify(0.5f);
             ShowValues();
             SetMode(OmsiTerrainBrushMode.Raise);
+            ShowPage(false);
+        }
+
+        /// <summary>The height under the pointer or the ramp; the shell shows it in the status bar.</summary>
+        public event Action<string, bool> HintChanged;
+
+        /// <summary>The X of the panel was pressed; the shell ends the tool.</summary>
+        public event Action CloseRequested;
+
+        /// <summary>Shows the brushes or the height map in the panel beside the options.</summary>
+        private void ShowPage(bool heightMap)
+        {
+            brushPage.style.display = heightMap ? DisplayStyle.None : DisplayStyle.Flex;
+            heightMapPage.style.display = heightMap ? DisplayStyle.Flex : DisplayStyle.None;
+            brushTab.EnableInClassList("panel-tab-active", !heightMap);
+            heightMapTab.EnableInClassList("panel-tab-active", heightMap);
         }
 
         /// <summary>A setting changed; the shell draws the brush again.</summary>
@@ -223,6 +250,7 @@ namespace OmsiMapEditor.UI
             coarseLabel.style.display = coarse ? DisplayStyle.Flex : DisplayStyle.None;
             SetAdd(false);
             importBox.style.display = DisplayStyle.Flex;
+            ShowPage(true);
         }
 
         /// <summary>The language changed: what the panel wrote from the language files is written again.</summary>
@@ -285,8 +313,8 @@ namespace OmsiMapEditor.UI
             Painting = true;
             Mode = null;
             foreach (var pair in modeButtons)
-                pair.Key.EnableInClassList("panel-tab-active", false);
-            paintButton.EnableInClassList("panel-tab-active", true);
+                pair.Key.EnableInClassList("picker-tile-selected", false);
+            paintButton.EnableInClassList("picker-tile-selected", true);
             Paint.style.display = DisplayStyle.Flex;
             flattenField.SetEnabled(false);
             depthField?.SetEnabled(false);
@@ -302,13 +330,13 @@ namespace OmsiMapEditor.UI
             var wasPainting = Painting;
             Painting = false;
             Mode = mode;
-            paintButton?.EnableInClassList("panel-tab-active", false);
+            paintButton?.EnableInClassList("picker-tile-selected", false);
             if (Paint != null)
                 Paint.style.display = DisplayStyle.None;
             if (wasPainting)
                 PaintingChanged?.Invoke();
             foreach (var pair in modeButtons)
-                pair.Key.EnableInClassList("panel-tab-active", pair.Value == mode);
+                pair.Key.EnableInClassList("picker-tile-selected", pair.Value == mode);
             flattenField.SetEnabled(mode == OmsiTerrainBrushMode.Flatten);
             depthField?.SetEnabled(mode == OmsiTerrainBrushMode.Water);
             SettingsChanged?.Invoke();
@@ -330,26 +358,31 @@ namespace OmsiMapEditor.UI
 
         public void ShowPlan(string text, bool problem)
         {
-            planLabel.text = text;
-            planLabel.tooltip = text;
-            planLabel.EnableInClassList("panel-info-warning", problem);
+            HintChanged?.Invoke(text, problem);
         }
 
-        private void AddModes(VisualElement row, IEnumerable<KeyValuePair<string, OmsiTerrainBrushMode?>> modes)
+        private void AddMode(string nameKey, OmsiTerrainBrushMode? mode, string icon)
         {
-            var group = new VisualElement();
-            group.AddToClassList("panel-tabs");
-            group.AddToClassList("picker-segmented");
-            foreach (var pair in modes)
-            {
-                var mode = pair.Value;
-                var button = LocBindings.NewButton(pair.Key, () => SetMode(mode)); // i18n:keys
-                LocBindings.Tooltip(button, Describe(mode)); // i18n:keys
-                button.AddToClassList("panel-tab");
-                group.Add(button);
-                modeButtons[button] = mode;
-            }
-            row.Add(group);
+            modeButtons[Tile(nameKey, Describe(mode), icon, () => SetMode(mode))] = mode;
+        }
+
+        /// <summary>A brush as a tile of the picker: its icon over its name.</summary>
+        private Button Tile(string nameKey, string tooltipKey, string icon, Action clicked)
+        {
+            var tile = LocBindings.WithTooltip(new Button(clicked), tooltipKey); // i18n:keys
+            tile.AddToClassList("picker-tile");
+            tile.AddToClassList("terrain-brush-tile");
+            var preview = new VisualElement { pickingMode = PickingMode.Ignore };
+            preview.AddToClassList("picker-tile-preview");
+            preview.AddToClassList("terrain-brush-icon");
+            preview.Add(new IconElement(icon));
+            tile.Add(preview);
+            var name = LocBindings.NewLabel(nameKey); // i18n:keys
+            name.pickingMode = PickingMode.Ignore;
+            name.AddToClassList("picker-tile-name");
+            tile.Add(name);
+            brushPage.Add(tile);
+            return tile;
         }
 
         /// <summary>The key of the tooltip of a brush.</summary>
@@ -401,7 +434,7 @@ namespace OmsiMapEditor.UI
 
         private VisualElement Row(string labelKey)
         {
-            return Row(this, labelKey, out _);
+            return Row(options, labelKey, out _);
         }
 
         private static VisualElement Row(VisualElement parent, string labelKey, out Label text)

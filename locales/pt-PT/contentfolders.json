@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "As pastas ficam como estão.",
   "contentfolders.status.applied": "{objects, plural, =0 {Todas as pastas de objetos são lidas} one {# pasta de objetos fica de fora} other {# pastas de objetos ficam de fora}}, {splines, plural, =0 {todas as pastas de splines são lidas} one {# pasta de splines fica de fora} other {# pastas de splines ficam de fora}}. Os menus são lidos de novo.",
   "contentfolders.status.failed": "Os menus seguem a nova escolha, mas não foi possível guardá-la para o próximo arranque: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Escolher que pastas de Sceneryobjects o menu de objetos mostra} one {# pasta de Sceneryobjects fica de fora. Clique para escolher as pastas} other {# pastas de Sceneryobjects ficam de fora. Clique para escolher as pastas}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Escolher que pastas de Splines o menu de estradas mostra} one {# pasta de Splines fica de fora. Clique para escolher as pastas} other {# pastas de Splines ficam de fora. Clique para escolher as pastas}}",
   "contentfolders.this_project": "{name} (projeto aberto)",
   "contentfolders.this_project.tooltip": "A pasta do projeto aberto fica sempre incluída: o MapWorks guarda lá os cruzamentos e tipos de estrada que cria para este projeto."
 }

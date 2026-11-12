@@ -1,7 +1,6 @@
 {
   "menu.file": "Ficheiro",
   "menu.edit": "Editar",
-  "menu.view": "Ver",
   "menu.tools": "Ferramentas",
   "menu.help": "Ajuda",
   "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",

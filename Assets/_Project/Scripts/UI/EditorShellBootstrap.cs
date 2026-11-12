@@ -83,7 +83,7 @@ namespace OmsiMapEditor.UI
         private EditorTool activeTool = EditorTool.Drag;
         private Label mapHintLabel;
         private Label zoomLabel;
-        private Button toolsButton;
+        private Button checkMapMenuItem;
         private VisualElement projectPanel;
         private VisualElement inspectorPanel;
         private MapCanvasElement mapCanvas;
@@ -438,7 +438,7 @@ namespace OmsiMapEditor.UI
                         mapCanvas.PlacementHeading = heading;
                 };
                 objectsPanel.RandomHeadingChanged += _ => RandomHeadingToggled();
-                objectsPanel.FoldersRequested += OpenContentFolders;
+                objectsPanel.HintChanged += (text, warning) => ShowToolHint(objectsPanel, text, warning);
                 objectsPanelHost.Add(objectsPanel);
                 roadPanel = new RoadToolPanel();
                 roadPanel.style.display = DisplayStyle.None;
@@ -450,7 +450,7 @@ namespace OmsiMapEditor.UI
                         SetTool(EditorTool.Drag);
                 };
                 roadPanel.ProfilePicked += path => EndSplineTypePick(path);
-                roadPanel.FoldersRequested += OpenContentFolders;
+                roadPanel.HintChanged += (text, warning) => ShowToolHint(roadPanel, text, warning);
                 roadPanel.SettingsChanged += UpdateRoadPreview;
                 roadPanel.PathOptionsChanged += ApplyPathOptions;
                 // Another mode starts the next part anew; a control point belongs to Curved.
@@ -464,6 +464,8 @@ namespace OmsiMapEditor.UI
                     if (activeTool == EditorTool.Terrain)
                         ShowTerrainBrush();
                 };
+                terrainOptions.CloseRequested += () => SetTool(EditorTool.Drag);
+                terrainOptions.HintChanged += (text, warning) => ShowToolHint(terrainOptions, text, warning);
                 terrainOptions.ExportRequested += () => ExportHeightMap(null);
                 terrainOptions.ImportRequested += () => ChooseHeightMap(null);
                 terrainOptions.ImportConfirmed += LayHeightMap;
@@ -502,7 +504,8 @@ namespace OmsiMapEditor.UI
             inspectorPanel = root.Q<VisualElement>("inspector-panel");
             var editButton = root.Q<Button>("edit-menu-button");
             var viewButton = root.Q<Button>("view-menu-button");
-            toolsButton = root.Q<Button>("tools-menu-button");
+            checkMapMenuItem = root.Q<Button>("check-map-menu-item");
+            var roadBuilderMenuItem = root.Q<Button>("road-builder-menu-item");
             var helpButton = root.Q<Button>("help-menu-button");
             var helpCloseButton = root.Q<Button>("help-menu-close-button");
             var fitMapButton = root.Q<Button>("fit-map-button");
@@ -748,11 +751,22 @@ namespace OmsiMapEditor.UI
                     HidePopup(editMenu);
                     StepHistory(redoSteps, undoSteps, false);
                 };
-            if (toolsButton != null)
+            if (checkMapMenuItem != null)
             {
-                toolsButton.SetEnabled(false);
-                toolsButton.clicked += ValidateLoadedMap;
+                checkMapMenuItem.SetEnabled(false);
+                checkMapMenuItem.clicked += () =>
+                {
+                    HidePopup(viewMenu);
+                    ValidateLoadedMap();
+                };
             }
+            if (roadBuilderMenuItem != null)
+                roadBuilderMenuItem.clicked += () =>
+                {
+                    HidePopup(viewMenu);
+                    if (currentSummary != null)
+                        ShowRoadBuilder(true);
+                };
             if (helpButton != null)
                 helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu, viewMenu);
             if (helpCloseButton != null)
@@ -1916,8 +1930,7 @@ namespace OmsiMapEditor.UI
             RenderInspector();
             UpdateMapStateLabel();
             SetStatusT("map.loaded", ("name", currentSummary.Name), ("tiles", currentSummary.Tiles.Count), ("mode", session.CanEdit ? "project" : "readonly"));
-            if (toolsButton != null)
-                toolsButton.SetEnabled(true);
+            checkMapMenuItem?.SetEnabled(true);
         }
 
         /// <summary>
@@ -3101,6 +3114,7 @@ namespace OmsiMapEditor.UI
                 }
             roadPanel.SetInstallation(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath));
             roadPanel.SetProfiles(RoadProfilePaths(), counts);
+            roadPanel.SetOrigins(contentOrigins, HideDlcContent);
         }
 
         private OmsiSplineEnd SnapEnd(OmsiMapPoint point)
@@ -6705,6 +6719,7 @@ namespace OmsiMapEditor.UI
                               installationCatalog.Objects.Count + " objects.");
                 }
                 objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
+                ApplyHideDlc();
                 ShowFoldersLeftOut(installationCatalog);
                 if (activeTool == EditorTool.Road)
                     UpdateRoadProfiles();
@@ -7756,7 +7771,22 @@ namespace OmsiMapEditor.UI
             statusKey = null;
             statusArguments = null;
             if (statusLabel != null)
+            {
                 statusLabel.text = message;
+                statusLabel.RemoveFromClassList("status-warning");
+            }
+        }
+
+        /// <summary>
+        /// The line a tool's picker used to show in its header (ADR 098, stage 2): what the road would be, the height under the pointer,
+        /// the objects listed. It goes to the status bar while that picker is on screen, a warning in the warning colour.
+        /// </summary>
+        private void ShowToolHint(VisualElement source, string text, bool warning)
+        {
+            if (source == null || source.style.display == DisplayStyle.None || objectsPanelHost == null || objectsPanelHost.style.display == DisplayStyle.None)
+                return;
+            SetStatus(text);
+            statusLabel?.EnableInClassList("status-warning", warning);
         }
 
         /// <summary>
@@ -7768,7 +7798,10 @@ namespace OmsiMapEditor.UI
             statusKey = key;
             statusArguments = arguments;
             if (statusLabel != null)
+            {
                 statusLabel.text = Loc.T(key, arguments); // i18n:keys
+                statusLabel.RemoveFromClassList("status-warning");
+            }
         }
 
         /// <summary>Writes the message of <see cref="SetStatusT"/> again in the language now in use.</summary>

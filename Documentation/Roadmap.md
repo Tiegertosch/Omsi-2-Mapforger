@@ -52,6 +52,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Etappe 1: untere Leiste (Ansichten und Zoom, Kachelknopf mit Anzahl, Projektname, kompakte Werkzeugleiste, runde Knöpfe für Pfade, Einstiegspunkte, Linien, Chrono, Karte) mit Popups statt des Project-Fensters; Inspector nur auf Abruf; Kontextmenü per Rechtsklick auf Objekt, Spline und Kachel (u. a. Haltestelle umbenennen); `-inspector`, `-contextMenu`
   - [x] Esc schließt alle Dialoge und das Popup der Leiste, beendet Linien-, Move- und Rotate-Werkzeug; Werkzeugwechsel schließt das Popup; Kachel-Plus auch in Move und Rotate
   - [x] Etappe 2, Teil 1: eigene Tooltip-Anzeige im Stil der Vorbilder (Titel und Tastenkappe, Text), Kopfstreifen am Popup der Leiste (`-tooltipAt`)
+  - [x] Etappe 2, Teil 2: Gelände-Werkzeug wie Straße und Objekte (Optionen links, Pinsel als Kacheln, Höhenkarte als Reiter), Kontextmenü bleibt über der Leiste; Menüs höchstens 210 px hoch (Kataloge fest, Optionsspalten scrollen); Kataloge mit einer Kopfzeile aus Icon-Reitern, Lupe und X, Hinweise in der Statuszeile; Menü *Werkzeuge* mit Straßenbauer und Kartenprüfung; Straßen-Optionen als Icons ohne Scrollen; DLC-Inhalte global in den Einstellungen ausblenden (Objekte und Straßen)
   - [ ] Etappe 2, weiter: Kontextmenü für Splines in 3D, weitere Einträge (Reihen, Kreuzungen, Ampeln), Inspector als Panel am Zeiger prüfen
 
 ## Mehrsprachige Oberfläche (ADR 068, Entwicklungsauftrag 1.2)

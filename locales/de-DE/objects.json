@@ -1,13 +1,10 @@
 {
   "objects.options": "Optionen",
-  "objects.hide_dlc": "DLC-Objekte ausblenden",
-  "objects.hide_dlc.tooltip": "Blendet Objekte aus, die zu einem DLC gehören, damit die Karte nur das Basisspiel und Freeware braucht. {origin} Ordner von außerhalb von Steam gekauften Add-ons lassen sich in der Bibliothek mit der Etikett-Schaltfläche als DLC markieren.",
   "objects.origin.reading": "Die Herkunft der Dateien wird noch gelesen.",
   "objects.origin.no_steam": "{description} Ohne die Listen von Steam lassen sich nur als DLC markierte Ordner unterscheiden.",
   "objects.heading": "Ausrichtung (°)",
   "objects.heading.tooltip": "Die Ausrichtung, mit der das nächste Objekt platziert wird; R dreht es um 15°, Umschalt+R zurück.",
   "objects.hint": "Umschalt+Klick platziert weiter, R dreht das Objekt, Alt setzt eine Kreuzung frei neben eine Straße, Esc beendet.",
-  "objects.title": "Objekte",
   "objects.search": "Alle Objekte durchsuchen...",
   "objects.close.tooltip": "Schließen (3 oder Esc)",
   "objects.tab.in_map": "In der Karte",

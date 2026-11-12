@@ -1,7 +1,6 @@
 {
   "menu.file": "Soubor",
   "menu.edit": "Upravit",
-  "menu.view": "Zobrazení",
   "menu.tools": "Nástroje",
   "menu.help": "Nápověda",
   "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",

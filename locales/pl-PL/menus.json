@@ -1,7 +1,6 @@
 {
   "menu.file": "Plik",
   "menu.edit": "Edytuj",
-  "menu.view": "Widok",
   "menu.tools": "Narzędzia",
   "menu.help": "Pomoc",
   "@menu.tools": "The menu bar button that opens the map check and the other tools; not the drawing tools of the toolbar",

@@ -20,8 +20,6 @@
   "contentfolders.status.unchanged": "The folders stay as they are.",
   "contentfolders.status.applied": "{objects, plural, =0 {All object folders are read} one {# object folder is left out} other {# object folders are left out}}, {splines, plural, =0 {all spline folders are read} one {# spline folder is left out} other {# spline folders are left out}}. The menus are read again.",
   "contentfolders.status.failed": "The menus follow the new choice, but it could not be kept for the next start: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Choose which folders of Sceneryobjects the object menu lists} one {# folder of Sceneryobjects is left out. Click to choose the folders} other {# folders of Sceneryobjects are left out. Click to choose the folders}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Choose which folders of Splines the road menu lists} one {# folder of Splines is left out. Click to choose the folders} other {# folders of Splines are left out. Click to choose the folders}}",
   "contentfolders.this_project": "{name} (open project)",
   "contentfolders.this_project.tooltip": "The folder of the open project stays in: MapWorks puts the junctions and road types it makes for this project there."
 }

@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "Foldery pozostają bez zmian.",
   "contentfolders.status.applied": "{objects, plural, =0 {Wszystkie foldery obiektów są czytane} one {Pominięto # folder obiektów} few {Pominięto # foldery obiektów} many {Pominięto # folderów obiektów} other {Pominięto # folderu obiektów}}, {splines, plural, =0 {wszystkie foldery splajnów są czytane} one {pominięto # folder splajnów} few {pominięto # foldery splajnów} many {pominięto # folderów splajnów} other {pominięto # folderu splajnów}}. Menu są wczytywane ponownie.",
   "contentfolders.status.failed": "Menu stosują nowy wybór, ale nie udało się go zapisać na następne uruchomienie: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Wybierz, które foldery z Sceneryobjects pokazuje menu obiektów} one {Pominięto # folder z Sceneryobjects. Kliknij, aby wybrać foldery} few {Pominięto # foldery z Sceneryobjects. Kliknij, aby wybrać foldery} many {Pominięto # folderów z Sceneryobjects. Kliknij, aby wybrać foldery} other {Pominięto # folderu z Sceneryobjects. Kliknij, aby wybrać foldery}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Wybierz, które foldery z Splines pokazuje menu dróg} one {Pominięto # folder z Splines. Kliknij, aby wybrać foldery} few {Pominięto # foldery z Splines. Kliknij, aby wybrać foldery} many {Pominięto # folderów z Splines. Kliknij, aby wybrać foldery} other {Pominięto # folderu z Splines. Kliknij, aby wybrać foldery}}",
   "contentfolders.this_project": "{name} (otwarty projekt)",
   "contentfolders.this_project.tooltip": "Folder otwartego projektu jest zawsze uwzględniany: MapWorks zapisuje w nim skrzyżowania i typy dróg tworzone dla tego projektu."
 }

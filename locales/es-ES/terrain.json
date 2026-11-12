@@ -24,6 +24,8 @@
   "terrain.depth": "Profundidad del agua (m)",
   "terrain.depth.tooltip": "¿Qué tan profundo excava el lago/río bajo la superficie del agua?",
   "terrain.hint": "Mantenga presionado el botón izquierdo sobre el suelo para darle forma; el suelo nunca se eleva a través de un camino al lado de él. Rampa: pulsa donde empieza y donde termina. Los caminos adaptados al terreno permanecen ajustados. Esc finaliza la herramienta.",
+  "terrain.brushes": "Pinceles",
+  "terrain.close.tooltip": "Cerrar la herramienta de terreno (G)",
   "terrain.heightmap": "Mapa de alturas",
   "terrain.heightmap.hint": "El suelo como un cuadro gris, para darle forma en otro programa y traerlo de vuelta; openMapper lee y escribe lo mismo.",
   "terrain.export": "Exportar...",

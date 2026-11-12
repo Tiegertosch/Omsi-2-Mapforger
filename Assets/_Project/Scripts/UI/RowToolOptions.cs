@@ -12,7 +12,7 @@ namespace OmsiMapEditor.UI
     /// whether a row runs along the whole road. The shell plans and lays the rows; the options only hold the settings.
     /// While a row of the map is selected, the fields show its values instead and the laying values wait.
     /// </summary>
-    internal sealed class RowToolOptions : VisualElement
+    internal sealed class RowToolOptions : ScrollView
     {
         private readonly Label title;
         private readonly Label objectLabel;
@@ -30,8 +30,11 @@ namespace OmsiMapEditor.UI
 
         private bool layingTilt;
 
-        public RowToolOptions()
+        public RowToolOptions() : base(ScrollViewMode.Vertical)
         {
+            // Scrolls like the other option columns once taller than 210 px (ADR 098).
+            horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            AddToClassList("tool-options-scroll");
             AddToClassList("tool-panel");
             AddToClassList("picker-options");
             title = LocBindings.NewLabel("rows.title");

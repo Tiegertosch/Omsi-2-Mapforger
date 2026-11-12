@@ -4,6 +4,8 @@
     --mf-color-bg: #171C23;
     --mf-color-panel: #202630;
     --mf-color-panel-glass: rgba(32, 38, 48, 0.94);
+    --mf-color-bar-glass: rgba(23, 28, 35, 0.5);
+    --mf-color-scrim: rgba(23, 28, 35, 0.85);
     --mf-color-panel-raised: #29313D;
     --mf-color-panel-hover: #35475A;
     --mf-color-field: #141920;
@@ -69,15 +71,6 @@
 .popup-description { margin: 4px 8px; color: var(--mf-color-text-secondary); white-space: normal; }
 .help-controls { margin-bottom: var(--mf-space-2); padding: var(--mf-space-2); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-sm); }
 .popup-close { align-self: flex-end; min-width: 68px; -unity-text-align: middle-center; }
-.map-legend { flex-direction: row; flex-wrap: wrap; margin: 4px 10px 6px; }
-.map-legend > Label { margin-right: var(--mf-space-3); font-size: var(--mf-font-secondary); }
-.map-legend-spline { color: var(--mf-color-accent); }
-.map-legend-object { color: var(--mf-color-info); }
-.map-legend-tree { color: var(--mf-color-success); }
-.map-legend-selected { color: var(--mf-color-error); }
-.map-legend-wire { color: var(--mf-color-text-secondary); }
-.map-legend-fence { color: var(--mf-color-text-muted); }
-.map-legend-route { color: var(--mf-color-text-primary); }
 
 /* Workspace: the map fills it, panels and controls float above it */
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
@@ -146,7 +139,7 @@
 
 /* The bottom bar (ADR 098): view and zoom at the left, the tile button and the project name, the tools in the middle, the map's
    lists as round buttons at the right. The status bar runs below it. */
-.bottom-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 94px; flex-direction: row; align-items: stretch; background-color: rgba(23, 28, 35, 0.5); border-top-width: 1px; border-top-color: rgba(65, 75, 89, 0.6); }
+.bottom-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 94px; flex-direction: row; align-items: stretch; background-color: var(--mf-color-bar-glass); border-top-width: 1px; border-top-color: rgba(65, 75, 89, 0.6); }
 .bottom-bar-empty { height: 34px; }
 .bar-main { flex-grow: 1; flex-shrink: 1; min-width: 0; justify-content: flex-end; }
 .bar-row { flex-direction: row; align-items: center; height: 54px; flex-shrink: 0; padding: 0 var(--mf-space-3) 0 var(--mf-space-2); }
@@ -364,33 +357,76 @@
 .picker-field TextElement { margin: 0; padding: 0; font-size: 12px; }
 .picker-field .unity-base-text-field__input { height: 26px; margin: 0; padding: 0 6px; -unity-text-align: middle-left; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
 .picker-field .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
-.picker-panel { width: 780px; min-width: 780px; max-width: 780px; height: 362px; flex-shrink: 0; flex-grow: 0; }
-.picker-header { margin-bottom: var(--mf-space-2); }
+.picker-panel { width: 780px; min-width: 780px; max-width: 780px; height: 210px; padding: 0; flex-shrink: 0; flex-grow: 0; background-color: var(--mf-color-bar-glass); }
+.picker-header { height: 44px; flex-shrink: 0; margin: 0; padding: 0 var(--mf-space-2); background-color: var(--mf-color-panel); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
 .picker-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-search { width: 210px; margin: 0 var(--mf-space-2); flex-shrink: 0; }
-.picker-tabs { flex-shrink: 0; overflow: hidden; }
+.picker-tabs { flex-shrink: 0; overflow: hidden; margin-bottom: 6px; padding: 2px; }
 .picker-tab { flex-basis: 0; min-width: 0; padding: 0 4px; font-size: 11px; }
-.picker-tiles { flex-grow: 1; min-height: 0; }
+.picker-tiles { flex-grow: 1; min-height: 0; padding: var(--mf-space-2) var(--mf-space-1) 0 var(--mf-space-2); }
 .picker-tiles-content { flex-direction: row; flex-wrap: wrap; }
-.picker-tile { width: 112px; height: 98px; margin: 0 var(--mf-space-2) var(--mf-space-2) 0; padding: 4px; align-items: center; background-color: var(--mf-color-panel); border-width: 2px; border-color: rgba(0, 0, 0, 0); border-radius: var(--mf-radius-md); }
+.picker-tile { width: 70px; height: 70px; margin: 0 6px 8px 0; padding: 3px; align-items: center; background-color: var(--mf-color-panel); border-width: 2px; border-color: rgba(0, 0, 0, 0); border-radius: var(--mf-radius-md); }
 .picker-tile:hover { background-color: var(--mf-color-panel-hover); }
 .picker-tile-selected, .picker-tile-selected:hover { border-color: var(--mf-color-accent); }
-.picker-tile-preview { width: 96px; height: 64px; background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); -unity-background-scale-mode: stretch-to-fill; }
-.picker-tile-name { width: 100%; margin: 4px 0 0; padding: 0; font-size: 10px; -unity-text-align: middle-center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-tile-count { position: absolute; left: 6px; top: 6px; padding: 0 4px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-sm); }
-.picker-tile-star { position: absolute; right: 2px; top: 2px; width: 22px; height: 22px; padding: 3px; }
-.picker-tile-edit { position: absolute; right: 2px; top: 26px; width: 22px; height: 22px; padding: 4px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-sm); }
+.picker-tile-preview { width: 60px; height: 60px; background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); -unity-background-scale-mode: stretch-to-fill; }
+.picker-tile-name { display: none; position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 2px 3px; font-size: 9px; -unity-text-align: middle-center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mf-color-text-primary); background-color: var(--mf-color-scrim); border-bottom-left-radius: var(--mf-radius-md); border-bottom-right-radius: var(--mf-radius-md); }
+.picker-tile:hover > .picker-tile-name { display: flex; }
+.picker-tile-count { position: absolute; left: 4px; top: 4px; padding: 0 4px; font-size: 9px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-sm); }
+.picker-tile-star { position: absolute; right: 2px; top: 2px; width: 18px; height: 18px; padding: 2px; }
+.picker-tile-edit { position: absolute; right: 2px; top: 20px; width: 18px; height: 18px; padding: 3px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-sm); }
 .picker-tile-edit:hover { color: var(--mf-color-accent); }
-.picker-tile-tag { position: absolute; left: 6px; bottom: 26px; padding: 0 4px; font-size: 9px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); }
+.picker-tile-tag { position: absolute; left: 4px; bottom: 4px; padding: 0 4px; font-size: 9px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); }
 .picker-more { justify-content: center; white-space: normal; font-size: 11px; color: var(--mf-color-text-secondary); }
-.object-tile { height: 106px; }
-.object-tile-preview { height: 72px; align-items: center; justify-content: center; -unity-background-scale-mode: scale-to-fit; }
+.object-tile-preview { align-items: center; justify-content: center; -unity-background-scale-mode: scale-to-fit; }
 .object-tile-spinner { width: 24px; height: 24px; color: var(--mf-color-accent); }
-.object-tile-icon { width: 28px; height: 28px; color: var(--mf-color-text-muted); }
+.object-tile-icon { width: 22px; height: 22px; color: var(--mf-color-text-muted); }
 .object-folder-preview { flex-direction: column; }
 .object-folder-count { margin: 2px 0 0; font-size: 10px; color: var(--mf-color-text-secondary); }
-.picker-empty { position: absolute; left: var(--mf-space-3); right: var(--mf-space-3); top: 120px; }
+/* The terrain tool's brushes as tiles with an icon (ADR 098, stage 2). */
+.terrain-brush-icon { align-items: center; justify-content: center; color: var(--mf-color-text-primary); }
+.terrain-brush-icon > .icon { width: 28px; height: 28px; }
+.picker-tile-selected .terrain-brush-icon { color: var(--mf-color-accent); }
+.terrain-page { padding: var(--mf-space-2); }
+.picker-panel > .panel-folder-bar { margin: var(--mf-space-1) var(--mf-space-2) 0; }
+/* The menus of the bar are at most 210 px tall, as in the references (ADR 098, stage 2): a flat header, flat tabs, two rows of small
+   tiles that scroll, and option columns that scroll once they are taller. */
+.picker-search .panel-search-field .unity-base-text-field__input { height: 26px; padding-top: 0; padding-bottom: 0; -unity-text-align: middle-left; }
+.picker-search .panel-search-icon { top: 5px; }
+.picker-header { flex-direction: row; align-items: center; }
+.picker-header > .picker-tabs { flex-grow: 1; margin: 0 var(--mf-space-2) 0 0; padding: 0; background-color: rgba(0, 0, 0, 0); border-radius: 0; }
+.picker-icon-tab { flex-grow: 0; flex-basis: auto; width: 36px; height: 36px; margin: 0 2px 0 0; padding: 0; align-items: center; justify-content: center; border-radius: var(--mf-radius-md); }
+.picker-icon-tab:hover { background-color: var(--mf-color-panel-hover); }
+.picker-icon-tab > .icon { width: 22px; height: 22px; }
+.picker-header > .picker-search { width: 200px; margin: 0 var(--mf-space-1) 0 0; }
+.picker-search-open { color: var(--mf-color-accent); }
+.status-message.status-warning { color: var(--mf-color-warning); }
+.tool-options-scroll { max-height: 210px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); }
+.tool-options-scroll .picker-option { min-height: 26px; margin-bottom: 2px; }
+/* Option columns of icons (ADR 098, stage 2): rows of a short label and icons, all in view without scrolling. */
+.icon-options { width: 300px; min-width: 300px; max-width: 300px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
+.option-row { flex-direction: row; align-items: center; height: 30px; margin-bottom: 2px; }
+.option-row:disabled { opacity: 0.45; }
+.option-row-label { width: 64px; flex-shrink: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.option-icons { flex-direction: row; margin-right: var(--mf-space-1); padding: 0; background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); }
+.option-icon { width: 28px; height: 28px; margin: 0; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
+.option-icon:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
+.option-icon.panel-tab-active, .option-icon.panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
+/* Every icon of an option column is 16 x 16 px in a box of 28 x 28 px, whatever kind of control holds it. */
+.option-icon > .icon, .option-switch .icon, .option-value-icon { flex-grow: 0; flex-shrink: 0; width: 16px; height: 16px; }
+.option-switch { margin: 0 2px 0 0; padding: 0; }
+.option-switch > .unity-toggle__input { width: 28px; height: 28px; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); }
+.option-switch > .unity-toggle__input > .unity-toggle__checkmark { display: none; }
+.option-switch:hover > .unity-toggle__input { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
+.option-switch:checked > .unity-toggle__input { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
+.option-switch:disabled { opacity: 0.45; }
+.option-value { flex-direction: row; align-items: center; margin: 0 var(--mf-space-1) 0 0; }
+.option-value:disabled { opacity: 0.45; }
+.option-value-icon { margin-right: 3px; color: var(--mf-color-text-muted); }
+.picker-field.option-value-field { width: 40px; min-width: 40px; height: 28px; }
+.picker-field.option-value-field .unity-base-text-field__input { height: 28px; padding: 0 4px; }
+.option-value-unit { margin: 0 0 0 2px; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); }
+.picker-empty { position: absolute; left: var(--mf-space-3); right: var(--mf-space-3); top: 80px; }
 .panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
 .panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: 10px; -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }
@@ -542,6 +578,8 @@
 .new-map-dropdown .unity-base-popup-field__input:hover { border-color: var(--mf-color-accent); }
 .settings-language-slot { width: 220px; flex-grow: 0; flex-shrink: 0; margin: 0 8px; }
 .settings-dropdown { width: 100%; flex-grow: 0; }
+.settings-toggle { margin: var(--mf-space-1) var(--mf-space-2) 0; }
+.settings-toggle > .unity-label { min-width: 0; color: var(--mf-color-text-primary); }
 .new-map-seasons { margin: 0 var(--mf-space-2); }
 .new-map-swatches { height: 108px; flex-shrink: 0; margin: 0 var(--mf-space-2); }
 .new-map-swatches-content { flex-direction: row; }

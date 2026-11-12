@@ -24,6 +24,8 @@
   "terrain.depth": "Głębokość wody (m)",
   "terrain.depth.tooltip": "Jak głęboko jezioro/rzeka wkopuje się pod powierzchnię wody",
   "terrain.hint": "Przytrzymaj lewy przycisk nad ziemią, aby ją ukształtować; ziemia nigdy nie wznosi się przez drogę obok niej. Rampa: kliknij, gdzie się zaczyna i gdzie kończy. Drogi dopasowane do terenu pozostają niezmienne. Esc kończy działanie narzędzia.",
+  "terrain.brushes": "Pędzle",
+  "terrain.close.tooltip": "Zamknij narzędzie terenu (G)",
   "terrain.heightmap": "Mapa wysokości",
   "terrain.heightmap.hint": "Ziemia jako szary obraz, do ukształtowania w innym programie i przywrócenia; openMapper czyta i zapisuje to samo.",
   "terrain.export": "Eksportuj...",

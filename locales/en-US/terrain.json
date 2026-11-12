@@ -24,6 +24,8 @@
   "terrain.depth": "Water depth (m)",
   "terrain.depth.tooltip": "How deep Lake / river digs under the water's surface",
   "terrain.hint": "Hold the left button over the ground to shape it; the ground never rises through a road beside it. Ramp: click where it starts and where it ends. Roads fitted to the terrain stay fitted. Esc ends the tool.",
+  "terrain.brushes": "Brushes",
+  "terrain.close.tooltip": "Close the terrain tool (G)",
   "terrain.heightmap": "Height map",
   "terrain.heightmap.hint": "The ground as a grey picture, to shape in another program and bring back; openMapper reads and writes the same.",
   "terrain.export": "Export...",

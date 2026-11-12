@@ -136,10 +136,13 @@ namespace OmsiMapEditor.UI
             menu.style.top = local.y;
             menu.RegisterCallback<GeometryChangedEvent>(_ =>
             {
-                // Once its size is known, the menu stays inside the workspace.
+                // Once its size is known, the menu stays inside the workspace and above the bottom bar; near the bar it opens upwards.
                 var bounds = workspaceElement.layout;
+                var height = menu.layout.height;
+                var lowest = bounds.height - FreeMapInsets().w - 4f;
+                var top = local.y + height > lowest ? local.y - height : local.y;
                 menu.style.left = Mathf.Max(0f, Mathf.Min(local.x, bounds.width - menu.layout.width - 4f));
-                menu.style.top = Mathf.Max(0f, Mathf.Min(local.y, bounds.height - menu.layout.height - 4f));
+                menu.style.top = Mathf.Max(0f, Mathf.Min(top, lowest - height));
             });
         }
 

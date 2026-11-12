@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "Le cartelle restano come sono.",
   "contentfolders.status.applied": "{objects, plural, =0 {Tutte le cartelle di oggetti vengono lette} one {# cartella di oggetti è esclusa} other {# cartelle di oggetti sono escluse}}, {splines, plural, =0 {tutte le cartelle di spline vengono lette} one {# cartella di spline è esclusa} other {# cartelle di spline sono escluse}}. I menu vengono riletti.",
   "contentfolders.status.failed": "I menu seguono la nuova scelta, ma non è stato possibile conservarla per il prossimo avvio: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Scegli quali cartelle di Sceneryobjects mostra il menu degli oggetti} one {# cartella di Sceneryobjects è esclusa. Clicca per scegliere le cartelle} other {# cartelle di Sceneryobjects sono escluse. Clicca per scegliere le cartelle}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Scegli quali cartelle di Splines mostra il menu delle strade} one {# cartella di Splines è esclusa. Clicca per scegliere le cartelle} other {# cartelle di Splines sono escluse. Clicca per scegliere le cartelle}}",
   "contentfolders.this_project": "{name} (progetto aperto)",
   "contentfolders.this_project.tooltip": "La cartella del progetto aperto resta inclusa: MapWorks vi mette gli incroci e i tipi di strada che crea per questo progetto."
 }

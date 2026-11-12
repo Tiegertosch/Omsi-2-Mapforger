@@ -132,8 +132,6 @@ namespace OmsiMapEditor.UI
                         splines++;
                     else
                         objects++;
-            objectsPanel?.SetFoldersLeftOut(objects);
-            roadPanel?.SetFoldersLeftOut(splines);
         }
 
         /// <summary>Lists the folders of the map's installation with a tick for each that is read.</summary>

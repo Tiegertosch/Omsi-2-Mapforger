@@ -24,6 +24,8 @@
   "terrain.depth": "Hloubka vody (m)",
   "terrain.depth.tooltip": "Jak hluboko se jezero / řeka noří pod hladinu",
   "terrain.hint": "Podržte levé tlačítko nad zemí, abyste jej tvarovali; Země se nikdy nezvedá cestou vedle ní. Rampa: klikněte tam, kde začíná a kde končí. Silnice přizpůsobené terénu zůstanou přizpůsobeny. Esc ukončí nástroj.",
+  "terrain.brushes": "Štětce",
+  "terrain.close.tooltip": "Zavřít nástroj terénu (G)",
   "terrain.heightmap": "Výšková mapa",
   "terrain.heightmap.hint": "Země jako šedý obrázek, vytvarovat v jiném programu a přivést zpět; openMapper čte a zapisuje totéž.",
   "terrain.export": "Exportovat...",

@@ -24,6 +24,8 @@
   "terrain.depth": "Wassertiefe (m)",
   "terrain.depth.tooltip": "Wie tief See / Fluss unter die Wasseroberfläche gräbt",
   "terrain.hint": "Halte die linke Taste über dem Boden, um ihn zu formen; der Boden steigt nie durch eine Straße daneben. Rampe: Klicke dorthin, wo sie beginnt und endet. An das Gelände angepasste Straßen bleiben angepasst. Esc beendet das Werkzeug.",
+  "terrain.brushes": "Pinsel",
+  "terrain.close.tooltip": "Gelände-Werkzeug schließen (G)",
   "terrain.heightmap": "Höhenkarte",
   "terrain.heightmap.hint": "Der Boden als graues Bild, zum Formen in einem anderen Programm und zurückbringen; openMapper liest und schreibt dasselbe.",
   "terrain.export": "Exportieren...",

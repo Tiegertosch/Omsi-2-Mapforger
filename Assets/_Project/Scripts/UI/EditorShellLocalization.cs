@@ -48,14 +48,10 @@ namespace OmsiMapEditor.UI
             ("inspector-menu-item", "text", "menu.view.inspector"),
             ("satellite-menu-item", "text", "menu.view.satellite"),
             ("satellite-menu-item", "tooltip", "menu.view.satellite.tooltip"),
-            ("legend-title", "text", "legend.title"),
-            ("legend-splines", "text", "legend.splines"),
-            ("legend-objects", "text", "legend.objects"),
-            ("legend-trees", "text", "legend.trees"),
-            ("legend-wires", "text", "legend.wires"),
-            ("legend-fences", "text", "legend.fences"),
-            ("legend-routes", "text", "legend.routes"),
-            ("legend-selected", "text", "legend.selected"),
+            ("road-builder-menu-item", "text", "menu.view.road_builder"),
+            ("road-builder-menu-item", "tooltip", "roadtool.new_type.tooltip"),
+            ("check-map-menu-item", "text", "menu.view.check"),
+            ("check-map-menu-item", "tooltip", "menu.tools.tooltip"),
             ("help-text-open", "text", "help.text.open_map"),
             ("help-text-save", "text", "help.text.save_project"),
             ("help-text-edit", "text", "help.text.edit_object"),
@@ -84,9 +80,7 @@ namespace OmsiMapEditor.UI
         {
             LocBindings.Text(root.Q<Button>("file-menu-button"), "menu.file");
             LocBindings.Text(root.Q<Button>("edit-menu-button"), "menu.edit");
-            LocBindings.Text(root.Q<Button>("view-menu-button"), "menu.view");
-            LocBindings.Text(root.Q<Button>("tools-menu-button"), "menu.tools");
-            LocBindings.Tooltip(root.Q<Button>("tools-menu-button"), "menu.tools.tooltip");
+            LocBindings.Text(root.Q<Button>("view-menu-button"), "menu.tools");
             LocBindings.Text(root.Q<Button>("help-menu-button"), "menu.help");
             foreach (var (name, attribute, key) in UxmlTexts)
             {

@@ -5,6 +5,9 @@
   "settings.language.label": "Lingua",
   "@settings.language.label": "Label of the drop-down list of interface languages; the list itself shows each language in its own language",
   "settings.language.hint": "La lingua dell'interfaccia del programma. Non influisce su mappe, progetti o esportazioni; la scelta viene mantenuta al prossimo avvio.",
+  "settings.section.content": "Contenuti",
+  "settings.hide_dlc": "Nascondi contenuti DLC",
+  "settings.hide_dlc.hint": "Nasconde oggetti e tipi di strada di un DLC in tutti gli elenchi tranne quello della mappa, così la mappa richiede solo il gioco base e freeware. {origin} Le cartelle di add-on acquistati fuori da Steam si possono segnare come DLC con il pulsante etichetta della libreria oggetti.",
   "settings.language.changed": "La lingua dell'interfaccia ora è {language}.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
   "settings.close": "Chiudi"

@@ -19,8 +19,6 @@
   "contentfolders.status.unchanged": "Složky zůstávají beze změny.",
   "contentfolders.status.applied": "{objects, plural, =0 {Čtou se všechny složky objektů} one {Vynechána # složka objektů} few {Vynechány # složky objektů} many {Vynecháno # složky objektů} other {Vynecháno # složek objektů}}, {splines, plural, =0 {čtou se všechny složky splinů} one {vynechána # složka splinů} few {vynechány # složky splinů} many {vynecháno # složky splinů} other {vynecháno # složek splinů}}. Nabídky se načtou znovu.",
   "contentfolders.status.failed": "Nabídky se řídí novou volbou, ale nepodařilo se ji uložit pro příští spuštění: {reason}",
-  "objects.folders.tooltip": "{count, plural, =0 {Vybrat, které složky ze Sceneryobjects ukazuje nabídka objektů} one {Vynechána # složka ze Sceneryobjects. Kliknutím vyberete složky} few {Vynechány # složky ze Sceneryobjects. Kliknutím vyberete složky} many {Vynecháno # složky ze Sceneryobjects. Kliknutím vyberete složky} other {Vynecháno # složek ze Sceneryobjects. Kliknutím vyberete složky}}",
-  "roadtool.folders.tooltip": "{count, plural, =0 {Vybrat, které složky ze Splines ukazuje nabídka silnic} one {Vynechána # složka ze Splines. Kliknutím vyberete složky} few {Vynechány # složky ze Splines. Kliknutím vyberete složky} many {Vynecháno # složky ze Splines. Kliknutím vyberete složky} other {Vynecháno # složek ze Splines. Kliknutím vyberete složky}}",
   "contentfolders.this_project": "{name} (otevřený projekt)",
   "contentfolders.this_project.tooltip": "Složka otevřeného projektu zůstává vždy zahrnuta: MapWorks do ní ukládá křižovatky a typy silnic, které pro tento projekt vytvoří."
 }

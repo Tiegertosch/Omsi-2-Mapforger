@@ -6,8 +6,7 @@
             <ui:VisualElement class="menu-container">
                 <ui:Button name="file-menu-button" text="File" class="toolbar-menu-button" />
                 <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" />
-                <ui:Button name="view-menu-button" text="View" class="toolbar-menu-button" />
-                <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" tooltip="Check the loaded map: import, spline connections, IDs, entry points, attachments, files, timetable, chrono variants and DLC objects." />
+                <ui:Button name="view-menu-button" text="Tools" class="toolbar-menu-button" />
                 <ui:Button name="help-menu-button" text="Help" class="toolbar-menu-button" />
             </ui:VisualElement>
             <ui:Label name="map-title" class="menu-bar-map" />
@@ -91,17 +90,9 @@
         <ui:VisualElement name="view-menu" class="menu-popup view-menu">
             <ui:Button name="inspector-menu-item" text="Inspector" class="menu-popup-item" />
             <ui:Button name="satellite-menu-item" text="Satellite and terrain..." class="menu-popup-item" tooltip="Place the map on the Earth and load pictures from the air and terrain heights for its tiles, without any key, as openMapper does." />
+            <ui:Button name="road-builder-menu-item" text="Road builder..." class="menu-popup-item" />
             <ui:Label class="menu-divider" />
-            <ui:Label name="legend-title" text="Colours in the view from above" class="menu-section-label" />
-            <ui:VisualElement name="map-legend" class="map-legend">
-                <ui:Label name="legend-splines" text="Splines" class="map-legend-spline" />
-                <ui:Label name="legend-objects" text="Objects" class="map-legend-object" />
-                <ui:Label name="legend-trees" text="Trees" class="map-legend-tree" />
-                <ui:Label name="legend-wires" text="Wires (dashed)" class="map-legend-wire" />
-                <ui:Label name="legend-fences" text="Fences" class="map-legend-fence" />
-                <ui:Label name="legend-routes" text="Bus routes and stops" class="map-legend-route" />
-                <ui:Label name="legend-selected" text="Selected" class="map-legend-selected" />
-            </ui:VisualElement>
+            <ui:Button name="check-map-menu-item" text="Check map..." class="menu-popup-item" />
         </ui:VisualElement>
         <ui:VisualElement name="help-menu" class="menu-popup help-menu">
             <ui:Label text="OMSI MapWorks" class="popup-title" />
@@ -140,6 +131,9 @@
                     <ui:VisualElement name="settings-language-list" class="settings-language-slot" />
                 </ui:VisualElement>
                 <ui:Label name="settings-language-hint" text="The language of the program's interface. Maps, projects and exports do not depend on it; the choice is kept for the next start." class="popup-description" />
+                <ui:Label name="settings-content-heading" text="Content" class="inspector-section-heading" />
+                <ui:Toggle name="settings-hide-dlc" text="Hide DLC content" class="settings-toggle" />
+                <ui:Label name="settings-hide-dlc-hint" class="popup-description" />
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="settings-close-button" text="Close" class="map-control-button dialog-primary" />
                 </ui:VisualElement>

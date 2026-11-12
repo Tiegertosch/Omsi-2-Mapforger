@@ -18,6 +18,7 @@ namespace OmsiMapEditor.UI
             public bool Upper;
             public (string Name, object Value)[] TextArguments;
             public string TooltipKey;
+            public string TooltipTitleKey;
             public (string Name, object Value)[] TooltipArguments;
             public int Generation = -1;
         }
@@ -74,6 +75,7 @@ namespace OmsiMapEditor.UI
                 return;
             var binding = BindingOf(element);
             binding.TooltipKey = null;
+            binding.TooltipTitleKey = null;
             binding.TooltipArguments = null;
             element.tooltip = string.Empty;
         }
@@ -85,7 +87,20 @@ namespace OmsiMapEditor.UI
                 return;
             var binding = BindingOf(element);
             binding.TooltipKey = key;
+            binding.TooltipTitleKey = null;
             binding.TooltipArguments = arguments;
+            Apply(element, binding);
+        }
+
+        /// <summary>A tooltip "Name: description" from two keys, which the tooltip card shows with the name as its title; without a description only the name.</summary>
+        public static void TitledTooltip(VisualElement element, string titleKey, string key)
+        {
+            if (element == null)
+                return;
+            var binding = BindingOf(element);
+            binding.TooltipKey = key;
+            binding.TooltipTitleKey = titleKey;
+            binding.TooltipArguments = null;
             Apply(element, binding);
         }
 
@@ -149,7 +164,9 @@ namespace OmsiMapEditor.UI
                         break;
                 }
             }
-            if (binding.TooltipKey != null)
+            if (binding.TooltipTitleKey != null)
+                element.tooltip = binding.TooltipKey == null ? Loc.T(binding.TooltipTitleKey) : Loc.T(binding.TooltipTitleKey) + ": " + Loc.T(binding.TooltipKey);
+            else if (binding.TooltipKey != null)
                 element.tooltip = binding.TooltipArguments == null || binding.TooltipArguments.Length == 0 ? Loc.T(binding.TooltipKey) : Loc.T(binding.TooltipKey, binding.TooltipArguments);
             binding.Generation = Loc.Manager != null ? Loc.Manager.Generation : -1;
         }
