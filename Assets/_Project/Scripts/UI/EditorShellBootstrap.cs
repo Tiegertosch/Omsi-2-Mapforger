@@ -626,6 +626,7 @@ namespace OmsiMapEditor.UI
             DecorateButton(routesToggleButton, "route", "view.routes");
             CreatePathsButton();
             SetUpBottomBar(root);
+            SetUpTooltips(root);
             DecorateButton(inspectorCollapseButton, "x", null);
             AddPanelIcon(inspectorFrame, "sliders-horizontal");
 
@@ -1693,6 +1694,8 @@ namespace OmsiMapEditor.UI
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
                 RunPickArguments(args);
+                // -tooltipAt x y shows the tooltip there as hovering would (ADR 098, stage 2).
+                RunTooltipArguments(args);
                 // -inspector opens the inspector, -contextMenu id the context menu of an object (ADR 098).
                 RunContextMenuArguments(args);
                 if (Array.IndexOf(args, "-contextMenu") >= 0)

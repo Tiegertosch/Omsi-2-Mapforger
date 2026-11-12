@@ -50,7 +50,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Farben der Vektorebene an das Corporate Design anpassen: Auswahl rot, gewählte Kachel gold, Splines orange, Objekte blau, Bäume und Platzieren grün; die Farben kommen aus den Design-Tokens
 - [ ] Aufgeräumte Oberfläche nach dem Community-Feedback (ADR 098, Zweig `feature/ui-rework`):
   - [x] Etappe 1: untere Leiste (Ansichten und Zoom, Kachelknopf mit Anzahl, Projektname, kompakte Werkzeugleiste, runde Knöpfe für Pfade, Einstiegspunkte, Linien, Chrono, Karte) mit Popups statt des Project-Fensters; Inspector nur auf Abruf; Kontextmenü per Rechtsklick auf Objekt, Spline und Kachel (u. a. Haltestelle umbenennen); `-inspector`, `-contextMenu`
-  - [ ] Etappe 2 nach dem Nutzertest: Kontextmenü für Splines in 3D, weitere Einträge (Reihen, Kreuzungen, Ampeln), Inspector als Panel am Zeiger prüfen
+  - [x] Esc schließt alle Dialoge und das Popup der Leiste, beendet Linien-, Move- und Rotate-Werkzeug; Werkzeugwechsel schließt das Popup; Kachel-Plus auch in Move und Rotate
+  - [x] Etappe 2, Teil 1: eigene Tooltip-Anzeige im Stil der Vorbilder (Titel und Tastenkappe, Text), Kopfstreifen am Popup der Leiste (`-tooltipAt`)
+  - [ ] Etappe 2, weiter: Kontextmenü für Splines in 3D, weitere Einträge (Reihen, Kreuzungen, Ampeln), Inspector als Panel am Zeiger prüfen
 
 ## Mehrsprachige Oberfläche (ADR 068, Entwicklungsauftrag 1.2)
 

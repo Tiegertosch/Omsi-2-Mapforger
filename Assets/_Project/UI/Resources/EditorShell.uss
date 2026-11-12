@@ -124,6 +124,7 @@
 .bar-popup { top: auto; bottom: 106px; left: var(--mf-space-2); width: 320px; max-height: 70%; }
 .bar-popup-right { left: auto; right: var(--mf-space-2); }
 .bar-popup-tall { height: 480px; }
+.bar-popup > .floating-panel-header { margin: -12px -12px var(--mf-space-2) -12px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-bg); border-bottom-width: 1px; border-bottom-color: var(--mf-color-border-subtle); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
 .floating-panel-header { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
 .floating-panel-title { flex-grow: 1; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .floating-panel-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-accent); }
@@ -135,6 +136,13 @@
 .floating-panel-collapsed > .floating-panel-header { margin-bottom: 0; }
 .floating-panel-collapsed .floating-panel-title { margin-right: var(--mf-space-2); }
 .floating-panel-collapsed > .floating-panel-content { display: none; }
+
+/* Tooltips (ADR 098, stage 2): a dark card above the element, an upper-case title with its key, then the text, as in the references. */
+.shell-tooltip { position: absolute; max-width: 360px; padding: var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-bg); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.shell-tooltip-heading { flex-direction: row; align-items: center; }
+.shell-tooltip-title { flex-shrink: 1; margin: 0 0 2px 0; padding: 0; font-size: var(--mf-font-body); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-primary); white-space: normal; }
+.shell-tooltip-key { margin: 0 0 2px var(--mf-space-2); padding: 0 5px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.shell-tooltip-text { margin: 0; padding: 0; font-size: var(--mf-font-body); color: var(--mf-color-text-primary); white-space: normal; }
 
 /* The bottom bar (ADR 098): view and zoom at the left, the tile button and the project name, the tools in the middle, the map's
    lists as round buttons at the right. The status bar runs below it. */
