@@ -21,5 +21,7 @@
   "contentfolders.status.applied": "{objects, plural, =0 {All object folders are read} one {# object folder is left out} other {# object folders are left out}}, {splines, plural, =0 {all spline folders are read} one {# spline folder is left out} other {# spline folders are left out}}. The menus are read again.",
   "contentfolders.status.failed": "The menus follow the new choice, but it could not be kept for the next start: {reason}",
   "contentfolders.this_project": "{name} (open project)",
-  "contentfolders.this_project.tooltip": "The folder of the open project stays in: MapWorks puts the junctions and road types it makes for this project there."
+  "contentfolders.this_project.tooltip": "The folder of the open project stays in: MapWorks puts the junctions and road types it makes for this project there.",
+  "@contentfolders.left_out": "Added to the empty note of the object menu and the road menu when folders are left out of the listing.",
+  "contentfolders.left_out": "{count, plural, one {# folder is not read} other {# folders are not read}} (File › Object and spline folders...)."
 }

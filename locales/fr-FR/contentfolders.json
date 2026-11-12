@@ -20,5 +20,6 @@
   "contentfolders.status.applied": "{objects, plural, =0 {Tous les dossiers d'objets sont lus} one {# dossier d'objets est laissé de côté} other {# dossiers d'objets sont laissés de côté}}, {splines, plural, =0 {tous les dossiers de splines sont lus} one {# dossier de splines est laissé de côté} other {# dossiers de splines sont laissés de côté}}. Les menus sont relus.",
   "contentfolders.status.failed": "Les menus suivent le nouveau choix, mais il n'a pas pu être gardé pour le prochain démarrage : {reason}",
   "contentfolders.this_project": "{name} (projet ouvert)",
-  "contentfolders.this_project.tooltip": "Le dossier du projet ouvert reste inclus : MapWorks y range les carrefours et types de route qu'il crée pour ce projet."
+  "contentfolders.this_project.tooltip": "Le dossier du projet ouvert reste inclus : MapWorks y range les carrefours et types de route qu'il crée pour ce projet.",
+  "contentfolders.left_out": "{count, plural, one {# dossier n'est pas lu} other {# dossiers ne sont pas lus}} (Fichier › Dossiers d'objets et de splines...)."
 }

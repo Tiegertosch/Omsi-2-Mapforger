@@ -36,6 +36,9 @@ namespace OmsiMapEditor.UI
             }
             if (PickingElementType)
                 EndElementTypePick(null);
+            // The terrain and markings tools have a window of their own in the same place; it would stand beside the road panel.
+            if (activeTool == EditorTool.Terrain || activeTool == EditorTool.Markings)
+                SetTool(EditorTool.Drag);
             StopPlacement();
             StartInstallationScan();
             UpdateRoadProfiles();

@@ -20,5 +20,6 @@
   "contentfolders.status.applied": "{objects, plural, =0 {Alle Objektordner werden gelesen} one {# Objektordner wird weggelassen} other {# Objektordner werden weggelassen}}, {splines, plural, =0 {alle Spline-Ordner werden gelesen} one {# Spline-Ordner wird weggelassen} other {# Spline-Ordner werden weggelassen}}. Die Menüs werden neu eingelesen.",
   "contentfolders.status.failed": "Die Menüs folgen der neuen Auswahl, aber sie ließ sich nicht für den nächsten Start speichern: {reason}",
   "contentfolders.this_project": "{name} (offenes Projekt)",
-  "contentfolders.this_project.tooltip": "Der Ordner des offenen Projekts bleibt drin: Dort legt MapWorks die Kreuzungen und Straßentypen ab, die es für dieses Projekt erstellt."
+  "contentfolders.this_project.tooltip": "Der Ordner des offenen Projekts bleibt drin: Dort legt MapWorks die Kreuzungen und Straßentypen ab, die es für dieses Projekt erstellt.",
+  "contentfolders.left_out": "{count, plural, one {# Ordner wird nicht gelesen} other {# Ordner werden nicht gelesen}} (Datei › Objekt- und Spline-Ordner...)."
 }

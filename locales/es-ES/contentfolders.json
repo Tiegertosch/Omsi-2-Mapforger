@@ -20,5 +20,6 @@
   "contentfolders.status.applied": "{objects, plural, =0 {Se leen todas las carpetas de objetos} one {Se omite # carpeta de objetos} other {Se omiten # carpetas de objetos}}, {splines, plural, =0 {se leen todas las carpetas de splines} one {se omite # carpeta de splines} other {se omiten # carpetas de splines}}. Los menús se vuelven a leer.",
   "contentfolders.status.failed": "Los menús siguen la nueva elección, pero no se pudo guardar para el próximo inicio: {reason}",
   "contentfolders.this_project": "{name} (proyecto abierto)",
-  "contentfolders.this_project.tooltip": "La carpeta del proyecto abierto siempre se incluye: MapWorks guarda allí los cruces y tipos de carretera que crea para este proyecto."
+  "contentfolders.this_project.tooltip": "La carpeta del proyecto abierto siempre se incluye: MapWorks guarda allí los cruces y tipos de carretera que crea para este proyecto.",
+  "contentfolders.left_out": "{count, plural, one {# carpeta no se lee} other {# carpetas no se leen}} (Archivo › Carpetas de objetos y splines...)."
 }

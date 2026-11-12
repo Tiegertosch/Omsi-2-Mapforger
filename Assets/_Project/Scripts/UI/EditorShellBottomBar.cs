@@ -53,7 +53,6 @@ namespace OmsiMapEditor.UI
             // The pill only shows the name and the mode; the map's settings open from the Map button at the right.
             projectPill = new VisualElement();
             projectPill.AddToClassList("bar-pill");
-            LocBindings.Tooltip(projectPill, "bar.project.tooltip");
             projectPillLabel = new Label { pickingMode = PickingMode.Ignore };
             projectPill.Add(projectPillLabel);
             projectModeBadge = new VisualElement { pickingMode = PickingMode.Ignore };

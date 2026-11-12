@@ -734,6 +734,31 @@ namespace OmsiMapEditor.UI
                 : tab == Tab.Favorites && favorites.Count == 0 ? "objects.empty.favorites"
                 : tab == Tab.InMap && used.Count == 0 ? "objects.empty.in_map"
                 : "objects.empty.none"); // i18n:keys
+            // Only where a folder left out can be why the list is empty: a search and the lists of the installation, not the map's own
+            // objects and the favourites.
+            if (foldersLeftOut > 0 && library != null && (!string.IsNullOrWhiteSpace(search.value) || tab != Tab.InMap && tab != Tab.Favorites))
+                emptyLabel.text += "\n" + Loc.T("contentfolders.left_out", ("count", foldersLeftOut));
+        }
+
+        private int foldersLeftOut;
+
+        /// <summary>How many object folders the listing leaves out; the empty note says so, as an empty list could be just that.</summary>
+        public int FoldersLeftOut
+        {
+            get => foldersLeftOut;
+            set
+            {
+                if (foldersLeftOut == value)
+                    return;
+                foldersLeftOut = value;
+                UpdateInfo();
+            }
+        }
+
+        /// <summary>True when the element is the unfolded search field or a part of it.</summary>
+        public bool SearchHolds(VisualElement element)
+        {
+            return catalog.SearchOpen && element != null && (element == search || search.Contains(element));
         }
 
         private static void ShowFavorite(Button star, bool favorite)

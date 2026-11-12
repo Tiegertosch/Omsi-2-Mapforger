@@ -121,7 +121,7 @@ namespace OmsiMapEditor.UI
             return contentFolders.ExcludedFor(installationRoot);
         }
 
-        /// <summary>Shows on the folder buttons of the object and road menus how many folders the listing left out.</summary>
+        /// <summary>Tells the object and road menus how many folders the listing left out; their empty notes say so.</summary>
         private void ShowFoldersLeftOut(OmsiInstallationCatalog catalog)
         {
             var objects = 0;
@@ -132,6 +132,10 @@ namespace OmsiMapEditor.UI
                         splines++;
                     else
                         objects++;
+            if (objectsPanel != null)
+                objectsPanel.FoldersLeftOut = objects;
+            if (roadPanel != null)
+                roadPanel.FoldersLeftOut = splines;
         }
 
         /// <summary>Lists the folders of the map's installation with a tick for each that is read.</summary>

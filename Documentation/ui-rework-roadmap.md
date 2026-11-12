@@ -24,7 +24,7 @@ Vorschlag auf Grundlage von [ui-rework-audit.md](ui-rework-audit.md), [ui-rework
 |---|---|---|---|---|---|
 | M0 | Arbeitsstand sichern (**erledigt**, 12. November 2026) | P0 | S | – | testing |
 | M1 | Fehler der neuen Einstiege beheben (**erledigt**, 12. November 2026) | P0 | M | M0 | backend |
-| M2 | Statuszeile und Modusanzeige | P1 | M | M1 | frontend |
+| M2 | Statuszeile und Modusanzeige (**erledigt**, 12. November 2026) | P1 | M | M1 | frontend |
 | M3 | Modus- und Überlagerungsgerüst, erste Shell-Tests | P1 | L | M1 | backend |
 | M4 | Werkzeug-Fenster fertig migrieren | P1 | L | M2 | frontend |
 | M5 | Kontextmenü, zweite Etappe | P1 | M | M3 | frontend + backend |

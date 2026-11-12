@@ -1,6 +1,5 @@
 {
   "bar.tiles.tooltip": "Kafelki: lista kafelków mapy z wyszukiwaniem; kliknięcie wybiera kafelek.",
-  "bar.project.tooltip": "Projekt i mapa, którą edytuje.",
   "bar.paths.tooltip": "Ścieżki AI: pokaż ścieżki według rodzaju i przejdź do otwartych końców. Przełącznik „Ścieżki” po lewej pokazuje je na mapie.",
   "bar.entries.tooltip": "Punkty wejścia: gdzie startują autobusy; umieszczanie, zmiana nazwy i usuwanie.",
   "bar.lines.tooltip": "Linie: linie rozkładu jazdy, edytor rozkładu i grupy pojazdów.",

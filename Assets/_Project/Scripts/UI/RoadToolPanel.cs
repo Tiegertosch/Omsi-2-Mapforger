@@ -480,6 +480,7 @@ namespace OmsiMapEditor.UI
             {
                 lastDefaultHint = Loc.T("roadtool.hint");
                 planText = lastDefaultHint;
+                ShowHint(planText, false);
             }
             Refresh();
         }
@@ -655,6 +656,21 @@ namespace OmsiMapEditor.UI
             Refresh();
         }
 
+        private int foldersLeftOut;
+
+        /// <summary>How many spline folders the listing leaves out; the empty note says so, as an empty list could be just that.</summary>
+        public int FoldersLeftOut
+        {
+            get => foldersLeftOut;
+            set
+            {
+                if (foldersLeftOut == value)
+                    return;
+                foldersLeftOut = value;
+                Refresh();
+            }
+        }
+
         private void Refresh()
         {
             var text = search.value?.Trim() ?? string.Empty;
@@ -687,6 +703,9 @@ namespace OmsiMapEditor.UI
                     : tab == Tab.Favorites ? "roadtool.empty.favorites"
                     : tab == Tab.MyRoads ? "roadtool.empty.mine"
                     : "roadtool.empty.none"); // i18n:keys
+            // Only where a folder left out can be why the list is empty: a search and the lists of the installation.
+            if (shown.Count == 0 && foldersLeftOut > 0 && (text.Length > 0 || tab == Tab.Category))
+                emptyLabel.text += "\n" + Loc.T("contentfolders.left_out", ("count", foldersLeftOut));
             // The empty note lies over the tile area, which keeps its size.
             emptyLabel.style.display = shown.Count > 0 ? DisplayStyle.None : DisplayStyle.Flex;
         }

@@ -1,6 +1,5 @@
 {
   "bar.tiles.tooltip": "Dlaždice: seznam dlaždic mapy s vyhledáváním; kliknutí dlaždici vybere.",
-  "bar.project.tooltip": "Projekt a mapa, kterou upravuje.",
   "bar.paths.tooltip": "Cesty AI: zobrazit cesty podle druhu a přejít na otevřené konce. Přepínač „Cesty“ vlevo je zobrazí na mapě.",
   "bar.entries.tooltip": "Vstupní body: kde autobusy startují; umístit, přejmenovat a smazat.",
   "bar.lines.tooltip": "Linky: linky jízdního řádu, editor jízdního řádu a skupiny vozidel.",

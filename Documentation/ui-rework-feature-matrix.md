@@ -37,7 +37,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Objekt- und Spline-Ordner | File › Object and spline folders (`EditorShellContentFolders.cs:32`) | **Lücke** | offen | Ordner-Knopf im Katalog entfiel; Hinweis „N Ordner ausgelassen“ fehlt |
 | Kartenprüfung | Tools › Check map (`Bootstrap:754`) | voll (Menü), Dialog alt | offen | früherer Knopf *Tools* entfiel |
 | Updates, Fehlerbericht | Menü Help | alt | – | |
-| Modus der Karte (nur lesen, Variante, geändert) | – | **Lücke** | – | Anzeige versteckt (`EditorShell.uss:552`) |
+| Modus der Karte (nur lesen, Variante, geändert) | – | Abzeichen an der Projektpille, Zahl geänderter Dateien im Tooltip (seit 12. November 2026, M2) | – | `EditorShellBottomBar.cs` (`UpdateProjectModeBadge`), `UpdateMapStateLabel` |
 | **Ansicht** | | | | |
 | Draufsicht, 3D, Texturen, Zoom, Einpassen, Zentrieren | Leiste links | voll | ja | |
 | Linien anzeigen (Routes) | Leiste links | voll | ja | öffnet die Linienliste nicht mehr mit |

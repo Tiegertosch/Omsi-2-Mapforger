@@ -120,7 +120,8 @@ namespace OmsiMapEditor.UI
             }
             if (PickingElementType)
                 EndElementTypePick(null);
-            if (activeTool == EditorTool.Road || activeTool == EditorTool.Rows)
+            // The terrain and markings tools have a window of their own in the same place; it would stand beside the library.
+            if (activeTool == EditorTool.Road || activeTool == EditorTool.Rows || activeTool == EditorTool.Terrain || activeTool == EditorTool.Markings)
                 SetTool(EditorTool.Drag);
             StopPlacement();
             if (typePickOptions == null)

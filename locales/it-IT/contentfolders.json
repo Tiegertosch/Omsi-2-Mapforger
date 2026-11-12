@@ -20,5 +20,6 @@
   "contentfolders.status.applied": "{objects, plural, =0 {Tutte le cartelle di oggetti vengono lette} one {# cartella di oggetti è esclusa} other {# cartelle di oggetti sono escluse}}, {splines, plural, =0 {tutte le cartelle di spline vengono lette} one {# cartella di spline è esclusa} other {# cartelle di spline sono escluse}}. I menu vengono riletti.",
   "contentfolders.status.failed": "I menu seguono la nuova scelta, ma non è stato possibile conservarla per il prossimo avvio: {reason}",
   "contentfolders.this_project": "{name} (progetto aperto)",
-  "contentfolders.this_project.tooltip": "La cartella del progetto aperto resta inclusa: MapWorks vi mette gli incroci e i tipi di strada che crea per questo progetto."
+  "contentfolders.this_project.tooltip": "La cartella del progetto aperto resta inclusa: MapWorks vi mette gli incroci e i tipi di strada che crea per questo progetto.",
+  "contentfolders.left_out": "{count, plural, one {# cartella non viene letta} other {# cartelle non vengono lette}} (File › Cartelle di oggetti e spline...)."
 }

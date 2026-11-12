@@ -20,5 +20,6 @@
   "contentfolders.status.applied": "{objects, plural, =0 {Wszystkie foldery obiektów są czytane} one {Pominięto # folder obiektów} few {Pominięto # foldery obiektów} many {Pominięto # folderów obiektów} other {Pominięto # folderu obiektów}}, {splines, plural, =0 {wszystkie foldery splajnów są czytane} one {pominięto # folder splajnów} few {pominięto # foldery splajnów} many {pominięto # folderów splajnów} other {pominięto # folderu splajnów}}. Menu są wczytywane ponownie.",
   "contentfolders.status.failed": "Menu stosują nowy wybór, ale nie udało się go zapisać na następne uruchomienie: {reason}",
   "contentfolders.this_project": "{name} (otwarty projekt)",
-  "contentfolders.this_project.tooltip": "Folder otwartego projektu jest zawsze uwzględniany: MapWorks zapisuje w nim skrzyżowania i typy dróg tworzone dla tego projektu."
+  "contentfolders.this_project.tooltip": "Folder otwartego projektu jest zawsze uwzględniany: MapWorks zapisuje w nim skrzyżowania i typy dróg tworzone dla tego projektu.",
+  "contentfolders.left_out": "{count, plural, one {# folder nie jest czytany} few {# foldery nie są czytane} many {# folderów nie jest czytanych} other {# folderu nie jest czytane}} (Plik › Foldery obiektów i splajnów...)."
 }

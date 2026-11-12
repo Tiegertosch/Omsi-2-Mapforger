@@ -478,6 +478,7 @@ namespace OmsiMapEditor.UI
                 CreateSignalOptions();
             }
             statusLabel = root.Q<Label>("status-message");
+            toolHintLabel = root.Q<Label>("tool-hint");
             mapStateLabel = root.Q<Label>("map-state");
             SetStatusT("status.ready");
             if (mapStateLabel != null)
@@ -850,6 +851,7 @@ namespace OmsiMapEditor.UI
         {
             if (benchmarkFrames != null && Time.frameCount > benchmarkOpenFrame)
                 benchmarkFrames.Add(Time.unscaledDeltaTime * 1000.0);
+            RefreshToolHint();
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
             TickSignalPreview(Time.unscaledDeltaTime);
@@ -6092,7 +6094,10 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var focused = evt.target as VisualElement;
-            // Esc in the object search still stops placing first, then closes the panel.
+            // Esc in the unfolded object search folds the search first: the field's own handler does that, so the key is left to it.
+            if (evt.keyCode == KeyCode.Escape && objectsPanel != null && objectsPanel.SearchHolds(focused))
+                return;
+            // Esc elsewhere in the object library stops placing first, then closes the panel.
             if (evt.keyCode == KeyCode.Escape && objectsPanel != null && focused != null && objectsPanel.Contains(focused))
             {
                 if (PickingElementType)
@@ -7309,6 +7314,9 @@ namespace OmsiMapEditor.UI
                     : Loc.T("status.mode.readonly");
             mapStateLabel.text = Loc.T("status.map", ("kind", string.IsNullOrWhiteSpace(currentProjectName) ? "map" : "project"), ("name", string.IsNullOrWhiteSpace(currentProjectName) ? mapName : currentProjectName),
                 ("tiles", currentSummary.Tiles.Count), ("mode", mode));
+            // The pill's tooltip carries the whole line, with the number of edited files; it is written again on a language change.
+            if (projectPill != null)
+                projectPill.tooltip = mapStateLabel.text;
         }
 
         private static string SanitizeFileName(string value)
@@ -7852,23 +7860,16 @@ namespace OmsiMapEditor.UI
         {
             statusKey = null;
             statusArguments = null;
-            if (statusLabel != null)
-            {
-                statusLabel.text = message;
-                statusLabel.RemoveFromClassList("status-warning");
-            }
+            ShowStatusText(message);
         }
 
-        /// <summary>
-        /// The line a tool's picker used to show in its header (ADR 098, stage 2): what the road would be, the height under the pointer,
-        /// the objects listed. It goes to the status bar while that picker is on screen, a warning in the warning colour.
-        /// </summary>
-        private void ShowToolHint(VisualElement source, string text, bool warning)
+        /// <summary>Writes the message; its tooltip holds the whole text, as the one line of the status bar cuts long messages off.</summary>
+        private void ShowStatusText(string message)
         {
-            if (source == null || source.style.display == DisplayStyle.None || objectsPanelHost == null || objectsPanelHost.style.display == DisplayStyle.None)
+            if (statusLabel == null)
                 return;
-            SetStatus(text);
-            statusLabel?.EnableInClassList("status-warning", warning);
+            statusLabel.text = OneLine(message);
+            statusLabel.tooltip = message;
         }
 
         /// <summary>
@@ -7879,18 +7880,14 @@ namespace OmsiMapEditor.UI
         {
             statusKey = key;
             statusArguments = arguments;
-            if (statusLabel != null)
-            {
-                statusLabel.text = Loc.T(key, arguments); // i18n:keys
-                statusLabel.RemoveFromClassList("status-warning");
-            }
+            ShowStatusText(Loc.T(key, arguments)); // i18n:keys
         }
 
         /// <summary>Writes the message of <see cref="SetStatusT"/> again in the language now in use.</summary>
         private void RefreshStatusText()
         {
-            if (statusKey != null && statusLabel != null)
-                statusLabel.text = Loc.T(statusKey, statusArguments); // i18n:keys
+            if (statusKey != null)
+                ShowStatusText(Loc.T(statusKey, statusArguments)); // i18n:keys
         }
 
         private static void CreateBackgroundCamera()

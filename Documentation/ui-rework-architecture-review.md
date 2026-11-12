@@ -61,6 +61,8 @@ Fünf Bauweisen ohne gemeinsame Basis:
 
 ## 4. Statuszeile als einziger Kanal
 
+*Stand 12. November 2026: Die vier Befunde dieses Abschnitts sind mit dem Modus-Abzeichen und M2 behoben (`EditorShellToolHints.cs`, ADR 098 „M2“); der Text darunter beschreibt den Zustand davor.*
+
 Seit „Hinweise in die Statuszeile“ teilen sich drei Dinge ein Label: Meldungen nach einer Aktion, laufende Hinweise der Werkzeuge und (versteckt) der Modus der Karte.
 
 - **Bestätigt:** `ShowToolHint` schreibt über `SetStatus` (`:7784–7790`) und wird bei jeder Zeigerbewegung im Straßen- und Gelände-Werkzeug ausgelöst. Meldungen wie „Bau fehlgeschlagen“ mit Grund sind nach der nächsten Mausbewegung weg.

@@ -20,5 +20,6 @@
   "contentfolders.status.applied": "{objects, plural, =0 {Čtou se všechny složky objektů} one {Vynechána # složka objektů} few {Vynechány # složky objektů} many {Vynecháno # složky objektů} other {Vynecháno # složek objektů}}, {splines, plural, =0 {čtou se všechny složky splinů} one {vynechána # složka splinů} few {vynechány # složky splinů} many {vynecháno # složky splinů} other {vynecháno # složek splinů}}. Nabídky se načtou znovu.",
   "contentfolders.status.failed": "Nabídky se řídí novou volbou, ale nepodařilo se ji uložit pro příští spuštění: {reason}",
   "contentfolders.this_project": "{name} (otevřený projekt)",
-  "contentfolders.this_project.tooltip": "Složka otevřeného projektu zůstává vždy zahrnuta: MapWorks do ní ukládá křižovatky a typy silnic, které pro tento projekt vytvoří."
+  "contentfolders.this_project.tooltip": "Složka otevřeného projektu zůstává vždy zahrnuta: MapWorks do ní ukládá křižovatky a typy silnic, které pro tento projekt vytvoří.",
+  "contentfolders.left_out": "{count, plural, one {# složka se nečte} few {# složky se nečtou} many {# složky se nečte} other {# složek se nečte}} (Soubor › Složky objektů a splinů...)."
 }
