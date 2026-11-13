@@ -27,6 +27,7 @@ namespace OmsiMapEditor.UI
             parkListDialog = new VisualElement { name = "park-list-dialog" };
             parkListDialog.AddToClassList("dialog-overlay");
             parkListDialog.style.display = DisplayStyle.None;
+            RegisterOverlay(parkListDialog, true);
             var dialog = new VisualElement();
             dialog.AddToClassList("dialog");
             dialog.AddToClassList("content-folders");

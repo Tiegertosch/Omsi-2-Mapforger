@@ -32,6 +32,7 @@ namespace OmsiMapEditor.UI
         private void InitializeBugReport(VisualElement root, VisualElement helpMenu)
         {
             bugReportDialog = root.Q<VisualElement>("bug-report-dialog");
+            RegisterOverlay(bugReportDialog, true);
             if (bugReportDialog != null)
             {
                 bugReportForm = new BugReportDialog();

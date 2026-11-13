@@ -78,6 +78,12 @@ namespace OmsiMapEditor.UI
             satelliteWindow = new SatelliteWindow();
             satelliteWindow.style.display = DisplayStyle.None;
             workspaceElement?.Add(satelliteWindow);
+            // Not modal: the window floats beside the map while the map is edited.
+            RegisterOverlay(satelliteWindow, false, () =>
+            {
+                EndPlacementPick();
+                UpdatePlacementMarks();
+            });
             satelliteWindow.Closed += () =>
             {
                 HidePopup(satelliteWindow);

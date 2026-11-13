@@ -57,8 +57,367 @@ namespace OmsiMapEditor.OMSI
         public bool Succeeded => Change != null;
     }
 
+    /// <summary>
+    /// The edits of a tile discarded: the bytes before and after of every file the revert wrote (the tile, global.cfg for its
+    /// entry points, the terrain fitted again around it), and the records of the tile on the side not shown. Undo and redo
+    /// swap those records into the same tile summary, so every older and newer step finds the records it holds.
+    /// </summary>
+    public sealed class OmsiTileRevertChange
+    {
+        internal OmsiTileRevertChange(string tileFileName, int x, int y)
+        {
+            TileFileName = tileFileName;
+            X = x;
+            Y = y;
+        }
+
+        /// <summary>The tile's file, relative to the map folder.</summary>
+        public string TileFileName { get; }
+
+        public int X { get; }
+        public int Y { get; }
+        public bool IsApplied { get; internal set; } = true;
+
+        /// <summary>The reverted tile in the summary given to the revert; null when it was given none.</summary>
+        public OmsiTileSummary Tile { get; internal set; }
+
+        /// <summary>The tiles of that summary whose terrain the revert fitted again, to draw again.</summary>
+        public List<OmsiTileSummary> TerrainTiles { get; } = new List<OmsiTileSummary>();
+
+        /// <summary>The tile's records in the state that is not shown: the edited ones while the revert is in effect, else the original's.</summary>
+        internal OmsiTileContent Hidden { get; set; }
+
+        internal List<OmsiObjectChange.FileState> Files { get; } = new List<OmsiObjectChange.FileState>();
+
+        /// <summary>The relative paths of the files the revert wrote.</summary>
+        public IEnumerable<string> FilePaths()
+        {
+            foreach (var file in Files)
+                yield return file.RelativePath;
+        }
+
+        /// <summary>The text of the tile file before and after, such as to see what undoing the revert brings back.</summary>
+        public IEnumerable<string> TileTexts()
+        {
+            foreach (var file in Files)
+            {
+                if (!file.RelativePath.EndsWith(".map", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (file.Before != null)
+                    yield return OmsiTextFile.Decode(file.Before);
+                if (file.After != null)
+                    yield return OmsiTextFile.Decode(file.After);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A step that was refused because a file it writes was changed since, in the workspace or by another way: nothing was written, files
+    /// and summary are as before the call. Trying again gives the same answer.
+    /// </summary>
+    public sealed class OmsiStepRefusedException : InvalidOperationException
+    {
+        public OmsiStepRefusedException(string message)
+            : base(message)
+        {
+        }
+    }
+
+    /// <summary>
+    /// A step that failed, and putting back what it had written failed as well: the workspace may hold part of the step, so files and the
+    /// summary in memory may disagree; read the map again. The inner <see cref="AggregateException"/> holds the step's failure first, then
+    /// the roll-back's.
+    /// </summary>
+    public sealed class OmsiRollBackFailedException : InvalidOperationException
+    {
+        public OmsiRollBackFailedException(string message, AggregateException failures)
+            : base(message, failures)
+        {
+        }
+    }
+
+    /// <summary>The records of one tile and their counts, kept aside so they can be put back into the very tile summary.</summary>
+    internal sealed class OmsiTileContent
+    {
+        private readonly List<OmsiObjectRecord> objects;
+        private readonly List<OmsiSplineRecord> splines;
+        private readonly List<OmsiAttachedObjectRecord> attachedObjects;
+        private readonly List<OmsiSplineAttachmentRecord> splineAttachments;
+        private readonly int objectCount;
+        private readonly int splineCount;
+        private readonly int attachmentCount;
+
+        private OmsiTileContent(OmsiTileSummary tile)
+        {
+            objects = new List<OmsiObjectRecord>(tile.Objects);
+            splines = new List<OmsiSplineRecord>(tile.Splines);
+            attachedObjects = new List<OmsiAttachedObjectRecord>(tile.AttachedObjects);
+            splineAttachments = new List<OmsiSplineAttachmentRecord>(tile.SplineAttachments);
+            objectCount = tile.ObjectCount;
+            splineCount = tile.SplineCount;
+            attachmentCount = tile.AttachmentCount;
+        }
+
+        public static OmsiTileContent Of(OmsiTileSummary tile)
+        {
+            return new OmsiTileContent(tile);
+        }
+
+        /// <summary>Puts these records into <paramref name="tile"/>, keeping the map's totals right, and returns the ones it held.</summary>
+        public OmsiTileContent SwapInto(OmsiMapSummary summary, OmsiTileSummary tile)
+        {
+            var shown = Of(tile);
+            if (summary != null)
+            {
+                summary.ObjectCount += objectCount - tile.ObjectCount;
+                summary.SplineCount += splineCount - tile.SplineCount;
+                summary.AttachmentCount += attachmentCount - tile.AttachmentCount;
+            }
+            tile.Objects.Clear();
+            tile.Objects.AddRange(objects);
+            tile.Splines.Clear();
+            tile.Splines.AddRange(splines);
+            tile.AttachedObjects.Clear();
+            tile.AttachedObjects.AddRange(attachedObjects);
+            tile.SplineAttachments.Clear();
+            tile.SplineAttachments.AddRange(splineAttachments);
+            tile.ObjectCount = objectCount;
+            tile.SplineCount = splineCount;
+            tile.AttachmentCount = attachmentCount;
+            return shown;
+        }
+    }
+
+    /// <summary>Rules for the editor's undo and redo stacks that hold whatever their steps are; the last item of a stack is its top.</summary>
+    public static class OmsiStepHistory
+    {
+        /// <summary>
+        /// Clears the history beyond a revert of a tile whose undo or redo was refused, as a file it wrote changed since: the revert
+        /// stays as it is for good. <paramref name="from"/> is the stack the refused step was taken from, already without it; every
+        /// step left there goes, as each needs the revert the other way. A refused undo drops the older steps, which hold the tile's
+        /// records from before the revert; a refused redo drops the newer steps, made on top of the revert. The other stack stays:
+        /// its steps were made, or undone, in the state that is shown, so they still apply. Returns the number of steps dropped.
+        /// </summary>
+        public static int DropStepsBeyondRefusedRevert<T>(List<T> from)
+        {
+            if (from == null)
+                throw new ArgumentNullException(nameof(from));
+            var dropped = from.Count;
+            from.Clear();
+            return dropped;
+        }
+    }
+
     public sealed partial class OmsiMapSession
     {
+        /// <summary>
+        /// The step of a revert of <paramref name="tilePath"/>, with the files it may write: the tile, global.cfg, and the terrain of
+        /// the tile and the tiles beside it, which the terrain fit around it rewrites.
+        /// </summary>
+        private OmsiTileRevertChange RevertedFiles(OmsiRecordFile config, string tilePath, out List<string> touched)
+        {
+            var maps = config.Records.FindAll(record => string.Equals(record.Name, "map", StringComparison.OrdinalIgnoreCase) && record.Fields.Count == 3);
+            var own = maps.Find(record => SamePath(record.GetField(2), tilePath));
+            if (own == null || !own.TryGetInt(0, out var x) || !own.TryGetInt(1, out var y))
+                throw new InvalidOperationException(tilePath + " is not listed in global.cfg.");
+            touched = new List<string> { tilePath, GlobalConfigFileName };
+            foreach (var record in maps)
+            {
+                if (!record.TryGetInt(0, out var otherX) || !record.TryGetInt(1, out var otherY) || Math.Abs(otherX - x) > 1 || Math.Abs(otherY - y) > 1)
+                    continue;
+                string terrainPath;
+                try
+                {
+                    terrainPath = OmsiRelativePath.Normalize(record.GetField(2)) + ".terrain";
+                }
+                catch (ArgumentException)
+                {
+                    // The reader ignores such an entry too, so no terrain of it is fitted.
+                    continue;
+                }
+                if (!touched.Exists(path => string.Equals(path, terrainPath, StringComparison.OrdinalIgnoreCase)))
+                    touched.Add(terrainPath);
+            }
+            return new OmsiTileRevertChange(tilePath, x, y);
+        }
+
+        /// <summary>True when two states of a file are alike: both missing, or the same bytes.</summary>
+        private static bool SameState(byte[] first, byte[] second)
+        {
+            if (first == null || second == null)
+                return first == null && second == null;
+            return SameBytes(first, second);
+        }
+
+        /// <summary>
+        /// Reads what the tile in the summary shows after the revert: the records read again from its file, and the ground and water of it
+        /// and of the tiles whose terrain was fitted again. Changes nothing yet; the action returned puts it all in without reading a file,
+        /// keeping the records the tile held in the step. Null when there is no summary, or no such tile in it, to keep up to date.
+        /// </summary>
+        private Action ReadRevertPresentation(OmsiMapSummary summary, OmsiTileRevertChange change)
+        {
+            if (summary == null)
+                return null;
+            var tile = summary.Tiles.Find(candidate => SamePath(candidate.FileName, change.TileFileName));
+            if (tile == null)
+                return null;
+            var terrainTiles = new List<OmsiTileSummary>();
+            foreach (var file in change.Files)
+            {
+                if (!file.RelativePath.EndsWith(".terrain", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var terrainTile = summary.Tiles.Find(candidate =>
+                    string.Equals(OmsiRelativePath.Normalize(candidate.FileName) + ".terrain", file.RelativePath, StringComparison.OrdinalIgnoreCase));
+                if (terrainTile != null && !terrainTiles.Contains(terrainTile))
+                    terrainTiles.Add(terrainTile);
+            }
+            var workspace = RequireWorkspace();
+            var fresh = OmsiMapReader.ReadAddedElements(workspace, change.TileFileName, tile);
+            var shownTiles = new List<OmsiTileSummary> { tile };
+            foreach (var terrainTile in terrainTiles)
+                if (!shownTiles.Contains(terrainTile))
+                    shownTiles.Add(terrainTile);
+            var ground = TileGround.ReadAll(workspace, shownTiles);
+            return () =>
+            {
+                change.Tile = tile;
+                change.TerrainTiles.AddRange(terrainTiles);
+                change.Hidden = OmsiTileContent.Of(fresh).SwapInto(summary, tile);
+                TileGround.ApplyAll(ground);
+            };
+        }
+
+        /// <summary>
+        /// Takes back a revert of a tile: writes every file as it was before, and puts the records the tile held then back into its
+        /// summary, so older steps find their records again. Failures:
+        /// <see cref="OmsiStepRefusedException"/> when a file was changed since: nothing was written, files, summary and
+        /// <see cref="OmsiTileRevertChange.IsApplied"/> are as before, and the undo can never succeed;
+        /// <see cref="OmsiRollBackFailedException"/> when writing or reading failed and putting the files back failed too: the files
+        /// may hold part of the step while summary and <see cref="OmsiTileRevertChange.IsApplied"/> are as before, so the map must be read again;
+        /// any other exception: writing or reading failed and every file written was put back, so files, summary and
+        /// <see cref="OmsiTileRevertChange.IsApplied"/> are as before and the undo can be tried again.
+        /// </summary>
+        public void Undo(OmsiMapSummary summary, OmsiTileRevertChange change)
+        {
+            if (change == null)
+                throw new ArgumentNullException(nameof(change));
+            if (!change.IsApplied)
+                throw new InvalidOperationException("The revert has already been undone.");
+            ApplyFiles(change.Files, true);
+            SwapRevertedTile(summary, change, true);
+            change.IsApplied = false;
+        }
+
+        /// <summary>
+        /// Reverts the tile again after an undo, with the same records as the first time, so newer steps find theirs. Fails with the same
+        /// three kinds of failure as <see cref="Undo(OmsiMapSummary, OmsiTileRevertChange)"/>, which leave the same states behind.
+        /// </summary>
+        public void Redo(OmsiMapSummary summary, OmsiTileRevertChange change)
+        {
+            if (change == null)
+                throw new ArgumentNullException(nameof(change));
+            if (change.IsApplied)
+                throw new InvalidOperationException("The revert is already applied.");
+            ApplyFiles(change.Files, false);
+            SwapRevertedTile(summary, change, false);
+            change.IsApplied = true;
+        }
+
+        /// <param name="undo">Whether the files were just written as before the revert; a failure writes them back the other way.</param>
+        private void SwapRevertedTile(OmsiMapSummary summary, OmsiTileRevertChange change, bool undo)
+        {
+            if (change.Tile == null || change.Hidden == null)
+                return;
+            List<TileGround> ground;
+            try
+            {
+                ground = TileGround.ReadAll(RequireWorkspace(), RevertedTiles(change));
+            }
+            catch (Exception failure)
+            {
+                RollBackAfter(failure, () => ApplyFiles(change.Files, !undo));
+                throw;
+            }
+            change.Hidden = change.Hidden.SwapInto(summary, change.Tile);
+            TileGround.ApplyAll(ground);
+        }
+
+        /// <summary>
+        /// Takes back what a step wrote before it failed. When that fails as well, both errors are reported as an
+        /// <see cref="OmsiRollBackFailedException"/>: the message begins with the step's and names the failed roll-back, and the inner
+        /// exception holds both, the step's first.
+        /// </summary>
+        private static void RollBackAfter(Exception failure, Action rollBack)
+        {
+            try
+            {
+                rollBack();
+            }
+            catch (Exception rollBackFailure)
+            {
+                throw new OmsiRollBackFailedException(failure.Message + " Putting the files back as they were failed as well, so the workspace may hold part of the step: " +
+                                                      rollBackFailure.Message, new AggregateException(failure, rollBackFailure));
+            }
+        }
+
+        /// <summary>
+        /// The range of ground heights and the water of a tile as its files hold them, read first and put into the tile summary later,
+        /// so a failed read changes nothing. Reads what <see cref="ReadWaterOf"/> reads.
+        /// </summary>
+        private sealed class TileGround
+        {
+            private OmsiTileSummary tile;
+            private bool hasRange;
+            private float minHeight;
+            private float maxHeight;
+            private float[] water;
+
+            public static List<TileGround> ReadAll(OmsiMapWorkspace workspace, IEnumerable<OmsiTileSummary> tiles)
+            {
+                var states = new List<TileGround>();
+                foreach (var tile in tiles)
+                {
+                    var tilePath = OmsiRelativePath.Normalize(tile.FileName);
+                    var terrainPath = tilePath + ".terrain";
+                    var state = new TileGround { tile = tile };
+                    if (workspace.FileExists(terrainPath) && OmsiMapReader.TryReadTerrainRange(workspace.ReadAllBytes(terrainPath), out var min, out var max))
+                    {
+                        state.hasRange = true;
+                        state.minHeight = min;
+                        state.maxHeight = max;
+                    }
+                    var file = OmsiRecordFile.Parse(workspace.ReadAllBytes(tilePath), OmsiTileRecordLayouts.Instance);
+                    state.water = file.Records.Exists(record => string.Equals(record.Name, "water", StringComparison.OrdinalIgnoreCase))
+                        ? OmsiMapReader.ReadWater(workspace, tilePath)
+                        : null;
+                    states.Add(state);
+                }
+                return states;
+            }
+
+            public static void ApplyAll(List<TileGround> states)
+            {
+                foreach (var state in states)
+                {
+                    if (state.hasRange)
+                    {
+                        state.tile.TerrainMinHeight = state.minHeight;
+                        state.tile.TerrainMaxHeight = state.maxHeight;
+                    }
+                    state.tile.Water = state.water;
+                }
+            }
+        }
+
+        private static List<OmsiTileSummary> RevertedTiles(OmsiTileRevertChange change)
+        {
+            var tiles = new List<OmsiTileSummary> { change.Tile };
+            foreach (var tile in change.TerrainTiles)
+                if (!tiles.Contains(tile))
+                    tiles.Add(tile);
+            return tiles;
+        }
+
         /// <summary>
         /// Adds an empty tile at a free place of the grid: a tile file as OMSI writes one, its terrain blended from the edges
         /// of the tiles beside it so the ground runs on without a step, and a [map] entry at the end of global.cfg's list,
@@ -368,7 +727,12 @@ namespace OmsiMapEditor.OMSI
             change.Files.Add(new OmsiObjectChange.FileState { RelativePath = path, Before = before, After = after });
         }
 
-        /// <summary>Writes the files of a tile step; a file without content goes from the workspace, as the original map lacks it.</summary>
+        /// <summary>
+        /// Writes the files of a step, all or none; a file without content goes from the workspace, as the original map lacks it. Throws
+        /// <see cref="OmsiStepRefusedException"/> without writing when a file is no longer as the step left it. When a write fails, the
+        /// files written so far are put back and the failure is thrown as it was, so the workspace is as before the call; when putting
+        /// them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
+        /// </summary>
         private void ApplyFiles(List<OmsiObjectChange.FileState> files, bool undo)
         {
             var workspace = RequireWorkspace();
@@ -376,19 +740,62 @@ namespace OmsiMapEditor.OMSI
             {
                 var expected = undo ? file.After : file.Before;
                 var actual = Existing(workspace, file.RelativePath);
-                if (expected == null ? actual != null : actual == null || !SameBytes(actual, expected))
-                    throw new InvalidOperationException(file.RelativePath + " was changed in the meantime; the step cannot be " + (undo ? "undone." : "applied."));
+                if (!SameState(expected, actual))
+                    throw new OmsiStepRefusedException(file.RelativePath + " was changed in the meantime; the step cannot be " + (undo ? "undone." : "applied."));
             }
-            foreach (var file in files)
+            // A file counts as touched before its write starts: a save that fails can already have taken it off the list of deleted files.
+            var touched = new List<OmsiObjectChange.FileState>();
+            try
             {
-                var target = undo ? file.Before : file.After;
-                if (target != null)
-                    workspace.Save(file.RelativePath, target);
-                else if (workspace.ReadOriginalBytes(file.RelativePath) == null)
-                    workspace.Revert(file.RelativePath);
-                else
-                    workspace.Delete(file.RelativePath);
+                foreach (var file in files)
+                {
+                    touched.Add(file);
+                    WriteState(workspace, file.RelativePath, undo ? file.Before : file.After);
+                }
             }
+            catch (Exception failure)
+            {
+                RollBackAfter(failure, () => PutBack(workspace, touched, undo));
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Puts the files a step began to write back as the step found them, last first; a file still as it was is left alone, so one whose
+        /// write failed before changing anything needs no write. Tries every file; throws the failure, or all of them, at the end.
+        /// </summary>
+        private static void PutBack(OmsiMapWorkspace workspace, List<OmsiObjectChange.FileState> touched, bool undo)
+        {
+            var failures = new List<Exception>();
+            for (var index = touched.Count - 1; index >= 0; index--)
+            {
+                var file = touched[index];
+                var before = undo ? file.After : file.Before;
+                try
+                {
+                    if (!SameState(before, Existing(workspace, file.RelativePath)))
+                        WriteState(workspace, file.RelativePath, before);
+                }
+                catch (Exception failure)
+                {
+                    failures.Add(failure);
+                }
+            }
+            if (failures.Count == 1)
+                throw failures[0];
+            if (failures.Count > 1)
+                throw new AggregateException(failures);
+        }
+
+        /// <summary>Gives a file of the workspace these bytes; null takes it away, as the original map lacks it or as the project deletes it.</summary>
+        private static void WriteState(OmsiMapWorkspace workspace, string relativePath, byte[] bytes)
+        {
+            if (bytes != null)
+                workspace.Save(relativePath, bytes);
+            else if (workspace.ReadOriginalBytes(relativePath) == null)
+                workspace.Revert(relativePath);
+            else
+                workspace.Delete(relativePath);
         }
 
         /// <summary>Files read once for a tile step, with their bytes before it; the encoding of each stays as it is.</summary>

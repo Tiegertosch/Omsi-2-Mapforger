@@ -45,6 +45,7 @@ namespace OmsiMapEditor.UI
         private void InitializeUpdates(VisualElement root, VisualElement helpMenu)
         {
             updateDialog = root.Q<VisualElement>("update-dialog");
+            RegisterOverlay(updateDialog, true, CloseUpdates);
             if (updateDialog != null)
             {
                 updateForm = new UpdateDialog();

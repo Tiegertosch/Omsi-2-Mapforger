@@ -26,6 +26,7 @@ namespace OmsiMapEditor.UI
             trafficCurvesDialog = new VisualElement { name = "traffic-curves-dialog" };
             trafficCurvesDialog.AddToClassList("dialog-overlay");
             trafficCurvesDialog.style.display = DisplayStyle.None;
+            RegisterOverlay(trafficCurvesDialog, true);
             var dialog = new VisualElement();
             dialog.AddToClassList("dialog");
             dialog.AddToClassList("content-folders");

@@ -819,27 +819,81 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Discards the workspace copy of a tile, so the original is shown again. Entry points of that tile get their
-        /// original object indices back, because deleting objects in the tile may have shifted them.
+        /// Discards the workspace copy of a tile, so the original is shown again, without a summary to keep up to date. See
+        /// <see cref="RevertTile(OmsiMapSummary, string)"/>.
         /// </summary>
-        public void RevertTile(string tileFileName)
+        public OmsiTileRevertChange RevertTile(string tileFileName)
+        {
+            return RevertTile(null, tileFileName);
+        }
+
+        /// <summary>
+        /// Discards the workspace copy of a tile, so the original is shown again. Entry points of that tile get their
+        /// original object indices back, because deleting objects in the tile may have shifted them, and the terrain around
+        /// follows the roads that remain. The tile in <paramref name="summary"/> gets the original's records in place, so
+        /// steps that hold its tile summaries stay valid. Returns the step that takes it back, or null when no file changed.
+        /// When the revert fails, every file it wrote is put back and the failure is thrown, so files and summary are as before; when
+        /// putting them back fails too, <see cref="OmsiRollBackFailedException"/> says so: the files may hold part of the revert while
+        /// the summary is unchanged, so the map must be read again.
+        /// </summary>
+        public OmsiTileRevertChange RevertTile(OmsiMapSummary summary, string tileFileName)
         {
             var workspace = RequireWorkspace();
             var tilePath = OmsiRelativePath.Normalize(tileFileName);
             // Without its file the map would still list an added tile; deleting it takes it out of the list.
             if (IsTileAdded(tilePath))
                 throw new InvalidOperationException(tilePath + " was added in this project and has no original; delete the tile instead.");
-            workspace.Revert(tilePath);
-            if (workspace.IsModified(GlobalConfigFileName))
-                RestoreEntryPoints(workspace, tilePath);
-            // Roads of this tile may have fitted the terrain here and around; it follows the roads that remain.
-            if (workspace.ModifiedFiles().Exists(path => path.EndsWith(".terrain", StringComparison.OrdinalIgnoreCase)))
+            var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
+            var change = RevertedFiles(config, tilePath, out var touched);
+            var before = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in touched)
+                before[path] = Existing(workspace, path);
+
+            // Everything that reads a file happens before the summary changes: a revert that fails leaves the files and the summary as they were.
+            Action present;
+            try
             {
-                var summary = Read();
-                var tile = summary.Tiles.Find(candidate => SamePath(candidate.FileName, tilePath));
-                if (tile != null)
-                    RefitTerrainAround(summary, tile);
+                workspace.Revert(tilePath);
+                if (workspace.IsModified(GlobalConfigFileName))
+                    RestoreEntryPoints(workspace, tilePath);
+                // Roads of this tile may have fitted the terrain here and around; it follows the roads that remain.
+                if (workspace.ModifiedFiles().Exists(path => path.EndsWith(".terrain", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var fresh = Read();
+                    var tile = fresh.Tiles.Find(candidate => SamePath(candidate.FileName, tilePath));
+                    if (tile != null)
+                        RefitTerrainAround(fresh, tile);
+                }
+
+                foreach (var path in touched)
+                {
+                    var after = Existing(workspace, path);
+                    if (!SameState(before[path], after))
+                        change.Files.Add(new OmsiObjectChange.FileState { RelativePath = path, Before = before[path], After = after });
+                }
+                if (change.Files.Count == 0)
+                    return null;
+                present = ReadRevertPresentation(summary, change);
             }
+            catch (Exception failure)
+            {
+                // A revert that did not finish leaves no half of itself behind.
+                RollBackAfter(failure, () =>
+                {
+                    var written = new List<OmsiObjectChange.FileState>();
+                    foreach (var path in touched)
+                    {
+                        var now = Existing(workspace, path);
+                        if (!SameState(before[path], now))
+                            written.Add(new OmsiObjectChange.FileState { RelativePath = path, Before = before[path], After = now });
+                    }
+                    ApplyFiles(written, true);
+                });
+                throw;
+            }
+
+            present?.Invoke();
+            return change;
         }
 
         /// <summary>

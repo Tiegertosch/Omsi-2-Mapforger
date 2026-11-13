@@ -42,6 +42,7 @@ namespace OmsiMapEditor.UI
             timetableDialog = new VisualElement { name = "timetable-dialog" };
             timetableDialog.AddToClassList("dialog-overlay");
             timetableDialog.style.display = DisplayStyle.None;
+            RegisterOverlay(timetableDialog, true);
             var dialog = new VisualElement();
             dialog.AddToClassList("dialog");
             dialog.AddToClassList("content-folders");

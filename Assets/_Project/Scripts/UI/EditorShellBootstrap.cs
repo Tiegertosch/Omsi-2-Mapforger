@@ -52,6 +52,12 @@ namespace OmsiMapEditor.UI
 
             /// <summary>A road type of the road builder changed or deleted in the installation (ADR 049).</summary>
             public OmsiRoadTypeChange RoadTypeChange;
+
+            /// <summary>
+            /// The edits of a tile discarded. The tile's records are swapped in place, so the history before and after it stays;
+            /// it is always a step of its own, never part of a group.
+            /// </summary>
+            public OmsiTileRevertChange TileRevert;
         }
 
         private const int HistoryLimit = 200;
@@ -353,12 +359,14 @@ namespace OmsiMapEditor.UI
             var saveProjectMenuItem = root.Q<Button>("save-project-menu-item");
             var exportMenuItem = root.Q<Button>("export-menu-item");
             exportDialog = root.Q<VisualElement>("export-dialog");
+            RegisterOverlay(exportDialog, true);
             exportFolderField = root.Q<TextField>("export-folder-field");
             exportNameField = root.Q<TextField>("export-name-field");
             exportTargetLabel = root.Q<Label>("export-target-label");
             exportConfirmButton = root.Q<Button>("export-confirm-button");
             var exportCancelButton = root.Q<Button>("export-cancel-button");
             checkDialog = root.Q<VisualElement>("check-dialog");
+            RegisterOverlay(checkDialog, true);
             checkSummaryLabel = root.Q<Label>("check-summary");
             checkSections = root.Q<ScrollView>("check-sections");
             var checkCopyButton = root.Q<Button>("check-copy-button");
@@ -375,6 +383,7 @@ namespace OmsiMapEditor.UI
                 checkCloseButton.clicked += () => HidePopup(checkDialog);
             var newMapMenuItem = root.Q<Button>("new-map-menu-item");
             newMapDialog = root.Q<VisualElement>("new-map-dialog");
+            RegisterOverlay(newMapDialog, true);
             if (newMapDialog != null)
             {
                 newMapForm = new NewMapDialog();
@@ -537,47 +546,11 @@ namespace OmsiMapEditor.UI
                     roadPointer = new OmsiMapPoint(x, y);
                     if (rowLaidAt.HasValue && Math.Abs(x - rowLaidAt.Value.X) + Math.Abs(y - rowLaidAt.Value.Y) > 1.0)
                         rowLaidAt = null;
-                    if (activeTool == EditorTool.Rows)
-                        UpdateRowPreview();
-                    else if (activeTool == EditorTool.Terrain)
-                        ShowTerrainBrush();
-                    else if (activeTool == EditorTool.Markings)
-                        UpdateMarkingPreview();
-                    else if (activeTool == EditorTool.Priorities)
-                        UpdatePriorityPreview();
-                    else if (activeTool == EditorTool.Lanes)
-                        UpdateLanePreview();
-                    else if (activeTool == EditorTool.Signals)
-                        UpdateSignalPlan();
-                    else if (activeTool == EditorTool.Line)
-                        UpdateLinePreview();
-                    else
-                        UpdateRoadPreview();
+                    // The tool table says which tool follows the pointer (EditorShellTools.cs).
+                    OnToolPointerMoved();
                 };
-                mapCanvas.RoadReleased += () =>
-                {
-                    if (activeTool == EditorTool.Terrain)
-                        ReleaseTerrain();
-                };
-                mapCanvas.RoadClicked += (x, y) =>
-                {
-                    if (activeTool == EditorTool.Terrain)
-                        PressTerrain(x, y);
-                    else if (activeTool == EditorTool.Rows)
-                        ClickRow(x, y);
-                    else if (activeTool == EditorTool.Markings)
-                        ClickMarking(x, y);
-                    else if (activeTool == EditorTool.Priorities)
-                        ClickPriority(x, y);
-                    else if (activeTool == EditorTool.Lanes)
-                        ClickLane(x, y);
-                    else if (activeTool == EditorTool.Signals)
-                        ClickSignal(x, y);
-                    else if (activeTool == EditorTool.Line)
-                        ClickLine(x, y);
-                    else
-                        BuildRoadTo(x, y);
-                };
+                mapCanvas.RoadReleased += OnToolReleased;
+                mapCanvas.RoadClicked += OnToolClicked;
                 mapCanvas.SplineEndDragStarted += handle =>
                 {
                     bendingSpline = handle == SplineHandleKind.Curve;
@@ -1182,6 +1155,45 @@ namespace OmsiMapEditor.UI
             {
                 DeleteSelectedObjects();
                 Debug.Log("Delete selection: " + statusLabel?.text);
+            }
+
+            // -revertTile [x y] discards the edits of that tile, or of the selected one, as one step of the history, which -elementUndo
+            // and -elementRedo below take back and do again; the status goes to the log as "Revert:". One number alone, or values that are
+            // not whole numbers, warn and revert nothing.
+            if (Array.IndexOf(args, "-revertTile") >= 0)
+            {
+                var revertKnown = true;
+                // No value means the selected tile: the end of the arguments, or the next one (tile numbers may be negative).
+                var revertFirst = Argument("-revertTile", 1);
+                var revertNamesTile = revertFirst != null &&
+                                      !(revertFirst.StartsWith("-", StringComparison.Ordinal) && !int.TryParse(revertFirst, NumberStyles.Integer, CultureInfo.InvariantCulture, out _));
+                var revertX = 0;
+                var revertY = 0;
+                var revertParsed = revertNamesTile && int.TryParse(revertFirst, NumberStyles.Integer, CultureInfo.InvariantCulture, out revertX) &&
+                                   int.TryParse(Argument("-revertTile", 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out revertY);
+                if (revertNamesTile && !revertParsed)
+                {
+                    revertKnown = false;
+                    Debug.LogWarning("-revertTile needs two whole numbers x y, or none for the selected tile; nothing is reverted.");
+                }
+                else if (revertParsed)
+                {
+                    var revertTile = currentSummary.Tiles.Find(tile => tile.X == revertX && tile.Y == revertY);
+                    revertKnown = revertTile != null;
+                    if (revertKnown)
+                        SelectTile(revertTile, false);
+                    else
+                        Debug.LogWarning("-revertTile: the map has no tile " + revertX + ", " + revertY + "; nothing is reverted.");
+                }
+                if (revertKnown)
+                {
+                    // Wait for the ground, so the terrain fitted again is drawn into a loaded map as after a click.
+                    var groundStarted = Time.realtimeSinceStartup;
+                    while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundStarted < 300f)
+                        yield return null;
+                    RevertSelectedTile();
+                    Debug.Log("Revert: " + statusLabel?.text);
+                }
             }
 
             // -retype <file.sco> and -relabel <line|line|...> change the selected object, or with -elementId <ID> the attached
@@ -1895,7 +1907,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <param name="projectFilePath">The project whose workspace is used; null opens the map read-only.</param>
-        /// <param name="keepView">Keeps the view, selected tile and selected object, for example after reverting a tile.</param>
+        /// <param name="keepView">Keeps the view, selected tile and selected object, for example after adding or deleting a tile.</param>
         private void LoadMap(string globalConfigPath, string projectName, string projectFilePath, bool keepView)
         {
             ShowMap(ReadMap(globalConfigPath, projectFilePath), projectName, keepView);
@@ -1946,50 +1958,15 @@ namespace OmsiMapEditor.UI
         {
             // Picks waiting for a click and the context menu hold records of the summary shown, which is replaced now.
             LeaveTransientModes();
-            // Roads are drawn on the summary shown; another map or a chrono view ends the road tool and the spline selection.
-            if (activeTool == EditorTool.Road)
-            {
-                activeTool = EditorTool.Drag;
-                EndRoadTool();
-            }
-            // The markings tool holds a junction of the summary shown.
-            if (activeTool == EditorTool.Markings)
-            {
-                activeTool = EditorTool.Drag;
-                EndMarkingTool();
-            }
-            // So do the priority and lanes tools.
-            if (activeTool == EditorTool.Priorities)
-            {
-                activeTool = EditorTool.Drag;
-                EndPriorityTool();
-            }
-            if (activeTool == EditorTool.Signals)
-            {
-                activeTool = EditorTool.Drag;
-                EndSignalTool();
-            }
-            if (activeTool == EditorTool.Lanes)
-            {
-                activeTool = EditorTool.Drag;
-                EndLaneTool();
-            }
-            // Rows, terrain and line keep panels and previews of their own; a view where they cannot be used ends them too.
+            // Roads, markings, right of way, signals and lanes hold records of the summary shown; another map or a chrono view ends
+            // them and the spline selection (EditorToolRules.EndsOnEveryView).
+            if (EditorToolRules.EndsOnEveryView(activeTool))
+                EndToolForView();
+            // Rows, terrain and line keep panels and previews of their own; a view where they cannot be used ends them too. A terrain
+            // stroke still held has saved the heights it showed with every tick: ending the tool finishes it on the summary it was
+            // begun on, which is still the current one here, so that the files are whole and the step can be undone.
             if (mapCanvas != null && activeTool != EditorTool.Drag && OnlySelectingWith(activeTool))
-            {
-                var leaving = activeTool;
-                activeTool = EditorTool.Drag;
-                if (leaving == EditorTool.Rows)
-                    EndRowTool();
-                else if (leaving == EditorTool.Terrain)
-                {
-                    // A stroke still held has saved the heights it showed with every tick: ending the tool finishes it on the summary
-                    // it was begun on, which is still the current one here, so that the files are whole and the step can be undone.
-                    EndTerrainTool();
-                }
-                else if (leaving == EditorTool.Line)
-                    EndLineTool();
-            }
+                EndToolForView();
             ClearSelectedSpline();
             var previousTile = selectedTile;
             var previousObjectId = selectedObject?.Id;
@@ -2034,7 +2011,8 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private bool OnlySelectingWith(EditorTool tool)
         {
-            return !CanEditObjects || !CanEdit && tool != EditorTool.Move && tool != EditorTool.Rotate && tool != EditorTool.Priorities && tool != EditorTool.Road;
+            // In a variant being edited Move, Rotate, Priorities and Road keep working; Drag only ever selects.
+            return !CanEditObjects || !CanEdit && (tool == EditorTool.Drag || !EditorToolRules.NeedsObjectEditingOnly(tool));
         }
 
         private static List<OmsiChronoVariant> ReadChronoVariants(IOmsiFileSource source)
@@ -5999,68 +5977,6 @@ namespace OmsiMapEditor.UI
             return null;
         }
 
-        private IEnumerable<VisualElement> Dialogs()
-        {
-            yield return exportDialog;
-            yield return newMapDialog;
-            yield return checkDialog;
-            yield return settingsDialog;
-            yield return contentFoldersDialog;
-            yield return parkListDialog;
-            yield return timetableDialog;
-            yield return trafficCurvesDialog;
-            yield return vehiclesDialog;
-            yield return updateDialog;
-            yield return bugReportDialog;
-            yield return satelliteWindow;
-        }
-
-        private bool AnyDialogShown()
-        {
-            foreach (var dialog in Dialogs())
-                if (IsShown(dialog))
-                    return true;
-            return false;
-        }
-
-        /// <summary>Esc closes the topmost overlay: a dialog or window first, then the list popup above the bottom bar.</summary>
-        private bool CloseTopOverlay()
-        {
-            if (AnyDialogShown())
-            {
-                var satelliteOpen = IsShown(satelliteWindow);
-                var updatesOpen = IsShown(updateDialog);
-                foreach (var dialog in Dialogs())
-                    HidePopup(dialog);
-                if (satelliteOpen)
-                {
-                    EndPlacementPick();
-                    UpdatePlacementMarks();
-                }
-                if (updatesOpen)
-                    CloseUpdates();
-                return true;
-            }
-            if (barPopupOpen)
-            {
-                ShowBarPopup(false);
-                return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Whether a dialog that takes the keys is open: every dialog but the window for pictures from the air, which floats beside the map
-        /// while it is edited.
-        /// </summary>
-        private bool AnyModalDialogShown()
-        {
-            foreach (var dialog in Dialogs())
-                if (!ReferenceEquals(dialog, satelliteWindow) && IsShown(dialog))
-                    return true;
-            return false;
-        }
-
         /// <summary>Whether the element is, or lies in, a field that takes typed text or numbers, where keys are typing.</summary>
         internal static bool InTextInput(VisualElement element)
         {
@@ -6135,17 +6051,10 @@ namespace OmsiMapEditor.UI
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
-                if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Rows)
+                // Esc goes to the active tool first (the tool table, EditorShellTools.cs); Drag leaves it to placing, the library
+                // and the selection below.
+                if (evt.keyCode == KeyCode.Escape && EscapeActiveTool())
                 {
-                    if (rowStart != null || selectedRow != null)
-                    {
-                        rowStart = null;
-                        DeselectRow();
-                        UpdateRowPreview();
-                        SetStatusT("rows.status.idle");
-                    }
-                    else
-                        SetTool(EditorTool.Drag);
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Rows && selectedRow != null)
@@ -6161,66 +6070,6 @@ namespace OmsiMapEditor.UI
                         ChangeSelectedRow(null);
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.T && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Rows ? EditorTool.Drag : EditorTool.Rows);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.B && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Line ? EditorTool.Drag : EditorTool.Line);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.G && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Terrain ? EditorTool.Drag : EditorTool.Terrain);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.M && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Markings ? EditorTool.Drag : EditorTool.Markings);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Markings)
-                {
-                    EscapeMarking();
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.V && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Priorities ? EditorTool.Drag : EditorTool.Priorities);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.A && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Signals ? EditorTool.Drag : EditorTool.Signals);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && (activeTool == EditorTool.Line || activeTool == EditorTool.Move || activeTool == EditorTool.Rotate))
-                {
-                    SetTool(EditorTool.Drag);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Signals)
-                {
-                    SetTool(EditorTool.Drag);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Priorities)
-                {
-                    SetTool(EditorTool.Drag);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.L && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Lanes ? EditorTool.Drag : EditorTool.Lanes);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Lanes)
-                {
-                    EscapeLane();
-                    evt.StopPropagation();
-                }
                 else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Markings && (markingSelected >= 0 || markingArea >= 0 || markingArrow >= 0))
                 {
                     DeleteSelectedMarking();
@@ -6229,42 +6078,6 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.Y && activeTool == EditorTool.Markings)
                 {
                     NextMarkingStyle();
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Terrain)
-                {
-                    if (terrainRampStart.HasValue)
-                    {
-                        terrainRampStart = null;
-                        ShowTerrainBrush();
-                        SetStatusT("terrain.status.ramp_start");
-                    }
-                    else
-                        SetTool(EditorTool.Drag);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && activeTool == EditorTool.Road)
-                {
-                    if (pickingRowObject)
-                        EndRowObjectPick(null);
-                    else if (RoadBuilderShown)
-                    {
-                        ShowRoadBuilder(false);
-                        SetStatusT("roadbuilder.status.closed");
-                    }
-                    else if (roadControl.HasValue)
-                    {
-                        roadControl = null;
-                        UpdateRoadPreview();
-                        SetStatusT("roadbuild.status.control_back");
-                    }
-                    else if (roadStarted)
-                    {
-                        EndRoad();
-                        SetStatusT("roadbuild.status.ended");
-                    }
-                    else
-                        SetTool(EditorTool.Drag);
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Escape && mapCanvas != null && mapCanvas.IsPlacing)
@@ -6290,11 +6103,6 @@ namespace OmsiMapEditor.UI
                     SetStatusT("place.status.heading", ("path", placementAsset), ("heading", mapCanvas.PlacementHeading));
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.R && mapCanvas != null && !mapCanvas.IsPlacing)
-                {
-                    SetTool(activeTool == EditorTool.Road ? EditorTool.Drag : EditorTool.Road);
-                    evt.StopPropagation();
-                }
                 else if (evt.keyCode == KeyCode.Delete && selection.Count > 0)
                 {
                     DeleteSelectedObjects();
@@ -6312,9 +6120,11 @@ namespace OmsiMapEditor.UI
                     SetStatusT(mapCanvas.LocalArrowAxes ? "move.axes.local" : "move.axes.global") /* i18n:keys */;
                     evt.StopPropagation();
                 }
-                else if (evt.keyCode == KeyCode.Q || evt.keyCode == KeyCode.W || evt.keyCode == KeyCode.E)
+                // The tool keys (the tool table): Q, W and E choose their tool always; the others switch between their tool and
+                // Drag, only while nothing is being placed. R in the rows tool, R while placing and W in the move tool are taken above.
+                else if (TryGetToolOfShortcut(evt.keyCode, out var keyTool))
                 {
-                    SetTool(evt.keyCode == KeyCode.W ? EditorTool.Move : evt.keyCode == KeyCode.E ? EditorTool.Rotate : EditorTool.Drag);
+                    SetTool(EditorToolRules.KeyTogglesWithDrag(keyTool) && activeTool == keyTool ? EditorTool.Drag : keyTool);
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.Alpha3 || evt.keyCode == KeyCode.Keypad3)
@@ -6367,6 +6177,11 @@ namespace OmsiMapEditor.UI
                 StepTile(step, to, undo);
                 return;
             }
+            if (step.TileRevert != null)
+            {
+                StepTileRevert(step, from, to, undo);
+                return;
+            }
             var touched = new List<MapSelectionItem>();
             try
             {
@@ -6397,6 +6212,9 @@ namespace OmsiMapEditor.UI
                     ApplyStep(step.Group[undo ? step.Group.Count - 1 - index : index], undo, touched);
                 return;
             }
+
+            if (step.TileRevert != null)
+                throw new InvalidOperationException("Reverting a tile is a step of its own; it cannot be part of a group.");
 
             if (step.SplineChange != null)
             {
@@ -6490,6 +6308,127 @@ namespace OmsiMapEditor.UI
             SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
         }
 
+        /// <summary>
+        /// Undoes or redoes a revert of a tile, keeping the history: the tile's records are swapped in place. A refused step leaves
+        /// files and summary as they were, so the revert stays as it is for good: the step and every step beyond it on its stack leave
+        /// the history, as those need the revert the other way (<see cref="OmsiStepHistory.DropStepsBeyondRefusedRevert{T}"/>); the
+        /// other stack stays. A step whose roll-back failed may have left part of itself in the files: the map is read again, which
+        /// clears the history. Any other failure was rolled back, so the step goes back where it was and can be tried again.
+        /// </summary>
+        private void StepTileRevert(ObjectEditStep step, List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)
+        {
+            try
+            {
+                if (undo)
+                    session.Undo(currentSummary, step.TileRevert);
+                else
+                    session.Redo(currentSummary, step.TileRevert);
+            }
+            catch (OmsiStepRefusedException exception)
+            {
+                Debug.LogException(exception);
+                var dropped = OmsiStepHistory.DropStepsBeyondRefusedRevert(from);
+                Debug.Log("History: " + (undo ? "undoing" : "redoing") + " the revert of tile " + step.TileRevert.X + ", " + step.TileRevert.Y +
+                          " was refused; it and " + dropped + " step(s) beyond it left the history.");
+                SetStatus(Loc.T(undo ? "history.undo_failed_dropped" : "history.redo_failed_dropped", ("step", DescribeStep(step)), ("reason", exception.Message))) /* i18n:keys */;
+                return;
+            }
+            catch (OmsiRollBackFailedException exception)
+            {
+                Debug.LogException(exception);
+                var description = DescribeStep(step);
+                ReloadAfterFailedRollBack();
+                SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", description), ("reason", exception.Message))) /* i18n:keys */;
+                return;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                // Files and summary are as before: the step goes back on top of its stack, to be tried again.
+                from.Add(step);
+                SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message))) /* i18n:keys */;
+                return;
+            }
+            to.Add(step);
+            RefreshAfterTileRevert(step.TileRevert);
+            SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
+        }
+
+        /// <summary>
+        /// Reads the map again after a step whose roll-back failed, so the views show what the files hold; that clears the history, whose
+        /// steps hold records that may no longer match the files. When reading fails as well, the history is cleared all the same. The
+        /// caller sets the status afterwards, so the reason of the failure is not replaced by the reload's own message.
+        /// </summary>
+        private void ReloadAfterFailedRollBack()
+        {
+            try
+            {
+                ReloadMap();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                undoSteps.Clear();
+                redoSteps.Clear();
+                UpdateToolbar();
+            }
+        }
+
+        /// <summary>
+        /// Brings the views and tools up to date after a tile was reverted, or the revert undone or redone. The tile summaries stay,
+        /// only the reverted tile's records changed, so the selection is found again by ID. What holds records of the summary ends as
+        /// when another view is shown (<see cref="PresentSummary"/>): the picks waiting for a click, and the tools the tool table ends on
+        /// every view; the rows tool lets go of its row.
+        /// </summary>
+        private void RefreshAfterTileRevert(OmsiTileRevertChange change)
+        {
+            LeaveTransientModes();
+            if (EditorToolRules.EndsOnEveryView(activeTool))
+            {
+                EndToolForView();
+                if (mapCanvas != null)
+                    mapCanvas.Tool = activeTool;
+            }
+            if (activeTool == EditorTool.Rows)
+            {
+                rowLayout = null;
+                rowObjects = null;
+                rowStart = null;
+                DeselectRow();
+            }
+            ClearSelectedSpline();
+            // The revert fitted the terrain around the tile itself, and undo and redo put those files back: the junctions as they are now
+            // are the ones the terrain was fitted to, so no fit outside the step follows.
+            if (CanEdit && currentSummary != null &&
+                currentSummary.Tiles.Exists(tile => tile.Splines.Exists(spline => spline.AlignsTerrain && session.ShapesTerrain(spline))))
+            {
+                try
+                {
+                    junctionTerrainState = session.JunctionTerrainState(currentSummary);
+                }
+                catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
+                {
+                    // The junctions are compared again at the next edit, which fits the terrain to them then.
+                    Debug.LogException(exception);
+                    junctionTerrainState = null;
+                }
+            }
+            roadGuideLines = null;
+            mapCanvas?.RefreshSplines();
+            if (change.Tile != null && groundRenderer != null && !groundRenderer.RefreshSplines(new[] { change.Tile }))
+                Debug.Log("Spline surfaces of the reverted tile are built once the ground has finished loading.");
+            var groundTiles = new List<OmsiTileSummary>(change.TerrainTiles);
+            if (change.Tile != null && !groundTiles.Contains(change.Tile))
+                groundTiles.Add(change.Tile);
+            RefreshGround(groundTiles);
+            if (roadPorts != null)
+                UpdateRoadPorts();
+            StartOutlineBuild(currentSummary);
+            ResetPaths(currentSummary);
+            RefreshAfterChange(null);
+            UpdateToolbar();
+        }
+
         /// <summary>Adds an empty tile at a free place beside the map, its terrain running on from its neighbours.</summary>
         private void AddTile(int x, int y)
         {
@@ -6561,6 +6500,8 @@ namespace OmsiMapEditor.UI
                 return step.Description;
             if (step.TileChange != null)
                 return Loc.T(step.TileChange.Added ? "history.step.new_tile" : "history.step.deleted_tile", ("x", step.TileChange.X), ("y", step.TileChange.Y)); // i18n:keys
+            if (step.TileRevert != null)
+                return Loc.T("history.step.reverted_tile", ("x", step.TileRevert.X), ("y", step.TileRevert.Y));
             if (step.AttachedChange != null)
                 return step.AttachedChange.Added.Count > 0 ? Loc.T("history.step.attached", ("name", Path.GetFileNameWithoutExtension(step.AttachedChange.Added[0].Value.AssetPath)))
                     : Loc.T("history.step.take_off", ("name", Path.GetFileNameWithoutExtension(step.AttachedChange.Removed[0].Value.AssetPath)));
@@ -7133,17 +7074,38 @@ namespace OmsiMapEditor.UI
                 SetStatusT("tile.status.added_here", ("file", selectedTile.FileName));
                 return;
             }
+            var tile = selectedTile;
+            // A terrain stroke still held has saved the heights it showed; it becomes its own step before the files go back.
+            if (activeTool == EditorTool.Terrain)
+                ReleaseTerrain();
+            OmsiTileRevertChange change;
             try
             {
-                session.RevertTile(selectedTile.FileName);
-                ReloadMap();
-                SetStatusT("tile.status.reverted", ("file", selectedTile.FileName));
+                change = session.RevertTile(currentSummary, tile.FileName);
+            }
+            catch (OmsiRollBackFailedException exception)
+            {
+                // Part of the revert may have stayed in the files: the map is read again, then the reason is shown.
+                Debug.LogException(exception);
+                ReloadAfterFailedRollBack();
+                SetStatusT("tile.status.revert_failed", ("file", tile.FileName), ("reason", exception.Message));
+                return;
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                SetStatusT("tile.status.revert_failed", ("file", selectedTile.FileName), ("reason", exception.Message));
+                SetStatusT("tile.status.revert_failed", ("file", tile.FileName), ("reason", exception.Message));
+                return;
             }
+            if (change == null)
+            {
+                SetStatusT("tile.status.revert_nothing", ("file", tile.FileName));
+                return;
+            }
+            // The step keeps the history before it: the tile's records were swapped in place, the tile summaries stay.
+            PushHistory(new ObjectEditStep { TileRevert = change });
+            RefreshAfterTileRevert(change);
+            SetStatusT("tile.status.reverted", ("file", tile.FileName));
         }
 
         private void OpenExportDialog()
@@ -7343,13 +7305,12 @@ namespace OmsiMapEditor.UI
 
         private static bool IsShown(VisualElement popup)
         {
-            return popup != null && popup.resolvedStyle.display != DisplayStyle.None;
+            return OverlayRegistry.IsShown(popup);
         }
 
         private static void HidePopup(VisualElement popup)
         {
-            if (popup != null)
-                popup.style.display = DisplayStyle.None;
+            OverlayRegistry.Hide(popup);
         }
 
         /// <summary>
@@ -7370,13 +7331,10 @@ namespace OmsiMapEditor.UI
         {
             if (currentSummary == null)
                 return;
-            var objectTool = tool == EditorTool.Drag || tool == EditorTool.Move || tool == EditorTool.Rotate || tool == EditorTool.Priorities || tool == EditorTool.Road;
-            if (tool != EditorTool.Drag && !(objectTool ? CanEditObjects : CanEdit))
+            var entry = ToolEntryOf(tool);
+            if (!EditorToolRules.IsAllowed(tool, CanEdit, CanEditObjects))
             {
-                SetStatus(ReadOnlyMessage(tool == EditorTool.Road ? "readonly.action.build_roads" : tool == EditorTool.Rows ? "readonly.action.lay_rows"
-                    : tool == EditorTool.Terrain ? "readonly.action.shape_ground" : tool == EditorTool.Markings ? "readonly.action.draw_markings"
-                    : tool == EditorTool.Priorities ? "readonly.action.right_of_way" : tool == EditorTool.Lanes ? "readonly.action.choose_lanes"
-                    : tool == EditorTool.Signals ? "readonly.action.edit_signals" : tool == EditorTool.Line ? "readonly.action.make_lines" : "readonly.action.move_rotate"));
+                SetStatus(ReadOnlyMessage(EditorToolRules.ReadOnlyKey(tool)));
                 return;
             }
             // Another tool ends placing and the picks waiting for a click, and closes the object library, the list above the bottom bar and the
@@ -7388,57 +7346,24 @@ namespace OmsiMapEditor.UI
             }
             EndSplineTypePick(null);
             ShowObjectsPanel(false);
-            var wasRoad = activeTool == EditorTool.Road;
-            var wasRows = activeTool == EditorTool.Rows;
-            var wasTerrain = activeTool == EditorTool.Terrain;
-            var wasMarkings = activeTool == EditorTool.Markings;
-            var wasPriorities = activeTool == EditorTool.Priorities;
-            var wasLanes = activeTool == EditorTool.Lanes;
-            var wasSignals = activeTool == EditorTool.Signals;
-            var wasLine = activeTool == EditorTool.Line;
+            var previous = activeTool;
+            // The end methods read activeTool: it names the new tool before the old one ends.
             activeTool = tool;
             if (mapCanvas != null)
                 mapCanvas.Tool = tool;
             // The old tool ends before the new one begins, as both use the map's road mode.
-            if (wasRoad && tool != EditorTool.Road)
-                EndRoadTool();
-            if (wasRows && tool != EditorTool.Rows)
-                EndRowTool();
-            if (wasTerrain && tool != EditorTool.Terrain)
-                EndTerrainTool();
-            if (wasMarkings && tool != EditorTool.Markings)
-                EndMarkingTool();
-            if (wasPriorities && tool != EditorTool.Priorities)
-                EndPriorityTool();
-            if (wasLanes && tool != EditorTool.Lanes)
-                EndLaneTool();
-            if (wasSignals && tool != EditorTool.Signals)
-                EndSignalTool();
-            if (wasLine && tool != EditorTool.Line)
-                EndLineTool();
-            if (tool == EditorTool.Road)
-                BeginRoadTool();
-            if (tool == EditorTool.Rows)
-                BeginRowTool();
-            if (tool == EditorTool.Terrain)
-                BeginTerrainTool();
-            if (tool == EditorTool.Markings && !wasMarkings)
-                BeginMarkingTool();
-            if (tool == EditorTool.Priorities && !wasPriorities)
-                BeginPriorityTool();
-            if (tool == EditorTool.Lanes && !wasLanes)
-                BeginLaneTool();
-            if (tool == EditorTool.Signals && !wasSignals)
-                BeginSignalTool();
-            if (tool == EditorTool.Line && !wasLine)
-                BeginLineTool();
+            if (previous != tool)
+                ToolEntryOf(previous).End?.Invoke();
+            var again = previous == tool;
+            var beginsAgain = EditorToolRules.BeginsAgain(tool);
+            if (entry.Begin != null && (!again || beginsAgain))
+                entry.Begin();
             // Choosing the tool that is on again keeps its panel in view, which closing the object library hid above.
-            if (objectsPanelHost != null && (tool == EditorTool.Markings && wasMarkings || tool == EditorTool.Priorities && wasPriorities ||
-                                             tool == EditorTool.Lanes && wasLanes || tool == EditorTool.Signals && wasSignals || tool == EditorTool.Line && wasLine))
+            if (objectsPanelHost != null && again && entry.Begin != null && !beginsAgain)
                 objectsPanelHost.style.display = DisplayStyle.Flex;
             UpdateToolbar();
-            if (tool == EditorTool.Road || tool == EditorTool.Rows || tool == EditorTool.Terrain || tool == EditorTool.Markings || tool == EditorTool.Priorities ||
-                tool == EditorTool.Lanes || tool == EditorTool.Signals || tool == EditorTool.Line)
+            // Only Drag, Move and Rotate write a status here; the tools with a mode of their own write theirs when they begin.
+            if (!EditorToolRules.IsSelectionTool(tool))
                 return;
             SetStatusT(tool == EditorTool.Move ? "tool.status.move" : tool == EditorTool.Rotate ? "tool.status.rotate" : "tool.status.drag") /* i18n:keys */;
         }
@@ -7744,6 +7669,8 @@ namespace OmsiMapEditor.UI
                 }
                 if (step.TileChange != null)
                     keep.AddRange(step.TileChange.TileTexts());
+                if (step.TileRevert != null)
+                    keep.AddRange(step.TileRevert.TileTexts());
             }
             foreach (var step in undoSteps)
                 Collect(step);

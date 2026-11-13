@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -172,6 +173,91 @@ namespace OmsiMapEditor.Tests
             var after = session.ReadEntryPoints(OmsiMapReader.Read(session.Source));
             Assert.AreEqual(new[] { 1, 2 }, after.Select(entry => entry.ObjectId).ToArray());
             AssertEntryCheckPasses(OmsiMapReader.Read(session.Source));
+        }
+
+        [Test]
+        public void UndoingTheRevertBringsTheEditedEntryPointsBackAndRedoTheOriginalsAgain()
+        {
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            session.AddEntryPoint(summary, tile, "Garage", 100.0, 120.0, 0.0, 0.0);
+            session.DeleteEntryPoint(summary, session.ReadEntryPoints(summary)[0]);
+            var edited = session.ReadEntryPoints(summary).Select(entry => entry.Name + " " + entry.ObjectId).ToArray();
+            var configEdited = Bytes("global.cfg");
+            var tileEdited = Bytes("tile_0_0.map");
+            var modifiedEdited = session.ModifiedFiles().ToList();
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            CollectionAssert.AreEquivalent(new[] { "global.cfg", "tile_0_0.map" }, revert.FilePaths().ToArray());
+            Assert.AreEqual(new[] { 1, 2 }, session.ReadEntryPoints(summary).Select(entry => entry.ObjectId).ToArray());
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            AssertEntryCheckPasses(summary);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            var configReverted = Bytes("global.cfg");
+
+            session.Undo(summary, revert);
+
+            CollectionAssert.AreEqual(configEdited, Bytes("global.cfg"));
+            CollectionAssert.AreEqual(tileEdited, Bytes("tile_0_0.map"));
+            CollectionAssert.AreEquivalent(modifiedEdited, session.ModifiedFiles());
+            CollectionAssert.AreEqual(edited, session.ReadEntryPoints(summary).Select(entry => entry.Name + " " + entry.ObjectId).ToArray());
+            AssertEntryCheckPasses(summary);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            CollectionAssert.AreEqual(configReverted, Bytes("global.cfg"));
+            Assert.AreEqual(new[] { 1, 2 }, session.ReadEntryPoints(summary).Select(entry => entry.ObjectId).ToArray());
+            AssertEntryCheckPasses(summary);
+        }
+
+        [Test]
+        public void UndoingARevertIsRefusedWithoutWritingWhenGlobalCfgWasSavedOutsideTheHistorySince()
+        {
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            session.AddEntryPoint(summary, tile, "Garage", 100.0, 120.0, 0.0, 0.0);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            CollectionAssert.Contains(revert.FilePaths().ToArray(), "global.cfg");
+            // The traffic curves, like the map settings, save global.cfg without a step of the history.
+            Assert.IsTrue(session.WriteTrafficCurves(new[] { new KeyValuePair<double, double>(0, 0.5), new KeyValuePair<double, double>(12, 1.5) }, null));
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var records = tile.Objects.ToList();
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, revert));
+
+            StringAssert.Contains("global.cfg was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(revert.IsApplied);
+            Assert.AreEqual(records.Count, tile.Objects.Count);
+            for (var index = 0; index < records.Count; index++)
+                Assert.AreSame(records[index], tile.Objects[index]);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void RedoingARevertIsRefusedWithoutWritingWhenGlobalCfgWasSavedOutsideTheHistoryAfterTheUndo()
+        {
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            session.AddEntryPoint(summary, tile, "Garage", 100.0, 120.0, 0.0, 0.0);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            CollectionAssert.Contains(revert.FilePaths().ToArray(), "global.cfg");
+            session.Undo(summary, revert);
+            Assert.IsTrue(session.WriteTrafficCurves(new[] { new KeyValuePair<double, double>(0, 0.5), new KeyValuePair<double, double>(12, 1.5) }, null));
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var records = tile.Objects.ToList();
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, revert));
+
+            StringAssert.Contains("global.cfg was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsFalse(revert.IsApplied);
+            Assert.AreEqual(records.Count, tile.Objects.Count);
+            for (var index = 0; index < records.Count; index++)
+                Assert.AreSame(records[index], tile.Objects[index]);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
         }
     }
 }

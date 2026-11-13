@@ -640,6 +640,101 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void RevertingATileFitsTheTerrainAroundAgainAndUndoPutsEveryTerrainFileBack()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A cutting 2 m high along the east edge of tile 0, 0, which the ground of tile 1, 0 beside it follows too.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 295, StartY = 100, StartHeight = 2, EndX = 295, EndY = 160, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var road = session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsTrue(session.Workspace.IsModified("tile_1_0.map.terrain"), "The cutting reaches into the tile beside.");
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var modified = session.ModifiedFiles().ToList();
+            var splines = summary.Tiles[0].Splines.ToList();
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            CollectionAssert.IsSupersetOf(revert.FilePaths(), new[] { "tile_0_0.map", "tile_0_0.map.terrain", "tile_1_0.map.terrain" });
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
+            CollectionAssert.AreEquivalent(summary.Tiles, revert.TerrainTiles);
+            CollectionAssert.AreEqual(new[] { 10, 11 }, summary.Tiles[0].Splines.Select(spline => spline.Id).ToArray());
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "Nothing is left to fit outside the step.");
+
+            session.Undo(summary, revert);
+
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEquivalent(modified, session.ModifiedFiles());
+            CollectionAssert.AreEqual(splines, summary.Tiles[0].Splines, "The road's own records are back, which its step holds.");
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "The terrain put back is the one fitted to the road.");
+
+            // The road built before the revert is taken back as ever, with the terrain it fitted.
+            session.Undo(summary, road);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            // Undoing a road leaves the range of heights the summary tells for a tile as it was; the records follow the files.
+            CollectionAssert.AreEqual(new[] { 10, 11 }, summary.Tiles[0].Splines.Select(spline => spline.Id).ToArray());
+            Assert.AreEqual(session.Read().SplineCount, summary.SplineCount);
+        }
+
+        [Test]
+        public void UndoAndRedoOfARevertAreRefusedWithoutWritingWhenATerrainFileItWroteChangedSince()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 295, StartY = 100, StartHeight = 2, EndX = 295, EndY = 160, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            CollectionAssert.Contains(revert.FilePaths().ToArray(), "tile_1_0.map.terrain");
+            var reverted = session.Workspace.ReadAllBytes("tile_1_0.map.terrain");
+
+            // The terrain beside is saved by another way, such as a terrain brush outside the history.
+            session.Workspace.Save("tile_1_0.map.terrain", ChangedLastByte(reverted));
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var splines = summary.Tiles[0].Splines.ToList();
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, revert));
+
+            StringAssert.Contains("tile_1_0.map.terrain was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(revert.IsApplied);
+            CollectionAssert.AreEqual(splines, summary.Tiles[0].Splines);
+
+            // With the terrain as the revert left it, the undo goes through; the terrain changed after it refuses the redo.
+            session.Workspace.Save("tile_1_0.map.terrain", reverted);
+            session.Undo(summary, revert);
+            var undone = session.Workspace.ReadAllBytes("tile_1_0.map.terrain");
+            session.Workspace.Save("tile_1_0.map.terrain", ChangedLastByte(undone));
+            files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            splines = summary.Tiles[0].Splines.ToList();
+
+            refused = Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, revert));
+
+            StringAssert.Contains("tile_1_0.map.terrain was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsFalse(revert.IsApplied);
+            CollectionAssert.AreEqual(splines, summary.Tiles[0].Splines);
+        }
+
+        private static byte[] ChangedLastByte(byte[] bytes)
+        {
+            var changed = (byte[])bytes.Clone();
+            changed[changed.Length - 1] ^= 0x01;
+            return changed;
+        }
+
+        [Test]
         public void TerrainIsLeftAloneBeyondARoadEndOnAJunctionAndLiesBelowTheSplineBeforeIt()
         {
             // A junction whose one connection point lies at its origin, facing south.
@@ -2592,6 +2687,79 @@ namespace OmsiMapEditor.Tests
             session.Undo(summary, deleted.Change);
             Assert.AreEqual(1, tile.AttachedObjects.Count);
             Assert.AreEqual(row.Id, session.Read().Tiles[0].AttachedObjects.Single().ParentId);
+        }
+
+        [Test]
+        public void UndoingARevertPutsTheVeryRecordsOfRowsAndAttachedObjectsBackAndRedoTheRevertedOnes()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 50, StartY = 100, StartHeight = 2, EndX = 250, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var tile = summary.Tiles[0];
+            var first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var plan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), tile, first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(plan.Problem);
+            session.AddAttachmentRow(summary, plan);
+            var row = tile.SplineAttachments.Single(item => item.AssetPath == @"Sceneryobjects\lamp.sco");
+            Assert.IsNotNull(session.AttachObject(summary, tile, row.Id, 1, @"Sceneryobjects\head.sco", 0));
+            var attached = tile.AttachedObjects.Single(item => item.ParentId == row.Id);
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            CollectionAssert.DoesNotContain(tile.SplineAttachments, row);
+            CollectionAssert.DoesNotContain(tile.AttachedObjects, attached);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            var revertedRows = tile.SplineAttachments.ToList();
+            var revertedAttached = tile.AttachedObjects.ToList();
+
+            session.Undo(summary, revert);
+
+            // The row and the object hung on it are the records the steps before the revert hold, not ones read again.
+            Assert.AreSame(row, tile.SplineAttachments.Single(item => item.Id == row.Id));
+            Assert.AreSame(attached, tile.AttachedObjects.Single(item => item.Id == attached.Id));
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            Assert.AreEqual(revertedRows.Count, tile.SplineAttachments.Count);
+            for (var index = 0; index < revertedRows.Count; index++)
+                Assert.AreSame(revertedRows[index], tile.SplineAttachments[index]);
+            Assert.AreEqual(revertedAttached.Count, tile.AttachedObjects.Count);
+            for (var index = 0; index < revertedAttached.Count; index++)
+                Assert.AreSame(revertedAttached[index], tile.AttachedObjects[index]);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void RevertingATileWhoseEditsLaidWaterKeepsTheSummaryAsTheFilesSayThroughUndoAndRedo()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsNull(tile.Water);
+            Assert.IsNotNull(session.SetTileWater(summary, tile, 5.0));
+            StringAssert.Contains("[water]", OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_0_0.map")));
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            Assert.IsNull(tile.Water);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            // The water file is not one the revert writes: its copy stays, unread while the tile has no [water] entry.
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.water"));
+
+            session.Undo(summary, revert);
+
+            CollectionAssert.AreEqual(new[] { 5f, 5f, 5f, 5f }, tile.Water);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            Assert.IsNull(tile.Water);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
         }
 
         [Test]

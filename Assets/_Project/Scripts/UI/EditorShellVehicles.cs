@@ -32,6 +32,7 @@ namespace OmsiMapEditor.UI
             vehiclesDialog = new VisualElement { name = "vehicles-dialog" };
             vehiclesDialog.AddToClassList("dialog-overlay");
             vehiclesDialog.style.display = DisplayStyle.None;
+            RegisterOverlay(vehiclesDialog, true);
             var dialog = new VisualElement();
             dialog.AddToClassList("dialog");
             dialog.AddToClassList("content-folders");

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
@@ -152,94 +153,117 @@ namespace OmsiMapEditor.UI
         private void FillSelectionMenu(VisualElement menu)
         {
             AddContextHeader(menu, Loc.T("context.selection", ("count", selection.Count)));
-            AddContextItem(menu, "context.properties", () => OpenInspector(InspectorTab.Selection));
-            if (!CanEditObjects)
+            var state = new ContextMenuState { CanEdit = CanEdit, CanEditObjects = CanEditObjects };
+            AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Selection, state), action =>
             {
-                AddContextNote(menu);
-                return;
-            }
-            AddContextDivider(menu);
-            AddContextItem(menu, "context.copy", () => CopySelection(), "Ctrl+C");
-            AddContextItem(menu, "context.duplicate", DuplicateSelection, "Ctrl+D");
-            if (CanEdit)
-                AddContextItem(menu, "context.level", LevelSelectedGround);
-            AddContextDivider(menu);
-            AddContextItem(menu, new Label(Loc.T("context.delete_many", ("count", selection.Count))), DeleteSelectedObjects, "Del", true);
+                switch (action)
+                {
+                    case ContextMenuAction.OpenProperties: return () => OpenInspector(InspectorTab.Selection);
+                    case ContextMenuAction.Copy: return () => CopySelection();
+                    case ContextMenuAction.Duplicate: return DuplicateSelection;
+                    case ContextMenuAction.LevelGround: return LevelSelectedGround;
+                    default: return DeleteSelectedObjects;
+                }
+            });
         }
 
         private void FillObjectMenu(VisualElement menu, OmsiTileSummary tile, OmsiObjectRecord item)
         {
             AddContextHeader(menu, Loc.T("context.object", ("id", item.Id), ("name", Path.GetFileName(item.AssetPath ?? string.Empty))));
-            AddContextItem(menu, "context.properties", () => OpenInspector(InspectorTab.Selection));
             var holdingTile = TileHolding(new MapSelectionItem { Tile = tile, Record = item }) ?? tile;
             var entryPoint = EditingVariant ? null : session?.EntryPointOf(currentSummary, holdingTile, item);
-            if (entryPoint != null)
-                AddContextItem(menu, "context.rename_entry", () => OpenInspector(InspectorTab.Selection, "object-entry"));
-            if (!EditingVariant && session != null && session.IsBusStop(currentSummary, holdingTile, item))
-                AddContextItem(menu, "context.rename_busstop", () => OpenInspector(InspectorTab.Selection, "bus-stop"));
-            if (CanEditObjects)
+            var state = new ContextMenuState
             {
-                AddContextItem(menu, "context.change_type", () => PickElementType(holdingTile, item));
-                AddContextItem(menu, "context.labels", () => OpenInspector(InspectorTab.Selection, "object-type"));
-            }
-            if (PathsGroupShown)
-                AddContextItem(menu, "context.paths", () => OpenInspector(InspectorTab.Selection, "paths"));
-            if (!CanEditObjects)
+                CanEdit = CanEdit,
+                CanEditObjects = CanEditObjects,
+                PathsGroupShown = PathsGroupShown,
+                IsEntryPoint = entryPoint != null,
+                IsBusStop = !EditingVariant && session != null && session.IsBusStop(currentSummary, holdingTile, item),
+            };
+            AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Object, state), action =>
             {
-                AddContextNote(menu);
-                return;
-            }
-            AddContextDivider(menu);
-            AddContextItem(menu, "context.copy", () => CopySelection(), "Ctrl+C");
-            AddContextItem(menu, "context.duplicate", DuplicateSelection, "Ctrl+D");
-            if (CanEdit)
-                AddContextItem(menu, "context.level", LevelSelectedGround);
-            AddContextDivider(menu);
-            if (entryPoint != null)
-                AddContextItem(menu, "context.delete_entry", () => DeleteEntryPoint(entryPoint), null, true);
-            else
-                AddContextItem(menu, "context.delete", DeleteSelectedObjects, "Del", true);
+                switch (action)
+                {
+                    case ContextMenuAction.OpenProperties: return () => OpenInspector(InspectorTab.Selection);
+                    case ContextMenuAction.RenameEntryPoint: return () => OpenInspector(InspectorTab.Selection, "object-entry");
+                    case ContextMenuAction.RenameBusStop: return () => OpenInspector(InspectorTab.Selection, "bus-stop");
+                    case ContextMenuAction.ChangeType: return () => PickElementType(holdingTile, item);
+                    case ContextMenuAction.EditLabels: return () => OpenInspector(InspectorTab.Selection, "object-type");
+                    case ContextMenuAction.OpenPaths: return () => OpenInspector(InspectorTab.Selection, "paths");
+                    case ContextMenuAction.Copy: return () => CopySelection();
+                    case ContextMenuAction.Duplicate: return DuplicateSelection;
+                    case ContextMenuAction.LevelGround: return LevelSelectedGround;
+                    case ContextMenuAction.DeleteEntryPoint: return () => DeleteEntryPoint(entryPoint);
+                    default: return DeleteSelectedObjects;
+                }
+            });
         }
 
         private void FillSplineMenu(VisualElement menu, OmsiSplineRecord spline)
         {
             AddContextHeader(menu, Loc.T("context.spline", ("id", spline.Id), ("name", Path.GetFileName(spline.AssetPath ?? string.Empty))));
-            AddContextItem(menu, "context.properties", () => OpenInspector(InspectorTab.Selection));
-            if (CanEdit)
-                AddContextItem(menu, "context.spline_heights", () => OpenInspector(InspectorTab.Selection, "spline-heights"));
-            if (PathsGroupShown)
-                AddContextItem(menu, "context.paths", () => OpenInspector(InspectorTab.Selection, "paths"));
-            if (CanEdit)
+            var state = new ContextMenuState
             {
-                AddContextDivider(menu);
-                AddContextItem(menu, "context.delete_spline", DeleteSelectedSpline, "Del", true);
-            }
-            else if (CanEditSplinesInVariant)
+                CanEdit = CanEdit,
+                CanEditSplinesInVariant = CanEditSplinesInVariant,
+                PathsGroupShown = PathsGroupShown,
+            };
+            AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Spline, state), action =>
             {
-                AddContextDivider(menu);
-                AddContextItem(menu, "context.change_spline_type", PickSplineType);
-                AddContextItem(menu, "context.delete_spline_variant", DeleteSelectedSplineInVariant, "Del", true);
-            }
-            else
-                AddContextNote(menu);
+                switch (action)
+                {
+                    case ContextMenuAction.OpenProperties: return () => OpenInspector(InspectorTab.Selection);
+                    case ContextMenuAction.EditSplineHeights: return () => OpenInspector(InspectorTab.Selection, "spline-heights");
+                    case ContextMenuAction.OpenPaths: return () => OpenInspector(InspectorTab.Selection, "paths");
+                    case ContextMenuAction.DeleteSpline: return DeleteSelectedSpline;
+                    case ContextMenuAction.ChangeSplineType: return PickSplineType;
+                    default: return DeleteSelectedSplineInVariant;
+                }
+            });
         }
 
         private void FillTileMenu(VisualElement menu, MapContextHit hit)
         {
             var tile = hit.Tile;
             AddContextHeader(menu, Loc.T("context.tile", ("x", tile.X), ("y", tile.Y)));
-            AddContextItem(menu, "context.tile_properties", () => OpenInspector(InspectorTab.Tile));
-            if (!CanEditObjects)
+            var state = new ContextMenuState
             {
-                AddContextNote(menu);
-                return;
-            }
-            if (clipboard != null && clipboard.Items.Count > 0)
-                AddContextItem(menu, "context.paste", () => PasteHere(new MapPlacement { Tile = tile, LocalX = hit.LocalX, LocalY = hit.LocalY }), "Ctrl+V");
-            if (CanEdit && IsTileEdited(tile) && !session.IsTileAdded(tile.FileName))
+                CanEdit = CanEdit,
+                CanEditObjects = CanEditObjects,
+                ClipboardFilled = clipboard != null && clipboard.Items.Count > 0,
+                TileRevertible = CanEdit && IsTileEdited(tile) && !session.IsTileAdded(tile.FileName),
+            };
+            AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Tile, state), action =>
             {
-                AddContextDivider(menu);
-                AddContextItem(menu, "context.revert_tile", RevertSelectedTile);
+                switch (action)
+                {
+                    case ContextMenuAction.OpenTileProperties: return () => OpenInspector(InspectorTab.Tile);
+                    case ContextMenuAction.Paste: return () => PasteHere(new MapPlacement { Tile = tile, LocalX = hit.LocalX, LocalY = hit.LocalY });
+                    default: return RevertSelectedTile;
+                }
+            });
+        }
+
+        /// <summary>Adds the entries of <see cref="ContextMenuEntries"/> in order; <paramref name="actionOf"/> maps an entry's action to what it does.</summary>
+        private void AddContextEntries(VisualElement menu, List<ContextMenuEntry> entries, Func<ContextMenuAction, Action> actionOf)
+        {
+            foreach (var entry in entries)
+            {
+                switch (entry.Type)
+                {
+                    case ContextMenuEntryType.Divider:
+                        AddContextDivider(menu);
+                        break;
+                    case ContextMenuEntryType.ReadOnlyNote:
+                        AddContextNote(menu);
+                        break;
+                    default:
+                        if (entry.TextKey == "context.delete_many")
+                            AddContextItem(menu, new Label(Loc.T("context.delete_many", ("count", selection.Count))), actionOf(entry.Action), entry.Shortcut, entry.Danger);
+                        else
+                            AddContextItem(menu, entry.TextKey, actionOf(entry.Action), entry.Shortcut, entry.Danger);
+                        break;
+                }
             }
         }
 

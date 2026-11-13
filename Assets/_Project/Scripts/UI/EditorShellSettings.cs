@@ -27,6 +27,7 @@ namespace OmsiMapEditor.UI
         private void SetUpSettings(VisualElement root)
         {
             settingsDialog = root.Q<VisualElement>("settings-dialog");
+            RegisterOverlay(settingsDialog, true);
             languageSlot = root.Q<VisualElement>("settings-language-list");
             if (languageSlot != null)
             {

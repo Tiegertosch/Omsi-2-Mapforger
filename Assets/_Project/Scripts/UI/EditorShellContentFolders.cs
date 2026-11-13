@@ -43,6 +43,7 @@ namespace OmsiMapEditor.UI
             contentFoldersDialog = new VisualElement { name = "content-folders-dialog" };
             contentFoldersDialog.AddToClassList("dialog-overlay");
             contentFoldersDialog.style.display = DisplayStyle.None;
+            RegisterOverlay(contentFoldersDialog, true);
             var dialog = new VisualElement();
             dialog.AddToClassList("dialog");
             dialog.AddToClassList("content-folders");

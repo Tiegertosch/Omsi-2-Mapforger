@@ -25,21 +25,21 @@ namespace OmsiMapEditor.UI
             AddToClassList("tool-bar");
 
             var selection = AddGroup();
-            AddTool(selection, EditorTool.Drag, "mouse-pointer-2", "toolbar.drag", "Q", "toolbar.drag.tooltip");
-            AddTool(selection, EditorTool.Move, "move", "toolbar.move", "W", "toolbar.move.tooltip");
-            AddTool(selection, EditorTool.Rotate, "rotate-cw", "toolbar.rotate", "E", "toolbar.rotate.tooltip");
+            AddTool(selection, EditorTool.Drag, "mouse-pointer-2", "toolbar.drag", "toolbar.drag.tooltip");
+            AddTool(selection, EditorTool.Move, "move", "toolbar.move", "toolbar.move.tooltip");
+            AddTool(selection, EditorTool.Rotate, "rotate-cw", "toolbar.rotate", "toolbar.rotate.tooltip");
             deleteButton = AddButton(selection, "trash-2", "toolbar.delete", "Del", "toolbar.delete.tooltip", () => DeleteRequested?.Invoke());
 
             AddSeparator();
             var world = AddGroup();
-            AddTool(world, EditorTool.Road, "spline", "toolbar.road", "R", "toolbar.road.tooltip");
-            AddTool(world, EditorTool.Rows, "fence", "toolbar.rows", "T", "toolbar.rows.tooltip");
-            AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain", "G", "toolbar.terrain.tooltip");
-            AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "M", "toolbar.markings.tooltip");
-            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "V", "toolbar.priority.tooltip");
-            AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes", "L", "toolbar.lanes.tooltip");
-            AddTool(world, EditorTool.Signals, "traffic-light", "toolbar.signals", "A", "toolbar.signals.tooltip");
-            AddTool(world, EditorTool.Line, "route", "toolbar.line", "B", "toolbar.line.tooltip");
+            AddTool(world, EditorTool.Road, "spline", "toolbar.road", "toolbar.road.tooltip");
+            AddTool(world, EditorTool.Rows, "fence", "toolbar.rows", "toolbar.rows.tooltip");
+            AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain", "toolbar.terrain.tooltip");
+            AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "toolbar.markings.tooltip");
+            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "toolbar.priority.tooltip");
+            AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes", "toolbar.lanes.tooltip");
+            AddTool(world, EditorTool.Signals, "traffic-light", "toolbar.signals", "toolbar.signals.tooltip");
+            AddTool(world, EditorTool.Line, "route", "toolbar.line", "toolbar.line.tooltip");
             objectsButton = AddButton(world, "box", "toolbar.objects", "3", "toolbar.objects.tooltip", () => ObjectsRequested?.Invoke());
         }
 
@@ -78,9 +78,10 @@ namespace OmsiMapEditor.UI
             Add(separator);
         }
 
-        private void AddTool(VisualElement group, EditorTool tool, string icon, string name, string key, string description)
+        /// <summary>A tool's button; its key cap is the key that chooses the tool (a letter key, whose name is the letter).</summary>
+        private void AddTool(VisualElement group, EditorTool tool, string icon, string name, string description)
         {
-            toolButtons[tool] = AddButton(group, icon, name, key, description, () => ToolChosen?.Invoke(tool));
+            toolButtons[tool] = AddButton(group, icon, name, EditorToolRules.KeyOf(tool).ToString(), description, () => ToolChosen?.Invoke(tool));
         }
 
         private static Button AddButton(VisualElement group, string icon, string nameKey, string key, string tooltipKey, Action clicked)

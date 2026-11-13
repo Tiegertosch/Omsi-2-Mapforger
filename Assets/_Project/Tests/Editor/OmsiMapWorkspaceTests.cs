@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -419,7 +420,7 @@ namespace OmsiMapEditor.Tests
             session.UpdateObject(tile, tile.Objects[0], 15, 20, 0, 0);
             var edited = session.Workspace.ReadAllBytes("tile_0_0.map");
 
-            Assert.Throws<InvalidOperationException>(() => session.Undo(summary, change));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, change));
 
             CollectionAssert.AreEqual(edited, session.Workspace.ReadAllBytes("tile_0_0.map"));
             Assert.AreEqual(2, tile.Objects.Count);
@@ -578,6 +579,501 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(30.5, Number(entries.GetField(4)), 1e-9);
             Assert.AreEqual(40.0, Number(entries.GetField(6)), 1e-9);
             Assert.AreEqual(0.0, Number(entries.GetField(8)), 1e-9);
+        }
+
+        [Test]
+        public void RevertingATileIsAStepThatUndoTakesBackByteForByteKeepingTheStepsBefore()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var originalTile = File.ReadAllBytes(Path.Combine(original, "tile_0_0.map"));
+            var placement = session.PlaceObject(summary, tile, @"Sceneryobjects\new.sco", 100.5, 50.25, 0, 90);
+            var moved = tile.Objects[0];
+            Assert.IsTrue(session.UpdateObject(tile, moved, 15, 20, 0, 0));
+            var filesBefore = WorkspaceFiles(session.Workspace);
+            var modifiedBefore = session.ModifiedFiles().ToList();
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            Assert.IsNotNull(revert);
+            Assert.AreSame(tile, revert.Tile);
+            Assert.AreEqual(0, revert.X);
+            Assert.AreEqual(0, revert.Y);
+            // Only the tile was written: global.cfg keeps the raised [NextIDCode], as reverting a tile always did.
+            CollectionAssert.AreEquivalent(new[] { "tile_0_0.map" }, revert.FilePaths().ToArray());
+            CollectionAssert.AreEqual(new[] { "global.cfg" }, session.ModifiedFiles());
+            CollectionAssert.AreEqual(originalTile, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            Assert.AreEqual(1, tile.Objects.Count);
+            Assert.AreEqual(10.0, tile.Objects[0].LocalX, 1e-12);
+            Assert.AreEqual(1, summary.ObjectCount);
+            AssertSummaryMatchesFiles(session, summary);
+            AssertSameReferences(session);
+
+            session.Undo(summary, revert);
+
+            AssertSameFiles(filesBefore, WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEquivalent(modifiedBefore, session.ModifiedFiles());
+            Assert.IsFalse(revert.IsApplied);
+            // The very records the steps before hold are back in the tile.
+            Assert.AreSame(moved, tile.Objects[0]);
+            Assert.AreSame(placement.Record, tile.Objects[1]);
+            Assert.AreEqual(15.0, moved.LocalX, 1e-12);
+            AssertSummaryMatchesFiles(session, summary);
+            AssertSameReferences(session);
+
+            // The steps before the revert are undone as the shell does it: the move by its values, then the placement.
+            Assert.IsTrue(session.UpdateObject(tile, tile.Objects.Single(item => item.Id == 5), 10, 20, 0, 0));
+            session.Undo(summary, placement);
+            Assert.AreEqual(1, tile.Objects.Count);
+            Assert.AreEqual(1, summary.ObjectCount);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            CollectionAssert.AreEqual(originalTile, session.Workspace.ReadAllBytes("tile_0_0.map"));
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void ARevertDoneAgainIsTheSameAsTheFirstAndStepsAfterItStillWork()
+        {
+            UseTwoTiles();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var deletion = session.DeleteObject(summary, tile, tile.Objects[0]);
+            Assert.IsTrue(deletion.Succeeded);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            var filesAfter = WorkspaceFiles(session.Workspace);
+            var modifiedAfter = session.ModifiedFiles().ToList();
+            var recordsAfter = tile.Objects.ToList();
+            // The original's entry point numbers are back, and its object 5.
+            Assert.AreEqual("1", EntryPoints(session.Workspace).GetField(1));
+            CollectionAssert.AreEqual(new[] { 5, 6 }, tile.Objects.Select(item => item.Id).ToArray());
+
+            // A step made after the revert holds the records the revert put in.
+            var later = session.PlaceObject(summary, tile, @"Sceneryobjects\new.sco", 1, 2, 0, 0);
+            session.Undo(summary, later);
+            session.Undo(summary, revert);
+            CollectionAssert.AreEqual(new[] { 6 }, tile.Objects.Select(item => item.Id).ToArray());
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+            AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            AssertSameFiles(filesAfter, WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEquivalent(modifiedAfter, session.ModifiedFiles());
+            Assert.IsTrue(revert.IsApplied);
+            CollectionAssert.AreEqual(recordsAfter, tile.Objects, "Redo puts back the records of the first revert, not new ones.");
+            AssertSummaryMatchesFiles(session, summary);
+            session.Redo(summary, later);
+            Assert.AreSame(later.Record, tile.Objects.Last());
+            AssertSummaryMatchesFiles(session, summary);
+            AssertSameReferences(session);
+
+            // Back to the start, step by step.
+            session.Undo(summary, later);
+            session.Undo(summary, revert);
+            session.Undo(summary, deletion.Change);
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void ATileAddedInTheProjectIsNotRevertedAndNothingIsWritten()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            session.AddTile(summary, 1, 0);
+            Assert.IsTrue(session.IsTileAdded("tile_1_0.map"));
+            var files = WorkspaceFiles(session.Workspace);
+
+            var refused = Assert.Throws<InvalidOperationException>(() => session.RevertTile(OmsiMapReader.Read(session.Source), "tile_1_0.map"));
+
+            StringAssert.Contains("was added in this project", refused.Message);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+        }
+
+        [Test]
+        public void ARevertThatFailsHalfWayLeavesEveryFileAsItWas()
+        {
+            // The original folder holds a tile file its global.cfg does not list; the project adds the tile there, so it has an
+            // original, but the original map has no entry points to give it back.
+            Write(original, "tile_1_0.map", "[version]", "14", "", "[object]", "0", "c.sco", "7", "50", "60", "0", "0", "0", "0", "0", "");
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            session.AddTile(summary, 1, 0);
+            summary = session.Read();
+            Assert.IsFalse(session.IsTileAdded("tile_1_0.map"));
+            var files = WorkspaceFiles(session.Workspace);
+            var tile = summary.Tiles.Single(candidate => candidate.X == 1);
+            var records = tile.Objects.ToList();
+            var stamp = session.Workspace.Stamp("tile_1_0.map");
+
+            var failed = Assert.Throws<InvalidOperationException>(() => session.RevertTile(summary, "tile_1_0.map"));
+
+            // The project's global.cfg lists the tile, so the revert got as far as writing it; the original's lacks it, which fails the
+            // entry points after that. The workspace counted the write and the one that put the tile back, with the same bytes.
+            StringAssert.Contains("is not listed in global.cfg", failed.Message);
+            Assert.AreNotEqual(stamp, session.Workspace.Stamp("tile_1_0.map"), "The revert wrote the tile before it failed.");
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEqual(records, tile.Objects);
+        }
+
+        [Test]
+        public void RedoingARevertIsRefusedWithoutWritingWhenAFileChangedAfterTheUndo()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsTrue(session.UpdateObject(tile, tile.Objects[0], 15, 20, 0, 0));
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            session.Undo(summary, revert);
+            var shown = tile.Objects.Single();
+            // An edit outside the history after the undo.
+            Assert.IsTrue(session.UpdateObject(tile, shown, 12, 20, 0, 0));
+            var files = WorkspaceFiles(session.Workspace);
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, revert));
+
+            StringAssert.Contains("tile_0_0.map was changed in the meantime", refused.Message);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            Assert.IsFalse(revert.IsApplied);
+            Assert.AreSame(shown, tile.Objects.Single());
+            Assert.AreEqual(12.0, shown.LocalX, 1e-12);
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AMoveAfterARevertThatIsUndoneLandsOnTheOriginalSoTheRevertIsUndoneByteForByte()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsTrue(session.UpdateObject(tile, tile.Objects[0], 15, 20, 0, 0));
+            var filesBefore = WorkspaceFiles(session.Workspace);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            var item = tile.Objects.Single();
+
+            // The move and its undo as the shell does them: by values, the undo writing the values before.
+            Assert.IsTrue(session.UpdateObject(tile, item, 25, 20, 0, 0));
+            Assert.IsTrue(session.UpdateObject(tile, item, 10, 20, 0, 0));
+            // The original writes its numbers as the editor does, so the undo gives its bytes, and the copy goes.
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+
+            session.Undo(summary, revert);
+
+            AssertSameFiles(filesBefore, WorkspaceFiles(session.Workspace));
+            Assert.AreEqual(15.0, tile.Objects.Single().LocalX, 1e-12);
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AMoveAfterARevertThatIsUndoneInOtherNumbersThanTheOriginalsRefusesTheRevertsUndo()
+        {
+            // The original writes 10.000 where the editor writes 10.
+            Write(original, "tile_0_0.map", "[version]", "14", "", "[object]", "0", "a.sco", "5", "10.000", "20", "0", "0", "0", "0", "0", "");
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsTrue(session.UpdateObject(tile, tile.Objects[0], 15, 20, 0, 0));
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            var item = tile.Objects.Single();
+            Assert.IsTrue(session.UpdateObject(tile, item, 25, 20, 0, 0));
+            Assert.IsTrue(session.UpdateObject(tile, item, 10, 20, 0, 0));
+            // The same place, in other bytes: the copy stays.
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map"));
+            StringAssert.Contains("\r\n10\r\n", OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_0_0.map")));
+            var files = WorkspaceFiles(session.Workspace);
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, revert));
+
+            StringAssert.Contains("tile_0_0.map was changed in the meantime", refused.Message);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(revert.IsApplied);
+            Assert.AreSame(item, tile.Objects.Single());
+        }
+
+        [Test]
+        public void ARefusedUndoOfARevertDropsTheOlderStepsAndKeepsTheRedoStack()
+        {
+            // Placed, moved, reverted, then an edit undone, then the revert's undo refused: the shell took the revert off the stack.
+            var undo = new List<string> { "place", "move" };
+            var redo = new List<string> { "edit after the revert" };
+
+            Assert.AreEqual(2, OmsiStepHistory.DropStepsBeyondRefusedRevert(undo));
+
+            CollectionAssert.IsEmpty(undo);
+            CollectionAssert.AreEqual(new[] { "edit after the revert" }, redo);
+        }
+
+        [Test]
+        public void ARefusedRedoOfARevertDropsTheNewerStepsAndKeepsTheUndoStack()
+        {
+            // Placed, reverted, two edits; all three undone, then the revert's redo refused: the steps under it were made on top of it.
+            var undo = new List<string> { "place" };
+            var redo = new List<string> { "second edit", "first edit" };
+
+            Assert.AreEqual(2, OmsiStepHistory.DropStepsBeyondRefusedRevert(redo));
+
+            CollectionAssert.IsEmpty(redo);
+            CollectionAssert.AreEqual(new[] { "place" }, undo);
+            Assert.AreEqual(0, OmsiStepHistory.DropStepsBeyondRefusedRevert(redo));
+            Assert.Throws<ArgumentNullException>(() => OmsiStepHistory.DropStepsBeyondRefusedRevert<string>(null));
+        }
+
+        [Test]
+        public void UndoingARevertIsRefusedWithoutWritingWhenAFileChangedSince()
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsTrue(session.UpdateObject(tile, tile.Objects[0], 15, 20, 0, 0));
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            var shown = tile.Objects[0];
+            // An edit outside the history, such as a save of the tile by another way.
+            Assert.IsTrue(session.UpdateObject(tile, shown, 12, 20, 0, 0));
+            var files = WorkspaceFiles(session.Workspace);
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, revert));
+
+            StringAssert.Contains("tile_0_0.map was changed in the meantime", refused.Message);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(revert.IsApplied);
+            Assert.AreSame(shown, tile.Objects.Single());
+            Assert.AreEqual(12.0, shown.LocalX, 1e-12);
+        }
+
+        [Test]
+        public void AnUndoOfARevertWhoseWriteFailsHalfWayPutsTheFilesBackAndCanBeDoneLater()
+        {
+            UseTwoTiles();
+            var session = RevertedTileWithEntryPoint(out var summary, out var revert);
+            var tile = summary.Tiles[0];
+            var originalFolder = FolderFiles(original);
+            var files = WorkspaceFiles(session.Workspace);
+            var records = tile.Objects.ToList();
+            var tileStamp = session.Workspace.Stamp("tile_0_0.map");
+
+            Exception failed;
+            // global.cfg is written after the tile; its save cannot write the file it moves into place.
+            using (BlockWrites(session.Workspace, "global.cfg", false))
+                failed = Assert.Catch(() => session.Undo(summary, revert));
+
+            AssertWriteFailure(failed);
+            Assert.AreNotEqual(tileStamp, session.Workspace.Stamp("tile_0_0.map"), "The undo wrote the tile before it failed.");
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            AssertSameFiles(originalFolder, FolderFiles(original));
+            Assert.IsTrue(revert.IsApplied);
+            AssertSameRecords(records, tile.Objects);
+            AssertSummaryMatchesFiles(session, summary);
+
+            // Without the obstacle the very step succeeds.
+            session.Undo(summary, revert);
+
+            Assert.IsFalse(revert.IsApplied);
+            CollectionAssert.AreEqual(new[] { 6 }, tile.Objects.Select(item => item.Id).ToArray());
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+            AssertSummaryMatchesFiles(session, summary);
+            AssertSameFiles(originalFolder, FolderFiles(original));
+        }
+
+        [Test]
+        public void ARedoOfARevertWhoseWriteFailsHalfWayPutsTheFilesBackAndCanBeDoneLater()
+        {
+            UseTwoTiles();
+            var session = RevertedTileWithEntryPoint(out var summary, out var revert);
+            var tile = summary.Tiles[0];
+            var filesReverted = WorkspaceFiles(session.Workspace);
+            session.Undo(summary, revert);
+            var originalFolder = FolderFiles(original);
+            var files = WorkspaceFiles(session.Workspace);
+            var records = tile.Objects.ToList();
+            var tileStamp = session.Workspace.Stamp("tile_0_0.map");
+
+            Exception failed;
+            using (BlockWrites(session.Workspace, "global.cfg", true))
+                failed = Assert.Catch(() => session.Redo(summary, revert));
+
+            AssertWriteFailure(failed);
+            Assert.AreNotEqual(tileStamp, session.Workspace.Stamp("tile_0_0.map"), "The redo wrote the tile before it failed.");
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            AssertSameFiles(originalFolder, FolderFiles(original));
+            Assert.IsFalse(revert.IsApplied);
+            AssertSameRecords(records, tile.Objects);
+            AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            Assert.IsTrue(revert.IsApplied);
+            AssertSameFiles(filesReverted, WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEqual(new[] { 5, 6 }, tile.Objects.Select(item => item.Id).ToArray());
+            AssertSummaryMatchesFiles(session, summary);
+            AssertSameFiles(originalFolder, FolderFiles(original));
+        }
+
+        [Test]
+        public void ARedoOfARevertWhoseRollBackFailsReportsBothFailuresTheStepsFirst()
+        {
+            UseTwoTiles();
+            var session = RevertedTileWithEntryPoint(out var summary, out var revert);
+            var tile = summary.Tiles[0];
+            session.Undo(summary, revert);
+            var originalFolder = FolderFiles(original);
+            var records = tile.Objects.ToList();
+
+            OmsiRollBackFailedException failed;
+            // The redo takes the tile's copy away, which needs no save; putting the copy back does, and cannot.
+            using (BlockWrites(session.Workspace, "tile_0_0.map", false))
+            using (BlockWrites(session.Workspace, "global.cfg", true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.Redo(summary, revert));
+
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreEqual(2, both.InnerExceptions.Count);
+            AssertWriteFailure(both.InnerExceptions[0]);
+            AssertWriteFailure(both.InnerExceptions[1]);
+            StringAssert.StartsWith(both.InnerExceptions[0].Message, failed.Message);
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+            // Part of the step stayed in the files; the summary was left alone, so the map has to be read again.
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            Assert.IsFalse(revert.IsApplied);
+            AssertSameRecords(records, tile.Objects);
+            AssertSameFiles(originalFolder, FolderFiles(original));
+        }
+
+        [Test]
+        public void RevertUndoAndRedoLeaveTheOriginalMapAsItWas()
+        {
+            UseTwoTiles();
+            var originalFolder = FolderFiles(original);
+            var session = RevertedTileWithEntryPoint(out var summary, out var revert);
+            AssertSameFiles(originalFolder, FolderFiles(original));
+
+            session.Undo(summary, revert);
+            AssertSameFiles(originalFolder, FolderFiles(original));
+
+            session.Redo(summary, revert);
+            AssertSameFiles(originalFolder, FolderFiles(original));
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        /// <summary>
+        /// The map of <see cref="UseTwoTiles"/>; object 5 of tile 0 deleted, which moves the entry point of object 6 to its place 0, then tile 0 reverted: the revert
+        /// writes the tile first and global.cfg after it.
+        /// </summary>
+        private OmsiMapSession RevertedTileWithEntryPoint(out OmsiMapSummary summary, out OmsiTileRevertChange revert)
+        {
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsTrue(session.DeleteObject(summary, tile, tile.Objects[0]).Succeeded);
+            Assert.AreEqual("0", EntryPoints(session.Workspace).GetField(1));
+            revert = session.RevertTile(summary, "tile_0_0.map");
+            CollectionAssert.AreEqual(new[] { "tile_0_0.map", "global.cfg" }, revert.FilePaths().ToArray());
+            return session;
+        }
+
+        /// <summary>
+        /// Makes every write of a workspace file fail until disposed: a folder takes the place of the file a save writes first, and with
+        /// <paramref name="holdCopy"/> the edited copy is held open, so taking it away fails too. Reading the file still works.
+        /// </summary>
+        private static IDisposable BlockWrites(OmsiMapWorkspace workspace, string relativePath, bool holdCopy)
+        {
+            var copy = Path.Combine(workspace.WorkspacePath, relativePath);
+            var temporary = copy + ".mapforge-tmp";
+            Directory.CreateDirectory(temporary);
+            FileStream held = null;
+            if (holdCopy)
+            {
+                Assert.IsTrue(File.Exists(copy), relativePath + " has an edited copy to hold.");
+                held = new FileStream(copy, FileMode.Open, FileAccess.Read, FileShare.Read);
+            }
+            return new Obstacle(temporary, held);
+        }
+
+        private sealed class Obstacle : IDisposable
+        {
+            private readonly string folder;
+            private readonly FileStream held;
+
+            public Obstacle(string folder, FileStream held)
+            {
+                this.folder = folder;
+                this.held = held;
+            }
+
+            public void Dispose()
+            {
+                held?.Dispose();
+                Directory.Delete(folder, true);
+            }
+        }
+
+        /// <summary>A failure of the file system, not a refusal of the step or a failed roll-back.</summary>
+        private static void AssertWriteFailure(Exception failure)
+        {
+            Assert.IsNotNull(failure);
+            Assert.That(failure, Is.InstanceOf<IOException>().Or.InstanceOf<UnauthorizedAccessException>(), failure.ToString());
+        }
+
+        private static void AssertSameRecords<T>(List<T> expected, List<T> actual)
+        {
+            Assert.AreEqual(expected.Count, actual.Count);
+            for (var index = 0; index < expected.Count; index++)
+                Assert.AreSame(expected[index], actual[index], "record " + index);
+        }
+
+        /// <summary>Every file of a folder and its subfolders, by its path relative to it.</summary>
+        internal static Dictionary<string, byte[]> FolderFiles(string folder)
+        {
+            var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
+                files[path.Substring(folder.Length).TrimStart(Path.DirectorySeparatorChar)] = File.ReadAllBytes(path);
+            return files;
+        }
+
+        /// <summary>Every file of the workspace folder, by its path relative to it, including the project's own data.</summary>
+        internal static Dictionary<string, byte[]> WorkspaceFiles(OmsiMapWorkspace workspace)
+        {
+            var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            if (!Directory.Exists(workspace.WorkspacePath))
+                return files;
+            foreach (var path in Directory.GetFiles(workspace.WorkspacePath, "*", SearchOption.AllDirectories))
+                files[path.Substring(workspace.WorkspacePath.Length).TrimStart(Path.DirectorySeparatorChar)] = File.ReadAllBytes(path);
+            return files;
+        }
+
+        internal static void AssertSameFiles(Dictionary<string, byte[]> expected, Dictionary<string, byte[]> actual)
+        {
+            CollectionAssert.AreEquivalent(expected.Keys, actual.Keys);
+            foreach (var pair in expected)
+                CollectionAssert.AreEqual(pair.Value, actual[pair.Key], pair.Key);
+        }
+
+        /// <summary>The summary kept up to date in place says what reading the files anew says, tile by tile.</summary>
+        internal static void AssertSummaryMatchesFiles(OmsiMapSession session, OmsiMapSummary summary)
+        {
+            var fresh = session.Read();
+            Assert.AreEqual(fresh.ObjectCount, summary.ObjectCount, "objects of the map");
+            Assert.AreEqual(fresh.SplineCount, summary.SplineCount, "splines of the map");
+            Assert.AreEqual(fresh.AttachmentCount, summary.AttachmentCount, "attachments of the map");
+            Assert.AreEqual(fresh.Tiles.Count, summary.Tiles.Count);
+            for (var index = 0; index < fresh.Tiles.Count; index++)
+            {
+                var expected = fresh.Tiles[index];
+                var actual = summary.Tiles[index];
+                var name = actual.FileName;
+                Assert.AreEqual(expected.ObjectCount, actual.ObjectCount, name);
+                Assert.AreEqual(expected.SplineCount, actual.SplineCount, name);
+                Assert.AreEqual(expected.AttachmentCount, actual.AttachmentCount, name);
+                CollectionAssert.AreEqual(expected.Objects.Select(item => item.Id + " " + item.AssetPath + " " + item.LocalX + " " + item.LocalY + " " + item.HeadingDegrees),
+                    actual.Objects.Select(item => item.Id + " " + item.AssetPath + " " + item.LocalX + " " + item.LocalY + " " + item.HeadingDegrees), name);
+                CollectionAssert.AreEqual(expected.Splines.Select(spline => spline.Id + " " + spline.LocalX + " " + spline.LocalY + " " + spline.AlignsTerrain),
+                    actual.Splines.Select(spline => spline.Id + " " + spline.LocalX + " " + spline.LocalY + " " + spline.AlignsTerrain), name);
+                CollectionAssert.AreEqual(expected.AttachedObjects.Select(item => item.Id), actual.AttachedObjects.Select(item => item.Id), name);
+                CollectionAssert.AreEqual(expected.SplineAttachments.Select(item => item.Id), actual.SplineAttachments.Select(item => item.Id), name);
+                Assert.AreEqual(expected.TerrainMinHeight, actual.TerrainMinHeight, name);
+                Assert.AreEqual(expected.TerrainMaxHeight, actual.TerrainMaxHeight, name);
+                Assert.AreEqual(expected.Water, actual.Water, name);
+            }
         }
 
         private static double Number(string text)
