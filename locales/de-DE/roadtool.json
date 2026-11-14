@@ -50,7 +50,7 @@
   "roadtool.junctions.tooltip": "Eine Straße, die auf einer anderen endet, schließt mit einer neuen T-Kreuzung an; eine Straße, die eine andere kreuzt, bekommt dort eine Kreuzung; eine Straße, die an eine andere Breite anschließt, bekommt einen Übergang. Sie werden in den Profilen beider Straßen erzeugt und unter Sceneryobjects\\Mapforge in deiner OMSI-Installation gespeichert.",
   "roadtool.standalone.tooltip": "Eine Straße in einer Chrono-Variante steht allein: Das gilt nur für die Basiskarte",
   "roadtool.hint": "Klicke die Punkte einer Straße an; Esc beendet sie",
-  "roadtool.new_type.tooltip": "Öffnet den Straßenbauer: Setze Fahrstreifen zu einem eigenen Straßentyp zusammen (ADR 049)",
+  "roadtool.new_type.tooltip": "Öffnet den Straßenbauer, um Fahrstreifen zu einem eigenen Straßentyp zusammenzusetzen (ADR 049)",
   "roadtool.search": "Alle Straßen durchsuchen...",
   "roadtool.close.tooltip": "Das Straßenwerkzeug schließen (R)",
   "roadtool.tab.in_map": "In der Karte",

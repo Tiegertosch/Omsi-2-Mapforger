@@ -269,17 +269,8 @@ namespace OmsiMapEditor.Tests
             Assert.That(parts.ShowsText, Is.False);
         }
 
-        // Plain tooltips whose translation does not split like the English one, as "locale|key". Each is a real defect of the translation
-        // (it loses or gains the heading of the card, or changes the key cap); the list keeps them visible, and a new mismatch fails.
-        private static readonly HashSet<string> KnownStructureDifferences = new HashSet<string>(StringComparer.Ordinal)
-        {
-            // English: a head of four or more words, so no title. Translation: a head of exactly three words, so the card gains a title
-            // ("OEFFNET DEN STRASSENBAUER", "NASTEPNIE KLIKNIJ MAPE") that is the start of a sentence.
-            "de-DE|roadtool.new_type.tooltip",
-            "pl-PL|satellite.pick.tooltip",
-            "pl-PL|satellite.fit.pick.tooltip",
-        };
-
+        // A translation that splits otherwise than the English text loses or gains the heading of the card, or changes the key cap: a
+        // head of three words or fewer before a colon becomes a title, so a translated sentence start must keep more words or no colon.
         [TestCaseSource(nameof(LanguageCodes))]
         public void EveryPlainTooltipOfALanguageSplitsLikeTheEnglishOne(string code)
         {
@@ -302,28 +293,12 @@ namespace OmsiMapEditor.Tests
                     differences.Add("key cap '" + (expected.HasKeyCap ? expected.KeyCap : "none") + "' -> '" + (actual.HasKeyCap ? actual.KeyCap : "none") + "'");
                 if (actual.Text.Length == 0)
                     differences.Add("empty text");
-                if (differences.Count > 0 && !KnownStructureDifferences.Contains(code + "|" + pair.Key))
+                if (differences.Count > 0)
                     problems.Add(code + "|" + pair.Key + ": " + string.Join(", ", differences));
             }
 
             Assert.That(checkedCount, Is.GreaterThan(20), code + " has too few plain tooltips; the keys were not recognised");
             Assert.That(problems, Is.Empty, string.Join("\n", problems));
-        }
-
-        [Test]
-        public void EveryKnownStructureDifferenceStillExists()
-        {
-            var english = ContextMenuEntriesTests.LoadMessages("en-US");
-            foreach (var entry in KnownStructureDifferences)
-            {
-                var separator = entry.IndexOf('|');
-                var messages = ContextMenuEntriesTests.LoadMessages(entry.Substring(0, separator));
-                var key = entry.Substring(separator + 1);
-                var expected = EditorShellBootstrap.SplitTooltip(english[key]);
-                var actual = EditorShellBootstrap.SplitTooltip(messages[key]);
-                Assert.That(expected.HasTitle != actual.HasTitle || expected.KeyCap != actual.KeyCap || expected.HasKeyCap != actual.HasKeyCap || actual.Text.Length == 0,
-                    Is.True, entry + " is listed as a known difference but no longer differs; remove it");
-            }
         }
 
         // A tooltip with a title sibling is joined as a card tooltip and never goes through the heading regex.
