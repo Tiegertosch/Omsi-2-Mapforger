@@ -978,6 +978,7 @@ namespace OmsiMapEditor.OMSI
                         targets.Add(tile);
 
             var shapedTiles = new List<OmsiTileSummary>();
+            var fitted = new List<KeyValuePair<OmsiTileSummary, byte[]>>();
             foreach (var tile in targets)
             {
                 var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
@@ -993,6 +994,7 @@ namespace OmsiMapEditor.OMSI
                                                                     junction.OriginY + junction.Reach + reach >= south && junction.OriginY - junction.Reach - reach <= south + size);
                 OmsiTerrainShaping.Shape(heights, tile.X, tile.Y, size, nearby, TerrainShape, nearbyJunctions);
                 var bytes = OmsiTerrain.Encode(heights);
+                fitted.Add(new KeyValuePair<OmsiTileSummary, byte[]>(tile, bytes));
                 var current = workspace.ReadAllBytes(path);
                 if (SameBytes(bytes, current))
                     continue;
@@ -1000,6 +1002,13 @@ namespace OmsiMapEditor.OMSI
                 shapedTiles.Add(tile);
             }
             ApplyFiles(written, false);
+            // The lowest and highest point the inspector shows follow the ground fitted, also of a tile whose file an undo just wrote back.
+            foreach (var pair in fitted)
+                if (OmsiMapReader.TryReadTerrainRange(pair.Value, out var minHeight, out var maxHeight))
+                {
+                    pair.Key.TerrainMinHeight = minHeight;
+                    pair.Key.TerrainMaxHeight = maxHeight;
+                }
             reshaped.AddRange(shapedTiles);
             return written;
         }

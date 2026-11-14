@@ -54,6 +54,7 @@
   "history.step.row_new": "novou řadu objektů",
   "history.step.row_deleted": "odstranění řady objektů",
   "history.step.objects_changed": "změna objektů {count}",
+  "history.step.objects_and_splines": "změna {objects, plural, one {# objektu} few {# objektů} many {# objektu} other {# objektů}} a {splines, plural, one {# splinu} few {# splinů} many {# splinu} other {# splinů}}",
   "history.step.terrain_fit": "terénní přizpůsobení {count, plural, one {# spline} few {# splines} many {# splines} other {# splines}}",
   "history.step.spline_move": "přesun {count, plural, one {spline #{id}} few {# splines} many {# splines} other {# splines}}",
   "history.step.road_of": "cesta {count, plural, one {spline #{id}} few {# splines} many {# splines} other {# splines}}",

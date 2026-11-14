@@ -54,6 +54,7 @@
   "history.step.row_new": "nowy rząd obiektów",
   "history.step.row_deleted": "usunięcie rzędu obiektów",
   "history.step.objects_changed": "zmiana obiektów {count}",
+  "history.step.objects_and_splines": "zmiana {objects, plural, one {# obiektu} few {# obiektów} many {# obiektów} other {# obiektu}} i {splines, plural, one {# splajnu} few {# splajnów} many {# splajnów} other {# splajnu}}",
   "history.step.terrain_fit": "dopasowanie do terenu {count, plural, one {# spline} few {# splines} many {# splines} other {# splines}}",
   "history.step.spline_move": "ruch {count, plural, one {spline #{id}} few {# splines} many {# splines} other {# splines}}",
   "history.step.road_of": "droga {count, plural, one {spline #{id}} few {# splines} many {# splines} other {# splines}}",

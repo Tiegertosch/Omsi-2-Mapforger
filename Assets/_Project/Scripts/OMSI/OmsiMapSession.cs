@@ -172,7 +172,7 @@ namespace OmsiMapEditor.OMSI
     public sealed class OmsiObjectValueEdit
     {
         public OmsiObjectValueEdit(OmsiTileSummary tile, OmsiObjectRecord record, double x, double y, double z, double headingDegrees,
-            double pitchDegrees, double bankDegrees)
+            double pitchDegrees, double bankDegrees, bool moved = false)
         {
             Tile = tile ?? throw new ArgumentNullException(nameof(tile));
             Record = record ?? throw new ArgumentNullException(nameof(record));
@@ -182,7 +182,14 @@ namespace OmsiMapEditor.OMSI
             HeadingDegrees = headingDegrees;
             PitchDegrees = pitchDegrees;
             BankDegrees = bankDegrees;
+            Moved = moved;
         }
+
+        /// <summary>
+        /// True when the object already left its place in the same edit, such as by a move into another tile just before: its connection
+        /// points left the road ends, so no road follows its height (<see cref="OmsiMapSession.JunctionRoadEnds"/>).
+        /// </summary>
+        public bool Moved { get; }
 
         public OmsiTileSummary Tile { get; }
         public OmsiObjectRecord Record { get; }

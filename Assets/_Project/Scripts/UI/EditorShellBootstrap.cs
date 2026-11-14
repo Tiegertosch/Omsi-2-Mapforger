@@ -1123,16 +1123,19 @@ namespace OmsiMapEditor.UI
                 mapCanvas != null && !mapCanvas.TurnSelection(turnDegrees))
                 Debug.LogWarning("-turnSelection needs a project and at least two selected objects.");
 
-            // -moveSelection <dx> <dy>: moves the selected objects by metres east and north and saves, as dragging does.
+            // -moveSelection <dx> <dy> [<dz>]: moves the selected objects by metres east and north, and up, and saves, as dragging the
+            // object or the Move tool's arrows does.
             if (double.TryParse(Argument("-moveSelection", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveEast) &&
                 double.TryParse(Argument("-moveSelection", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveNorth) && selection.Count > 0)
             {
+                if (!double.TryParse(Argument("-moveSelection", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var moveUp))
+                    moveUp = 0.0;
                 var edits = new List<MapObjectEdit>();
                 foreach (var item in selection)
                     edits.Add(new MapObjectEdit
                     {
                         Tile = item.Tile, Record = item.Record, LocalX = item.Record.LocalX + moveEast, LocalY = item.Record.LocalY + moveNorth,
-                        Height = item.Record.Height, HeadingDegrees = item.Record.HeadingDegrees, PitchDegrees = item.Record.PitchDegrees,
+                        Height = item.Record.Height + moveUp, HeadingDegrees = item.Record.HeadingDegrees, PitchDegrees = item.Record.PitchDegrees,
                         BankDegrees = item.Record.BankDegrees
                     });
                 CommitEdits(edits);
@@ -4820,10 +4823,18 @@ namespace OmsiMapEditor.UI
                         if (failure != null)
                             break;
                         references = references ?? session.BuildReferenceIndex();
+                        // The roads on a junction lifted in the variant stay with the base map; they are named in the status once the copy
+                        // is made. They are found before, as the copy takes the object's place.
+                        var variantEnds = session.JunctionRoadEnds(currentSummary, new[]
+                        {
+                            new OmsiObjectValueEdit(edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height, edit.HeadingDegrees,
+                                edit.PitchDegrees, edit.BankDegrees)
+                        });
                         var copied = session.CopyInEditedVariant(currentSummary, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height,
                             edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees, references);
                         if (copied.Succeeded)
                         {
+                            NameVariantRoads(pending, variantEnds);
                             parts.Add(new ObjectEditStep { Change = copied.Change });
                             copies[edit.Record] = copied.Change.Record;
                             stale.AddRange(copied.Change.StaleReferences);
@@ -4856,7 +4867,7 @@ namespace OmsiMapEditor.UI
                             parts.Add(new ObjectEditStep { Change = result.Change });
                             transfers.Add(Loc.T("objects.edit.transfer", ("id", edit.Record.Id), ("x", target.X), ("y", target.Y)));
                             // A transfer keeps height and orientation; an edit from the inspector may change them too.
-                            failure = QueueValueEdit(parts, pending, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit);
+                            failure = QueueValueEdit(parts, pending, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit, true);
                             if (failure != null)
                                 break;
                             continue;
@@ -4916,7 +4927,33 @@ namespace OmsiMapEditor.UI
                 message += Loc.T("objects.edit.moved", ("list", JoinLimited(transfers)));
             if (kept.Count > 0)
                 message += Loc.T(EditingVariant ? "objects.edit.not_changed" : "objects.edit.kept_in_tile", ("list", JoinLimited(kept))); // i18n:keys
+            message += RoadsFollowedMessage(pending);
             SetStatus(message + " " + Loc.T("objects.edit.undo"));
+        }
+
+        /// <summary>
+        /// What the saves did to the roads on lifted, lowered or tilted junctions, for the status line: the splines whose ends followed, with
+        /// the warnings of their planning, the ends that stayed and why, and in a chrono variant the roads that stay with the base map.
+        /// </summary>
+        private static string RoadsFollowedMessage(ValueEditQueue pending)
+        {
+            var message = string.Empty;
+            if (pending.FollowedRoads.Count > 0)
+                message += Loc.T("objects.edit.roads_followed", ("count", pending.FollowedRoads.Count), ("list", JoinLimited(pending.FollowedRoads)),
+                    ("hasWarnings", pending.RoadWarnings.Count > 0 ? "yes" : "no"), ("warnings", JoinLimited(pending.RoadWarnings)));
+            if (pending.KeptRoads.Count > 0)
+                message += Loc.T("objects.edit.roads_kept", ("list", JoinLimited(pending.KeptRoads)));
+            if (pending.VariantRoads.Count > 0)
+                message += Loc.T("objects.edit.roads_kept_variant", ("list", JoinLimited(pending.VariantRoads)));
+            return message;
+        }
+
+        /// <summary>Names the splines of road ends on junctions lifted in a chrono variant, which stay with the base map, each once.</summary>
+        private static void NameVariantRoads(ValueEditQueue pending, List<OmsiJunctionRoadEnd> ends)
+        {
+            foreach (var end in ends)
+                if (!pending.VariantRoads.Contains("#" + end.End.Spline.Id))
+                    pending.VariantRoads.Add("#" + end.End.Spline.Id);
         }
 
         /// <summary>True when an edit leaves the object's place and orientation as written.</summary>
@@ -4938,13 +4975,25 @@ namespace OmsiMapEditor.UI
             public double X;
             public double Y;
             public MapObjectEdit Edit;
+
+            /// <summary>True when the object moved into another tile in the same edit, so no road follows its height.</summary>
+            public bool Moved;
         }
 
-        /// <summary>The moves and turns by values waiting to be saved, in their order, and the objects they move.</summary>
+        /// <summary>
+        /// The moves and turns by values waiting to be saved, in their order, and the objects they move; with what the saves did to the
+        /// roads on junctions they lifted, lowered or tilted (<see cref="OmsiMapSession.UpdateObjectsFollowingRoads"/>).
+        /// </summary>
         private sealed class ValueEditQueue
         {
             public readonly List<PendingValueEdit> Edits = new List<PendingValueEdit>();
             public readonly HashSet<OmsiObjectRecord> Records = new HashSet<OmsiObjectRecord>();
+            public readonly List<string> FollowedRoads = new List<string>();
+            public readonly List<string> KeptRoads = new List<string>();
+            public readonly List<string> RoadWarnings = new List<string>();
+
+            /// <summary>Road ends on junctions lifted in a chrono variant, which stay with the base map.</summary>
+            public readonly List<string> VariantRoads = new List<string>();
         }
 
         /// <summary>
@@ -4953,22 +5002,25 @@ namespace OmsiMapEditor.UI
         /// Returns the status of a failed save, or null.
         /// </summary>
         private string QueueValueEdit(List<ObjectEditStep> parts, ValueEditQueue pending, OmsiTileSummary tile, OmsiObjectRecord item, double x, double y,
-            MapObjectEdit edit)
+            MapObjectEdit edit, bool moved = false)
         {
             string failure = null;
             if (pending.Records.Contains(item))
                 failure = SaveValueEdits(parts, pending);
             if (failure == null)
             {
-                pending.Edits.Add(new PendingValueEdit { Tile = tile, Record = item, X = x, Y = y, Edit = edit });
+                pending.Edits.Add(new PendingValueEdit { Tile = tile, Record = item, X = x, Y = y, Edit = edit, Moved = moved });
                 pending.Records.Add(item);
             }
             return failure;
         }
 
         /// <summary>
-        /// Saves the queued moves and turns by values all or none and records one part of the history for each object they changed. A
-        /// failure saves none of them and returns its status; null when they were saved. The queue is empty afterwards.
+        /// Saves the queued moves and turns by values all or none and records one part of the history for each object they changed. Road
+        /// ends on junctions made here that they lift, lower or tilt follow in the same save, written first and recorded before the objects,
+        /// so an undo takes the objects back first (<see cref="OmsiMapSession.UpdateObjectsFollowingRoads"/>); in a chrono variant the roads
+        /// stay with the base map and are only named. A failure saves none of them and returns its status; null when they were saved. The
+        /// queue is empty afterwards.
         /// </summary>
         private string SaveValueEdits(List<ObjectEditStep> parts, ValueEditQueue pending)
         {
@@ -4983,12 +5035,23 @@ namespace OmsiMapEditor.UI
             {
                 before.Add(Values(item.Record));
                 edits.Add(new OmsiObjectValueEdit(item.Tile, item.Record, item.X, item.Y, item.Edit.Height, item.Edit.HeadingDegrees, item.Edit.PitchDegrees,
-                    item.Edit.BankDegrees));
+                    item.Edit.BankDegrees, item.Moved));
             }
             IReadOnlyList<bool> changed;
+            OmsiValueEditOutcome outcome = null;
             try
             {
-                changed = session.UpdateObjects(edits);
+                if (EditingVariant)
+                {
+                    var variantEnds = session.JunctionRoadEnds(currentSummary, edits);
+                    changed = session.UpdateObjects(edits);
+                    NameVariantRoads(pending, variantEnds);
+                }
+                else
+                {
+                    outcome = session.UpdateObjectsFollowingRoads(currentSummary, edits);
+                    changed = outcome.Changed;
+                }
             }
             catch (Exception exception)
             {
@@ -4996,6 +5059,25 @@ namespace OmsiMapEditor.UI
                 return queued.Count == 1
                     ? Loc.T("objects.edit.save_failed", ("id", queued[0].Record.Id), ("reason", exception.Message))
                     : Loc.T("objects.edit.save_failed_many", ("count", queued.Count), ("reason", exception.Message));
+            }
+            if (outcome != null)
+            {
+                foreach (var change in outcome.RoadChanges)
+                {
+                    parts.Add(new ObjectEditStep { SplineChange = change });
+                    RefreshSplineViews(change);
+                }
+                if (outcome.RoadChanges.Count > 0)
+                    roadPorts = null;
+                foreach (var id in outcome.FollowedSplineIds)
+                    if (!pending.FollowedRoads.Contains("#" + id))
+                        pending.FollowedRoads.Add("#" + id);
+                // The reasons and warnings are sentences; joined into the status line they lose their full stop.
+                foreach (var kept in outcome.KeptEnds)
+                    pending.KeptRoads.Add(kept.TrimEnd('.'));
+                foreach (var warning in outcome.Warnings)
+                    if (!pending.RoadWarnings.Contains(warning.TrimEnd('.')))
+                        pending.RoadWarnings.Add(warning.TrimEnd('.'));
             }
             for (var index = 0; index < queued.Count; index++)
             {
@@ -6340,6 +6422,13 @@ namespace OmsiMapEditor.UI
                 // failure was rolled back: files and memory are as before, so the step goes back on top of its stack, to be tried again.
                 if (!refused)
                     from.Add(step);
+                // Parts taken back refit the terrain with the parts after them still as they were then, such as a road redone below a
+                // junction not yet lifted again; the junctions end where they were, so only a fit of the whole map, now, is sure to fit.
+                if (HasSplineChange(step))
+                {
+                    junctionTerrainState = null;
+                    junctionTerrainPlaces = null;
+                }
                 RefreshAfterChange(null);
                 SetStatus(message);
                 return;
@@ -6348,6 +6437,14 @@ namespace OmsiMapEditor.UI
             to.Add(step);
             RefreshAfterChange(touched);
             SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
+        }
+
+        /// <summary>True when a step or one of its parts changes splines.</summary>
+        private static bool HasSplineChange(ObjectEditStep step)
+        {
+            if (step.Group != null)
+                return step.Group.Exists(HasSplineChange);
+            return step.SplineChange != null;
         }
 
         /// <summary>Whether each part of a step is in effect, in the order of <see cref="ApplyStep"/>; parts without such a state add nothing.</summary>
@@ -6811,9 +6908,10 @@ namespace OmsiMapEditor.UI
                     step.AttachmentChange.Added.Count > 0 ? "history.step.row_new" : "history.step.row_deleted"); // i18n:keys
             if (step.Group != null)
             {
-                var ids = new HashSet<int>();
-                CollectIds(step, ids);
-                return Loc.T("history.step.objects_changed", ("count", ids.Count));
+                var objects = new HashSet<int>();
+                var splines = new HashSet<int>();
+                CollectIds(step, objects, splines);
+                return DescribeGroupChange(objects.Count, splines.Count);
             }
             if (step.SplineChange != null && step.SplineChange.Kind == OmsiSplineChangeKind.TerrainAlignment)
                 return Loc.T("history.step.terrain_fit", ("count", step.SplineChange.SplineIds.Count));
@@ -6841,15 +6939,27 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private static void CollectIds(ObjectEditStep step, HashSet<int> ids)
+        /// <summary>
+        /// Names a group of changes in the history's messages: a group of objects or of splines only by their number, as before; one with
+        /// both, such as a move whose roads followed a junction, by the number of each.
+        /// </summary>
+        internal static string DescribeGroupChange(int objects, int splines)
+        {
+            if (objects == 0 || splines == 0)
+                return Loc.T("history.step.objects_changed", ("count", objects + splines));
+            return Loc.T("history.step.objects_and_splines", ("objects", objects), ("splines", splines));
+        }
+
+        /// <summary>The IDs of the objects and of the splines the parts of a step change.</summary>
+        private static void CollectIds(ObjectEditStep step, HashSet<int> objects, HashSet<int> splines)
         {
             if (step.Group != null)
                 foreach (var part in step.Group)
-                    CollectIds(part, ids);
+                    CollectIds(part, objects, splines);
             else if (step.SplineChange != null)
-                ids.UnionWith(step.SplineChange.SplineIds);
+                splines.UnionWith(step.SplineChange.SplineIds);
             else
-                ids.Add(step.Change?.Record?.Id ?? step.ObjectId);
+                objects.Add(step.Change?.Record?.Id ?? step.ObjectId);
         }
 
         private void PushHistory(ObjectEditStep step)

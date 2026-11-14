@@ -54,6 +54,7 @@
   "history.step.row_new": "la nouvelle rangée d'objets",
   "history.step.row_deleted": "la suppression d'une ligne d'objets",
   "history.step.objects_changed": "le changement des objets {count}",
+  "history.step.objects_and_splines": "le changement de {objects, plural, one {# objet} other {# objets}} et de {splines, plural, one {# spline} other {# splines}}",
   "history.step.terrain_fit": "l'adaptation au terrain du {count, plural, one {# spline} other {# splines}}",
   "history.step.spline_move": "le déménagement de {count, plural, one {spline #{id}} other {# splines}}",
   "history.step.road_of": "la route de {count, plural, one {spline #{id}} other {# splines}}",

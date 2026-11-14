@@ -60,6 +60,8 @@
   "history.step.row_new": "the new row of objects",
   "history.step.row_deleted": "the deletion of a row of objects",
   "history.step.objects_changed": "the change of {count} objects",
+  "history.step.objects_and_splines": "the change of {objects, plural, one {# object} other {# objects}} and {splines, plural, one {# spline} other {# splines}}",
+  "@history.step.objects_and_splines": "Names a move of objects whose connected road splines followed, in the Undid and Redid messages of the history",
   "history.step.terrain_fit": "the terrain fit of {count, plural, one {# spline} other {# splines}}",
   "history.step.spline_move": "the move of {count, plural, one {spline #{id}} other {# splines}}",
   "history.step.road_of": "the road of {count, plural, one {spline #{id}} other {# splines}}",

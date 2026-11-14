@@ -45,6 +45,7 @@
   "history.step.row_new": "neue Objektreihe",
   "history.step.row_deleted": "Löschen einer Objektreihe",
   "history.step.objects_changed": "Änderung von {count} Objekten",
+  "history.step.objects_and_splines": "Änderung von {objects, plural, one {# Objekt} other {# Objekten}} und {splines, plural, one {# Spline} other {# Splines}}",
   "history.step.terrain_fit": "Geländeanpassung von {count, plural, one {# Spline} other {# Splines}}",
   "history.step.spline_move": "Verschieben von {count, plural, one {Spline #{id}} other {# Splines}}",
   "history.step.road_of": "Straße aus {count, plural, one {Spline #{id}} other {# Splines}}",
