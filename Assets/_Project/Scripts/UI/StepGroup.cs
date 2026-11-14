@@ -59,6 +59,36 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>
+        /// Splits <paramref name="parts"/>, in their order, into units for <see cref="Apply{T}"/>: parts next to each other for which
+        /// <paramref name="joins"/> is true form one unit, done together; every other part is a unit of its own.
+        /// </summary>
+        public static List<List<T>> Runs<T>(IReadOnlyList<T> parts, Func<T, bool> joins)
+        {
+            if (parts == null)
+                throw new ArgumentNullException(nameof(parts));
+            if (joins == null)
+                throw new ArgumentNullException(nameof(joins));
+            var units = new List<List<T>>();
+            List<T> run = null;
+            foreach (var part in parts)
+            {
+                if (!joins(part))
+                {
+                    run = null;
+                    units.Add(new List<T> { part });
+                    continue;
+                }
+                if (run == null)
+                {
+                    run = new List<T>();
+                    units.Add(run);
+                }
+                run.Add(part);
+            }
+            return units;
+        }
+
         private static bool Same(List<bool> first, List<bool> second)
         {
             if (first.Count != second.Count)

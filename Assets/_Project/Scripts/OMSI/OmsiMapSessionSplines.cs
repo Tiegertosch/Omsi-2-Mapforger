@@ -179,6 +179,30 @@ namespace OmsiMapEditor.OMSI
         public bool Succeeded => Change != null;
     }
 
+    /// <summary>An editor-placed junction that the terrain is fitted to, and where it lies (<see cref="OmsiMapSession.JunctionTerrainPlaces"/>).</summary>
+    public sealed class OmsiJunctionTerrainPlace
+    {
+        internal OmsiJunctionTerrainPlace(int id, string assetPath, double worldX, double worldY, string state)
+        {
+            Id = id;
+            AssetPath = assetPath;
+            WorldX = worldX;
+            WorldY = worldY;
+            State = state;
+        }
+
+        public int Id { get; }
+        public string AssetPath { get; }
+
+        /// <summary>Where its origin lies, in map metres east and north.</summary>
+        public double WorldX { get; }
+
+        public double WorldY { get; }
+
+        /// <summary>Its file, tile, place and orientation as text; a change of it calls for fitting the terrain again.</summary>
+        public string State { get; }
+    }
+
     public sealed partial class OmsiMapSession
     {
         /// <summary>The kind of reference a spline's neighbours hold to it; deleting the spline opens those ends instead.</summary>
@@ -906,6 +930,17 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         private List<OmsiObjectChange.FileState> ReshapeTerrainOf(OmsiMapSummary summary, IEnumerable<OmsiTileSummary> changedTiles, List<OmsiTileSummary> reshaped)
         {
+            var centres = new List<KeyValuePair<int, int>>();
+            foreach (var changed in changedTiles)
+                centres.Add(new KeyValuePair<int, int>(changed.X, changed.Y));
+            return ReshapeTerrainAround(summary, centres, reshaped);
+        }
+
+        /// <summary>
+        /// Like <see cref="ReshapeTerrainOf"/> for the tiles at and around tile coordinates, east and north, whether a tile lies there or not.
+        /// </summary>
+        private List<OmsiObjectChange.FileState> ReshapeTerrainAround(OmsiMapSummary summary, IEnumerable<KeyValuePair<int, int>> centres, List<OmsiTileSummary> reshaped)
+        {
             var written = new List<OmsiObjectChange.FileState>();
             if (summary == null)
                 return written;
@@ -937,9 +972,9 @@ namespace OmsiMapEditor.OMSI
             junctions.Sort((left, right) => left.Object.Id.CompareTo(right.Object.Id));
 
             var targets = new List<OmsiTileSummary>();
-            foreach (var changed in changedTiles)
+            foreach (var centre in centres)
                 foreach (var tile in summary.Tiles)
-                    if (Math.Abs(tile.X - changed.X) <= 1 && Math.Abs(tile.Y - changed.Y) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
+                    if (Math.Abs(tile.X - centre.Key) <= 1 && Math.Abs(tile.Y - centre.Value) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
                         targets.Add(tile);
 
             var shapedTiles = new List<OmsiTileSummary>();
@@ -1013,11 +1048,24 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public string JunctionTerrainState(OmsiMapSummary summary)
         {
+            var text = new System.Text.StringBuilder();
+            foreach (var place in JunctionTerrainPlaces(summary))
+                text.Append(place.State);
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// The editor-placed junction objects of <see cref="JunctionTerrainState"/>, one by one, with where they lie, to compare with an
+        /// earlier list in <see cref="RefitTerrainAtJunctions"/>.
+        /// </summary>
+        public IReadOnlyList<OmsiJunctionTerrainPlace> JunctionTerrainPlaces(OmsiMapSummary summary)
+        {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
+            var places = new List<OmsiJunctionTerrainPlace>();
             if (Workspace == null)
-                return string.Empty;
-            var text = new System.Text.StringBuilder();
+                return places;
+            var size = summary.TileSizeMeters;
             foreach (var tile in summary.Tiles)
                 foreach (var item in tile.Objects)
                 {
@@ -1027,12 +1075,154 @@ namespace OmsiMapEditor.OMSI
                     if (shapeJunctions.Helpers(item.AssetPath).Count == 0)
                         continue;
                     // The file as well: a junction made again changes its shape in place.
+                    var text = new System.Text.StringBuilder();
                     text.Append(item.Id).Append(' ').Append(item.AssetPath).Append(' ').Append(tile.X).Append(' ').Append(tile.Y).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.LocalX)).Append(' ').Append(OmsiNumberFormat.Format(item.LocalY)).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.Height)).Append(' ').Append(OmsiNumberFormat.Format(item.HeadingDegrees)).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.PitchDegrees)).Append(' ').Append(OmsiNumberFormat.Format(item.BankDegrees)).Append(';');
+                    var world = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, item.LocalX, item.LocalY, size);
+                    places.Add(new OmsiJunctionTerrainPlace(item.Id, item.AssetPath, world.X, world.Y, text.ToString()));
                 }
-            return text.ToString();
+            return places;
+        }
+
+        /// <summary>
+        /// Fits the terrain anew where editor-placed junctions moved, appeared or went between two lists of
+        /// <see cref="JunctionTerrainPlaces"/>: around where each such junction lay and lies now, and around junctions that may share a
+        /// connection point with it. Each tile is fitted from the whole map's roads and junctions, as <see cref="RefitAllTerrain"/> fits it,
+        /// and a junction reaches less than a tile from where it lies, so the tiles left alone would come out as they are: the result is
+        /// that of a full fit, as long as the terrain was fitted to <paramref name="before"/>. Without <paramref name="before"/>, with an
+        /// ID listed twice, or with a junction or road reaching a tile or further, the whole map is fitted instead.
+        /// </summary>
+        /// <returns>The tiles whose terrain changed.</returns>
+        public List<OmsiTileSummary> RefitTerrainAtJunctions(OmsiMapSummary summary, IReadOnlyList<OmsiJunctionTerrainPlace> before,
+            IReadOnlyList<OmsiJunctionTerrainPlace> after)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (after == null)
+                throw new ArgumentNullException(nameof(after));
+            var centres = before == null ? null : JunctionRefitCentres(summary, before, after);
+            if (centres == null)
+                return RefitAllTerrain(summary);
+            var reshaped = new List<OmsiTileSummary>();
+            if (centres.Count > 0)
+                ReshapeTerrainAround(summary, centres, reshaped);
+            return reshaped;
+        }
+
+        /// <summary>
+        /// The tile coordinates to fit the terrain around for <see cref="RefitTerrainAtJunctions"/>, or null when only a full fit is sure
+        /// to give the same terrain.
+        /// </summary>
+        private List<KeyValuePair<int, int>> JunctionRefitCentres(OmsiMapSummary summary, IReadOnlyList<OmsiJunctionTerrainPlace> before,
+            IReadOnlyList<OmsiJunctionTerrainPlace> after)
+        {
+            var earlier = new Dictionary<int, OmsiJunctionTerrainPlace>();
+            foreach (var place in before)
+                if (!earlier.ContainsKey(place.Id))
+                    earlier.Add(place.Id, place);
+                else
+                    return null;
+            var now = new Dictionary<int, OmsiJunctionTerrainPlace>();
+            foreach (var place in after)
+                if (!now.ContainsKey(place.Id))
+                    now.Add(place.Id, place);
+                else
+                    return null;
+            var changed = new List<OmsiJunctionTerrainPlace>();
+            foreach (var place in before)
+                if (!now.TryGetValue(place.Id, out var current) || current.State != place.State)
+                    changed.Add(place);
+            foreach (var place in after)
+                if (!earlier.TryGetValue(place.Id, out var previous) || previous.State != place.State)
+                    changed.Add(place);
+            var centres = new List<KeyValuePair<int, int>>();
+            if (changed.Count == 0)
+                return centres;
+
+            ShapeCatalogs();
+            var size = summary.TileSizeMeters;
+            var tolerance = new OmsiJunctionTolerances().PositionMeters;
+            // A road joined to a junction changes the terrain near its end when the junction comes or goes: beyond the end, and under and
+            // beside the road a shoulder before it (OmsiTerrainShaping.Locate).
+            var shoulder = Math.Max(TerrainShape.ShoulderMeters, size / (OmsiTerrain.Resolution - 1) * Math.Sqrt(2.0));
+            var widest = 0.0;
+            foreach (var tile in summary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (!ShapesTerrain(spline))
+                        continue;
+                    var profile = ShapeCatalogs().Get(spline.AssetPath);
+                    if (profile != null)
+                        widest = Math.Max(widest, Math.Max(-profile.LeftEdge, profile.RightEdge));
+                }
+            var roadEnd = widest + TerrainShape.MaximumReachMeters + shoulder;
+
+            // Junctions whose connection points may meet one that changed: a road end on both is joined to the first one found, so the
+            // other may come into the fit or leave it. Each point may lie a tolerance off the road end.
+            // Each file is looked up once: the catalogue compares paths ignoring case, which is slow on Mono for every pair of places.
+            var portReaches = new Dictionary<string, double>(StringComparer.Ordinal);
+            double PortReachOf(OmsiJunctionTerrainPlace place)
+            {
+                var path = place.AssetPath ?? string.Empty;
+                if (!portReaches.TryGetValue(path, out var known))
+                {
+                    known = PortReach(path);
+                    portReaches.Add(path, known);
+                }
+                return known;
+            }
+
+            // The list keeps the order the places were found in, which the tiles are fitted in; the set answers whether one is in it.
+            var affected = new List<OmsiJunctionTerrainPlace>(changed);
+            var inAffected = new HashSet<OmsiJunctionTerrainPlace>(changed);
+            var everyPlace = new List<OmsiJunctionTerrainPlace>(before);
+            everyPlace.AddRange(after);
+            foreach (var place in changed)
+            {
+                var reachOfPlace = PortReachOf(place);
+                foreach (var other in everyPlace)
+                {
+                    if (inAffected.Contains(other))
+                        continue;
+                    var dx = other.WorldX - place.WorldX;
+                    var dy = other.WorldY - place.WorldY;
+                    var meet = reachOfPlace + PortReachOf(other) + 2.0 * tolerance;
+                    if (dx * dx + dy * dy <= meet * meet)
+                    {
+                        affected.Add(other);
+                        inAffected.Add(other);
+                    }
+                }
+            }
+
+            foreach (var place in affected)
+            {
+                // The footprint reaches its corners and slopes beyond them; roads joined at its points reach from there.
+                var footprint = 0.0;
+                foreach (var contour in shapeOutlines.Get(place.AssetPath).Contours)
+                    foreach (var point in contour)
+                        footprint = Math.Max(footprint, Math.Sqrt(point.X * point.X + point.Y * point.Y));
+                var reach = Math.Max(footprint + TerrainShape.MaximumReachMeters, PortReachOf(place) + tolerance + roadEnd);
+                // Within a tile of the junction, every place lies in the tiles at and around its own.
+                if (!(reach < size))
+                    return null;
+                var centre = new KeyValuePair<int, int>((int)Math.Floor(place.WorldX / size), (int)Math.Floor(place.WorldY / size));
+                if (!centres.Contains(centre))
+                    centres.Add(centre);
+            }
+            return centres;
+        }
+
+        /// <summary>How far from its origin the furthest connection point of an object lies, in any turn of it.</summary>
+        private double PortReach(string assetPath)
+        {
+            ShapeCatalogs();
+            var reach = 0.0;
+            foreach (var helper in shapeJunctions.Helpers(assetPath))
+                reach = Math.Max(reach, Math.Sqrt(helper.X * helper.X + helper.Y * helper.Y + helper.Height * helper.Height));
+            return reach;
         }
 
         /// <summary>The connection point of a placed object, such as a junction, that a spline end lies on (ADR 024); or null.</summary>

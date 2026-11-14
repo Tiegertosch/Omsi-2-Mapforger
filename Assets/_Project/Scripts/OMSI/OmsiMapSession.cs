@@ -168,6 +168,35 @@ namespace OmsiMapEditor.OMSI
         internal List<FileState> Files { get; } = new List<FileState>();
     }
 
+    /// <summary>A place and orientation to give an object of a tile summary, for <see cref="OmsiMapSession.UpdateObjects"/>.</summary>
+    public sealed class OmsiObjectValueEdit
+    {
+        public OmsiObjectValueEdit(OmsiTileSummary tile, OmsiObjectRecord record, double x, double y, double z, double headingDegrees,
+            double pitchDegrees, double bankDegrees)
+        {
+            Tile = tile ?? throw new ArgumentNullException(nameof(tile));
+            Record = record ?? throw new ArgumentNullException(nameof(record));
+            X = x;
+            Y = y;
+            Z = z;
+            HeadingDegrees = headingDegrees;
+            PitchDegrees = pitchDegrees;
+            BankDegrees = bankDegrees;
+        }
+
+        public OmsiTileSummary Tile { get; }
+        public OmsiObjectRecord Record { get; }
+
+        /// <summary>Tile-local position east and north, and height, in metres.</summary>
+        public double X { get; }
+
+        public double Y { get; }
+        public double Z { get; }
+        public double HeadingDegrees { get; }
+        public double PitchDegrees { get; }
+        public double BankDegrees { get; }
+    }
+
     /// <summary>Outcome of deleting or transferring an object: the change, or the references that prevented it.</summary>
     public sealed class OmsiObjectChangeResult
     {
@@ -276,56 +305,168 @@ namespace OmsiMapEditor.OMSI
         private bool UpdateObject(string tileFileName, int objectId, double x, double y, double z, double headingDegrees,
             double? pitchDegrees, double? bankDegrees)
         {
-            var workspace = RequireWorkspace();
-            var relative = OmsiRelativePath.Normalize(tileFileName);
-            var tileBefore = workspace.ReadAllBytes(relative);
-            var tile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
-            OmsiObjectView target = null;
-            foreach (var view in OmsiTileRecords.Of<OmsiObjectView>(tile))
-            {
-                if (view.Id == objectId)
-                {
-                    target = view;
-                    break;
-                }
-            }
-            if (target == null)
-                throw new InvalidOperationException("Object " + objectId + " was not found in " + tileFileName + ".");
+            var edit = new ValueEditInFile(OmsiRelativePath.Normalize(tileFileName), tileFileName, objectId, x, y, z, headingDegrees, pitchDegrees, bankDegrees);
+            return WriteValueEdits(new[] { edit })[0];
+        }
 
-            var oldX = target.X;
-            var oldY = target.Y;
-            var oldZ = target.Z;
-            var oldHeading = target.HeadingDegrees;
-            // Entry points name base tiles only; objects of a chrono change list have none.
-            var isChronoFile = IsChronoFile(relative);
-            var changed = false;
-            if (target.X != x) { target.X = x; changed = true; }
-            if (target.Y != y) { target.Y = y; changed = true; }
-            if (target.Z != z) { target.Z = z; changed = true; }
-            if (target.HeadingDegrees != headingDegrees) { target.HeadingDegrees = headingDegrees; changed = true; }
-            if (pitchDegrees.HasValue && target.PitchDegrees != pitchDegrees.Value) { target.PitchDegrees = pitchDegrees.Value; changed = true; }
-            if (bankDegrees.HasValue && target.BankDegrees != bankDegrees.Value) { target.BankDegrees = bankDegrees.Value; changed = true; }
-            if (!changed)
-                return false;
-            // Both files are made in memory first and written all or none, the tile first (ADR 098, failure contract): a failure leaves
-            // the files as they were, or throws OmsiRollBackFailedException when putting them back failed too.
-            OmsiObjectChange.FileState configState = null;
-            if (!isChronoFile)
+        /// <summary>
+        /// Same as <see cref="UpdateObject(OmsiTileSummary,OmsiObjectRecord,double,double,double,double,double,double)"/> for several
+        /// objects at once, such as a moved selection or its undo: each file is read once, the edits are made in the order given, as if one
+        /// came after the other, and every file they change, tiles and global.cfg, is written all or none in one go. The records receive
+        /// the values as written, and only once every file is written. A failure writes nothing, or puts back what was written, and leaves
+        /// every record as it was; <see cref="OmsiRollBackFailedException"/> and <see cref="RollBackFailed"/> report a failed putting back,
+        /// as for one object. Returns, for each edit, whether it changed its object.
+        /// </summary>
+        public IReadOnlyList<bool> UpdateObjects(IReadOnlyList<OmsiObjectValueEdit> edits)
+        {
+            if (edits == null)
+                throw new ArgumentNullException(nameof(edits));
+            var inFiles = new ValueEditInFile[edits.Count];
+            for (var index = 0; index < edits.Count; index++)
             {
-                var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
-                var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
-                if (config.Records.Exists(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase)) &&
-                    OmsiTileEditing.FollowEntryPoints(tile, target, TileIndexOf(config, relative), config, oldX, oldY, oldZ, oldHeading) > 0)
-                    configState = new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() };
+                var edit = edits[index] ?? throw new ArgumentException("An edit is missing.", nameof(edits));
+                var path = FileHolding(edit.Tile, edit.Record);
+                inFiles[index] = new ValueEditInFile(path, path, edit.Record.Id, edit.X, edit.Y, edit.Z, edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees);
             }
-            var files = new List<OmsiObjectChange.FileState>
+            var changed = WriteValueEdits(inFiles);
+            for (var index = 0; index < edits.Count; index++)
             {
-                new OmsiObjectChange.FileState { RelativePath = relative, Before = tileBefore, After = tile.ToBytes() }
-            };
-            if (configState != null)
-                files.Add(configState);
-            ApplyFiles(files, false);
-            return true;
+                if (!changed[index])
+                    continue;
+                var edit = edits[index];
+                edit.Record.LocalX = AsWritten(edit.X);
+                edit.Record.LocalY = AsWritten(edit.Y);
+                edit.Record.Height = AsWritten(edit.Z);
+                edit.Record.HeadingDegrees = AsWritten(edit.HeadingDegrees);
+                edit.Record.PitchDegrees = AsWritten(edit.PitchDegrees);
+                edit.Record.BankDegrees = AsWritten(edit.BankDegrees);
+            }
+            return changed;
+        }
+
+        /// <summary>One move or turn by values, by the file that holds the object.</summary>
+        private sealed class ValueEditInFile
+        {
+            public ValueEditInFile(string path, string shownName, int objectId, double x, double y, double z, double headingDegrees,
+                double? pitchDegrees, double? bankDegrees)
+            {
+                Path = path;
+                ShownName = shownName;
+                ObjectId = objectId;
+                X = x;
+                Y = y;
+                Z = z;
+                HeadingDegrees = headingDegrees;
+                PitchDegrees = pitchDegrees;
+                BankDegrees = bankDegrees;
+            }
+
+            public string Path { get; }
+
+            /// <summary>The file as the caller named it, for messages.</summary>
+            public string ShownName { get; }
+
+            public int ObjectId { get; }
+            public double X { get; }
+            public double Y { get; }
+            public double Z { get; }
+            public double HeadingDegrees { get; }
+
+            /// <summary>Null keeps the stored pitch; the same for bank.</summary>
+            public double? PitchDegrees { get; }
+
+            public double? BankDegrees { get; }
+        }
+
+        /// <summary>A file the value edits of one call change, read and parsed once.</summary>
+        private sealed class ValueEditFile
+        {
+            public byte[] Before;
+            public OmsiRecordFile File;
+            public Dictionary<int, OmsiObjectView> Objects;
+            public bool IsChrono;
+            public int? TileIndex;
+            public bool Changed;
+        }
+
+        /// <summary>
+        /// Makes value edits in memory, in the order given, and writes the files they changed all or none, the tiles in the order first
+        /// edited and global.cfg last (ADR 098, failure contract): a failure leaves the files as they were, or throws
+        /// <see cref="OmsiRollBackFailedException"/> when putting them back failed too. Throws before writing anything when an object
+        /// is not found. Entry points on the objects follow them in global.cfg, as for one object. Returns whether each edit changed its object.
+        /// </summary>
+        private bool[] WriteValueEdits(IReadOnlyList<ValueEditInFile> edits)
+        {
+            var workspace = RequireWorkspace();
+            var changed = new bool[edits.Count];
+            var files = new Dictionary<string, ValueEditFile>(StringComparer.OrdinalIgnoreCase);
+            var order = new List<string>();
+            byte[] configBefore = null;
+            OmsiRecordFile config = null;
+            var configHasEntryPoints = false;
+            var configChanged = false;
+            for (var index = 0; index < edits.Count; index++)
+            {
+                var edit = edits[index];
+                if (!files.TryGetValue(edit.Path, out var file))
+                {
+                    var bytes = workspace.ReadAllBytes(edit.Path);
+                    var parsed = OmsiRecordFile.Parse(bytes, OmsiTileRecordLayouts.Instance);
+                    // The first object with the ID, as a search from the top finds it.
+                    var objects = new Dictionary<int, OmsiObjectView>();
+                    foreach (var view in OmsiTileRecords.Of<OmsiObjectView>(parsed))
+                        if (!objects.ContainsKey(view.Id))
+                            objects.Add(view.Id, view);
+                    // Entry points name base tiles only; objects of a chrono change list have none.
+                    file = new ValueEditFile { Before = bytes, File = parsed, Objects = objects, IsChrono = IsChronoFile(edit.Path) };
+                    files.Add(edit.Path, file);
+                    order.Add(edit.Path);
+                }
+                if (!file.Objects.TryGetValue(edit.ObjectId, out var target))
+                    throw new InvalidOperationException("Object " + edit.ObjectId + " was not found in " + edit.ShownName + ".");
+
+                var oldX = target.X;
+                var oldY = target.Y;
+                var oldZ = target.Z;
+                var oldHeading = target.HeadingDegrees;
+                var moved = false;
+                if (target.X != edit.X) { target.X = edit.X; moved = true; }
+                if (target.Y != edit.Y) { target.Y = edit.Y; moved = true; }
+                if (target.Z != edit.Z) { target.Z = edit.Z; moved = true; }
+                if (target.HeadingDegrees != edit.HeadingDegrees) { target.HeadingDegrees = edit.HeadingDegrees; moved = true; }
+                if (edit.PitchDegrees.HasValue && target.PitchDegrees != edit.PitchDegrees.Value) { target.PitchDegrees = edit.PitchDegrees.Value; moved = true; }
+                if (edit.BankDegrees.HasValue && target.BankDegrees != edit.BankDegrees.Value) { target.BankDegrees = edit.BankDegrees.Value; moved = true; }
+                if (!moved)
+                    continue;
+                changed[index] = true;
+                file.Changed = true;
+                if (file.IsChrono)
+                    continue;
+                if (config == null)
+                {
+                    configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+                    config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
+                    configHasEntryPoints = config.Records.Exists(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase));
+                }
+                if (!configHasEntryPoints)
+                    continue;
+                file.TileIndex = file.TileIndex ?? TileIndexOf(config, edit.Path);
+                if (OmsiTileEditing.FollowEntryPoints(file.File, target, file.TileIndex.Value, config, oldX, oldY, oldZ, oldHeading) > 0)
+                    configChanged = true;
+            }
+
+            var states = new List<OmsiObjectChange.FileState>();
+            foreach (var path in order)
+            {
+                var file = files[path];
+                if (file.Changed)
+                    states.Add(new OmsiObjectChange.FileState { RelativePath = path, Before = file.Before, After = file.File.ToBytes() });
+            }
+            if (configChanged)
+                states.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });
+            if (states.Count > 0)
+                ApplyFiles(states, false);
+            return changed;
         }
 
         /// <summary>
@@ -348,16 +489,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(tile));
             if (record == null)
                 throw new ArgumentNullException(nameof(record));
-
-            if (!UpdateObject(FileHolding(tile, record), record.Id, x, y, z, headingDegrees, pitchDegrees, bankDegrees))
-                return false;
-            record.LocalX = AsWritten(x);
-            record.LocalY = AsWritten(y);
-            record.Height = AsWritten(z);
-            record.HeadingDegrees = AsWritten(headingDegrees);
-            record.PitchDegrees = AsWritten(pitchDegrees);
-            record.BankDegrees = AsWritten(bankDegrees);
-            return true;
+            return UpdateObjects(new[] { new OmsiObjectValueEdit(tile, record, x, y, z, headingDegrees, pitchDegrees, bankDegrees) })[0];
         }
 
         private static double AsWritten(double value)

@@ -9,6 +9,7 @@
   "selection.describe.many": "{count} Objekte gewählt. Ziehe eines, um alle zu verschieben; Entf löscht sie; Strg+Klick fügt eines hinzu oder nimmt es weg.",
   "objects.edit.saved_before": "Die Änderungen davor wurden gespeichert; Strg+Z macht sie rückgängig.",
   "objects.edit.save_failed": "Objekt #{id} konnte nicht gespeichert werden: {reason}",
+  "objects.edit.save_failed_many": "{count, plural, one {# Objekt konnte} other {Die # Objekte konnten}} nicht gespeichert werden: {reason}",
   "objects.edit.kept_in_variant": "In {title} nicht geändert: {list}.",
   "objects.edit.unchanged_one": "Objekt #{id} ist unverändert.",
   "objects.edit.unchanged_many": "Die Objekte sind unverändert.",

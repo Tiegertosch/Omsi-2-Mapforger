@@ -159,6 +159,8 @@ namespace OmsiMapEditor.UI
         private OmsiSplineProfileCatalog roadProfiles;
         // Where the editor-placed junctions lay when the terrain was last fitted to them; null until the first edit.
         private string junctionTerrainState;
+        // The same junctions one by one, for fitting only around those that changed; null when the terrain may not be fitted to them.
+        private IReadOnlyList<OmsiJunctionTerrainPlace> junctionTerrainPlaces;
         private string roadProfilesRoot;
         // Where the selected object is while it is dragged or turned, as in Values(), so its connection points follow; null otherwise.
         private double[] junctionPreview;
@@ -1926,6 +1928,7 @@ namespace OmsiMapEditor.UI
                 ReleaseTerrain();
             UseSession(reading.Session);
             junctionTerrainState = null;
+            junctionTerrainPlaces = null;
             baseSummary = summary;
             chronoDate = null;
             chronoGeneration++;
@@ -1975,6 +1978,9 @@ namespace OmsiMapEditor.UI
             var previousTile = selectedTile;
             var previousObjectId = selectedObject?.Id;
             currentSummary = summary;
+            // The base map and each chrono view have roads and junctions of their own: the terrain was fitted to the junctions of the
+            // summary shown before, so the next fit after a junction changed fits the whole map (RefitTerrainAtJunctions).
+            junctionTerrainPlaces = null;
             selectedTile = null;
             selectedObject = null;
             if (keepView && previousTile != null)
@@ -2142,6 +2148,8 @@ namespace OmsiMapEditor.UI
             lineCandidates = null;
             editedVariant = null;
             session?.EditChronoVariant(null, null);
+            // Edits go to the base map again; the next fit after a junction changed fits the whole map (RefitTerrainAtJunctions).
+            junctionTerrainPlaces = null;
             undoSteps.Clear();
             redoSteps.Clear();
             if (session != null)
@@ -4777,7 +4785,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Saves moved or rotated objects into the workspace as one undo step. An object that ends up in another tile
-        /// moves into that tile, unless references tie it to its own; then it stays there with outside coordinates.
+        /// moves into that tile, unless references tie it to its own; then it stays there with outside coordinates. Moves and turns
+        /// by values are saved together, all or none, as one write of each file they change (<see cref="OmsiMapSession.UpdateObjects"/>);
+        /// a move into another tile or a copy in a chrono variant first saves those before it, so the files change in the order of the edits.
         /// </summary>
         private void CommitEdits(List<MapObjectEdit> edits)
         {
@@ -4790,6 +4800,7 @@ namespace OmsiMapEditor.UI
             }
 
             var parts = new List<ObjectEditStep>();
+            var pending = new ValueEditQueue();
             var kept = new List<string>();
             var transfers = new List<string>();
             var copies = new Dictionary<OmsiObjectRecord, OmsiObjectRecord>();
@@ -4805,6 +4816,9 @@ namespace OmsiMapEditor.UI
                     {
                         if (SameValues(edit.Record, edit))
                             continue;
+                        failure = SaveValueEdits(parts, pending);
+                        if (failure != null)
+                            break;
                         references = references ?? session.BuildReferenceIndex();
                         var copied = session.CopyInEditedVariant(currentSummary, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit.Height,
                             edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees, references);
@@ -4822,12 +4836,17 @@ namespace OmsiMapEditor.UI
                     }
                     if (EditingVariant)
                     {
-                        AddValueStep(parts, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit);
+                        failure = QueueValueEdit(parts, pending, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit);
+                        if (failure != null)
+                            break;
                         continue;
                     }
                     var target = OtherTileAt(edit.Tile, edit.LocalX, edit.LocalY, out var targetX, out var targetY);
                     if (target != null)
                     {
+                        failure = SaveValueEdits(parts, pending);
+                        if (failure != null)
+                            break;
                         references = references ?? session.BuildReferenceIndex();
                         var result = session.TransferObject(currentSummary, edit.Tile, edit.Record, target, targetX, targetY, references);
                         if (result.Succeeded)
@@ -4837,12 +4856,16 @@ namespace OmsiMapEditor.UI
                             parts.Add(new ObjectEditStep { Change = result.Change });
                             transfers.Add(Loc.T("objects.edit.transfer", ("id", edit.Record.Id), ("x", target.X), ("y", target.Y)));
                             // A transfer keeps height and orientation; an edit from the inspector may change them too.
-                            AddValueStep(parts, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit);
+                            failure = QueueValueEdit(parts, pending, target, edit.Record, edit.Record.LocalX, edit.Record.LocalY, edit);
+                            if (failure != null)
+                                break;
                             continue;
                         }
                         kept.Add("#" + edit.Record.Id + " (" + DescribeReferences(result.Blockers) + ")");
                     }
-                    AddValueStep(parts, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit);
+                    failure = QueueValueEdit(parts, pending, edit.Tile, edit.Record, edit.LocalX, edit.LocalY, edit);
+                    if (failure != null)
+                        break;
                 }
                 catch (Exception exception)
                 {
@@ -4851,6 +4874,9 @@ namespace OmsiMapEditor.UI
                     break;
                 }
             }
+            // The moves and turns queued before a failure are saved still, so the history and "saved before" hold all that was written.
+            var last = SaveValueEdits(parts, pending);
+            failure = failure ?? last;
 
             if (parts.Count > 0)
                 PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts });
@@ -4904,12 +4930,81 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
-        /// <summary>Saves the edit's height and orientation at a tile-local position and records it for undo.</summary>
-        private void AddValueStep(List<ObjectEditStep> parts, OmsiTileSummary tile, OmsiObjectRecord item, double x, double y, MapObjectEdit edit)
+        /// <summary>A move or turn by values of <see cref="CommitEdits"/>, waiting to be saved with the others next to it.</summary>
+        private sealed class PendingValueEdit
         {
-            var before = Values(item);
-            if (session.UpdateObject(tile, item, x, y, edit.Height, edit.HeadingDegrees, edit.PitchDegrees, edit.BankDegrees))
-                parts.Add(new ObjectEditStep { TileX = tile.X, TileY = tile.Y, ObjectId = item.Id, Before = before, After = Values(item) });
+            public OmsiTileSummary Tile;
+            public OmsiObjectRecord Record;
+            public double X;
+            public double Y;
+            public MapObjectEdit Edit;
+        }
+
+        /// <summary>The moves and turns by values waiting to be saved, in their order, and the objects they move.</summary>
+        private sealed class ValueEditQueue
+        {
+            public readonly List<PendingValueEdit> Edits = new List<PendingValueEdit>();
+            public readonly HashSet<OmsiObjectRecord> Records = new HashSet<OmsiObjectRecord>();
+        }
+
+        /// <summary>
+        /// Queues the edit's height and orientation at a tile-local position, to be saved by <see cref="SaveValueEdits"/>. A second edit of
+        /// an object already queued saves the queue first, so each part of the history holds one object's values before and after it.
+        /// Returns the status of a failed save, or null.
+        /// </summary>
+        private string QueueValueEdit(List<ObjectEditStep> parts, ValueEditQueue pending, OmsiTileSummary tile, OmsiObjectRecord item, double x, double y,
+            MapObjectEdit edit)
+        {
+            string failure = null;
+            if (pending.Records.Contains(item))
+                failure = SaveValueEdits(parts, pending);
+            if (failure == null)
+            {
+                pending.Edits.Add(new PendingValueEdit { Tile = tile, Record = item, X = x, Y = y, Edit = edit });
+                pending.Records.Add(item);
+            }
+            return failure;
+        }
+
+        /// <summary>
+        /// Saves the queued moves and turns by values all or none and records one part of the history for each object they changed. A
+        /// failure saves none of them and returns its status; null when they were saved. The queue is empty afterwards.
+        /// </summary>
+        private string SaveValueEdits(List<ObjectEditStep> parts, ValueEditQueue pending)
+        {
+            if (pending.Edits.Count == 0)
+                return null;
+            var queued = new List<PendingValueEdit>(pending.Edits);
+            pending.Edits.Clear();
+            pending.Records.Clear();
+            var edits = new List<OmsiObjectValueEdit>(queued.Count);
+            var before = new List<double[]>(queued.Count);
+            foreach (var item in queued)
+            {
+                before.Add(Values(item.Record));
+                edits.Add(new OmsiObjectValueEdit(item.Tile, item.Record, item.X, item.Y, item.Edit.Height, item.Edit.HeadingDegrees, item.Edit.PitchDegrees,
+                    item.Edit.BankDegrees));
+            }
+            IReadOnlyList<bool> changed;
+            try
+            {
+                changed = session.UpdateObjects(edits);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                return queued.Count == 1
+                    ? Loc.T("objects.edit.save_failed", ("id", queued[0].Record.Id), ("reason", exception.Message))
+                    : Loc.T("objects.edit.save_failed_many", ("count", queued.Count), ("reason", exception.Message));
+            }
+            for (var index = 0; index < queued.Count; index++)
+            {
+                if (!changed[index])
+                    continue;
+                var item = queued[index];
+                parts.Add(new ObjectEditStep { TileX = item.Tile.X, TileY = item.Tile.Y, ObjectId = item.Record.Id, Before = before[index], After = Values(item.Record) });
+            }
+            return null;
         }
 
         /// <summary>
@@ -5944,22 +6039,34 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Fits the terrain again when an editor-placed junction moved, appeared or went, since fitted roads may join it
-        /// (ADR 022). The terrain follows from the original and the roads, so this is no undo step of its own.
+        /// (ADR 022). The terrain follows from the original and the roads, so this is no undo step of its own. Only the tiles around
+        /// the junctions that changed are fitted, which gives the terrain of a full fit as long as the terrain was fitted to the junctions
+        /// as they were last (<see cref="OmsiMapSession.RefitTerrainAtJunctions"/>); when that is not known, such as after opening the map,
+        /// after a failed fit or while no fitted road was there, the whole map is fitted.
         /// </summary>
         private void RefitTerrainAtJunctions()
         {
             if (!CanEdit || currentSummary == null)
                 return;
             if (!currentSummary.Tiles.Exists(tile => tile.Splines.Exists(spline => spline.AlignsTerrain && session.ShapesTerrain(spline))))
+            {
+                // Junctions may move meanwhile without a fit, so the next fit cannot start from the junctions known.
+                junctionTerrainPlaces = null;
                 return;
+            }
             List<OmsiTileSummary> tiles;
             try
             {
-                var state = session.JunctionTerrainState(currentSummary);
+                var places = session.JunctionTerrainPlaces(currentSummary);
+                var state = JunctionStateText(places);
                 if (state == junctionTerrainState)
                     return;
                 junctionTerrainState = state;
-                tiles = session.RefitAllTerrain(currentSummary);
+                var before = junctionTerrainPlaces;
+                // Known again only once the fit succeeded; a failed fit leaves the next one to fit the whole map.
+                junctionTerrainPlaces = null;
+                tiles = session.RefitTerrainAtJunctions(currentSummary, before, places);
+                junctionTerrainPlaces = places;
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
             {
@@ -5973,6 +6080,15 @@ namespace OmsiMapEditor.UI
             objectRenderer?.RefreshTerrain(tiles, session.Source);
             if (roadTerrain != null)
                 roadTerrain = new OmsiTerrainSampler(currentSummary, session.Source);
+        }
+
+        /// <summary>The text of <see cref="OmsiMapSession.JunctionTerrainState"/> for these junctions.</summary>
+        private static string JunctionStateText(IReadOnlyList<OmsiJunctionTerrainPlace> places)
+        {
+            var text = new System.Text.StringBuilder();
+            foreach (var place in places)
+                text.Append(place.State);
+            return text.ToString();
         }
 
         private OmsiTileSummary TileHolding(MapSelectionItem item)
@@ -6262,9 +6378,9 @@ namespace OmsiMapEditor.UI
                 states.Add(step.AttachmentChange.IsApplied);
             else if (step.Change != null)
                 states.Add(step.Change.IsApplied);
-            // A move or turn by values adds nothing: OmsiMapSession.UpdateObject writes its files all or none and sets the record only
-            // after, so a value part that fails has changed nothing and needs no taking back, and one that succeeded is taken back by
-            // writing its values before. So StepGroup takes back only the parts done before a failed value part.
+            // A move or turn by values adds nothing: OmsiMapSession.UpdateObjects writes the files of a run of value parts all or none and
+            // sets the records only after, so a run that fails has changed nothing and needs no taking back, and one that succeeded is taken
+            // back by writing its values before. So StepGroup takes back only the parts done before a failed run.
         }
 
         /// <summary>True when every part of a step is in effect, or not, as before a failed undo or redo.</summary>
@@ -6281,7 +6397,8 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Undoes or redoes a step; the parts of a group are undone in reverse order. Collects the objects that exist
-        /// afterwards, so they can be selected. When a part of a group fails, it is taken back when it changed whether it is in effect,
+        /// afterwards, so they can be selected. Parts next to each other that move or turn objects by values are written together, all or
+        /// none (<see cref="ApplyValueParts"/>). When a part of a group fails, it is taken back when it changed whether it is in effect,
         /// then the parts done before it, the last first, and the failure is thrown as it was (<see cref="StepGroup.Apply{T}"/>); when
         /// taking them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
         /// </summary>
@@ -6292,9 +6409,11 @@ namespace OmsiMapEditor.UI
                 var order = new List<ObjectEditStep>(step.Group);
                 if (undo)
                     order.Reverse();
+                var units = StepGroup.Runs(order, IsValuePart);
                 var takenBack = new List<MapSelectionItem>();
                 // A failed roll-back is noted like one the session reports; the undo or redo reads the map at once, which clears the note.
-                StepGroup.Apply(order, part => ApplyStep(part, undo, touched), part => ApplyStep(part, !undo, takenBack), AppliedStates, NoteRollBackFailure);
+                // A run of value parts is taken back last part first, as single parts were, so an object moved twice ends where it was.
+                StepGroup.Apply(units, unit => ApplyUnit(unit, undo, touched), unit => ApplyUnit(Reversed(unit), !undo, takenBack), UnitStates, NoteRollBackFailure);
                 return;
             }
 
@@ -6366,14 +6485,64 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            var tile = currentSummary.Tiles.Find(candidate => candidate.X == step.TileX && candidate.Y == step.TileY);
-            var item = tile?.Objects.Find(candidate => candidate.Id == step.ObjectId);
-            // Nothing is written, and trying again gives the same answer: the step is refused.
-            if (item == null)
-                throw new OmsiStepRefusedException("Object #" + step.ObjectId + " no longer exists.");
-            var target = undo ? step.Before : step.After;
-            session.UpdateObject(tile, item, target[0], target[1], target[2], target[3], target[4], target[5]);
-            Touch(touched, tile, item);
+            ApplyValueParts(new[] { step }, undo, touched);
+        }
+
+        /// <summary>True for a part that moves or turns an object by values, the part <see cref="ApplyStep"/> handles last.</summary>
+        private static bool IsValuePart(ObjectEditStep step)
+        {
+            return step.Group == null && step.TileRevert == null && step.SplineChange == null && step.RoadTypeChange == null &&
+                   step.TerrainChange == null && step.AttachedChange == null && step.AttachmentChange == null && step.Change == null &&
+                   step.TileChange == null;
+        }
+
+        /// <summary>Applies one part of a group, or a run of value parts together.</summary>
+        private void ApplyUnit(List<ObjectEditStep> unit, bool undo, List<MapSelectionItem> touched)
+        {
+            if (unit.Count == 1 && !IsValuePart(unit[0]))
+                ApplyStep(unit[0], undo, touched);
+            else
+                ApplyValueParts(unit, undo, touched);
+        }
+
+        /// <summary>Whether each piece of a unit of <see cref="ApplyUnit"/> is in effect; value parts add nothing (<see cref="AddAppliedStates"/>).</summary>
+        private static List<bool> UnitStates(List<ObjectEditStep> unit)
+        {
+            var states = new List<bool>();
+            foreach (var part in unit)
+                AddAppliedStates(part, states);
+            return states;
+        }
+
+        private static List<ObjectEditStep> Reversed(List<ObjectEditStep> unit)
+        {
+            var reversed = new List<ObjectEditStep>(unit);
+            reversed.Reverse();
+            return reversed;
+        }
+
+        /// <summary>
+        /// Moves or turns the objects of value parts to their values before or after, in the order given, writing every file once and all
+        /// or none (<see cref="OmsiMapSession.UpdateObjects"/>): a failure leaves files and records as they were. The objects are found when
+        /// the parts are applied, as a part done just before may have moved one into another tile. An object that no longer exists refuses
+        /// the parts before anything is written.
+        /// </summary>
+        private void ApplyValueParts(IReadOnlyList<ObjectEditStep> parts, bool undo, List<MapSelectionItem> touched)
+        {
+            var edits = new List<OmsiObjectValueEdit>(parts.Count);
+            foreach (var part in parts)
+            {
+                var tile = currentSummary.Tiles.Find(candidate => candidate.X == part.TileX && candidate.Y == part.TileY);
+                var item = tile?.Objects.Find(candidate => candidate.Id == part.ObjectId);
+                // Nothing is written, and trying again gives the same answer: the step is refused.
+                if (item == null)
+                    throw new OmsiStepRefusedException("Object #" + part.ObjectId + " no longer exists.");
+                var target = undo ? part.Before : part.After;
+                edits.Add(new OmsiObjectValueEdit(tile, item, target[0], target[1], target[2], target[3], target[4], target[5]));
+            }
+            session.UpdateObjects(edits);
+            foreach (var edit in edits)
+                Touch(touched, edit.Tile, edit.Record);
         }
 
         /// <summary>
@@ -6526,14 +6695,17 @@ namespace OmsiMapEditor.UI
                 DeselectRow();
             }
             ClearSelectedSpline();
-            // The revert fitted the terrain around the tile itself, and undo and redo put those files back: the junctions as they are now
-            // are the ones the terrain was fitted to, so no fit outside the step follows.
+            // The revert fitted the terrain around the tile and its neighbours only, and undo and redo put those files back, so no fit
+            // outside the step follows now. A junction lying outside its tile, or one that takes a road end over from a junction in the
+            // tile, may still reach beyond them: the terrain is not known to be fitted to the junctions as they are, and the next fit
+            // after a junction changed fits the whole map (RefitTerrainAtJunctions).
+            junctionTerrainPlaces = null;
             if (CanEdit && currentSummary != null &&
                 currentSummary.Tiles.Exists(tile => tile.Splines.Exists(spline => spline.AlignsTerrain && session.ShapesTerrain(spline))))
             {
                 try
                 {
-                    junctionTerrainState = session.JunctionTerrainState(currentSummary);
+                    junctionTerrainState = JunctionStateText(session.JunctionTerrainPlaces(currentSummary));
                 }
                 catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
                 {

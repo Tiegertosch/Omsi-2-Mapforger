@@ -809,6 +809,307 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void FittingTheTerrainAroundMovedJunctionsGivesTheTerrainOfAFullFit()
+        {
+            // Four tiles in a row; a junction 20 m square whose one connection point lies 10 m behind its origin, facing back.
+            WriteUtf16("global.cfg", "[NextIDCode]", "100", "", "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "",
+                "[map]", "2", "0", "tile_2_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            WriteUtf16("tile_2_0.map", "[version]", "14", "");
+            WriteUtf16("tile_3_0.map", "[version]", "14", "");
+            WriteTerrain("tile_2_0.map.terrain", 2);
+            WriteTerrain("tile_3_0.map.terrain", 3);
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 270, Height = 2 };
+            summary.Tiles[0].Objects.Add(junction);
+            // A fitted road ending on the junction's point, and one far away in tile 3, 0, which no junction reaches.
+            foreach (var x in new[] { 100.0, 1000.0 })
+                session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+                {
+                    StartX = x, StartY = 200, StartHeight = 2, EndX = x, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+                }, null), @"Splines\road.sli", null, null, true);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "The terrain is fitted to the junction as it lies.");
+            var places = session.JunctionTerrainPlaces(summary);
+            Assert.AreEqual(session.JunctionTerrainState(summary), string.Concat(places.Select(place => place.State)));
+            var far = session.Workspace.Stamp("tile_3_0.map.terrain");
+
+            // Away from the road end, to the edge of its tile, out of its tile with coordinates outside, where the map has no tile, and back.
+            foreach (var place in new[] { new[] { 150.0, 270.0 }, new[] { 295.0, 150.0 }, new[] { 310.0, 280.0 }, new[] { -5.0, 100.0 }, new[] { 100.0, 270.0 } })
+            {
+                junction.LocalX = place[0];
+                junction.LocalY = place[1];
+                var now = session.JunctionTerrainPlaces(summary);
+                var fitted = session.RefitTerrainAtJunctions(summary, places, now);
+                places = now;
+
+                Assert.IsFalse(fitted.Exists(tile => tile.X == 3), "Tile 3, 0 lies beyond the junction's reach.");
+                CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "A full fit after the junction moved to " + place[0] + ", " + place[1] + " changes nothing.");
+            }
+            Assert.AreEqual(far, session.Workspace.Stamp("tile_3_0.map.terrain"));
+            // The junction away from the road and back: the terrain under it changed and came back.
+            junction.LocalX = 150;
+            var away = session.RefitTerrainAtJunctions(summary, places, session.JunctionTerrainPlaces(summary));
+            CollectionAssert.Contains(away, summary.Tiles[0]);
+
+            // Without the junctions the terrain was fitted to, the whole map is fitted.
+            junction.LocalX = 100;
+            CollectionAssert.Contains(session.RefitTerrainAtJunctions(summary, null, session.JunctionTerrainPlaces(summary)), summary.Tiles[0]);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary));
+        }
+
+        [Test]
+        public void FittingTheTerrainAroundAJunctionThatTakesARoadEndFromAnotherGivesTheTerrainOfAFullFit()
+        {
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            // Its point lies 60 m behind its origin, so it can take the road end while it lies well away from the other junction.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "long.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-60\r\n180\r\n\r\n[boundingbox]\r\n30\r\n30\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            // The long junction comes first in the tile, so a road end on both points is joined to it and the square one leaves the fit.
+            var taker = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\long.sco", Id = 501, LocalX = 200, LocalY = 150, Height = 2 };
+            var square = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 270, Height = 2 };
+            summary.Tiles[0].Objects.Add(taker);
+            summary.Tiles[0].Objects.Add(square);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary));
+            var places = session.JunctionTerrainPlaces(summary);
+            var underSquare = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"))[20, 54];
+            Assert.AreEqual(1.95, underSquare, 1e-4, "The square junction is fitted.");
+
+            // On the road end, then away again.
+            foreach (var place in new[] { new[] { 100.0, 320.0 }, new[] { 200.0, 150.0 } })
+            {
+                taker.LocalX = place[0];
+                taker.LocalY = place[1];
+                var now = session.JunctionTerrainPlaces(summary);
+                AssertLocalFitIsFullFit(session, summary, places, now, "the junction moved to " + place[0] + ", " + place[1]);
+                places = now;
+                CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "A full fit after the junction moved to " + place[0] + ", " + place[1] + " changes nothing.");
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FittingTheTerrainAroundJunctionsGivesEveryTileTheBytesOfAFullFitFromTheSameStart(bool worldCoordinates)
+        {
+            // A grid of three by two tiles and a tile apart; on a [worldcoordinates] map at Berlin's latitude tiles are 371.9 m wide.
+            var originX = worldCoordinates ? 2402 : 0;
+            var originY = worldCoordinates ? 11279 : 0;
+            var config = new List<string>();
+            if (worldCoordinates)
+                config.AddRange(new[] { "[worldcoordinates]", "" });
+            config.AddRange(new[] { "[NextIDCode]", "100", "" });
+            foreach (var place in new[] { new[] { 0, 0 }, new[] { 1, 0 }, new[] { 2, 0 }, new[] { 0, 1 }, new[] { 1, 1 }, new[] { 2, 1 }, new[] { 5, 0 } })
+            {
+                var name = "tile_" + (originX + place[0]) + "_" + (originY + place[1]) + ".map";
+                config.AddRange(new[] { "[map]", (originX + place[0]).ToString(CultureInfo.InvariantCulture), (originY + place[1]).ToString(CultureInfo.InvariantCulture), name, "" });
+                WriteUtf16(name, "[version]", "14", "");
+                WriteUnevenTerrain(name + ".terrain", place[0], place[1]);
+            }
+            WriteUtf16("global.cfg", config.ToArray());
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var size = summary.TileSizeMeters;
+            Assert.AreEqual(worldCoordinates ? 371.9 : 300.0, size, 0.1);
+            var home = summary.Tiles.Single(tile => tile.X == originX && tile.Y == originY);
+            // Near the north-east corner of its tile: its point lies 20 m from both edges, where a fitted road ends.
+            var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = size - 20, LocalY = size - 10, Height = 2 };
+            home.Objects.Add(junction);
+            var westEdge = originX * size;
+            var southEdge = originY * size;
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = westEdge + size - 20, StartY = southEdge + size - 100, StartHeight = 2, EndX = westEdge + size - 20, EndY = southEdge + size - 20,
+                EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            // A fitted road in the tile apart, which no junction reaches.
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = westEdge + 5 * size + 100, StartY = southEdge + 100, StartHeight = 2, EndX = westEdge + 5 * size + 100, EndY = southEdge + 160,
+                EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            session.RefitAllTerrain(summary);
+            var places = session.JunctionTerrainPlaces(summary);
+            var changedSomewhere = false;
+
+            // Away across the corner with coordinates outside its tile, back onto the road end, from there straight into the tile two east
+            // where no full fit looks (so the tiles where it lay have to be fitted as well as those where it lies), outside to the north,
+            // back, outside to the west where the map has no tile, and back.
+            foreach (var place in new[]
+                     {
+                         new[] { size + 5, size + 5 }, new[] { size - 20, size - 10 }, new[] { 2 * size + 150, 150.0 }, new[] { size - 15, size + 8 },
+                         new[] { size - 20, size - 10 }, new[] { -5.0, size - 10 }, new[] { size - 20, size - 10 }
+                     })
+            {
+                junction.LocalX = place[0];
+                junction.LocalY = place[1];
+                var now = session.JunctionTerrainPlaces(summary);
+                var fitted = AssertLocalFitIsFullFit(session, summary, places, now, "the junction moved to " + place[0] + ", " + place[1]);
+                places = now;
+                changedSomewhere |= fitted.Count > 0;
+                Assert.IsFalse(fitted.Exists(tile => tile.X == originX + 5), "The tile apart lies beyond the junction's reach.");
+            }
+            Assert.IsTrue(changedSomewhere, "Joining and leaving the road end changes the terrain.");
+        }
+
+        [Test]
+        public void AJunctionLosingARoadEndToOneTwoTilesAwayGetsItsTerrainFittedToo()
+        {
+            // Four tiles in a row, tile 2, 0 listed first, so a road end on points of junctions in tiles 1 and 2 is joined to the one in tile 2.
+            WriteUtf16("global.cfg", "[NextIDCode]", "100", "", "[map]", "2", "0", "tile_2_0.map", "", "[map]", "0", "0", "tile_0_0.map", "",
+                "[map]", "1", "0", "tile_1_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            foreach (var column in new[] { 0, 1, 2, 3 })
+            {
+                WriteUtf16("tile_" + column + "_0.map", "[version]", "14", "");
+                WriteUnevenTerrain("tile_" + column + "_0.map.terrain", column, 0);
+            }
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            // 100 m wide, its point 10 m behind its origin: its slopes reach out of its tile to the west.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "wide.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n100\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            // Its point lies 246 m to the west and 10 m behind its origin, less than a tile away with what a road joined to it reaches.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "arm.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n-246\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile1 = summary.Tiles.Single(tile => tile.X == 1);
+            var tile2 = summary.Tiles.Single(tile => tile.X == 2);
+            // The wide junction at 355, 150 in the world, 10 m below the ground, with its point at 355, 140 where a fitted road ends.
+            tile1.Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\wide.sco", Id = 500, LocalX = 55, LocalY = 150, Height = -10 });
+            var arm = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\arm.sco", Id = 501, LocalX = 150, LocalY = 250, Height = -10 };
+            tile2.Objects.Add(arm);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 355, StartY = 60, StartHeight = -10, EndX = 355, EndY = 140, EndHeight = -10, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            session.RefitAllTerrain(summary);
+            var places = session.JunctionTerrainPlaces(summary);
+            var westBefore = session.Workspace.ReadAllBytes("tile_0_0.map.terrain");
+
+            // The arm's point onto the road end: the wide junction leaves the fit, and the terrain two tiles from the arm, in tile 0, 0, changes.
+            arm.LocalX = 1;
+            arm.LocalY = 150;
+            var now = session.JunctionTerrainPlaces(summary);
+            AssertLocalFitIsFullFit(session, summary, places, now, "the arm took the road end");
+            CollectionAssert.AreNotEqual(westBefore, session.Workspace.ReadAllBytes("tile_0_0.map.terrain"), "The wide junction's slopes left tile 0, 0.");
+            places = now;
+
+            // And back: the wide junction takes the road end again.
+            arm.LocalX = 150;
+            arm.LocalY = 250;
+            AssertLocalFitIsFullFit(session, summary, places, session.JunctionTerrainPlaces(summary), "the arm let go of the road end");
+            CollectionAssert.AreEqual(westBefore, session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+        }
+
+        [Test]
+        public void AJunctionReachingATileOrFurtherFitsTheWholeMap()
+        {
+            // Four tiles in a row with a fitted road in the last one.
+            WriteUtf16("global.cfg", "[NextIDCode]", "100", "", "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "",
+                "[map]", "2", "0", "tile_2_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            WriteUtf16("tile_2_0.map", "[version]", "14", "");
+            WriteUtf16("tile_3_0.map", "[version]", "14", "");
+            WriteTerrain("tile_2_0.map.terrain", 2);
+            WriteTerrain("tile_3_0.map.terrain", 3);
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            // Its point lies 400 m behind its origin, further than a tile.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "far.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-400\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 1000, StartY = 200, StartHeight = 2, EndX = 1000, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            session.RefitAllTerrain(summary);
+            var fittedFar = session.Workspace.ReadAllBytes("tile_3_0.map.terrain");
+            // The terrain of tile 3, 0 put back to the original's, as if it had not been fitted: only a full fit mends it.
+            session.Workspace.Revert("tile_3_0.map.terrain");
+            CollectionAssert.AreNotEqual(fittedFar, session.Workspace.ReadAllBytes("tile_3_0.map.terrain"));
+            var farTile = summary.Tiles.Single(tile => tile.X == 3);
+            var places = session.JunctionTerrainPlaces(summary);
+
+            // A junction reaching less than a tile is fitted around: tile 3, 0 stays as it is.
+            summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 100, Height = 2 });
+            var now = session.JunctionTerrainPlaces(summary);
+            CollectionAssert.DoesNotContain(session.RefitTerrainAtJunctions(summary, places, now), farTile);
+            places = now;
+            CollectionAssert.AreNotEqual(fittedFar, session.Workspace.ReadAllBytes("tile_3_0.map.terrain"));
+
+            // One reaching a tile or further fits the whole map, tile 3, 0 as well.
+            summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\far.sco", Id = 501, LocalX = 150, LocalY = 150, Height = 2 });
+            CollectionAssert.Contains(session.RefitTerrainAtJunctions(summary, places, session.JunctionTerrainPlaces(summary)), farTile);
+            CollectionAssert.AreEqual(fittedFar, session.Workspace.ReadAllBytes("tile_3_0.map.terrain"));
+        }
+
+        /// <summary>
+        /// Fits the terrain around the junctions that changed from <paramref name="before"/> to <paramref name="now"/>, then puts every tile's
+        /// terrain back as it was and fits the whole map from there: every tile's terrain has to come out byte for byte the same, also in
+        /// tiles a full fit does not look at. Returns the tiles the local fit changed; the terrain is that of the full fit afterwards.
+        /// </summary>
+        private static List<OmsiTileSummary> AssertLocalFitIsFullFit(OmsiMapSession session, OmsiMapSummary summary,
+            IReadOnlyList<OmsiJunctionTerrainPlace> before, IReadOnlyList<OmsiJunctionTerrainPlace> now, string what)
+        {
+            var start = TerrainFiles(session, summary);
+            var fitted = session.RefitTerrainAtJunctions(summary, before, now);
+            var local = TerrainFiles(session, summary);
+            foreach (var file in start)
+                session.Workspace.Save(file.Key, file.Value);
+            session.RefitTerrainAtJunctions(summary, null, now);
+            var full = TerrainFiles(session, summary);
+            CollectionAssert.AreEquivalent(full.Keys, local.Keys);
+            foreach (var file in full)
+                Assert.IsTrue(file.Value.SequenceEqual(local[file.Key]), "After " + what + ", " + file.Key + " differs from a full fit from the same start.");
+            return fitted;
+        }
+
+        /// <summary>The terrain file of every tile with terrain, as the workspace holds it.</summary>
+        private static Dictionary<string, byte[]> TerrainFiles(OmsiMapSession session, OmsiMapSummary summary)
+        {
+            var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            foreach (var tile in summary.Tiles)
+                if (tile.IsAvailable && tile.HasTerrain)
+                {
+                    var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                    files[path] = session.Workspace.ReadAllBytes(path);
+                }
+            return files;
+        }
+
+        /// <summary>A terrain rising unevenly to the north-east, a little different in every tile, whatever the tile size.</summary>
+        private void WriteUnevenTerrain(string relative, int column, int row)
+        {
+            var bytes = new byte[4 + OmsiTerrain.Resolution * OmsiTerrain.Resolution * 4];
+            Buffer.BlockCopy(BitConverter.GetBytes(60), 0, bytes, 0, 4);
+            for (var y = 0; y < OmsiTerrain.Resolution; y++)
+                for (var x = 0; x < OmsiTerrain.Resolution; x++)
+                {
+                    var height = 3.0 + 0.02 * (column * 60 + x) + 0.03 * (row * 60 + y) + 0.4 * Math.Sin((column * 60 + x) / 5.0) * Math.Cos((row * 60 + y) / 7.0);
+                    Buffer.BlockCopy(BitConverter.GetBytes((float)height), 0, bytes, 4 + (y * OmsiTerrain.Resolution + x) * 4, 4);
+                }
+            File.WriteAllBytes(Path.Combine(mapFolder, relative), bytes);
+        }
+
+        [Test]
         public void TheMapCheckSumsUpTheConnectionPointsOfJunctions()
         {
             using var english = EnglishTexts.Use();

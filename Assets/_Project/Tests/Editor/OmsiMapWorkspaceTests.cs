@@ -59,6 +59,42 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void SavingTheOriginalsBytesCountsOneNewVersionWithOrWithoutAnEditedCopy()
+        {
+            var workspace = new OmsiMapWorkspace(original, workspaceFolder);
+            var originalBytes = File.ReadAllBytes(Path.Combine(original, "tile_0_0.map"));
+
+            // Without an edited copy the file stays the original's, but its version moves on by one, so readers look again (ADR 057).
+            var stamp = workspace.Stamp("tile_0_0.map");
+            var writes = workspace.WriteCount;
+            workspace.Save("tile_0_0.map", originalBytes);
+            Assert.IsFalse(workspace.IsModified("tile_0_0.map"));
+            StringAssert.StartsWith("o", workspace.Stamp("tile_0_0.map"));
+            Assert.AreEqual(StampVersion(stamp) + 1, StampVersion(workspace.Stamp("tile_0_0.map")));
+            Assert.AreEqual(writes + 1, workspace.WriteCount);
+
+            // With an edited copy the copy goes, and the version moves on by one as well.
+            var edited = (byte[])originalBytes.Clone();
+            edited[edited.Length - 1] ^= 1;
+            workspace.Save("tile_0_0.map", edited);
+            Assert.IsTrue(workspace.IsModified("tile_0_0.map"));
+            stamp = workspace.Stamp("tile_0_0.map");
+            writes = workspace.WriteCount;
+            workspace.Save("tile_0_0.map", originalBytes);
+            Assert.IsFalse(workspace.IsModified("tile_0_0.map"));
+            StringAssert.StartsWith("o", workspace.Stamp("tile_0_0.map"));
+            Assert.AreEqual(StampVersion(stamp) + 1, StampVersion(workspace.Stamp("tile_0_0.map")));
+            Assert.AreEqual(writes + 1, workspace.WriteCount);
+            CollectionAssert.AreEqual(originalBytes, workspace.ReadAllBytes("tile_0_0.map"));
+        }
+
+        /// <summary>The version counted in a stamp of <see cref="OmsiMapWorkspace.Stamp"/>: the number after its first letter.</summary>
+        private static long StampVersion(string stamp)
+        {
+            return long.Parse(stamp.Substring(1, stamp.IndexOf(':') - 1), System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        [Test]
         public void RoadsOfAMapMadeHereStillShapeTheTerrainAfterAnExportAndReopening()
         {
             var made = OmsiNewMap.Create(Path.Combine(original, "global.cfg"), "Own map", "Own Map", new DateTime(2026, 10, 30));

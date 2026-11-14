@@ -16,6 +16,8 @@ namespace OmsiMapEditor.OMSI
         private long lastVersion;
         // Files of the original map this project takes away (a deleted line): listed in the project data folder, the original stays as it is.
         private HashSet<string> deleted;
+        private int readCount;
+        private int writeCount;
 
         public OmsiMapWorkspace(string sourceMapFolder, string workspaceFolder)
         {
@@ -35,6 +37,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The project's folder holding edited files.</summary>
         public string WorkspacePath { get; }
+
+        /// <summary>How many files were read through <see cref="ReadAllBytes"/> and <see cref="ReadOriginalBytes"/>, for tests of how often a step reads.</summary>
+        internal int ReadCount => System.Threading.Volatile.Read(ref readCount);
+
+        /// <summary>How many saves, reverts and deletions were asked for, for tests of how often a step writes.</summary>
+        internal int WriteCount => System.Threading.Volatile.Read(ref writeCount);
 
         /// <summary>Workspace folder for a project file: <c>Name.omproj</c> uses <c>Name.workspace</c> next to it.</summary>
         public static string FolderForProject(string projectFilePath)
@@ -88,6 +96,7 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public void Delete(string relativePath)
         {
+            System.Threading.Interlocked.Increment(ref writeCount);
             var edited = WorkspaceFile(relativePath);
             Count(edited);
             if (File.Exists(edited))
@@ -113,6 +122,7 @@ namespace OmsiMapEditor.OMSI
         {
             if (IsDeleted(relativePath))
                 throw new FileNotFoundException("The project took this file away.", relativePath);
+            System.Threading.Interlocked.Increment(ref readCount);
             var edited = WorkspaceFile(relativePath);
             return File.ReadAllBytes(File.Exists(edited) ? edited : OmsiRelativePath.Resolve(RootPath, relativePath));
         }
@@ -132,6 +142,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A file as the original map has it, whatever the workspace holds; null when the original has no such file.</summary>
         public byte[] ReadOriginalBytes(string relativePath)
         {
+            System.Threading.Interlocked.Increment(ref readCount);
             var original = OmsiRelativePath.Resolve(RootPath, relativePath);
             return File.Exists(original) ? File.ReadAllBytes(original) : null;
         }
@@ -190,11 +201,12 @@ namespace OmsiMapEditor.OMSI
             if (bytes == null)
                 throw new ArgumentNullException(nameof(bytes));
 
+            System.Threading.Interlocked.Increment(ref writeCount);
             Restore(relativePath);
             var original = OmsiRelativePath.Resolve(RootPath, relativePath);
             if (File.Exists(original) && SameBytes(File.ReadAllBytes(original), bytes))
             {
-                Revert(relativePath);
+                RevertCopy(relativePath);
                 return;
             }
 
@@ -218,6 +230,12 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>Discards the edited copy of a file, so the original is read again.</summary>
         public void Revert(string relativePath)
+        {
+            System.Threading.Interlocked.Increment(ref writeCount);
+            RevertCopy(relativePath);
+        }
+
+        private void RevertCopy(string relativePath)
         {
             var edited = WorkspaceFile(relativePath);
             Count(edited);
