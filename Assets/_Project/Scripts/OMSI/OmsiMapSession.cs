@@ -256,6 +256,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>
         /// Sets an object's position and heading and saves the tile into the workspace; entry points on the object follow
         /// it in global.cfg. Values equal to the stored ones keep their original text. Returns false when nothing changed.
+        /// The tile and global.cfg are written all or none: when a write fails, what was written is put back and the failure is
+        /// thrown as it was, so the files are as before the call; when putting them back fails too,
+        /// <see cref="OmsiRollBackFailedException"/> reports both and <see cref="RollBackFailed"/> is raised.
         /// </summary>
         public bool UpdateObject(string tileFileName, int objectId, double x, double y, double z, double headingDegrees)
         {
@@ -275,7 +278,8 @@ namespace OmsiMapEditor.OMSI
         {
             var workspace = RequireWorkspace();
             var relative = OmsiRelativePath.Normalize(tileFileName);
-            var tile = OmsiRecordFile.Parse(workspace.ReadAllBytes(relative), OmsiTileRecordLayouts.Instance);
+            var tileBefore = workspace.ReadAllBytes(relative);
+            var tile = OmsiRecordFile.Parse(tileBefore, OmsiTileRecordLayouts.Instance);
             OmsiObjectView target = null;
             foreach (var view in OmsiTileRecords.Of<OmsiObjectView>(tile))
             {
@@ -303,21 +307,31 @@ namespace OmsiMapEditor.OMSI
             if (bankDegrees.HasValue && target.BankDegrees != bankDegrees.Value) { target.BankDegrees = bankDegrees.Value; changed = true; }
             if (!changed)
                 return false;
+            // Both files are made in memory first and written all or none, the tile first (ADR 098, failure contract): a failure leaves
+            // the files as they were, or throws OmsiRollBackFailedException when putting them back failed too.
+            OmsiObjectChange.FileState configState = null;
             if (!isChronoFile)
             {
-                var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
+                var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+                var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
                 if (config.Records.Exists(record => string.Equals(record.Name, "entrypoints", StringComparison.OrdinalIgnoreCase)) &&
                     OmsiTileEditing.FollowEntryPoints(tile, target, TileIndexOf(config, relative), config, oldX, oldY, oldZ, oldHeading) > 0)
-                    workspace.Save(GlobalConfigFileName, config);
+                    configState = new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() };
             }
-            workspace.Save(relative, tile);
+            var files = new List<OmsiObjectChange.FileState>
+            {
+                new OmsiObjectChange.FileState { RelativePath = relative, Before = tileBefore, After = tile.ToBytes() }
+            };
+            if (configState != null)
+                files.Add(configState);
+            ApplyFiles(files, false);
             return true;
         }
 
         /// <summary>
         /// Same as <see cref="UpdateObject(string,int,double,double,double,double)"/> and also updates the object in a
         /// summary read from this session, so the map does not have to be read again. The record receives the values
-        /// as written to the file.
+        /// as written to the file, and only once the files are written: a failure leaves the record as it was.
         /// </summary>
         public bool UpdateObject(OmsiTileSummary tile, OmsiObjectRecord record, double x, double y, double z, double headingDegrees)
         {

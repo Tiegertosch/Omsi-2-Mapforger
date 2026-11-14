@@ -6210,9 +6210,9 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
                 var message = Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message)) /* i18n:keys */;
                 var refused = exception is OmsiStepRefusedException;
-                // A failed roll-back, a part left done or undone, or a moved object whose failure may have written part of it: files and
-                // memory may disagree, so the map is read again, which clears the history.
-                if (exception is OmsiRollBackFailedException || !SameAppliedStates(step, applied) || (!refused && HasValueMove(step)))
+                // A failed roll-back or a part left done or undone: files and memory may disagree, so the map is read again, which
+                // clears the history. A move by values is all or none like every other step, so it needs no exception here.
+                if (exception is OmsiRollBackFailedException || !SameAppliedStates(step, applied))
                 {
                     if (ReloadAfterFailedRollBack())
                         SetStatus(message);
@@ -6262,6 +6262,9 @@ namespace OmsiMapEditor.UI
                 states.Add(step.AttachmentChange.IsApplied);
             else if (step.Change != null)
                 states.Add(step.Change.IsApplied);
+            // A move or turn by values adds nothing: OmsiMapSession.UpdateObject writes its files all or none and sets the record only
+            // after, so a value part that fails has changed nothing and needs no taking back, and one that succeeded is taken back by
+            // writing its values before. So StepGroup takes back only the parts done before a failed value part.
         }
 
         /// <summary>True when every part of a step is in effect, or not, as before a failed undo or redo.</summary>
@@ -6274,18 +6277,6 @@ namespace OmsiMapEditor.UI
                 if (now[index] != before[index])
                     return false;
             return true;
-        }
-
-        /// <summary>
-        /// True when a step moves or turns an object by its values. Such a move writes global.cfg before the tile when entry points follow
-        /// the object, without putting it back when the tile fails, so its failure may leave part of it behind.
-        /// </summary>
-        private static bool HasValueMove(ObjectEditStep step)
-        {
-            if (step.Group != null)
-                return step.Group.Exists(HasValueMove);
-            return step.SplineChange == null && step.RoadTypeChange == null && step.TerrainChange == null && step.AttachedChange == null &&
-                   step.AttachmentChange == null && step.Change == null && step.TileChange == null && step.TileRevert == null;
         }
 
         /// <summary>

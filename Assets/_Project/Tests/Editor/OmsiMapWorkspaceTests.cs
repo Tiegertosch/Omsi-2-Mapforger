@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using OmsiMapEditor.OMSI;
+using OmsiMapEditor.UI;
 
 namespace OmsiMapEditor.Tests
 {
@@ -961,6 +962,285 @@ namespace OmsiMapEditor.Tests
             session.Redo(summary, revert);
             AssertSameFiles(originalFolder, FolderFiles(original));
             AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AMoveWithItsEntryPointWritesTheSameBytesAsSavingBothFilesAndUndoAndRedoToo()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects.Single(o => o.Id == 6);
+            var originalFolder = FolderFiles(original);
+
+            // The move, its undo and its redo as the shell does them, each checked against the bytes of the old way: both files parsed,
+            // changed and saved one after the other.
+            foreach (var values in new[] { new[] { 30.25, 50.0, 1.0, 90.0 }, new[] { 30.0, 40.0, 0.0, 0.0 }, new[] { 30.25, 50.0, 1.0, 90.0 } })
+            {
+                var expected = BytesOfOldMove(session.Workspace, 6, values);
+                Assert.IsTrue(session.UpdateObject(tile, item, values[0], values[1], values[2], values[3]));
+                CollectionAssert.AreEqual(expected[0], session.Workspace.ReadAllBytes("tile_0_0.map"));
+                CollectionAssert.AreEqual(expected[1], session.Workspace.ReadAllBytes("global.cfg"));
+                AssertSummaryMatchesFiles(session, summary);
+            }
+            CollectionAssert.AreEquivalent(new[] { "global.cfg", "tile_0_0.map" }, session.ModifiedFiles());
+
+            // Back in its place, the tile has its original bytes again, so its copy goes.
+            Assert.IsTrue(session.UpdateObject(tile, item, 30, 40, 0, 0));
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            AssertSameFiles(originalFolder, FolderFiles(original));
+        }
+
+        [Test]
+        public void AMoveWhoseTileCannotBeWrittenLeavesFilesAndRecordAsTheyWere()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects.Single(o => o.Id == 6);
+            var files = WorkspaceFiles(session.Workspace);
+            var originalFolder = FolderFiles(original);
+            var values = ValuesOf(item);
+            var raised = WatchRollBackFailures(session);
+
+            Exception failed;
+            // The tile is written first, so nothing is written at all.
+            using (BlockWrites(session.Workspace, "tile_0_0.map", false))
+                failed = Assert.Catch(() => session.UpdateObject(tile, item, 30, 50, 1, 90));
+
+            AssertWriteFailure(failed);
+            Assert.IsEmpty(raised);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            AssertSameFiles(originalFolder, FolderFiles(original));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            CollectionAssert.AreEqual(values, ValuesOf(item));
+            AssertSummaryMatchesFiles(session, summary);
+
+            // Without the obstacle the very move succeeds.
+            Assert.IsTrue(session.UpdateObject(tile, item, 30, 50, 1, 90));
+            Assert.AreEqual(50.0, item.LocalY, 1e-12);
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AMoveWhoseEntryPointCannotBeWrittenPutsTheTileBackAndLeavesTheRecordAsItWas()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects.Single(o => o.Id == 6);
+            var files = WorkspaceFiles(session.Workspace);
+            var originalFolder = FolderFiles(original);
+            var values = ValuesOf(item);
+            var tileStamp = session.Workspace.Stamp("tile_0_0.map");
+            var raised = WatchRollBackFailures(session);
+
+            Exception failed;
+            using (BlockWrites(session.Workspace, "global.cfg", false))
+                failed = Assert.Catch(() => session.UpdateObject(tile, item, 30, 50, 1, 90));
+
+            AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The tile was put back, so no failed roll-back is reported.");
+            Assert.AreNotEqual(tileStamp, session.Workspace.Stamp("tile_0_0.map"), "The move wrote the tile before it failed.");
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            AssertSameFiles(originalFolder, FolderFiles(original));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            CollectionAssert.AreEqual(values, ValuesOf(item));
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AnUndoOfAMoveWhoseWriteFailsPutsTheFilesBackAndCanBeDoneLater()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects.Single(o => o.Id == 6);
+            Assert.IsTrue(session.UpdateObject(tile, item, 30, 50, 1, 90));
+            var files = WorkspaceFiles(session.Workspace);
+            var values = ValuesOf(item);
+            var raised = WatchRollBackFailures(session);
+
+            Exception failed;
+            // The undo gives the tile its original bytes, which takes its copy away; global.cfg's copy is held open, so taking it away fails.
+            using (BlockWrites(session.Workspace, "global.cfg", true))
+                failed = Assert.Catch(() => session.UpdateObject(tile, item, 30, 40, 0, 0));
+
+            AssertWriteFailure(failed);
+            Assert.IsEmpty(raised);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEqual(values, ValuesOf(item));
+            AssertSummaryMatchesFiles(session, summary);
+
+            Assert.IsTrue(session.UpdateObject(tile, item, 30, 40, 0, 0));
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            var undone = WorkspaceFiles(session.Workspace);
+            var undoneValues = ValuesOf(item);
+
+            // The redo, with global.cfg written after the tile failing: the tile goes back to the original.
+            using (BlockWrites(session.Workspace, "global.cfg", false))
+                failed = Assert.Catch(() => session.UpdateObject(tile, item, 30, 50, 1, 90));
+
+            AssertWriteFailure(failed);
+            Assert.IsEmpty(raised);
+            AssertSameFiles(undone, WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEqual(undoneValues, ValuesOf(item));
+            AssertSummaryMatchesFiles(session, summary);
+
+            Assert.IsTrue(session.UpdateObject(tile, item, 30, 50, 1, 90));
+            CollectionAssert.AreEqual(values, ValuesOf(item));
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AnUndoOfAMoveWhoseRollBackFailsReportsItOnce()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var item = tile.Objects.Single(o => o.Id == 6);
+            Assert.IsTrue(session.UpdateObject(tile, item, 30, 50, 1, 90));
+            var originalFolder = FolderFiles(original);
+            var values = ValuesOf(item);
+            var raised = WatchRollBackFailures(session);
+
+            OmsiRollBackFailedException failed;
+            // The undo takes the tile's copy away, which needs no save; putting the copy back does, and cannot. global.cfg fails after it.
+            using (BlockWrites(session.Workspace, "tile_0_0.map", false))
+            using (BlockWrites(session.Workspace, "global.cfg", true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.UpdateObject(tile, item, 30, 40, 0, 0));
+
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
+            var both = (AggregateException)failed.InnerException;
+            AssertWriteFailure(both.InnerExceptions[0]);
+            AssertWriteFailure(both.InnerExceptions[1]);
+            // The tile stayed as the undo wrote it; the record was left alone, so the map has to be read again.
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            CollectionAssert.AreEqual(values, ValuesOf(item));
+            AssertSameFiles(originalFolder, FolderFiles(original));
+        }
+
+        [Test]
+        public void AGroupOfMovesWhoseSecondPartFailsTakesTheFirstBack()
+        {
+            UseMapWithEntryPoint();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            var first = tile.Objects.Single(o => o.Id == 5);
+            var second = tile.Objects.Single(o => o.Id == 6);
+            var parts = new[]
+            {
+                new ValuePart { Record = first, Before = ValuesOf(first), After = new[] { 15.0, 20.0, 0.0, 0.0, 0.0, 0.0 } },
+                // Object 6 has an entry point, so its part writes global.cfg after the tile.
+                new ValuePart { Record = second, Before = ValuesOf(second), After = new[] { 30.0, 50.0, 1.0, 90.0, 0.0, 0.0 } }
+            };
+            var files = WorkspaceFiles(session.Workspace);
+            var raised = WatchRollBackFailures(session);
+            var noted = new List<OmsiRollBackFailedException>();
+
+            Exception failed;
+            // As the shell's undo and redo do a group: a value part has no applied state, since it writes all or nothing.
+            using (BlockWrites(session.Workspace, "global.cfg", false))
+                failed = Assert.Catch(() => StepGroup.Apply(parts, part => Move(session, tile, part.Record, part.After),
+                    part => Move(session, tile, part.Record, part.Before), part => new List<bool>(), noted.Add));
+
+            AssertWriteFailure(failed);
+            Assert.IsEmpty(raised);
+            Assert.IsEmpty(noted);
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            CollectionAssert.AreEqual(parts[0].Before, ValuesOf(first));
+            CollectionAssert.AreEqual(parts[1].Before, ValuesOf(second));
+            AssertSummaryMatchesFiles(session, summary);
+
+            StepGroup.Apply(parts, part => Move(session, tile, part.Record, part.After), part => Move(session, tile, part.Record, part.Before),
+                part => new List<bool>(), noted.Add);
+            CollectionAssert.AreEqual(parts[0].After, ValuesOf(first));
+            CollectionAssert.AreEqual(parts[1].After, ValuesOf(second));
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void ATransferWhoseTargetCannotBeWrittenLeavesFilesAndSummaryAsTheyWere()
+        {
+            UseTwoTiles();
+            var session = OmsiMapSession.OpenProject(Path.Combine(original, "global.cfg"), Path.Combine(testRoot, "Projects", "Test.omproj"));
+            var summary = session.Read();
+            var source = summary.Tiles[0];
+            var target = summary.Tiles[1];
+            var item = source.Objects.Single(o => o.Id == 5);
+            var sourceRecords = source.Objects.ToList();
+            var targetRecords = target.Objects.ToList();
+            var files = WorkspaceFiles(session.Workspace);
+            var sourceStamp = session.Workspace.Stamp("tile_0_0.map");
+            var raised = WatchRollBackFailures(session);
+
+            Exception failed;
+            // The source tile is written first, then the target fails.
+            using (BlockWrites(session.Workspace, "tile_1_0.map", false))
+                failed = Assert.Catch(() => session.TransferObject(summary, source, item, target, 12.5, 40));
+
+            AssertWriteFailure(failed);
+            Assert.IsEmpty(raised);
+            Assert.AreNotEqual(sourceStamp, session.Workspace.Stamp("tile_0_0.map"), "The transfer wrote the source tile before it failed.");
+            AssertSameFiles(files, WorkspaceFiles(session.Workspace));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            AssertSameRecords(sourceRecords, source.Objects);
+            AssertSameRecords(targetRecords, target.Objects);
+            Assert.AreEqual(10.0, item.LocalX, 1e-12);
+            AssertSummaryMatchesFiles(session, summary);
+
+            Assert.IsTrue(session.TransferObject(summary, source, item, target, 12.5, 40).Succeeded);
+            AssertSummaryMatchesFiles(session, summary);
+        }
+
+        private sealed class ValuePart
+        {
+            public OmsiObjectRecord Record;
+            public double[] Before;
+            public double[] After;
+        }
+
+        private static void Move(OmsiMapSession session, OmsiTileSummary tile, OmsiObjectRecord record, double[] values)
+        {
+            session.UpdateObject(tile, record, values[0], values[1], values[2], values[3], values[4], values[5]);
+        }
+
+        private static double[] ValuesOf(OmsiObjectRecord item)
+        {
+            return new[] { item.LocalX, item.LocalY, item.Height, item.HeadingDegrees, item.PitchDegrees, item.BankDegrees };
+        }
+
+        /// <summary>
+        /// The bytes of tile_0_0.map and global.cfg after moving an object as UpdateObject did before it wrote all or none: both files
+        /// parsed, the object's changed values set, its entry points followed.
+        /// </summary>
+        private static byte[][] BytesOfOldMove(OmsiMapWorkspace workspace, int id, double[] values)
+        {
+            var tile = OmsiRecordFile.Parse(workspace.ReadAllBytes("tile_0_0.map"), OmsiTileRecordLayouts.Instance);
+            var view = OmsiTileRecords.Of<OmsiObjectView>(tile).Single(candidate => candidate.Id == id);
+            var oldX = view.X;
+            var oldY = view.Y;
+            var oldZ = view.Z;
+            var oldHeading = view.HeadingDegrees;
+            if (view.X != values[0])
+                view.X = values[0];
+            if (view.Y != values[1])
+                view.Y = values[1];
+            if (view.Z != values[2])
+                view.Z = values[2];
+            if (view.HeadingDegrees != values[3])
+                view.HeadingDegrees = values[3];
+            var config = OmsiRecordFile.Parse(workspace.ReadAllBytes("global.cfg"), OmsiGlobalConfigLayouts.Instance);
+            OmsiTileEditing.FollowEntryPoints(tile, view, 0, config, oldX, oldY, oldZ, oldHeading);
+            return new[] { tile.ToBytes(), config.ToBytes() };
         }
 
         /// <summary>
