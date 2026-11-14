@@ -5997,71 +5997,96 @@ namespace OmsiMapEditor.UI
                    key == KeyCode.Return || key == KeyCode.KeypadEnter || key >= KeyCode.RightShift && key <= KeyCode.AltGr;
         }
 
+        /// <summary>Esc: the order comes from <see cref="EscapeOrder"/>; the actions are tried until one takes the key.</summary>
+        private void OnEscape(KeyDownEvent evt)
+        {
+            var focused = evt.target as VisualElement;
+            var state = new EscapeState
+            {
+                ContextMenuOpen = ContextMenuOpen,
+                SearchHoldsFocus = objectsPanel != null && objectsPanel.SearchHolds(focused),
+                FocusInObjectLibrary = objectsPanel != null && focused != null && objectsPanel.Contains(focused),
+                PickingElementType = PickingElementType,
+                PickingVarParent = PickingVarParent,
+                PickingSplineType = PickingSplineType,
+                PlacementAssetChosen = placementAsset != null,
+                MapPlacing = mapCanvas != null && mapCanvas.IsPlacing,
+                TypingInField = InTextInput(focused),
+                ModalDialogShown = AnyModalDialogShown(),
+                // The window for pictures from the air leaves keys to the map, except while it waits for a point to be clicked in the map.
+                SatelliteWaitsForPick = IsShown(satelliteWindow) && (placementPickFor >= 0 || mapCanvas != null && mapCanvas.IsPickingPoint),
+                ControlHeld = evt.ctrlKey || evt.commandKey,
+                ObjectsPanelOpen = objectsPanelOpen,
+                SelectionNotEmpty = selection.Count > 0,
+            };
+            foreach (var action in EscapeOrder.Order(state))
+            {
+                if (!RunEscapeAction(action))
+                    continue;
+                if (EscapeOrder.StopsPropagation(action))
+                    evt.StopPropagation();
+                return;
+            }
+        }
+
+        /// <summary>Does what the action says; false when it found nothing to do (only for actions that <see cref="EscapeOrder.CanDecline"/>).</summary>
+        private bool RunEscapeAction(EscapeAction action)
+        {
+            switch (action)
+            {
+                case EscapeAction.CloseContextMenu:
+                    CloseContextMenu();
+                    return true;
+                case EscapeAction.CloseTopOverlay:
+                    return CloseTopOverlay();
+                case EscapeAction.EscapeActiveTool:
+                    return EscapeActiveTool();
+                case EscapeAction.EndVarParentPick:
+                    EndVarParentPick(true);
+                    return true;
+                case EscapeAction.EndElementTypePick:
+                    EndElementTypePick(null);
+                    return true;
+                case EscapeAction.EndSplineTypePick:
+                    EndSplineTypePick(null);
+                    return true;
+                case EscapeAction.StopPlacement:
+                    StopPlacement();
+                    return true;
+                case EscapeAction.StopPlacementWithStatus:
+                    StopPlacement();
+                    SetStatusT("place.status.stopped");
+                    return true;
+                case EscapeAction.CloseObjectsPanel:
+                    ShowObjectsPanel(false);
+                    return true;
+                case EscapeAction.ClearSelection:
+                    SelectTile(selectedTile, false);
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
         private void OnShortcut(KeyDownEvent evt)
         {
-            if (evt.keyCode == KeyCode.Escape && ContextMenuOpen)
+            if (evt.keyCode == KeyCode.Escape)
             {
-                CloseContextMenu();
-                evt.StopPropagation();
+                OnEscape(evt);
                 return;
             }
             // Any other key closes the menu first, as its entries were made for the state before, and then does what it always does.
             if (ContextMenuOpen && !KeepsContextMenu(evt.keyCode))
                 CloseContextMenu();
-            if (evt.keyCode == KeyCode.Escape && CloseTopOverlay())
-            {
-                evt.StopPropagation();
-                return;
-            }
             var focused = evt.target as VisualElement;
-            // Esc in the unfolded object search folds the search first: the field's own handler does that, so the key is left to it.
-            if (evt.keyCode == KeyCode.Escape && objectsPanel != null && objectsPanel.SearchHolds(focused))
-                return;
-            // Esc elsewhere in the object library stops placing first, then closes the panel.
-            if (evt.keyCode == KeyCode.Escape && objectsPanel != null && focused != null && objectsPanel.Contains(focused))
-            {
-                if (PickingElementType)
-                    EndElementTypePick(null);
-                else if (placementAsset != null)
-                    StopPlacement();
-                else
-                    ShowObjectsPanel(false);
-                evt.StopPropagation();
-                return;
-            }
             // Keys are typing in a field, and a modal dialog takes them all. The window for pictures from the air leaves them to the map,
             // except while it waits for a point to be clicked in the map.
             if (InTextInput(focused) || AnyModalDialogShown() || IsShown(satelliteWindow) && (placementPickFor >= 0 || mapCanvas != null && mapCanvas.IsPickingPoint))
                 return;
 
-            if (evt.keyCode == KeyCode.Escape && PickingVarParent && !(evt.ctrlKey || evt.commandKey))
-            {
-                EndVarParentPick(true);
-                evt.StopPropagation();
-                return;
-            }
-            if (evt.keyCode == KeyCode.Escape && PickingElementType && !(evt.ctrlKey || evt.commandKey))
-            {
-                EndElementTypePick(null);
-                evt.StopPropagation();
-                return;
-            }
-            if (evt.keyCode == KeyCode.Escape && PickingSplineType && !(evt.ctrlKey || evt.commandKey))
-            {
-                EndSplineTypePick(null);
-                evt.StopPropagation();
-                return;
-            }
-
             if (!(evt.ctrlKey || evt.commandKey))
             {
-                // Esc goes to the active tool first (the tool table, EditorShellTools.cs); Drag leaves it to placing, the library
-                // and the selection below.
-                if (evt.keyCode == KeyCode.Escape && EscapeActiveTool())
-                {
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Rows && selectedRow != null)
+                if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Rows && selectedRow != null)
                 {
                     DeleteSelectedRow();
                     evt.StopPropagation();
@@ -6083,22 +6108,6 @@ namespace OmsiMapEditor.UI
                 {
                     NextMarkingStyle();
                     evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && mapCanvas != null && mapCanvas.IsPlacing)
-                {
-                    StopPlacement();
-                    SetStatusT("place.status.stopped");
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && objectsPanelOpen)
-                {
-                    ShowObjectsPanel(false);
-                    evt.StopPropagation();
-                }
-                else if (evt.keyCode == KeyCode.Escape && selection.Count > 0)
-                {
-                    // Not stopped: the map view also cancels a drag in progress.
-                    SelectTile(selectedTile, false);
                 }
                 else if (evt.keyCode == KeyCode.R && mapCanvas != null && mapCanvas.IsPlacing)
                 {
