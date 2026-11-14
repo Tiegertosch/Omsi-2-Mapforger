@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -28,7 +27,8 @@ namespace OmsiMapEditor.OMSI
         /// <summary>
         /// Puts copied objects down at their targets, each with its labels, pitch and bank, its rules and the objects hung on it,
         /// all with new IDs. It happens all or not at all: every target is checked before anything is written, and when a write still
-        /// fails, what was done is taken back in reverse order before the exception goes on, so no file is left half pasted. In a chrono
+        /// fails, what was done is taken back in reverse order before the exception goes on, so no file is left half pasted; when taking
+        /// it back fails too, <see cref="OmsiRollBackFailedException"/> reports both and the map must be read again. In a chrono
         /// variant only the objects themselves are put down (with labels, pitch and bank), as attached objects and rules belong to the
         /// base map there.
         /// </summary>
@@ -102,17 +102,15 @@ namespace OmsiMapEditor.OMSI
             }
             catch (Exception exception)
             {
-                for (var index = undo.Count - 1; index >= 0; index--)
+                // The failure is thrown as it was; when taking back what was pasted fails too, both are reported together.
+                RollBackAfter(exception, () =>
                 {
-                    try
+                    for (var index = undo.Count - 1; index >= 0; index--)
                     {
                         undo[index]();
+                        undo.RemoveAt(index);
                     }
-                    catch (Exception rollback) when (rollback is InvalidOperationException || rollback is IOException)
-                    {
-                        throw new InvalidOperationException("Pasting failed (" + exception.Message + ") and could not be taken back completely: " + rollback.Message, exception);
-                    }
-                }
+                });
                 throw;
             }
             return result;

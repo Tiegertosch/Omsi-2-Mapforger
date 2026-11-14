@@ -54,9 +54,10 @@ namespace OmsiMapEditor.OMSI
                 steps.Add(LeadToPort(summary, cutEnd, plan.PortAtEnd, plan.ProfilePath, plan.AlignsTerrain));
                 return new OmsiJunctionInsertionResult(steps, placed.Record, new OmsiReference[0]);
             }
-            catch
+            catch (Exception failure)
             {
-                Revert(summary, steps);
+                // The failure is thrown as it was; when taking back the steps before it fails too, both are reported together.
+                RollBackAfter(failure, () => Revert(summary, steps));
                 throw;
             }
         }
@@ -100,9 +101,10 @@ namespace OmsiMapEditor.OMSI
                 }
                 return new OmsiJunctionInsertionResult(steps, rebuild.Junction, new OmsiReference[0]);
             }
-            catch
+            catch (Exception failure)
             {
-                Revert(summary, steps);
+                // The failure is thrown as it was; when taking back the steps before it fails too, both are reported together.
+                RollBackAfter(failure, () => Revert(summary, steps));
                 throw;
             }
         }
@@ -188,7 +190,10 @@ namespace OmsiMapEditor.OMSI
             return new OmsiJunctionInsertionResult(new object[0], null, blockers);
         }
 
-        /// <summary>Takes back the steps done so far, the last first.</summary>
+        /// <summary>
+        /// Takes back the steps done so far, the last first; each leaves the list once taken back, so a second call goes on where a
+        /// failed one stopped.
+        /// </summary>
         private void Revert(OmsiMapSummary summary, List<object> steps)
         {
             for (var index = steps.Count - 1; index >= 0; index--)
@@ -197,8 +202,8 @@ namespace OmsiMapEditor.OMSI
                     Undo(summary, spline);
                 else if (steps[index] is OmsiObjectChange item)
                     Undo(summary, item);
+                steps.RemoveAt(index);
             }
-            steps.Clear();
         }
 
         private static OmsiSplineRecord Find(OmsiMapSummary summary, int id, out OmsiTileSummary tile)

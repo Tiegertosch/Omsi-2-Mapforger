@@ -551,7 +551,9 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// Keeps the stroke as one step: the shaped ground of the touched tiles is saved, and the ground they show is fitted
-        /// to the roads again from it, with their neighbours. Null when nothing changed.
+        /// to the roads again from it, with their neighbours. Null when nothing changed. When fitting or reading the ground fails, the
+        /// shaped ground and the ground fitted so far are put back as before the call and the failure is thrown as it was; when putting
+        /// them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
         /// </summary>
         public OmsiTerrainChange EndTerrainStroke(OmsiMapSummary summary, OmsiTerrainStroke stroke)
         {
@@ -581,8 +583,23 @@ namespace OmsiMapEditor.OMSI
                         change.Tiles.Add(tile);
                 }
             ApplyFiles(change.Files, false);
-            FitTerrainToRoads(summary, change);
-            ReadWaterOf(change.Tiles);
+            List<OmsiObjectChange.FileState> fitted = null;
+            try
+            {
+                fitted = FitTerrainToRoads(summary, change);
+                ReadWaterOf(change.Tiles);
+            }
+            catch (Exception failure)
+            {
+                // The fit writes all or nothing; the ground shown keeps what the stroke gave it, as before the call.
+                RollBackAfter(failure, () =>
+                {
+                    if (fitted != null)
+                        ApplyFiles(fitted, true);
+                    ApplyFiles(change.Files, true);
+                });
+                throw;
+            }
             return change;
         }
 
@@ -706,14 +723,15 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The change has already been undone.");
+                throw new OmsiStepRefusedException("The change has already been undone.");
             ApplyFiles(change.Files, true);
+            // The flag follows the files, so a failed fit or read below shows that the files were written.
+            change.IsApplied = false;
             if (!change.Painted)
             {
                 FitTerrainToRoads(summary, change);
                 ReadWaterOf(change.Tiles);
             }
-            change.IsApplied = false;
         }
 
         /// <summary>Applies undone ground shaping again.</summary>
@@ -722,24 +740,28 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The change is already applied.");
+                throw new OmsiStepRefusedException("The change is already applied.");
             ApplyFiles(change.Files, false);
+            change.IsApplied = true;
             if (!change.Painted)
             {
                 FitTerrainToRoads(summary, change);
                 ReadWaterOf(change.Tiles);
             }
-            change.IsApplied = true;
         }
 
-        /// <summary>The shown ground of a tile changed by a stroke, fitted to the roads from its shaped ground; the tiles drawn again are added.</summary>
-        private void FitTerrainToRoads(OmsiMapSummary summary, OmsiTerrainChange change)
+        /// <summary>
+        /// The shown ground of a tile changed by a stroke, fitted to the roads from its shaped ground; the tiles drawn again are added.
+        /// Returns the files written, before and after.
+        /// </summary>
+        private List<OmsiObjectChange.FileState> FitTerrainToRoads(OmsiMapSummary summary, OmsiTerrainChange change)
         {
             var refitted = new List<OmsiTileSummary>();
-            ReshapeTerrainOf(summary, change.Tiles, refitted);
+            var written = ReshapeTerrainOf(summary, change.Tiles, refitted);
             foreach (var tile in refitted)
                 if (!change.Tiles.Contains(tile))
                     change.Tiles.Add(tile);
+            return written;
         }
 
         /// <summary>The samples of the shown ground around a place, before a brush step changes them.</summary>

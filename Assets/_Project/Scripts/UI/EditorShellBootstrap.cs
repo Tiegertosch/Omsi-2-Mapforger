@@ -825,6 +825,7 @@ namespace OmsiMapEditor.UI
             if (benchmarkFrames != null && Time.frameCount > benchmarkOpenFrame)
                 benchmarkFrames.Add(Time.unscaledDeltaTime * 1000.0);
             RefreshToolHint();
+            ReloadAfterPendingRollBack();
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
             TickSignalPreview(Time.unscaledDeltaTime);
@@ -1910,6 +1911,9 @@ namespace OmsiMapEditor.UI
         /// <param name="keepView">Keeps the view, selected tile and selected object, for example after adding or deleting a tile.</param>
         private void LoadMap(string globalConfigPath, string projectName, string projectFilePath, bool keepView)
         {
+            // A terrain or paint stroke still held is finished before the map is read, so the reading sees what it wrote.
+            if (session != null && currentSummary != null && activeTool == EditorTool.Terrain)
+                ReleaseTerrain();
             ShowMap(ReadMap(globalConfigPath, projectFilePath), projectName, keepView);
         }
 
@@ -1920,7 +1924,7 @@ namespace OmsiMapEditor.UI
             // A terrain or paint stroke still held belongs to the session that is leaving: it is finished there, before the new one takes over.
             if (session != null && currentSummary != null && activeTool == EditorTool.Terrain)
                 ReleaseTerrain();
-            session = reading.Session;
+            UseSession(reading.Session);
             junctionTerrainState = null;
             baseSummary = summary;
             chronoDate = null;
@@ -6174,7 +6178,7 @@ namespace OmsiMapEditor.UI
             from.RemoveAt(from.Count - 1);
             if (step.TileChange != null)
             {
-                StepTile(step, to, undo);
+                StepTile(step, from, to, undo);
                 return;
             }
             if (step.TileRevert != null)
@@ -6183,6 +6187,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var touched = new List<MapSelectionItem>();
+            var applied = AppliedStates(step);
             try
             {
                 ApplyStep(step, undo, touched);
@@ -6190,8 +6195,24 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
+                var message = Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message)) /* i18n:keys */;
+                var refused = exception is OmsiStepRefusedException;
+                // A failed roll-back, a part left done or undone, or a moved object whose failure may have written part of it: files and
+                // memory may disagree, so the map is read again, which clears the history.
+                if (exception is OmsiRollBackFailedException || !SameAppliedStates(step, applied) || (!refused && HasValueMove(step)))
+                {
+                    if (ReloadAfterFailedRollBack())
+                        SetStatus(message);
+                    else
+                        SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
+                    return;
+                }
+                // Refused: nothing was written and trying again gives the same answer, so the step leaves the history. Any other
+                // failure was rolled back: files and memory are as before, so the step goes back on top of its stack, to be tried again.
+                if (!refused)
+                    from.Add(step);
                 RefreshAfterChange(null);
-                SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message))) /* i18n:keys */;
+                SetStatus(message);
                 return;
             }
 
@@ -6200,16 +6221,94 @@ namespace OmsiMapEditor.UI
             SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
         }
 
+        /// <summary>Whether each part of a step is in effect, in the order of <see cref="ApplyStep"/>; parts without such a state add nothing.</summary>
+        private static List<bool> AppliedStates(ObjectEditStep step)
+        {
+            var states = new List<bool>();
+            AddAppliedStates(step, states);
+            return states;
+        }
+
+        private static void AddAppliedStates(ObjectEditStep step, List<bool> states)
+        {
+            if (step.Group != null)
+            {
+                foreach (var part in step.Group)
+                    AddAppliedStates(part, states);
+                return;
+            }
+            if (step.SplineChange != null)
+                states.Add(step.SplineChange.IsApplied);
+            else if (step.RoadTypeChange != null)
+                return;
+            else if (step.TerrainChange != null)
+                states.Add(step.TerrainChange.IsApplied);
+            else if (step.AttachedChange != null)
+                states.Add(step.AttachedChange.IsApplied);
+            else if (step.AttachmentChange != null)
+                states.Add(step.AttachmentChange.IsApplied);
+            else if (step.Change != null)
+                states.Add(step.Change.IsApplied);
+        }
+
+        /// <summary>True when every part of a step is in effect, or not, as before a failed undo or redo.</summary>
+        private static bool SameAppliedStates(ObjectEditStep step, List<bool> before)
+        {
+            var now = AppliedStates(step);
+            if (now.Count != before.Count)
+                return false;
+            for (var index = 0; index < now.Count; index++)
+                if (now[index] != before[index])
+                    return false;
+            return true;
+        }
+
+        /// <summary>
+        /// True when a step moves or turns an object by its values. Such a move writes global.cfg before the tile when entry points follow
+        /// the object, without putting it back when the tile fails, so its failure may leave part of it behind.
+        /// </summary>
+        private static bool HasValueMove(ObjectEditStep step)
+        {
+            if (step.Group != null)
+                return step.Group.Exists(HasValueMove);
+            return step.SplineChange == null && step.RoadTypeChange == null && step.TerrainChange == null && step.AttachedChange == null &&
+                   step.AttachmentChange == null && step.Change == null && step.TileChange == null && step.TileRevert == null;
+        }
+
         /// <summary>
         /// Undoes or redoes a step; the parts of a group are undone in reverse order. Collects the objects that exist
-        /// afterwards, so they can be selected.
+        /// afterwards, so they can be selected. When a part of a group fails, the parts done before it are taken back, the last
+        /// first, and the failure is thrown as it was; when taking them back fails too, <see cref="OmsiRollBackFailedException"/>
+        /// reports both.
         /// </summary>
         private void ApplyStep(ObjectEditStep step, bool undo, List<MapSelectionItem> touched)
         {
             if (step.Group != null)
             {
-                for (var index = 0; index < step.Group.Count; index++)
-                    ApplyStep(step.Group[undo ? step.Group.Count - 1 - index : index], undo, touched);
+                var done = 0;
+                try
+                {
+                    for (; done < step.Group.Count; done++)
+                        ApplyStep(step.Group[undo ? step.Group.Count - 1 - done : done], undo, touched);
+                }
+                catch (Exception failure) when (!(failure is OmsiRollBackFailedException))
+                {
+                    try
+                    {
+                        var takenBack = new List<MapSelectionItem>();
+                        for (var index = done - 1; index >= 0; index--)
+                            ApplyStep(step.Group[undo ? step.Group.Count - 1 - index : index], !undo, takenBack);
+                    }
+                    catch (Exception rollBackFailure)
+                    {
+                        var failed = new OmsiRollBackFailedException(failure.Message + " Taking back the parts of the step done before failed as well, so the workspace may hold part of the step: " +
+                                                                     rollBackFailure.Message, new AggregateException(failure, rollBackFailure));
+                        // Noted like one the session reports; the undo or redo reads the map at once, which clears the note.
+                        NoteRollBackFailure(failed);
+                        throw failed;
+                    }
+                    throw;
+                }
                 return;
             }
 
@@ -6283,29 +6382,62 @@ namespace OmsiMapEditor.UI
 
             var tile = currentSummary.Tiles.Find(candidate => candidate.X == step.TileX && candidate.Y == step.TileY);
             var item = tile?.Objects.Find(candidate => candidate.Id == step.ObjectId);
+            // Nothing is written, and trying again gives the same answer: the step is refused.
             if (item == null)
-                throw new InvalidOperationException("Object #" + step.ObjectId + " no longer exists.");
+                throw new OmsiStepRefusedException("Object #" + step.ObjectId + " no longer exists.");
             var target = undo ? step.Before : step.After;
             session.UpdateObject(tile, item, target[0], target[1], target[2], target[3], target[4], target[5]);
             Touch(touched, tile, item);
         }
 
-        /// <summary>Undoes or redoes an added or deleted tile; reading the map again clears the history, so the step is put back alone.</summary>
-        private void StepTile(ObjectEditStep step, List<ObjectEditStep> to, bool undo)
+        /// <summary>
+        /// Undoes or redoes an added or deleted tile; reading the map again clears the history, so the step is put back alone. A refused
+        /// step leaves the history; a step whose roll-back failed reads the map again, which clears the history; any other failure was
+        /// rolled back, so the step goes back where it was and can be tried again.
+        /// </summary>
+        private void StepTile(ObjectEditStep step, List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)
         {
             try
             {
                 session.ApplyTileChange(step.TileChange, undo);
             }
+            catch (OmsiRollBackFailedException exception)
+            {
+                Debug.LogException(exception);
+                var description = DescribeStep(step);
+                if (ReloadAfterFailedRollBack())
+                    SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", description), ("reason", exception.Message))) /* i18n:keys */;
+                else
+                    SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
+                return;
+            }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
+                // Refused: nothing was written and trying again gives the same answer, so the step leaves the history. Any other failure
+                // was rolled back: files and memory are as before, so the step goes back on top of its stack.
+                if (!(exception is OmsiStepRefusedException))
+                    from.Add(step);
                 SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", DescribeStep(step)), ("reason", exception.Message))) /* i18n:keys */;
                 return;
             }
-            ReloadMap();
+            // The step is done: the tiles changed, so the map is read again. When that fails, what is shown no longer matches the files.
+            var stepDescription = DescribeStep(step);
+            try
+            {
+                ReloadMap();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                undoSteps.Clear();
+                redoSteps.Clear();
+                UpdateToolbar();
+                SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
+                return;
+            }
             to.Add(step);
-            SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
+            SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", stepDescription))) /* i18n:keys */;
         }
 
         /// <summary>
@@ -6337,8 +6469,10 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 var description = DescribeStep(step);
-                ReloadAfterFailedRollBack();
-                SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", description), ("reason", exception.Message))) /* i18n:keys */;
+                if (ReloadAfterFailedRollBack())
+                    SetStatus(Loc.T(undo ? "history.undo_failed" : "history.redo_failed", ("step", description), ("reason", exception.Message))) /* i18n:keys */;
+                else
+                    SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
                 return;
             }
             catch (Exception exception)
@@ -6357,13 +6491,17 @@ namespace OmsiMapEditor.UI
         /// <summary>
         /// Reads the map again after a step whose roll-back failed, so the views show what the files hold; that clears the history, whose
         /// steps hold records that may no longer match the files. When reading fails as well, the history is cleared all the same. The
-        /// caller sets the status afterwards, so the reason of the failure is not replaced by the reload's own message.
+        /// caller sets the status afterwards, so the reason of the failure is not replaced by the reload's own message. Clears a failed
+        /// roll-back noted for the next frame (<see cref="ReloadAfterPendingRollBack"/>), so the map is not read twice, also one noted
+        /// while the map is read. Returns false when reading failed: then the caller says so (history.rollback_failed_reload_failed).
         /// </summary>
-        private void ReloadAfterFailedRollBack()
+        private bool ReloadAfterFailedRollBack()
         {
+            pendingRollBackFailure = null;
             try
             {
                 ReloadMap();
+                return true;
             }
             catch (Exception exception)
             {
@@ -6371,6 +6509,11 @@ namespace OmsiMapEditor.UI
                 undoSteps.Clear();
                 redoSteps.Clear();
                 UpdateToolbar();
+                return false;
+            }
+            finally
+            {
+                pendingRollBackFailure = null;
             }
         }
 
@@ -7087,8 +7230,10 @@ namespace OmsiMapEditor.UI
             {
                 // Part of the revert may have stayed in the files: the map is read again, then the reason is shown.
                 Debug.LogException(exception);
-                ReloadAfterFailedRollBack();
-                SetStatusT("tile.status.revert_failed", ("file", tile.FileName), ("reason", exception.Message));
+                if (ReloadAfterFailedRollBack())
+                    SetStatusT("tile.status.revert_failed", ("file", tile.FileName), ("reason", exception.Message));
+                else
+                    SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
                 return;
             }
             catch (Exception exception)

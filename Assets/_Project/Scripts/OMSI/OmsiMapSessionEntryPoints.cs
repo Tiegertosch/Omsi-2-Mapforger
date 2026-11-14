@@ -185,14 +185,16 @@ namespace OmsiMapEditor.OMSI
             {
                 result = DeleteObject(summary, entry.Tile, entry.Object);
             }
-            catch
+            catch (Exception failure)
             {
-                workspace.Save(GlobalConfigFileName, OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance));
+                // The failure is thrown as it was; when putting global.cfg back fails too, both are reported together.
+                RollBackAfter(failure, () => workspace.Save(GlobalConfigFileName, configBefore));
                 throw;
             }
             if (result.Change == null)
             {
-                workspace.Save(GlobalConfigFileName, OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance));
+                RollBackAfter(new InvalidOperationException("The entry point's object cannot be deleted, so the entry point stays."),
+                    () => workspace.Save(GlobalConfigFileName, configBefore));
                 return result;
             }
             SetConfigState(result.Change, configBefore, workspace.ReadAllBytes(GlobalConfigFileName));

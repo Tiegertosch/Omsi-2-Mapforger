@@ -278,9 +278,12 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                ReshapeTerrain(summary, change);
+            });
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, pieceIds[pieceIds.Count - 1]);
             summary.NextIdCode = ids.NextFreeId;
             return change;
@@ -357,10 +360,13 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            if (shaped)
-                ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                if (shaped)
+                    ReshapeTerrain(summary, change);
+            });
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
         }
 
@@ -505,10 +511,13 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            if (shaped)
-                ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                if (shaped)
+                    ReshapeTerrain(summary, change);
+            });
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, newId);
             summary.NextIdCode = ids.NextFreeId;
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
@@ -590,9 +599,12 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                ReshapeTerrain(summary, change);
+            });
             return change;
         }
 
@@ -650,18 +662,41 @@ namespace OmsiMapEditor.OMSI
                     changes.Add(update);
                 return changes;
             }
-            catch
+            catch (Exception failure)
             {
-                UndoAll(summary, changes);
+                // The failure is thrown as it was; when taking back the earlier changes fails too, both are reported together.
+                RollBackAfter(failure, () => UndoAll(summary, changes));
                 throw;
             }
         }
 
+        /// <summary>
+        /// Brings the summary, the chains and the terrain up to date after the files of a new spline step were written. When that fails,
+        /// the step is taken back (<see cref="Undo(OmsiMapSummary, OmsiSplineChange)"/>): <paramref name="change"/> holds every file
+        /// written so far, as the chain and terrain passes write all or nothing. The failure is thrown as it was; when taking the step back
+        /// fails too, <see cref="OmsiRollBackFailedException"/> reports both.
+        /// </summary>
+        private void FinishSplineStep(OmsiMapSummary summary, OmsiSplineChange change, Action finish)
+        {
+            try
+            {
+                finish();
+            }
+            catch (Exception failure)
+            {
+                RollBackAfter(failure, () => Undo(summary, change));
+                throw;
+            }
+        }
+
+        /// <summary>Undoes the changes, the last first; each leaves the list once undone, so a second call goes on where a failed one stopped.</summary>
         private void UndoAll(OmsiMapSummary summary, List<OmsiSplineChange> changes)
         {
             for (var index = changes.Count - 1; index >= 0; index--)
+            {
                 Undo(summary, changes[index]);
-            changes.Clear();
+                changes.RemoveAt(index);
+            }
         }
 
         /// <summary>
@@ -711,9 +746,12 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                ReshapeTerrain(summary, change);
+            });
             return change;
         }
 
@@ -794,7 +832,7 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The change has already been undone.");
+                throw new OmsiStepRefusedException("The change has already been undone.");
             if (change.InVariant)
             {
                 ApplyFiles(change.Files, true);
@@ -815,7 +853,7 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The change is already applied.");
+                throw new OmsiStepRefusedException("The change is already applied.");
             if (change.InVariant)
             {
                 ApplyFiles(change.Files, false);
@@ -863,12 +901,14 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// Fits the ground of tiles and their neighbours to the roads anew, from the ground shaped by hand or else the
-        /// original map's (ADR 022, ADR 040); the tiles whose ground changed are added to <paramref name="reshaped"/>.
+        /// original map's (ADR 022, ADR 040); the tiles whose ground changed are added to <paramref name="reshaped"/>. Writes all or
+        /// nothing (<see cref="ApplyFiles"/>), and returns the files written, before and after.
         /// </summary>
-        private void ReshapeTerrainOf(OmsiMapSummary summary, IEnumerable<OmsiTileSummary> changedTiles, List<OmsiTileSummary> reshaped)
+        private List<OmsiObjectChange.FileState> ReshapeTerrainOf(OmsiMapSummary summary, IEnumerable<OmsiTileSummary> changedTiles, List<OmsiTileSummary> reshaped)
         {
+            var written = new List<OmsiObjectChange.FileState>();
             if (summary == null)
-                return;
+                return written;
             var workspace = RequireWorkspace();
             var size = summary.TileSizeMeters;
             var reach = TerrainShape.MaximumReachMeters + TerrainShape.ShoulderMeters + 30.0;
@@ -902,6 +942,7 @@ namespace OmsiMapEditor.OMSI
                     if (Math.Abs(tile.X - changed.X) <= 1 && Math.Abs(tile.Y - changed.Y) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
                         targets.Add(tile);
 
+            var shapedTiles = new List<OmsiTileSummary>();
             foreach (var tile in targets)
             {
                 var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
@@ -917,11 +958,15 @@ namespace OmsiMapEditor.OMSI
                                                                     junction.OriginY + junction.Reach + reach >= south && junction.OriginY - junction.Reach - reach <= south + size);
                 OmsiTerrainShaping.Shape(heights, tile.X, tile.Y, size, nearby, TerrainShape, nearbyJunctions);
                 var bytes = OmsiTerrain.Encode(heights);
-                if (SameBytes(bytes, workspace.ReadAllBytes(path)))
+                var current = workspace.ReadAllBytes(path);
+                if (SameBytes(bytes, current))
                     continue;
-                workspace.Save(path, bytes);
-                reshaped.Add(tile);
+                written.Add(new OmsiObjectChange.FileState { RelativePath = path, Before = current, After = bytes });
+                shapedTiles.Add(tile);
             }
+            ApplyFiles(written, false);
+            reshaped.AddRange(shapedTiles);
+            return written;
         }
 
         /// <summary>The spline profiles of the installation, with the connection points and outlines of its objects alongside.</summary>
@@ -1169,15 +1214,18 @@ namespace OmsiMapEditor.OMSI
 
             if (edited.Count == 0)
                 return;
+            // All or nothing, and the step's files learn of it only once written, so on a failure they still say what the files hold.
+            var states = new List<OmsiObjectChange.FileState>();
             foreach (var pair in edited)
+                states.Add(new OmsiObjectChange.FileState { RelativePath = pair.Key, Before = workspace.ReadAllBytes(pair.Key), After = pair.Value.ToBytes() });
+            ApplyFiles(states, false);
+            foreach (var applied in states)
             {
-                var bytes = pair.Value.ToBytes();
-                var state = change.Files.Find(file => string.Equals(file.RelativePath, pair.Key, StringComparison.OrdinalIgnoreCase));
+                var state = change.Files.Find(file => string.Equals(file.RelativePath, applied.RelativePath, StringComparison.OrdinalIgnoreCase));
                 if (state != null)
-                    state.After = bytes;
+                    state.After = applied.After;
                 else
-                    change.Files.Add(new OmsiObjectChange.FileState { RelativePath = pair.Key, Before = workspace.ReadAllBytes(pair.Key), After = bytes });
-                workspace.Save(pair.Key, bytes);
+                    change.Files.Add(applied);
             }
             foreach (var tile in tiles)
                 if (!change.Tiles.Contains(tile))
@@ -1206,15 +1254,14 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
+        /// <summary>
+        /// Writes the files of a road step all or none, as every other step does (<see cref="ApplyFiles"/>): refused with
+        /// <see cref="OmsiStepRefusedException"/> before anything is written when a file is no longer as the step left it, a missing or
+        /// deleted file included; a failed write puts back what was written, and <see cref="OmsiRollBackFailedException"/> says when that failed too.
+        /// </summary>
         private void WriteFiles(List<OmsiObjectChange.FileState> files, bool undo)
         {
-            var workspace = RequireWorkspace();
-            foreach (var file in files)
-                if (!SameBytes(workspace.ReadAllBytes(file.RelativePath), undo ? file.After : file.Before))
-                    throw new InvalidOperationException(file.RelativePath + " was changed in the meantime; the step cannot be " +
-                                                        (undo ? "undone." : "applied."));
-            foreach (var file in files)
-                workspace.Save(file.RelativePath, undo ? file.Before : file.After);
+            ApplyFiles(files, undo);
         }
 
         /// <summary>Tile files and global.cfg read once for an edit, with their bytes before it.</summary>

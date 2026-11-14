@@ -112,8 +112,8 @@ namespace OmsiMapEditor.OMSI
     }
 
     /// <summary>
-    /// A step that was refused because a file it writes was changed since, in the workspace or by another way: nothing was written, files
-    /// and summary are as before the call. Trying again gives the same answer.
+    /// A step that was refused because a file it writes was changed since, in the workspace or by another way, or because it is already
+    /// undone or done: nothing was written, files and summary are as before the call. Trying again gives the same answer.
     /// </summary>
     public sealed class OmsiStepRefusedException : InvalidOperationException
     {
@@ -293,7 +293,8 @@ namespace OmsiMapEditor.OMSI
         /// <see cref="OmsiStepRefusedException"/> when a file was changed since: nothing was written, files, summary and
         /// <see cref="OmsiTileRevertChange.IsApplied"/> are as before, and the undo can never succeed;
         /// <see cref="OmsiRollBackFailedException"/> when writing or reading failed and putting the files back failed too: the files
-        /// may hold part of the step while summary and <see cref="OmsiTileRevertChange.IsApplied"/> are as before, so the map must be read again;
+        /// may hold part of the step while the summary is as before and <see cref="OmsiTileRevertChange.IsApplied"/> says the files were
+        /// written, so the map must be read again;
         /// any other exception: writing or reading failed and every file written was put back, so files, summary and
         /// <see cref="OmsiTileRevertChange.IsApplied"/> are as before and the undo can be tried again.
         /// </summary>
@@ -302,10 +303,11 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The revert has already been undone.");
+                throw new OmsiStepRefusedException("The revert has already been undone.");
             ApplyFiles(change.Files, true);
-            SwapRevertedTile(summary, change, true);
+            // The flag follows the files: a failed read below puts them back and the flag with them; a failed roll-back leaves it so.
             change.IsApplied = false;
+            SwapRevertedTile(summary, change, true);
         }
 
         /// <summary>
@@ -317,10 +319,10 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The revert is already applied.");
+                throw new OmsiStepRefusedException("The revert is already applied.");
             ApplyFiles(change.Files, false);
-            SwapRevertedTile(summary, change, false);
             change.IsApplied = true;
+            SwapRevertedTile(summary, change, false);
         }
 
         /// <param name="undo">Whether the files were just written as before the revert; a failure writes them back the other way.</param>
@@ -336,6 +338,8 @@ namespace OmsiMapEditor.OMSI
             catch (Exception failure)
             {
                 RollBackAfter(failure, () => ApplyFiles(change.Files, !undo));
+                // The files are back as before the call, and so is the flag.
+                change.IsApplied = undo;
                 throw;
             }
             change.Hidden = change.Hidden.SwapInto(summary, change.Tile);
@@ -343,11 +347,20 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// Raised when a step failed and putting back what it had written failed as well, just before the session throws the
+        /// <see cref="OmsiRollBackFailedException"/>: the workspace may hold part of the step, so the map must be read again. Raised
+        /// once per failed roll-back, also when the exception is caught or wrapped further up: a step whose failure or roll-back already
+        /// holds such an exception does not raise it again. It comes on the thread of the call while the call is still unwinding, so a
+        /// handler should only take note and act later.
+        /// </summary>
+        public event Action<OmsiRollBackFailedException> RollBackFailed;
+
+        /// <summary>
         /// Takes back what a step wrote before it failed. When that fails as well, both errors are reported as an
         /// <see cref="OmsiRollBackFailedException"/>: the message begins with the step's and names the failed roll-back, and the inner
-        /// exception holds both, the step's first.
+        /// exception holds both, the step's first. <see cref="RollBackFailed"/> is raised before it is thrown.
         /// </summary>
-        private static void RollBackAfter(Exception failure, Action rollBack)
+        private void RollBackAfter(Exception failure, Action rollBack)
         {
             try
             {
@@ -355,9 +368,30 @@ namespace OmsiMapEditor.OMSI
             }
             catch (Exception rollBackFailure)
             {
-                throw new OmsiRollBackFailedException(failure.Message + " Putting the files back as they were failed as well, so the workspace may hold part of the step: " +
-                                                      rollBackFailure.Message, new AggregateException(failure, rollBackFailure));
+                var failed = new OmsiRollBackFailedException(failure.Message + " Putting the files back as they were failed as well, so the workspace may hold part of the step: " +
+                                                             rollBackFailure.Message, new AggregateException(failure, rollBackFailure));
+                // A roll-back failure further in was reported where it happened.
+                if (!HoldsRollBackFailure(failure) && !HoldsRollBackFailure(rollBackFailure))
+                    RollBackFailed?.Invoke(failed);
+                throw failed;
             }
+        }
+
+        /// <summary>True when the exception is an <see cref="OmsiRollBackFailedException"/> or holds one among its inner exceptions.</summary>
+        private static bool HoldsRollBackFailure(Exception exception)
+        {
+            if (exception == null)
+                return false;
+            if (exception is OmsiRollBackFailedException)
+                return true;
+            if (exception is AggregateException aggregate)
+            {
+                foreach (var inner in aggregate.InnerExceptions)
+                    if (HoldsRollBackFailure(inner))
+                        return true;
+                return false;
+            }
+            return HoldsRollBackFailure(exception.InnerException);
         }
 
         /// <summary>
@@ -595,7 +629,7 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied != undo)
-                throw new InvalidOperationException(undo ? "The tile step is already taken back." : "The tile step is already done.");
+                throw new OmsiStepRefusedException(undo ? "The tile step is already taken back." : "The tile step is already done.");
             ApplyFiles(change.Files, undo);
             change.IsApplied = !undo;
         }

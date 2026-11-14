@@ -658,8 +658,10 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The change has already been undone.");
+                throw new OmsiStepRefusedException("The change has already been undone.");
             WriteFiles(change, true);
+            // The flag follows the files, so a failure below shows that the files were written.
+            change.IsApplied = false;
             if (change.Kind == OmsiObjectChangeKind.Placement)
                 RemoveFromSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Deletion)
@@ -680,7 +682,6 @@ namespace OmsiMapEditor.OMSI
                 ApplyElementChange(change, false);
             else
                 MoveInSummary(change, false);
-            change.IsApplied = false;
         }
 
         /// <summary>Applies an undone change again.</summary>
@@ -689,8 +690,9 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The change is already applied.");
+                throw new OmsiStepRefusedException("The change is already applied.");
             WriteFiles(change, false);
+            change.IsApplied = true;
             if (change.Kind == OmsiObjectChangeKind.Placement)
                 AddToSummary(summary, change);
             else if (change.Kind == OmsiObjectChangeKind.Deletion)
@@ -710,7 +712,6 @@ namespace OmsiMapEditor.OMSI
                 ApplyElementChange(change, true);
             else
                 MoveInSummary(change, true);
-            change.IsApplied = true;
         }
 
         private static void AddFile(OmsiObjectChange change, string relativePath, byte[] before, byte[] after)

@@ -731,10 +731,12 @@ namespace OmsiMapEditor.Tests
             // An edit outside the history after the undo.
             Assert.IsTrue(session.UpdateObject(tile, shown, 12, 20, 0, 0));
             var files = WorkspaceFiles(session.Workspace);
+            var raised = WatchRollBackFailures(session);
 
             var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, revert));
 
             StringAssert.Contains("tile_0_0.map was changed in the meantime", refused.Message);
+            Assert.IsEmpty(raised, "A refused step wrote nothing, so no failed roll-back is reported.");
             AssertSameFiles(files, WorkspaceFiles(session.Workspace));
             Assert.IsFalse(revert.IsApplied);
             Assert.AreSame(shown, tile.Objects.Single());
@@ -889,11 +891,13 @@ namespace OmsiMapEditor.Tests
             var records = tile.Objects.ToList();
             var tileStamp = session.Workspace.Stamp("tile_0_0.map");
 
+            var raised = WatchRollBackFailures(session);
             Exception failed;
             using (BlockWrites(session.Workspace, "global.cfg", true))
                 failed = Assert.Catch(() => session.Redo(summary, revert));
 
             AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
             Assert.AreNotEqual(tileStamp, session.Workspace.Stamp("tile_0_0.map"), "The redo wrote the tile before it failed.");
             AssertSameFiles(files, WorkspaceFiles(session.Workspace));
             AssertSameFiles(originalFolder, FolderFiles(original));
@@ -920,11 +924,15 @@ namespace OmsiMapEditor.Tests
             var originalFolder = FolderFiles(original);
             var records = tile.Objects.ToList();
 
+            var raised = WatchRollBackFailures(session);
             OmsiRollBackFailedException failed;
             // The redo takes the tile's copy away, which needs no save; putting the copy back does, and cannot.
             using (BlockWrites(session.Workspace, "tile_0_0.map", false))
             using (BlockWrites(session.Workspace, "global.cfg", true))
                 failed = Assert.Throws<OmsiRollBackFailedException>(() => session.Redo(summary, revert));
+
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
 
             var both = (AggregateException)failed.InnerException;
             Assert.AreEqual(2, both.InnerExceptions.Count);
@@ -975,7 +983,7 @@ namespace OmsiMapEditor.Tests
         /// Makes every write of a workspace file fail until disposed: a folder takes the place of the file a save writes first, and with
         /// <paramref name="holdCopy"/> the edited copy is held open, so taking it away fails too. Reading the file still works.
         /// </summary>
-        private static IDisposable BlockWrites(OmsiMapWorkspace workspace, string relativePath, bool holdCopy)
+        internal static IDisposable BlockWrites(OmsiMapWorkspace workspace, string relativePath, bool holdCopy)
         {
             var copy = Path.Combine(workspace.WorkspacePath, relativePath);
             var temporary = copy + ".mapforge-tmp";
@@ -1007,8 +1015,16 @@ namespace OmsiMapEditor.Tests
             }
         }
 
+        /// <summary>Collects every <see cref="OmsiMapSession.RollBackFailed"/> the session raises from now on.</summary>
+        internal static List<OmsiRollBackFailedException> WatchRollBackFailures(OmsiMapSession session)
+        {
+            var raised = new List<OmsiRollBackFailedException>();
+            session.RollBackFailed += raised.Add;
+            return raised;
+        }
+
         /// <summary>A failure of the file system, not a refusal of the step or a failed roll-back.</summary>
-        private static void AssertWriteFailure(Exception failure)
+        internal static void AssertWriteFailure(Exception failure)
         {
             Assert.IsNotNull(failure);
             Assert.That(failure, Is.InstanceOf<IOException>().Or.InstanceOf<UnauthorizedAccessException>(), failure.ToString());
