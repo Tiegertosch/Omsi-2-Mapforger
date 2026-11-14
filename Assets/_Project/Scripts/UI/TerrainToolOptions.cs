@@ -22,13 +22,25 @@ namespace OmsiMapEditor.UI
         private readonly Label strengthLabel;
         private readonly TextField flattenField;
         private readonly TextField depthField;
-        private readonly Button paintButton;
+        private readonly VisualElement flattenBox;
+        private readonly VisualElement depthBox;
         private readonly VisualElement options;
         private readonly ToolCatalog catalog;
         private readonly VisualElement brushPage;
         private readonly VisualElement heightMapPage;
         private readonly Button brushTab;
+        private readonly Button paintTab;
         private readonly Button heightMapTab;
+        private readonly VisualElement heightsRow;
+        private readonly Label terrainHint;
+        private OmsiTerrainBrushMode? lastBrush = OmsiTerrainBrushMode.Raise;
+
+        private enum Page
+        {
+            Brushes,
+            Paint,
+            HeightMap
+        }
 
         // The height map: export and import, and the settings of a picture about to be laid on the map.
         private readonly VisualElement importBox;
@@ -49,25 +61,40 @@ namespace OmsiMapEditor.UI
             AddToClassList("picker-tool");
             // The row is as tall as its taller panel; the empty part above the shorter one must not catch clicks meant for the map.
             pickingMode = PickingMode.Ignore;
-            options = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
-            options.AddToClassList("tool-options-scroll");
-            options.AddToClassList("tool-panel");
-            options.AddToClassList("picker-options");
+            options = ToolCatalog.Options(scrolling: true, icons: true);
             Add(options);
 
             // The brushes beside the options, as tiles, and the height map on the second tab.
             catalog = new ToolCatalog("terrain.close.tooltip", () => CloseRequested?.Invoke(), scrollingTiles: false);
             catalog.Panel.AddToClassList("terrain-picker");
             catalog.Empty.style.display = DisplayStyle.None;
-            brushTab = catalog.AddTab("mountain", "terrain.brushes", null, () => ShowPage(false));
-            heightMapTab = catalog.AddTab("image", "terrain.heightmap", "terrain.heightmap.hint", () => ShowPage(true));
+            // Three tabs: the brushes that shape the ground, painting ground textures (its textures are tiles of their own), the height map.
+            brushTab = catalog.AddTab("mountain", "terrain.brushes", null, () =>
+            {
+                if (Painting)
+                    SetMode(lastBrush);
+                else
+                    ShowPage(Page.Brushes);
+            });
+            paintTab = catalog.AddTab("paintbrush", "terrain.mode.paint", "terrain.mode.paint.tooltip", () =>
+            {
+                if (!Painting)
+                    SetPainting();
+                else
+                    ShowPage(Page.Paint);
+            });
+            heightMapTab = catalog.AddTab("image", "terrain.heightmap", "terrain.heightmap.hint", () => ShowPage(Page.HeightMap));
             brushPage = new VisualElement();
             brushPage.AddToClassList("picker-tiles-content");
             brushPage.AddToClassList("terrain-page");
             catalog.Panel.Insert(1, brushPage);
+            Paint = new GroundPaintOptions();
+            Paint.style.display = DisplayStyle.None;
+            Paint.TextureChosen += () => SettingsChanged?.Invoke();
+            catalog.Panel.Insert(2, Paint.Page);
             heightMapPage = new VisualElement();
             heightMapPage.AddToClassList("terrain-page");
-            catalog.Panel.Insert(2, heightMapPage);
+            catalog.Panel.Insert(3, heightMapPage);
             Add(catalog.Panel);
 
             AddMode("terrain.mode.raise", OmsiTerrainBrushMode.Raise, "arrow-up");
@@ -77,34 +104,27 @@ namespace OmsiMapEditor.UI
             AddMode("terrain.mode.roughen", OmsiTerrainBrushMode.Roughen, "activity");
             AddMode("terrain.mode.ramp", null, "trending-up");
             AddMode("terrain.mode.water", OmsiTerrainBrushMode.Water, "droplets");
-            paintButton = Tile("terrain.mode.paint", "terrain.mode.paint.tooltip", "paintbrush", () => SetPainting());
 
+            // The options as rows of icons and small fields, as the road tool has them (ADR 098, M4): the brush's radius and strength as
+            // sliders, and the two heights some brushes work with as fields in metres.
             radiusSlider = new Slider(0f, 1f);
-            LocBindings.Tooltip(radiusSlider, "terrain.radius.tooltip");
             radiusLabel = new Label();
-            AddSlider(Row("terrain.radius"), radiusSlider, radiusLabel, "terrain.radius.tooltip");
+            AddSlider(OptionControls.Row(options, "terrain.radius"), "radius", radiusSlider, radiusLabel, "terrain.radius", "terrain.radius.tooltip");
             strengthSlider = new Slider(0.05f, 1f);
-            LocBindings.Tooltip(strengthSlider, "terrain.strength.tooltip");
             strengthLabel = new Label();
-            AddSlider(Row("terrain.strength"), strengthSlider, strengthLabel, "terrain.strength.tooltip");
-            flattenField = new TextField();
-            LocBindings.Tooltip(flattenField, "terrain.flatten.tooltip");
-            flattenField.AddToClassList("picker-field");
+            AddSlider(OptionControls.Row(options, "terrain.strength"), "gauge", strengthSlider, strengthLabel, "terrain.strength", "terrain.strength.tooltip");
+            heightsRow = OptionControls.Row(options, "terrain.row.heights");
+            flattenField = OptionControls.Value(heightsRow, "move-vertical", string.Empty, "m", "terrain.flatten", "terrain.flatten.tooltip");
             flattenField.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
-            Row("terrain.flatten").Add(flattenField);
-            depthField = new TextField { value = "1.5" };
-            LocBindings.Tooltip(depthField, "terrain.depth.tooltip");
-            depthField.AddToClassList("picker-field");
-            Row("terrain.depth").Add(depthField);
+            flattenBox = flattenField.parent;
+            depthField = OptionControls.Value(heightsRow, "arrow-down-to-line", "1.5", "m", "terrain.depth", "terrain.depth.tooltip");
+            depthBox = depthField.parent;
 
-            Paint = new GroundPaintOptions();
-            Paint.style.display = DisplayStyle.None;
-            Paint.TextureChosen += () => SettingsChanged?.Invoke();
             options.Add(Paint);
 
-            var hint = LocBindings.NewLabel("terrain.hint");
-            hint.AddToClassList("panel-info");
-            options.Add(hint);
+            terrainHint = LocBindings.NewLabel("terrain.hint");
+            terrainHint.AddToClassList("panel-info");
+            options.Add(terrainHint);
 
             var heightMapHint = LocBindings.NewLabel("terrain.heightmap.hint");
             heightMapHint.AddToClassList("panel-info");
@@ -182,7 +202,7 @@ namespace OmsiMapEditor.UI
             strengthSlider.SetValueWithoutNotify(0.5f);
             ShowValues();
             SetMode(OmsiTerrainBrushMode.Raise);
-            ShowPage(false);
+            ShowPage(Page.Brushes);
         }
 
         /// <summary>The height under the pointer or the ramp; the shell shows it in the status bar.</summary>
@@ -195,13 +215,36 @@ namespace OmsiMapEditor.UI
         /// <summary>The X of the panel was pressed; the shell ends the tool.</summary>
         public event Action CloseRequested;
 
-        /// <summary>Shows the brushes or the height map in the panel beside the options.</summary>
-        private void ShowPage(bool heightMap)
+        /// <summary>Shows the brushes, the ground textures or the height map in the panel beside the options.</summary>
+        private void ShowPage(Page shown)
         {
-            brushPage.style.display = heightMap ? DisplayStyle.None : DisplayStyle.Flex;
-            heightMapPage.style.display = heightMap ? DisplayStyle.Flex : DisplayStyle.None;
-            brushTab.EnableInClassList("panel-tab-active", !heightMap);
-            heightMapTab.EnableInClassList("panel-tab-active", heightMap);
+            // Covering or clearing a tile by click belongs to the Paint tab.
+            if (shown != Page.Paint)
+                Paint.Arm(PaintTileArm.None);
+            brushPage.style.display = shown == Page.Brushes ? DisplayStyle.Flex : DisplayStyle.None;
+            Paint.Page.style.display = shown == Page.Paint ? DisplayStyle.Flex : DisplayStyle.None;
+            heightMapPage.style.display = shown == Page.HeightMap ? DisplayStyle.Flex : DisplayStyle.None;
+            brushTab.EnableInClassList("panel-tab-active", shown == Page.Brushes);
+            paintTab.EnableInClassList("panel-tab-active", shown == Page.Paint);
+            heightMapTab.EnableInClassList("panel-tab-active", shown == Page.HeightMap);
+        }
+
+        /// <summary>Opens a tab by its name (terrain, paint or heightmap) as a click on it would; for command-line checks.</summary>
+        public void ShowTab(string name)
+        {
+            if (string.Equals(name, "paint", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!Painting)
+                    SetPainting();
+                else
+                    ShowPage(Page.Paint);
+            }
+            else if (string.Equals(name, "heightmap", StringComparison.OrdinalIgnoreCase))
+                ShowPage(Page.HeightMap);
+            else if (Painting)
+                SetMode(lastBrush);
+            else
+                ShowPage(Page.Brushes);
         }
 
         /// <summary>A setting changed; the shell draws the brush again.</summary>
@@ -245,7 +288,7 @@ namespace OmsiMapEditor.UI
             coarseLabel.style.display = coarse ? DisplayStyle.Flex : DisplayStyle.None;
             SetAdd(false);
             importBox.style.display = DisplayStyle.Flex;
-            ShowPage(true);
+            ShowPage(Page.HeightMap);
         }
 
         /// <summary>The language changed: what the panel wrote from the language files is written again.</summary>
@@ -309,10 +352,12 @@ namespace OmsiMapEditor.UI
             Mode = null;
             foreach (var pair in modeButtons)
                 pair.Key.EnableInClassList("picker-tile-selected", false);
-            paintButton.EnableInClassList("picker-tile-selected", true);
             Paint.style.display = DisplayStyle.Flex;
-            flattenField.SetEnabled(false);
-            depthField?.SetEnabled(false);
+            heightsRow.style.display = DisplayStyle.None;
+            terrainHint.style.display = DisplayStyle.None;
+            ShowPage(Page.Paint);
+            flattenBox.SetEnabled(false);
+            depthBox?.SetEnabled(false);
             PaintingChanged?.Invoke();
             SettingsChanged?.Invoke();
         }
@@ -325,15 +370,17 @@ namespace OmsiMapEditor.UI
             var wasPainting = Painting;
             Painting = false;
             Mode = mode;
-            paintButton?.EnableInClassList("picker-tile-selected", false);
-            if (Paint != null)
-                Paint.style.display = DisplayStyle.None;
+            lastBrush = mode;
+            Paint.style.display = DisplayStyle.None;
+            heightsRow.style.display = DisplayStyle.Flex;
+            terrainHint.style.display = DisplayStyle.Flex;
+            ShowPage(Page.Brushes);
             if (wasPainting)
                 PaintingChanged?.Invoke();
             foreach (var pair in modeButtons)
                 pair.Key.EnableInClassList("picker-tile-selected", pair.Value == mode);
-            flattenField.SetEnabled(mode == OmsiTerrainBrushMode.Flatten);
-            depthField?.SetEnabled(mode == OmsiTerrainBrushMode.Water);
+            flattenBox.SetEnabled(mode == OmsiTerrainBrushMode.Flatten);
+            depthBox?.SetEnabled(mode == OmsiTerrainBrushMode.Water);
             SettingsChanged?.Invoke();
         }
 
@@ -358,27 +405,7 @@ namespace OmsiMapEditor.UI
 
         private void AddMode(string nameKey, OmsiTerrainBrushMode? mode, string icon)
         {
-            modeButtons[Tile(nameKey, Describe(mode), icon, () => SetMode(mode))] = mode;
-        }
-
-        /// <summary>A brush as a tile of the picker: its icon over its name.</summary>
-        private Button Tile(string nameKey, string tooltipKey, string icon, Action clicked)
-        {
-            var tile = new Button(clicked);
-            LocBindings.TitledTooltip(tile, nameKey, tooltipKey); // i18n:keys
-            tile.AddToClassList("picker-tile");
-            tile.AddToClassList("terrain-brush-tile");
-            var preview = new VisualElement { pickingMode = PickingMode.Ignore };
-            preview.AddToClassList("picker-tile-preview");
-            preview.AddToClassList("terrain-brush-icon");
-            preview.Add(new IconElement(icon));
-            tile.Add(preview);
-            var name = LocBindings.NewLabel(nameKey); // i18n:keys
-            name.pickingMode = PickingMode.Ignore;
-            name.AddToClassList("picker-tile-name");
-            tile.Add(name);
-            brushPage.Add(tile);
-            return tile;
+            modeButtons[catalog.AddTile(icon, nameKey, Describe(mode), () => SetMode(mode), brushPage)] = mode;
         }
 
         /// <summary>The key of the tooltip of a brush.</summary>
@@ -403,18 +430,14 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void AddSlider(VisualElement row, Slider slider, Label value, string tooltipKey)
+        private void AddSlider(VisualElement row, string icon, Slider slider, Label value, string nameKey, string tooltipKey)
         {
-            slider.AddToClassList("new-map-slider");
-            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             slider.RegisterValueChangedCallback(_ =>
             {
                 ShowValues();
                 SettingsChanged?.Invoke();
             });
-            row.Add(slider);
-            value.AddToClassList("new-map-factor");
-            row.Add(value);
+            OptionControls.SliderBox(row, icon, slider, value, nameKey, tooltipKey);
         }
 
         private void ShowValues()
@@ -426,11 +449,6 @@ namespace OmsiMapEditor.UI
         private static float RadiusToSlider(double metres)
         {
             return (float)(Math.Log(Math.Max(3.0, Math.Min(150.0, metres)) / 3.0) / Math.Log(50.0));
-        }
-
-        private VisualElement Row(string labelKey)
-        {
-            return Row(options, labelKey, out _);
         }
 
         private static VisualElement Row(VisualElement parent, string labelKey, out Label text)

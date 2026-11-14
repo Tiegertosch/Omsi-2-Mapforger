@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Dipingi",
-  "terrain.mode.paint.tooltip": "Dipinge le texture del terreno con il pennello invece di modellare il terreno",
-  "paint.title": "Texture del terreno",
+  "terrain.mode.paint.tooltip": "Dipingere le texture del terreno",
+  "paint.texture.tooltip": "Dipinge con questa texture",
   "paint.hint": "Scegli una texture e dipingi dove deve vedersi. Una texture dipinta dopo copre quelle prima; la prima è il terreno di partenza di tutta la mappa.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Dipingi",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Sfoca il bordo della texture scelta per una transizione morbida",
   "paint.hardness": "Durezza",
   "paint.hardness.tooltip": "Quanta parte del raggio del pennello dipinge pienamente; il resto sfuma in una transizione morbida",
+  "paint.row.mode": "Modalità",
+  "paint.row.tile": "Tessera",
   "paint.cover": "Riempi tessera",
-  "paint.cover.tooltip": "Copre interamente la tessera sotto il puntatore con la texture scelta",
+  "paint.cover.tooltip": "Trasforma il puntatore in un secchio di vernice: fai clic su una tessera per coprirla interamente con la texture scelta. Premi di nuovo il pulsante o Esc per terminare",
   "paint.clear": "Svuota tessera",
-  "paint.clear.tooltip": "Toglie la texture scelta dalla tessera sotto il puntatore",
+  "paint.clear.tooltip": "Trasforma il puntatore in una gomma per tessere: fai clic su una tessera per toglierle la texture scelta. Premi di nuovo il pulsante o Esc per terminare",
   "paint.add": "Aggiungi texture...",
   "paint.add.tooltip": "Aggiunge a questa mappa una texture dalla cartella Texture dell'installazione di OMSI",
   "paint.add.texture": "Texture",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Dipinto su {count} tessere.",
   "paint.status.failed": "Impossibile dipingere il terreno: {reason}",
   "paint.status.no_tile": "Punta prima una tessera.",
+  "paint.status.disarmed": "Modalità tessera disattivata.",
+  "paint.hint.cover": "Fai clic sulle tessere per coprirle con {texture}. Esc termina.",
+  "paint.hint.clear": "Fai clic sulle tessere per togliere {texture}. Esc termina.",
   "paint.status.added": "Texture del terreno aggiunta."
 }

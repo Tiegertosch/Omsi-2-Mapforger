@@ -397,6 +397,8 @@ namespace OmsiMapEditor.UI
             {
                 SetPlacementPointer(null);
                 ClearHoveredAdder();
+                if (pointerBadge != null)
+                    pointerBadge.style.display = DisplayStyle.None;
             });
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
@@ -407,6 +409,51 @@ namespace OmsiMapEditor.UI
             angleLabel.AddToClassList("map-angle-label");
             angleLabel.style.display = DisplayStyle.None;
             Add(angleLabel);
+        }
+
+        // A tool icon that follows the pointer, for modes where a click acts on what is under it (a paint bucket for covering a tile).
+        // The round badge holds the icon as a child that fills its padded content, so the icon sits in the middle of the circle.
+        private VisualElement pointerBadge;
+        private IconElement pointerBadgeImage;
+        private string pointerBadgeIcon;
+
+        /// <summary>Shows the named icon beside the pointer while it is over the map, or none with null.</summary>
+        public void SetPointerBadge(string icon)
+        {
+            pointerBadgeIcon = icon;
+            if (icon == null)
+            {
+                if (pointerBadge != null)
+                    pointerBadge.style.display = DisplayStyle.None;
+                return;
+            }
+            if (pointerBadge == null)
+            {
+                pointerBadge = new VisualElement();
+                pointerBadge.AddToClassList("map-pointer-badge");
+                pointerBadge.pickingMode = PickingMode.Ignore;
+                pointerBadge.style.display = DisplayStyle.None;
+                pointerBadgeImage = new IconElement(icon);
+                pointerBadgeImage.pickingMode = PickingMode.Ignore;
+                pointerBadge.Add(pointerBadgeImage);
+                Add(pointerBadge);
+            }
+            else
+                pointerBadgeImage.SetIcon(icon);
+        }
+
+        /// <summary>Puts the badge at a world point instead of where the pointer is; for command-line checks, which have no pointer.</summary>
+        public void PlacePointerBadgeAtWorld(OmsiMapPoint point)
+        {
+            if (pointerBadge != null && pointerBadgeIcon != null)
+                MovePointerBadge(MapToScreen(WorldToMap(point)));
+        }
+
+        private void MovePointerBadge(Vector2 local)
+        {
+            pointerBadge.style.left = local.x + 12f;
+            pointerBadge.style.top = local.y + 10f;
+            pointerBadge.style.display = DisplayStyle.Flex;
         }
 
         private void OnCustomStyleResolved(CustomStyleResolvedEvent evt)
@@ -3713,6 +3760,8 @@ namespace OmsiMapEditor.UI
         private void OnPointerMove(PointerMoveEvent evt)
         {
             var position = (Vector2)evt.localPosition;
+            if (pointerBadge != null && pointerBadgeIcon != null)
+                MovePointerBadge(position);
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
                 if (roadMode && !ThreeDimensional)

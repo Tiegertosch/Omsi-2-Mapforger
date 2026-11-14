@@ -23,6 +23,7 @@
   "terrain.flatten.tooltip": "La hauteur vers laquelle Flatten travaille ; vide utilise la hauteur à laquelle commence chaque trait",
   "terrain.depth": "Profondeur de l'eau (m)",
   "terrain.depth.tooltip": "À quelle profondeur le lac/la rivière creuse sous la surface de l'eau",
+  "terrain.row.heights": "Hauteurs",
   "terrain.hint": "Maintenez le bouton gauche au-dessus du sol pour le façonner ; le sol ne s'élève jamais à travers une route à côté. Rampe : cliquez là où elle commence et où elle se termine. Les routes adaptées au terrain restent adaptées. Esc termine l'outil.",
   "terrain.brushes": "Pinceaux",
   "terrain.close.tooltip": "Fermer l'outil de terrain (G)",

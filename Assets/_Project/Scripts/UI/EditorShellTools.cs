@@ -195,17 +195,24 @@ namespace OmsiMapEditor.UI
             return true;
         }
 
-        /// <summary>Esc with the terrain tool: lets go of the start of a ramp, then leaves the tool.</summary>
+        /// <summary>Esc with the terrain tool: lets go of the tile mode (cover or clear by click), then of the start of a ramp, then leaves the tool.</summary>
         private bool EscapeTerrainTool()
         {
-            if (terrainRampStart.HasValue)
+            switch (TerrainEscape.Next(terrainOptions != null && terrainOptions.Paint.Armed != PaintTileArm.None, terrainRampStart.HasValue))
             {
-                terrainRampStart = null;
-                ShowTerrainBrush();
-                SetStatusT("terrain.status.ramp_start");
+                case TerrainEscapeStep.DisarmTileMode:
+                    terrainOptions.Paint.Arm(PaintTileArm.None);
+                    SetStatusT("paint.status.disarmed");
+                    break;
+                case TerrainEscapeStep.ReleaseRampStart:
+                    terrainRampStart = null;
+                    ShowTerrainBrush();
+                    SetStatusT("terrain.status.ramp_start");
+                    break;
+                default:
+                    SetTool(EditorTool.Drag);
+                    break;
             }
-            else
-                SetTool(EditorTool.Drag);
             return true;
         }
 

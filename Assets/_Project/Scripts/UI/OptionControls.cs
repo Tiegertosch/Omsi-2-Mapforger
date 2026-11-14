@@ -80,5 +80,32 @@ namespace OmsiMapEditor.UI
             }
             row.Add(box);
         }
+
+        /// <summary>A slider with an icon before it and its current value after it; the caller keeps the value text up to date.</summary>
+        public static void SliderBox(VisualElement row, string icon, VisualElement slider, Label valueLabel, string nameKey, string tooltipKey)
+        {
+            var box = new VisualElement();
+            box.AddToClassList("option-slider");
+            LocBindings.TitledTooltip(box, nameKey, tooltipKey); // i18n:keys
+            var mark = new IconElement(icon) { pickingMode = PickingMode.Ignore };
+            mark.AddToClassList("option-value-icon");
+            box.Add(mark);
+            slider.AddToClassList("new-map-slider");
+            slider.AddToClassList("option-slider-control");
+            box.Add(slider);
+            valueLabel.AddToClassList("option-slider-value");
+            valueLabel.pickingMode = PickingMode.Ignore;
+            box.Add(valueLabel);
+            row.Add(box);
+        }
+
+        /// <summary>A short heading above a block of rows that belong together, such as a list.</summary>
+        public static Label Heading(VisualElement parent, string textKey)
+        {
+            var heading = LocBindings.NewLabel(textKey); // i18n:keys
+            heading.AddToClassList("option-heading");
+            parent.Add(heading);
+            return heading;
+        }
     }
 }

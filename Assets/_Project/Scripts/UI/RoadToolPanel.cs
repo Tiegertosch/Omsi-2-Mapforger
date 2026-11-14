@@ -88,10 +88,7 @@ namespace OmsiMapEditor.UI
 
             // The options on the left, in rows of icons that all fit at once (ADR 098, stage 2): mode, snapping, height, parallel roads,
             // what a click builds, and the pieces. Name and explanation of each control stand in its tooltip.
-            var options = new VisualElement();
-            options.AddToClassList("tool-panel");
-            options.AddToClassList("picker-options");
-            options.AddToClassList("icon-options");
+            var options = ToolCatalog.Options(icons: true);
             optionsColumn = options;
 
             // How the road runs to the click (ADR 043), as the building modes of Cities: Skylines.

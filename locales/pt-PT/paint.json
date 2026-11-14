@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Pintar",
-  "terrain.mode.paint.tooltip": "Pinta texturas do terreno com o pincel em vez de moldar o terreno",
-  "paint.title": "Texturas do terreno",
+  "terrain.mode.paint.tooltip": "Pintar texturas do terreno",
+  "paint.texture.tooltip": "Pinta com esta textura",
   "paint.hint": "Escolhe uma textura e pinta onde deve aparecer. Uma textura pintada depois cobre as anteriores; a primeira é o chão com que todo o mapa começa.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Pintar",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Esbate a borda da textura escolhida para uma transição suave",
   "paint.hardness": "Dureza",
   "paint.hardness.tooltip": "Quanto do raio do pincel pinta por completo; o resto esbate-se numa transição suave",
+  "paint.row.mode": "Modo",
+  "paint.row.tile": "Peça",
   "paint.cover": "Preencher peça",
-  "paint.cover.tooltip": "Cobre por completo a peça sob o ponteiro com a textura escolhida",
+  "paint.cover.tooltip": "Transforma o ponteiro num balde de tinta: clica numa peça para a cobrir por completo com a textura escolhida. Clica de novo no botão ou prime Esc para terminar",
   "paint.clear": "Esvaziar peça",
-  "paint.clear.tooltip": "Retira a textura escolhida da peça sob o ponteiro",
+  "paint.clear.tooltip": "Transforma o ponteiro numa borracha de peças: clica numa peça para lhe retirar a textura escolhida. Clica de novo no botão ou prime Esc para terminar",
   "paint.add": "Adicionar textura...",
   "paint.add.tooltip": "Adiciona a este mapa uma textura da pasta Texture da instalação do OMSI",
   "paint.add.texture": "Textura",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Pintado em {count} peças.",
   "paint.status.failed": "Não foi possível pintar o terreno: {reason}",
   "paint.status.no_tile": "Aponta primeiro para uma peça.",
+  "paint.status.disarmed": "Modo de peça desativado.",
+  "paint.hint.cover": "Clica em peças para as cobrir com {texture}. Esc termina.",
+  "paint.hint.clear": "Clica em peças para lhes retirar {texture}. Esc termina.",
   "paint.status.added": "Textura de terreno adicionada."
 }

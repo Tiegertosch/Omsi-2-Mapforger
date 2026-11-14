@@ -1639,6 +1639,60 @@ namespace OmsiMapEditor.UI
                 Debug.Log("Terrain: " + statusLabel?.text);
             }
 
+            // -terrainTab <terrain|paint|heightmap>: opens that tab of the terrain window (with -paintTexture, -paintMode, -paintHardness,
+            // -paintAddForm on the paint tab), also without -terrain.
+            var terrainTabName = Argument("-terrainTab", 1);
+            if (terrainTabName != null && terrainOptions != null)
+            {
+                if (activeTool != EditorTool.Terrain)
+                    SetTool(EditorTool.Terrain);
+                terrainOptions.ShowTab(terrainTabName);
+                if (terrainMode == null)
+                    ApplyPaintArguments(Argument);
+            }
+
+            // -paintArm cover|clear [tile x tile y], -paintCover tile x tile y, -paintClear tile x tile y: the Paint tab with the tile mode
+            // armed (the pointer's tool and the hint show; with a tile, the pointer stands at its middle), or armed and one click on that tile.
+            var tileArm = Argument("-paintArm", 1);
+            var tileClick = Argument("-paintCover", 1) != null ? PaintTileArm.Cover : Argument("-paintClear", 1) != null ? PaintTileArm.Clear : PaintTileArm.None;
+            if (terrainOptions != null && currentSummary != null && (tileArm != null || tileClick != PaintTileArm.None))
+            {
+                var tileWait = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - tileWait < 300f)
+                    yield return null;
+                if (activeTool != EditorTool.Terrain)
+                    SetTool(EditorTool.Terrain);
+                terrainOptions.ShowTab("paint");
+                ApplyPaintArguments(Argument);
+                var clickName = tileClick == PaintTileArm.Cover ? "-paintCover" : "-paintClear";
+                var armed = tileClick != PaintTileArm.None ? tileClick
+                    : string.Equals(tileArm, "clear", StringComparison.OrdinalIgnoreCase) ? PaintTileArm.Clear : PaintTileArm.Cover;
+                terrainOptions.Paint.Arm(armed);
+                var tileAtName = tileClick != PaintTileArm.None ? clickName : "-paintArm";
+                var tileAtOffset = tileClick != PaintTileArm.None ? 1 : 2;
+                if (int.TryParse(Argument(tileAtName, tileAtOffset), NumberStyles.Integer, CultureInfo.InvariantCulture, out var armTileX) &&
+                    int.TryParse(Argument(tileAtName, tileAtOffset + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var armTileY))
+                {
+                    var middle = OmsiMapGeometry.TileLocalToWorld(armTileX, armTileY, currentSummary.TileSizeMeters / 2.0, currentSummary.TileSizeMeters / 2.0,
+                        currentSummary.TileSizeMeters);
+                    roadPointer = middle;
+                    mapCanvas?.PlacePointerBadgeAtWorld(middle);
+                    if (tileClick != PaintTileArm.None)
+                    {
+                        ClickTileMode(middle.X, middle.Y);
+                        // The element arguments ran before this block, so an undo asked for with the click is done here, after it.
+                        if (Array.IndexOf(args, "-elementUndo") >= 0)
+                        {
+                            StepHistory(undoSteps, redoSteps, true);
+                            Debug.Log("Undo after tile click: " + statusLabel?.text);
+                        }
+                    }
+                    else
+                        ShowTerrainBrush();
+                }
+                Debug.Log("Paint tile mode " + armed + ": " + statusLabel?.text);
+            }
+
             // -turnArm <object ID> <arm from 1> <heading in the object>: drags that arm handle of a junction made here.
             if (int.TryParse(Argument("-turnArm", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var armObjectId) &&
                 int.TryParse(Argument("-turnArm", 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out var armNumber) &&
@@ -5201,6 +5255,7 @@ namespace OmsiMapEditor.UI
         private void EndTerrainTool()
         {
             ReleaseTerrain();
+            terrainOptions?.Paint.Arm(PaintTileArm.None);
             mapCanvas?.EndRoad();
             mapCanvas?.ClearRoadPreview();
             if (terrainOptions != null)
@@ -5215,6 +5270,11 @@ namespace OmsiMapEditor.UI
         {
             if (mapCanvas == null || terrainOptions == null || activeTool != EditorTool.Terrain)
                 return;
+            if (terrainOptions.Painting && terrainOptions.Paint.Armed != PaintTileArm.None)
+            {
+                ShowTileModeBrush();
+                return;
+            }
             if (!roadPointer.HasValue)
             {
                 mapCanvas.ClearRoadPreview();
@@ -5267,7 +5327,11 @@ namespace OmsiMapEditor.UI
             roadPointer = new OmsiMapPoint(x, y);
             if (terrainOptions.Painting)
             {
-                PressPaint();
+                // With a tile mode armed a click acts on the tile and paints no stroke.
+                if (terrainOptions.Paint.Armed != PaintTileArm.None)
+                    ClickTileMode(x, y);
+                else
+                    PressPaint();
                 return;
             }
             if (!terrainOptions.Mode.HasValue)

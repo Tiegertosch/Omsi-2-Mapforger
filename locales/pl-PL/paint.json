@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Maluj",
-  "terrain.mode.paint.tooltip": "Maluje tekstury terenu pędzlem zamiast kształtować teren",
-  "paint.title": "Tekstury terenu",
+  "terrain.mode.paint.tooltip": "Malowanie tekstur terenu",
+  "paint.texture.tooltip": "Maluje tą teksturą",
   "paint.hint": "Wybierz teksturę i maluj tam, gdzie ma być widoczna. Tekstura namalowana później przykrywa wcześniejsze; pierwsza jest podłożem, od którego zaczyna cała mapa.",
   "paint.base": "{name} (podstawa)",
   "paint.mode.paint": "Maluj",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Rozmywa brzeg wybranej tekstury dla miękkiego przejścia",
   "paint.hardness": "Twardość",
   "paint.hardness.tooltip": "Jaka część promienia pędzla maluje w pełni; reszta zanika w miękkie przejście",
+  "paint.row.mode": "Tryb",
+  "paint.row.tile": "Kafel",
   "paint.cover": "Wypełnij kafel",
-  "paint.cover.tooltip": "Całkowicie pokrywa kafel pod wskaźnikiem wybraną teksturą",
+  "paint.cover.tooltip": "Zmienia wskaźnik w wiaderko z farbą: kliknij kafel, aby całkowicie pokryć go wybraną teksturą. Kliknij przycisk ponownie lub naciśnij Esc, aby zakończyć",
   "paint.clear": "Opróżnij kafel",
-  "paint.clear.tooltip": "Zdejmuje wybraną teksturę z kafla pod wskaźnikiem",
+  "paint.clear.tooltip": "Zmienia wskaźnik w gumkę do kafli: kliknij kafel, aby zdjąć z niego wybraną teksturę. Kliknij przycisk ponownie lub naciśnij Esc, aby zakończyć",
   "paint.add": "Dodaj teksturę...",
   "paint.add.tooltip": "Dodaje do tej mapy teksturę z folderu Texture instalacji OMSI",
   "paint.add.texture": "Tekstura",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Namalowano na {count} kaflach.",
   "paint.status.failed": "Nie udało się namalować terenu: {reason}",
   "paint.status.no_tile": "Najpierw wskaż kafel.",
+  "paint.status.disarmed": "Tryb kafli wyłączony.",
+  "paint.hint.cover": "Klikaj kafle, aby pokryć je teksturą {texture}. Esc kończy.",
+  "paint.hint.clear": "Klikaj kafle, aby zdjąć z nich teksturę {texture}. Esc kończy.",
   "paint.status.added": "Dodano teksturę terenu."
 }

@@ -25,6 +25,26 @@ namespace OmsiMapEditor.UI
         ClearSelection,
     }
 
+    /// <summary>What Esc does inside the terrain tool, one step at a time.</summary>
+    internal enum TerrainEscapeStep
+    {
+        /// <summary>Lets go of covering or clearing tiles by click.</summary>
+        DisarmTileMode,
+        /// <summary>Lets go of the start of a ramp.</summary>
+        ReleaseRampStart,
+        /// <summary>Nothing is under way: the tool ends.</summary>
+        LeaveTool,
+    }
+
+    /// <summary>The order of Esc inside the terrain tool (ADR 098, M4): the armed tile mode first, then a begun ramp, then the tool.</summary>
+    internal static class TerrainEscape
+    {
+        public static TerrainEscapeStep Next(bool tileModeArmed, bool rampStarted)
+        {
+            return tileModeArmed ? TerrainEscapeStep.DisarmTileMode : rampStarted ? TerrainEscapeStep.ReleaseRampStart : TerrainEscapeStep.LeaveTool;
+        }
+    }
+
     /// <summary>What the shell knows when Esc is pressed.</summary>
     internal struct EscapeState
     {

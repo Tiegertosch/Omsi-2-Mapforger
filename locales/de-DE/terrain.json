@@ -23,6 +23,7 @@
   "terrain.flatten.tooltip": "Die Höhe, auf die Einebnen hinarbeitet; leer nimmt die Höhe, wo jeder Strich beginnt",
   "terrain.depth": "Wassertiefe (m)",
   "terrain.depth.tooltip": "Wie tief See / Fluss unter die Wasseroberfläche gräbt",
+  "terrain.row.heights": "Höhen",
   "terrain.hint": "Halte die linke Taste über dem Boden, um ihn zu formen; der Boden steigt nie durch eine Straße daneben. Rampe: Klicke dorthin, wo sie beginnt und endet. An das Gelände angepasste Straßen bleiben angepasst. Esc beendet das Werkzeug.",
   "terrain.brushes": "Pinsel",
   "terrain.close.tooltip": "Gelände-Werkzeug schließen (G)",

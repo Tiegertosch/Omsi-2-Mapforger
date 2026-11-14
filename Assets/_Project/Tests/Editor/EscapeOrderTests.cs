@@ -136,5 +136,14 @@ namespace OmsiMapEditor.Tests
                 Assert.That(EscapeOrder.StopsPropagation(action), Is.EqualTo(!goesOn), action.ToString());
             }
         }
+
+        [Test]
+        public void TheTerrainToolLetsGoOfTheArmedTileModeFirstThenOfARampThenEndsTheTool()
+        {
+            Assert.That(TerrainEscape.Next(true, false), Is.EqualTo(TerrainEscapeStep.DisarmTileMode));
+            Assert.That(TerrainEscape.Next(true, true), Is.EqualTo(TerrainEscapeStep.DisarmTileMode));
+            Assert.That(TerrainEscape.Next(false, true), Is.EqualTo(TerrainEscapeStep.ReleaseRampStart));
+            Assert.That(TerrainEscape.Next(false, false), Is.EqualTo(TerrainEscapeStep.LeaveTool));
+        }
     }
 }

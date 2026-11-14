@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Peindre",
-  "terrain.mode.paint.tooltip": "Peint des textures de terrain avec le pinceau au lieu de modeler le terrain",
-  "paint.title": "Textures de terrain",
+  "terrain.mode.paint.tooltip": "Peindre des textures de terrain",
+  "paint.texture.tooltip": "Peint avec cette texture",
   "paint.hint": "Choisis une texture et peins là où elle doit apparaître. Une texture peinte plus tard recouvre les précédentes ; la première est le sol de départ de toute la carte.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Peindre",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Floute le bord de la texture choisie pour une transition douce",
   "paint.hardness": "Dureté",
   "paint.hardness.tooltip": "Quelle part du rayon du pinceau peint pleinement ; le reste s'estompe en transition douce",
+  "paint.row.mode": "Mode",
+  "paint.row.tile": "Tuile",
   "paint.cover": "Remplir la tuile",
-  "paint.cover.tooltip": "Recouvre entièrement la tuile sous le pointeur avec la texture choisie",
+  "paint.cover.tooltip": "Transforme le pointeur en pot de peinture : clique sur une tuile pour la recouvrir entièrement avec la texture choisie. Clique de nouveau sur le bouton ou appuie sur Échap pour arrêter",
   "paint.clear": "Vider la tuile",
-  "paint.clear.tooltip": "Retire la texture choisie de la tuile sous le pointeur",
+  "paint.clear.tooltip": "Transforme le pointeur en gomme à tuiles : clique sur une tuile pour en retirer la texture choisie. Clique de nouveau sur le bouton ou appuie sur Échap pour arrêter",
   "paint.add": "Ajouter une texture...",
   "paint.add.tooltip": "Ajoute à cette carte une texture du dossier Texture de l'installation d'OMSI",
   "paint.add.texture": "Texture",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Peint sur {count} tuiles.",
   "paint.status.failed": "Le terrain n'a pas pu être peint : {reason}",
   "paint.status.no_tile": "Pointe d'abord une tuile.",
+  "paint.status.disarmed": "Mode tuile désactivé.",
+  "paint.hint.cover": "Clique sur des tuiles pour les recouvrir avec {texture}. Échap arrête.",
+  "paint.hint.clear": "Clique sur des tuiles pour en retirer {texture}. Échap arrête.",
   "paint.status.added": "Texture de terrain ajoutée."
 }

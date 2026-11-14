@@ -140,13 +140,79 @@ namespace OmsiMapEditor.UI
             HintChanged?.Invoke(text, warning);
         }
 
-        /// <summary>The option column of a tool, without a title: what it holds says what it is for.</summary>
-        public static VisualElement Options()
+        /// <summary>
+        /// The option column of a tool, without a title: what it holds says what it is for. A scrolling column holds the rows in a
+        /// <see cref="ScrollView"/> (add to it as to any element) and grows to the height of the catalog beside it before it scrolls.
+        /// </summary>
+        /// <param name="scrolling">True for a column that scrolls once its rows are taller than the catalog.</param>
+        /// <param name="icons">True for the wider column of <see cref="OptionControls"/> rows: a label, then icons and small fields.</param>
+        public static VisualElement Options(bool scrolling = false, bool icons = false)
         {
-            var options = new VisualElement();
+            VisualElement options = scrolling
+                ? new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden }
+                : new VisualElement();
+            if (scrolling)
+                options.AddToClassList("tool-options-scroll");
             options.AddToClassList("tool-panel");
             options.AddToClassList("picker-options");
+            if (icons)
+                options.AddToClassList("icon-options");
             return options;
+        }
+
+        /// <summary>
+        /// A tile of the catalog with an icon over its name; its tooltip holds name and explanation. The tool marks the chosen one
+        /// with <c>picker-tile-selected</c>.
+        /// </summary>
+        /// <param name="into">Where the tile goes: a page of the tool's own, or the area of tiles when null.</param>
+        /// <param name="captioned">True to show the name under the icon always, not only while the pointer is over the tile.</param>
+        public Button AddTile(string icon, string nameKey, string tooltipKey, Action clicked, VisualElement into = null, bool captioned = false)
+        {
+            var tile = new Button(clicked);
+            LocBindings.TitledTooltip(tile, nameKey, tooltipKey); // i18n:keys
+            tile.AddToClassList("picker-tile");
+            if (captioned)
+                tile.AddToClassList("picker-tile-captioned");
+            var preview = new VisualElement { pickingMode = PickingMode.Ignore };
+            preview.AddToClassList("picker-tile-preview");
+            preview.AddToClassList("picker-tile-icon");
+            preview.Add(new IconElement(icon));
+            tile.Add(preview);
+            var name = LocBindings.NewLabel(nameKey); // i18n:keys
+            name.pickingMode = PickingMode.Ignore;
+            name.AddToClassList("picker-tile-name");
+            tile.Add(name);
+            (into ?? Tiles.contentContainer).Add(tile);
+            return tile;
+        }
+
+        /// <summary>
+        /// A tile with a picture over its name, for a catalog of things that are told apart by how they look (the ground textures; the
+        /// object library draws its own tiles). The name stays visible under the picture; a picture that is not there shows
+        /// <paramref name="fallbackIcon"/>. The caller adds the tile and marks the chosen one with <c>picker-tile-selected</c>.
+        /// </summary>
+        /// <param name="image">The picture, scaled to the tile (up to 128 px is plenty), or null.</param>
+        /// <param name="name">The name as text, not a key: it is a file or an item of the map.</param>
+        /// <param name="description">The line the tooltip shows under the name, or empty.</param>
+        public static Button ImageTile(Texture2D image, string fallbackIcon, string name, string description, Action clicked)
+        {
+            var tile = new Button(clicked) { tooltip = LocBindings.CardTooltip(name, description) };
+            tile.AddToClassList("picker-tile");
+            tile.AddToClassList("picker-tile-captioned");
+            var preview = new VisualElement { pickingMode = PickingMode.Ignore };
+            preview.AddToClassList("picker-tile-preview");
+            if (image != null)
+                preview.style.backgroundImage = new StyleBackground(image);
+            else
+            {
+                preview.AddToClassList("picker-tile-icon");
+                preview.Add(new IconElement(fallbackIcon));
+            }
+            tile.Add(preview);
+            var label = new Label(name) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("picker-tile-name");
+            tile.Add(label);
+            return tile;
         }
     }
 }

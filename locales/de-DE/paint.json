@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Malen",
-  "terrain.mode.paint.tooltip": "Malt Geländetexturen mit dem Pinsel, statt das Gelände zu formen",
-  "paint.title": "Geländetexturen",
+  "terrain.mode.paint.tooltip": "Geländetexturen malen",
+  "paint.texture.tooltip": "Malt mit dieser Textur",
   "paint.hint": "Wähle eine Textur und male dorthin, wo sie zu sehen sein soll. Eine später gemalte Textur deckt die davor ab; die erste ist der Boden, mit dem die ganze Karte beginnt.",
   "paint.base": "{name} (Basis)",
   "paint.mode.paint": "Malen",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Verwischt den Rand der gewählten Textur für einen weichen Übergang",
   "paint.hardness": "Härte",
   "paint.hardness.tooltip": "Wie viel vom Radius des Pinsels voll malt; der Rest läuft zu einem weichen Übergang aus",
+  "paint.row.mode": "Modus",
+  "paint.row.tile": "Kachel",
   "paint.cover": "Kachel füllen",
-  "paint.cover.tooltip": "Bedeckt die Kachel unter dem Zeiger ganz mit der gewählten Textur",
+  "paint.cover.tooltip": "Macht den Zeiger zum Farbeimer: Klicke auf eine Kachel, um sie ganz mit der gewählten Textur zu bedecken. Knopf erneut drücken oder Esc beendet das",
   "paint.clear": "Kachel leeren",
-  "paint.clear.tooltip": "Nimmt die gewählte Textur von der Kachel unter dem Zeiger",
+  "paint.clear.tooltip": "Macht den Zeiger zum Kachel-Radierer: Klicke auf eine Kachel, um die gewählte Textur davon zu nehmen. Knopf erneut drücken oder Esc beendet das",
   "paint.add": "Textur hinzufügen...",
   "paint.add.tooltip": "Fügt dieser Karte eine Textur aus dem Texture-Ordner der OMSI-Installation hinzu",
   "paint.add.texture": "Textur",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Auf {count} Kacheln gemalt.",
   "paint.status.failed": "Das Gelände konnte nicht gemalt werden: {reason}",
   "paint.status.no_tile": "Zeige zuerst auf eine Kachel.",
+  "paint.status.disarmed": "Kachelmodus beendet.",
+  "paint.hint.cover": "Klicke Kacheln an, um sie mit {texture} zu füllen. Esc beendet.",
+  "paint.hint.clear": "Klicke Kacheln an, um {texture} davon zu nehmen. Esc beendet.",
   "paint.status.added": "Geländetextur hinzugefügt."
 }

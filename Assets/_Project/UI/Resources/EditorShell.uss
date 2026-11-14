@@ -77,6 +77,8 @@
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
 .map-view { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; background-color: rgba(0, 0, 0, 0); }
 .map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); --map-wire: var(--mf-color-text-secondary); --map-fence: var(--mf-color-text-muted); --map-route: var(--mf-color-text-primary); --map-route-quiet: var(--mf-color-text-secondary); }
+.map-pointer-badge { position: absolute; width: 30px; height: 30px; padding: 3px; color: var(--mf-color-accent); background-color: var(--mf-color-panel-glass); border-radius: 15px; }
+.map-pointer-badge > .icon { flex-grow: 1; }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 .empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
 /* Welcome screen in the middle of the empty map */
@@ -395,10 +397,10 @@
 .object-tile-icon { width: 22px; height: 22px; color: var(--mf-color-text-muted); }
 .object-folder-preview { flex-direction: column; }
 .object-folder-count { margin: 2px 0 0; font-size: 10px; color: var(--mf-color-text-secondary); }
-/* The terrain tool's brushes as tiles with an icon (ADR 098, stage 2). */
-.terrain-brush-icon { align-items: center; justify-content: center; color: var(--mf-color-text-primary); }
-.terrain-brush-icon > .icon { width: 28px; height: 28px; }
-.picker-tile-selected .terrain-brush-icon { color: var(--mf-color-accent); }
+/* A tile of the catalog with an icon over its name (ToolCatalog.AddTile), such as the terrain tool's brushes (ADR 098). */
+.picker-tile-icon { align-items: center; justify-content: center; color: var(--mf-color-text-primary); }
+.picker-tile-icon > .icon { width: 28px; height: 28px; }
+.picker-tile-selected .picker-tile-icon { color: var(--mf-color-accent); }
 .terrain-page { padding: var(--mf-space-2); }
 .picker-panel > .panel-folder-bar { margin: var(--mf-space-1) var(--mf-space-2) 0; }
 /* The menus of the bar are at most 210 px tall, as in the references (ADR 098, stage 2): a flat header, flat tabs, two rows of small
@@ -438,6 +440,11 @@
 .picker-field.option-value-field { width: 40px; min-width: 40px; height: 28px; }
 .picker-field.option-value-field .unity-base-text-field__input { height: 28px; padding: 0 4px; }
 .option-value-unit { margin: 0 0 0 2px; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); }
+.option-slider { flex-direction: row; flex-grow: 1; align-items: center; margin: 0 var(--mf-space-1) 0 0; }
+.option-slider:disabled { opacity: 0.45; }
+.option-slider > .option-slider-control { flex-grow: 1; margin: 0 var(--mf-space-1) 0 0; }
+.option-slider-value { width: 44px; margin: 0; padding: 0; -unity-text-align: middle-right; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); }
+.option-heading { margin: var(--mf-space-1) 0 var(--mf-space-1); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .picker-empty { position: absolute; left: var(--mf-space-3); right: var(--mf-space-3); top: 80px; }
 .panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
@@ -712,12 +719,13 @@
 .road-builder-surface-tiles { flex-grow: 1; min-height: 0; }
 
 /* Ground texture painting (ADR 091) */
-.ground-texture-list { margin: 2px 0 6px 0; }
-.ground-texture-row { flex-direction: row; align-items: center; height: 28px; margin: 0 0 2px 0; padding: 0 6px; background-color: var(--mf-color-field); border-color: var(--mf-color-border); border-width: 1px; border-radius: var(--mf-radius-sm); }
-.ground-texture-row:hover { border-color: var(--mf-color-accent); }
-.ground-texture-chosen { border-color: var(--mf-color-accent); background-color: rgba(240, 138, 50, 0.18); }
-.ground-texture-swatch { width: 20px; height: 20px; margin: 0 8px 0 0; border-radius: 3px; border-color: var(--mf-color-border); border-width: 1px; flex-shrink: 0; }
-.ground-texture-name { flex-grow: 1; flex-shrink: 1; overflow: hidden; color: var(--mf-color-text-primary); -unity-text-align: middle-left; font-size: 12px; }
+.picker-tile-captioned { height: 88px; }
+.picker-tile-captioned > .picker-tile-name { display: flex; position: relative; left: auto; right: auto; bottom: auto; width: 100%; margin: 2px 0 0 0; padding: 0; background-color: rgba(0, 0, 0, 0); border-radius: 0; }
+.paint-add-form { flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
+.paint-add-field { width: 236px; margin: 0 var(--mf-space-2) var(--mf-space-1) 0; }
+.paint-add-field > .picker-option-label { margin: 0 0 2px 0; }
+.paint-add-field > .new-map-dropdown, .paint-add-field > .picker-field { width: 100%; flex-grow: 0; }
+.paint-add-actions { width: 236px; flex-grow: 0; margin: 0 var(--mf-space-2) var(--mf-space-1) 0; }
 
 /* Every text input of the app, also Integer/Float/DoubleField (their input is a .unity-base-text-field__input as well): a light caret,
    a visible selection and an accent border while focused. The class is doubled to outrank the default theme. The border colour changes

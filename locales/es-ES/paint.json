@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Pintar",
-  "terrain.mode.paint.tooltip": "Pinta texturas del terreno con el pincel en vez de modelar el terreno",
-  "paint.title": "Texturas del terreno",
+  "terrain.mode.paint.tooltip": "Pintar texturas del terreno",
+  "paint.texture.tooltip": "Pinta con esta textura",
   "paint.hint": "Elige una textura y pinta donde deba verse. Una textura pintada después tapa las anteriores; la primera es el suelo con el que empieza todo el mapa.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Pintar",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Difumina el borde de la textura elegida para una transición suave",
   "paint.hardness": "Dureza",
   "paint.hardness.tooltip": "Cuánto del radio del pincel pinta por completo; el resto se desvanece en una transición suave",
+  "paint.row.mode": "Modo",
+  "paint.row.tile": "Loseta",
   "paint.cover": "Rellenar loseta",
-  "paint.cover.tooltip": "Cubre por completo la loseta bajo el puntero con la textura elegida",
+  "paint.cover.tooltip": "Convierte el puntero en un bote de pintura: haz clic en una loseta para cubrirla por completo con la textura elegida. Pulsa el botón de nuevo o Esc para terminar",
   "paint.clear": "Vaciar loseta",
-  "paint.clear.tooltip": "Quita la textura elegida de la loseta bajo el puntero",
+  "paint.clear.tooltip": "Convierte el puntero en una goma para losetas: haz clic en una loseta para quitarle la textura elegida. Pulsa el botón de nuevo o Esc para terminar",
   "paint.add": "Añadir textura...",
   "paint.add.tooltip": "Añade a este mapa una textura de la carpeta Texture de la instalación de OMSI",
   "paint.add.texture": "Textura",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Pintado en {count} losetas.",
   "paint.status.failed": "No se pudo pintar el terreno: {reason}",
   "paint.status.no_tile": "Señala primero una loseta.",
+  "paint.status.disarmed": "Modo de loseta desactivado.",
+  "paint.hint.cover": "Haz clic en losetas para cubrirlas con {texture}. Esc termina.",
+  "paint.hint.clear": "Haz clic en losetas para quitarles {texture}. Esc termina.",
   "paint.status.added": "Textura de terreno añadida."
 }

@@ -23,6 +23,7 @@
   "terrain.flatten.tooltip": "L'altezza verso cui Flatten lavora; vuoto utilizza l'altezza in cui inizia ogni tratto",
   "terrain.depth": "Profondità dell'acqua (m)",
   "terrain.depth.tooltip": "Quanto è profondo il lago/fiume che scava sotto la superficie dell'acqua",
+  "terrain.row.heights": "Altezze",
   "terrain.hint": "Tieni il pulsante sinistro sul terreno per modellarlo; il terreno non sale mai attraverso una strada accanto ad esso. Rampa: clicca dove inizia e dove finisce. Le strade adattate al terreno rimangono adattate. Esc termina lo strumento.",
   "terrain.brushes": "Pennelli",
   "terrain.close.tooltip": "Chiudi lo strumento terreno (G)",

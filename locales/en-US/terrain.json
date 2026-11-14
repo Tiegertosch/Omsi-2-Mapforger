@@ -23,6 +23,8 @@
   "terrain.flatten.tooltip": "The height Flatten works towards; empty uses the height where each stroke starts",
   "terrain.depth": "Water depth (m)",
   "terrain.depth.tooltip": "How deep Lake / river digs under the water's surface",
+  "@terrain.row.heights": "Label of a row in the terrain tool's option column, at most about 9 characters: its two fields are the height Flatten works towards and the depth Lake / river digs",
+  "terrain.row.heights": "Heights",
   "terrain.hint": "Hold the left button over the ground to shape it; the ground never rises through a road beside it. Ramp: click where it starts and where it ends. Roads fitted to the terrain stay fitted. Esc ends the tool.",
   "terrain.brushes": "Brushes",
   "terrain.close.tooltip": "Close the terrain tool (G)",

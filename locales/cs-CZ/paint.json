@@ -1,7 +1,7 @@
 {
   "terrain.mode.paint": "Malovat",
-  "terrain.mode.paint.tooltip": "Maluje textury terénu štětcem místo tvarování terénu",
-  "paint.title": "Textury terénu",
+  "terrain.mode.paint.tooltip": "Malovat textury terénu",
+  "paint.texture.tooltip": "Maluje touto texturou",
   "paint.hint": "Vyber texturu a maluj tam, kde se má zobrazit. Později namalovaná textura překryje ty před ní; první je podklad, kterým celá mapa začíná.",
   "paint.base": "{name} (základ)",
   "paint.mode.paint": "Malovat",
@@ -12,10 +12,12 @@
   "paint.mode.soften.tooltip": "Rozostří okraj vybrané textury pro měkký přechod",
   "paint.hardness": "Tvrdost",
   "paint.hardness.tooltip": "Kolik poloměru štětce maluje plně; zbytek plynule slábne v měkký přechod",
+  "paint.row.mode": "Režim",
+  "paint.row.tile": "Dlaždice",
   "paint.cover": "Vyplnit dlaždici",
-  "paint.cover.tooltip": "Zcela pokryje dlaždici pod kurzorem vybranou texturou",
+  "paint.cover.tooltip": "Změní kurzor na plechovku s barvou: kliknutím na dlaždici ji zcela pokryješ vybranou texturou. Dalším kliknutím na tlačítko nebo klávesou Esc to ukončíš",
   "paint.clear": "Vyprázdnit dlaždici",
-  "paint.clear.tooltip": "Odebere vybranou texturu z dlaždice pod kurzorem",
+  "paint.clear.tooltip": "Změní kurzor na gumu na dlaždice: kliknutím na dlaždici z ní odebereš vybranou texturu. Dalším kliknutím na tlačítko nebo klávesou Esc to ukončíš",
   "paint.add": "Přidat texturu...",
   "paint.add.tooltip": "Přidá do této mapy texturu ze složky Texture instalace OMSI",
   "paint.add.texture": "Textura",
@@ -32,5 +34,8 @@
   "paint.status.painted": "Namalováno na {count} dlaždicích.",
   "paint.status.failed": "Terén nelze malovat: {reason}",
   "paint.status.no_tile": "Nejdřív ukaž na dlaždici.",
+  "paint.status.disarmed": "Režim dlaždic je vypnutý.",
+  "paint.hint.cover": "Klikej na dlaždice a pokrývej je texturou {texture}. Esc ukončí.",
+  "paint.hint.clear": "Klikej na dlaždice a odebírej z nich texturu {texture}. Esc ukončí.",
   "paint.status.added": "Textura terénu přidána."
 }
