@@ -103,6 +103,26 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The tiles the Water brush went over, which get water at its surface when they have none.</summary>
         internal HashSet<OmsiTileSummary> WaterTiles { get; } = new HashSet<OmsiTileSummary>();
 
+        /// <summary>
+        /// The tiles whose shown ground the stroke wrote while it went on, in the order first written. When the stroke is not kept,
+        /// their ground is put back as before the stroke, so the map draws them again from the files.
+        /// </summary>
+        public IReadOnlyList<OmsiTileSummary> WrittenTiles => writtenTiles;
+
+        private readonly List<OmsiTileSummary> writtenTiles = new List<OmsiTileSummary>();
+
+        /// <summary>The bytes of each .terrain file the stroke wrote, as the workspace held them before its first write; null when there was none.</summary>
+        internal Dictionary<string, byte[]> TerrainBefore { get; } = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Notes a tile's .terrain before the stroke writes it the first time; later writes keep the first note.</summary>
+        internal void NoteTerrainBefore(OmsiTileSummary tile, string terrainPath, byte[] bytes)
+        {
+            if (TerrainBefore.ContainsKey(terrainPath))
+                return;
+            TerrainBefore[terrainPath] = bytes;
+            writtenTiles.Add(tile);
+        }
+
         /// <summary>The ground's height as shown at a world position; null outside the terrain.</summary>
         public double? HeightAt(double x, double y)
         {
@@ -551,9 +571,11 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// Keeps the stroke as one step: the shaped ground of the touched tiles is saved, and the ground they show is fitted
-        /// to the roads again from it, with their neighbours. Null when nothing changed. When fitting or reading the ground fails, the
-        /// shaped ground and the ground fitted so far are put back as before the call and the failure is thrown as it was; when putting
-        /// them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
+        /// to the roads again from it, with their neighbours. Null when nothing changed. When keeping it fails, the stroke is not kept:
+        /// the shaped ground, the water, the ground fitted so far and the shown ground the stroke wrote while it went on
+        /// (<see cref="OmsiTerrainStroke.WrittenTiles"/>) are put back as before the stroke, all or nothing, the water and range of heights
+        /// of those tiles are read again, and the failure is thrown as it was; when putting them back fails too,
+        /// <see cref="OmsiRollBackFailedException"/> reports both.
         /// </summary>
         public OmsiTerrainChange EndTerrainStroke(OmsiMapSummary summary, OmsiTerrainStroke stroke)
         {
@@ -563,44 +585,70 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(stroke));
             var workspace = RequireWorkspace();
             var change = new OmsiTerrainChange();
-            foreach (var tile in stroke.Shaped.Changed)
-            {
-                var terrainPath = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
-                var shapedPath = ShapedTerrainPath(terrainPath);
-                var before = workspace.IsModified(shapedPath) ? workspace.ReadAllBytes(shapedPath) : null;
-                var after = OmsiTerrain.Encode(stroke.Shaped.Loaded[tile]);
-                change.Files.Add(new OmsiObjectChange.FileState { RelativePath = shapedPath, Before = before, After = after });
-                change.Tiles.Add(tile);
-            }
-            if (change.Files.Count == 0)
-                return null;
-            // Tiles the Water brush dug in get water at its surface, as openMapper lays it.
-            foreach (var tile in stroke.WaterTiles)
-                if (tile.Water == null)
-                {
-                    AddWaterFiles(change, tile, stroke.WaterLevel);
-                    if (!change.Tiles.Contains(tile))
-                        change.Tiles.Add(tile);
-                }
-            ApplyFiles(change.Files, false);
+            var applied = false;
             List<OmsiObjectChange.FileState> fitted = null;
             try
             {
+                foreach (var tile in stroke.Shaped.Changed)
+                {
+                    var terrainPath = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                    var shapedPath = ShapedTerrainPath(terrainPath);
+                    var before = workspace.IsModified(shapedPath) ? workspace.ReadAllBytes(shapedPath) : null;
+                    var after = OmsiTerrain.Encode(stroke.Shaped.Loaded[tile]);
+                    change.Files.Add(new OmsiObjectChange.FileState { RelativePath = shapedPath, Before = before, After = after });
+                    change.Tiles.Add(tile);
+                }
+                if (change.Files.Count == 0)
+                    return null;
+                // Tiles the Water brush dug in get water at its surface, as openMapper lays it.
+                foreach (var tile in stroke.WaterTiles)
+                    if (tile.Water == null)
+                    {
+                        AddWaterFiles(change, tile, stroke.WaterLevel);
+                        if (!change.Tiles.Contains(tile))
+                            change.Tiles.Add(tile);
+                    }
+                // Writes all or nothing, as does the fit.
+                ApplyFiles(change.Files, false);
+                applied = true;
                 fitted = FitTerrainToRoads(summary, change);
                 ReadWaterOf(change.Tiles);
             }
             catch (Exception failure)
             {
-                // The fit writes all or nothing; the ground shown keeps what the stroke gave it, as before the call.
-                RollBackAfter(failure, () =>
-                {
-                    if (fitted != null)
-                        ApplyFiles(fitted, true);
-                    ApplyFiles(change.Files, true);
-                });
+                RollBackAfter(failure, () => PutBackStroke(stroke, change, applied, fitted));
                 throw;
             }
             return change;
+        }
+
+        /// <summary>
+        /// Puts back what a stroke that is not kept wrote, all or nothing: the ground it fitted, its shaped ground and water when they were
+        /// written, and the shown ground it wrote while it went on, each as before the stroke. Then reads the water and range of heights of
+        /// the tiles again, so the summary tells what the files hold.
+        /// </summary>
+        private void PutBackStroke(OmsiTerrainStroke stroke, OmsiTerrainChange change, bool applied, List<OmsiObjectChange.FileState> fitted)
+        {
+            var workspace = RequireWorkspace();
+            var files = new List<OmsiObjectChange.FileState>();
+            // A tile the stroke wrote goes back to its bytes before the stroke, which come before those the fit found.
+            if (fitted != null)
+                foreach (var file in fitted)
+                    if (!stroke.TerrainBefore.ContainsKey(file.RelativePath))
+                        files.Add(file);
+            if (applied)
+                files.AddRange(change.Files);
+            foreach (var pair in stroke.TerrainBefore)
+                files.Add(new OmsiObjectChange.FileState { RelativePath = pair.Key, Before = pair.Value, After = Existing(workspace, pair.Key) });
+            // Nothing written: the summary was not read again either.
+            if (files.Count == 0)
+                return;
+            ApplyFiles(files, true);
+            var tiles = new List<OmsiTileSummary>(change.Tiles);
+            foreach (var tile in stroke.WrittenTiles)
+                if (!tiles.Contains(tile))
+                    tiles.Add(tile);
+            ReadWaterOf(tiles);
         }
 
         /// <summary>
@@ -798,7 +846,11 @@ namespace OmsiMapEditor.OMSI
             var result = new List<OmsiTileSummary>();
             foreach (var tile in stroke.Shown.Changed)
             {
-                workspace.Save(OmsiRelativePath.Normalize(tile.FileName) + ".terrain", OmsiTerrain.Encode(stroke.Shown.Loaded[tile]));
+                var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                // Noted before the write, so a write that fails half way is put back too when the stroke is not kept.
+                if (!stroke.TerrainBefore.ContainsKey(path))
+                    stroke.NoteTerrainBefore(tile, path, Existing(workspace, path));
+                workspace.Save(path, OmsiTerrain.Encode(stroke.Shown.Loaded[tile]));
                 result.Add(tile);
             }
             stroke.Shown.Changed.Clear();

@@ -3996,6 +3996,76 @@ namespace OmsiMapEditor.Tests
             OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
         }
 
+        /// <summary>
+        /// A brush stroke over tile 1, 0 that draws its ground while it goes on; a bump shaped by hand beside it makes the fit write the
+        /// tile's ground once more when the stroke ends.
+        /// </summary>
+        /// <param name="water">Digs with the Water brush instead, so the tile gets water when the stroke is kept, as the shell starts it.</param>
+        private static OmsiTerrainStroke DragOverTileBeside(OmsiMapSession session, OmsiMapSummary summary, bool water = false)
+        {
+            var stroke = session.BeginTerrainStroke(summary);
+            stroke.WaterLevel = (stroke.HeightAt(450, 150) ?? 0.0) - 0.3;
+            var shownBefore = session.Workspace.ReadAllBytes("tile_1_0.map.terrain");
+            var touched = session.ApplyTerrainBrush(summary, stroke, water ? OmsiTerrainBrushMode.Water : OmsiTerrainBrushMode.Raise, 450, 150, 20, 0.5, 1.0);
+            if (water)
+                CollectionAssert.AreEqual(new[] { "tile_1_0.map" }, stroke.WaterTiles.Select(tile => tile.FileName).ToArray(), "The tile gets water with the stroke.");
+            CollectionAssert.AreEqual(new[] { "tile_1_0.map" }, touched.Select(tile => tile.FileName).ToArray());
+            CollectionAssert.AreNotEqual(shownBefore, session.Workspace.ReadAllBytes("tile_1_0.map.terrain"), "The drag draws the ground at once.");
+            CollectionAssert.AreEqual(new[] { "tile_1_0.map" }, stroke.WrittenTiles.Select(tile => tile.FileName).ToArray());
+            stroke.Shaped.Set(90, 10, 50f);
+            return stroke;
+        }
+
+        [Test]
+        public void ADraggedTerrainStrokeWhoseGroundCannotBeFittedPutsBackTheGroundItDrewAndItsWater()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var heights = summary.Tiles.Select(tile => tile.TerrainMinHeight + " " + tile.TerrainMaxHeight).ToArray();
+            var water = summary.Tiles.Select(tile => tile.Water).ToArray();
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+            var stroke = DragOverTileBeside(session, summary, true);
+
+            Exception failed;
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", false))
+                failed = Assert.Catch(() => session.EndTerrainStroke(summary, stroke));
+
+            OmsiMapWorkspaceTests.AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
+            // The ground the drag drew, the shaped ground, the water and the ground fitted are as before the stroke: no stroke is kept that no step holds.
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            CollectionAssert.AreEqual(heights, summary.Tiles.Select(tile => tile.TerrainMinHeight + " " + tile.TerrainMaxHeight).ToArray());
+            CollectionAssert.AreEqual(water, summary.Tiles.Select(tile => tile.Water).ToArray());
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void ADraggedTerrainStrokeWhoseGroundCanNeitherBeFittedNorPutBackReportsTheFailedRollBackOnce()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+            var stroke = DragOverTileBeside(session, summary);
+
+            OmsiRollBackFailedException failed;
+            // Held open, the ground the drag drew can neither be fitted nor go back to the original's.
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.EndTerrainStroke(summary, stroke));
+
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreEqual(2, both.InnerExceptions.Count);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[0]);
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+        }
+
         [Test]
         public void UndoingAStepAlreadyUndoneOrRedoingOneAlreadyDoneIsRefused()
         {

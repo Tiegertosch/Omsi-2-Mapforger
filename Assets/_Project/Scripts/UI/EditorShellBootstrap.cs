@@ -5165,9 +5165,13 @@ namespace OmsiMapEditor.UI
             {
                 change = session.EndTerrainStroke(currentSummary, stroke);
             }
-            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException)
+            catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is InvalidDataException ||
+                                              exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
+                // The ground the stroke drew is back in the files as before it; after a failed roll-back the map is read again anyway.
+                if (!(exception is OmsiRollBackFailedException))
+                    RefreshGround(stroke.WrittenTiles);
                 SetStatusT("terrain.status.not_kept", ("reason", exception.Message));
                 return;
             }
@@ -6286,38 +6290,20 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// Undoes or redoes a step; the parts of a group are undone in reverse order. Collects the objects that exist
-        /// afterwards, so they can be selected. When a part of a group fails, the parts done before it are taken back, the last
-        /// first, and the failure is thrown as it was; when taking them back fails too, <see cref="OmsiRollBackFailedException"/>
-        /// reports both.
+        /// afterwards, so they can be selected. When a part of a group fails, it is taken back when it changed whether it is in effect,
+        /// then the parts done before it, the last first, and the failure is thrown as it was (<see cref="StepGroup.Apply{T}"/>); when
+        /// taking them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
         /// </summary>
         private void ApplyStep(ObjectEditStep step, bool undo, List<MapSelectionItem> touched)
         {
             if (step.Group != null)
             {
-                var done = 0;
-                try
-                {
-                    for (; done < step.Group.Count; done++)
-                        ApplyStep(step.Group[undo ? step.Group.Count - 1 - done : done], undo, touched);
-                }
-                catch (Exception failure) when (!(failure is OmsiRollBackFailedException))
-                {
-                    try
-                    {
-                        var takenBack = new List<MapSelectionItem>();
-                        for (var index = done - 1; index >= 0; index--)
-                            ApplyStep(step.Group[undo ? step.Group.Count - 1 - index : index], !undo, takenBack);
-                    }
-                    catch (Exception rollBackFailure)
-                    {
-                        var failed = new OmsiRollBackFailedException(failure.Message + " Taking back the parts of the step done before failed as well, so the workspace may hold part of the step: " +
-                                                                     rollBackFailure.Message, new AggregateException(failure, rollBackFailure));
-                        // Noted like one the session reports; the undo or redo reads the map at once, which clears the note.
-                        NoteRollBackFailure(failed);
-                        throw failed;
-                    }
-                    throw;
-                }
+                var order = new List<ObjectEditStep>(step.Group);
+                if (undo)
+                    order.Reverse();
+                var takenBack = new List<MapSelectionItem>();
+                // A failed roll-back is noted like one the session reports; the undo or redo reads the map at once, which clears the note.
+                StepGroup.Apply(order, part => ApplyStep(part, undo, touched), part => ApplyStep(part, !undo, takenBack), AppliedStates, NoteRollBackFailure);
                 return;
             }
 
