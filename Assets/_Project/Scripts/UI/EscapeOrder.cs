@@ -45,6 +45,26 @@ namespace OmsiMapEditor.UI
         }
     }
 
+    /// <summary>What Esc does inside the traffic rules tool, one step at a time.</summary>
+    internal enum TrafficEscapeStep
+    {
+        /// <summary>Takes the sign from the pointer: a sign being dragged from a tile goes back.</summary>
+        CancelDrag,
+        /// <summary>Lets go of the armed sign, so clicks in the map select again.</summary>
+        DisarmSign,
+        /// <summary>Nothing is under way: the tool ends.</summary>
+        LeaveTool,
+    }
+
+    /// <summary>The order of Esc inside the traffic rules tool (ADR 098, M4): a drag first, then the armed sign, then the tool.</summary>
+    internal static class TrafficEscape
+    {
+        public static TrafficEscapeStep Next(bool dragging, bool signArmed)
+        {
+            return dragging ? TrafficEscapeStep.CancelDrag : signArmed ? TrafficEscapeStep.DisarmSign : TrafficEscapeStep.LeaveTool;
+        }
+    }
+
     /// <summary>What the shell knows when Esc is pressed.</summary>
     internal struct EscapeState
     {

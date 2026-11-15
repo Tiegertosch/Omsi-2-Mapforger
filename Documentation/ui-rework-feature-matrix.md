@@ -77,7 +77,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Reihen entlang von Straßen | Leiste T (`RowToolOptions.cs`) | teilweise | – | Fenster alt; kein Kontextmenü |
 | **Kreuzungen und Verkehr** | | | | |
 | Markierungen | Leiste M (`MarkingToolOptions.cs`) | teilweise | offen | Katalog neu (uncommittet), Optionen alt |
-| Vorfahrt | Leiste V (`EditorShellPriorities.cs`) | teilweise | – | nur Hülle neu |
+| Vorfahrt (seit 15. November 2026 „Traffic rules“, ADR 099; Stand dieser Matrix: davor) | Leiste V (`EditorShellPriorities.cs`) | teilweise | – | nur Hülle neu |
 | Spuren, Abbiegespur | Leiste L (`EditorShellLanes.cs`) | teilweise | – | nur Hülle neu |
 | Ampeln, Phasen, Zeitleiste | Leiste A (`EditorShellSignals*.cs`) | teilweise | – | nur Hülle neu; 380 px breite Sonderspalte |
 | Ampel-Assistent, Vorlagen | Knöpfe im Ampel-Fenster (`EditorShellSignals.cs:328–340`) | alt | – | Dialoge alt |

@@ -16,6 +16,12 @@ namespace OmsiMapEditor.OMSI
 
         public ICollection<string> Names { get; set; }
         public List<OmsiPathRule> Rules { get; } = new List<OmsiPathRule>();
+
+        /// <summary>
+        /// True to leave [kill_rule] records of the names alone and take away only [rule] records. The eraser of the traffic rules tool
+        /// needs it: a [kill_rule] that cancels an inherited limit must not go without a replacement. False (the default) takes both, as the inspector does.
+        /// </summary>
+        public bool KeepKillRules { get; set; }
     }
 
     /// <summary>Changes of the [rule] records after objects, such as the right of way of a junction's paths (ADR 047).</summary>
@@ -159,7 +165,7 @@ namespace OmsiMapEditor.OMSI
                         view = candidate;
                 if (view == null)
                     throw new InvalidOperationException("Spline " + edit.Spline.Id + " was not found in " + edit.Tile.FileName + ".");
-                ReplaceRules(tileFile, view.Record, edit.Paths, edit.Names, edit.Rules);
+                ReplaceRules(tileFile, view.Record, edit.Paths, edit.Names, edit.Rules, edit.KeepKillRules);
                 if (!change.SplineIds.Contains(edit.Spline.Id))
                     change.SplineIds.Add(edit.Spline.Id);
                 if (!change.Tiles.Contains(edit.Tile))
@@ -178,7 +184,7 @@ namespace OmsiMapEditor.OMSI
         /// ones after the records that follow the element, where the stock maps keep them. Returns the rules written.
         /// </summary>
         private static List<OmsiPathRule> ReplaceRules(OmsiRecordFile file, OmsiRecord element, ICollection<int> paths, ICollection<string> names,
-            IEnumerable<OmsiPathRule> rules)
+            IEnumerable<OmsiPathRule> rules, bool keepKillRules = false)
         {
             var at = file.Records.IndexOf(element);
             var following = new List<OmsiRecord>();
@@ -189,6 +195,8 @@ namespace OmsiMapEditor.OMSI
             {
                 var isRule = string.Equals(record.Name, "rule", StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(record.Name, "kill_rule", StringComparison.OrdinalIgnoreCase);
+                if (keepKillRules && string.Equals(record.Name, "kill_rule", StringComparison.OrdinalIgnoreCase))
+                    continue;
                 if (!isRule || record.Fields.Count < 2 ||
                     !int.TryParse(record.GetField(0), NumberStyles.Integer, CultureInfo.InvariantCulture, out var path))
                     continue;

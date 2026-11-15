@@ -35,7 +35,7 @@ namespace OmsiMapEditor.UI
             AddTool(world, EditorTool.Road, "spline", "toolbar.road", "toolbar.road.tooltip");
             AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain", "toolbar.terrain.tooltip");
             AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "toolbar.markings.tooltip");
-            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "toolbar.priority.tooltip");
+            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.traffic", "toolbar.traffic.tooltip");
             AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes", "toolbar.lanes.tooltip");
             AddTool(world, EditorTool.Signals, "traffic-light", "toolbar.signals", "toolbar.signals.tooltip");
             AddTool(world, EditorTool.Line, "route", "toolbar.line", "toolbar.line.tooltip");

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -20,6 +19,7 @@ namespace OmsiMapEditor.UI
         private static readonly Dictionary<string, List<PathStep>> Cache = new Dictionary<string, List<PathStep>>();
 
         private List<PathStep> steps;
+        private SvgSign svg;
 
         public IconElement(string iconName)
         {
@@ -29,6 +29,16 @@ namespace OmsiMapEditor.UI
             generateVisualContent += Draw;
             // A new colour, such as on an active tool, needs a new drawing.
             RegisterCallback<CustomStyleResolvedEvent>(_ => MarkDirtyRepaint());
+        }
+
+        /// <summary>
+        /// Draws an SVG picture instead of the line icon (the tab icons the owner draws, ADR 099); null goes back to the icon. The picture is
+        /// fitted into the square of the element, and its <c>currentColor</c> is the text colour, so an active tab keeps its colour.
+        /// </summary>
+        public void SetSvg(SvgSign sign)
+        {
+            svg = sign;
+            MarkDirtyRepaint();
         }
 
         public void SetIcon(string iconName)
@@ -50,6 +60,11 @@ namespace OmsiMapEditor.UI
             var size = contentRect.size;
             if (size.x <= 0f || size.y <= 0f || steps == null)
                 return;
+            if (svg != null)
+            {
+                svg.Draw(context.painter2D, size * 0.5f, Mathf.Min(size.x, size.y), resolvedStyle.color);
+                return;
+            }
             var scale = Mathf.Min(size.x, size.y) / GridSize;
             var offset = (size - new Vector2(GridSize, GridSize) * scale) * 0.5f;
             Vector2 Map(Vector2 point) => offset + point * scale;
@@ -99,15 +114,15 @@ namespace OmsiMapEditor.UI
     /// </summary>
     internal static class SvgPath
     {
-        private static readonly Regex Token = new Regex(@"[MmLlHhVvCcSsQqTtAaZz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", RegexOptions.Compiled);
+        private const string Commands = "MmLlHhVvCcSsQqTtAaZz";
 
+        /// <summary>
+        /// Reads the path data. Only whitespace and commas may stand between numbers and commands; anything else, a number that is
+        /// missing or too large, and a command that is not known make it a <see cref="FormatException"/>, so a path is never drawn half.
+        /// </summary>
         public static void Parse(string data, List<PathStep> steps)
         {
-            var tokens = new List<string>();
-            foreach (Match match in Token.Matches(data))
-                tokens.Add(match.Value);
-
-            var index = 0;
+            var position = 0;
             var command = 'M';
             var current = Vector2.zero;
             var start = Vector2.zero;
@@ -115,13 +130,76 @@ namespace OmsiMapEditor.UI
             var lastWasCubic = false;
             var lastWasQuadratic = false;
 
-            float Next() => float.Parse(tokens[index++], NumberStyles.Float, CultureInfo.InvariantCulture);
+            void SkipGaps()
+            {
+                while (position < data.Length && (char.IsWhiteSpace(data[position]) || data[position] == ','))
+                    position++;
+            }
+
+            float Next()
+            {
+                SkipGaps();
+                var begin = position;
+                if (position < data.Length && (data[position] == '-' || data[position] == '+'))
+                    position++;
+                var digits = 0;
+                while (position < data.Length && data[position] >= '0' && data[position] <= '9')
+                {
+                    position++;
+                    digits++;
+                }
+                if (position < data.Length && data[position] == '.')
+                {
+                    position++;
+                    while (position < data.Length && data[position] >= '0' && data[position] <= '9')
+                    {
+                        position++;
+                        digits++;
+                    }
+                }
+                if (digits == 0)
+                    throw new FormatException(begin >= data.Length ? "the path data ends where a number is expected" : "the path data has \"" + data[begin] + "\" where a number is expected");
+                // An exponent counts only with digits after it; otherwise the letter is read as the next token.
+                if (position < data.Length && (data[position] == 'e' || data[position] == 'E'))
+                {
+                    var look = position + 1;
+                    if (look < data.Length && (data[look] == '-' || data[look] == '+'))
+                        look++;
+                    if (look < data.Length && data[look] >= '0' && data[look] <= '9')
+                    {
+                        while (look < data.Length && data[look] >= '0' && data[look] <= '9')
+                            look++;
+                        position = look;
+                    }
+                }
+                var text = data.Substring(begin, position - begin);
+                if (!float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) || float.IsNaN(value) || float.IsInfinity(value))
+                    throw new FormatException("the path data has the number \"" + text + "\" which is out of range");
+                return value;
+            }
+
+            // An arc flag is one character, 0 or 1, and needs no gap after it: "a5 5 0 011 1" reads 0, 1, 1, 1.
+            bool Flag()
+            {
+                SkipGaps();
+                if (position >= data.Length || (data[position] != '0' && data[position] != '1'))
+                    throw new FormatException("an arc flag in the path data is not 0 or 1");
+                return data[position++] == '1';
+            }
+
             Vector2 Point(bool relative) => new Vector2(Next(), Next()) + (relative ? current : Vector2.zero);
 
-            while (index < tokens.Count)
+            SkipGaps();
+            while (position < data.Length)
             {
-                if (char.IsLetter(tokens[index][0]))
-                    command = tokens[index++][0];
+                if (char.IsLetter(data[position]))
+                {
+                    command = data[position++];
+                    if (Commands.IndexOf(command) < 0)
+                        throw new FormatException("Unsupported path command '" + command + "'.");
+                }
+                else if (char.ToUpperInvariant(command) == 'Z')
+                    throw new FormatException("the path data has a number after a close command");
                 var relative = char.IsLower(command);
                 var cubic = false;
                 var quadratic = false;
@@ -193,8 +271,8 @@ namespace OmsiMapEditor.UI
                         var radiusX = Next();
                         var radiusY = Next();
                         var rotation = Next();
-                        var largeArc = Next() != 0f;
-                        var sweep = Next() != 0f;
+                        var largeArc = Flag();
+                        var sweep = Flag();
                         var end = Point(relative);
                         AddArc(steps, current, end, radiusX, radiusY, rotation, largeArc, sweep);
                         current = end;
@@ -209,6 +287,7 @@ namespace OmsiMapEditor.UI
                 }
                 lastWasCubic = cubic;
                 lastWasQuadratic = quadratic;
+                SkipGaps();
             }
         }
 

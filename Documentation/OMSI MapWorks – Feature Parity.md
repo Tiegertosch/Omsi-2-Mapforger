@@ -106,7 +106,7 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 - [ ] Signalrouten bearbeiten und löschen — Offen
 - [ ] Fahrstraßen und Weichen zuordnen — Offen
 - [ ] Signalabhängigkeiten konfigurieren — Offen
-- [x] Prioritätsregeln für KI-Pfade bearbeiten — Vorhanden (Vorfahrt-Werkzeug (V), auch in Chrono-Varianten)
+- [x] Prioritätsregeln für KI-Pfade bearbeiten — Vorhanden (Vorfahrt-Werkzeug (V), seit dem 15. November 2026 „Traffic rules“ mit Schildern, Tempolimits und Überholverbot, ADR 099; auch in Chrono-Varianten)
 - [ ] Schienenpfade und Weichenverbindungen prüfen — Teilweise
 - [ ] Bahn- und Straßenbahnsignale konfigurieren — Offen
 

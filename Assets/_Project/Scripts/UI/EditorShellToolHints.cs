@@ -37,7 +37,7 @@ namespace OmsiMapEditor.UI
             var warning = false;
             if (objectsPanelHost != null && objectsPanelHost.style.display != DisplayStyle.None)
             {
-                if (!OpenToolHint(markingOptions, ref text, ref warning) && !OpenToolHint(terrainOptions, ref text, ref warning) &&
+                if (!OpenToolHint(markingOptions, ref text, ref warning) && !OpenToolHint(trafficOptions, ref text, ref warning) && !OpenToolHint(terrainOptions, ref text, ref warning) &&
                     !OpenToolHint(roadPanel, ref text, ref warning))
                     OpenToolHint(objectsPanel, ref text, ref warning);
             }

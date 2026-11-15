@@ -1543,11 +1543,14 @@ namespace OmsiMapEditor.UI
             DrawPaths(painter, visible);
             DrawHighlightedPaths(painter);
             DrawSignalMovements(painter);
+            DrawTrafficHighlight(painter);
             DrawPriorityHandles(painter);
             DrawLaneEnds(painter);
             DrawRoutes(context, painter, visible);
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
+            // The signs of the road pieces lie over the selection and the road cursor, which would cross them.
+            DrawTrafficLabels(painter, visible);
             DrawPlacementPoints(painter);
             DrawJunctionMarkers(painter, visible);
             DrawArmHandles(painter);
@@ -3563,7 +3566,9 @@ namespace OmsiMapEditor.UI
             DrawPlacementPoints3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
             DrawSignalMovements(painter, camera);
+            DrawTrafficHighlight(painter, camera);
             DrawPriorityHandles(painter, camera);
+            DrawTrafficLabels3D(painter, camera);
             DrawLaneEnds(painter, camera);
             DrawBox(painter);
             painter.lineWidth = 1.5f;

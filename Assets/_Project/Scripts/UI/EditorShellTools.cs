@@ -82,8 +82,8 @@ namespace OmsiMapEditor.UI
             };
             table[(int)EditorTool.Priorities] = new ToolEntry
             {
-                Tool = EditorTool.Priorities, Begin = BeginPriorityTool, End = EndPriorityTool, Escape = toDrag,
-                PointerMoved = UpdatePriorityPreview, Clicked = ClickPriority,
+                Tool = EditorTool.Priorities, Begin = BeginPriorityTool, End = EndPriorityTool, Escape = EscapeTrafficTool,
+                PointerMoved = UpdateTrafficPreview, Clicked = ClickPriority,
             };
             table[(int)EditorTool.Lanes] = new ToolEntry
             {

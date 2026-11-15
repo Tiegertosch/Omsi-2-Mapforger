@@ -487,7 +487,7 @@ namespace OmsiMapEditor.UI
                 objectsPanelHost.Add(terrainOptions);
                 CreateLineTool(objectsPanelHost);
                 CreateMarkingOptions();
-                CreatePriorityOptions();
+                CreateTrafficOptions();
                 CreateLaneOptions();
                 CreateSignalOptions();
             }
@@ -1220,7 +1220,7 @@ namespace OmsiMapEditor.UI
             if (markingArgument != null)
                 RunMarkingArgument(markingArgument);
 
-            // -priorities [n ...] opens the priority tool on the selected junction and clicks the signs given (ADR 047).
+            // -priorities [n ...] opens the traffic rules tool on the selected junction and clicks the signs given (ADR 047).
             var priorityAt = Array.IndexOf(args, "-priorities");
             if (priorityAt >= 0)
             {
@@ -1488,6 +1488,9 @@ namespace OmsiMapEditor.UI
                     RunSplineLookArguments(args);
                 }
             }
+
+            // -trafficTab, -trafficArm, -trafficSign, -trafficSpeed and -trafficPointer check the traffic rules tool on the junction or spline chosen above (ADR 098, M4).
+            RunTrafficArguments(args);
 
             // -splineType, -splinePick, -splineDelete, -splineUndo and -splineRedo work on the spline chosen above in a variant being edited (ADR 065).
             if (EditingVariant && (Array.IndexOf(args, "-splineType") >= 0 || Array.IndexOf(args, "-splinePick") >= 0 || Array.IndexOf(args, "-splineDelete") >= 0 ||
@@ -1788,6 +1791,8 @@ namespace OmsiMapEditor.UI
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
                 RunPickArguments(args);
+                // -trafficGhost and -trafficDrop <tile> px py hold or drop a sign at a pixel, as dragging it from the window would.
+                RunTrafficPointerArguments(args);
                 // -tooltipAt x y shows the tooltip there as hovering would (ADR 098, stage 2).
                 RunTooltipArguments(args);
                 // -inspector opens the inspector, -contextMenu id the context menu of an object (ADR 098).
