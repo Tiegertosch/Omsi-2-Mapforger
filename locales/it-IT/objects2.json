@@ -87,7 +87,6 @@
   "level.step": "livellando il terreno sotto {count, plural, one {# oggetto} other {# oggetti}}",
   "rows.status.start": "Righe: scegli un oggetto nella libreria, punta su una strada e clicca; la riga si trova sul lato del puntatore. Fare clic su un oggetto di una riga per selezionare la riga, Del la elimina; Esc lascia lo strumento.",
   "rows.status.selected": "Selezionata la riga di {path} (#{id}): cambiarne i valori e premere Enter, oppure scegliere un altro oggetto nella libreria; Del lo cancella.",
-  "rows.panel_hint": "Puntare su una strada e fare clic per tracciarne una fila; Esc termina lo strumento.",
   "rows.plan.choose": "Scegli l'oggetto per la riga nella libreria.",
   "rows.plan.point": "Indica una strada.",
   "rows.plan.laid": "Disposto. Muovi il puntatore per posare un'altra fila.",

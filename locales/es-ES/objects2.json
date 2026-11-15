@@ -87,7 +87,6 @@
   "level.step": "nivelar el terreno bajo {count, plural, one {# objeto} other {# objetos}}",
   "rows.status.start": "Filas: elija un objeto en la biblioteca, apunte a una carretera y haga clic; la fila se encuentra en el lado del puntero. Haga clic en un objeto de una fila para seleccionar la fila, Del la elimina; Esc sale de la herramienta.",
   "rows.status.selected": "Seleccionada la fila de {path} (#{id}): cambie sus valores y presione Enter, o elija otro objeto en la biblioteca; Del lo elimina.",
-  "rows.panel_hint": "Señale una carretera y haga clic para colocar una fila; Esc finaliza la herramienta.",
   "rows.plan.choose": "Elija el objeto para la fila en la biblioteca.",
   "rows.plan.point": "Señale una carretera.",
   "rows.plan.laid": "Puesto. Mueva el puntero para colocar otra fila.",

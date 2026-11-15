@@ -30,7 +30,7 @@
   "inspector.port.invalid": "Neplatné",
   "inspector.port.unconnected": "Nepřipojeno",
   "inspector.selected_spline": "Vybráno spline",
-  "inspector.spline_info": "#{id} {path}\nDélka {length, number, 0.0} m • {straight, select, yes {rovně} other {poloměr {radius, number, 0.0} m}} • záhlaví {heading, number, 0.0}°\nVýška {from, number, 0.00} až {to, number, 0.00} m • střední sklon {gradient, number, 0.0} %\nPřipojeno na začátku: {startJoin} • na konci: {endJoin}{terrain, select, here {\nTerén, který mu tento editor přizpůsobil} original {\nPřizpůsobený terén (původní mapa)} other {}}",
+  "inspector.spline_info": "#{id} {path}\nDélka {length, number, 0.0} m • {straight, select, yes {rovně} other {poloměr {radius, number, 0.0} m}} • směr {heading, number, 0.0}°\nVýška {from, number, 0.00} až {to, number, 0.00} m • střední sklon {gradient, number, 0.0} %\nPřipojeno na začátku: {startJoin} • na konci: {endJoin}{terrain, select, here {\nTerén, který mu tento editor přizpůsobil} original {\nPřizpůsobený terén (původní mapa)} other {}}",
   "inspector.join.open": "otevřít",
   "inspector.join.touching": "#{id} (dotyk, bez ID)",
   "inspector.apply_heights": "Aplikujte výšky",

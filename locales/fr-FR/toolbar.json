@@ -10,8 +10,6 @@
   "toolbar.delete.tooltip": "Supprimer (Del) : supprimez la sélection. Les objets référencés par d'autres parties de la carte sont conservés.",
   "toolbar.road": "Route",
   "toolbar.road.tooltip": "Route (R) : construisez des routes en vue de dessus : cliquez pour commencer, puis à chaque virage ; Esc termine. Les routes se raccordent aux extrémités libres des splines.",
-  "toolbar.rows": "Rangées",
-  "toolbar.rows.tooltip": "Rangées (T) : placez des rangées d'objets, comme des lampadaires ou des poteaux, le long des routes : choisissez un objet, pointez une route et cliquez.",
   "toolbar.terrain": "Terrain",
   "toolbar.terrain.tooltip": "Terrain (G) : modelez le sol avec un pinceau pour le relever, l'abaisser, le lisser, l'aplanir ou l'accidenter, ou créez une rampe entre deux clics.",
   "toolbar.markings": "Marquages",

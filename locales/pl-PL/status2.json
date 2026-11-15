@@ -31,7 +31,7 @@
   "roadbuild.status.control_back": "Punkt kontrolny odebrany. Kliknij go ponownie lub Esc zakończy drogę.",
   "roadbuild.status.ended": "Droga się skończyła. Kliknij, aby rozpocząć następny, Esc opuszcza narzędzie drogowe.",
   "place.status.stopped": "Umieszczanie zatrzymane.",
-  "place.status.heading": "Umieszczenie {path} na kursie {heading, number, 0}°.",
+  "place.status.heading": "Umieszczenie {path} z kierunkiem {heading, number, 0}°.",
   "history.nothing_undo": "Nic do cofnięcia.",
   "history.nothing_redo": "Nic do przerobienia.",
   "history.undo_failed": "Nie można cofnąć {step}: {reason}",

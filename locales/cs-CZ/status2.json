@@ -31,7 +31,7 @@
   "roadbuild.status.control_back": "Kontrolní bod vzat zpět. Klikněte na něj znovu, nebo Esc ukončí cestu.",
   "roadbuild.status.ended": "Cesta skončila. Kliknutím spustíte další, Esc opustí silniční nástroj.",
   "place.status.stopped": "Umístění zastaveno.",
-  "place.status.heading": "Umístění {path} na záhlaví {heading, number, 0}°.",
+  "place.status.heading": "Umístění {path} se směrem {heading, number, 0}°.",
   "history.nothing_undo": "Není co vrátit.",
   "history.nothing_redo": "Není co předělávat.",
   "history.undo_failed": "Nelze vrátit zpět {step}: {reason}",

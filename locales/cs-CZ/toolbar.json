@@ -10,8 +10,6 @@
   "toolbar.delete.tooltip": "Odstranit (Del): Odstraní výběr. Objekty, na které odkazují jiné části mapy, zůstanou.",
   "toolbar.road": "Silnice",
   "toolbar.road.tooltip": "Silnice (R): Stavějte silnice v pohledu shora: kliknutím začnete, dalším kliknutím určíte každou zatáčku, Esc ukončí stavbu. Silnice se připojují k volným koncům spline.",
-  "toolbar.rows": "Řady",
-  "toolbar.rows.tooltip": "Řady (T): Pokládejte řady objektů, například lamp nebo sloupků, podél silnic: vyberte objekt, ukažte na silnici a klikněte.",
   "toolbar.terrain": "Terén",
   "toolbar.terrain.tooltip": "Terén (G): Tvarujte povrch štětcem: zvyšujte, snižujte, vyhlazujte, zarovnávejte nebo zdrsňujte terén, případně dvěma kliknutími vytvořte rampu.",
   "toolbar.markings": "Značení",

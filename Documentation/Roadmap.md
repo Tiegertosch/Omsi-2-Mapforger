@@ -181,7 +181,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Mehrere Objekte gemeinsam drehen: Rotate-Werkzeug mit Griff in der Mitte der Auswahl (Draufsicht) oder grünem Ring um die Gruppe (3D), Positionen schwenken um die Mitte, Headings drehen mit, ein Rückgängig-Schritt
 - [x] Objekte in der App anlegen und löschen: Auswahl aus den `.sco`-Dateien der Installation, Platzieren per Klick, Löschen mit Prüfung aller Verweise, Rückgängig über Dateistände (ADR 011)
 - [x] Höhe neuer Objekte mit absoluter Höhe, etwa Kreuzungen, aus dem Gelände übernehmen (24. Oktober 2026)
-- [x] Reihen von Objekten entlang von Straßen anlegen und löschen (ADR 037): Werkzeug „Rows“ (T) mit Objekt-Bibliothek, Vorschau, ganze Straße oder von Klick zu Klick, beide Seiten, ein Datensatz je Kachel ohne Wiederholungen
+- [x] Reihen von Objekten entlang von Straßen anlegen und löschen (ADR 037): Werkzeug „Rows“ (T; seit 14. November 2026 der Reihen-Modus des Objekte-Fensters, ADR 098) mit Objekt-Bibliothek, Vorschau, ganze Straße oder von Klick zu Klick, beide Seiten, ein Datensatz je Kachel ohne Wiederholungen
 - [x] Reihen beim Ändern ihrer Kette an Ort und Stelle halten (ADR 037, Ergänzung): Wächst oder schrumpft die Kette vor dem Spline einer Reihe, etwa durch eine angebaute Straße, ein gelöschtes Stück oder eine eingesetzte Kreuzung, ändert sich ihr Startabstand um dasselbe, im selben Rückgängig-Schritt; gilt auch für Reihen der Originalkarten
 - [x] Vorhandene Reihen bearbeiten (ADR 037, zweite Ergänzung): Ein Klick wählt die ganze Reihe samt ihren Teilen auf anderen Kacheln, die Felder zeigen ihre Werte (Abstand, Abstand von der Mitte, Höhe, Drehung), Enter ändert sie, ein Objekt aus der Bibliothek ersetzt ihre Objekte, R dreht sie; die Reihe wird über dieselbe Strecke neu geplant, ihre Datensätze behalten ihre IDs; Reihen mit Wiederholungen bekommen die Werte in jedem Datensatz
 - [x] Kettenabstände pflegen und Reihen wie openOMSI auslegen (ADR 038): Feld 17 der Splines nach jeder Spline-Änderung, Reihen ab dem gespeicherten Kettenabstand und nur in der eigenen Kachel, Thema „Chain offsets“ der Kartenprüfung mit Reparatur
@@ -207,7 +207,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Inspector überarbeitet: Reiter „Selection“/„Tile“, Gruppen mit Merkzustand, kompakte Zeilen, feste Knopfleiste (ADR 077)
   - [x] Project-Fenster überarbeitet: Reiter Tiles (mit Filter), Map, Chrono, Lines, Paths; der gewählte Reiter bleibt beim Neuaufbau (ADR 078)
   - [x] Einstiegspunkte erstellen, umbenennen und löschen: Reiter „Entries“, Klick in die Karte, Gruppe im Inspector (ADR 079)
-  - [x] Reihen folgen der Steigung und Querneigung der Straße: Option „Follow slope“ im Rows-Werkzeug, Kippflag der Reihen (ADR 080)
+  - [x] Reihen folgen der Steigung und Querneigung der Straße: Option „Follow slope“ im Rows-Werkzeug (jetzt Reihen-Modus des Objekte-Fensters), Kippflag der Reihen (ADR 080)
   - [x] Gelände einer Kachel als DirectX-Netz (.x) exportieren: Knopf im Kachel-Reiter (ADR 081)
   - [x] Erster und letzter Tag einer Chrono-Variante nachträglich ändern (ADR 075)
   - [x] Spiegelung und Texturversatz von Splines im Inspector (ADR 074)

@@ -1,8 +1,5 @@
 {
   "rows.selected": "Vybraný řádek",
-  "rows.choose": "Vyberte objekt v knihovně.",
-  "rows.object": "Objekt: {name}",
-  "@rows.object": "{name} is a file name without extension, shown unchanged",
   "rows.interval": "Každý (m)",
   "rows.interval.tooltip": "Vzdálenost mezi objekty v řadě podél silnice",
   "rows.offset": "Ze středu (m)",
@@ -15,5 +12,8 @@
   "rows.both.tooltip": "Položí řádek na obě strany silnice najednou",
   "rows.whole": "Celá silnice",
   "rows.whole.tooltip": "Kliknutím se řádek položí podél celé silnice, od křižovatky nebo volného konce ke křižovatce nebo volnému konci, rovnoměrně rozmístěných. Vypněte a klikněte na místo, kde řádek začíná a kde končí.",
-  "rows.hint": "Ukázat na silnici: řádek leží na straně ukazatele. Kliknutím ji položíte; R otočí předměty o 15°, Shift+R zpět. Klepnutím na objekt řádku vyberte řádek: změňte jeho hodnoty a stiskněte Enter nebo vyberte jiný objekt v knihovně; Del jej smaže. Esc ukončí nástroj."
+  "rows.hint": "Ukázat na silnici: řádek leží na straně ukazatele. Kliknutím ji položíte; R otočí předměty o 15°, Shift+R zpět. Klepnutím na objekt řádku vyberte řádek: změňte jeho hodnoty a stiskněte Enter nebo vyberte jiný objekt v knihovně; Del jej smaže. Esc ukončí nástroj.",
+  "rows.row.spacing": "Rozestup",
+  "rows.row.position": "Poloha",
+  "rows.row.layout": "Rozložení"
 }

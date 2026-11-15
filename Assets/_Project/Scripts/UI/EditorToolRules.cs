@@ -25,6 +25,7 @@ namespace OmsiMapEditor.UI
                 case EditorTool.Move: return KeyCode.W;
                 case EditorTool.Rotate: return KeyCode.E;
                 case EditorTool.Road: return KeyCode.R;
+                // Rows has no button of its own since ADR 098, M4: it is the Row mode of the Objects window, and T opens the window in it.
                 case EditorTool.Rows: return KeyCode.T;
                 case EditorTool.Terrain: return KeyCode.G;
                 case EditorTool.Markings: return KeyCode.M;

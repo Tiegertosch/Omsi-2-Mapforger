@@ -3,8 +3,8 @@
   "objects.origin.reading": "A origem dos ficheiros ainda está a ser lida.",
   "objects.origin.no_steam": "{description} Sem as listas de Steam, apenas as pastas marcadas como DLC podem ser diferenciadas.",
   "@objects.origin.no_steam": "{description} is a sentence written by the program, in English",
-  "objects.heading": "Orientação (°)",
-  "objects.heading.tooltip": "O título com que é colocado o próximo objeto; R roda 15°, Shift+R volta.",
+  "objects.heading": "Orientação",
+  "objects.heading.tooltip": "A orientação com que é colocado o próximo objeto; R roda 15°, Shift+R volta.",
   "objects.hint": "Shift+clique continua a posicionar, R vira o objeto, Alt coloca um cruzamento livremente junto a uma estrada, Esc pára.",
   "objects.search": "Pesquisar todos os objetos...",
   "objects.close.tooltip": "Fechar (3 ou Esc)",
@@ -54,5 +54,10 @@
   "objects.empty.listing": "Listagem dos objetos de cenário da instalação OMSI...",
   "objects.empty.favorites": "Marca os objetos com a estrela para os encontrares aqui.",
   "objects.empty.in_map": "Este mapa ainda não utiliza objetos de cenário.",
-  "objects.empty.none": "Nenhum objeto corresponde."
+  "objects.empty.none": "Nenhum objeto corresponde.",
+  "objects.place": "Colocar",
+  "objects.place.single": "Objeto individual",
+  "objects.place.single.tooltip": "Objetos individuais: escolha um e clique no mapa. Shift+clique permite continuar a colocar, R roda e Esc termina.",
+  "objects.place.row": "Fila ao longo de uma estrada",
+  "objects.place.row.tooltip": "Filas (T): Coloque filas de objetos, como candeeiros ou postes, ao longo das estradas: escolha um objeto, aponte para uma estrada e clique."
 }

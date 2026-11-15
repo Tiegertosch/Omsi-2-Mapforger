@@ -87,7 +87,6 @@
   "level.step": "vyrovnání terénu pod {count, plural, one {# objekt} few {# objekty} many {# objektu} other {# objektů}}",
   "rows.status.start": "Řádky: vyberte objekt v knihovně, ukažte na silnici a klikněte; řádek leží na straně ukazatele. Klepnutím na objekt řádku vyberte řádek, Del jej odstraní; Esc opouští nástroj.",
   "rows.status.selected": "Vybraný řádek {path} (#{id}): změňte jeho hodnoty a stiskněte Enter nebo vyberte jiný objekt v knihovně; Del jej smaže.",
-  "rows.panel_hint": "Ukažte na silnici a kliknutím položte její řadu; Esc ukončí nástroj.",
   "rows.plan.choose": "Vyberte objekt pro řádek v knihovně.",
   "rows.plan.point": "Ukažte na silnici.",
   "rows.plan.laid": "Položeno. Přesunutím ukazatele položte další řádek.",

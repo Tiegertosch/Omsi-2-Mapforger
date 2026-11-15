@@ -90,7 +90,6 @@
   "level.step": "levelling the ground under {count, plural, one {# object} other {# objects}}",
   "rows.status.start": "Rows: choose an object in the library, point at a road and click; the row lies on the side of the pointer. Click an object of a row to select the row, Del deletes it; Esc leaves the tool.",
   "rows.status.selected": "Selected the row of {path} (#{id}): change its values and press Enter, or choose another object in the library; Del deletes it.",
-  "rows.panel_hint": "Point at a road and click to lay a row of it; Esc ends the tool.",
   "rows.plan.choose": "Choose the object for the row in the library.",
   "rows.plan.point": "Point at a road.",
   "rows.plan.laid": "Laid. Move the pointer to lay another row.",

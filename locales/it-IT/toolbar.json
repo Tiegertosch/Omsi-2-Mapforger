@@ -10,8 +10,6 @@
   "toolbar.delete.tooltip": "Elimina (Del): Elimina la selezione. Gli oggetti a cui fanno riferimento altre parti della mappa vengono mantenuti.",
   "toolbar.road": "Strada",
   "toolbar.road.tooltip": "Strada (R): Costruisci strade nella vista dall'alto: fai clic per iniziare e a ogni curva; Esc termina. Le strade si collegano alle estremità libere delle spline.",
-  "toolbar.rows": "File",
-  "toolbar.rows.tooltip": "File (T): Disponi file di oggetti, come lampioni o pali, lungo le strade: scegli un oggetto, punta una strada e fai clic.",
   "toolbar.terrain": "Terreno",
   "toolbar.terrain.tooltip": "Terreno (G): Modella il suolo con un pennello per alzarlo, abbassarlo, levigarlo, spianarlo o renderlo irregolare, oppure crea una rampa tra due clic.",
   "toolbar.markings": "Segnaletica",

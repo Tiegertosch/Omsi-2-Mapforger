@@ -3,8 +3,8 @@
   "objects.origin.reading": "Pochodzenie plików jest nadal odczytywane.",
   "objects.origin.no_steam": "{description} Bez list Steam można rozróżnić jedynie foldery oznaczone jako DLC.",
   "@objects.origin.no_steam": "{description} is a sentence written by the program, in English",
-  "objects.heading": "Kierunek (°)",
-  "objects.heading.tooltip": "Nagłówek, z którym umieszczany jest następny obiekt; R obraca go o 15°, Shift+R z powrotem.",
+  "objects.heading": "Kierunek",
+  "objects.heading.tooltip": "Kierunek, w którym zostanie ustawiony następny obiekt; R obraca go o 15°, Shift+R z powrotem.",
   "objects.hint": "Shift+kliknięcie kontynuuje umieszczanie, R obraca obiekt, Alt swobodnie umieszcza skrzyżowanie obok drogi, Esc zatrzymuje się.",
   "objects.search": "Przeszukaj wszystkie obiekty...",
   "objects.close.tooltip": "Zamknij (3 lub Esc)",
@@ -54,5 +54,10 @@
   "objects.empty.listing": "Wyświetlanie listy obiektów scenerii instalacji OMSI...",
   "objects.empty.favorites": "Oznacz obiekty gwiazdką, aby je tutaj znaleźć.",
   "objects.empty.in_map": "Ta mapa nie wykorzystuje jeszcze żadnych obiektów scenerii.",
-  "objects.empty.none": "Brak dopasowań obiektów."
+  "objects.empty.none": "Brak dopasowań obiektów.",
+  "objects.place": "Umieść",
+  "objects.place.single": "Pojedynczy obiekt",
+  "objects.place.single.tooltip": "Pojedyncze obiekty: wybierz obiekt i kliknij mapę. Shift+kliknięcie pozwala umieszczać kolejne, R obraca, Esc kończy.",
+  "objects.place.row": "Rząd wzdłuż drogi",
+  "objects.place.row.tooltip": "Rzędy (T): Układaj rzędy obiektów, np. latarni lub słupków, wzdłuż dróg: wybierz obiekt, wskaż drogę i kliknij."
 }

@@ -10,8 +10,6 @@
   "toolbar.delete.tooltip": "Eliminar (Del): Elimine a seleção. São mantidos os objetos referenciados por outras partes do mapa.",
   "toolbar.road": "Estrada",
   "toolbar.road.tooltip": "Estrada (R): Construa estradas na vista de cima: clique para começar e em cada curva; Esc termina. As estradas ligam-se às extremidades livres das splines.",
-  "toolbar.rows": "Filas",
-  "toolbar.rows.tooltip": "Filas (T): Coloque filas de objetos, como candeeiros ou postes, ao longo das estradas: escolha um objeto, aponte para uma estrada e clique.",
   "toolbar.terrain": "Terreno",
   "toolbar.terrain.tooltip": "Terreno (G): Modele o solo com um pincel para o elevar, baixar, suavizar, nivelar ou tornar irregular, ou crie uma rampa entre dois cliques.",
   "toolbar.markings": "Marcações",

@@ -75,7 +75,6 @@
   "level.step": "Boden unter {count, plural, one {# Objekt} other {# Objekten}} einebnen",
   "rows.status.start": "Reihen: Wähle ein Objekt in der Bibliothek, zeige auf eine Straße und klicke; die Reihe liegt auf der Seite des Mauszeigers. Klicke ein Objekt einer Reihe an, um die Reihe zu wählen, Entf löscht sie; Esc verlässt das Werkzeug.",
   "rows.status.selected": "Die Reihe aus {path} (#{id}) gewählt: Ändere ihre Werte und drücke Enter oder wähle ein anderes Objekt in der Bibliothek; Entf löscht sie.",
-  "rows.panel_hint": "Zeige auf eine Straße und klicke, um eine Reihe davon zu legen; Esc beendet das Werkzeug.",
   "rows.plan.choose": "Wähle in der Bibliothek das Objekt für die Reihe.",
   "rows.plan.point": "Zeige auf eine Straße.",
   "rows.plan.laid": "Gelegt. Bewege den Mauszeiger, um eine weitere Reihe zu legen.",

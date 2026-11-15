@@ -422,7 +422,8 @@ namespace OmsiMapEditor.UI
                     else
                         StartPlacement(path);
                 };
-                rowOptions = new RowToolOptions();
+                rowOptions = objectsPanel.RowOptions;
+                objectsPanel.PlaceModeChosen += ChoosePlaceMode;
                 rowOptions.SettingsChanged += () =>
                 {
                     if (activeTool == EditorTool.Rows)
@@ -439,6 +440,8 @@ namespace OmsiMapEditor.UI
                         EndElementTypePick(null);
                     else if (pickingRowObject)
                         EndRowObjectPick(null);
+                    else if (activeTool == EditorTool.Rows)
+                        SetTool(EditorTool.Drag);
                     else
                         ShowObjectsPanel(false);
                 };
@@ -592,7 +595,7 @@ namespace OmsiMapEditor.UI
                 toolbar = new MapToolbar();
                 toolbar.ToolChosen += SetTool;
                 toolbar.DeleteRequested += DeleteSelectedObjects;
-                toolbar.ObjectsRequested += () => ShowObjectsPanel(!objectsPanelOpen);
+                toolbar.ObjectsRequested += ToggleObjectsWindow;
                 toolbarHost.Add(toolbar);
             }
 
@@ -1729,6 +1732,9 @@ namespace OmsiMapEditor.UI
             if (Array.IndexOf(args, "-objects") >= 0)
             {
                 ShowObjectsPanel(true);
+                // -objectsRow: opens the window in Row mode, with nothing chosen yet.
+                if (Array.IndexOf(args, "-objectsRow") >= 0)
+                    SetTool(EditorTool.Rows);
                 objectsPanel?.ShowState(Argument("-objectsTab", 1), Argument("-objectsAt", 1), Argument("-objectsSearch", 1));
             }
 
@@ -5733,7 +5739,7 @@ namespace OmsiMapEditor.UI
                 return;
             UpdateObjectsCatalog();
             StartInstallationScan();
-            objectsPanel.UseOptions(rowOptions, Loc.T("rows.panel_hint"));
+            objectsPanel.ShowMode(true);
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.None;
             objectsPanel.style.display = DisplayStyle.Flex;
@@ -5753,7 +5759,7 @@ namespace OmsiMapEditor.UI
             mapCanvas?.EndRoad();
             objectRenderer?.SetRowPreview(null, null);
             rowLaidAt = null;
-            objectsPanel?.UseOptions(null, null);
+            objectsPanel?.ShowMode(false);
             if (objectsPanelHost != null && !objectsPanelOpen)
                 objectsPanelHost.style.display = DisplayStyle.None;
             rowLayout = null;
@@ -6283,6 +6289,7 @@ namespace OmsiMapEditor.UI
                 SatelliteWaitsForPick = IsShown(satelliteWindow) && (placementPickFor >= 0 || mapCanvas != null && mapCanvas.IsPickingPoint),
                 ControlHeld = evt.ctrlKey || evt.commandKey,
                 ObjectsPanelOpen = objectsPanelOpen,
+                RowToolActive = activeTool == EditorTool.Rows,
                 SelectionNotEmpty = selection.Count > 0,
             };
             foreach (var action in EscapeOrder.Order(state))
@@ -6408,7 +6415,7 @@ namespace OmsiMapEditor.UI
                 }
                 else if (evt.keyCode == KeyCode.Alpha3 || evt.keyCode == KeyCode.Keypad3)
                 {
-                    ShowObjectsPanel(!objectsPanelOpen);
+                    ToggleObjectsWindow();
                     evt.StopPropagation();
                 }
                 return;
@@ -7150,6 +7157,35 @@ namespace OmsiMapEditor.UI
             UpdateToolbar();
         }
 
+        /// <summary>The Objects button and key 3: opens the window in Single mode, or closes it, in either mode.</summary>
+        private void ToggleObjectsWindow()
+        {
+            if (activeTool == EditorTool.Rows)
+                SetTool(EditorTool.Drag);
+            else
+                ShowObjectsPanel(!objectsPanelOpen);
+        }
+
+        /// <summary>The Place choice of the Objects window: Row switches to the rows tool and carries the object being placed, Single back.</summary>
+        private void ChoosePlaceMode(bool row)
+        {
+            if (row == (activeTool == EditorTool.Rows))
+                return;
+            if (row)
+            {
+                var carried = placementAsset;
+                SetTool(EditorTool.Rows);
+                if (activeTool == EditorTool.Rows && carried != null)
+                {
+                    ChooseRowObject(carried);
+                    objectsPanel.MarkChosen(carried);
+                }
+                return;
+            }
+            SetTool(EditorTool.Drag);
+            ShowObjectsPanel(true);
+        }
+
         /// <summary>Counts the objects the map uses and hands them with the installation's objects to the panel.</summary>
         private void UpdateObjectsCatalog()
         {
@@ -7847,7 +7883,8 @@ namespace OmsiMapEditor.UI
 
         private void UpdateToolbar()
         {
-            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen, CanEdit, CanEditObjects, selection.Count > 0);
+            toolbar?.ShowState(activeTool, placementAsset != null || objectsPanelOpen || activeTool == EditorTool.Rows, CanEdit, CanEditObjects, selection.Count > 0);
+            objectsPanel?.SetRowAllowed(CanEdit);
         }
 
         /// <summary>

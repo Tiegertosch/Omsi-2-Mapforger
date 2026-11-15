@@ -1,8 +1,5 @@
 {
   "rows.selected": "Fila seleccionada",
-  "rows.choose": "Elija un objeto en la biblioteca.",
-  "rows.object": "Objeto: {name}",
-  "@rows.object": "{name} is a file name without extension, shown unchanged",
   "rows.interval": "Cada (m)",
   "rows.interval.tooltip": "Distancia entre los objetos de una fila a lo largo del camino.",
   "rows.offset": "Desde el centro (m)",
@@ -15,5 +12,8 @@
   "rows.both.tooltip": "Coloca una fila a ambos lados de la carretera a la vez.",
   "rows.whole": "Carretera completa",
   "rows.whole.tooltip": "Un clic coloca la fila a lo largo de toda la carretera, desde el cruce o extremo libre hasta el cruce o extremo libre, espaciadas uniformemente. Desactive para hacer clic donde comienza la fila y donde termina.",
-  "rows.hint": "Señale una carretera: la fila se encuentra al lado del puntero. Haga clic para colocarlo; R gira los objetos 15°, Shift+R hacia atrás. Haga clic en un objeto de una fila para seleccionar la fila: cambie sus valores y presione Enter, o elija otro objeto en la biblioteca; Del lo elimina. Esc finaliza la herramienta."
+  "rows.hint": "Señale una carretera: la fila se encuentra al lado del puntero. Haga clic para colocarlo; R gira los objetos 15°, Shift+R hacia atrás. Haga clic en un objeto de una fila para seleccionar la fila: cambie sus valores y presione Enter, o elija otro objeto en la biblioteca; Del lo elimina. Esc finaliza la herramienta.",
+  "rows.row.spacing": "Separación",
+  "rows.row.position": "Posición",
+  "rows.row.layout": "Disposición"
 }

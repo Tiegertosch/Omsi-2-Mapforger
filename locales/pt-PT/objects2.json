@@ -87,7 +87,6 @@
   "level.step": "nivelando o terreno sob {count, plural, one {# objeto} other {# objetos}}",
   "rows.status.start": "Linhas: escolha um objeto na biblioteca, aponte para uma estrada e clique; a linha está ao lado do ponteiro. Clique num objeto de uma linha para selecionar a linha, Del apaga-a; Esc sai da ferramenta.",
   "rows.status.selected": "Selecionada a linha de {path} (#{id}): altere os seus valores e pressione Enter, ou escolha outro objeto na biblioteca; Del apaga-o.",
-  "rows.panel_hint": "Aponte para uma estrada e clique para traçar uma linha; Esc termina a ferramenta.",
   "rows.plan.choose": "Escolha o objeto para a linha na biblioteca.",
   "rows.plan.point": "Aponte para uma estrada.",
   "rows.plan.laid": "Colocado. Mova o ponteiro para colocar outra linha.",

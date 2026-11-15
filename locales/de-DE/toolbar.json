@@ -9,8 +9,6 @@
   "toolbar.delete.tooltip": "Löschen (Entf): Die Auswahl löschen. Objekte, auf die andere Teile der Karte verweisen, bleiben.",
   "toolbar.road": "Straße",
   "toolbar.road.tooltip": "Straße (R): Straßen in der Ansicht von oben bauen: zum Beginnen klicken, für jede Biegung klicken, Esc beendet. Straßen schließen an freie Spline-Enden an.",
-  "toolbar.rows": "Reihen",
-  "toolbar.rows.tooltip": "Reihen (T): Reihen von Objekten entlang von Straßen legen, etwa Laternen oder Pfosten: ein Objekt wählen, auf eine Straße zeigen und klicken.",
   "toolbar.terrain": "Gelände",
   "toolbar.terrain.tooltip": "Gelände (G): Den Boden mit einem Pinsel formen: anheben, absenken, glätten, einebnen oder aufrauen, oder zwischen zwei Klicks eine Rampe legen.",
   "toolbar.markings": "Markierungen",

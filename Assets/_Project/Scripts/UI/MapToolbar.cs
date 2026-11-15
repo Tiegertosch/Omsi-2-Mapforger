@@ -33,7 +33,6 @@ namespace OmsiMapEditor.UI
             AddSeparator();
             var world = AddGroup();
             AddTool(world, EditorTool.Road, "spline", "toolbar.road", "toolbar.road.tooltip");
-            AddTool(world, EditorTool.Rows, "fence", "toolbar.rows", "toolbar.rows.tooltip");
             AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain", "toolbar.terrain.tooltip");
             AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "toolbar.markings.tooltip");
             AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "toolbar.priority.tooltip");

@@ -87,7 +87,6 @@
   "level.step": "niveler le sol sous {count, plural, one {# objet} other {# objets}}",
   "rows.status.start": "Lignes : choisissez un objet dans la bibliothèque, pointez sur une route et cliquez ; la ligne se trouve du côté du pointeur. Cliquez sur un objet d'une ligne pour sélectionner la ligne, Del la supprime ; Esc quitte l'outil.",
   "rows.status.selected": "Sélection de la ligne de {path} (#{id}) : modifiez ses valeurs et appuyez sur Enter, ou choisissez un autre objet dans la bibliothèque ; Del le supprime.",
-  "rows.panel_hint": "Pointez sur une route et cliquez pour en tracer une rangée ; Esc termine l'outil.",
   "rows.plan.choose": "Choisissez l'objet pour la ligne dans la bibliothèque.",
   "rows.plan.point": "Montrez une route.",
   "rows.plan.laid": "Posé. Déplacez le pointeur pour créer une autre ligne.",

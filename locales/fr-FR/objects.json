@@ -3,8 +3,8 @@
   "objects.origin.reading": "L'origine des fichiers est toujours en cours de lecture.",
   "objects.origin.no_steam": "{description} Sans les listes de Steam, seuls les dossiers marqués DLC peuvent être distingués.",
   "@objects.origin.no_steam": "{description} is a sentence written by the program, in English",
-  "objects.heading": "Orientation (°)",
-  "objects.heading.tooltip": "L'en-tête avec lequel l'objet suivant est placé ; R le tourne de 15°, Shift+R en arrière.",
+  "objects.heading": "Orientation",
+  "objects.heading.tooltip": "L'orientation avec laquelle l'objet suivant est placé ; R la tourne de 15°, Shift+R en arrière.",
   "objects.hint": "Shift+clic continue de placer, R fait tourner l'objet, Alt place librement un carrefour au bord d'une route, Esc s'arrête.",
   "objects.search": "Rechercher tous les objets...",
   "objects.close.tooltip": "Fermer (3 ou Esc)",
@@ -54,5 +54,10 @@
   "objects.empty.listing": "Listage des objets de scène de l'installation OMSI...",
   "objects.empty.favorites": "Marquez les objets avec l’étoile pour les retrouver ici.",
   "objects.empty.in_map": "Cette carte n'utilise pas encore d'objets de paysage.",
-  "objects.empty.none": "Aucun objet ne correspond."
+  "objects.empty.none": "Aucun objet ne correspond.",
+  "objects.place": "Placer",
+  "objects.place.single": "Objet isolé",
+  "objects.place.single.tooltip": "Objets isolés : choisissez un objet, puis cliquez sur la carte. Shift+clic permet d'en placer d'autres, R fait pivoter, Esc termine.",
+  "objects.place.row": "Rangée le long d'une route",
+  "objects.place.row.tooltip": "Rangées (T) : placez des rangées d'objets, comme des lampadaires ou des poteaux, le long des routes : choisissez un objet, pointez une route et cliquez."
 }

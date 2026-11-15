@@ -87,7 +87,6 @@
   "level.step": "wyrównywanie podłoża pod {count, plural, one {# obiekt} few {# obiekty} many {# obiektów} other {# obiektu}}",
   "rows.status.start": "Wiersze: wybierz obiekt w bibliotece, wskaż drogę i kliknij; wiersz leży po stronie wskaźnika. Kliknij obiekt w wierszu, aby wybrać wiersz, Del go usunie; Esc opuszcza narzędzie.",
   "rows.status.selected": "Wybrano wiersz {path} (#{id}): zmień jego wartości i naciśnij Enter lub wybierz inny obiekt w bibliotece; Del usuwa go.",
-  "rows.panel_hint": "Wskaż drogę i kliknij, aby ułożyć jej rząd; Esc kończy działanie narzędzia.",
   "rows.plan.choose": "Wybierz obiekt dla wiersza w bibliotece.",
   "rows.plan.point": "Wskaż drogę.",
   "rows.plan.laid": "Ułożony. Przesuń wskaźnik, aby ułożyć kolejny rząd.",

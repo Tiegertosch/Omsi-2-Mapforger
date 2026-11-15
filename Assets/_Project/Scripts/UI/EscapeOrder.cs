@@ -65,6 +65,8 @@ namespace OmsiMapEditor.UI
         /// <summary>Ctrl (or Cmd) is held.</summary>
         public bool ControlHeld;
         public bool ObjectsPanelOpen;
+        /// <summary>The Objects window is in Row mode (the rows tool is active); it is not <see cref="ObjectsPanelOpen"/> then.</summary>
+        public bool RowToolActive;
         public bool SelectionNotEmpty;
     }
 
@@ -94,9 +96,16 @@ namespace OmsiMapEditor.UI
             }
             if (state.FocusInObjectLibrary)
             {
-                order.Add(state.PickingElementType ? EscapeAction.EndElementTypePick
-                    : state.PlacementAssetChosen ? EscapeAction.StopPlacement
-                    : EscapeAction.CloseObjectsPanel);
+                if (state.PickingElementType)
+                    order.Add(EscapeAction.EndElementTypePick);
+                else if (state.RowToolActive)
+                {
+                    // In Row mode the rows tool's own Esc comes first: let go of the row begun or selected, then leave the tool.
+                    order.Add(EscapeAction.EscapeActiveTool);
+                    order.Add(EscapeAction.CloseObjectsPanel);
+                }
+                else
+                    order.Add(state.PlacementAssetChosen ? EscapeAction.StopPlacement : EscapeAction.CloseObjectsPanel);
                 return order;
             }
             if (state.TypingInField || state.ModalDialogShown || state.SatelliteWaitsForPick || state.ControlHeld)

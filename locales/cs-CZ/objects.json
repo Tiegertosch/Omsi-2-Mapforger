@@ -3,8 +3,8 @@
   "objects.origin.reading": "Původ souborů se stále čte.",
   "objects.origin.no_steam": "{description} Bez seznamů Steam lze oddělit pouze složky označené jako DLC.",
   "@objects.origin.no_steam": "{description} is a sentence written by the program, in English",
-  "objects.heading": "Směr (°)",
-  "objects.heading.tooltip": "Nadpis, se kterým je umístěn další objekt; R jej otočí o 15°, Shift+R zpět.",
+  "objects.heading": "Směr",
+  "objects.heading.tooltip": "Směr, kterým bude natočen další umístěný objekt; R jej otočí o 15°, Shift+R zpět.",
   "objects.hint": "Shift+klik pokračuje v umístění, R otočí objekt, Alt umístí křižovatku volně vedle silnice, Esc se zastaví.",
   "objects.search": "Prohledat všechny objekty...",
   "objects.close.tooltip": "Zavřít (3 nebo Esc)",
@@ -54,5 +54,10 @@
   "objects.empty.listing": "Výpis objektů scenérie instalace OMSI...",
   "objects.empty.favorites": "Označte objekty hvězdičkou, abyste je zde našli.",
   "objects.empty.in_map": "Tato mapa zatím nepoužívá žádné objekty scenérie.",
-  "objects.empty.none": "Žádný objekt neodpovídá."
+  "objects.empty.none": "Žádný objekt neodpovídá.",
+  "objects.place": "Umístit",
+  "objects.place.single": "Jeden objekt",
+  "objects.place.single.tooltip": "Jednotlivé objekty: vyberte objekt a klikněte do mapy. Shift+kliknutí pokračuje v umisťování, R otáčí, Esc ukončí.",
+  "objects.place.row": "Řada podél silnice",
+  "objects.place.row.tooltip": "Řady (T): Pokládejte řady objektů, například lamp nebo sloupků, podél silnic: vyberte objekt, ukažte na silnici a klikněte."
 }

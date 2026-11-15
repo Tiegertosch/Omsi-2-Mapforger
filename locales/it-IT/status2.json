@@ -31,7 +31,7 @@
   "roadbuild.status.control_back": "Punto di controllo ripreso. Fare nuovamente clic oppure Esc terminerà la strada.",
   "roadbuild.status.ended": "La strada è finita. Fare clic per avviare quello successivo, Esc lascia lo strumento strada.",
   "place.status.stopped": "Posizionamento interrotto.",
-  "place.status.heading": "Posizionamento {path} sulla rotta {heading, number, 0}°.",
+  "place.status.heading": "Posizionamento {path} con orientamento {heading, number, 0}°.",
   "history.nothing_undo": "Niente da annullare.",
   "history.nothing_redo": "Niente da rifare.",
   "history.undo_failed": "Impossibile annullare {step}: {reason}",

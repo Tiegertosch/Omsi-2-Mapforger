@@ -358,7 +358,7 @@
 .panel-info-warning { color: var(--mf-color-warning); }
 .panel-toggle { margin: 0 0 var(--mf-space-2); }
 /* Options column and catalog stand side by side with the same top and bottom edge; a tool without a catalog is not a picker-tool and keeps the height of its content. */
-.picker-tool { flex-direction: row; align-items: stretch; }
+.picker-tool { flex-direction: row; align-items: stretch; flex-shrink: 1; }
 .picker-options { width: 236px; min-width: 236px; max-width: 236px; height: auto; margin-right: var(--mf-space-2); flex-shrink: 0; flex-grow: 0; }
 .picker-options-title { margin: 0 0 var(--mf-space-2); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .picker-option { flex-direction: row; align-items: center; justify-content: space-between; min-height: 30px; margin-bottom: var(--mf-space-1); }
@@ -371,7 +371,7 @@
 .picker-field TextElement { margin: 0; padding: 0; font-size: 12px; }
 .picker-field .unity-base-text-field__input { height: 26px; margin: 0; padding: 0 6px; -unity-text-align: middle-left; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
 .picker-field .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
-.picker-panel { width: 780px; min-width: 780px; max-width: 780px; height: 210px; padding: 0; flex-shrink: 0; flex-grow: 0; background-color: var(--mf-color-bar-glass); }
+.picker-panel { width: 780px; min-width: 700px; max-width: 780px; height: 210px; padding: 0; flex-shrink: 1; flex-grow: 0; background-color: var(--mf-color-bar-glass); }
 .picker-header { height: 44px; flex-shrink: 0; margin: 0; padding: 0 var(--mf-space-2); background-color: var(--mf-color-panel); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
 .picker-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -418,12 +418,13 @@
 .tool-options-scroll { max-height: 210px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); }
 .tool-options-scroll .picker-option { min-height: 26px; margin-bottom: 2px; }
 /* Option columns of icons (ADR 098, stage 2): rows of a short label and icons, all in view without scrolling. */
-.icon-options { width: 312px; min-width: 312px; max-width: 312px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
+.icon-options { width: 336px; min-width: 336px; max-width: 336px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
 .option-row { flex-direction: row; align-items: center; height: 30px; margin-bottom: 2px; }
 .option-row:disabled { opacity: 0.45; }
-.option-row-label { width: 64px; flex-shrink: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.option-row-label { width: 88px; flex-shrink: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .option-icons { flex-direction: row; margin: 0 2px 0 0; padding: 0; }
 .option-icon { width: 28px; height: 28px; margin: 0 2px 0 0; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-field); border-width: 0; border-radius: var(--mf-radius-md); }
+.option-icon.option-icon-locked { opacity: 0.45; }
 .option-icon:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
 .option-icon.panel-tab-active, .option-icon.panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
 /* Every icon of an option column is 16 x 16 px in a box of 28 x 28 px, whatever kind of control holds it. */

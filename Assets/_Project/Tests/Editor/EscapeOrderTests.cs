@@ -56,6 +56,16 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void InTheLibraryInRowModeTheRowToolsOwnEscComesBeforeThePanelCloses()
+        {
+            var inLibrary = new EscapeState { FocusInObjectLibrary = true, RowToolActive = true, PlacementAssetChosen = true };
+
+            Assert.That(Order(inLibrary), Is.EqualTo(new[] { EscapeAction.CloseTopOverlay, EscapeAction.EscapeActiveTool, EscapeAction.CloseObjectsPanel }));
+            inLibrary.PickingElementType = true;
+            Assert.That(Order(inLibrary), Is.EqualTo(new[] { EscapeAction.CloseTopOverlay, EscapeAction.EndElementTypePick }));
+        }
+
+        [Test]
         public void TypingInAFieldAModalDialogAndTheWaitingSatelliteWindowLeaveTheKey()
         {
             foreach (var state in new[]
@@ -112,7 +122,7 @@ namespace OmsiMapEditor.Tests
                 Assert.That(EscapeOrder.CanDecline(action), Is.EqualTo(declines), action.ToString());
             }
 
-            for (var bits = 0; bits < 1 << 14; bits++)
+            for (var bits = 0; bits < 1 << 15; bits++)
             {
                 var state = new EscapeState
                 {
@@ -120,7 +130,7 @@ namespace OmsiMapEditor.Tests
                     PickingElementType = (bits & 8) != 0, PickingVarParent = (bits & 16) != 0, PickingSplineType = (bits & 32) != 0,
                     PlacementAssetChosen = (bits & 64) != 0, MapPlacing = (bits & 128) != 0, TypingInField = (bits & 256) != 0,
                     ModalDialogShown = (bits & 512) != 0, SatelliteWaitsForPick = (bits & 1024) != 0, ControlHeld = (bits & 2048) != 0,
-                    ObjectsPanelOpen = (bits & 4096) != 0, SelectionNotEmpty = (bits & 8192) != 0,
+                    ObjectsPanelOpen = (bits & 4096) != 0, SelectionNotEmpty = (bits & 8192) != 0, RowToolActive = (bits & 16384) != 0,
                 };
                 var order = EscapeOrder.Order(state);
                 Assert.That(EscapeOrder.CanDecline(order[order.Count - 1]), Is.False, bits.ToString());

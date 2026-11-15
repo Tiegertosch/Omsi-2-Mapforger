@@ -10,8 +10,6 @@
   "toolbar.delete.tooltip": "Delete (Del): Delete the selection. Objects that other parts of the map refer to stay.",
   "toolbar.road": "Road",
   "toolbar.road.tooltip": "Road (R): Build roads from the view from above: click to start, click for each bend, Esc ends. Roads join free spline ends.",
-  "toolbar.rows": "Rows",
-  "toolbar.rows.tooltip": "Rows (T): Lay rows of objects along roads, such as lamps or posts: choose an object, point at a road and click.",
   "toolbar.terrain": "Terrain",
   "toolbar.terrain.tooltip": "Terrain (G): Shape the ground with a brush held over it, raising, lowering, smoothing, flattening or roughening it, or lay a ramp between two clicks.",
   "toolbar.markings": "Markings",

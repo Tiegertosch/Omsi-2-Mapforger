@@ -63,6 +63,13 @@ namespace OmsiMapEditor.UI
         private bool hideDlc;
         private readonly TextField headingField;
         private readonly Toggle randomHeading;
+        private readonly VisualElement headingRow;
+        private readonly Label placeLabel;
+        private readonly Button singleButton;
+        private readonly Button rowButton;
+        private bool rowMode;
+        private string rowPlan;
+        private bool rowPlanWarning;
         private readonly Dictionary<string, VisualElement> tileByPath = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
         private IVisualElementScheduledItem searchRefresh;
 
@@ -93,36 +100,40 @@ namespace OmsiMapEditor.UI
 
             // The options on the left.
             // The options scroll once they are taller than the panels of the bar may be (ADR 098, 210 px).
-            var options = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
-            options.AddToClassList("tool-options-scroll");
-            options.AddToClassList("tool-panel");
-            options.AddToClassList("picker-options");
-            var headingRow = Row(options, "objects.heading");
-            headingField = new TextField { value = "0" };
-            LocBindings.Tooltip(headingField, "objects.heading.tooltip");
-            headingField.AddToClassList("picker-field");
+            var options = ToolCatalog.Options(scrolling: true, icons: true);
+            // What to do with a chosen object: put it down singly, or lay a row of it along a road (ADR 098, M4).
+            var placeRow = OptionControls.Row(options, "objects.place");
+            placeLabel = placeRow.Q<Label>();
+            placeLabel.tooltip = Loc.T("objects.hint");
+            var places = OptionControls.Group(placeRow);
+            singleButton = OptionControls.Choice(places, "box", "objects.place.single", "objects.place.single.tooltip", () => PlaceModeChosen?.Invoke(false));
+            rowButton = OptionControls.Choice(places, "fence", "objects.place.row", "objects.place.row.tooltip", () => PlaceModeChosen?.Invoke(true));
+            singleButton.AddToClassList("panel-tab-active");
+
+            headingRow = OptionControls.Row(options, "objects.heading");
+            headingField = OptionControls.Value(headingRow, "compass", "0", "°", "objects.heading", "objects.heading.tooltip");
             headingField.RegisterValueChangedCallback(evt =>
             {
                 if (double.TryParse(evt.newValue.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var heading) && !double.IsInfinity(heading))
                     HeadingChanged?.Invoke(heading);
             });
-            LocBindings.Tooltip(headingRow, "objects.heading.tooltip");
-            headingRow.Add(headingField);
-            randomHeading = new Toggle { value = PlayerPrefs.GetInt(RandomHeadingKey, 0) != 0 };
-            randomHeading.AddToClassList("picker-option-toggle");
+            randomHeading = OptionControls.Switch(headingRow, "shuffle", "objects.random_heading", "objects.random_heading.tooltip", PlayerPrefs.GetInt(RandomHeadingKey, 0) != 0);
             randomHeading.RegisterValueChangedCallback(evt =>
             {
                 PlayerPrefs.SetInt(RandomHeadingKey, evt.newValue ? 1 : 0);
                 PlayerPrefs.Save();
                 RandomHeadingChanged?.Invoke(evt.newValue);
             });
-            var randomRow = Row(options, "objects.random_heading");
-            LocBindings.Tooltip(randomRow, "objects.random_heading.tooltip");
-            LocBindings.Tooltip(randomHeading, "objects.random_heading.tooltip");
-            randomRow.Add(randomHeading);
-            var hint = LocBindings.NewLabel("objects.hint");
-            hint.AddToClassList("panel-info");
-            options.Add(hint);
+            RowOptions = new RowToolOptions();
+            RowOptions.style.display = DisplayStyle.None;
+            RowOptions.PlanChanged += (text, problem) =>
+            {
+                rowPlan = text;
+                rowPlanWarning = problem;
+                if (rowMode)
+                    UpdateInfo();
+            };
+            options.Add(RowOptions);
             Add(options);
             placingOptions = options;
             shownOptions = options;
@@ -183,6 +194,49 @@ namespace OmsiMapEditor.UI
         public event Action<string> ObjectChosen;
 
         public event Action CloseRequested;
+
+        /// <summary>The user chose what to do with an object: true to lay rows along a road, false to place single objects.</summary>
+        public event Action<bool> PlaceModeChosen;
+
+        /// <summary>The options of the rows, shown in place of the heading while the window is in Row mode.</summary>
+        public RowToolOptions RowOptions { get; }
+
+        /// <summary>True while the window is in Row mode.</summary>
+        public bool IsRowMode => rowMode;
+
+        /// <summary>
+        /// Switches between placing single objects and laying rows: the option column shows the one's options, and the line of the status
+        /// bar follows the plan of the next row while it is on.
+        /// </summary>
+        public void ShowMode(bool row)
+        {
+            rowMode = row;
+            singleButton.EnableInClassList("panel-tab-active", !row);
+            rowButton.EnableInClassList("panel-tab-active", row);
+            headingRow.style.display = row ? DisplayStyle.None : DisplayStyle.Flex;
+            RowOptions.style.display = row ? DisplayStyle.Flex : DisplayStyle.None;
+            placeLabel.tooltip = Loc.T(row ? "rows.hint" : "objects.hint"); // i18n:keys
+            if (!row)
+                rowPlan = null;
+            UpdateInfo();
+        }
+
+        /// <summary>Rows need the whole map; where only objects can be edited the choice is dimmed, and a click says why in the status bar.</summary>
+        public void SetRowAllowed(bool allowed)
+        {
+            rowButton.EnableInClassList("option-icon-locked", !allowed);
+        }
+
+        /// <summary>Highlights the tile of an object as chosen without reporting it, such as the object that was being placed when rows were chosen.</summary>
+        public void MarkChosen(string path)
+        {
+            if (chosen != null && tileByPath.TryGetValue(chosen, out var previous))
+                previous.RemoveFromClassList("picker-tile-selected");
+            chosen = path;
+            if (path != null && tileByPath.TryGetValue(path, out var tile))
+                tile.AddToClassList("picker-tile-selected");
+            UpdateInfo();
+        }
 
         /// <summary>The line about the list or the chosen object changed; the shell shows it in the status bar, a warning in its colour.</summary>
         public event Action<string, bool> HintChanged
@@ -245,6 +299,7 @@ namespace OmsiMapEditor.UI
         public void RefreshTexts()
         {
             search.textEdition.placeholder = Loc.T("objects.search");
+            placeLabel.tooltip = Loc.T(rowMode ? "rows.hint" : "objects.hint"); // i18n:keys
             Refresh();
         }
 
@@ -313,17 +368,6 @@ namespace OmsiMapEditor.UI
                 catalog.ShowSearch(searchText.Length > 0);
             }
             ShowTab(kind, each);
-        }
-
-        private static VisualElement Row(VisualElement parent, string labelKey)
-        {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            row.Add(text);
-            parent.Add(row);
-            return row;
         }
 
         private void AddTab(Tab kind, OmsiObjectCategory each, string icon, string textKey, string tooltipKey)
@@ -721,14 +765,16 @@ namespace OmsiMapEditor.UI
             var objectCount = entries.Count - folderCount;
             var usesDlc = DlcUse(out var kinds, out var placements);
             var dlcWarning = chosen == null && tab == Tab.InMap && usesDlc;
-            var text = chosen != null ? Path.GetFileNameWithoutExtension(chosen) + ": " + (otherChosenHint ?? Loc.T("objects.hint.chosen"))
+            var planned = rowMode && rowPlan != null;
+            var text = planned ? rowPlan : chosen != null ? Path.GetFileNameWithoutExtension(chosen) + ": " + (otherChosenHint ?? Loc.T("objects.hint.chosen"))
                 : dlcWarning ? Loc.T("objects.dlc_warning", ("kinds", kinds), ("placements", placements))
                 : Loc.T("objects.info", ("folders", folderCount), ("objects", objectCount), ("hasHint", otherIdleHint != null ? "yes" : "no"), ("hint", otherIdleHint ?? string.Empty));
-            if (text != hint || dlcWarning != hintWarning)
+            var warning = planned ? rowPlanWarning : dlcWarning;
+            if (text != hint || warning != hintWarning)
             {
                 hint = text;
-                hintWarning = dlcWarning;
-                catalog.ShowHint(text, dlcWarning);
+                hintWarning = warning;
+                catalog.ShowHint(text, warning);
             }
             emptyLabel.text = Loc.T(library == null && tab != Tab.InMap ? "objects.empty.listing" // i18n:keys
                 : tab == Tab.Favorites && favorites.Count == 0 ? "objects.empty.favorites"

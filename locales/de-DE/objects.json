@@ -1,7 +1,7 @@
 {
   "objects.origin.reading": "Die Herkunft der Dateien wird noch gelesen.",
   "objects.origin.no_steam": "{description} Ohne die Listen von Steam lassen sich nur als DLC markierte Ordner unterscheiden.",
-  "objects.heading": "Ausrichtung (°)",
+  "objects.heading": "Ausrichtung",
   "objects.heading.tooltip": "Die Ausrichtung, mit der das nächste Objekt platziert wird; R dreht es um 15°, Umschalt+R zurück.",
   "objects.hint": "Umschalt+Klick platziert weiter, R dreht das Objekt, Alt setzt eine Kreuzung frei neben eine Straße, Esc beendet.",
   "objects.search": "Alle Objekte durchsuchen...",
@@ -50,5 +50,10 @@
   "objects.empty.listing": "Die Szenerieobjekte der OMSI-Installation werden aufgelistet...",
   "objects.empty.favorites": "Markiere Objekte mit dem Stern, um sie hier zu finden.",
   "objects.empty.in_map": "Diese Karte nutzt noch keine Szenerieobjekte.",
-  "objects.empty.none": "Kein Objekt passt."
+  "objects.empty.none": "Kein Objekt passt.",
+  "objects.place": "Platzieren",
+  "objects.place.single": "Einzelobjekt",
+  "objects.place.single.tooltip": "Einzelne Objekte: ein Objekt wählen, dann in die Karte klicken. Umschalt+Klick platziert weiter, R dreht es, Esc beendet.",
+  "objects.place.row": "Reihe entlang einer Straße",
+  "objects.place.row.tooltip": "Reihen (T): Reihen von Objekten entlang von Straßen legen, etwa Laternen oder Pfosten: ein Objekt wählen, auf eine Straße zeigen und klicken."
 }

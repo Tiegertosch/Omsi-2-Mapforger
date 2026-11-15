@@ -10,8 +10,6 @@
   "toolbar.delete.tooltip": "Eliminar (Del): Elimina la selección. Se conservan los objetos a los que hacen referencia otras partes del mapa.",
   "toolbar.road": "Carretera",
   "toolbar.road.tooltip": "Carretera (R): Construye carreteras desde la vista superior: haz clic para empezar y en cada curva; Esc termina. Las carreteras se conectan a los extremos libres de los splines.",
-  "toolbar.rows": "Filas",
-  "toolbar.rows.tooltip": "Filas (T): Coloca filas de objetos, como farolas o postes, a lo largo de las carreteras: elige un objeto, apunta a una carretera y haz clic.",
   "toolbar.terrain": "Terreno",
   "toolbar.terrain.tooltip": "Terreno (G): Modela el suelo con un pincel para elevarlo, bajarlo, suavizarlo, aplanarlo o añadir irregularidades, o crea una rampa entre dos clics.",
   "toolbar.markings": "Marcas viales",
