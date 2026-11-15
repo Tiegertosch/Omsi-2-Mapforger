@@ -17,9 +17,7 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement laneOptions;
-        private Label laneJunctionLabel;
-        private Label lanePlanLabel;
+        private LaneToolOptions laneOptions;
         private OmsiTileSummary laneTile;
         private OmsiObjectRecord laneJunction;
         private OmsiGeneratedJunction laneMade;
@@ -31,65 +29,43 @@ namespace OmsiMapEditor.UI
         /// <summary>The ways through the junction has without chosen ones, as it was made.</summary>
         private HashSet<string> laneDefaultWays = new HashSet<string>(StringComparer.Ordinal);
 
+        // The junction whose tab was chosen, so the choice is made once per junction and not on every refresh.
+        private OmsiObjectRecord laneTabJunction;
+
         private int laneSource = -1;
         private int laneHover = -1;
-        private VisualElement laneTurnRows;
         private TextField laneTaperField;
         private TextField laneStorageField;
 
+        /// <summary>The window of the lanes tool (ADR 098, M4): options on the left, the arms of the junction on the right.</summary>
         private void CreateLaneOptions()
         {
-            laneOptions = ToolCatalog.Options();
+            laneOptions = new LaneToolOptions();
             laneOptions.style.display = DisplayStyle.None;
-            laneJunctionLabel = new Label();
-            laneJunctionLabel.AddToClassList("panel-info");
-            laneJunctionLabel.style.marginTop = 0f;
-            laneOptions.Add(laneJunctionLabel);
-            var legend = LocBindings.NewLabel("lanes.legend");
-            legend.AddToClassList("panel-info");
-            laneOptions.Add(legend);
-            var reset = LocBindings.WithTooltip(LocBindings.NewButton("lanes.every", () => ApplyLaneConnections(null, Loc.T("lanes.done.every"))), "lanes.every.tooltip");
-            reset.AddToClassList("map-control-button");
-            laneOptions.Add(reset);
-            var none = LocBindings.WithTooltip(LocBindings.NewButton("lanes.none", () => ApplyLaneConnections(new HashSet<string>(StringComparer.Ordinal), Loc.T("lanes.done.none"))),
-                "lanes.none.tooltip");
-            none.AddToClassList("map-control-button");
-            laneOptions.Add(none);
-
-            // Left-turn lanes out of the median of an arm (ADR 051, stage 2).
-            var turnTitle = LocBindings.NewLabel("lanes.turn.title");
-            turnTitle.AddToClassList("picker-options-title");
-            turnTitle.style.marginTop = 8f;
-            laneOptions.Add(turnTitle);
-            laneTaperField = LaneNumberRow("lanes.taper", OmsiTurnLane.DefaultTaperMeters, "lanes.taper.tooltip");
-            laneStorageField = LaneNumberRow("lanes.storage", OmsiTurnLane.DefaultStorageMeters, "lanes.storage.tooltip");
-            laneTurnRows = new VisualElement();
-            laneOptions.Add(laneTurnRows);
-            CreateLaneCrossingOptions();
-
-            lanePlanLabel = new Label();
-            lanePlanLabel.AddToClassList("panel-info");
-            laneOptions.Add(lanePlanLabel);
-            var hint = LocBindings.NewLabel("lanes.hint");
-            hint.AddToClassList("panel-info");
-            laneOptions.Add(hint);
+            laneTaperField = laneOptions.TaperField;
+            laneStorageField = laneOptions.StorageField;
+            laneCrossingDistanceField = laneOptions.CrossingDistanceField;
+            laneCrossingWidthField = laneOptions.CrossingWidthField;
+            laneOptions.EveryRequested += () => ApplyLaneConnections(null, Loc.T("lanes.done.every"));
+            laneOptions.NoneRequested += () => ApplyLaneConnections(new HashSet<string>(StringComparer.Ordinal), Loc.T("lanes.done.none"));
+            laneOptions.TurnToggled += arm => ApplyTurnLane(arm, ArmTurnLane(arm) == null ? LaneTurnLengths() : null);
+            laneOptions.TurnLengthsRequested += arm => ApplyTurnLane(arm, LaneTurnLengths());
+            laneOptions.CrossingToggled += arm => ApplyCrossing(arm, ArmCrossing(arm) == null ? LaneCrossingValues() : null);
+            laneOptions.CrossingValuesRequested += arm => ApplyCrossing(arm, LaneCrossingValues());
+            laneOptions.ArmHovered += HoverLaneArm;
+            laneOptions.CloseRequested += () => SetTool(EditorTool.Drag);
+            laneOptions.HintChanged += (text, warning) => ShowToolHint(laneOptions, text, warning);
             objectsPanelHost.Add(laneOptions);
         }
 
-        private TextField LaneNumberRow(string labelKey, double value, string tooltipKey)
+        private OmsiTurnLane ArmTurnLane(int arm)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            row.Add(text);
-            var field = new TextField { value = value.ToString("0.#", CultureInfo.InvariantCulture) };
-            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
-            field.AddToClassList("picker-field");
-            row.Add(field);
-            laneOptions.Add(row);
-            return field;
+            return laneMade != null && arm >= 0 && arm < laneMade.Arms.Count ? laneMade.Arms[arm].TurnLane : null;
+        }
+
+        private OmsiCrossing ArmCrossing(int arm)
+        {
+            return laneMade != null && arm >= 0 && arm < laneMade.Arms.Count ? laneMade.Arms[arm].Crossing : null;
         }
 
         /// <summary>The lengths in the fields, kept within the bounds a turn lane allows.</summary>
@@ -103,46 +79,38 @@ namespace OmsiMapEditor.UI
             };
         }
 
-        /// <summary>A row for each arm of the junction with a median: a left-turn lane to add, or to take away or give the lengths in the fields.</summary>
-        private void RefreshLaneTurnRows(OmsiJunctionLayout layout)
+        /// <summary>
+        /// Lists the arms of the junction in the window: for the left-turn lanes those with a median (or a lane already), for the crossings
+        /// all of them. Without a junction the list is empty.
+        /// </summary>
+        private void RefreshLaneArms(OmsiJunctionLayout layout)
         {
-            if (laneTurnRows == null)
+            if (laneOptions == null)
                 return;
-            laneTurnRows.Clear();
+            if (!laneHighlightPinned)
+                mapCanvas?.SetArmHighlight(null, default, 0.0);
             if (layout == null || laneMade == null)
+            {
+                laneOptions.SetArms(null);
                 return;
+            }
+            var entries = new List<LaneArmEntry>();
             for (var arm = 0; arm < layout.Arms.Count && arm < laneMade.Arms.Count; arm++)
             {
-                var lane = laneMade.Arms[arm].TurnLane;
-                if (lane == null && (arm >= layout.IslandNoses.Length || double.IsNaN(layout.IslandNoses[arm])))
-                    continue;
-                var each = arm;
-                var direction = LaneArmDirection(layout.Arms[arm]);
-                var toggle = new Button(() => ApplyTurnLane(each, lane == null ? LaneTurnLengths() : null));
-                if (lane == null)
+                var turn = laneMade.Arms[arm].TurnLane;
+                entries.Add(new LaneArmEntry
                 {
-                    LocBindings.Text(toggle, "lanes.turn.add", ("n", arm + 1), ("direction", direction));
-                    LocBindings.Tooltip(toggle, "lanes.turn.add.tooltip");
-                }
-                else
-                {
-                    LocBindings.Text(toggle, "lanes.turn.remove", ("n", arm + 1), ("direction", direction), ("taper", lane.TaperMeters), ("storage", lane.StorageMeters));
-                    LocBindings.Tooltip(toggle, "lanes.turn.remove.tooltip");
-                }
-                toggle.AddToClassList("map-control-button");
-                toggle.style.whiteSpace = WhiteSpace.Normal;
-                HighlightArmOnHover(toggle, layout.Arms[arm]);
-                laneTurnRows.Add(toggle);
-                if (lane == null)
-                    continue;
-                var lengths = new Button(() => ApplyTurnLane(each, LaneTurnLengths()));
-                LocBindings.Text(lengths, "lanes.turn.lengths", ("n", arm + 1), ("direction", direction));
-                LocBindings.Tooltip(lengths, "lanes.turn.lengths.tooltip");
-                lengths.AddToClassList("map-control-button");
-                lengths.style.whiteSpace = WhiteSpace.Normal;
-                HighlightArmOnHover(lengths, layout.Arms[arm]);
-                laneTurnRows.Add(lengths);
+                    Arm = arm, Direction = LaneArmDirection(layout.Arms[arm]), Turn = turn, Crossing = laneMade.Arms[arm].Crossing,
+                    TurnAvailable = turn != null || arm < layout.IslandNoses.Length && !double.IsNaN(layout.IslandNoses[arm])
+                });
             }
+            // A junction chosen now opens the crossings when no arm can have a left-turn lane; the tab the user picked stays for one that can.
+            if (!ReferenceEquals(laneTabJunction, laneJunction))
+            {
+                laneTabJunction = laneJunction;
+                laneOptions.ShowTab(LaneToolOptions.TabForJunction(entries.Exists(entry => entry.TurnAvailable), laneOptions.UserTab));
+            }
+            laneOptions.SetArms(entries);
         }
 
         /// <summary>The way an arm of the selected junction points on the map, such as "north-east".</summary>
@@ -235,12 +203,16 @@ namespace OmsiMapEditor.UI
                 terrainOptions.style.display = DisplayStyle.None;
             laneOptions.style.display = DisplayStyle.Flex;
             objectsPanelHost.style.display = DisplayStyle.Flex;
+            laneOptions.ShowTab(laneOptions.Tab);
             mapCanvas.ShowSplineEnds = false;
             mapCanvas.BeginRoad();
             ClearLaneTarget();
             var item = selection.Count == 1 ? selection[0] : null;
             if (item?.Tile == null || !TargetLaneJunction(item.Tile, item.Record))
                 SetStatusT("lanes.status.start");
+            else
+                // The window is laid out in a later frame; then the junction is moved out from under it if it is.
+                KeepLaneJunctionClearWhenLaidOut();
         }
 
         private void EndLaneTool()
@@ -270,10 +242,13 @@ namespace OmsiMapEditor.UI
             laneConnections = new HashSet<string>(StringComparer.Ordinal);
             laneSource = -1;
             laneHover = -1;
-            if (laneJunctionLabel != null)
-                LocBindings.Text(laneJunctionLabel, "lanes.click_junction");
-            if (lanePlanLabel != null)
-                lanePlanLabel.text = string.Empty;
+            laneTabJunction = null;
+            if (laneOptions != null)
+            {
+                laneOptions.ShowJunction(Loc.T("lanes.click_junction"));
+                laneOptions.ShowPlan(string.Empty, false);
+                RefreshLaneArms(null);
+            }
             mapCanvas?.SetLaneEnds(null, null, -1);
         }
 
@@ -330,10 +305,9 @@ namespace OmsiMapEditor.UI
                 laneEndHeights.Add(record.Height + end.Height);
             }
             laneSource = keepSource >= 0 && keepSource < laneEnds.Count && laneEnds[keepSource].Inbound ? keepSource : -1;
-            LocBindings.Text(laneJunctionLabel, "lanes.junction", ("id", record.Id), ("arms", made.Arms.Count), ("count", laneConnections.Count),
-                ("total", OmsiLaneConnections.All(laneEnds).Count));
-            RefreshLaneTurnRows(layout);
-            RefreshLaneCrossingRows(layout);
+            laneOptions.ShowJunction(Loc.T("lanes.junction", ("id", record.Id), ("arms", made.Arms.Count), ("count", laneConnections.Count),
+                ("total", OmsiLaneConnections.All(laneEnds).Count)));
+            RefreshLaneArms(layout);
             if (selection.Count != 1 || !ReferenceEquals(selection[0].Record, record))
             {
                 selection.Clear();
@@ -343,6 +317,21 @@ namespace OmsiMapEditor.UI
             UpdateLanePreview();
             SetStatusT("lanes.status.target", ("id", record.Id));
             return true;
+        }
+
+        /// <summary>Keeps the selected junction clear of the lanes window (ADR 098, M4), once the window has its place.</summary>
+        private void KeepLaneJunctionClearWhenLaidOut()
+        {
+            KeepClearOfToolWindow(laneOptions, () => activeTool == EditorTool.Lanes, () => ObjectWorldPoint(laneTile, laneJunction));
+        }
+
+        /// <summary>The language changed: the junction's line, the arms and the plan are written again.</summary>
+        private void RefreshLaneTexts()
+        {
+            if (laneJunction != null && laneTile != null && laneTile.Objects.Contains(laneJunction))
+                TargetLaneJunction(laneTile, laneJunction);
+            else
+                ClearLaneTarget();
         }
 
         /// <summary>The junction was made again or taken back, such as by undo: its lanes are read anew.</summary>
@@ -425,6 +414,7 @@ namespace OmsiMapEditor.UI
                         (bright ? shownHeights : guideHeights).Add(LaneCurveHeights(from, to, curve.Length));
                     }
             string plan;
+            var problem = false;
             if (laneSource < 0)
                 plan = Loc.T(laneHover >= 0 && laneEnds[laneHover].Inbound ? "lanes.plan.choose" : "lanes.plan.pick_in"); // i18n:keys
             else if (laneHover >= 0 && !laneEnds[laneHover].Inbound)
@@ -437,7 +427,8 @@ namespace OmsiMapEditor.UI
                     shown.Add(curve);
                     shownHeights.Add(LaneCurveHeights(laneEnds[laneSource], laneEnds[laneHover], curve.Length));
                 }
-                plan = Loc.T(laneEnds[laneHover].Arm == laneEnds[laneSource].Arm ? "lanes.plan.same_arm" : has ? "lanes.plan.remove" : "lanes.plan.add"); // i18n:keys
+                problem = laneEnds[laneHover].Arm == laneEnds[laneSource].Arm;
+                plan = Loc.T(problem ? "lanes.plan.same_arm" : has ? "lanes.plan.remove" : "lanes.plan.add"); // i18n:keys
             }
             else
                 plan = Loc.T("lanes.plan.pick_out");
@@ -445,7 +436,7 @@ namespace OmsiMapEditor.UI
             KeepPinnedArmHighlight();
             mapCanvas.SetRoadGuides(guides, false, guideHeights);
             mapCanvas.SetRoadPreview(shown, true, null, null, null, shownHeights);
-            lanePlanLabel.text = plan;
+            laneOptions.ShowPlan(plan, problem);
         }
 
         /// <summary>A click with the lanes tool: chooses a lane in, adds or takes away a way to a lane out, or works on another junction.</summary>
@@ -486,7 +477,9 @@ namespace OmsiMapEditor.UI
             }
             if (MadeJunctionAt(point, out var tile, out var record) && !ReferenceEquals(record, laneJunction))
             {
-                TargetLaneJunction(tile, record);
+                // Another junction chosen while the tool is open: it is moved out from under the window as at the start (not on undo or edits).
+                if (TargetLaneJunction(tile, record))
+                    KeepLaneJunctionClearWhenLaidOut();
                 return;
             }
             laneSource = -1;
@@ -652,6 +645,29 @@ namespace OmsiMapEditor.UI
             }
             else
                 SetTool(EditorTool.Drag);
+        }
+
+        /// <summary>For command-line checks: opens the lanes tool and chooses the lane in <c>arm.lane</c>, such as <c>0.2</c>; the result goes to the log as "Lane pick:".</summary>
+        private void RunLanePickArgument(string end)
+        {
+            SetTool(EditorTool.Lanes);
+            for (var index = 0; index < laneEnds.Count; index++)
+            {
+                if (!laneEnds[index].Inbound || laneEnds[index].Arm + "." + laneEnds[index].Lane != end)
+                    continue;
+                laneSource = index;
+                UpdateLanePreview();
+                Debug.Log("Lane pick: lane in " + end + " chosen.");
+                return;
+            }
+            Debug.Log("Lane pick: no lane in " + end + ".");
+        }
+
+        /// <summary>For command-line checks: opens the lanes tool and its tab <c>turn</c> or <c>crossing</c>.</summary>
+        private void RunLaneTabArgument(string tab)
+        {
+            SetTool(EditorTool.Lanes);
+            laneOptions?.ChooseTab(string.Equals(tab, "crossing", StringComparison.OrdinalIgnoreCase) ? LaneTab.Crossings : LaneTab.TurnLanes);
         }
 
         /// <summary>

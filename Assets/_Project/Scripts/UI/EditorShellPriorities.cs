@@ -79,7 +79,15 @@ namespace OmsiMapEditor.UI
             var item = selection.Count == 1 ? selection[0] : null;
             if (item?.Tile == null || !TargetPriorityJunction(item.Tile, item.Record))
                 SetStatusT("traffic.status.start");
+            else
+                KeepPriorityJunctionClear();
             UpdateTrafficHint();
+        }
+
+        /// <summary>Keeps the junction of the traffic rules tool clear of its window (ADR 098, M4); only when it was chosen, not on a refresh, undo or a sign dropped.</summary>
+        private void KeepPriorityJunctionClear()
+        {
+            KeepClearOfToolWindow(trafficOptions, () => activeTool == EditorTool.Priorities, () => ObjectWorldPoint(priorityTile, priorityJunction));
         }
 
         private void EndPriorityTool()
@@ -380,8 +388,8 @@ namespace OmsiMapEditor.UI
             }
             if (PriorityJunctionAt(point, out var tile, out var record))
             {
-                if (!ReferenceEquals(record, priorityJunction))
-                    TargetPriorityJunction(tile, record);
+                if (!ReferenceEquals(record, priorityJunction) && TargetPriorityJunction(tile, record))
+                    KeepPriorityJunctionClear();
                 return;
             }
             SetStatusT("traffic.status.none_here");

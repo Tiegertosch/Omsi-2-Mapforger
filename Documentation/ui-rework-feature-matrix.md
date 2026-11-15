@@ -78,7 +78,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | **Kreuzungen und Verkehr** | | | | |
 | Markierungen | Leiste M (`MarkingToolOptions.cs`) | teilweise | offen | Katalog neu (uncommittet), Optionen alt |
 | Vorfahrt (seit 15. November 2026 „Traffic rules“, ADR 099; Stand dieser Matrix: davor) | Leiste V (`EditorShellPriorities.cs`) | teilweise | – | nur Hülle neu |
-| Spuren, Abbiegespur | Leiste L (`EditorShellLanes.cs`) | teilweise | – | nur Hülle neu |
+| Spuren, Abbiegespur | Leiste L (`EditorShellLanes.cs`) | teilweise | – | Fenster neu gebaut (M4 Schritt 6, 15. November 2026) |
 | Ampeln, Phasen, Zeitleiste | Leiste A (`EditorShellSignals*.cs`) | teilweise | – | nur Hülle neu; 380 px breite Sonderspalte |
 | Ampel-Assistent, Vorlagen | Knöpfe im Ampel-Fenster (`EditorShellSignals.cs:328–340`) | alt | – | Dialoge alt |
 | KI-Pfade und Regeln je Element | Kontextmenü „AI paths and rules…“ → Inspector (`EditorShellPaths.cs:304`) | voll | ja | nur bei eingeschalteten Pfaden; stumm, solange Pfade nicht gelesen sind |
@@ -88,7 +88,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Luftbilder, Verortung, Geländehöhen | Tools › Satellite and terrain (`EditorShellAerial.cs:243`) | **Lücke** | – | Fenster alt; sperrt alle Tastenkürzel (Audit 5.4) |
 | Eigene Bilder | im Luftbild-Fenster (`EditorShellPictures.cs`; Einstieg nicht einzeln nachverfolgt) | alt | – | |
 | **Fahrplan** | | | | |
-| Linie anlegen (Haltestellen klicken) | Leiste B (`LineToolPanel.cs`, `EditorShellLine.cs`) | teilweise | – | Fenster alt |
+| Linie anlegen (Haltestellen klicken) | Leiste B (`LineToolPanel.cs`, `EditorShellLine.cs`) | teilweise | – | Fenster neu gebaut (M4 Schritt 5, 15. November 2026) |
 | Fahrten, Zeiten, Depots | Fahrplan- und Fahrzeug-Dialog | alt | – | |
 | **Querschnitt** | | | | |
 | Undo/Redo | Strg+Z/Y, Edit-Menü | voll | ja | gesperrt bei offenem Luftbild-Fenster; wirkt unter offenem Kontextmenü |

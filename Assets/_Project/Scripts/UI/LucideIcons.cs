@@ -210,6 +210,9 @@ namespace OmsiMapEditor.UI
             ["scissors"] = new[] { "M3 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0", "M8.12 8.12 12 12", "M20 4 8.12 15.88", "M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0", "M14.8 14.8 20 20" },
             // The tab of the speed signs in the traffic rules tool (ADR 098, M4): a round sign with 50, drawn here in Lucide's style.
             ["speed-sign"] = new[] { "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0", "M10.5 9H7.5v3h3v3h-3", "M13.5 9h3v6h-3z" },
+            // The options of the lanes tool (ADR 098, M4); Lucide's ban and corner-up-left, circle and polyline as paths.
+            ["ban"] = new[] { "M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0", "m4.9 4.9 14.2 14.2" },
+            ["corner-up-left"] = new[] { "m9 14-5-5 5-5", "M20 20v-7a4 4 0 0 0-4-4H4" },
             // The options of the line tool (ADR 098, M4), from lucide-static 0.454.0.
             ["arrow-right"] = new[] { "M5 12h14", "m12 5 7 7-7 7" },
             ["arrow-left"] = new[] { "m12 19-7-7 7-7", "M19 12H5" },

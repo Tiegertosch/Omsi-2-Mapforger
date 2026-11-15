@@ -86,7 +86,8 @@ namespace OmsiMapEditor.UI
             if (centre && mapCanvas != null)
             {
                 var item = CurrentLineList[index];
-                mapCanvas.CenterOnWorld(item.World, false);
+                // In the free part above the window, not the middle of the whole map, where the window would cover it.
+                mapCanvas.CenterOnWorldInFreeArea(item.World, ToolWindowRects(lineOptions));
             }
             DrawLine();
         }

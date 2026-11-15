@@ -9,31 +9,17 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// Pedestrian crossings in the lanes tool: a row for each arm of the selected junction to give it a crossing, change
+    /// Pedestrian crossings in the lanes tool: a tile for each arm of the selected junction in the window to give it a crossing, change
     /// its distance and width or take it away. The junction is made again with the crossing, as one undo step.
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement laneCrossingRows;
-
         /// <summary>For screenshots: keeps the arm marked by <c>-crossing n hover</c> when the rows are made again.</summary>
         private bool laneHighlightPinned;
 
         private int laneHighlightArm;
         private TextField laneCrossingDistanceField;
         private TextField laneCrossingWidthField;
-
-        private void CreateLaneCrossingOptions()
-        {
-            var title = LocBindings.NewLabel("lanes.crossing.title");
-            title.AddToClassList("picker-options-title");
-            title.style.marginTop = 8f;
-            laneOptions.Add(title);
-            laneCrossingDistanceField = LaneNumberRow("lanes.crossing.distance", OmsiCrossing.DefaultDistanceMeters, "lanes.crossing.distance.tooltip");
-            laneCrossingWidthField = LaneNumberRow("lanes.crossing.width", OmsiCrossing.DefaultWidthMeters, "lanes.crossing.width.tooltip");
-            laneCrossingRows = new VisualElement();
-            laneOptions.Add(laneCrossingRows);
-        }
 
         /// <summary>The distance and width in the fields, kept within the bounds a crossing allows.</summary>
         private OmsiCrossing LaneCrossingValues()
@@ -47,57 +33,16 @@ namespace OmsiMapEditor.UI
             };
         }
 
-        /// <summary>A row for each arm of the junction: a crossing to add, or to take away or give the values in the fields.</summary>
-        private void RefreshLaneCrossingRows(OmsiJunctionLayout layout)
-        {
-            if (laneCrossingRows == null)
-                return;
-            laneCrossingRows.Clear();
-            if (!laneHighlightPinned)
-                mapCanvas?.SetArmHighlight(null, default, 0.0);
-            if (layout == null || laneMade == null)
-                return;
-            for (var arm = 0; arm < layout.Arms.Count && arm < laneMade.Arms.Count; arm++)
-            {
-                var crossing = laneMade.Arms[arm].Crossing;
-                var each = arm;
-                var direction = LaneArmDirection(layout.Arms[arm]);
-                var toggle = new Button(() => ApplyCrossing(each, crossing == null ? LaneCrossingValues() : null));
-                if (crossing == null)
-                {
-                    LocBindings.Text(toggle, "lanes.crossing.add", ("n", arm + 1), ("direction", direction));
-                    LocBindings.Tooltip(toggle, "lanes.crossing.add.tooltip");
-                }
-                else
-                {
-                    LocBindings.Text(toggle, "lanes.crossing.remove", ("n", arm + 1), ("direction", direction),
-                        ("distance", crossing.DistanceMeters), ("width", crossing.WidthMeters));
-                    LocBindings.Tooltip(toggle, "lanes.crossing.remove.tooltip");
-                }
-                toggle.AddToClassList("map-control-button");
-                toggle.style.whiteSpace = WhiteSpace.Normal;
-                HighlightArmOnHover(toggle, layout.Arms[arm]);
-                laneCrossingRows.Add(toggle);
-                if (crossing == null)
-                    continue;
-                var values = new Button(() => ApplyCrossing(each, LaneCrossingValues()));
-                LocBindings.Text(values, "lanes.crossing.values", ("n", arm + 1), ("direction", direction));
-                LocBindings.Tooltip(values, "lanes.crossing.values.tooltip");
-                values.AddToClassList("map-control-button");
-                values.style.whiteSpace = WhiteSpace.Normal;
-                HighlightArmOnHover(values, layout.Arms[arm]);
-                laneCrossingRows.Add(values);
-            }
-        }
-
         /// <summary>
-        /// Marks an arm of the selected junction on the map while the pointer is over a button that acts on it, so the
-        /// right arm is easy to pick from its number and direction.
+        /// Marks an arm of the selected junction on the map while the pointer is over a tile that acts on it, so the right arm is easy to
+        /// pick from its number and direction.
         /// </summary>
-        private void HighlightArmOnHover(VisualElement button, OmsiJunctionArm arm)
+        private void HoverLaneArm(int arm, bool entered)
         {
-            button.RegisterCallback<PointerEnterEvent>(_ => ShowArmHighlight(arm));
-            button.RegisterCallback<PointerLeaveEvent>(_ => mapCanvas?.SetArmHighlight(null, default, 0.0));
+            if (entered && laneMade != null && arm >= 0 && arm < laneMade.Arms.Count)
+                ShowArmHighlight(laneMade.Arms[arm]);
+            else if (!entered)
+                mapCanvas?.SetArmHighlight(null, default, 0.0);
         }
 
         /// <summary>Marks the arm again after the lane preview was made again, while one is pinned for a screenshot.</summary>

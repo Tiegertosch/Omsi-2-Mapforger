@@ -124,6 +124,7 @@ namespace OmsiMapEditor.UI
             terrainOptions?.RefreshTexts();
             objectsPanel?.RefreshTexts();
             lineOptions?.RefreshTexts();
+            laneOptions?.RefreshTexts();
             // The hint of the open tool is written when the pointer moves; it is written again now, in the new language.
             if (currentSummary != null)
             {
@@ -133,6 +134,8 @@ namespace OmsiMapEditor.UI
                     ShowTerrainBrush();
                 else if (activeTool == EditorTool.Markings)
                     UpdateMarkingPreview();
+                else if (activeTool == EditorTool.Lanes)
+                    RefreshLaneTexts();
             }
             // An open map check report was written in the earlier language: the check runs again, as the report is made when it runs.
             if (currentSummary != null && IsShown(checkDialog))

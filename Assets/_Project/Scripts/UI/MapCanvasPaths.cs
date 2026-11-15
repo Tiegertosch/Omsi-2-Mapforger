@@ -271,6 +271,64 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>True while the pointer holds something on the map: an object, a handle, a rotation ring being dragged, or one pressed to be.</summary>
+        public bool IsDragging => dragMode != DragMode.None;
+
+        /// <summary>The view's place and zoom as one value, to tell whether it was moved by someone else in between.</summary>
+        public Vector3 ViewState => new Vector3(center.x, center.y, metersPerPixel);
+
+        /// <summary>Where a point in world metres stands on the screen in the view from above, in panel coordinates; false in 3D or before the first view.</summary>
+        public bool TryScreenPosition(OmsiMapPoint world, out Vector2 screen)
+        {
+            screen = default;
+            if (summary == null || !hasView || ThreeDimensional)
+                return false;
+            screen = this.LocalToWorld(MapToScreen(WorldToMap(world)));
+            return true;
+        }
+
+        /// <summary>
+        /// Moves the view up or down, keeping the zoom, so a point stands in the free part of the map above the tool windows (their places, in
+        /// panel coordinates) when it stands under one or too close to it; the point is put in the middle of the free part then. Nothing moves
+        /// when it is clear already, in 3D, or before the first view. True when the view moved.
+        /// </summary>
+        public bool PanIntoFreeArea(OmsiMapPoint world, IReadOnlyList<Rect> windows, float margin)
+        {
+            if (!TryScreenPosition(world, out var screen))
+                return false;
+            var shift = FreeAreaPan.ShiftFor(screen.x, screen.y, windows, worldBound.yMin, margin);
+            if (shift == 0f)
+                return false;
+            center.y += shift * metersPerPixel;
+            isFitted = false;
+            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
+            return true;
+        }
+
+        /// <summary>
+        /// Centres a point from above in the free part of the map: horizontally in the map, vertically between its top and the highest tool
+        /// window, keeping the zoom. Like <see cref="CenterOnWorld"/> (the whole map) while no window has its place yet; nothing in 3D.
+        /// </summary>
+        public void CenterOnWorldInFreeArea(OmsiMapPoint world, IReadOnlyList<Rect> windows)
+        {
+            var bottom = FreeAreaPan.FreeBottom(windows);
+            if (float.IsNaN(bottom) || bottom - worldBound.yMin < 1f)
+            {
+                CenterOnWorld(world, false);
+                return;
+            }
+            if (!TryScreenPosition(world, out var screen))
+                return;
+            var shiftX = worldBound.center.x - screen.x;
+            var shiftY = (worldBound.yMin + bottom) * 0.5f - screen.y;
+            center.x -= shiftX * metersPerPixel;
+            center.y += shiftY * metersPerPixel;
+            isFitted = false;
+            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
+        }
+
         private Color PathColor(int kind)
         {
             return kind == 0 ? (Color)objectColor : kind == 1 ? treeStrokeColor : selectedTileColor;

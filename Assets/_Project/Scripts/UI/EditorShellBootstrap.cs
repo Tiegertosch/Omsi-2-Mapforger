@@ -1240,6 +1240,14 @@ namespace OmsiMapEditor.UI
                 RunLaneArgument(ways);
             }
 
+            // -lanesPick arm.lane chooses that lane in (ADR 048), as a click on its dot does; -lanesTab turn|crossing opens that tab of the window.
+            var lanesPickAt = Array.IndexOf(args, "-lanesPick");
+            if (lanesPickAt >= 0 && lanesPickAt + 1 < args.Length)
+                RunLanePickArgument(args[lanesPickAt + 1]);
+            var lanesTabAt = Array.IndexOf(args, "-lanesTab");
+            if (lanesTabAt >= 0 && lanesTabAt + 1 < args.Length)
+                RunLaneTabArgument(args[lanesTabAt + 1]);
+
             // -turnLane n [taper storage|off] gives arm n of the selected junction a left-turn lane or takes it away (ADR 051).
             var turnLaneAt = Array.IndexOf(args, "-turnLane");
             if (turnLaneAt >= 0)
@@ -1793,6 +1801,10 @@ namespace OmsiMapEditor.UI
                 RunPickArguments(args);
                 // -trafficGhost and -trafficDrop <tile> px py hold or drop a sign at a pixel, as dragging it from the window would.
                 RunTrafficPointerArguments(args);
+                // -lineCentre n selects stop n of the line like a click on the strip does and centres the map on it above the window (ADR 098, M4).
+                if (RunLineCentreArgument(args))
+                    for (var frame = 0; frame < 3; frame++)
+                        yield return null;
                 // -tooltipAt x y shows the tooltip there as hovering would (ADR 098, stage 2).
                 RunTooltipArguments(args);
                 // -inspector opens the inspector, -contextMenu id the context menu of an object (ADR 098).
@@ -4763,6 +4775,7 @@ namespace OmsiMapEditor.UI
             ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, item);
+            KeepSelectionClearOfObjectsWindow();
             SetStatusT("selection.status.object", ("id", item.Id), ("path", item.AssetPath), ("mode", CanEditObjects ? "edit" : chronoDate != null ? "chrono" : "readonly"));
         }
 
@@ -4777,6 +4790,9 @@ namespace OmsiMapEditor.UI
             else
                 selection.Add(new MapSelectionItem { Tile = tile, Record = item });
             ApplySelection(selection.Count > 0 ? selection[selection.Count - 1].Tile : tile);
+            // Only the object just added is kept in sight; taking one out leaves the view alone.
+            if (index < 0)
+                KeepSelectionClearOfObjectsWindow();
             SetStatus(DescribeSelection());
         }
 
@@ -7169,6 +7185,9 @@ namespace OmsiMapEditor.UI
             objectsPanelHost.style.display = DisplayStyle.Flex;
             objectsPanel.FocusSearch();
             UpdateToolbar();
+            // A selected object is moved out from under the window the same as in the other tool windows.
+            if (selection.Count == 1)
+                KeepSelectionClearOfObjectsWindow();
         }
 
         /// <summary>The Objects button and key 3: opens the window in Single mode, or closes it, in either mode.</summary>
