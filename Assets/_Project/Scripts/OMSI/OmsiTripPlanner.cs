@@ -51,13 +51,127 @@ namespace OmsiMapEditor.OMSI
         public List<OmsiMapPoint[]> Lines { get; } = new List<OmsiMapPoint[]>();
     }
 
+    /// <summary>What keeps a trip or track from being planned; the editor shows each in its own language.</summary>
+    public enum OmsiPlanProblemCode
+    {
+        /// <summary>Fewer than two stops.</summary>
+        TooFewStops,
+
+        /// <summary>A stop has no vehicle lane beside it. Arguments: Stop.</summary>
+        StopHasNoLane,
+
+        /// <summary>No lane leads between two stops. Arguments: From, To.</summary>
+        NoWay,
+
+        /// <summary>No lane leads between two stops over the waypoints between them. Arguments: From, To.</summary>
+        NoWayOverWaypoints,
+
+        /// <summary>A waypoint between two stops lies off the vehicle lanes. Arguments: From, To.</summary>
+        WaypointNotNearLane,
+
+        /// <summary>A lane of the way lies on a tile global.cfg does not list. Arguments: From, To.</summary>
+        LaneOnUnlistedTile,
+
+        /// <summary>A stop has no rail within reach. Arguments: Stop, Meters.</summary>
+        StopHasNoRail,
+
+        /// <summary>A waypoint has no rail within reach. Arguments: Meters.</summary>
+        WaypointHasNoRail,
+
+        /// <summary>No rail leads between two points; either may be a waypoint (<see cref="OmsiPlanProblem.FromIsWaypoint"/>). Arguments: From, To.</summary>
+        NoRailWay,
+
+        /// <summary>No rail leads from the first to the last stop.</summary>
+        NoRailWayFirstToLast,
+    }
+
+    /// <summary>A reason a trip or track cannot be made: a code with its arguments, and the English text for logs (<see cref="ToString"/>).</summary>
+    public sealed class OmsiPlanProblem
+    {
+        public OmsiPlanProblemCode Code { get; }
+
+        /// <summary>The stop the problem is about, or empty.</summary>
+        public string Stop { get; }
+
+        public string From { get; }
+        public string To { get; }
+        public bool FromIsWaypoint { get; }
+        public bool ToIsWaypoint { get; }
+
+        /// <summary>The reach in metres, for the rail problems.</summary>
+        public int Meters { get; }
+
+        private OmsiPlanProblem(OmsiPlanProblemCode code, string stop = "", string from = "", string to = "", bool fromIsWaypoint = false, bool toIsWaypoint = false, int meters = 0)
+        {
+            Code = code;
+            Stop = stop ?? string.Empty;
+            From = from ?? string.Empty;
+            To = to ?? string.Empty;
+            FromIsWaypoint = fromIsWaypoint;
+            ToIsWaypoint = toIsWaypoint;
+            Meters = meters;
+        }
+
+        public static OmsiPlanProblem Of(OmsiPlanProblemCode code)
+        {
+            return new OmsiPlanProblem(code);
+        }
+
+        /// <summary>A distance in whole metres, halves away from zero (what "0" formatting gave), so the log text stays as it was.</summary>
+        public static int WholeMetres(double metres)
+        {
+            return (int)Math.Round(metres, MidpointRounding.AwayFromZero);
+        }
+
+        public static OmsiPlanProblem OfStop(OmsiPlanProblemCode code, string stop, int meters = 0)
+        {
+            return new OmsiPlanProblem(code, stop: stop, meters: meters);
+        }
+
+        public static OmsiPlanProblem Between(OmsiPlanProblemCode code, string from, string to, bool fromIsWaypoint = false, bool toIsWaypoint = false)
+        {
+            return new OmsiPlanProblem(code, from: from, to: to, fromIsWaypoint: fromIsWaypoint, toIsWaypoint: toIsWaypoint);
+        }
+
+        /// <summary>The English text, as the planners wrote it before the codes.</summary>
+        public override string ToString()
+        {
+            var metres = Meters.ToString(CultureInfo.InvariantCulture);
+            switch (Code)
+            {
+                case OmsiPlanProblemCode.TooFewStops:
+                    return "A trip needs at least two stops.";
+                case OmsiPlanProblemCode.StopHasNoLane:
+                    return Stop + " has no vehicle lane beside it.";
+                case OmsiPlanProblemCode.NoWay:
+                    return "No way leads from " + From + " to " + To + ".";
+                case OmsiPlanProblemCode.NoWayOverWaypoints:
+                    return "No way leads from " + From + " to " + To + " over its waypoints.";
+                case OmsiPlanProblemCode.WaypointNotNearLane:
+                    return "A waypoint between " + From + " and " + To + " is not near a vehicle lane.";
+                case OmsiPlanProblemCode.LaneOnUnlistedTile:
+                    return "A lane between " + From + " and " + To + " lies on a tile the map does not list.";
+                case OmsiPlanProblemCode.StopHasNoRail:
+                    return "The stop " + Stop + " has no rail within " + metres + " m.";
+                case OmsiPlanProblemCode.WaypointHasNoRail:
+                    return "A waypoint has no rail within " + metres + " m.";
+                case OmsiPlanProblemCode.NoRailWay:
+                    return "No way leads over the rails from " + (FromIsWaypoint ? "a waypoint" : From) + " to " + (ToIsWaypoint ? "a waypoint" : To) + ".";
+                case OmsiPlanProblemCode.NoRailWayFirstToLast:
+                    return "No way leads over the rails from the first to the last stop.";
+                default:
+                    return Code.ToString();
+            }
+        }
+    }
+
     /// <summary>What a new trip needs: its legs, and what keeps it from being written.</summary>
     public sealed class OmsiTripPlan
     {
         public List<OmsiTripLeg> Legs { get; } = new List<OmsiTripLeg>();
 
         /// <summary>Reasons the trip cannot be made, such as two stops no lane leads between.</summary>
-        public List<string> Problems { get; } = new List<string>();
+        public List<OmsiPlanProblem> Problems { get; } = new List<OmsiPlanProblem>();
 
         public bool IsValid => Problems.Count == 0 && Legs.Count > 0;
 
@@ -108,7 +222,7 @@ namespace OmsiMapEditor.OMSI
             }
             if (stops.Count < 2)
             {
-                plan.Problems.Add("A trip needs at least two stops.");
+                plan.Problems.Add(OmsiPlanProblem.Of(OmsiPlanProblemCode.TooFewStops));
                 return plan;
             }
             // Every stop could be served from several lanes of its road; the lane a bus stands on is the one it leaves on, so the lanes are chosen for
@@ -186,15 +300,15 @@ namespace OmsiMapEditor.OMSI
                 }
                 if (candidates[index].Count == 0 || candidates[index + 1].Count == 0)
                 {
-                    plan.Problems.Add((candidates[index].Count == 0 ? from.Name : to.Name) + " has no vehicle lane beside it.");
+                    plan.Problems.Add(OmsiPlanProblem.OfStop(OmsiPlanProblemCode.StopHasNoLane, candidates[index].Count == 0 ? from.Name : to.Name));
                     plan.Legs.Add(leg);
                     continue;
                 }
-                var result = RouteLeg(network, candidates[index][choice[index]], candidates[index + 1][choice[index + 1]], waypoints, out var problem);
+                var result = RouteLeg(network, candidates[index][choice[index]], candidates[index + 1][choice[index + 1]], waypoints, out var waypointOffLane);
                 if (result == null)
                 {
-                    plan.Problems.Add(problem == null ? "No way leads from " + from.Name + " to " + to.Name + (waypoints.Count > 0 ? " over its waypoints." : ".")
-                        : problem.Replace("{from}", from.Name).Replace("{to}", to.Name));
+                    var code = waypointOffLane ? OmsiPlanProblemCode.WaypointNotNearLane : waypoints.Count > 0 ? OmsiPlanProblemCode.NoWayOverWaypoints : OmsiPlanProblemCode.NoWay;
+                    plan.Problems.Add(OmsiPlanProblem.Between(code, from.Name, to.Name));
                     plan.Legs.Add(leg);
                     continue;
                 }
@@ -208,7 +322,7 @@ namespace OmsiMapEditor.OMSI
                     var tile = tileIndexOf(lane.Path.TileX, lane.Path.TileY);
                     if (tile < 0)
                     {
-                        plan.Problems.Add("A lane between " + from.Name + " and " + to.Name + " lies on a tile the map does not list.");
+                        plan.Problems.Add(OmsiPlanProblem.Between(OmsiPlanProblemCode.LaneOnUnlistedTile, from.Name, to.Name));
                         break;
                     }
                     leg.Entries.Add(new OmsiPathEntry { ElementId = lane.Path.ElementId, PathIndex = lane.Path.PathIndex, TileIndex = tile, LengthMeters = lane.LengthMeters });
@@ -227,16 +341,17 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>The way from a place to a place over the waypoints, joined to one route whose length is the sum of the lane lengths; null when none leads there.</summary>
-        private static OmsiNetworkRoute RouteLeg(OmsiPathNetwork network, OmsiStopPlace from, OmsiStopPlace to, List<OmsiTripStopChoice> waypoints, out string problem)
+        /// <param name="waypointOffLane">True when it failed because a waypoint is not near a vehicle lane.</param>
+        private static OmsiNetworkRoute RouteLeg(OmsiPathNetwork network, OmsiStopPlace from, OmsiStopPlace to, List<OmsiTripStopChoice> waypoints, out bool waypointOffLane)
         {
-            problem = null;
+            waypointOffLane = false;
             var targets = new List<List<OmsiStopPlace>>();
             foreach (var waypoint in waypoints)
             {
                 var found = network.PlaceWaypointCandidates(waypoint.World);
                 if (found.Count == 0)
                 {
-                    problem = "A waypoint between {from} and {to} is not near a vehicle lane.";
+                    waypointOffLane = true;
                     return null;
                 }
                 targets.Add(found);

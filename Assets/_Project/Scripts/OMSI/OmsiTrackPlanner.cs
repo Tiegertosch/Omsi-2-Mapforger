@@ -68,7 +68,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The paths of the entries as lines on the map, in world metres.</summary>
         public List<OmsiMapPoint[]> Lines { get; } = new List<OmsiMapPoint[]>();
 
-        public List<string> Problems { get; } = new List<string>();
+        public List<OmsiPlanProblem> Problems { get; } = new List<OmsiPlanProblem>();
         public double LengthMeters { get; internal set; }
         public bool IsValid => Problems.Count == 0 && Entries.Count > 0 && Stations.Count >= 2;
     }
@@ -100,7 +100,7 @@ namespace OmsiMapEditor.OMSI
                 points.RemoveAt(points.Count - 1);
             if (points.Count(item => !item.IsWaypoint) < 2)
             {
-                plan.Problems.Add("A trip needs at least two stops.");
+                plan.Problems.Add(OmsiPlanProblem.Of(OmsiPlanProblemCode.TooFewStops));
                 return plan;
             }
             var candidates = new List<List<OmsiStopPlace>>();
@@ -111,7 +111,9 @@ namespace OmsiMapEditor.OMSI
                     found = found.GetRange(0, MostPlaces);
                 if (found.Count == 0)
                 {
-                    plan.Problems.Add((point.IsWaypoint ? "A waypoint" : "The stop " + point.Name) + " has no rail within " + ReachMeters.ToString("0", CultureInfo.InvariantCulture) + " m.");
+                    var reach = OmsiPlanProblem.WholeMetres(ReachMeters);
+                    plan.Problems.Add(point.IsWaypoint ? OmsiPlanProblem.OfStop(OmsiPlanProblemCode.WaypointHasNoRail, string.Empty, reach)
+                        : OmsiPlanProblem.OfStop(OmsiPlanProblemCode.StopHasNoRail, point.Name, reach));
                     return plan;
                 }
                 candidates.Add(found);
@@ -157,11 +159,12 @@ namespace OmsiMapEditor.OMSI
                     var reachable = candidates[index - 1].Any(from => candidates[index].Any(to => network.Route(from, to) != null));
                     if (!reachable)
                     {
-                        plan.Problems.Add("No way leads over the rails from " + Describe(points[index - 1]) + " to " + Describe(points[index]) + ".");
+                        plan.Problems.Add(OmsiPlanProblem.Between(OmsiPlanProblemCode.NoRailWay, points[index - 1].IsWaypoint ? string.Empty : points[index - 1].Name,
+                            points[index].IsWaypoint ? string.Empty : points[index].Name, points[index - 1].IsWaypoint, points[index].IsWaypoint));
                         return plan;
                     }
                 }
-                plan.Problems.Add("No way leads over the rails from the first to the last stop.");
+                plan.Problems.Add(OmsiPlanProblem.Of(OmsiPlanProblemCode.NoRailWayFirstToLast));
                 return plan;
             }
             var chosen = new int[count];
@@ -204,11 +207,6 @@ namespace OmsiMapEditor.OMSI
             }
             plan.LengthMeters = plan.Stations[plan.Stations.Count - 1].Distance - plan.Stations[0].Distance;
             return plan;
-        }
-
-        private static string Describe(OmsiTripStopChoice point)
-        {
-            return point.IsWaypoint ? "a waypoint" : point.Name;
         }
     }
 

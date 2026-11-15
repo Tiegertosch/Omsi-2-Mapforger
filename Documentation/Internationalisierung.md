@@ -38,6 +38,10 @@ Menüleiste, Statusleiste und Kartenhinweise, Willkommensbild, Werkzeugleiste, P
 - Player-Prüfung an Grundorf auf Deutsch und im Live-Wechsel Englisch nach Deutsch (Hauptfenster, Straßenwerkzeug, Straßenbauer, Objekte, Satellit, Gelände, Einstellungen, Neue Karte, Fehlerbericht).
 - Nicht ausführbar auf diesem Rechner: der GitHub-Workflow (nur das .NET SDK 2.1 vorhanden); seine Quellen sind mit `csc` geprüft.
 
+## Meldungen der OMSI-Ebene (Muster am Beispiel der Linienplaner)
+
+Die Ebene `Editor.OMSI` kennt keine Sprachdateien. Wo sie dem Nutzer etwas sagen muss (zuerst die Probleme von `OmsiTripPlanner` und `OmsiTrackPlanner`), gibt sie **Code und Argumente** zurück (`OmsiPlanProblem` mit `OmsiPlanProblemCode`, Haltestelle, von, nach, Meter, Wegpunkt-Kennzeichen), nicht einen Text. Die Oberfläche bildet den Code auf einen Schlüssel ab (`LinePlanProblems.Key`, `line.problem.*`) und setzt die Argumente mit `Loc.T` ein (`LinePlanProblems.Text`). `ToString()` des Problems bleibt der englische Text für das Log und für Tests der OMSI-Ebene. Ein Test (`LinePlanProblemsTests`) stellt die Vollständigkeit sicher: jeder Code hat einen eigenen Schlüssel in jeder Sprache, nur mit den Platzhaltern des Problems, und der englische Text jedes Codes gleicht `ToString()`. Zahlen werden vorher gerundet (`WholeMetres`, Hälften von Null weg wie `ToString("0")`) und ohne Tausendertrennung gezeigt. Wer einen neuen Code anlegt, ergänzt Schlüssel in allen Sprachen und die Probe in diesem Test; sonst schlägt er fehl.
+
 ## Bekannte Einschränkungen
 
 - Rückgängig-Beschreibungen und Statusmeldungen, in die schon übersetzte Teile eingebaut sind (`SetStatus` statt `SetStatusT`), behalten nach einem Sprachwechsel ihre damalige Sprache.

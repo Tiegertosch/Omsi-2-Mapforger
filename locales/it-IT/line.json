@@ -63,5 +63,17 @@
   "line.stop.tooltip": "Clicca per selezionarla, trascina per cambiare l'ordine, Canc la toglie.",
   "line.stop.new.double": "Una fermata non ancora nell'orario: fai doppio clic sul nome per scriverne uno",
   "line.move.left": "Sposta a sinistra",
-  "line.move.right": "Sposta a destra"
+  "line.move.right": "Sposta a destra",
+  "line.network.rail": "Lettura dei binari della mappa...",
+  "line.problem.a_waypoint": "un punto di passaggio",
+  "line.problem.too_few_stops": "Una corsa richiede almeno due fermate.",
+  "line.problem.stop_no_lane": "{stop} non ha nessuna corsia accanto.",
+  "line.problem.no_way": "Nessun percorso porta da {from} a {to}.",
+  "line.problem.no_way_waypoints": "Nessun percorso porta da {from} a {to} attraverso i suoi punti di passaggio.",
+  "line.problem.waypoint_no_lane": "Un punto di passaggio tra {from} e {to} non è vicino a una corsia.",
+  "line.problem.lane_unlisted_tile": "Una corsia tra {from} e {to} si trova su una tessera che la mappa non elenca.",
+  "line.problem.stop_no_rail": "La fermata {stop} non ha binari entro {metres} m.",
+  "line.problem.waypoint_no_rail": "Un punto di passaggio non ha binari entro {metres} m.",
+  "line.problem.no_rail_way": "Nessun percorso porta sui binari da {from} a {to}.",
+  "line.problem.no_rail_way_first_last": "Nessun percorso porta sui binari dalla prima all'ultima fermata."
 }

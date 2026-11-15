@@ -63,5 +63,17 @@
   "line.stop.tooltip": "Haz clic para seleccionarla, arrástrala para cambiar el orden, Supr la quita.",
   "line.stop.new.double": "Una parada que aún no está en el horario: haz doble clic en su nombre para escribir uno",
   "line.move.left": "Mover a la izquierda",
-  "line.move.right": "Mover a la derecha"
+  "line.move.right": "Mover a la derecha",
+  "line.network.rail": "Leyendo las vías del mapa...",
+  "line.problem.a_waypoint": "un punto de paso",
+  "line.problem.too_few_stops": "Un viaje necesita al menos dos paradas.",
+  "line.problem.stop_no_lane": "{stop} no tiene ningún carril al lado.",
+  "line.problem.no_way": "Ningún camino lleva de {from} a {to}.",
+  "line.problem.no_way_waypoints": "Ningún camino lleva de {from} a {to} por sus puntos de paso.",
+  "line.problem.waypoint_no_lane": "Un punto de paso entre {from} y {to} no está cerca de un carril.",
+  "line.problem.lane_unlisted_tile": "Un carril entre {from} y {to} está en una casilla que el mapa no incluye.",
+  "line.problem.stop_no_rail": "La parada {stop} no tiene ninguna vía a menos de {metres} m.",
+  "line.problem.waypoint_no_rail": "Un punto de paso no tiene ninguna vía a menos de {metres} m.",
+  "line.problem.no_rail_way": "Ningún camino lleva por las vías de {from} a {to}.",
+  "line.problem.no_rail_way_first_last": "Ningún camino lleva por las vías de la primera a la última parada."
 }

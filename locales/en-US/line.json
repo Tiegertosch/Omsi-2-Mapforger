@@ -63,5 +63,17 @@
   "line.stop.tooltip": "Click to select it, drag it to change the order, Delete takes it out.",
   "line.stop.new.double": "A stop not in the timetable yet: double-click its name to type one",
   "line.move.left": "Move left",
-  "line.move.right": "Move right"
+  "line.move.right": "Move right",
+  "line.network.rail": "Reading the rails of the map...",
+  "line.problem.a_waypoint": "a waypoint",
+  "line.problem.too_few_stops": "A trip needs at least two stops.",
+  "line.problem.stop_no_lane": "{stop} has no vehicle lane beside it.",
+  "line.problem.no_way": "No way leads from {from} to {to}.",
+  "line.problem.no_way_waypoints": "No way leads from {from} to {to} over its waypoints.",
+  "line.problem.waypoint_no_lane": "A waypoint between {from} and {to} is not near a vehicle lane.",
+  "line.problem.lane_unlisted_tile": "A lane between {from} and {to} lies on a tile the map does not list.",
+  "line.problem.stop_no_rail": "The stop {stop} has no rail within {metres} m.",
+  "line.problem.waypoint_no_rail": "A waypoint has no rail within {metres} m.",
+  "line.problem.no_rail_way": "No way leads over the rails from {from} to {to}.",
+  "line.problem.no_rail_way_first_last": "No way leads over the rails from the first to the last stop."
 }

@@ -63,5 +63,17 @@
   "line.stop.tooltip": "Kliknutím vybereš, tažením změníš pořadí, Delete ji odstraní.",
   "line.stop.new.double": "Zastávka, která ještě není v jízdním řádu: dvojklikem na název ho napíšeš",
   "line.move.left": "Doleva",
-  "line.move.right": "Doprava"
+  "line.move.right": "Doprava",
+  "line.network.rail": "Čtu koleje mapy...",
+  "line.problem.a_waypoint": "průjezdního bodu",
+  "line.problem.too_few_stops": "Jízda potřebuje alespoň dvě zastávky.",
+  "line.problem.stop_no_lane": "{stop} nemá vedle sebe jízdní pruh.",
+  "line.problem.no_way": "Z {from} do {to} nevede žádná cesta.",
+  "line.problem.no_way_waypoints": "Z {from} do {to} nevede přes průjezdní body žádná cesta.",
+  "line.problem.waypoint_no_lane": "Průjezdní bod mezi {from} a {to} neleží u jízdního pruhu.",
+  "line.problem.lane_unlisted_tile": "Pruh mezi {from} a {to} leží na dlaždici, kterou mapa neuvádí.",
+  "line.problem.stop_no_rail": "Zastávka {stop} nemá kolej do {metres} m.",
+  "line.problem.waypoint_no_rail": "Průjezdní bod nemá kolej do {metres} m.",
+  "line.problem.no_rail_way": "Po kolejích nevede žádná cesta z {from} do {to}.",
+  "line.problem.no_rail_way_first_last": "Po kolejích nevede žádná cesta z první do poslední zastávky."
 }

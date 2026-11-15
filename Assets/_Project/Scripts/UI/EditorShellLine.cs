@@ -377,7 +377,7 @@ namespace OmsiMapEditor.UI
         {
             if (lineRail ? lineRailNetwork == null : lineNetwork == null)
             {
-                lineOptions.ShowResult(Loc.T("line.network"), false);
+                lineOptions.ShowResult(lineRail ? Loc.T("line.network.rail") : Loc.T("line.network"), false);
                 return;
             }
             var text = new List<string>();
@@ -394,7 +394,7 @@ namespace OmsiMapEditor.UI
                     else
                     {
                         problem = true;
-                        text.Add(Loc.T(pair.Key + ".problem", ("problems", string.Join(" ", pair.Value.Problems)))); // i18n:keys
+                        text.Add(Loc.T(pair.Key + ".problem", ("problems", LinePlanProblems.Join(pair.Value.Problems)))); // i18n:keys
                     }
                 }
                 lineOptions.ShowResult(string.Join("\n", text), problem);
@@ -410,7 +410,7 @@ namespace OmsiMapEditor.UI
                 else
                 {
                     problem = true;
-                    text.Add(Loc.T(pair.Key + ".problem", ("problems", string.Join(" ", pair.Value.Problems)))); // i18n:keys
+                    text.Add(Loc.T(pair.Key + ".problem", ("problems", LinePlanProblems.Join(pair.Value.Problems)))); // i18n:keys
                 }
             }
             if (lineHoverText.Length > 0)

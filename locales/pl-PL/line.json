@@ -63,5 +63,17 @@
   "line.stop.tooltip": "Kliknij, aby zaznaczyć, przeciągnij, aby zmienić kolejność, Delete usuwa.",
   "line.stop.new.double": "Przystanek, którego nie ma jeszcze w rozkładzie: kliknij dwukrotnie nazwę, aby ją wpisać",
   "line.move.left": "W lewo",
-  "line.move.right": "W prawo"
+  "line.move.right": "W prawo",
+  "line.network.rail": "Czytam tory mapy...",
+  "line.problem.a_waypoint": "punktu przejazdu",
+  "line.problem.too_few_stops": "Kurs wymaga co najmniej dwóch przystanków.",
+  "line.problem.stop_no_lane": "{stop} nie ma obok pasa ruchu.",
+  "line.problem.no_way": "Żadna droga nie prowadzi z {from} do {to}.",
+  "line.problem.no_way_waypoints": "Żadna droga nie prowadzi z {from} do {to} przez punkty przejazdu.",
+  "line.problem.waypoint_no_lane": "Punkt przejazdu między {from} a {to} nie leży przy pasie ruchu.",
+  "line.problem.lane_unlisted_tile": "Pas między {from} a {to} leży na kafelku, którego mapa nie wymienia.",
+  "line.problem.stop_no_rail": "Przystanek {stop} nie ma toru w promieniu {metres} m.",
+  "line.problem.waypoint_no_rail": "Punkt przejazdu nie ma toru w promieniu {metres} m.",
+  "line.problem.no_rail_way": "Żadna droga po torach nie prowadzi z {from} do {to}.",
+  "line.problem.no_rail_way_first_last": "Żadna droga po torach nie prowadzi z pierwszego do ostatniego przystanku."
 }

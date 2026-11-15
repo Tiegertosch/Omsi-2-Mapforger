@@ -63,5 +63,17 @@
   "line.stop.tooltip": "Anklicken zum Auswählen, ziehen ändert die Reihenfolge, Entf nimmt sie heraus.",
   "line.stop.new.double": "Eine Haltestelle, die noch nicht im Fahrplan steht: Doppelklick auf den Namen, um einen einzutippen",
   "line.move.left": "Nach links",
-  "line.move.right": "Nach rechts"
+  "line.move.right": "Nach rechts",
+  "line.network.rail": "Lese die Gleise der Karte...",
+  "line.problem.a_waypoint": "einem Wegpunkt",
+  "line.problem.too_few_stops": "Eine Fahrt braucht mindestens zwei Haltestellen.",
+  "line.problem.stop_no_lane": "{stop} hat keine Fahrspur daneben.",
+  "line.problem.no_way": "Kein Weg führt von {from} nach {to}.",
+  "line.problem.no_way_waypoints": "Kein Weg führt von {from} über die Wegpunkte nach {to}.",
+  "line.problem.waypoint_no_lane": "Ein Wegpunkt zwischen {from} und {to} liegt nicht an einer Fahrspur.",
+  "line.problem.lane_unlisted_tile": "Eine Spur zwischen {from} und {to} liegt auf einer Kachel, die die Karte nicht aufführt.",
+  "line.problem.stop_no_rail": "Die Haltestelle {stop} hat kein Gleis im Umkreis von {metres} m.",
+  "line.problem.waypoint_no_rail": "Ein Wegpunkt hat kein Gleis im Umkreis von {metres} m.",
+  "line.problem.no_rail_way": "Kein Weg führt über die Gleise von {from} nach {to}.",
+  "line.problem.no_rail_way_first_last": "Kein Weg führt über die Gleise von der ersten zur letzten Haltestelle."
 }
