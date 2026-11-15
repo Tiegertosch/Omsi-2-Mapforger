@@ -426,6 +426,8 @@
 .option-icon { width: 28px; height: 28px; margin: 0 2px 0 0; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-field); border-width: 0; border-radius: var(--mf-radius-md); }
 .option-icon.option-icon-locked { opacity: 0.45; }
 .option-icon:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
+.option-icon.option-icon-danger { color: var(--mf-color-error); }
+.option-icon.option-icon-danger:hover { color: var(--mf-color-error); background-color: var(--mf-color-panel-hover); }
 .option-icon.panel-tab-active, .option-icon.panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
 /* Every icon of an option column is 16 x 16 px in a box of 28 x 28 px, whatever kind of control holds it. */
 .option-icon > .icon, .option-switch .icon, .option-value-icon { flex-grow: 0; flex-shrink: 0; width: 16px; height: 16px; }
@@ -728,6 +730,13 @@
 .paint-add-field > .new-map-dropdown, .paint-add-field > .picker-field { width: 100%; flex-grow: 0; }
 .paint-add-actions { width: 236px; flex-grow: 0; margin: 0 var(--mf-space-2) var(--mf-space-1) 0; }
 
+/* The traffic rules tool (ADR 098, M4): sign tiles that can be dragged to the map, and the sign that follows the pointer meanwhile. */
+.traffic-tile:focus { border-color: var(--mf-color-text-secondary); }
+.traffic-tile.picker-tile-selected:focus { border-color: var(--mf-color-accent); }
+.traffic-sign { flex-grow: 1; }
+.traffic-ghost { opacity: 0.92; }
+.traffic-ghost-icon { align-items: center; justify-content: center; color: var(--mf-color-accent); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-md); }
+.traffic-ghost-icon > .icon { width: 28px; height: 28px; }
 /* Every text input of the app, also Integer/Float/DoubleField (their input is a .unity-base-text-field__input as well): a light caret,
    a visible selection and an accent border while focused. The class is doubled to outrank the default theme. The border colour changes
    only, so nothing moves. Keep this at the end: it must come after the per-field rules above. Unity 6.6 has no caret blink for UI Toolkit. */
