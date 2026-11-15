@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Scava un lago o il letto di un fiume sotto l'acqua dell'tile, oppure 0,3 m sotto il terreno dove inizia la corsa, e deposita l'acqua sull'tiles che raggiunge; non si riempie mai",
   "terrain.mode.ramp.tooltip": "Clicca dove inizia e dove finisce: il terreno in mezzo diventa un pendio uniforme largo quanto il pennello",
   "terrain.radius": "Raggio",
-  "terrain.radius.tooltip": "Quanto lontano arriva il pennello, da 3 a 150 m; funziona completamente al centro e dolcemente verso il bordo",
+  "terrain.radius.tooltip": "Quanto lontano arriva il pennello, da 3 a 150 m (da 1 a 150 m quando dipingi); agisce pienamente al centro e dolcemente verso il bordo",
   "terrain.strength": "Intensità",
   "terrain.strength.tooltip": "La velocità con cui funziona la spazzola mentre si tiene premuto il pulsante",
   "terrain.flatten": "Appiattisci a (m)",

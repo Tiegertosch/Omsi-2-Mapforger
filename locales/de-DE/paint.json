@@ -2,7 +2,6 @@
   "terrain.mode.paint": "Malen",
   "terrain.mode.paint.tooltip": "Geländetexturen malen",
   "paint.texture.tooltip": "Malt mit dieser Textur",
-  "paint.hint": "Wähle eine Textur und male dorthin, wo sie zu sehen sein soll. Eine später gemalte Textur deckt die davor ab; die erste ist der Boden, mit dem die ganze Karte beginnt.",
   "paint.base": "{name} (Basis)",
   "paint.mode.paint": "Malen",
   "paint.mode.paint.tooltip": "Legt die gewählte Textur auf und nimmt darüber gemalte Texturen unter dem Pinsel weg",

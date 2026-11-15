@@ -2,7 +2,6 @@
   "terrain.mode.paint": "Peindre",
   "terrain.mode.paint.tooltip": "Peindre des textures de terrain",
   "paint.texture.tooltip": "Peint avec cette texture",
-  "paint.hint": "Choisis une texture et peins là où elle doit apparaître. Une texture peinte plus tard recouvre les précédentes ; la première est le sol de départ de toute la carte.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Peindre",
   "paint.mode.paint.tooltip": "Pose la texture choisie et retire sous le pinceau les textures peintes par-dessus",

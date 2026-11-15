@@ -2,7 +2,6 @@
   "terrain.mode.paint": "Malovat",
   "terrain.mode.paint.tooltip": "Malovat textury terénu",
   "paint.texture.tooltip": "Maluje touto texturou",
-  "paint.hint": "Vyber texturu a maluj tam, kde se má zobrazit. Později namalovaná textura překryje ty před ní; první je podklad, kterým celá mapa začíná.",
   "paint.base": "{name} (základ)",
   "paint.mode.paint": "Malovat",
   "paint.mode.paint.tooltip": "Nanese vybranou texturu a pod štětcem odstraní textury namalované nad ní",

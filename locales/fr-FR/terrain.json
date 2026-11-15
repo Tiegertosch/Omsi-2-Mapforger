@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Creuse un lac ou un lit de rivière sous l'eau du tile, ou 0,3 m sous le sol là où commence le coup, et dépose de l'eau sur le tiles qu'il atteint ; ça ne remplit jamais",
   "terrain.mode.ramp.tooltip": "Cliquez là où cela commence et où cela se termine : le sol entre les deux devient une pente uniforme aussi large que les broussailles",
   "terrain.radius": "Rayon",
-  "terrain.radius.tooltip": "Jusqu'où les broussailles atteignent, 3 à 150 m ; il fonctionne pleinement au milieu et doucement vers son bord",
+  "terrain.radius.tooltip": "Jusqu'où le pinceau agit, de 3 à 150 m (de 1 à 150 m en peinture) ; il agit pleinement au centre et doucement vers le bord",
   "terrain.strength": "Intensité",
   "terrain.strength.tooltip": "À quelle vitesse la brosse fonctionne lorsque le bouton est maintenu enfoncé",
   "terrain.flatten": "Aplatir à (m)",

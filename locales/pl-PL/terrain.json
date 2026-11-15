@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Kopie jezioro lub koryto rzeki pod wodą tile lub 0,3 m pod ziemią w miejscu rozpoczęcia uderzenia i zalewa wodą tiles, do której dotrze; nigdy się nie zapełnia",
   "terrain.mode.ramp.tooltip": "Kliknij, gdzie się zaczyna i gdzie kończy: teren pomiędzy nimi staje się równym zboczem o szerokości zarośli",
   "terrain.radius": "Promień",
-  "terrain.radius.tooltip": "Jak daleko sięga szczotka, od 3 do 150 m; pracuje całkowicie w środku i miękko w kierunku brzegu",
+  "terrain.radius.tooltip": "Jak daleko sięga pędzel, od 3 do 150 m (przy malowaniu od 1 do 150 m); działa w pełni w środku i łagodnie ku krawędzi",
   "terrain.strength": "Siła",
   "terrain.strength.tooltip": "Jak szybko działa pędzel, gdy przycisk jest przytrzymywany",
   "terrain.flatten": "Spłaszcz do (m)",

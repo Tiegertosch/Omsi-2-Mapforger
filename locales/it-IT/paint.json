@@ -2,7 +2,6 @@
   "terrain.mode.paint": "Dipingi",
   "terrain.mode.paint.tooltip": "Dipingere le texture del terreno",
   "paint.texture.tooltip": "Dipinge con questa texture",
-  "paint.hint": "Scegli una texture e dipingi dove deve vedersi. Una texture dipinta dopo copre quelle prima; la prima è il terreno di partenza di tutta la mappa.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Dipingi",
   "paint.mode.paint.tooltip": "Applica la texture scelta e toglie sotto il pennello quelle dipinte sopra",

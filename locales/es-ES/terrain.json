@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Excava un lago o el lecho de un río bajo el agua del tile, o 0,3 m bajo tierra donde comienza el golpe, y deposita agua sobre el tiles al que llega; nunca se llena",
   "terrain.mode.ramp.tooltip": "Haga clic donde comienza y donde termina: el terreno intermedio se convierte en una pendiente uniforme tan ancha como la maleza.",
   "terrain.radius": "Radio",
-  "terrain.radius.tooltip": "Hasta dónde llega el matorral, de 3 a 150 m; trabaja completamente en el medio y suavemente hacia su borde",
+  "terrain.radius.tooltip": "Hasta dónde llega el pincel, de 3 a 150 m (al pintar, de 1 a 150 m); actúa por completo en el centro y suavemente hacia el borde",
   "terrain.strength": "Intensidad",
   "terrain.strength.tooltip": "Qué tan rápido funciona el cepillo mientras se mantiene presionado el botón",
   "terrain.flatten": "Aplanar a (m)",

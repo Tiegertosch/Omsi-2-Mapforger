@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Gräbt einen See oder ein Flussbett unter das Wasser der Kachel oder 0,3 m unter den Boden, wo der Strich beginnt, und legt Wasser auf die Kacheln, die er erreicht; er füllt nie auf",
   "terrain.mode.ramp.tooltip": "Klicke dorthin, wo sie beginnt und wo sie endet: Der Boden dazwischen wird eine gleichmäßige Steigung so breit wie der Pinsel",
   "terrain.radius": "Radius",
-  "terrain.radius.tooltip": "Wie weit der Pinsel reicht, 3 bis 150 m; in der Mitte wirkt er voll, zum Rand hin sanft",
+  "terrain.radius.tooltip": "Wie weit der Pinsel reicht, 3 bis 150 m (beim Malen 1 bis 150 m); in der Mitte wirkt er voll, zum Rand hin sanft",
   "terrain.strength": "Stärke",
   "terrain.strength.tooltip": "Wie schnell der Pinsel arbeitet, solange die Taste gehalten wird",
   "terrain.flatten": "Einebnen auf (m)",

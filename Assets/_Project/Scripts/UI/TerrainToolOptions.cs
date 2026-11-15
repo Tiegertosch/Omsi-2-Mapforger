@@ -322,8 +322,12 @@ namespace OmsiMapEditor.UI
         /// <summary>The brush chosen, or null for the ramp.</summary>
         public OmsiTerrainBrushMode? Mode { get; private set; }
 
-        /// <summary>The brush's radius in metres, 3 to 150 on a logarithmic slider as in openMapper.</summary>
-        public double Radius => Math.Round(3.0 * Math.Pow(50.0, radiusSlider.value), 1);
+        /// <summary>The brush's radius in metres on a logarithmic slider as in openMapper: 3 to 150 when shaping, 1 to 150 when painting.</summary>
+        public double Radius => Math.Round(MinimumRadius * Math.Pow(MaximumRadius / MinimumRadius, radiusSlider.value), 1);
+
+        private const double MaximumRadius = 150.0;
+
+        private double MinimumRadius => Painting ? 1.0 : 3.0;
 
         public double Strength => Math.Round(strengthSlider.value, 2);
 
@@ -348,7 +352,9 @@ namespace OmsiMapEditor.UI
         /// <summary>Switches the brush to painting ground textures.</summary>
         public void SetPainting()
         {
+            var radius = Radius;
             Painting = true;
+            KeepRadius(radius);
             Mode = null;
             foreach (var pair in modeButtons)
                 pair.Key.EnableInClassList("picker-tile-selected", false);
@@ -368,7 +374,9 @@ namespace OmsiMapEditor.UI
         public void SetMode(OmsiTerrainBrushMode? mode)
         {
             var wasPainting = Painting;
+            var radius = Radius;
             Painting = false;
+            KeepRadius(radius);
             Mode = mode;
             lastBrush = mode;
             Paint.style.display = DisplayStyle.None;
@@ -446,9 +454,17 @@ namespace OmsiMapEditor.UI
             strengthLabel.text = Strength.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
-        private static float RadiusToSlider(double metres)
+        private float RadiusToSlider(double metres)
         {
-            return (float)(Math.Log(Math.Max(3.0, Math.Min(150.0, metres)) / 3.0) / Math.Log(50.0));
+            var minimum = MinimumRadius;
+            return (float)(Math.Log(Math.Max(minimum, Math.Min(MaximumRadius, metres)) / minimum) / Math.Log(MaximumRadius / minimum));
+        }
+
+        /// <summary>Keeps the radius in metres when the slider's range changes between shaping and painting.</summary>
+        private void KeepRadius(double metres)
+        {
+            radiusSlider.SetValueWithoutNotify(RadiusToSlider(metres));
+            ShowValues();
         }
 
         private static VisualElement Row(VisualElement parent, string labelKey, out Label text)

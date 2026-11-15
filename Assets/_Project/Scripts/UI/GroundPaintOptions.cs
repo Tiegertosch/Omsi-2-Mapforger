@@ -101,9 +101,6 @@ namespace OmsiMapEditor.UI
             }
             addBox.Add(actions);
 
-            var hint = LocBindings.NewLabel("paint.hint");
-            hint.AddToClassList("panel-info");
-            Add(hint);
             SetPaintMode(OmsiPaintMode.Paint);
         }
 

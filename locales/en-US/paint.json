@@ -3,7 +3,6 @@
   "terrain.mode.paint.tooltip": "Paint ground textures",
   "@paint.texture.tooltip": "Second line of the tooltip of a ground texture tile on the Paint tab; the first line is the name of the texture (a file name), so keep this short",
   "paint.texture.tooltip": "Paints with this texture",
-  "paint.hint": "Choose a texture and paint where it should show. A texture painted later covers the ones before it; the first one is the ground the whole map starts as.",
   "paint.base": "{name} (base)",
   "paint.mode.paint": "Paint",
   "paint.mode.paint.tooltip": "Lays the chosen texture on and takes textures painted over it away under the brush",

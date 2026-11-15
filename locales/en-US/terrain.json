@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Digs a lake or a river bed under the water of the tile, or 0.3 m under the ground where the stroke starts, and lays water on the tiles it reaches; it never fills",
   "terrain.mode.ramp.tooltip": "Click where it starts and where it ends: the ground between becomes one even slope as wide as the brush",
   "terrain.radius": "Radius",
-  "terrain.radius.tooltip": "How far the brush reaches, 3 to 150 m; it works fully in the middle and softly towards its rim",
+  "terrain.radius.tooltip": "How far the brush reaches, 3 to 150 m (1 to 150 m when painting); it works fully in the middle and softly towards its rim",
   "terrain.strength": "Strength",
   "terrain.strength.tooltip": "How fast the brush works while the button is held",
   "terrain.flatten": "Flatten to (m)",

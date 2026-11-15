@@ -16,7 +16,7 @@
   "terrain.mode.water.tooltip": "Vykope jezero nebo koryto řeky pod vodou tile nebo 0,3 m pod zemí, kde začíná zdvih, a položí vodu na tiles, kam dosáhne; nikdy se nenaplní",
   "terrain.mode.ramp.tooltip": "Klikněte na místo, kde začíná a kde končí: země mezi nimi se stane jedním rovným svahem širokým jako kartáč",
   "terrain.radius": "Poloměr",
-  "terrain.radius.tooltip": "Jak daleko kartáč dosáhne, 3 až 150 m; působí plně uprostřed a měkce směrem k jeho okraji",
+  "terrain.radius.tooltip": "Jak daleko štětec dosáhne, 3 až 150 m (při malování 1 až 150 m); uprostřed působí plně, k okraji jemně",
   "terrain.strength": "Síla",
   "terrain.strength.tooltip": "Jak rychle kartáč pracuje, když držíte tlačítko",
   "terrain.flatten": "Vyrovnat na (m)",

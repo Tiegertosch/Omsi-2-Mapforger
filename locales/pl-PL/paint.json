@@ -2,7 +2,6 @@
   "terrain.mode.paint": "Maluj",
   "terrain.mode.paint.tooltip": "Malowanie tekstur terenu",
   "paint.texture.tooltip": "Maluje tą teksturą",
-  "paint.hint": "Wybierz teksturę i maluj tam, gdzie ma być widoczna. Tekstura namalowana później przykrywa wcześniejsze; pierwsza jest podłożem, od którego zaczyna cała mapa.",
   "paint.base": "{name} (podstawa)",
   "paint.mode.paint": "Maluj",
   "paint.mode.paint.tooltip": "Nakłada wybraną teksturę i usuwa pod pędzlem tekstury namalowane nad nią",
