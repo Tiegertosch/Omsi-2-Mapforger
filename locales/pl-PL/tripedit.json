@@ -19,5 +19,6 @@
   "timetable.stopping.1": "Na żądanie",
   "timetable.stopping.2": "Bez zatrzymania",
   "timetable.stopping.3": "Gdy przed czasem",
-  "timetable.stopping.4": "Na żądanie (4)"
+  "timetable.stopping.4": "Na żądanie (4)",
+  "line.edit.title": "Kurs {trip}"
 }

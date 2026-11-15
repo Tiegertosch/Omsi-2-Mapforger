@@ -19,5 +19,6 @@
   "timetable.stopping.1": "Sur demande",
   "timetable.stopping.2": "Sans arrêt",
   "timetable.stopping.3": "Si en avance",
-  "timetable.stopping.4": "Sur demande (4)"
+  "timetable.stopping.4": "Sur demande (4)",
+  "line.edit.title": "Course {trip}"
 }

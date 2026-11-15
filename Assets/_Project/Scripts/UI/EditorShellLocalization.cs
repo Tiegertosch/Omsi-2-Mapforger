@@ -123,6 +123,7 @@ namespace OmsiMapEditor.UI
             roadBuilder?.RefreshTexts();
             terrainOptions?.RefreshTexts();
             objectsPanel?.RefreshTexts();
+            lineOptions?.RefreshTexts();
             // The hint of the open tool is written when the pointer moves; it is written again now, in the new language.
             if (currentSummary != null)
             {

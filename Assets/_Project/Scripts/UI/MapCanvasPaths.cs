@@ -259,11 +259,11 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>Centres the view from above on a point in world metres, close enough to see the paths there.</summary>
-        public void CenterOnWorld(OmsiMapPoint point)
+        /// <summary>Centres the view from above on a point in world metres, close enough to see the paths there unless <paramref name="closeUp"/> is false (the zoom stays).</summary>
+        public void CenterOnWorld(OmsiMapPoint point, bool closeUp = true)
         {
             center = WorldToMap(point);
-            if (metersPerPixel > 0.25f)
+            if (closeUp && metersPerPixel > 0.25f)
                 metersPerPixel = 0.25f;
             hasView = true;
             isFitted = false;

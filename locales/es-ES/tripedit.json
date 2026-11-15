@@ -19,5 +19,6 @@
   "timetable.stopping.1": "Si se pide",
   "timetable.stopping.2": "Sin parar",
   "timetable.stopping.3": "Si va pronto",
-  "timetable.stopping.4": "Si se pide (4)"
+  "timetable.stopping.4": "Si se pide (4)",
+  "line.edit.title": "Viaje {trip}"
 }

@@ -448,6 +448,36 @@
 .option-slider > .option-slider-control { flex-grow: 1; margin: 0 var(--mf-space-1) 0 0; }
 .option-slider-value { width: 44px; margin: 0; padding: 0; -unity-text-align: middle-right; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); }
 .option-heading { margin: var(--mf-space-1) 0 var(--mf-space-1); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
+/* The route strip of the line tool (ADR 098, M4): the window beside its options, a thick track with a node for each stop, the stop's name aslant under
+   the node, and above the node the two buttons that move it one place left or right. */
+.line-panel { background-color: var(--mf-color-panel-glass); }
+.line-save { height: 30px; min-width: 150px; margin: 0; flex-grow: 0; }
+.line-strip-scroll { flex-grow: 1; min-height: 0; padding: var(--mf-space-1) var(--mf-space-2) 0 var(--mf-space-2); }
+.line-strip { flex-direction: row; align-items: flex-start; padding: var(--mf-space-1) 100px 0 0; }
+.line-stop { width: 76px; flex-shrink: 0; height: 120px; }
+.line-stop-waypoint-column { width: 40px; }
+.line-stop-moves { flex-direction: row; justify-content: center; align-items: center; height: 26px; margin-bottom: 6px; }
+.line-move { width: 30px; height: 26px; margin: 0 2px; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-raised); border-width: 0; border-radius: var(--mf-radius-md); }
+.line-move:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
+.line-move > .icon { flex-grow: 0; flex-shrink: 0; width: 14px; height: 14px; }
+.line-move.line-move-small { width: 18px; height: 22px; margin: 0 1px; }
+.line-move.line-move-small > .icon { width: 12px; height: 12px; }
+.line-move.line-move-locked, .line-move.line-move-locked:hover { opacity: 0.35; color: var(--mf-color-text-muted); background-color: var(--mf-color-panel-raised); }
+.line-stop-track { height: 26px; align-items: center; justify-content: center; }
+.line-track-bar { position: absolute; left: 0; right: 0; top: 10px; height: 6px; background-color: var(--mf-color-border); }
+.line-node { width: 22px; height: 22px; border-radius: 11px; border-width: 3px; border-color: var(--mf-color-panel); background-color: var(--mf-color-text-muted); }
+.line-node:hover { background-color: var(--mf-color-text-secondary); }
+.line-node-waypoint { width: 12px; height: 12px; border-width: 0; border-radius: 2px; rotate: 45deg; background-color: var(--mf-color-text-secondary); }
+.line-stop-selected .line-node { border-color: var(--mf-color-accent); }
+.line-stop-selected .line-node-waypoint { background-color: var(--mf-color-accent); }
+.line-stop-dragging { opacity: 0.45; }
+.line-stop-label { position: absolute; left: 50%; top: 62px; width: 118px; height: 16px; margin: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -unity-text-align: middle-left; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); rotate: 45deg; transform-origin: 0 50%; }
+.line-stop-selected .line-stop-label { color: var(--mf-color-text-primary); }
+.line-stop-remove { display: none; position: absolute; left: 50%; top: -6px; width: 16px; height: 16px; margin: 0 0 0 7px; padding: 2px; color: var(--mf-color-bg); background-color: var(--mf-color-error); border-width: 0; border-radius: 8px; }
+.line-stop-remove > .icon { flex-grow: 1; }
+.line-stop:hover .line-stop-remove, .line-stop-selected .line-stop-remove { display: flex; }
+.line-drop { position: absolute; top: 0; bottom: 0; width: 3px; background-color: var(--mf-color-accent); border-radius: 2px; }
+.line-stop-rename { position: absolute; top: 64px; width: 120px; }
 .picker-empty { position: absolute; left: var(--mf-space-3); right: var(--mf-space-3); top: 80px; }
 .panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
@@ -539,6 +569,12 @@
 .unity-scroller--vertical .unity-base-slider__dragger { width: 8px; left: 0; border-width: 0; border-radius: var(--mf-radius-sm); background-color: var(--mf-color-border); }
 .unity-scroller--vertical .unity-base-slider__dragger:hover { background-color: var(--mf-color-text-muted); }
 .unity-scroller--vertical > .unity-scroller__slider { margin: 0; top: 0; bottom: 0; }
+.unity-scroller--horizontal { height: 8px; margin-top: var(--mf-space-1); border-width: 0; background-color: rgba(0, 0, 0, 0); }
+.unity-scroller--horizontal > .unity-scroller__low-button, .unity-scroller--horizontal > .unity-scroller__high-button { display: none; }
+.unity-scroller--horizontal .unity-base-slider__tracker { height: 8px; top: 0; border-width: 0; border-radius: var(--mf-radius-sm); background-color: var(--mf-color-panel); }
+.unity-scroller--horizontal .unity-base-slider__dragger { height: 8px; top: 0; border-width: 0; border-radius: var(--mf-radius-sm); background-color: var(--mf-color-border); }
+.unity-scroller--horizontal .unity-base-slider__dragger:hover { background-color: var(--mf-color-text-muted); }
+.unity-scroller--horizontal > .unity-scroller__slider { margin: 0; left: 0; right: 0; }
 
 /* Foldouts */
 .unity-foldout__toggle { margin-left: 0; }

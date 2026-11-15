@@ -97,7 +97,7 @@ namespace OmsiMapEditor.UI
             };
             table[(int)EditorTool.Line] = new ToolEntry
             {
-                Tool = EditorTool.Line, Begin = BeginLineTool, End = EndLineTool, Escape = toDrag,
+                Tool = EditorTool.Line, Begin = BeginLineTool, End = EndLineTool, Escape = EscapeLineTool,
                 PointerMoved = UpdateLinePreview, Clicked = ClickLine,
             };
             for (var index = 0; index < table.Length; index++)

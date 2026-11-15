@@ -155,5 +155,12 @@ namespace OmsiMapEditor.Tests
             Assert.That(TerrainEscape.Next(false, true), Is.EqualTo(TerrainEscapeStep.ReleaseRampStart));
             Assert.That(TerrainEscape.Next(false, false), Is.EqualTo(TerrainEscapeStep.LeaveTool));
         }
+
+        [Test]
+        public void TheLineToolLetsGoOfTheSelectedStopBeforeItEndsTheTool()
+        {
+            Assert.That(LineEscape.Next(true), Is.EqualTo(LineEscapeStep.ClearStopSelection));
+            Assert.That(LineEscape.Next(false), Is.EqualTo(LineEscapeStep.LeaveTool));
+        }
     }
 }

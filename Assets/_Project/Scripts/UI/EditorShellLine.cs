@@ -48,11 +48,13 @@ namespace OmsiMapEditor.UI
         {
             lineOptions = new LineToolPanel();
             lineOptions.style.display = DisplayStyle.None;
+            lineOptions.HintChanged += (text, warning) => ShowToolHint(lineOptions, text, warning);
             lineOptions.NameChanged += name => lineName = name.Trim();
             lineOptions.GroupChanged += group => lineGroup = group;
             lineOptions.DirectionChosen += back =>
             {
                 lineBackMode = back && !lineRing;
+                lineStripSelected = -1;
                 LineChanged(false);
             };
             lineOptions.RingChanged += ring =>
@@ -60,11 +62,14 @@ namespace OmsiMapEditor.UI
                 lineRing = ring;
                 if (ring)
                     lineBackMode = false;
+                lineStripSelected = -1;
                 LineChanged(true);
             };
             lineOptions.WaypointModeChanged += on => lineWaypointMode = on;
             lineOptions.RailChanged += on =>
             {
+                if (on == lineRail)
+                    return;
                 lineRail = on;
                 if (on)
                 {
@@ -73,40 +78,12 @@ namespace OmsiMapEditor.UI
                 }
                 LineChanged(true);
             };
-            lineOptions.CopyReversedRequested += () =>
-            {
-                lineBack.Clear();
-                for (var index = lineOut.Count - 1; index >= 0; index--)
-                    lineBack.Add(lineOut[index]);
-                lineRing = false;
-                lineBackMode = true;
-                LineChanged(true);
-            };
-            lineOptions.ClearRequested += () =>
-            {
-                CurrentLineList.Clear();
-                if (!lineBackMode)
-                    lineRing = false;
-                LineChanged(true);
-            };
-            lineOptions.MoveRequested += (index, delta) =>
-            {
-                var list = CurrentLineList;
-                var target = index + delta;
-                if (index < 0 || index >= list.Count || target < 0 || target >= list.Count)
-                    return;
-                var item = list[index];
-                list.RemoveAt(index);
-                list.Insert(target, item);
-                LineChanged(true);
-            };
-            lineOptions.RemoveRequested += index =>
-            {
-                var list = CurrentLineList;
-                if (index >= 0 && index < list.Count)
-                    list.RemoveAt(index);
-                LineChanged(true);
-            };
+            lineOptions.CopyReversedRequested += CopyLineReversed;
+            lineOptions.ClearRequested += ClearLineStops;
+            lineOptions.MoveRequested += MoveLineStop;
+            lineOptions.RemoveRequested += RemoveLineStop;
+            lineOptions.SelectRequested += index => SelectLineStop(index, true);
+            lineOptions.CloseRequested += () => SetTool(EditorTool.Drag);
             lineOptions.StopNamed += (stop, name) =>
             {
                 if (string.IsNullOrWhiteSpace(name))
@@ -136,6 +113,8 @@ namespace OmsiMapEditor.UI
                 LineChanged(true);
             };
             lineOptions.SaveRequested += SaveLine;
+            // The panel's constructor said its hint before anyone listened; it says it again now.
+            lineOptions.RefreshTexts();
             host.Add(lineOptions);
         }
 
@@ -272,6 +251,7 @@ namespace OmsiMapEditor.UI
 
         private void EndLineTool()
         {
+            lineOptions?.CancelInteraction();
             mapCanvas?.EndRoad();
             mapCanvas?.ClearRoadPreview();
             lineNetworkTask = null;
@@ -317,7 +297,7 @@ namespace OmsiMapEditor.UI
                     SetStatusT("line.status.waypoint_off");
                     return;
                 }
-                list.Add(new OmsiTripStopChoice { Name = "waypoint", IsWaypoint = true, World = new OmsiMapPoint(x, y) });
+                LineAddWaypoint(new OmsiTripStopChoice { Name = "waypoint", IsWaypoint = true, World = new OmsiMapPoint(x, y) });
                 LineChanged(true);
                 return;
             }
@@ -333,7 +313,7 @@ namespace OmsiMapEditor.UI
             // Clicking the first stop again closes a ring.
             if (!lineBackMode && !lineRing && stops.Count >= 2 && stops[0] == stop)
                 lineRing = true;
-            list.Add(stop);
+            LineAddStop(stop);
             LineChanged(true);
         }
 
@@ -370,6 +350,8 @@ namespace OmsiMapEditor.UI
         {
             if (lineOptions == null)
                 return;
+            if (lineStripSelected >= CurrentLineList.Count)
+                lineStripSelected = -1;
             if (replan)
             {
                 lineHoverKey = -1;
@@ -379,7 +361,7 @@ namespace OmsiMapEditor.UI
                 lineTrackOut = lineRail ? TrackPlanOf(lineOut) : null;
                 lineTrackBack = lineRail && !lineRing ? TrackPlanOf(lineBack) : null;
             }
-            lineOptions.ShowDirection(lineBackMode, lineRing, lineWaypointMode, CurrentLineList);
+            lineOptions.ShowDirection(lineBackMode, lineRing, lineWaypointMode, lineRail, CurrentLineList, lineStripSelected);
             ShowLineResult();
             DrawLine();
         }
@@ -443,10 +425,25 @@ namespace OmsiMapEditor.UI
                 return;
             var marks = new List<OmsiMapPoint[]>();
             var chosen = new HashSet<int>(lineOut.Concat(lineBack).Where(item => !item.IsWaypoint).Select(item => item.ObjectId));
+            // The stop selected in the route strip keeps its circle, drawn in the accent colour instead.
+            var selected = lineStripSelected >= 0 && lineStripSelected < CurrentLineList.Count ? CurrentLineList[lineStripSelected] : null;
+            var accent = new List<OmsiMapPoint[]>();
             foreach (var stop in lineObjects)
-                marks.Add(Circle(stop.World, chosen.Contains(stop.ObjectId) ? 8.0 : 4.0));
+            {
+                var ring = Circle(stop.World, chosen.Contains(stop.ObjectId) ? 8.0 : 4.0);
+                if (selected != null && !selected.IsWaypoint && selected.ObjectId == stop.ObjectId)
+                    accent.Add(ring);
+                else
+                    marks.Add(ring);
+            }
             foreach (var item in lineOut.Concat(lineBack).Where(item => item.IsWaypoint))
-                marks.Add(Circle(item.World, 3.0));
+            {
+                var ring = Circle(item.World, 3.0);
+                if (ReferenceEquals(item, selected))
+                    accent.Add(ring);
+                else
+                    marks.Add(ring);
+            }
             foreach (var plan in new[] { linePlanOut, linePlanBack })
                 if (plan != null)
                     foreach (var leg in plan.Legs)
@@ -458,6 +455,7 @@ namespace OmsiMapEditor.UI
             var valid = (linePlanOut == null || linePlanOut.IsValid) && (linePlanBack == null || linePlanBack.IsValid) &&
                         (lineTrackOut == null || lineTrackOut.IsValid) && (lineTrackBack == null || lineTrackBack.IsValid);
             mapCanvas.SetRoadPreview(marks, valid, null, null, null);
+            mapCanvas.SetRoadPreviewAccent(accent);
         }
 
         private static string FileName(string text)
@@ -555,8 +553,7 @@ namespace OmsiMapEditor.UI
                     Debug.LogWarning("Timetable check: " + finding);
             }
             Debug.Log("Line: " + statusLabel?.text);
-            lineOut.Clear();
-            lineBack.Clear();
+            ResetLineDraft();
             lineRing = false;
             lineBackMode = false;
             lineName = string.Empty;
@@ -566,7 +563,7 @@ namespace OmsiMapEditor.UI
             LineChanged(true);
         }
 
-        /// <summary>For checks: -line [-lineName x] [-lineStops id,id,...] [-lineBack id,...] [-lineWaypoint x y] [-lineRing] [-lineSave].</summary>
+        /// <summary>For checks: -line [-lineName x] [-lineStops id,id,...] [-lineBack id,...] [-lineWaypoint x y] [-lineRing] [-lineSelect n] [-lineSave].</summary>
         private void RunLineArguments(Func<string, int, string> argument, string[] args)
         {
             if (Array.IndexOf(args, "-line") < 0 || session == null || !session.CanEdit)
@@ -620,6 +617,8 @@ namespace OmsiMapEditor.UI
             if (argument("-lineBack", 1) != null && !lineRing)
                 lineBackMode = Array.IndexOf(args, "-lineBackMode") >= 0;
             LineChanged(true);
+            if (int.TryParse(argument("-lineSelect", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var selectIndex))
+                SelectLineStop(selectIndex, false);
             Debug.Log("Line plan: out " + (linePlanOut == null ? "none" : linePlanOut.IsValid ? Math.Round(linePlanOut.LengthMeters) + " m" : string.Join(" ", linePlanOut.Problems)) +
                       ", back " + (linePlanBack == null ? "none" : linePlanBack.IsValid ? Math.Round(linePlanBack.LengthMeters) + " m" : string.Join(" ", linePlanBack.Problems)));
             if (lineRail)

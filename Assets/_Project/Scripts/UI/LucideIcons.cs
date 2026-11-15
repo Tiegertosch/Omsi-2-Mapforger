@@ -210,6 +210,12 @@ namespace OmsiMapEditor.UI
             ["scissors"] = new[] { "M3 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0", "M8.12 8.12 12 12", "M20 4 8.12 15.88", "M3 18a3 3 0 1 0 6 0a3 3 0 1 0-6 0", "M14.8 14.8 20 20" },
             // The tab of the speed signs in the traffic rules tool (ADR 098, M4): a round sign with 50, drawn here in Lucide's style.
             ["speed-sign"] = new[] { "M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0", "M10.5 9H7.5v3h3v3h-3", "M13.5 9h3v6h-3z" },
+            // The options of the line tool (ADR 098, M4), from lucide-static 0.454.0.
+            ["arrow-right"] = new[] { "M5 12h14", "m12 5 7 7-7 7" },
+            ["arrow-left"] = new[] { "m12 19-7-7 7-7", "M19 12H5" },
+            ["repeat"] = new[] { "m17 2 4 4-4 4", "M3 11v-1a4 4 0 0 1 4-4h14", "m7 22-4-4 4-4", "M21 13v1a4 4 0 0 1-4 4H3" },
+            ["train-front"] = new[] { "M8 3.1V7a4 4 0 0 0 8 0V3.1", "m9 15-1-1", "m15 15 1-1", "M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z", "m8 19-2 3", "m16 19 2 3" },
+            ["copy"] = new[] { "M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z", "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" },
         };
     }
 }

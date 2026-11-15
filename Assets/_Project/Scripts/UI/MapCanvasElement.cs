@@ -272,6 +272,7 @@ namespace OmsiMapEditor.UI
 
         // Heights of the preview points, for the 3D view; null where none were given.
         private readonly List<float[]> roadPreviewHeights = new List<float[]>();
+        private readonly List<Vector2[]> roadAccent = new List<Vector2[]>();
         private bool roadPreviewValid;
         private readonly List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>> roadIssues = new List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>>();
         private Vector2? roadSnap;
@@ -993,6 +994,7 @@ namespace OmsiMapEditor.UI
         {
             roadPreview.Clear();
             roadPreviewHeights.Clear();
+            roadAccent.Clear();
             roadIssues.Clear();
             if (pieces != null)
             {
@@ -1086,8 +1088,24 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>Pieces of the road preview to draw in the accent colour instead of the preview colour (such as the selected stop of the line tool); null for none. Call after <see cref="SetRoadPreview"/>, which clears them.</summary>
+        public void SetRoadPreviewAccent(IEnumerable<OmsiMapPoint[]> pieces)
+        {
+            roadAccent.Clear();
+            if (pieces != null)
+                foreach (var piece in pieces)
+                {
+                    var points = new Vector2[piece.Length];
+                    for (var index = 0; index < piece.Length; index++)
+                        points[index] = WorldToMap(piece[index]);
+                    roadAccent.Add(points);
+                }
+            MarkDirtyRepaint();
+        }
+
         public void ClearRoadPreview()
         {
+            roadAccent.Clear();
             roadGuides.Clear();
             roadGuideHeights.Clear();
             markingAnchors.Clear();
@@ -1891,7 +1909,7 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void DrawRoad(Painter2D painter, Rect visible)
         {
-            if (!roadMode && roadPreview.Count == 0)
+            if (!roadMode && roadPreview.Count == 0 && roadAccent.Count == 0)
                 return;
             if (roadMode && ShowSplineEnds && metersPerPixel <= FreeEndMetersPerPixel)
             {
@@ -1940,6 +1958,19 @@ namespace OmsiMapEditor.UI
                     painter.Fill();
                 }
             }
+            if (roadAccent.Count > 0)
+            {
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                painter.strokeColor = handleFillColor;
+                painter.lineWidth = 6f;
+                foreach (var piece in roadAccent)
+                    StrokePolyline(painter, piece);
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 3f;
+                foreach (var piece in roadAccent)
+                    StrokePolyline(painter, piece);
+            }
             if (roadStart.HasValue)
             {
                 painter.fillColor = placementColor;
@@ -1968,7 +1999,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The road tool in 3D: free spline ends, the planned road at its heights, its issues and the snap ring.</summary>
         private void DrawRoad3D(Painter2D painter, MapOrbitCamera camera)
         {
-            if (!roadMode && roadPreview.Count == 0)
+            if (!roadMode && roadPreview.Count == 0 && roadAccent.Count == 0)
                 return;
             const float lift = 0.3f;
             if (roadMode)
@@ -2028,6 +2059,20 @@ namespace OmsiMapEditor.UI
                     var world = new List<Vector3>(points.Length);
                     for (var point = 0; point < points.Length; point++)
                         world.Add(new Vector3(points[point].x, (heights != null ? heights[point] : GroundAt(points[point])) + lift, points[point].y));
+                    StrokeWorldLine(painter, camera, world);
+                }
+            }
+            for (var pass = 0; pass < 2 && roadAccent.Count > 0; pass++)
+            {
+                painter.strokeColor = pass == 0 ? handleFillColor : splineColor;
+                painter.lineWidth = pass == 0 ? 6f : 3f;
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                foreach (var points in roadAccent)
+                {
+                    var world = new List<Vector3>(points.Length);
+                    foreach (var point in points)
+                        world.Add(new Vector3(point.x, GroundAt(point) + lift, point.y));
                     StrokeWorldLine(painter, camera, world);
                 }
             }

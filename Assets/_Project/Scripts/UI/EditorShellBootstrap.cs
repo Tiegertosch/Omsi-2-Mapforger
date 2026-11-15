@@ -6364,7 +6364,12 @@ namespace OmsiMapEditor.UI
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
-                if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Rows && selectedRow != null)
+                // The route strip of the line tool comes first: Delete takes out its selected stop, not the selected objects.
+                if (LineStripKey(evt.keyCode, false))
+                {
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Delete && activeTool == EditorTool.Rows && selectedRow != null)
                 {
                     DeleteSelectedRow();
                     evt.StopPropagation();
@@ -6426,7 +6431,11 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (evt.keyCode == KeyCode.C && !evt.shiftKey)
+            if (LineStripKey(evt.keyCode, true))
+            {
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.C && !evt.shiftKey)
             {
                 CopySelection();
                 evt.StopPropagation();

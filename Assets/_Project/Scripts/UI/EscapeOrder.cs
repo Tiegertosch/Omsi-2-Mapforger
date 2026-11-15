@@ -65,6 +65,24 @@ namespace OmsiMapEditor.UI
         }
     }
 
+    /// <summary>What Esc does inside the line tool, one step at a time.</summary>
+    internal enum LineEscapeStep
+    {
+        /// <summary>Lets go of the selected stop of the route strip.</summary>
+        ClearStopSelection,
+        /// <summary>Nothing is selected: the tool ends.</summary>
+        LeaveTool,
+    }
+
+    /// <summary>The order of Esc inside the line tool (ADR 098, M4): the selected stop first, then the tool.</summary>
+    internal static class LineEscape
+    {
+        public static LineEscapeStep Next(bool stopSelected)
+        {
+            return stopSelected ? LineEscapeStep.ClearStopSelection : LineEscapeStep.LeaveTool;
+        }
+    }
+
     /// <summary>What the shell knows when Esc is pressed.</summary>
     internal struct EscapeState
     {
