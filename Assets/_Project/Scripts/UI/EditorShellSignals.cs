@@ -21,19 +21,12 @@ namespace OmsiMapEditor.UI
         /// <summary>A movement counts as under the pointer within this many pixels.</summary>
         private const float SignalPickPixels = 10f;
 
-        /// <summary>Colours that tell the signal groups apart; none of them is red, yellow or green, the colours of the lights.</summary>
-        private static readonly Color[] SignalGroupColours =
-        {
-            new Color(0.30f, 0.55f, 0.96f), new Color(0.66f, 0.44f, 1.00f), new Color(0.13f, 0.76f, 0.84f), new Color(0.94f, 0.42f, 0.78f),
-            new Color(0.48f, 0.55f, 1.00f), new Color(0.18f, 0.77f, 0.63f), new Color(0.79f, 0.63f, 1.00f), new Color(0.37f, 0.66f, 1.00f)
-        };
-
         private VisualElement signalOptions;
-        private Label signalJunctionLabel;
-        private Label signalOwnerLabel;
+        private SignalWindow signalWindow;
         private VisualElement signalGroupsBox;
-        private ScrollView signalMovementsBox;
-        private Label signalPlanLabel;
+        private VisualElement signalMovementsBox;
+        private Label signalEmptyNote;
+        private string signalPlanText = string.Empty;
         private OmsiTileSummary signalTile;
         private OmsiObjectRecord signalJunction;
         private OmsiGeneratedJunction signalMade;
@@ -43,76 +36,103 @@ namespace OmsiMapEditor.UI
         private readonly List<OmsiMapPoint[]> signalLines = new List<OmsiMapPoint[]>();
         private int signalSelected = -1;
 
-        private static Color SignalGroupColour(int light)
-        {
-            return SignalGroupColours[((light % SignalGroupColours.Length) + SignalGroupColours.Length) % SignalGroupColours.Length];
-        }
+        /// <summary>The group chosen in the list of groups (its movements are marked in the list and on the map), or -1.</summary>
+        private int signalSelectedGroup = -1;
+
+        /// <summary>The group whose delete button was clicked once and asks to be clicked again, or -1.</summary>
+        private int signalDeleteArmed = -1;
+
+        private readonly List<VisualElement> signalGroupRows = new List<VisualElement>();
+        private readonly List<(VisualElement Row, int ControlPath, int Light)> signalMovementRows = new List<(VisualElement, int, int)>();
 
         private bool SignalsEditable => signalMade != null && CanEdit && signalLayout != null;
 
+        /// <summary>
+        /// The window of the signals tool (ADR 085, ADR 098): one window that floats beside the map like the one for pictures from the air.
+        /// Its areas are the signal groups, the phases and times, the check and the assistant; the preview and the footer stay in view.
+        /// </summary>
         private void CreateSignalOptions()
         {
-            signalOptions = ToolCatalog.Options();
-            signalOptions.AddToClassList("signal-options");
+            signalWindow = new SignalWindow(() => SetTool(EditorTool.Drag), ChooseSignalArea, ChooseSignalPage);
+            signalOptions = signalWindow;
             signalOptions.style.display = DisplayStyle.None;
-            signalJunctionLabel = new Label();
-            signalJunctionLabel.AddToClassList("panel-info");
-            signalJunctionLabel.style.marginTop = 0f;
-            signalOptions.Add(signalJunctionLabel);
-            signalOwnerLabel = new Label();
-            signalOwnerLabel.AddToClassList("panel-info");
-            signalOptions.Add(signalOwnerLabel);
-            signalOptions.Add(CreateSignalTabs());
-            signalMovementsPage = new VisualElement();
-            var groupsTitle = LocBindings.NewLabel("signals.groups");
-            groupsTitle.AddToClassList("inspector-section-heading");
-            signalMovementsPage.Add(groupsTitle);
-            signalGroupsBox = new VisualElement();
-            signalMovementsPage.Add(signalGroupsBox);
-            var movementsTitle = LocBindings.NewLabel("signals.movements");
-            movementsTitle.AddToClassList("inspector-section-heading");
-            signalMovementsPage.Add(movementsTitle);
-            signalMovementsBox = new ScrollView(ScrollViewMode.Vertical);
-            signalMovementsBox.AddToClassList("signal-movements");
-            signalMovementsPage.Add(signalMovementsBox);
-            signalPlanLabel = new Label();
-            signalPlanLabel.AddToClassList("panel-info");
-            signalMovementsPage.Add(signalPlanLabel);
-            var headsTitle = LocBindings.NewLabel("signals.heads");
-            headsTitle.AddToClassList("inspector-section-heading");
-            signalMovementsPage.Add(headsTitle);
-            signalHeadsBox = new VisualElement();
-            signalMovementsPage.Add(signalHeadsBox);
-            signalOptions.Add(signalMovementsPage);
-            signalOptions.Add(CreateSignalPhasesPage());
-            signalOptions.Add(CreateSignalTimelinePage());
-            signalOptions.Add(CreateSignalCheckPage());
-            signalOptions.Add(CreateSignalWizardPage());
-            signalOptions.Add(signalWizardButtons);
-            signalOptions.Add(CreateSignalTemplatesPage());
-            signalOptions.Add(signalTemplatesButtons);
-            signalOptions.Add(signalDraftRow);
+            signalEmptyNote = LocBindings.NewLabel("signals.click_junction");
+            signalEmptyNote.AddToClassList("panel-info");
+            signalEmptyNote.AddToClassList("signal-empty");
+            signalWindow.Body.Add(signalEmptyNote);
+            signalWindow.AddPage(CreateSignalMovementsPage());
+            signalWindow.AddPage(CreateSignalPhasesPage());
+            signalWindow.AddPage(CreateSignalTimelinePage());
+            signalWindow.AddPage(CreateSignalCheckPage());
+            signalWindow.AddPage(CreateSignalWizardPage());
+            signalWindow.AddPage(CreateSignalTemplatesPage());
+            CreateSignalPreview(signalWindow.PreviewHost);
+            CreateSignalFooter();
             ShowSignalTab(SignalTab.Movements);
-            objectsPanelHost.Add(signalOptions);
+            // The window floats over the map: it is a child of the workspace, not of the row of the tool windows above the bottom bar.
+            (objectsPanelHost.parent ?? objectsPanelHost).Add(signalOptions);
+        }
+
+        /// <summary>
+        /// The groups page: the signal groups in a compact list on the left (colour, name, number of movements, delete; a button to add one), on
+        /// the right the movements by approach and lane with the group each obeys, and below them the heads that show the groups.
+        /// </summary>
+        private VisualElement CreateSignalMovementsPage()
+        {
+            var page = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            page.contentContainer.AddToClassList("signal-columns");
+            signalMovementsPage = page;
+            var groups = new VisualElement();
+            groups.AddToClassList("signal-column");
+            groups.AddToClassList("signal-column-groups");
+            var groupsHead = new VisualElement();
+            groupsHead.AddToClassList("signal-column-head");
+            var groupsTitle = LocBindings.NewLabel("signals.groups"); // i18n:keys
+            groupsTitle.AddToClassList("inspector-section-heading");
+            groupsTitle.AddToClassList("signal-column-title");
+            groupsHead.Add(groupsTitle);
+            signalAddGroupButton = SignalLabelButton("plus", "signals.group.add", "signals.group.add.tooltip", AddSignalGroup);
+            groupsHead.Add(signalAddGroupButton);
+            groups.Add(groupsHead);
+            signalGroupsBox = new VisualElement();
+            groups.Add(signalGroupsBox);
+            page.Add(groups);
+
+            var right = new VisualElement();
+            right.AddToClassList("signal-column");
+            right.AddToClassList("signal-column-movements");
+            var movementsTitle = LocBindings.NewLabel("signals.movements"); // i18n:keys
+            movementsTitle.AddToClassList("inspector-section-heading");
+            right.Add(movementsTitle);
+            signalMovementsBox = new VisualElement();
+            right.Add(signalMovementsBox);
+            var headsTitle = LocBindings.NewLabel("signals.heads"); // i18n:keys
+            headsTitle.AddToClassList("inspector-section-heading");
+            right.Add(headsTitle);
+            signalHeadsBox = new VisualElement();
+            right.Add(signalHeadsBox);
+            page.Add(right);
+            return page;
         }
 
         private void BeginSignalTool()
         {
             if (signalOptions == null || mapCanvas == null || currentSummary == null)
                 return;
+            signalPlanText = string.Empty;
             objectsPanel.style.display = DisplayStyle.None;
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.None;
             if (terrainOptions != null)
                 terrainOptions.style.display = DisplayStyle.None;
             signalOptions.style.display = DisplayStyle.Flex;
-            objectsPanelHost.style.display = DisplayStyle.Flex;
             mapCanvas.ShowSplineEnds = false;
             mapCanvas.BeginRoad();
             ClearSignalTarget();
             var item = selection.Count == 1 ? selection[0] : null;
             if (item?.Tile == null || !TargetSignalJunction(item.Tile, item.Record))
                 SetStatusT("signals.status.start");
+            RefreshSignalHint();
         }
 
         private void EndSignalTool()
@@ -125,8 +145,6 @@ namespace OmsiMapEditor.UI
             }
             if (signalOptions != null)
                 signalOptions.style.display = DisplayStyle.None;
-            if (objectsPanelHost != null && !objectsPanelOpen)
-                objectsPanelHost.style.display = DisplayStyle.None;
             ClearSignalTarget();
         }
 
@@ -148,14 +166,22 @@ namespace OmsiMapEditor.UI
             signalLayout = null;
             signalLines.Clear();
             signalSelected = -1;
-            if (signalJunctionLabel != null)
-                LocBindings.Text(signalJunctionLabel, "signals.click_junction");
-            if (signalOwnerLabel != null)
-                signalOwnerLabel.text = string.Empty;
+            signalSelectedGroup = -1;
+            signalDeleteArmed = -1;
+            signalGuard.Clear();
+            signalWindow?.ShowPrompt(null, false);
+            signalConfirmText = string.Empty;
+            signalPlanText = string.Empty;
+            signalIdentity.Reset(0);
             signalGroupsBox?.Clear();
             signalMovementsBox?.Clear();
-            if (signalPlanLabel != null)
-                signalPlanLabel.text = string.Empty;
+            signalHeadsBox?.Clear();
+            signalGroupRows.Clear();
+            signalMovementRows.Clear();
+            ShowSignalEmptyNote();
+            RenderSignalPreviewTracks();
+            RefreshSignalHint();
+            UpdateSignalRows();
             mapCanvas?.SetSignalMovements(null, null, null, double.NaN);
         }
 
@@ -180,7 +206,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Works on a crossing: reads its program and movements; false when it has fewer than two approaches.</summary>
-        private bool TargetSignalJunction(OmsiTileSummary tile, OmsiObjectRecord record)
+        private bool TargetSignalJunction(OmsiTileSummary tile, OmsiObjectRecord record, bool keepDraft = false)
         {
             var sceneryObject = PrioritySceneryObject(record.AssetPath);
             if (sceneryObject == null || OmsiJunctionPriorities.Arms(sceneryObject, null).Count < 2)
@@ -202,8 +228,22 @@ namespace OmsiMapEditor.UI
             if (signalLayout != null && signalLayout.Paths.Count != sceneryObject.Paths.Count)
                 signalLayout = null;
             if (!sameCrossing)
+            {
                 StopSignalPreview();
+                signalSelectedGroup = -1;
+                signalDeleteArmed = -1;
+                signalIdentity.Reset(program.Lights.Count);
+            }
+            else
+                signalIdentity.Sync(program.Lights.Count);
+            // A draft with changes that the caller wants kept (heads changed, an apply that failed) survives the crossing being read anew.
+            var keptDraft = sameCrossing && keepDraft && signalDirty ? signalDraft : null;
             ResetSignalDraft(!sameCrossing);
+            if (keptDraft != null && keptDraft.Lights.Count == program.Lights.Count && SignalsEditable)
+            {
+                signalDraft = keptDraft;
+                signalDirty = true;
+            }
             if (signalSelected >= crossing.Movements.Count)
                 signalSelected = -1;
             signalLines.Clear();
@@ -225,6 +265,10 @@ namespace OmsiMapEditor.UI
                 RenderSignalTemplates();
             RenderSignalDraft();
             UpdateSignalPreview();
+            RefreshSignalHint();
+            // Another crossing (not the same one read anew after Apply) is kept in sight beside the window, which stands over the map.
+            if (!sameCrossing)
+                KeepClearOfFloatingWindow(signalWindow, () => activeTool == EditorTool.Signals, () => ObjectWorldPoint(tile, record));
             SetStatusT("signals.status.target", ("id", record.Id), ("approaches", crossing.Approaches.Count), ("movements", crossing.Movements.Count),
                 ("groups", program.Lights.Count));
             return true;
@@ -250,21 +294,42 @@ namespace OmsiMapEditor.UI
             return points.ToArray();
         }
 
-        private void RefreshSignalTarget()
+        /// <summary>
+        /// Reads the crossing anew after files changed. Undo and redo put other files back, so a draft with changes is dropped, which the
+        /// status says (undo asks the draft first, see <see cref="UndoSignalDraft"/>). Changes of the heads and an apply that failed leave
+        /// the program as it was: the draft stays.
+        /// </summary>
+        private void RefreshSignalTarget(bool keepDraft = false)
         {
             if (signalJunction == null || signalTile == null)
                 return;
+            keepDraft |= signalApplying;
             var id = signalJunction.Id;
-            StopSignalPreview();
-            // Undo puts other files back: a draft with changes is dropped.
-            if (signalDirty)
+            if (!keepDraft)
+                StopSignalPreview();
+            if (signalDirty && !keepDraft)
             {
                 signalDirty = false;
                 SetStatusT("signals.status.discarded");
             }
             var current = signalTile.Objects.Find(candidate => candidate.Id == id);
-            if (current == null || !TargetSignalJunction(signalTile, current))
+            if (current == null || !TargetSignalJunction(signalTile, current, keepDraft))
                 ClearSignalTarget();
+        }
+
+        /// <summary>True while ApplySignals runs: a refresh of the crossing it causes must not drop the draft of a failed apply.</summary>
+        private bool signalApplying;
+
+        /// <summary>
+        /// Undo while the signals tool has a draft with changes takes back the draft first (the newest change), as the history holds only what
+        /// was applied; the next undo goes on in the history. Returns whether it took the key.
+        /// </summary>
+        private bool UndoSignalDraft()
+        {
+            if (activeTool != EditorTool.Signals || !SignalsEditable || !signalDirty)
+                return false;
+            DiscardSignalDraft();
+            return true;
         }
 
         private void UpdateSignalPreview()
@@ -287,61 +352,51 @@ namespace OmsiMapEditor.UI
                 if (SignalPreviewActive && proposed == null)
                     colours.Add(light >= 0 ? SignalStateColour(signalClockProgram.StateAt(light, signalClock.Time)) : (Color?)null);
                 else
-                    colours.Add(light >= 0 ? SignalGroupColour(light) : (Color?)null);
-                selected.Add(signalSelected >= 0 && signalCrossing.Movements[signalSelected].ControlPath == movement.ControlPath);
+                    colours.Add(light >= 0 ? (proposed != null ? SignalGroupColour(light) : SignalColourOf(light)) : (Color?)null);
+                selected.Add((signalSelected >= 0 && signalCrossing.Movements[signalSelected].ControlPath == movement.ControlPath) ||
+                             (signalSelectedGroup >= 0 && movement.Light == signalSelectedGroup && proposed == null));
             }
             mapCanvas.SetSignalMovements(signalLines, colours, selected, signalJunction.Height);
         }
 
-        /// <summary>The panel: the signal groups with their colours, then the movements by approach and lane with the group each obeys.</summary>
+        /// <summary>The page: the signal groups with their colours, then the movements by approach and lane with the group each obeys, then the heads.</summary>
         private void RenderSignalPanel()
         {
+            var scroll = signalMovementsPage as ScrollView;
+            var offset = scroll != null ? scroll.scrollOffset : default;
+            var focusKey = SignalFocus.Capture(signalMovementsPage);
             signalGroupsBox.Clear();
             signalMovementsBox.Clear();
+            signalGroupRows.Clear();
+            signalMovementRows.Clear();
+            ShowSignalEmptyNote();
             if (signalCrossing == null)
+            {
+                RefreshSignalHint();
+                UpdateSignalRows();
                 return;
-            LocBindings.Text(signalJunctionLabel, "signals.junction", ("id", signalJunction.Id), ("approaches", signalCrossing.Approaches.Count),
-                ("movements", signalCrossing.Movements.Count), ("groups", signalProgram.Lights.Count));
+            }
             var editable = SignalsEditable;
-            signalOwnerLabel.text = editable ? Loc.T("signals.owner.made")
-                : signalMade != null ? Loc.T(CanEdit ? "signals.owner.mismatch" : "signals.owner.readonly") // i18n:keys
-                : Loc.T("signals.owner.omsi");
             for (var light = 0; light < signalProgram.Lights.Count; light++)
                 signalGroupsBox.Add(SignalGroupRow(light, editable));
             if (signalProgram.Lights.Count == 0)
             {
-                var none = LocBindings.NewLabel("signals.groups.none");
+                // Without groups the assistant is offered first: its button in the navigation says so in its tooltip.
+                var none = LocBindings.NewLabel(editable ? "signals.wizard.offer" : "signals.groups.none"); // i18n:keys
                 none.AddToClassList("panel-info");
                 signalGroupsBox.Add(none);
             }
-            if (editable)
-            {
-                // Without groups the assistant is offered first (§6 of the brief); it stays at hand next to adding a group by hand.
-                if (signalProgram.Lights.Count == 0)
-                {
-                    var offer = LocBindings.NewLabel("signals.wizard.offer");
-                    offer.AddToClassList("panel-info");
-                    signalGroupsBox.Add(offer);
-                }
-                var buttons = new VisualElement();
-                buttons.AddToClassList("signal-group-row");
-                buttons.Add(SignalWizardButton());
-                buttons.Add(SignalTemplatesButton());
-                var add = LocBindings.WithTooltip(LocBindings.NewButton("signals.group.add", AddSignalGroup), "signals.group.add.tooltip");
-                add.AddToClassList("map-control-button");
-                buttons.Add(add);
-                signalGroupsBox.Add(buttons);
-            }
-            else if (signalProgram.Lights.Count > 0)
-            {
-                // A crossing that is only read: its program can still be kept as a template.
-                var buttons = new VisualElement();
-                buttons.AddToClassList("signal-group-row");
-                buttons.Add(SignalTemplatesButton());
-                signalGroupsBox.Add(buttons);
-            }
 
             var shown = new HashSet<int>();
+            var unassigned = signalCrossing.Movements.Where(movement => movement.Light < 0).Select(movement => movement.ControlPath).Distinct().Count();
+            // A crossing that is only read shows its groups as OMSI made them; "no group yet" would be no call to do anything.
+            if (unassigned > 0 && editable)
+            {
+                var warn = new Label(Loc.T("signals.movements.unassigned", ("count", unassigned)));
+                warn.AddToClassList("panel-info");
+                warn.AddToClassList("panel-info-warning");
+                signalMovementsBox.Add(warn);
+            }
             foreach (var approach in signalCrossing.Approaches)
             {
                 var heading = new Label(Loc.T("signals.approach", ("n", approach.Index + 1), ("lanes", approach.Lanes.Count)));
@@ -362,33 +417,51 @@ namespace OmsiMapEditor.UI
             }
             UpdateSignalPlan();
             RenderSignalHeads();
+            UpdateSignalSelection();
+            UpdateSignalRows();
+            if (scroll != null)
+                scroll.schedule.Execute(() => scroll.scrollOffset = offset);
+            // The rebuild must not take the cursor from the field being typed in (Tab to the next name).
+            SignalFocus.Restore(signalMovementsPage, focusKey);
         }
 
         private VisualElement SignalGroupRow(int light, bool editable)
         {
             var row = new VisualElement();
             row.AddToClassList("signal-group-row");
+            row.AddToClassList("signal-group-item");
             var chip = new VisualElement();
             chip.AddToClassList("signal-group-chip");
-            chip.style.backgroundColor = SignalGroupColour(light);
+            chip.style.backgroundColor = SignalColourOf(light);
             row.Add(chip);
             var name = new TextField { value = signalProgram.Lights[light].Name, isDelayed = true };
+            name.userData = "focus:group:" + signalIdentity.IdOf(light).ToString(CultureInfo.InvariantCulture);
             name.AddToClassList("picker-field");
             name.AddToClassList("signal-group-name");
             name.SetEnabled(editable);
             name.tooltip = Loc.T("signals.group.name.tooltip", ("n", light));
             name.RegisterValueChangedCallback(evt => RenameSignalGroup(light, evt.newValue));
             row.Add(name);
-            var count = new Label(Loc.T("signals.group.count", ("count", signalCrossing.Movements.Count(movement => movement.Light == light))));
+            var movements = signalCrossing.Movements.Where(movement => movement.Light == light).Select(movement => movement.ControlPath).Distinct().Count();
+            var count = new Label(Loc.T("signals.group.count", ("count", movements)));
             count.AddToClassList("signal-group-count");
             row.Add(count);
             if (editable)
             {
                 var remove = new Button(() => RemoveSignalGroup(light)) { tooltip = Loc.T("signals.group.remove.tooltip") };
                 remove.AddToClassList("panel-icon-button");
+                remove.EnableInClassList("signal-group-remove-armed", signalDeleteArmed == light);
                 remove.Add(new IconElement("trash-2"));
                 row.Add(remove);
             }
+            // A click on the row (not in the name field) chooses the group; its movements light up in the list and on the map.
+            row.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (evt.target is TextElement || evt.target is Button)
+                    return;
+                SelectSignalGroup(light);
+            });
+            signalGroupRows.Add(row);
             return row;
         }
 
@@ -400,10 +473,10 @@ namespace OmsiMapEditor.UI
             var together = signalCrossing.SharingControl(movement);
             var row = new VisualElement();
             row.AddToClassList("signal-movement-row");
-            row.EnableInClassList("signal-movement-selected", signalSelected >= 0 && signalCrossing.Movements[signalSelected].ControlPath == movement.ControlPath);
+            row.EnableInClassList("signal-movement-unassigned", movement.Light < 0);
             var chip = new VisualElement();
             chip.AddToClassList("signal-group-chip");
-            chip.style.backgroundColor = movement.Light >= 0 ? SignalGroupColour(movement.Light) : new Color(0.45f, 0.48f, 0.53f);
+            chip.style.backgroundColor = movement.Light >= 0 ? SignalColourOf(movement.Light) : SignalDark;
             row.Add(chip);
             var text = new Label(MovementText(together, lane));
             text.AddToClassList("signal-movement-text");
@@ -417,6 +490,7 @@ namespace OmsiMapEditor.UI
             row.Add(dropdown);
             row.RegisterCallback<ClickEvent>(_ => SelectSignalMovement(movement.Index));
             signalMovementsBox.Add(row);
+            signalMovementRows.Add((row, movement.ControlPath, movement.Light));
             if (together.Count > 1)
             {
                 var hint = LocBindings.NewLabel("signals.shared_lane");
@@ -454,23 +528,86 @@ namespace OmsiMapEditor.UI
         private void SelectSignalMovement(int index)
         {
             signalSelected = index;
-            RenderSignalPanel();
+            signalSelectedGroup = -1;
+            DisarmSignalDelete();
+            UpdateSignalSelection();
+            UpdateSignalPlan();
             UpdateSignalPreview();
         }
 
+        /// <summary>Chooses a group in the list: its movements are marked in the list and on the map. Nothing is rebuilt, so a field keeps its focus.</summary>
+        private void SelectSignalGroup(int light)
+        {
+            signalSelectedGroup = signalSelectedGroup == light ? -1 : light;
+            signalSelected = -1;
+            DisarmSignalDelete();
+            UpdateSignalSelection();
+            UpdateSignalPlan();
+            UpdateSignalPreview();
+        }
+
+        /// <summary>Takes back the question "delete this group?" when the person does something else.</summary>
+        private void DisarmSignalDelete()
+        {
+            if (signalDeleteArmed < 0)
+                return;
+            signalDeleteArmed = -1;
+            signalConfirmText = string.Empty;
+            foreach (var row in signalGroupRows)
+                row.Q<Button>()?.RemoveFromClassList("signal-group-remove-armed");
+        }
+
+        /// <summary>Marks the chosen group and the chosen movement in the lists in place.</summary>
+        private void UpdateSignalSelection()
+        {
+            for (var light = 0; light < signalGroupRows.Count; light++)
+                signalGroupRows[light].EnableInClassList("signal-group-selected", light == signalSelectedGroup);
+            var selectedPath = signalSelected >= 0 && signalCrossing != null && signalSelected < signalCrossing.Movements.Count ? signalCrossing.Movements[signalSelected].ControlPath : -1;
+            foreach (var entry in signalMovementRows)
+            {
+                entry.Row.EnableInClassList("signal-movement-selected", entry.ControlPath == selectedPath);
+                entry.Row.EnableInClassList("signal-movement-ingroup", signalSelectedGroup >= 0 && entry.Light == signalSelectedGroup);
+            }
+        }
+
+        /// <summary>Without a crossing the window shows the note to click one; the pages show with it.</summary>
+        private void ShowSignalEmptyNote()
+        {
+            if (signalWindow == null)
+                return;
+            signalEmptyNote.style.display = signalCrossing == null ? DisplayStyle.Flex : DisplayStyle.None;
+            ApplySignalPageVisibility();
+        }
+
+        /// <summary>Only the open page shows, and none without a crossing.</summary>
+        private void ApplySignalPageVisibility()
+        {
+            void Show(VisualElement page, SignalTab of)
+            {
+                if (page != null)
+                    page.style.display = signalTab == of && signalCrossing != null ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            Show(signalMovementsPage, SignalTab.Movements);
+            Show(signalPhasesPage, SignalTab.Phases);
+            Show(signalTimelinePage, SignalTab.Timeline);
+            Show(signalCheckPage, SignalTab.Check);
+            Show(signalWizardPage, SignalTab.Wizard);
+            Show(signalTemplatesPage, SignalTab.Templates);
+        }
+
+        /// <summary>What the next click does: the plan line of the movements page, shown in the status bar with the crossing's line.</summary>
         private void UpdateSignalPlan()
         {
-            if (signalPlanLabel == null)
-                return;
             if (signalCrossing == null)
-                signalPlanLabel.text = string.Empty;
+                signalPlanText = string.Empty;
             else if (!SignalsEditable)
-                signalPlanLabel.text = Loc.T("signals.plan.readonly");
+                signalPlanText = Loc.T("signals.plan.readonly");
             else if (signalSelected >= 0)
-                signalPlanLabel.text = Loc.T("signals.plan.selected", ("text", MovementText(signalCrossing.SharingControl(signalCrossing.Movements[signalSelected]),
+                signalPlanText = Loc.T("signals.plan.selected", ("text", MovementText(signalCrossing.SharingControl(signalCrossing.Movements[signalSelected]),
                     null)));
             else
-                signalPlanLabel.text = Loc.T("signals.plan.point");
+                signalPlanText = Loc.T("signals.plan.point");
+            RefreshSignalHint();
         }
 
         /// <summary>
@@ -504,6 +641,9 @@ namespace OmsiMapEditor.UI
             {
                 if (!ReferenceEquals(record, signalJunction))
                 {
+                    // A draft with changes is not dropped for another crossing without asking.
+                    if (signalJunction != null && !SignalMayLeave(new SignalExit { Kind = SignalExitKind.OtherCrossing, Payload = new SignalCrossingTarget { Tile = tile, ObjectId = record.Id } }))
+                        return;
                     signalSelected = -1;
                     if (!TargetSignalJunction(tile, record))
                         SetStatusT("signals.status.none_here");
@@ -557,16 +697,24 @@ namespace OmsiMapEditor.UI
 
         private void AddSignalGroup()
         {
-            if (!SignalsEditable)
+            if (!SignalsEditable || !SignalGate(AddSignalGroup))
                 return;
             var signals = CurrentSignals();
             var index = signals.Program.AddLight(Loc.T("signals.group.default_name", ("n", signals.Program.Lights.Count + 1)));
-            ApplySignals(signals, null, Loc.T("signals.done.added", ("name", signals.Program.Lights[index].Name), ("id", signalJunction.Id)));
+            signalDeleteArmed = -1;
+            // The new group takes the colour no group has; the groups before it keep theirs. The colours go back when the junction could not be made.
+            signalIdentity.Sync(signalProgram.Lights.Count);
+            var identities = signalIdentity.Snapshot();
+            signalIdentity.Added();
+            if (!ApplySignals(signals, null, Loc.T("signals.done.added", ("name", signals.Program.Lights[index].Name), ("id", signalJunction.Id))))
+                RestoreSignalIdentities(identities, signalSelectedGroup);
         }
 
         private void RenameSignalGroup(int light, string name)
         {
             if (!SignalsEditable || light >= signalProgram.Lights.Count)
+                return;
+            if (!SignalGate(() => RenameSignalGroup(light, name)))
                 return;
             name = (name ?? string.Empty).Trim();
             if (name.Length == 0 || name.StartsWith("[", StringComparison.Ordinal) || name == signalProgram.Lights[light].Name)
@@ -582,7 +730,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Takes a group away; refused while heads in the map show it, which would then show another group or none.</summary>
         private void RemoveSignalGroup(int light)
         {
-            if (!SignalsEditable || light >= signalProgram.Lights.Count)
+            if (!SignalsEditable || light >= signalProgram.Lights.Count || !SignalGate(() => RemoveSignalGroup(light)))
                 return;
             var heads = OmsiSignalHead.Of(currentSummary, signalTile, signalJunction.Id, path => PrioritySceneryObject(path)?.IsTrafficLight == true);
             var showing = heads.Count(head => (head.LightIndex ?? 0) == light);
@@ -591,9 +739,28 @@ namespace OmsiMapEditor.UI
                 SetStatusT("signals.status.heads_show", ("name", signalProgram.Lights[light].Name), ("count", showing));
                 return;
             }
+            // A group with movements asks once more: they lose their group, which the text says.
+            var obeying = signalCrossing.Movements.Where(movement => movement.Light == light).Select(movement => movement.ControlPath).Distinct().Count();
+            if (obeying > 0 && signalDeleteArmed != light)
+            {
+                signalDeleteArmed = light;
+                signalConfirmText = Loc.T("signals.group.remove.confirm", ("name", signalProgram.Lights[light].Name), ("count", obeying));
+                RenderSignalPanel();
+                return;
+            }
+            signalDeleteArmed = -1;
+            signalConfirmText = string.Empty;
             var signals = CurrentSignals();
             var name = signals.Program.Lights[light].Name;
             var map = signals.Program.RemoveLight(light);
+            signalIdentity.Sync(signalProgram.Lights.Count);
+            var identities = signalIdentity.Snapshot();
+            var selectedGroup = signalSelectedGroup;
+            signalIdentity.Removed(light);
+            if (signalSelectedGroup == light)
+                signalSelectedGroup = -1;
+            else if (signalSelectedGroup > light)
+                signalSelectedGroup--;
             foreach (var key in signals.WayLights.Keys.ToList())
             {
                 var moved = map[signals.WayLights[key]];
@@ -605,8 +772,19 @@ namespace OmsiMapEditor.UI
             signals.RemapExceptions(map);
             // Heads of the groups after it follow their group to its new number, in the same step.
             var relabel = heads.Where(head => head.LightIndex.HasValue && head.LightIndex.Value > light).ToList();
-            ApplySignals(signals, relabel.Count > 0 ? (Func<List<object>>)(() => RelabelHeads(relabel, map)) : null,
-                Loc.T("signals.done.removed", ("name", name), ("id", signalJunction.Id)));
+            if (!ApplySignals(signals, relabel.Count > 0 ? (Func<List<object>>)(() => RelabelHeads(relabel, map)) : null,
+                    Loc.T("signals.done.removed", ("name", name), ("id", signalJunction.Id))))
+                RestoreSignalIdentities(identities, selectedGroup);
+        }
+
+        /// <summary>A change of the groups was not written: the colours and the chosen group are as before it, and the lists show them again.</summary>
+        private void RestoreSignalIdentities(int[] identities, int selectedGroup)
+        {
+            signalIdentity.Restore(identities);
+            signalSelectedGroup = selectedGroup;
+            if (signalCrossing != null)
+                RenderSignalPanel();
+            RenderSignalDraft();
         }
 
         private List<object> RelabelHeads(List<OmsiSignalHead> heads, int[] map)
@@ -623,7 +801,10 @@ namespace OmsiMapEditor.UI
 
         private void AssignSignalGroup(int movementIndex, int light)
         {
-            if (!SignalsEditable || signalCrossing == null || movementIndex >= signalCrossing.Movements.Count)
+            // (a group that does not exist, from the command line, is refused instead of failing in the middle of the write)
+            if (!SignalsEditable || signalCrossing == null || movementIndex < 0 || movementIndex >= signalCrossing.Movements.Count || light >= signalProgram.Lights.Count)
+                return;
+            if (!SignalGate(() => AssignSignalGroup(movementIndex, light)))
                 return;
             var movement = signalCrossing.Movements[movementIndex];
             var way = WayOf(movement);
@@ -651,12 +832,26 @@ namespace OmsiMapEditor.UI
         /// Makes the junction again with these signals under Sceneryobjects\Mapforge and puts it in place of the old one, as one
         /// undo step together with <paramref name="more"/> (changes of heads), as the markings tool does (ADR 044).
         /// </summary>
-        private void ApplySignals(OmsiJunctionSignals signals, Func<List<object>> more, string done)
+        /// <returns>True when the junction was made and put in place; false when something refused or failed, and nothing was changed.</returns>
+        private bool ApplySignals(OmsiJunctionSignals signals, Func<List<object>> more, string done)
+        {
+            signalApplying = true;
+            try
+            {
+                return ApplySignalsCore(signals, more, done);
+            }
+            finally
+            {
+                signalApplying = false;
+            }
+        }
+
+        private bool ApplySignalsCore(OmsiJunctionSignals signals, Func<List<object>> more, string done)
         {
             if (!CanEdit)
             {
                 SetStatus(ReadOnlyMessage("readonly.action.edit_signals"));
-                return;
+                return false;
             }
             var record = signalJunction;
             var made = signalMade;
@@ -665,14 +860,14 @@ namespace OmsiMapEditor.UI
             if (rebuild == null)
             {
                 SetStatusT("lanes.status.mismatch", ("id", record.Id));
-                return;
+                return false;
             }
             var plain = PlainRoadTexture();
             var turn = rebuild.PlanTurn(0, made.Arms[0].HeadingDegrees, plain);
             if (turn.HasErrors)
             {
                 SetStatusT("lanes.status.stays", ("id", record.Id), ("reason", turn.Problem ?? Loc.T("lanes.stays.default")));
-                return;
+                return false;
             }
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             string assetPath;
@@ -686,7 +881,7 @@ namespace OmsiMapEditor.UI
             {
                 Debug.LogException(exception);
                 SetStatusT("lanes.status.rebuild_failed", ("reason", exception.Message));
-                return;
+                return false;
             }
             OmsiJunctionInsertionResult result;
             List<object> extra;
@@ -700,13 +895,13 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
                 RefreshAfterChange(null);
                 SetStatusT("lanes.status.rebuild_failed_id", ("id", record.Id), ("reason", exception.Message));
-                return;
+                return false;
             }
             if (!result.Succeeded)
             {
                 RefreshAfterChange(null);
                 SetStatus(Loc.T("lanes.status.stays_refs", ("id", record.Id), ("references", DescribeReferences(result.Blockers))));
-                return;
+                return false;
             }
             var steps = new List<object>(result.Steps);
             steps.AddRange(extra);
@@ -716,10 +911,12 @@ namespace OmsiMapEditor.UI
             roadPorts = null;
             PushSteps(steps, Loc.T("signals.step", ("id", record.Id)));
             var selected = signalSelected;
+            signalApplying = false;
             TargetSignalJunction(tile, record);
             if (selected >= 0 && signalCrossing != null && selected < signalCrossing.Movements.Count)
                 SelectSignalMovement(selected);
             SetStatus(done);
+            return true;
         }
 
         /// <summary>Notes, after a junction was made anew, the movements that lost their signal group with it (ADR 085).</summary>
@@ -734,6 +931,63 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
+        /// Command line, after <c>-signals</c>, for the window: <c>-signalWindowAt x y [width height]</c> puts it there (pixels of the area
+        /// around it), <c>-signalWindowCollapse</c> collapses it, <c>-signalClose</c> clicks its close button (which asks when a draft has
+        /// changes) and <c>-signalPromptAnswer apply|discard|keep</c> answers that question, <c>-signalGroupSelect n</c> chooses group n
+        /// (from 1) in the list, <c>-signalGroupRemove n</c> clicks delete for group n (twice where it asks). The ways out that ask the same
+        /// question: <c>-signalOpenMap global.cfg</c>, <c>-signalChrono yyyy-MM-dd</c>, <c>-signalObjects</c> (opens the object library) and
+        /// <c>-signalRedo</c>.
+        /// </summary>
+        private void RunSignalWindowArguments(string[] args)
+        {
+            int Number(string text) => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : -1;
+            var at = Array.IndexOf(args, "-signalWindowAt");
+            if (at >= 0 && at + 2 < args.Length && signalWindow != null)
+            {
+                var hasSize = at + 4 < args.Length && Number(args[at + 3]) > 0 && Number(args[at + 4]) > 0;
+                signalWindow.PlaceAt(Number(args[at + 1]), Number(args[at + 2]), hasSize ? Number(args[at + 3]) : 0f, hasSize ? Number(args[at + 4]) : 0f);
+            }
+            if (Array.IndexOf(args, "-signalWindowCollapse") >= 0 && signalWindow != null)
+                signalWindow.Collapsed = true;
+        }
+
+        /// <summary>The arguments that act on the crossing and the groups, after the crossing is read (see <see cref="RunSignalWindowArguments"/>).</summary>
+        private void RunSignalGroupWindowArguments(string[] args)
+        {
+            int Number(string text) => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : -1;
+            var select = Array.IndexOf(args, "-signalGroupSelect");
+            if (select >= 0 && select + 1 < args.Length && signalProgram != null && Number(args[select + 1]) >= 1 && Number(args[select + 1]) <= signalProgram.Lights.Count)
+                SelectSignalGroup(Number(args[select + 1]) - 1);
+            for (var index = 0; index + 1 < args.Length; index++)
+                if (args[index] == "-signalGroupRemove" && signalProgram != null && Number(args[index + 1]) >= 1 && Number(args[index + 1]) <= signalProgram.Lights.Count)
+                    RemoveSignalGroup(Number(args[index + 1]) - 1);
+        }
+
+        /// <summary>The arguments that leave the tool, last: the close button and the answer to its question.</summary>
+        private void RunSignalLeaveArguments(string[] args)
+        {
+            if (Array.IndexOf(args, "-signalClose") >= 0)
+                SetTool(EditorTool.Drag);
+            // The other ways out, each of which asks when a draft has changes: another map, a chrono view, the object library, a redo.
+            var openMap = Array.IndexOf(args, "-signalOpenMap");
+            if (openMap >= 0 && openMap + 1 < args.Length)
+                OpenMapInBackground(args[openMap + 1], string.Empty, null, "Could not read map: ", null);
+            var chrono = Array.IndexOf(args, "-signalChrono");
+            if (chrono >= 0 && chrono + 1 < args.Length && TryParseDay(args[chrono + 1], out var chronoDay))
+                ShowChrono(chronoDay, null);
+            if (Array.IndexOf(args, "-signalObjects") >= 0)
+                ShowObjectsPanel(true);
+            if (Array.IndexOf(args, "-signalRedo") >= 0)
+                StepHistory(redoSteps, undoSteps, false);
+            var answer = Array.IndexOf(args, "-signalPromptAnswer");
+            if (answer >= 0 && answer + 1 < args.Length && signalGuard.Asking)
+            {
+                var word = args[answer + 1].ToLowerInvariant();
+                AnswerSignalPrompt(word == "apply" ? SignalPromptChoice.Apply : word == "discard" ? SignalPromptChoice.Discard : SignalPromptChoice.KeepEditing);
+            }
+        }
+
+        /// <summary>
         /// Command line, with a map: <c>-signals</c> starts the tool at the selected crossing and writes its approaches,
         /// lanes and movements to the log ("Signals:"); <c>-signalGroupAdd Name</c> adds a group, <c>-signalAssign m g</c>
         /// gives movement m (from 1) group g (from 1, 0 for none), <c>-signalSelect m</c> selects a movement.
@@ -743,6 +997,7 @@ namespace OmsiMapEditor.UI
             if (Array.IndexOf(args, "-signals") < 0)
                 return;
             SetTool(EditorTool.Signals);
+            RunSignalWindowArguments(args);
             if (signalCrossing == null)
             {
                 Debug.Log("Signals: no crossing selected");
@@ -771,10 +1026,16 @@ namespace OmsiMapEditor.UI
             RunSignalTemplateArguments(args);
             if (signalCrossing == null)
                 return;
+            RunSignalGroupWindowArguments(args);
+            if (signalCrossing == null)
+                return;
             RunSignalTimelineArguments(args);
             if (signalCrossing == null)
                 return;
             RunSignalCheckArguments(args);
+            if (signalCrossing == null)
+                return;
+            RunSignalLeaveArguments(args);
             if (signalCrossing == null)
                 return;
             Debug.Log("Signals: crossing " + signalJunction.Id + " (" + signalJunction.AssetPath + "), " + (SignalsEditable ? "editable" : "read-only") + ", " +

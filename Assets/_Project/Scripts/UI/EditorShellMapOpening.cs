@@ -56,6 +56,9 @@ namespace OmsiMapEditor.UI
         /// <param name="projectFilePath">The project whose workspace is used; null opens the map read-only.</param>
         private void OpenMapInBackground(string globalConfigPath, string projectName, string projectFilePath, string failure, Action opened)
         {
+            // Another map replaces the one the signals window works on: asked before the map is read, so Keep editing leaves everything as it is.
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => OpenMapInBackground(globalConfigPath, projectName, projectFilePath, failure, opened)))
+                return;
             var generation = ++mapOpeningGeneration;
             var task = Task.Run(() => ReadMap(globalConfigPath, projectFilePath));
             mapOpening = task;

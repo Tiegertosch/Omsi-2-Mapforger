@@ -117,7 +117,7 @@ namespace OmsiMapEditor.UI
             close.Add(new IconElement("x"));
             header.Add(close);
             Add(header);
-            MakeMovable(header);
+            FloatingWindow.MakeMovable(this, header);
 
             var body = new ScrollView(ScrollViewMode.Vertical);
             body.AddToClassList("floating-panel-content");
@@ -825,55 +825,6 @@ namespace OmsiMapEditor.UI
         {
             tileChosen = chosen;
             UpdateButtons();
-        }
-
-        /// <summary>
-        /// Lets the window be dragged by its title bar, kept inside the area around it. Once moved it stays where it was put
-        /// while the program runs.
-        /// </summary>
-        private void MakeMovable(VisualElement header)
-        {
-            Vector2? grabbed = null;
-            header.RegisterCallback<PointerDownEvent>(evt =>
-            {
-                if (evt.button != 0 || evt.target is Button || (evt.target as VisualElement)?.GetFirstAncestorOfType<Button>() != null)
-                    return;
-                grabbed = (Vector2)evt.position - new Vector2(layout.x, layout.y);
-                header.CapturePointer(evt.pointerId);
-                evt.StopPropagation();
-            });
-            header.RegisterCallback<PointerMoveEvent>(evt =>
-            {
-                if (!grabbed.HasValue || !header.HasPointerCapture(evt.pointerId))
-                    return;
-                MoveTo((Vector2)evt.position - grabbed.Value);
-                evt.StopPropagation();
-            });
-            header.RegisterCallback<PointerUpEvent>(evt =>
-            {
-                if (!header.HasPointerCapture(evt.pointerId))
-                    return;
-                header.ReleasePointer(evt.pointerId);
-                grabbed = null;
-                evt.StopPropagation();
-            });
-            // A smaller window around it keeps the window reachable.
-            RegisterCallback<AttachToPanelEvent>(_ => parent?.RegisterCallback<GeometryChangedEvent>(__ =>
-            {
-                if (resolvedStyle.display != DisplayStyle.None)
-                    MoveTo(new Vector2(layout.x, layout.y));
-            }));
-        }
-
-        private void MoveTo(Vector2 position)
-        {
-            if (parent == null)
-                return;
-            var area = parent.contentRect;
-            var x = Mathf.Clamp(position.x, 0f, Mathf.Max(0f, area.width - layout.width));
-            var y = Mathf.Clamp(position.y, 0f, Mathf.Max(0f, area.height - layout.height));
-            style.left = x;
-            style.top = y;
         }
 
         /// <summary>Shows one tab: 0 Place, 1 Pictures, 2 Terrain, 3 More.</summary>

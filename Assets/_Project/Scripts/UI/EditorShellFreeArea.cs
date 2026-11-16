@@ -43,6 +43,21 @@ namespace OmsiMapEditor.UI
         /// <param name="target">The target's place in world metres, read when the window is laid out; null when there is none.</param>
         private void KeepClearOfToolWindow(VisualElement window, Func<bool> isOpen, Func<OmsiMapPoint?> target)
         {
+            KeepClear(window, isOpen, target, ToolWindowRects, (point, rects) => mapCanvas.PanIntoFreeArea(point, rects, FreeAreaPan.MarginPixels));
+        }
+
+        /// <summary>
+        /// The same for a window that floats over the map (the signals window): the target is moved into the largest free part beside it,
+        /// which a window that can stand anywhere asks for instead of "above". Waits until the window has its place.
+        /// </summary>
+        private void KeepClearOfFloatingWindow(SignalWindow window, Func<bool> isOpen, Func<OmsiMapPoint?> target)
+        {
+            KeepClear(window, isOpen, target, _ => window.IsLaidOut ? new List<Rect> { window.worldBound } : new List<Rect>(),
+                (point, rects) => mapCanvas.PanAroundWindow(point, rects[0], window.VisibleMapArea(), FreeAreaPan.MarginPixels));
+        }
+
+        private void KeepClear(VisualElement window, Func<bool> isOpen, Func<OmsiMapPoint?> target, Func<VisualElement, List<Rect>> rectsOf, Action<OmsiMapPoint, List<Rect>> pan)
+        {
             if (window == null || mapCanvas == null)
                 return;
             var ticket = ++freeAreaTicket;
@@ -54,7 +69,7 @@ namespace OmsiMapEditor.UI
             {
                 var now = target();
                 var moved = targetAtRequest.HasValue && now.HasValue && FreeAreaRequest.Moved(targetAtRequest.Value.X, targetAtRequest.Value.Y, now.Value.X, now.Value.Y);
-                var rects = ticket == freeAreaTicket && mapCanvas != null && isOpen() ? ToolWindowRects(window) : null;
+                var rects = ticket == freeAreaTicket && mapCanvas != null && isOpen() ? rectsOf(window) : null;
                 var dragging = mapCanvas != null && mapCanvas.IsDragging;
                 var step = FreeAreaRequest.Next(rects == null, dragging, mapCanvas != null && mapCanvas.ViewState != viewAtRequest, moved, rects != null && rects.Count > 0);
                 if (step == FreeAreaStep.Wait)
@@ -66,7 +81,7 @@ namespace OmsiMapEditor.UI
                 }
                 done = true;
                 if (step == FreeAreaStep.Pan && now.HasValue)
-                    mapCanvas.PanIntoFreeArea(now.Value, rects, FreeAreaPan.MarginPixels);
+                    pan(now.Value, rects);
             }).Every(16).Until(() => done || tries >= 60);
         }
 

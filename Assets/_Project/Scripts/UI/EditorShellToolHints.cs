@@ -38,9 +38,13 @@ namespace OmsiMapEditor.UI
             if (objectsPanelHost != null && objectsPanelHost.style.display != DisplayStyle.None)
             {
                 if (!OpenToolHint(markingOptions, ref text, ref warning) && !OpenToolHint(trafficOptions, ref text, ref warning) && !OpenToolHint(terrainOptions, ref text, ref warning) &&
-                    !OpenToolHint(lineOptions, ref text, ref warning) && !OpenToolHint(laneOptions, ref text, ref warning) && !OpenToolHint(roadPanel, ref text, ref warning))
+                    !OpenToolHint(lineOptions, ref text, ref warning) && !OpenToolHint(laneOptions, ref text, ref warning) &&
+                    !OpenToolHint(roadPanel, ref text, ref warning))
                     OpenToolHint(objectsPanel, ref text, ref warning);
             }
+            // The signals window floats beside the map and is not in the row of tool windows: it says its line while it is on screen.
+            if (activeTool == EditorTool.Signals)
+                OpenToolHint(signalOptions, ref text, ref warning);
             if (text == shownToolHint && warning == shownToolHintWarning)
                 return;
             shownToolHint = text;

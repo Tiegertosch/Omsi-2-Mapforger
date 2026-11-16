@@ -307,6 +307,27 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
+        /// Moves the view, keeping the zoom, so a point that stands under a floating window (its place and the visible area of the map, in
+        /// panel coordinates) or within the margin of it stands in the largest free part beside it (<see cref="SignalWindowRules.ShiftAroundWindow"/>).
+        /// Nothing moves when it is clear already, in 3D, or before the first view. True when the view moved.
+        /// </summary>
+        public bool PanAroundWindow(OmsiMapPoint world, Rect window, Rect visibleMap, float margin)
+        {
+            if (!TryScreenPosition(world, out var screen))
+                return false;
+            var shift = SignalWindowRules.ShiftAroundWindow(screen, window, visibleMap, margin);
+            if (shift == Vector2.zero)
+                return false;
+            // The screen's y grows downwards, the map's upwards.
+            center.x -= shift.x * metersPerPixel;
+            center.y += shift.y * metersPerPixel;
+            isFitted = false;
+            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
+            return true;
+        }
+
+        /// <summary>
         /// Centres a point from above in the free part of the map: horizontally in the map, vertically between its top and the highest tool
         /// window, keeping the zoom. Like <see cref="CenterOnWorld"/> (the whole map) while no window has its place yet; nothing in 3D.
         /// </summary>

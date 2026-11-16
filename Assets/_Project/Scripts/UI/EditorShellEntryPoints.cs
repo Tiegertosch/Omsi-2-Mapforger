@@ -101,8 +101,12 @@ namespace OmsiMapEditor.UI
                 SetStatusT("entry.status.bad_name");
                 return;
             }
+            if (!SignalToolMayYield(SignalExitKind.Action, () => StartEntryPlacement(name)))
+                return;
             pendingEntryName = name;
             SetTool(EditorTool.Drag);
+            if (activeTool == EditorTool.Signals)
+                return;
             StartPlacement(OmsiNewMap.EntryPointObject);
             if (placingEntryName != null)
                 SetStatusT("entry.status.placing", ("name", name));

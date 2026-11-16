@@ -136,6 +136,8 @@ namespace OmsiMapEditor.UI
                     UpdateMarkingPreview();
                 else if (activeTool == EditorTool.Lanes)
                     RefreshLaneTexts();
+                else if (activeTool == EditorTool.Signals)
+                    RefreshSignalTexts();
             }
             // An open map check report was written in the earlier language: the check runs again, as the report is made when it runs.
             if (currentSummary != null && IsShown(checkDialog))

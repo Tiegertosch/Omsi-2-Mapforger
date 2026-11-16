@@ -102,6 +102,13 @@ namespace OmsiMapEditor.UI
             Rebuild();
         }
 
+        /// <summary>Draws the bars again after the program was changed in place (an edge dragged in another view of the same program).</summary>
+        public void Repaint()
+        {
+            foreach (var child in rows.Children())
+                child.Q<VisualElement>(className: "signal-timeline-bar")?.MarkDirtyRepaint();
+        }
+
         public void Select(int light, int segment)
         {
             SelectedLight = light;

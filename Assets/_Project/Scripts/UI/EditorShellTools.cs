@@ -119,6 +119,10 @@ namespace OmsiMapEditor.UI
         private void EndToolForView()
         {
             var leaving = activeTool;
+            // The ways the person starts ask about changes not applied before they get here (SignalToolMayYield); what still arrives with
+            // such a draft is the shell reading the map again by itself, which cannot wait: the draft goes, and a notice says so.
+            if (leaving == EditorTool.Signals && SignalsEditable && signalDirty)
+                ShowSignalDraftDroppedNotice();
             activeTool = EditorTool.Drag;
             ToolEntryOf(leaving).End?.Invoke();
         }

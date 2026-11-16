@@ -25,14 +25,12 @@ namespace OmsiMapEditor.UI
         private static readonly Color SignalDark = new Color(0.45f, 0.48f, 0.53f);
         private static readonly float[] SignalPreviewSpeeds = { 0.5f, 1f, 2f, 5f, 10f };
 
-        private Button signalCheckTab;
         private VisualElement signalCheckPage;
         private Label signalCheckSummary;
         private VisualElement signalMatrixBox;
         private VisualElement signalFindingsBox;
         private List<OmsiSignalFinding> signalFindings = new List<OmsiSignalFinding>();
 
-        private VisualElement signalPreviewBar;
         private Button signalPreviewPlayButton;
         private TextField signalPreviewTimeField;
         private DropdownField signalPreviewSpeedField;
@@ -51,29 +49,24 @@ namespace OmsiMapEditor.UI
 
         private bool SignalPreviewActive => signalClock != null;
 
-        private Button CreateSignalCheckTab()
-        {
-            signalCheckTab = LocBindings.NewButton("signals.tab.check", () => ShowSignalTab(SignalTab.Check));
-            signalCheckTab.AddToClassList("panel-tab");
-            return signalCheckTab;
-        }
-
+        /// <summary>The check page: the conflict matrix with its legend on the left, the summary and the findings beside it.</summary>
         private VisualElement CreateSignalCheckPage()
         {
-            signalCheckPage = new ScrollView(ScrollViewMode.Vertical);
-            signalCheckPage.AddToClassList("signal-scroll-page");
-            signalCheckSummary = new Label();
-            signalCheckSummary.AddToClassList("panel-info");
-            signalCheckPage.Add(signalCheckSummary);
+            var page = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            page.contentContainer.AddToClassList("signal-columns");
+            signalCheckPage = page;
+            var left = new VisualElement();
+            left.AddToClassList("signal-column");
+            left.AddToClassList("signal-column-matrix");
             var matrixTitle = LocBindings.NewLabel("signals.check.matrix");
             matrixTitle.AddToClassList("inspector-section-heading");
-            signalCheckPage.Add(matrixTitle);
+            left.Add(matrixTitle);
             var matrixScroll = new ScrollView(ScrollViewMode.Horizontal);
             matrixScroll.AddToClassList("signal-matrix-scroll");
             signalMatrixBox = new VisualElement();
             signalMatrixBox.AddToClassList("signal-matrix");
             matrixScroll.Add(signalMatrixBox);
-            signalCheckPage.Add(matrixScroll);
+            left.Add(matrixScroll);
             var legend = new VisualElement();
             legend.AddToClassList("signal-phase-groups");
             foreach (var relation in new[] { OmsiGroupRelation.Compatible, OmsiGroupRelation.Conditional, OmsiGroupRelation.Incompatible, OmsiGroupRelation.NotChecked })
@@ -89,14 +82,23 @@ namespace OmsiMapEditor.UI
                 item.Add(name);
                 legend.Add(item);
             }
-            signalCheckPage.Add(legend);
+            left.Add(legend);
+            page.Add(left);
+            var right = new VisualElement();
+            right.AddToClassList("signal-column");
+            right.AddToClassList("signal-column-findings");
             var findingsTitle = LocBindings.NewLabel("signals.check.findings");
             findingsTitle.AddToClassList("inspector-section-heading");
-            signalCheckPage.Add(findingsTitle);
+            right.Add(findingsTitle);
+            signalCheckSummary = new Label();
+            signalCheckSummary.AddToClassList("panel-info");
+            signalCheckSummary.style.marginTop = 0f;
+            right.Add(signalCheckSummary);
             signalFindingsBox = new VisualElement();
-            signalCheckPage.Add(signalFindingsBox);
-            signalCheckPage.style.display = DisplayStyle.None;
-            return signalCheckPage;
+            right.Add(signalFindingsBox);
+            page.Add(right);
+            page.style.display = DisplayStyle.None;
+            return page;
         }
 
         private static Color RelationColour(OmsiGroupRelation relation)
@@ -159,6 +161,13 @@ namespace OmsiMapEditor.UI
             // The matrix: a row and a column per group, the cells coloured by how they get on; manual exceptions marked M.
             var matrix = OmsiSignalMatrix.Build(program.Lights.Count, conflicts, lights);
             var editable = SignalsEditable;
+            var notChecked = 0;
+            for (var first = 0; first < program.Lights.Count; first++)
+                for (var second = first + 1; second < program.Lights.Count; second++)
+                    if (matrix[first, second] == OmsiGroupRelation.NotChecked)
+                        notChecked++;
+            if (notChecked > 0)
+                signalCheckSummary.text += "\n" + Loc.T("signals.check.unchecked", ("count", notChecked));
             var header = new VisualElement();
             header.AddToClassList("signal-matrix-row");
             header.Add(MatrixCorner());
@@ -208,11 +217,22 @@ namespace OmsiMapEditor.UI
 
             foreach (var finding in signalFindings.Take(40))
             {
+                var line = new VisualElement();
+                line.AddToClassList("signal-finding-row");
                 var label = new Label(DescribeSignalFinding(finding, program));
                 label.AddToClassList("signal-finding");
                 label.AddToClassList(finding.Level == OmsiSignalIssueLevel.Error ? "signal-finding-error"
                     : finding.Level == OmsiSignalIssueLevel.Warning ? "signal-finding-warning" : "signal-finding-hint");
-                signalFindingsBox.Add(label);
+                line.Add(label);
+                // The way to where it is mended: the timing of the groups on phases and times, the groups, movements and heads on the groups page.
+                var area = SignalWindowRules.AreaOfFinding(finding.Kind);
+                var go = new Button(() => ChooseSignalArea(area));
+                LocBindings.Tooltip(go, area == SignalArea.Groups ? "signals.check.goto.groups" : "signals.check.goto.phases"); // i18n:keys
+                go.AddToClassList("panel-icon-button");
+                go.AddToClassList("signal-finding-go");
+                go.Add(new IconElement("pencil"));
+                line.Add(go);
+                signalFindingsBox.Add(line);
             }
             if (signalFindings.Count > 40)
             {
@@ -234,7 +254,7 @@ namespace OmsiMapEditor.UI
         {
             var head = new Label((light + 1).ToString(CultureInfo.InvariantCulture));
             head.AddToClassList("signal-matrix-head");
-            head.style.borderBottomColor = SignalGroupColour(light);
+            head.style.borderBottomColor = SignalColourOf(light);
             head.tooltip = program.Lights[light].Name;
             return head;
         }
@@ -292,7 +312,7 @@ namespace OmsiMapEditor.UI
         /// <summary>Allows (or no longer allows) two incompatible groups to go together; written into the junction as one undo step.</summary>
         private void ToggleSignalException(int first, int second)
         {
-            if (!SignalsEditable)
+            if (!SignalsEditable || !SignalGate(() => ToggleSignalException(first, second)))
                 return;
             var signals = CurrentSignals();
             var pair = OmsiJunctionSignals.Pair(first, second);
@@ -400,7 +420,7 @@ namespace OmsiMapEditor.UI
             {
                 var light = place.Head.LightIndex ?? 0;
                 var colour = SignalPreviewActive ? SignalStateColour(program.StateAt(light, signalClock.Time))
-                    : light < program.Lights.Count ? SignalGroupColour(light) : SignalDark;
+                    : light < program.Lights.Count ? SignalColourOf(light) : SignalDark;
                 markers.Add((place.At, place.Height, colour, MapCanvasElement.SignalMarkerKind.Head));
             }
             if (signalTab == SignalTab.Check)
@@ -414,60 +434,6 @@ namespace OmsiMapEditor.UI
         }
 
         // ----- preview -----
-
-        private VisualElement CreateSignalPreviewBar()
-        {
-            signalPreviewBar = new VisualElement();
-            signalPreviewBar.AddToClassList("signal-preview");
-            var row = new VisualElement();
-            row.AddToClassList("signal-group-row");
-            signalPreviewPlayButton = LocBindings.WithTooltip(new Button(ToggleSignalPreview), "signals.preview.play.tooltip");
-            DecorateButton(signalPreviewPlayButton, "play", null);
-            signalPreviewPlayButton.AddToClassList("signal-preview-button");
-            row.Add(signalPreviewPlayButton);
-            var restart = LocBindings.WithTooltip(new Button(RestartSignalPreview), "signals.preview.restart.tooltip");
-            DecorateButton(restart, "skip-back", null);
-            restart.AddToClassList("signal-preview-button");
-            row.Add(restart);
-            var back = LocBindings.WithTooltip(new Button(() => StepSignalPreview(-1)), "signals.preview.back.tooltip");
-            DecorateButton(back, "chevron-left", null);
-            back.AddToClassList("signal-preview-button");
-            row.Add(back);
-            var forward = LocBindings.WithTooltip(new Button(() => StepSignalPreview(1)), "signals.preview.forward.tooltip");
-            DecorateButton(forward, "chevron-right", null);
-            forward.AddToClassList("signal-preview-button");
-            row.Add(forward);
-            signalPreviewTimeField = new TextField { isDelayed = true };
-            signalPreviewTimeField.AddToClassList("picker-field");
-            signalPreviewTimeField.AddToClassList("signal-preview-time");
-            LocBindings.Tooltip(signalPreviewTimeField, "signals.preview.time.tooltip");
-            signalPreviewTimeField.RegisterValueChangedCallback(evt =>
-            {
-                if (TrySignalSeconds(evt.newValue, out var seconds))
-                    JumpSignalPreview(seconds);
-                else
-                    SetStatusT("signals.status.bad_seconds");
-            });
-            row.Add(signalPreviewTimeField);
-            signalPreviewSpeedField = new DropdownField(SignalPreviewSpeeds.Select(speed => speed.ToString("0.#", CultureInfo.InvariantCulture) + "x").ToList(), 1);
-            signalPreviewSpeedField.AddToClassList("signal-movement-group");
-            signalPreviewSpeedField.AddToClassList("signal-preview-speed");
-            LocBindings.Tooltip(signalPreviewSpeedField, "signals.preview.speed.tooltip");
-            signalPreviewSpeedField.RegisterValueChangedCallback(_ => signalPreviewSpeed = SignalPreviewSpeeds[Math.Max(0, signalPreviewSpeedField.index)]);
-            row.Add(signalPreviewSpeedField);
-            signalPreviewBar.Add(row);
-            var options = new VisualElement();
-            options.AddToClassList("signal-phase-groups");
-            signalPreviewLoopToggle = new Toggle { value = true };
-            LocBindings.Text(signalPreviewLoopToggle, "signals.preview.loop");
-            LocBindings.Tooltip(signalPreviewLoopToggle, "signals.preview.loop.tooltip");
-            options.Add(signalPreviewLoopToggle);
-            signalPreviewRequests = new VisualElement();
-            signalPreviewRequests.AddToClassList("signal-phase-groups");
-            options.Add(signalPreviewRequests);
-            signalPreviewBar.Add(options);
-            return signalPreviewBar;
-        }
 
         /// <summary>The request switches: one for every group a stop or jump point waits for.</summary>
         private void RenderSignalPreviewRequests()
@@ -557,7 +523,7 @@ namespace OmsiMapEditor.UI
             EnsureSignalClock();
             if (signalClock == null)
                 return;
-            signalClock.JumpTo(seconds);
+            signalClock.JumpTo(SignalWindowRules.ClampPreviewTime(seconds, signalClock.CycleLength));
             ShowSignalPreviewState();
         }
 
@@ -570,9 +536,16 @@ namespace OmsiMapEditor.UI
             signalPreviewPlaying = false;
             if (signalTimeline != null)
                 signalTimeline.SetPlayhead(null);
+            signalPreviewTrack?.SetPlayhead(null);
             SetSignalPlayIcon(false);
             if (signalPreviewTimeField != null)
                 signalPreviewTimeField.SetValueWithoutNotify(string.Empty);
+            if (signalPreviewSlider != null)
+            {
+                signalPreviewUpdating = true;
+                signalPreviewSlider.SetValueWithoutNotify(0f);
+                signalPreviewUpdating = false;
+            }
             if (was)
             {
                 UpdateSignalPreview();
@@ -626,9 +599,20 @@ namespace OmsiMapEditor.UI
             if (signalClock == null)
                 return;
             signalTimeline?.SetPlayhead(signalClock.Time);
+            signalPreviewTrack?.SetPlayhead(signalClock.Time);
             SetSignalPlayIcon(signalPreviewPlaying);
+            if (signalPreviewSlider != null)
+            {
+                signalPreviewUpdating = true;
+                signalPreviewSlider.SetValueWithoutNotify((float)signalClock.Time);
+                signalPreviewUpdating = false;
+            }
             if (signalPreviewTimeField != null && signalPreviewTimeField.focusController?.focusedElement != signalPreviewTimeField)
+            {
+                signalPreviewUpdating = true;
                 signalPreviewTimeField.SetValueWithoutNotify(signalClock.Time.ToString("0.0", CultureInfo.InvariantCulture) + (signalClock.Held ? " (" + Loc.T("signals.preview.held") + ")" : string.Empty));
+                signalPreviewUpdating = false;
+            }
             UpdateSignalPreview();
             UpdateSignalMarkers();
         }
@@ -663,16 +647,12 @@ namespace OmsiMapEditor.UI
             var at = Array.IndexOf(args, "-signalPreview");
             if (at >= 0 && at + 1 < args.Length && TrySignalSeconds(args[at + 1], out var second))
             {
-                if (signalTab != SignalTab.Timeline)
-                    ShowSignalTab(SignalTab.Timeline);
                 JumpSignalPreview(second);
                 Debug.Log("Signal preview: t=" + signalClock?.Time.ToString("0.0", CultureInfo.InvariantCulture) + " " +
                           (signalClock != null ? string.Join(" ", Enumerable.Range(0, signalClockProgram.Lights.Count).Select(light => signalClock.StateOf(light).ToString(CultureInfo.InvariantCulture))) : "-"));
             }
             if (Array.IndexOf(args, "-signalPreviewPlay") >= 0)
             {
-                if (signalTab != SignalTab.Timeline)
-                    ShowSignalTab(SignalTab.Timeline);
                 signalPreviewLog = true;
                 if (!signalPreviewPlaying)
                     ToggleSignalPreview();

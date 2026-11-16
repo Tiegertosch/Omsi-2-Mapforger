@@ -1959,6 +1959,9 @@ namespace OmsiMapEditor.UI
                 SetStatusT("map.open_first");
                 return;
             }
+            // The project is opened in place of the map: changes not applied in the signals window would be dropped with it.
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, SaveProjectAs))
+                return;
 
             try
             {
@@ -2246,6 +2249,9 @@ namespace OmsiMapEditor.UI
         {
             if (session == null || baseSummary == null)
                 return;
+            // Another view replaces the one the signals window works on: asked before anything of the new view is begun.
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderProjectBrowser))
+                return;
             var generation = ++chronoGeneration;
             projectTab = ProjectTab.Chrono;
             StopPlacement();
@@ -2295,6 +2301,9 @@ namespace OmsiMapEditor.UI
                     SetStatusT("chrono.status.apply_failed", ("date", dateText), ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
+                // Changes of the signals window made while the view was laid are asked about before the view replaces the crossing.
+                if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderProjectBrowser))
+                    return;
                 chronoDate = date.Value.Date;
                 StopPlacement();
                 ShowObjectsPanel(false);
@@ -6480,6 +6489,15 @@ namespace OmsiMapEditor.UI
 
         private void StepHistory(List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)
         {
+            // The draft of the signals tool is the newest change: undo takes it back first, and redo waits until it is applied or discarded.
+            if (undo && UndoSignalDraft())
+                return;
+            if (!undo && activeTool == EditorTool.Signals && signalDirty && SignalsEditable)
+            {
+                // The question is asked in the window (the status line alone gave no way to answer); the redo goes on after Apply or Discard.
+                SignalMayLeave(new SignalExit { Kind = SignalExitKind.Action, Payload = (Action)(() => StepHistory(from, to, false)) });
+                return;
+            }
             if (!CanEditObjects || from.Count == 0)
             {
                 SetStatus(from.Count > 0 && session != null && session.CanEdit ? ReadOnlyMessage(undo ? "readonly.action.undo" : "readonly.action.redo") : Loc.T(undo ? "history.nothing_undo" : "history.nothing_redo")) /* i18n:keys */;
@@ -6500,9 +6518,11 @@ namespace OmsiMapEditor.UI
             }
             var touched = new List<MapSelectionItem>();
             var applied = AppliedStates(step);
+            timetableStepPending = false;
             try
             {
                 ApplyStep(step, undo, touched);
+                RefreshRoutesAfterTimetableStep();
             }
             catch (Exception exception)
             {
@@ -6517,12 +6537,12 @@ namespace OmsiMapEditor.UI
                         SetStatus(message);
                     else
                         SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
+                    timetableStepPending = false;
                     return;
-            timetableStepPending = false;
                 }
+                RefreshRoutesAfterTimetableStep();
                 // Refused: nothing was written and trying again gives the same answer, so the step leaves the history. Any other
                 // failure was rolled back: files and memory are as before, so the step goes back on top of its stack, to be tried again.
-                RefreshRoutesAfterTimetableStep();
                 if (!refused)
                     from.Add(step);
                 // Parts taken back refit the terrain with the parts after them still as they were then, such as a road redone below a
@@ -6537,10 +6557,8 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-                    timetableStepPending = false;
             to.Add(step);
             RefreshAfterChange(touched);
-                RefreshRoutesAfterTimetableStep();
             SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
         }
 
@@ -6684,6 +6702,9 @@ namespace OmsiMapEditor.UI
                     session.Redo(currentSummary, step.Change);
                 if (step.Change.ObjectExists)
                     Touch(touched, step.Change.CurrentTile, step.Change.CurrentRecord);
+                // Read once after the whole step (StepHistory), not once per part of a group.
+                if (step.Change.ChangesTimetable)
+                    timetableStepPending = true;
                 return;
             }
 
@@ -6702,9 +6723,6 @@ namespace OmsiMapEditor.UI
         private void ApplyUnit(List<ObjectEditStep> unit, bool undo, List<MapSelectionItem> touched)
         {
             if (unit.Count == 1 && !IsValuePart(unit[0]))
-                // Read once after the whole step (StepHistory), not once per part of a group.
-                if (step.Change.ChangesTimetable)
-                    timetableStepPending = true;
                 ApplyStep(unit[0], undo, touched);
             else
                 ApplyValueParts(unit, undo, touched);
@@ -6943,6 +6961,9 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.add_tiles"));
                 return;
             }
+            // The map is read again after the tile: with changes not applied in the signals window the question comes first.
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => AddTile(x, y)))
+                return;
             OmsiTileChange change;
             try
             {
@@ -6971,6 +6992,8 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.delete_tiles"));
                 return;
             }
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => DeleteTile(tile)))
+                return;
             OmsiTileDeletionResult result;
             try
             {
@@ -7129,6 +7152,9 @@ namespace OmsiMapEditor.UI
             if (parts.Count > 0)
                 PushHistory(parts.Count == 1 ? parts[0] : new ObjectEditStep { Group = parts });
             RefreshAfterChange(kept);
+            foreach (var part in parts)
+                if (RefreshRoutesIfTimetableChanged(part.Change))
+                    break;
 
             if (failure != null)
                 SetStatus(failure + (parts.Count > 0 ? " " + Loc.T("delete.before", ("count", parts.Count)) : string.Empty));
@@ -7152,9 +7178,6 @@ namespace OmsiMapEditor.UI
             var shown = described.GetRange(0, Math.Min(3, described.Count));
             return described.Count > shown.Count ? Loc.T("objects.join_more", ("list", string.Join(", ", shown)), ("count", described.Count - shown.Count)) : string.Join(", ", shown);
         }
-            foreach (var part in parts)
-                if (RefreshRoutesIfTimetableChanged(part.Change))
-                    break;
 
         /// <summary>
         /// Opens or closes the Objects tool's panel. Opening needs an editable map; it counts the objects the map uses
@@ -7185,9 +7208,13 @@ namespace OmsiMapEditor.UI
             }
 
             // Tools with a panel of their own in the same place end first, or both panels would stand there at once and Esc
-            // would close only one of them.
+            // would close only one of them. The signals tool with changes not applied asks first: the window opens after the answer, or not at all.
+            if (!SignalToolMayYield(SignalExitKind.Action, () => ShowObjectsPanel(true)))
+                return;
             if (activeTool != EditorTool.Drag && activeTool != EditorTool.Move && activeTool != EditorTool.Rotate)
                 SetTool(EditorTool.Drag);
+            if (activeTool == EditorTool.Signals)
+                return;
             UpdateObjectsCatalog();
             StartInstallationScan();
             objectsPanelOpen = true;
@@ -7628,6 +7655,8 @@ namespace OmsiMapEditor.UI
                 SetStatusT("tile.status.added_here", ("file", selectedTile.FileName));
                 return;
             }
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, RevertSelectedTile))
+                return;
             var tile = selectedTile;
             // A terrain stroke still held has saved the heights it showed; it becomes its own step before the files go back.
             if (activeTool == EditorTool.Terrain)
@@ -7893,6 +7922,9 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage(EditorToolRules.ReadOnlyKey(tool)));
                 return;
             }
+            // The signals tool with a draft that has changes asks before it is left (the close button and Esc choose the drag tool).
+            if (activeTool == EditorTool.Signals && tool != EditorTool.Signals && !SignalMayLeave(new SignalExit { Kind = SignalExitKind.OtherTool, Payload = tool }))
+                return;
             // Another tool ends placing and the picks waiting for a click, and closes the object library, the list above the bottom bar and the
             // context menu.
             if (tool != activeTool)
