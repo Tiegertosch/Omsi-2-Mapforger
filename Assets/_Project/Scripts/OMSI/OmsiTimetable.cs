@@ -189,6 +189,25 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
+        /// The trips of a folder by the names of their files (case as on disk), each with the track its [trip] names; cheaper than
+        /// <see cref="Read"/> because it reads no tracks, stops or station links.
+        /// </summary>
+        public static Dictionary<string, OmsiTrip> ReadTrips(IOmsiFileSource source, string folder = "TTData")
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            var trips = new Dictionary<string, OmsiTrip>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in source.EnumerateFiles(folder, "*.ttp", false))
+            {
+                if (!string.Equals(Path.GetExtension(path), ".ttp", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var name = Path.GetFileNameWithoutExtension(path);
+                trips[name] = ReadTrip(source.ReadAllBytes(path), name);
+            }
+            return trips;
+        }
+
+        /// <summary>
         /// The timetable of a day: the base timetable with the timetables of the chrono variants active then, in their
         /// order. Stops and station links of a variant add to the earlier ones; a track, trip or line file with the name of
         /// an earlier one replaces it; lines a variant switches off are dropped.

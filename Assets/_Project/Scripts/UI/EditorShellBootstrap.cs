@@ -6518,9 +6518,11 @@ namespace OmsiMapEditor.UI
                     else
                         SetStatusT("history.rollback_failed_reload_failed", ("reason", exception.Message));
                     return;
+            timetableStepPending = false;
                 }
                 // Refused: nothing was written and trying again gives the same answer, so the step leaves the history. Any other
                 // failure was rolled back: files and memory are as before, so the step goes back on top of its stack, to be tried again.
+                RefreshRoutesAfterTimetableStep();
                 if (!refused)
                     from.Add(step);
                 // Parts taken back refit the terrain with the parts after them still as they were then, such as a road redone below a
@@ -6535,8 +6537,10 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+                    timetableStepPending = false;
             to.Add(step);
             RefreshAfterChange(touched);
+                RefreshRoutesAfterTimetableStep();
             SetStatus(Loc.T(undo ? "history.undid" : "history.redid", ("step", DescribeStep(step)))) /* i18n:keys */;
         }
 
@@ -6698,6 +6702,9 @@ namespace OmsiMapEditor.UI
         private void ApplyUnit(List<ObjectEditStep> unit, bool undo, List<MapSelectionItem> touched)
         {
             if (unit.Count == 1 && !IsValuePart(unit[0]))
+                // Read once after the whole step (StepHistory), not once per part of a group.
+                if (step.Change.ChangesTimetable)
+                    timetableStepPending = true;
                 ApplyStep(unit[0], undo, touched);
             else
                 ApplyValueParts(unit, undo, touched);
@@ -7145,6 +7152,9 @@ namespace OmsiMapEditor.UI
             var shown = described.GetRange(0, Math.Min(3, described.Count));
             return described.Count > shown.Count ? Loc.T("objects.join_more", ("list", string.Join(", ", shown)), ("count", described.Count - shown.Count)) : string.Join(", ", shown);
         }
+            foreach (var part in parts)
+                if (RefreshRoutesIfTimetableChanged(part.Change))
+                    break;
 
         /// <summary>
         /// Opens or closes the Objects tool's panel. Opening needs an editable map; it counts the objects the map uses

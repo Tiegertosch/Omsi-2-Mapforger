@@ -21,6 +21,28 @@ namespace OmsiMapEditor.UI
         private string manageTrip;
         private string manageTripName = string.Empty;
 
+        /// <summary>After an object step that wrote timetable files (deleting an unused bus stop takes its entries along): the routes are read again.</summary>
+        private bool RefreshRoutesIfTimetableChanged(OmsiObjectChange change)
+        {
+            if (change == null || !change.ChangesTimetable)
+                return false;
+            StartRoutesBuild(currentSummary);
+            RefreshVehiclesIfOpen();
+            return true;
+        }
+
+        /// <summary>Set while undo or redo applies a step whose parts wrote timetable files; the routes are read once at its end.</summary>
+        private bool timetableStepPending;
+
+        private void RefreshRoutesAfterTimetableStep()
+        {
+            if (!timetableStepPending)
+                return;
+            timetableStepPending = false;
+            StartRoutesBuild(currentSummary);
+            RefreshVehiclesIfOpen();
+        }
+
         private void AddManageRows()
         {
             var fold = new Foldout { text = Loc.T("timetable.manage"), value = timetableManageOpen };
@@ -47,7 +69,7 @@ namespace OmsiMapEditor.UI
                     ManageTimetable(() => session.RenameLine(line, target), target, "timetable.status.line_renamed", ("old", line), ("name", target));
                 }));
                 row.Add(SmallButton("timetable.manage.delete", "timetable.manage.delete.line.tooltip", () =>
-                    ManageTimetable(() => session.DeleteLine(line), null, "timetable.status.line_deleted", ("name", line))));
+                    ManageTimetable(() => session.DeleteLine(line), null, "timetable.status.line_deleted", change => LineDeletedArguments(line, change))));
                 AddManageRow(fold, "timetable.manage.line", row);
             }
             if (timetableTripNames.Count > 0)
@@ -243,7 +265,34 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>Most file names the status names after a line deletion; the log has them all.</summary>
+        private const int LineDeletedShownFiles = 5;
+
+        /// <summary>The status arguments of a line deletion: how many trips and tracks went with it and the first of their file names.</summary>
+        private static (string Name, object Value)[] LineDeletedArguments(string line, OmsiTerrainChange change)
+        {
+            var removed = change.RemovedFiles.Where(path => !path.EndsWith(".ttl", StringComparison.OrdinalIgnoreCase)).Select(Path.GetFileName).ToList();
+            var trips = removed.Count(name => name.EndsWith(".ttp", StringComparison.OrdinalIgnoreCase));
+            var tracks = removed.Count(name => name.EndsWith(".ttr", StringComparison.OrdinalIgnoreCase));
+            var files = string.Empty;
+            if (removed.Count > 0)
+            {
+                Debug.Log("Timetable: deleting line " + line + " took " + string.Join(", ", removed));
+                var list = string.Join(", ", removed.Take(LineDeletedShownFiles));
+                if (removed.Count > LineDeletedShownFiles)
+                    list = Loc.T("timetable.status.files_more", ("list", list), ("count", removed.Count - LineDeletedShownFiles));
+                files = Loc.T("timetable.status.line_deleted.files", ("list", list));
+            }
+            return new (string Name, object Value)[] { ("name", line), ("trips", trips), ("tracks", tracks), ("files", files) };
+        }
+
         private void ManageTimetable(Func<OmsiTerrainChange> operation, string showLine, string statusKey, params (string Name, object Value)[] arguments)
+        {
+            ManageTimetable(operation, showLine, statusKey, change => arguments);
+        }
+
+        /// <summary>As above, with status arguments taken from the change, such as the files it removed.</summary>
+        private void ManageTimetable(Func<OmsiTerrainChange> operation, string showLine, string statusKey, Func<OmsiTerrainChange, (string Name, object Value)[]> argumentsOf)
         {
             if (session == null || !session.CanEdit || !FlushTimetableEdits())
                 return;
@@ -264,7 +313,7 @@ namespace OmsiMapEditor.UI
                 PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("timetable.manage.step") });
                 if (currentSummary != null)
                     StartRoutesBuild(currentSummary);
-                SetStatusT(statusKey, arguments); // i18n:keys
+                SetStatusT(statusKey, argumentsOf(change)); // i18n:keys
                 Debug.Log("Timetable: " + statusLabel?.text);
             }
             manageLineName = string.Empty;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -71,6 +72,9 @@ namespace OmsiMapEditor.OMSI
         public List<OmsiTileSummary> Tiles { get; } = new List<OmsiTileSummary>();
 
         internal List<OmsiObjectChange.FileState> Files { get; } = new List<OmsiObjectChange.FileState>();
+
+        /// <summary>The map-relative paths of the files the change takes away.</summary>
+        public List<string> RemovedFiles => Files.Where(file => file.After == null && file.Before != null).Select(file => file.RelativePath).ToList();
     }
 
     /// <summary>

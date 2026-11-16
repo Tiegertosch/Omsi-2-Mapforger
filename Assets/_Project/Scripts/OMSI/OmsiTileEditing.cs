@@ -137,8 +137,9 @@ namespace OmsiMapEditor.OMSI
         /// reference to one of them keeps all, and is returned instead.
         /// </summary>
         /// <param name="tilePath">The tile's relative path, to tell references from within it.</param>
+        /// <param name="resolved">References the caller takes away itself in the same step, such as the timetable entries of an unused bus stop; they do not block.</param>
         public static OmsiRemovalResult RemoveWithFamily(OmsiRecordFile tile, OmsiTileRecordView element, string tilePath, int tileIndex,
-            OmsiRecordFile globalConfig, OmsiReferenceIndex references)
+            OmsiRecordFile globalConfig, OmsiReferenceIndex references, ICollection<OmsiReference> resolved = null)
         {
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
@@ -153,7 +154,8 @@ namespace OmsiMapEditor.OMSI
             foreach (var member in family)
                 if (TryGetId(member, out var id))
                     foreach (var reference in references.To(id))
-                        if (reference.Kind != "attached object parent" || !string.Equals(OmsiRelativePath.Normalize(reference.File), tilePath, StringComparison.OrdinalIgnoreCase))
+                        if ((reference.Kind != "attached object parent" || !string.Equals(OmsiRelativePath.Normalize(reference.File), tilePath, StringComparison.OrdinalIgnoreCase)) &&
+                            (resolved == null || !resolved.Contains(reference)))
                             total.Blockers.Add(reference);
             if (total.Blockers.Count > 0)
                 return total;

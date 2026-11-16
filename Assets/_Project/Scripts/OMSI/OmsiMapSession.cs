@@ -166,6 +166,9 @@ namespace OmsiMapEditor.OMSI
         internal List<OmsiPathRule> RulesAfter { get; set; }
 
         internal List<FileState> Files { get; } = new List<FileState>();
+
+        /// <summary>True when the change also writes timetable files, as deleting an unused bus stop does with its entries (ADR 096, addendum).</summary>
+        public bool ChangesTimetable => Files.Exists(file => file.RelativePath != null && file.RelativePath.StartsWith("TTData\\", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>A place and orientation to give an object of a tile summary, for <see cref="OmsiMapSession.UpdateObjects"/>.</summary>
@@ -602,9 +605,15 @@ namespace OmsiMapEditor.OMSI
             var family = OmsiTileEditing.Family(tileFile, view);
 
             references = references ?? BuildReferenceIndex();
-            var result = OmsiTileEditing.RemoveWithFamily(tileFile, view, tilePath, TileIndexOf(config, tilePath), config, references);
+            var ids = new HashSet<int>();
+            foreach (var member in family)
+                ids.Add(member is OmsiAttachedObjectView attachedMember ? attachedMember.Id : view.Id);
+            var stopFiles = UnusedStopEntries(summary, tile, ids, references, out var resolved);
+            var result = OmsiTileEditing.RemoveWithFamily(tileFile, view, tilePath, TileIndexOf(config, tilePath), config, references, resolved);
             if (!result.Removed)
                 return new OmsiObjectChangeResult(null, result.Blockers);
+            if (stopFiles == null && resolved != null && resolved.Count > 0)
+                throw new InvalidOperationException("The timetable still names object " + view.Id + ", but nothing blocked its deletion.");
 
             var listIndex = tile.Objects.IndexOf(record);
             var change = new OmsiObjectChange(OmsiObjectChangeKind.Deletion, tile, record, listIndex < 0 ? tile.Objects.Count : listIndex);
@@ -618,6 +627,8 @@ namespace OmsiMapEditor.OMSI
             AddFile(change, tilePath, tileBefore, tileFile.ToBytes());
             if (result.ShiftedEntryPointIndices > 0)
                 AddFile(change, GlobalConfigFileName, configBefore, config.ToBytes());
+            if (stopFiles != null)
+                change.Files.AddRange(stopFiles);
             WriteFiles(change, false);
             RemoveFromSummary(summary, change);
             return new OmsiObjectChangeResult(change, new OmsiReference[0]);
