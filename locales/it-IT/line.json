@@ -33,6 +33,8 @@
   "line.step": "Nuova linea {name}",
   "line.status.start": "Clicca la prima fermata della linea.",
   "line.status.failed": "Impossibile creare la linea: {reason}",
+  "line.status.trip_problems": "La corsa {trip} ha dei problemi: {problems}",
+  "line.status.trip_problems_unnamed": "La corsa ha dei problemi: {problems}",
   "line.status.click_stop": "Clicca una fermata; le fermate sono cerchiate sulla mappa.",
   "line.status.waypoint_first": "Clicca prima una fermata; un punto di passaggio guida il percorso fra le fermate.",
   "line.status.waypoint_off": "Un punto di passaggio deve stare su una strada per veicoli.",

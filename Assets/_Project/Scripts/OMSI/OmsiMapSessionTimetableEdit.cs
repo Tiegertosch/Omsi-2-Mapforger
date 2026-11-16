@@ -220,7 +220,7 @@ namespace OmsiMapEditor.OMSI
         public OmsiTerrainChange ReplaceTripStops(string trip, OmsiTripPlan plan, string destination)
         {
             if (plan == null || !plan.IsValid)
-                throw new InvalidOperationException("The trip has problems: " + string.Join(" ", plan?.Problems ?? new List<OmsiPlanProblem>()));
+                throw new OmsiTripPlanException(trip, plan?.Problems);
             var workspace = RequireWorkspace();
             var path = TimetablePath(trip, ".ttp");
             if (!workspace.FileExists(path))

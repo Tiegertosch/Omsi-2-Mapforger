@@ -33,6 +33,8 @@
   "line.step": "Nouvelle ligne {name}",
   "line.status.start": "Clique sur le premier arrêt de la ligne.",
   "line.status.failed": "La ligne n'a pas pu être créée : {reason}",
+  "line.status.trip_problems": "Le trajet {trip} pose des problèmes : {problems}",
+  "line.status.trip_problems_unnamed": "Le trajet pose des problèmes : {problems}",
   "line.status.click_stop": "Clique sur un arrêt ; les arrêts sont entourés sur la carte.",
   "line.status.waypoint_first": "Clique d'abord sur un arrêt ; un point de passage guide le chemin entre arrêts.",
   "line.status.waypoint_off": "Un point de passage doit être sur une route pour véhicules.",

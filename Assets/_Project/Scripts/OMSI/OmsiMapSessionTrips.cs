@@ -200,7 +200,7 @@ namespace OmsiMapEditor.OMSI
             foreach (var trip in trips)
             {
                 if (trip.Plan == null || !trip.Plan.IsValid)
-                    throw new InvalidOperationException("The trip " + trip.Name + " has problems: " + string.Join(" ", trip.Plan?.Problems ?? new List<OmsiPlanProblem>()));
+                    throw new OmsiTripPlanException(trip.Name, trip.Plan?.Problems);
                 var tripPath = TimetablePath(trip.Name, ".ttp");
                 if (!names.Add(trip.Name) || workspace.FileExists(tripPath))
                     throw new InvalidOperationException("The map has a trip named " + trip.Name + " already.");

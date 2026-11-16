@@ -33,6 +33,8 @@
   "line.step": "New line {name}",
   "line.status.start": "Click the first stop of the line.",
   "line.status.failed": "The line could not be made: {reason}",
+  "line.status.trip_problems": "The trip {trip} has problems: {problems}",
+  "line.status.trip_problems_unnamed": "The trip has problems: {problems}",
   "line.status.click_stop": "Click a bus stop; the stops are ringed on the map.",
   "line.status.waypoint_first": "Click a stop first; a waypoint leads the way between stops.",
   "line.status.waypoint_off": "A waypoint must lie on a road for vehicles.",

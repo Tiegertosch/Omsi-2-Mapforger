@@ -97,14 +97,9 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> TrafficPieces(OmsiTileSummary tile, OmsiSplineRecord spline)
         {
-            var pieces = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
             if (trafficOptions != null && trafficOptions.WholeRoad)
-                foreach (var segment in new OmsiSplineAttachmentLayout(currentSummary).Chain(tile, spline))
-                    if (SameAsset(segment.Spline.AssetPath, spline.AssetPath))
-                        pieces.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(segment.Tile, segment.Spline));
-            if (!pieces.Exists(pair => pair.Value.Id == spline.Id))
-                pieces.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(tile, spline));
-            return pieces;
+                return OmsiWholeRoad.Pieces(new OmsiSplineAttachmentLayout(currentSummary), tile, spline);
+            return new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> { new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(tile, spline) };
         }
 
         private void ClearTrafficHover()

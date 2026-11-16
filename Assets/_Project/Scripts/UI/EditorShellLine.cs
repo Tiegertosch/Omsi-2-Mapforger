@@ -526,7 +526,7 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatusT("line.status.failed", ("reason", exception.Message));
+                SetStatusT("line.status.failed", ("reason", LinePlanProblems.Reason(exception)));
                 return;
             }
             if (change == null)

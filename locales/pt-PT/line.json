@@ -33,6 +33,8 @@
   "line.step": "Nova linha {name}",
   "line.status.start": "Clica na primeira paragem da linha.",
   "line.status.failed": "Não foi possível criar a linha: {reason}",
+  "line.status.trip_problems": "A viagem {trip} tem problemas: {problems}",
+  "line.status.trip_problems_unnamed": "A viagem tem problemas: {problems}",
   "line.status.click_stop": "Clica numa paragem; as paragens estão circuladas no mapa.",
   "line.status.waypoint_first": "Clica primeiro numa paragem; um ponto de passagem guia o caminho entre paragens.",
   "line.status.waypoint_off": "Um ponto de passagem tem de estar numa rua para veículos.",

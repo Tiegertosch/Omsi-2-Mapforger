@@ -33,6 +33,8 @@
   "line.step": "Nowa linia {name}",
   "line.status.start": "Kliknij pierwszy przystanek linii.",
   "line.status.failed": "Nie udało się utworzyć linii: {reason}",
+  "line.status.trip_problems": "Kurs {trip} ma problemy: {problems}",
+  "line.status.trip_problems_unnamed": "Kurs ma problemy: {problems}",
   "line.status.click_stop": "Kliknij przystanek; przystanki są otoczone kółkiem na mapie.",
   "line.status.waypoint_first": "Najpierw kliknij przystanek; punkt przejazdu prowadzi drogę między przystankami.",
   "line.status.waypoint_off": "Punkt przejazdu musi leżeć na ulicy dla pojazdów.",

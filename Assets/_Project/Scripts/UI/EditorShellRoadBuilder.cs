@@ -467,7 +467,7 @@ namespace OmsiMapEditor.UI
 
         private static bool SameAsset(string a, string b)
         {
-            return a != null && b != null && string.Equals(a.Trim().Replace('/', '\\'), b.Trim().Replace('/', '\\'), StringComparison.OrdinalIgnoreCase);
+            return OmsiWholeRoad.SameAsset(a, b);
         }
 
         /// <summary>

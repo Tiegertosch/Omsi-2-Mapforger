@@ -364,9 +364,7 @@ namespace OmsiMapEditor.UI
             {
                 var whole = new Button(() =>
                 {
-                    var chain = new OmsiSplineAttachmentLayout(currentSummary).Chain(selectedSplineTile, selectedSpline);
-                    SetMoreSplines(chain.Where(segment => SameAsset(segment.Spline.AssetPath, selectedSpline.AssetPath))
-                        .Select(segment => new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(segment.Tile, segment.Spline)));
+                    SetMoreSplines(OmsiWholeRoad.Pieces(new OmsiSplineAttachmentLayout(currentSummary), selectedSplineTile, selectedSpline));
                     RenderInspector();
                     SetStatusT("paths.status.whole", ("count", moreSplines.Count + 1));
                 });

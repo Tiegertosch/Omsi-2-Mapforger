@@ -271,19 +271,17 @@ namespace OmsiMapEditor.UI
         /// <summary>The status arguments of a line deletion: how many trips and tracks went with it and the first of their file names.</summary>
         private static (string Name, object Value)[] LineDeletedArguments(string line, OmsiTerrainChange change)
         {
-            var removed = change.RemovedFiles.Where(path => !path.EndsWith(".ttl", StringComparison.OrdinalIgnoreCase)).Select(Path.GetFileName).ToList();
-            var trips = removed.Count(name => name.EndsWith(".ttp", StringComparison.OrdinalIgnoreCase));
-            var tracks = removed.Count(name => name.EndsWith(".ttr", StringComparison.OrdinalIgnoreCase));
+            var summary = new OmsiLineDeletedSummary(change.RemovedFiles);
             var files = string.Empty;
-            if (removed.Count > 0)
+            if (summary.FileNames.Count > 0)
             {
-                Debug.Log("Timetable: deleting line " + line + " took " + string.Join(", ", removed));
-                var list = string.Join(", ", removed.Take(LineDeletedShownFiles));
-                if (removed.Count > LineDeletedShownFiles)
-                    list = Loc.T("timetable.status.files_more", ("list", list), ("count", removed.Count - LineDeletedShownFiles));
+                Debug.Log("Timetable: deleting line " + line + " took " + string.Join(", ", summary.FileNames));
+                var list = string.Join(", ", summary.FirstFileNames(LineDeletedShownFiles));
+                if (summary.MoreFileCount(LineDeletedShownFiles) > 0)
+                    list = Loc.T("timetable.status.files_more", ("list", list), ("count", summary.MoreFileCount(LineDeletedShownFiles)));
                 files = Loc.T("timetable.status.line_deleted.files", ("list", list));
             }
-            return new (string Name, object Value)[] { ("name", line), ("trips", trips), ("tracks", tracks), ("files", files) };
+            return new (string Name, object Value)[] { ("name", line), ("trips", summary.TripCount), ("tracks", summary.TrackCount), ("files", files) };
         }
 
         private void ManageTimetable(Func<OmsiTerrainChange> operation, string showLine, string statusKey, params (string Name, object Value)[] arguments)

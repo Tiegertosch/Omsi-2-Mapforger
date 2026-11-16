@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OmsiMapEditor.Core.Localization;
@@ -47,6 +48,16 @@ namespace OmsiMapEditor.UI
             var from = problem.FromIsWaypoint ? Loc.T("line.problem.a_waypoint") : problem.From;
             var to = problem.ToIsWaypoint ? Loc.T("line.problem.a_waypoint") : problem.To;
             return Loc.T(key, ("stop", problem.Stop), ("from", from), ("to", to), ("metres", problem.Meters)); // i18n:keys
+        }
+
+        /// <summary>
+        /// Why a save failed, in the language of the interface: a trip that cannot be planned names the trip and its problems; any other failure keeps its message.
+        /// </summary>
+        public static string Reason(Exception exception)
+        {
+            if (exception is OmsiTripPlanException plan)
+                return Loc.T(plan.TripName.Length == 0 ? "line.status.trip_problems_unnamed" : "line.status.trip_problems", ("trip", plan.TripName), ("problems", Join(plan.Problems))); // i18n:keys
+            return exception.Message;
         }
 
         /// <summary>All problems of a plan, joined by spaces as the result line shows them.</summary>

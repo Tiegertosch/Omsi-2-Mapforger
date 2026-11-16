@@ -33,6 +33,8 @@
   "line.step": "Neue Linie {name}",
   "line.status.start": "Klicke die erste Haltestelle der Linie an.",
   "line.status.failed": "Die Linie konnte nicht angelegt werden: {reason}",
+  "line.status.trip_problems": "Die Fahrt {trip} hat Probleme: {problems}",
+  "line.status.trip_problems_unnamed": "Die Fahrt hat Probleme: {problems}",
   "line.status.click_stop": "Klicke eine Haltestelle an; die Haltestellen sind auf der Karte umringt.",
   "line.status.waypoint_first": "Klicke zuerst eine Haltestelle an; ein Wegpunkt führt den Weg zwischen Haltestellen.",
   "line.status.waypoint_off": "Ein Wegpunkt muss auf einer Straße für Fahrzeuge liegen.",

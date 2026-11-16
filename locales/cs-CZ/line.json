@@ -33,6 +33,8 @@
   "line.step": "Nová linka {name}",
   "line.status.start": "Klikni na první zastávku linky.",
   "line.status.failed": "Linku nelze vytvořit: {reason}",
+  "line.status.trip_problems": "Jízda {trip} má problémy: {problems}",
+  "line.status.trip_problems_unnamed": "Jízda má problémy: {problems}",
   "line.status.click_stop": "Klikni na zastávku; zastávky jsou na mapě v kroužku.",
   "line.status.waypoint_first": "Nejdřív klikni na zastávku; bod trasy vede cestu mezi zastávkami.",
   "line.status.waypoint_off": "Bod trasy musí ležet na silnici pro vozidla.",

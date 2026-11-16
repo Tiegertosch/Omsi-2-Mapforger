@@ -1331,11 +1331,7 @@ namespace OmsiMapEditor.UI
                     // -wholeRoad chooses every piece of the selected spline's road, as Whole road in the inspector does.
                     if (Array.IndexOf(args, "-wholeRoad") >= 0 && selectedSpline != null)
                     {
-                        var wholeRoad = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
-                        foreach (var segment in new OmsiSplineAttachmentLayout(currentSummary).Chain(selectedSplineTile, selectedSpline))
-                            if (SameAsset(segment.Spline.AssetPath, selectedSpline.AssetPath))
-                                wholeRoad.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(segment.Tile, segment.Spline));
-                        SetMoreSplines(wholeRoad);
+                        SetMoreSplines(OmsiWholeRoad.Pieces(new OmsiSplineAttachmentLayout(currentSummary), selectedSplineTile, selectedSpline));
                     }
                     RunPathRulesArgument(args, rulesAt + 1);
                     RenderInspector();
