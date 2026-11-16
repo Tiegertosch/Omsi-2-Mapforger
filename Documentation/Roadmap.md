@@ -62,7 +62,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 
 ## Mehrsprachige Oberfläche (ADR 068, Entwicklungsauftrag 1.2)
 
-- [x] Meilenstein 1: Grundsystem in `Editor.Core` (JSON-Dateien, ICU-Teilmenge, CLDR-Pluralregeln, Fallback, Sprachwahl und Speicherung), Validator mit Werkzeug und GitHub-Workflow, Anbindung der Shell, Menüleiste als erste Texte, Tests
+- [x] Meilenstein 1: Grundsystem in `Editor.Core` (JSON-Dateien, ICU-Teilmenge, CLDR-Pluralregeln, Fallback, Sprachwahl und Speicherung), Validator mit Werkzeug und GitHub-Workflow, Anbindung der Shell, Menüleiste als erste Texte, Tests; vom Projektinhaber bestätigt (16. November 2026)
 - [x] Meilenstein 2: Migration aller Texte Datei für Datei (Shell, Werkzeugleiste, Panels, Dialoge, Inspector, Projektbrowser, Meldungen); Texte aus `Editor.OMSI` (Kartenprüfung u. a.) folgen später
 - [x] Meilenstein 3: Einstellungsdialog „Einstellungen > Allgemein > Sprache“, Layout für längere deutsche Texte geprüft, Deutsch und Englisch vollständig, Live-Wechsel in allen Fenstern
 - [x] Meilenstein 4: Doku für Übersetzer (`locales/README.md`), Abschlussdokument `Documentation/Internationalisierung.md`, Tests für den Wechsel in der Oberfläche, Prüfung im Build und im Workflow-Quelltext
@@ -85,10 +85,10 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Schritt 3 – Fußgängerampeln und Signalgruppe für Überwege (Ampel-Editor): Bindung des Überwegs, Zufahrt vor dem Überweg gebunden, Assistent mit Überweggruppen, Fußgängerköpfe, Warnung zu kurzes Grün (vom Nutzer in openOMSI getestet)
 - [x] Schritt 4 – Pfade mit OMSIs unsichtbaren Splines (`invis_sidewalk`, `invis_street`) im Straßen-Werkzeug, Einrasten auf vorhandene Pfadlinien, auf jeder Karte (vom Nutzer in openOMSI getestet; Zebra-Optik auf gewöhnlichen Straßen offen)
 - [x] Schritt 5 – Überweg-Stück in eine gewöhnliche Straße einfügen (Straßen-Werkzeug, Schalter „Insert crossing“): Fußpfad und Fahrspuren im selben Objekt, damit Autos Fußgängern auf dem Zebra Vorrang geben (vom Nutzer in openOMSI getestet; ohne Haltelinie und Ampel)
-- [x] Parkreihen – zwei Klicks im Straßen-Werkzeug (Schalter „Parking row“) setzen Parkplatz-Objekte neben die äußerste Fahrspur, in Fahrtrichtung, im Abstand, den openOMSI zum Ein- und Ausparken braucht; eine Karte ohne Parkliste bekommt eine (ADR 087; vom Nutzer in openOMSI bestätigt)
+- [x] Parkreihen – zwei Klicks im Straßen-Werkzeug (Schalter „Parking row“) setzen Parkplatz-Objekte neben die äußerste Fahrspur, in Fahrtrichtung, im Abstand, den openOMSI zum Ein- und Ausparken braucht; eine Karte ohne Parkliste bekommt eine (ADR 087; vom Projektinhaber in openOMSI bestätigt (16. November 2026))
 - [x] Parkliste bearbeiten – Dialog „Parking list...“ im Map-Reiter: Haken je geparktem Auto der Installation, schreibt `parklist_p.txt` der Karte, Gewichte bleiben (ADR 087; vom Nutzer in openOMSI getestet)
 - [x] Parken fertig – Listennummer je Parkreihe und Listen `parklist_p_n.txt` im Dialog, Abschnitt „Parking“ in der Kartenprüfung (Platz zu weit von der Spur, schief, zu nah am Spurende, fehlende Listen und Autos; ADR 087; vom Nutzer in openOMSI bestätigt)
-- [x] Tageskurven – Dialog „Traffic curves...“ im Map-Reiter: Diagramm mit Griff je Stunde für KI-Autos und Fahrgäste, schreibt `[trafficdensity_road]` und `[trafficdensity_passenger]` (ADR 088; mit openOMSI ohne Fenster geprüft)
+- [x] Tageskurven – Dialog „Traffic curves...“ im Map-Reiter: Diagramm mit Griff je Stunde für KI-Autos und Fahrgäste, schreibt `[trafficdensity_road]` und `[trafficdensity_passenger]` (ADR 088; mit openOMSI ohne Fenster geprüft; das Verhalten in openOMSI vom Projektinhaber bestätigt (16. November 2026))
 - [x] Pfade mit Breite und Richtung – im Pfadmodus „Path width (m)“ und „Both ways“ (eigener Pfadtyp unter Splines\Mapforge), Fahrzeugpfade starten und enden mit der Fahrtrichtung der Spur, auf der sie einrasten (ADR 089; vom Nutzer in openOMSI getestet)
 - [x] Straßenprofile vollständig lesen und zeichnen – `[path_2]`, Texturversatz der Kette, Skew, gespiegeltes v, `[scaleTexByLength]`, `[patchwork_chain]`; `[rail_enh]` und `[third_rail]` gelesen (ADR 090; vom Nutzer in openOMSI getestet)
 - [x] Geländetexturen malen – Modus „Malen“ im Geländewerkzeug: Texturen der Karte wählen oder neue hinzufügen, malen, radieren, weichzeichnen, Härte, Kachel füllen/leeren (ADR 091; vom Nutzer in openOMSI getestet)
@@ -267,5 +267,5 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Angehängte Objekte (`[attachObj]`, auch mehrstufig) und Spline-Anhängungen zeichnen; der Startabstand zählt ab dem gespeicherten Kettenabstand des Splines (ADR 038)
 - [x] Rückseiten wie OMSI weglassen, Glas überblenden, `[matl_transmap]` als Deckkraft auswerten, Bäume in 3D als gekreuzte Flächen
 - [x] Transparenzkarten am 70er-Wartehäuschen im Player prüfen (22. Oktober 2026: Seitenscheiben halbdurchsichtig)
-- [x] Variable parent (`[varparent]`) von Objekten und angehängten Objekten im Inspector setzen, wählen, anzeigen und entfernen, ein Rückgängig-Schritt (ADR 082, 9. November 2026)
-- [x] Geländeanpassung folgt der Querneigung von Straßen, neu angepasst nach dem Ändern von Querneigung und Schräge (ADR 083, 9. November 2026; Befund des Nutzers aus openOMSI)
+- [x] Variable parent (`[varparent]`) von Objekten und angehängten Objekten im Inspector setzen, wählen, anzeigen und entfernen, ein Rückgängig-Schritt (ADR 082, 9. November 2026; vom Projektinhaber bestätigt (16. November 2026))
+- [x] Geländeanpassung folgt der Querneigung von Straßen, neu angepasst nach dem Ändern von Querneigung und Schräge (ADR 083, 9. November 2026; Befund des Nutzers aus openOMSI; vom Projektinhaber bestätigt (16. November 2026))
