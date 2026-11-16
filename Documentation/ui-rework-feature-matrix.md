@@ -79,8 +79,8 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Markierungen | Leiste M (`MarkingToolOptions.cs`) | teilweise | offen | Katalog neu (uncommittet), Optionen alt |
 | Vorfahrt (seit 15. November 2026 „Traffic rules“, ADR 099; Stand dieser Matrix: davor) | Leiste V (`EditorShellPriorities.cs`) | teilweise | – | nur Hülle neu |
 | Spuren, Abbiegespur | Leiste L (`EditorShellLanes.cs`) | teilweise | – | Fenster neu gebaut (M4 Schritt 6, 15. November 2026) |
-| Ampeln, Phasen, Zeitleiste | Leiste A (`EditorShellSignals*.cs`) | teilweise | – | nur Hülle neu; 380 px breite Sonderspalte |
-| Ampel-Assistent, Vorlagen | Knöpfe im Ampel-Fenster (`EditorShellSignals.cs:328–340`) | alt | – | Dialoge alt |
+| Ampeln, Phasen, Zeitleiste | Freies Fenster `SignalWindow` (`EditorShellSignals*.cs`, `SignalWindow.cs`, `FloatingWindow.cs`) | neu (M4 Schritt 7b, vom Projektinhaber getestet 16. November 2026, committet) | – | Titelleiste, Navigation (Gruppen, Phasen & Zeiten, Prüfung, Assistent), Arbeitsbereich, Vorschau, Fußzeile; verschiebbar, einklappbar, größenveränderbar |
+| Ampel-Assistent, Vorlagen | Bereich „Assistant“ im Ampel-Fenster (Seiten Proposal, Templates) | neu (M4 Schritt 7b, vom Projektinhaber getestet 16. November 2026, committet) | – | Leiste mit beschrifteten Knöpfen oben auf der Seite |
 | KI-Pfade und Regeln je Element | Kontextmenü „AI paths and rules…“ → Inspector (`EditorShellPaths.cs:304`) | voll | ja | nur bei eingeschalteten Pfaden; stumm, solange Pfade nicht gelesen sind |
 | **Gelände und Unterlagen** | | | | |
 | Geländepinsel, Bodentexturen malen | Leiste G (`TerrainToolOptions.cs`, `GroundPaintOptions.cs`) | teilweise | offen | Katalog neu; Optionen alt |
