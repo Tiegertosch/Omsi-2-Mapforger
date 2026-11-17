@@ -60,9 +60,9 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Löschen | Entf, Leiste, Kontextmenü, Edit-Menü | voll | ja | |
 | Kopieren, Duplizieren | Strg+C/D, Kontextmenü (`EditorShellClipboard.cs`) | voll | ja | |
 | Einfügen | Strg+V; Kontextmenü „Paste here“ | **Lücke** | – | eigener Pfad (Audit 5.2) |
-| Eigenschaften, Typ und Labels, Elternobjekt | Kontextmenü → Inspector-Gruppen (`EditorShellInspector.cs:121`) | voll | ja | |
-| Typ ändern („Change type…“) | Kontextmenü, Inspector (`EditorShellLabels.cs:122`) | **Lücke** | – | Titel der Wahl unsichtbar; Wahl überlebt Werkzeugwechsel (Risiko) |
-| Haltestelle benennen | Kontextmenü „Rename bus stop…“ (`EditorShellBusStop.cs`) | voll | ja | Quelle des Fehlers 5.1 ohne Projekt |
+| Eigenschaften, Typ und Labels, Elternobjekt | Kontextmenü → Inspector-Gruppen (`EditorShellInspector.cs:121`) | voll | ja | Labels seit 16. November 2026 (M4 Schritt 8, vom Projektinhaber getestet 17. November 2026, committet): volle Zeilen, benannte Felder je Objektart (ADR 100), Ausrichtung ohne „Apply labels“ |
+| Typ ändern („Change type…“) | Inspector (Knopf in der Gruppenkopfzeile, bei angehängten Objekten in ihrer Zeile), Kontextmenü, `EditorShellLabels.cs` | voll | ja (vom Projektinhaber getestet 17. November 2026, committet) | Modus des Objekte-Fensters mit Zeilen „Current“/„Replace“; Ende bei Werkzeug-, Auswahl-, Ansichtswechsel und offenem Fenster (`TypePickRules`, M4 Schritt 8) |
+| Haltestelle benennen | Kontextmenü „Rename bus stop…“ (`EditorShellBusStop.cs`), Inspector-Gruppe „Bus stop“ (Name ist Label 0; „Add to stop list“/„Remove from stop list“, 16. November 2026; vom Projektinhaber getestet 17. November 2026, committet, Liste heißt „stop list“) | voll | ja (Namen, Liste: getestet 17. November 2026) | Quelle des Fehlers 5.1 ohne Projekt |
 | Gelände unter Objekt einebnen | Kontextmenü, Inspector | voll | ja | |
 | Zufällige Drehung | Optionen der Bibliothek (`EditorShellRandomHeading.cs`) | teilweise | offen | alte Optionsspalte |
 | **Straßen und Splines** | | | | |

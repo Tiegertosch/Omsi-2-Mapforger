@@ -55,7 +55,7 @@ Abhängigkeitsrichtung: UI → OMSI → Core; OMSI kennt UI nicht. Größte Date
 - **Dateimodell:** `OmsiTextFile` (Kodierung: BOM → striktes UTF-8 → Windows-1252), `OmsiRecordFile` (verlustfrei, `ToBytes()` byte-identisch), `OmsiTileRecordLayouts` / `OmsiGlobalConfigLayouts` (Feldanzahlen), `OmsiTileRecordViews` (typisierte Views: `OmsiObjectView`, `OmsiSplineView`, …), `OmsiNumberFormat` (Zahlen wie der OMSI-Editor).
 - **Lesen:** `OmsiMapReader` → `OmsiMapSummary` (u. a. `TileSizeMeters`), `OmsiTerrain` (61 × 61 Höhen), `OmsiMapGeometry`, `OmsiSplineTileIndex`, `OmsiSplineContinuity`.
 - **Bearbeiten:** `IOmsiFileSource` / `OmsiFolderSource` / `OmsiMapWorkspace` (Arbeitskopie über Original), `OmsiMapSession` (`PlaceObject`, `DeleteObject`, `TransferObject`, `OmsiObjectChange` für Undo; Straßen in `OmsiMapSessionSplines.cs`: `CreateRoad`, `DeleteSpline`, `OmsiSplineChange`, `OmsiSplineEnd`), `OmsiRoadPlanner` (Bogen, Stücke, Höhenmodi, Befunde), `OmsiTerrainSampler` (Gelände über Kachelgrenzen, außerhalb = ungültig), `OmsiTileEditing` (strukturelle Änderungen), `OmsiReferenceIndex` (kartenweite ID-Verweise), `OmsiIdAllocator` (`[NextIDCode]`), `OmsiMapExporter`.
-- **Modelle/Texturen:** `OmsiSceneryObject` (`.sco`), `OmsiO3dMesh` (`.o3d`, mit Entwürfelung), `OmsiXMesh` (Text-`.x`), `OmsiObjectModel` (`OmsiObjectModelCatalog`), `OmsiFootprintTracer` (Umrisse), `OmsiImage` (BMP/TGA/DDS DXT1/3/5), `OmsiGroundTextures`, `OmsiSplineProfile` (`.sli`), `OmsiSplineAttachmentLayout` (Spline-Anhängungen, Reihen).
+- **Modelle/Texturen:** `OmsiSceneryObject` (`.sco`), `OmsiLabelSchema` (Beschriftungsfelder je Objektart, ADR 100), `OmsiO3dMesh` (`.o3d`, mit Entwürfelung), `OmsiXMesh` (Text-`.x`), `OmsiObjectModel` (`OmsiObjectModelCatalog`), `OmsiFootprintTracer` (Umrisse), `OmsiImage` (BMP/TGA/DDS DXT1/3/5), `OmsiGroundTextures`, `OmsiSplineProfile` (`.sli`), `OmsiSplineAttachmentLayout` (Spline-Anhängungen, Reihen).
 - **Gelände und Luftbilder:** `OmsiTerrainBrush`/`OmsiTerrainGrid` (Pinsel, kartenweites Raster), `OmsiHeightMap`, `OmsiPng`, `OmsiTiff`, `OmsiGeo` (Verortung, Quellen, `OmsiGeoSettings` in `Mapforge\geo.txt`, `OmsiImageryPreferences` mit Schlüsseln nur auf dem Rechner), `OmsiAerial` (Kachelspeicher, Mosaik, `OmsiAerialJob`), `OmsiOsmMap` mit `OmsiCanvas` (Vektorgrafik) und `OmsiTrueTypeFont`, `OmsiOwnPictures`, `OmsiJson`.
 
 ## Harte Regeln (nicht verletzen)
@@ -91,7 +91,7 @@ Unity: `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. Befehle siehe `Docu
 **Der Nutzer hat den Unity-Editor oft offen → Projekt ist für Batch-Mode gesperrt.** Dann:
 
 - **Schnelle Logiktests ohne Unity:** `Editor.Core`, `Editor.OMSI` und die Tests mit Roslyn csc kompilieren (`C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe`), NUnit aus `Library/PackageCache/com.unity.ext.nunit@*/net472/unity-custom/`, mit kleinem Reflection-Runner im Scratchpad ausführen (Hilfsskripte sind nicht im Repo).
-- **Unity Test Runner / Player-Build:** `Assets`, `Packages`, `ProjectSettings`, `Library` (~1,1 GB) ins Scratchpad kopieren und Batch-Mode auf die Kopie (`-runTests -testPlatform EditMode` bzw. `-executeMethod OmsiMapEditor.Editor.WindowsPlayerBuild.Build`).
+- **Unity Test Runner / Player-Build:** `Assets`, `Packages`, `ProjectSettings`, `Library` (~1,1 GB) sowie `locales` (sonst scheitern die Sprach- und Tooltip-Tests) ins Scratchpad kopieren und Batch-Mode auf die Kopie (`-runTests -testPlatform EditMode` bzw. `-executeMethod OmsiMapEditor.Editor.WindowsPlayerBuild.Build`).
 - Build dauert ~3 Min: **immer im Hintergrund starten und das vorher ansagen** (ein stiller Vordergrund-Build wirkte wie ein Hänger).
 - Log des offenen Editors: `Logs/Editor.log` im Projekt. Player-Log: `%USERPROFILE%\AppData\LocalLow\OMSI MapWorks\OMSI MapWorks\Player.log`.
 - Der Nutzer bietet an, den Editor zu schließen – vorher um Speichern bitten.
@@ -122,7 +122,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 - `Documentation/Architecture.md` – Module und Datenfluss im Detail
 - `Documentation/Internationalisierung.md` – Abschluss der Mehrsprachigkeit: Technik, Architektur, Ausnahmen, neue Sprache anlegen
-- `Documentation/Decisions.md` – ADR 001–098
+- `Documentation/Decisions.md` – ADR 001–100
 - `Documentation/DevelopmentSetup.md` – Werkzeuge, Kommandozeile, Validierungsstand
 - `Documentation/Roadmap.md` – erledigt `[x]` und offen
 - `Documentation/ProjectStatus.md` – laufender Stand, Releases, Zweige, offene Nutzertests

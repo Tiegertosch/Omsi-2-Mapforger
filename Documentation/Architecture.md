@@ -13,11 +13,11 @@
 | Assembly | Zuständigkeit | Abhängigkeiten |
 |---|---|---|
 | `Editor.Core` | Gemeinsame Grundschicht und zentrale Datenverträge wie Projektdatei und Anwendungseinstellungen | Keine Projekt-Assembly |
-| `Editor.UI` | Shell, Kartenansicht (`MapCanvasElement`), Werkzeugleiste, Objekte-Bibliothek, Startbildschirm, Icons, Dateidialoge | `Editor.Core`, `Editor.OMSI`, `Editor.World` |
+| `Editor.UI` | Shell, Kartenansicht (`MapCanvasElement`), Werkzeugleiste, Objekte-Bibliothek, Startbildschirm, Icons, Dateidialoge, Regeln und Texte der Labels und der Typwahl (`TypePickRules`, `LabelEditRules`, `LabelCaptions`) | `Editor.Core`, `Editor.OMSI`, `Editor.World` |
 | `Editor.Geometry` | Reserviert, noch leer: gedacht für Geometrie-, Kurven- und Profilberechnungen; die heutige Geometrie rechnet OMSI-Datensätze und liegt deshalb in `Editor.OMSI` (RefactoringAudit.md) | `Editor.Core` |
 | `Editor.World` | Unity-Darstellung der Karte: Boden, Splines und Objekte mit Texturen (`MapGroundRenderer`, `MapObjectRenderer`), Picking und Vorschau | `Editor.Core`, `Editor.OMSI` |
 | `Editor.Objects` | Reserviert, noch leer: platzierbare Objektdefinitionen und Instanzen | `Editor.Core` |
-| `Editor.OMSI` | Import/Export und OMSI-Kompatibilität | `Editor.Core` |
+| `Editor.OMSI` | Import/Export und OMSI-Kompatibilität, Beschriftungsfelder je Objektart aus der `.sco` (`OmsiLabelSchema`, ADR 100) | `Editor.Core` |
 | `Editor.Validation` | Reserviert, noch leer: Prüfungen und Berichte; die Kartenprüfung liegt heute in `Editor.OMSI` (`OmsiMapCheck`) | `Editor.Core` |
 | `Editor.OMSI.Editor` | Editor-only: Kartenübersichtsfenster, Batch-Mode-Einstieg, Build-Prüfung | `Editor.OMSI` |
 | `Editor.UI.Editor` | Editor-only: URP-Setup und Windows-Build-Helfer | `Editor.Core`, `Editor.UI`, `Editor.OMSI.Editor`, URP Runtime |
