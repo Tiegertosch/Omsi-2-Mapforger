@@ -206,8 +206,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Karteneinstellungen nach dem Anlegen ändern: Name, Beschreibung, Fahrtseite, Verkehr, Jahre, Geld, Jahreszeiten, Bodentextur (ADR 076)
   - [x] Inspector überarbeitet: Reiter „Selection“/„Tile“, Gruppen mit Merkzustand, kompakte Zeilen, feste Knopfleiste (ADR 077)
   - [x] Project-Fenster überarbeitet: Reiter Tiles (mit Filter), Map, Chrono, Lines, Paths; der gewählte Reiter bleibt beim Neuaufbau (ADR 078)
-  - [x] Einstiegspunkte erstellen, umbenennen und löschen: Reiter „Entries“, Klick in die Karte, Gruppe im Inspector (ADR 079)
-  - [ ] Offen (Befund vom 17. November 2026): Ein über den Objektkatalog gesetztes `entrypoint_bus.sco` wird nicht in `[entrypoints]` der `global.cfg` eingetragen, nur das Einstiegspunkte-Popup schreibt den Eintrag (seit ADR 079; `EditorShellBootstrap.cs`, PlaceObject-Zweig ohne `IsEntryPoint`-Prüfung). Der ursprüngliche Einstiegspunkt lässt sich dadurch nicht löschen. Workaround: über das Popup anlegen; Fix-Variante wartet auf die Entscheidung des Projektinhabers
+  - [x] Einstiegspunkte erstellen, umbenennen und löschen: Platzieren im Objektbrowser mit Namensdialog, Gruppe im Inspector, „Change type“ (ADR 079, Ergänzung 17. November 2026; vom Projektinhaber getestet am 17. November 2026)
+  - [x] Befund vom 17. November 2026 behoben: Ein über den Objektkatalog gesetztes `entrypoint_bus.sco` trug keinen Eintrag in `[entrypoints]` ein, der ursprüngliche Einstiegspunkt ließ sich nicht löschen. Jetzt tragen Platzieren, Duplizieren und „Change type“ Objekt und Zeile gemeinsam ein (vom Projektinhaber getestet am 17. November 2026)
   - [x] Reihen folgen der Steigung und Querneigung der Straße: Option „Follow slope“ im Rows-Werkzeug (jetzt Reihen-Modus des Objekte-Fensters), Kippflag der Reihen (ADR 080)
   - [x] Gelände einer Kachel als DirectX-Netz (.x) exportieren: Knopf im Kachel-Reiter (ADR 081)
   - [x] Erster und letzter Tag einer Chrono-Variante nachträglich ändern (ADR 075)

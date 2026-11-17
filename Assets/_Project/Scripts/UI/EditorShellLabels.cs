@@ -433,17 +433,20 @@ namespace OmsiMapEditor.UI
                 SetStatusT("labels.status.stays");
         }
 
-        private void ApplyElementType(OmsiTileSummary tile, object element, string assetPath)
+        /// <param name="entryName">Set once the name dialog answered for an object that becomes an entry point (ADR 079); otherwise null, and such a change asks first.</param>
+        private void ApplyElementType(OmsiTileSummary tile, object element, string assetPath, string entryName = null)
         {
             if (!CanEditObjects)
             {
                 SetStatus(ReadOnlyMessage("readonly.action.object_types"));
                 return;
             }
+            if (entryName == null && HandleEntryPointTypeChange(tile, element, assetPath))
+                return;
             OmsiObjectChange change;
             try
             {
-                change = session.SetElementType(tile, element, assetPath);
+                change = session.SetElementType(currentSummary, tile, element, assetPath, IsEntryPointAsset, entryName);
             }
             catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException || exception is IOException ||
                                               exception is UnauthorizedAccessException)
@@ -605,6 +608,8 @@ namespace OmsiMapEditor.UI
                 if (retype != null)
                 {
                     ApplyElementType(tile, Current(), retype);
+                    // An object that becomes an entry point asks for its name first: -placeEntryName / -placeEntryDraft answer or fill that dialog.
+                    AnswerEntryNameFromArguments(args);
                     Debug.Log("Retype: " + statusLabel?.text);
                 }
                 if (relabel != null)

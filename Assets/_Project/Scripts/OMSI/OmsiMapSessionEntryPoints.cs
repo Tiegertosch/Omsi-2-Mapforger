@@ -89,14 +89,82 @@ namespace OmsiMapEditor.OMSI
         public OmsiObjectChange AddEntryPoint(OmsiMapSummary summary, OmsiTileSummary tile, string name, double x, double y, double groundHeight, double headingDegrees)
         {
             name = CheckEntryName(name);
-            RequireBaseMap("make an entry point");
-            var workspace = RequireWorkspace();
-            if (FindEntryList(OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance)) == null)
-                throw new InvalidOperationException("This map's global.cfg has no [entrypoints] list; openOMSI would then use the entry point objects of its tiles alone.");
+            RequireEntryPointRegistration("make an entry point");
 
             var change = PlaceObject(summary, tile, OmsiNewMap.EntryPointObject, x, y, 0.0, headingDegrees, 0.0, 0.0, new[] { name });
+            try
+            {
+                RegisterEntryPoint(change, tile, name, x, y, groundHeight, headingDegrees);
+            }
+            catch (Exception failure)
+            {
+                // The object must not stay without its line: that would be an entry point global.cfg does not list.
+                RollBackAfter(failure, () => Undo(summary, change));
+                throw;
+            }
+            return change;
+        }
+
+        /// <summary>
+        /// Whether this map lists its entry points in global.cfg and the base map is edited, so a new entry point object can be registered; false
+        /// in a chrono variant and in a map without an [entrypoints] list. <see cref="AddEntryPoint"/> and pasting entry point objects refuse otherwise.
+        /// </summary>
+        public bool CanRegisterEntryPoints(out string reason)
+        {
+            reason = null;
+            if (EditedVariant != null)
+            {
+                reason = "Entry points name tiles of the base map: end editing the chrono variant to make an entry point.";
+                return false;
+            }
+            if (!CanEdit)
+            {
+                reason = "This map cannot be changed.";
+                return false;
+            }
+            if (FindEntryList(OmsiRecordFile.Parse(RequireWorkspace().ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance)) == null)
+            {
+                reason = "This map's global.cfg has no [entrypoints] list; openOMSI would then use the entry point objects of its tiles alone.";
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// A name for a new entry point that no entry point of the map has yet: <paramref name="wanted"/> itself when it is free, otherwise it
+        /// with the next number (“Start 2”). The editor offers it when asking for the name of an entry point put down from the object library.
+        /// </summary>
+        public string UniqueEntryName(OmsiMapSummary summary, string wanted)
+        {
+            var baseName = (wanted ?? string.Empty).Trim();
+            if (baseName.Length == 0 || baseName.StartsWith("[", StringComparison.Ordinal) || baseName.IndexOf('\r') >= 0 || baseName.IndexOf('\n') >= 0)
+                baseName = "Start";
+            var taken = new HashSet<string>(ReadEntryPoints(summary).Select(entry => entry.Name), StringComparer.OrdinalIgnoreCase);
+            if (!taken.Contains(baseName))
+                return baseName;
+            for (var number = 2; ; number++)
+            {
+                var candidate = baseName + " " + number.ToString(CultureInfo.InvariantCulture);
+                if (!taken.Contains(candidate))
+                    return candidate;
+            }
+        }
+
+        private void RequireEntryPointRegistration(string action)
+        {
+            RequireBaseMap(action);
+            RequireWorkspace();
+            if (!CanRegisterEntryPoints(out var reason))
+                throw new InvalidOperationException(reason);
+        }
+
+        /// <summary>Writes the [entrypoints] line for an entry point object that <paramref name="change"/> just put into <paramref name="tile"/>, as part of that change.</summary>
+        private void RegisterEntryPoint(OmsiObjectChange change, OmsiTileSummary tile, string name, double x, double y, double groundHeight, double headingDegrees)
+        {
+            var workspace = RequireWorkspace();
             var configState = change.Files.Find(file => string.Equals(file.RelativePath, GlobalConfigFileName, StringComparison.OrdinalIgnoreCase));
-            var config = OmsiRecordFile.Parse(workspace.ReadAllBytes(GlobalConfigFileName), OmsiGlobalConfigLayouts.Instance);
+            var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+            var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
             var tilePath = OmsiRelativePath.Normalize(tile.FileName);
             var tileFile = OmsiRecordFile.Parse(workspace.ReadAllBytes(tilePath), OmsiTileRecordLayouts.Instance);
             var half = headingDegrees * Math.PI / 360.0;
@@ -109,8 +177,127 @@ namespace OmsiMapEditor.OMSI
             };
             ReplaceEntryList(config, existing => existing.Concat(fields));
             workspace.Save(GlobalConfigFileName, config);
-            configState.After = config.ToBytes();
-            return change;
+            // PlaceObject always records global.cfg (the next ID) in its change; a change of an object's type does not.
+            if (configState != null)
+                configState.After = config.ToBytes();
+            else
+                AddFile(change, GlobalConfigFileName, configBefore, config.ToBytes());
+        }
+
+        /// <summary>
+        /// Gives an object another object file (<see cref="SetElementType"/>) without leaving an unregistered entry point behind (ADR 079): an object
+        /// that becomes an <c>[entrypoint]</c> object gets its line in [entrypoints] under <paramref name="entryName"/> (also the object's first label),
+        /// from its place and heading; an object that stops being one loses its line, except the map's last. Everything is one undo step, and a failure
+        /// leaves the files as they were. An entry point that stays one keeps its line. Null when the file is the same.
+        /// </summary>
+        /// <param name="isEntryPoint">Whether an object file is an <c>[entrypoint]</c> object; without it only the editor's own entry point object counts.</param>
+        /// <param name="entryName">The name of the new entry point; only used, and then required, when an object that is no entry point becomes one.</param>
+        public OmsiObjectChange SetElementType(OmsiMapSummary summary, OmsiTileSummary tile, object element, string assetPath, Func<string, bool> isEntryPoint, string entryName)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (string.IsNullOrWhiteSpace(assetPath))
+                throw new ArgumentException("An object file is required.", nameof(assetPath));
+            assetPath = assetPath.Trim();
+            isEntryPoint = isEntryPoint ?? (asset => string.Equals(asset, OmsiNewMap.EntryPointObject, StringComparison.OrdinalIgnoreCase));
+            var item = element as OmsiObjectRecord;
+            var currentPath = item?.AssetPath ?? (element as OmsiAttachedObjectRecord)?.AssetPath;
+            if (currentPath == null || string.Equals(assetPath, currentPath, StringComparison.Ordinal))
+                return SetElementType(tile, element, assetPath);
+
+            var becomes = isEntryPoint(assetPath);
+            var registered = item == null ? null : EntryPointOf(summary, tile, item);
+            if (registered == null && !becomes)
+                return SetElementType(tile, element, assetPath);
+            if (registered != null && becomes)
+                return SetElementType(tile, element, assetPath);
+
+            var workspace = RequireWorkspace();
+            if (registered != null)
+            {
+                // An entry point that stops being one: its line goes with the type, but the map keeps one entry point at least.
+                RequireBaseMap("change the type of an entry point");
+                var configBefore = workspace.ReadAllBytes(GlobalConfigFileName);
+                var config = OmsiRecordFile.Parse(configBefore, OmsiGlobalConfigLayouts.Instance);
+                var list = FindEntryList(config);
+                var field = list == null ? -1 : FieldOfEntry(list, registered.TileIndex, registered.ObjectId);
+                if (field < 0)
+                    throw new InvalidOperationException("The entry point is no longer in global.cfg.");
+                if ((list.Fields.Count - 1) / EntryFieldCount <= 1)
+                    throw new InvalidOperationException("A map needs at least one entry point; make another before changing the type of this one.");
+                var change = SetElementType(tile, element, assetPath);
+                if (change == null)
+                    return null;
+                try
+                {
+                    ReplaceEntryList(config, existing => existing.Take(field - 1).Concat(existing.Skip(field - 1 + EntryFieldCount)));
+                    workspace.Save(GlobalConfigFileName, config);
+                    SetConfigState(change, configBefore, config.ToBytes());
+                }
+                catch (Exception failure)
+                {
+                    RollBackAfter(failure, () => Undo(summary, change));
+                    throw;
+                }
+                return change;
+            }
+
+            // An object that becomes an entry point: it needs the list, the base map, a name and a place on the terrain.
+            if (item == null)
+                throw new InvalidOperationException("An entry point stands on the terrain, not on an object: an attached object cannot become one.");
+            RequireEntryPointRegistration("make an entry point");
+            entryName = CheckEntryName(entryName);
+            var labels = new List<string>(item.Labels);
+            if (labels.Count == 0)
+                labels.Add(entryName);
+            else
+                labels[0] = entryName;
+            var ground = item.Height;
+            var world = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, item.LocalX, item.LocalY, summary.TileSizeMeters);
+            if (new OmsiTerrainSampler(summary, Source).TryGetHeight(world.X, world.Y, out var found))
+                ground = found;
+            var heading = item.HeadingDegrees;
+            var x = item.LocalX;
+            var y = item.LocalY;
+            var made = ChangeElement(tile, element, assetPath, labels);
+            if (made == null)
+                return null;
+            try
+            {
+                RegisterEntryPoint(made, tile, entryName, x, y, ground, heading);
+            }
+            catch (Exception failure)
+            {
+                RollBackAfter(failure, () => Undo(summary, made));
+                throw;
+            }
+            return made;
+        }
+
+        /// <summary>
+        /// Why changing this object's type to <paramref name="assetPath"/> cannot be done: it would make an entry point where none can be registered
+        /// (attached object, chrono variant, map without an [entrypoints] list), or take away the map's last one. Null when the type may change.
+        /// </summary>
+        public string EntryPointTypeProblem(OmsiMapSummary summary, OmsiTileSummary tile, object element, string assetPath, Func<string, bool> isEntryPoint)
+        {
+            isEntryPoint = isEntryPoint ?? (asset => string.Equals(asset, OmsiNewMap.EntryPointObject, StringComparison.OrdinalIgnoreCase));
+            var item = element as OmsiObjectRecord;
+            var currentPath = item?.AssetPath ?? (element as OmsiAttachedObjectRecord)?.AssetPath;
+            if (currentPath == null || string.Equals(assetPath, currentPath, StringComparison.Ordinal))
+                return null;
+            var becomes = isEntryPoint(assetPath);
+            var registered = item == null ? null : EntryPointOf(summary, tile, item);
+            if (registered != null && !becomes && EditedVariant != null)
+                return "Entry points name tiles of the base map: end editing the chrono variant to change the type of an entry point.";
+            if (registered == null && becomes)
+            {
+                if (item == null)
+                    return "An entry point stands on the terrain, not on an object: an attached object cannot become one.";
+                return CanRegisterEntryPoints(out var reason) ? null : reason;
+            }
+            if (registered != null && !becomes && ReadEntryPoints(summary).Count <= 1)
+                return "A map needs at least one entry point; make another before changing the type of this one.";
+            return null;
         }
 
         /// <summary>

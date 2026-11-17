@@ -253,7 +253,7 @@ namespace OmsiMapEditor.UI
             OmsiPasteResult result;
             try
             {
-                result = session.PasteObjects(currentSummary, data.PlaceAt(centreX, centreY, turn, headingOffsets), HasAbsoluteHeight, GroundAtWorld());
+                result = session.PasteObjects(currentSummary, data.PlaceAt(centreX, centreY, turn, headingOffsets), HasAbsoluteHeight, GroundAtWorld(), IsEntryPointAsset);
             }
             catch (Exception exception) when (exception is InvalidOperationException || exception is IOException || exception is ArgumentException)
             {

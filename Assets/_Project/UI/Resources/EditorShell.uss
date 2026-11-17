@@ -682,6 +682,8 @@
 .dialog-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; background-color: rgba(10, 12, 15, 0.7); }
 .dialog { width: 560px; padding: var(--mf-space-4); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .dialog-field { margin: 4px 8px; }
+.entry-name-error { color: var(--mf-color-error); }
+.entry-name-taken { color: var(--mf-color-warning); }
 .dialog-field > Label { min-width: 110px; width: 110px; color: var(--mf-color-text-secondary); }
 .export-target { margin-top: 8px; color: var(--mf-color-info); }
 .export-problem { color: var(--mf-color-error); }

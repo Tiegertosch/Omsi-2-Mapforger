@@ -22,7 +22,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Menü Help | Bedienhilfe, Check for updates, Report a bug | `EditorShell.uxml:97–111` |
 | Leiste links | Routes, Textures, 3D, Einpassen, Zoom, Zentrieren; Kachelknopf; Projektpille (nur Anzeige: Name und Modus-Abzeichen, seit 12. November ohne Klick) | `EditorShell.uxml:37–52`, `EditorShellBottomBar.cs:43–56` |
 | Leiste Mitte | Drag Q, Move W, Rotate E, Delete Entf, Road R, Rows T, Terrain G, Markings M, Priorities V, Lanes L, Signals A, Line B, Objects 3 | `MapToolbar.cs:27–43` |
-| Leiste rechts | Popups Pfade, Einstiegspunkte, Linien, Chrono, Karte | `EditorShellBottomBar.cs:26–30` |
+| Leiste rechts | Popups Pfade, Linien, Chrono, Karte (Einstiegspunkte seit 17. November 2026 ohne Popup, im Objektbrowser) | `EditorShellBottomBar.cs:26–30` |
 | Kontextmenü | Objekt, Mehrfachauswahl, Spline, Kachel | `EditorShellContextMenu.cs:149–241` |
 | Tasten | Werkzeugtasten, Esc, Entf, Strg+C/V/D/Z/Y | `Bootstrap:6019–6280` |
 
@@ -50,7 +50,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Karte: Name, Zahlen, Warnungen | Popup „Karte“ (`EditorShellProjectTabs.cs:63`) | voll | ja | |
 | Karteneinstellungen | Popup „Karte“ › Knopf (`EditorShellMapSettings.cs:19`) | teilweise | – | Dialog alt; nur mit Projekt |
 | Parkliste, Tageskurven | Popup „Karte“ › Knöpfe (`EditorShellProjectTabs.cs:92–93`) | teilweise | – | Dialoge alt |
-| Einstiegspunkte | Popup; Kontextmenü „Rename entry point…“ (`EditorShellEntryPoints.cs`) | voll | ja | |
+| Einstiegspunkte | Objektbrowser (Suche „entrypoint“): Platzieren mit Namensdialog, „Change type…“; Kontextmenü „Rename entry point…“ und Inspector-Gruppe „Entry point“ (`EditorShellEntryPoints.cs`). Die Liste aller Einstiegspunkte und das Springen zu einem Eintrag entfallen; Ersatz ist die Suche im Objektbrowser und die Kartenprüfung | voll | ja (17. November 2026: Platzieren, Duplizieren, Change type, Löschen, openOMSI) | Popup entfernt (ADR 079, Ergänzung 17. November 2026) |
 | Chrono-Varianten, Datum | Popup „Chrono“ (`Bootstrap:7991`, `EditorShellChronoDates.cs`) | voll | ja | welche Variante bearbeitet wird, ist nicht dauerhaft sichtbar |
 | Linienliste | Popup „Linien“ (`EditorShellProjectTabs.cs:110`) | voll | ja | |
 | Fahrplan-Editor, Fahrzeuge | Popup „Linien“ › Knöpfe (`:120–122`) | teilweise | – | Dialoge alt, 105 Inline-Größen |

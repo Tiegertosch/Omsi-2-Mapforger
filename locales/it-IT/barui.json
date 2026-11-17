@@ -1,7 +1,6 @@
 {
   "bar.tiles.tooltip": "Tessere: l'elenco delle tessere della mappa, con ricerca; un clic ne seleziona una.",
   "bar.paths.tooltip": "Percorsi IA: mostra i percorsi per tipo e vai alle estremità aperte. Il pulsante «Percorsi» a sinistra li mostra sulla mappa.",
-  "bar.entries.tooltip": "Punti di ingresso: dove partono gli autobus; posizionarli, rinominarli ed eliminarli.",
   "bar.lines.tooltip": "Linee: le linee dell'orario, l'editor dell'orario e i gruppi di veicoli.",
   "bar.chrono.tooltip": "Chrono: varianti della mappa con le loro date; mostra la mappa a una data o modifica una variante.",
   "bar.map.tooltip": "Mappa: nome, dimensione, impostazioni, elenco parcheggi, curve del traffico e descrizione della mappa.",

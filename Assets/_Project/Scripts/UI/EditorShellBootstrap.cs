@@ -1766,7 +1766,10 @@ namespace OmsiMapEditor.UI
                 StartPlacement(placeAsset);
                 mapCanvas?.PointPlacementAtCenter();
                 if (Array.IndexOf(args, "-placeCommit") >= 0)
+                {
                     mapCanvas?.ClickPlacement();
+                    AnswerEntryNameFromArguments(args);
+                }
                 Debug.Log("Place: " + statusLabel?.text);
             }
             var testProfile = Argument("-testJunction", 1);
@@ -5265,8 +5268,6 @@ namespace OmsiMapEditor.UI
             RefitTerrainAtJunctions();
             mapCanvas?.Refresh();
             objectRenderer?.RefreshPlacements();
-            if (projectTab == ProjectTab.Entries && projectPanel != null && currentSummary != null)
-                RenderProjectBrowser();
             groundRenderer?.RefreshTerrainHoles(currentSummary);
             // Moved stops and crossings move their routes.
             ScheduleRoutesRebuild();
@@ -7357,8 +7358,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             clipboardPlacing = false;
-            placingEntryName = pendingEntryName;
-            pendingEntryName = null;
+            placementIsEntryPoint = string.Equals(assetPath, OmsiNewMap.EntryPointObject, StringComparison.OrdinalIgnoreCase);
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             placementHasAbsoluteHeight = false;
             var problem = (string)null;
@@ -7369,6 +7369,7 @@ namespace OmsiMapEditor.UI
                 {
                     var sceneryObject = OmsiSceneryObject.Parse(File.ReadAllBytes(scoPath));
                     placementHasAbsoluteHeight = sceneryObject.HasAbsoluteHeight || sceneryObject.HasSplineHelper;
+                    placementIsEntryPoint |= sceneryObject.IsEntryPoint;
                 }
                 else
                 {
@@ -7388,9 +7389,18 @@ namespace OmsiMapEditor.UI
                 problem = " " + Loc.T("place.problem_unreadable", ("reason", exception.Message));
             }
 
+            // An entry point that cannot be made here (chrono variant, no [entrypoints] list) is not carried around: say why right away.
+            var entryProblem = placementIsEntryPoint ? EntryPlacementProblem() : null;
+            if (entryProblem != null)
+            {
+                StopPlacement();
+                SetStatus(entryProblem);
+                return;
+            }
+
             placementAsset = assetPath;
             mapCanvas?.BeginPlacement(assetPath, mapCanvas.PlacementHeading);
-            if (RandomHeadingOn && placingEntryName == null)
+            if (RandomHeadingOn && !placementIsEntryPoint)
                 RollPlacementHeading();
             if (mapCanvas != null)
                 objectsPanel?.ShowHeading(mapCanvas.PlacementHeading);
@@ -7427,9 +7437,9 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (placingEntryName != null)
+            if (placementIsEntryPoint)
             {
-                PlaceEntryPoint(placement);
+                AskEntryName(placement);
                 return;
             }
 
@@ -7475,7 +7485,7 @@ namespace OmsiMapEditor.UI
         {
             placementPlan = null;
             placementAttach = null;
-            if (placementAsset == null || !CanEdit || currentSummary == null || placingEntryName != null)
+            if (placementAsset == null || !CanEdit || currentSummary == null || placementIsEntryPoint)
                 return null;
             var catalog = Junctions();
             if (catalog == null || catalog.Helpers(placementAsset).Count < 2)
@@ -7630,7 +7640,9 @@ namespace OmsiMapEditor.UI
             placementPlan = null;
             placementSnapMessage = null;
             placementAsset = null;
-            placingEntryName = null;
+            placementIsEntryPoint = false;
+            entryNameAnswer = null;
+            HidePopup(entryNameDialog);
             clipboardPlacing = false;
             mapCanvas?.EndPlacement();
             objectsPanel?.ClearChosen();
@@ -8600,9 +8612,6 @@ namespace OmsiMapEditor.UI
             {
                 case ProjectTab.Map:
                     projectPanel.Add(MapTab());
-                    break;
-                case ProjectTab.Entries:
-                    projectPanel.Add(ProjectTabPage(EntriesSection()));
                     break;
                 case ProjectTab.Chrono:
                     projectPanel.Add(ProjectTabPage(ChronoSection()));

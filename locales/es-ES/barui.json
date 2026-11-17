@@ -1,7 +1,6 @@
 {
   "bar.tiles.tooltip": "Casillas: la lista de casillas del mapa, con búsqueda; un clic selecciona una.",
   "bar.paths.tooltip": "Rutas de IA: mostrar las rutas por tipo e ir a los extremos abiertos. El botón «Rutas» a la izquierda las muestra en el mapa.",
-  "bar.entries.tooltip": "Puntos de entrada: donde arrancan los autobuses; colocarlos, renombrarlos y eliminarlos.",
   "bar.lines.tooltip": "Líneas: las líneas del horario, el editor de horarios y los grupos de vehículos.",
   "bar.chrono.tooltip": "Chrono: variantes del mapa con sus fechas; mostrar el mapa en una fecha o editar una variante.",
   "bar.map.tooltip": "Mapa: nombre, tamaño, ajustes, lista de aparcamiento, curvas de tráfico y descripción del mapa.",

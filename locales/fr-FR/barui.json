@@ -1,7 +1,6 @@
 {
   "bar.tiles.tooltip": "Tuiles : la liste des tuiles de la carte, avec une recherche ; un clic en sélectionne une.",
   "bar.paths.tooltip": "Chemins IA : afficher les chemins par type et aller aux extrémités ouvertes. Le bouton « Chemins » à gauche les affiche sur la carte.",
-  "bar.entries.tooltip": "Points d'entrée : où les bus démarrent ; les placer, les renommer et les supprimer.",
   "bar.lines.tooltip": "Lignes : les lignes de l'horaire, l'éditeur d'horaire et les groupes de véhicules.",
   "bar.chrono.tooltip": "Chrono : les variantes de la carte avec leurs dates ; afficher la carte à une date ou modifier une variante.",
   "bar.map.tooltip": "Carte : nom, taille, réglages, liste de stationnement, courbes de trafic et description de la carte.",

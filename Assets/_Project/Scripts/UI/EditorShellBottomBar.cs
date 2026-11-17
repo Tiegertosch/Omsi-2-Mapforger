@@ -27,7 +27,7 @@ namespace OmsiMapEditor.UI
 
         private static readonly (ProjectTab Tab, string Icon, string TooltipKey)[] RightBarButtons =
         {
-            (ProjectTab.Paths, "waypoints", "bar.paths.tooltip"), (ProjectTab.Entries, "flag", "bar.entries.tooltip"), (ProjectTab.Lines, "route", "bar.lines.tooltip"),
+            (ProjectTab.Paths, "waypoints", "bar.paths.tooltip"), (ProjectTab.Lines, "route", "bar.lines.tooltip"),
             (ProjectTab.Chrono, "calendar", "bar.chrono.tooltip"), (ProjectTab.Map, "settings-2", "bar.map.tooltip")
         };
 
@@ -169,7 +169,6 @@ namespace OmsiMapEditor.UI
             switch (tab)
             {
                 case ProjectTab.Map: return "project.tab.map";
-                case ProjectTab.Entries: return "project.tab.entries";
                 case ProjectTab.Chrono: return "project.tab.chrono";
                 case ProjectTab.Lines: return "project.tab.lines";
                 case ProjectTab.Paths: return "project.tab.paths";

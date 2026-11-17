@@ -18,7 +18,6 @@ namespace OmsiMapEditor.UI
         {
             Tiles,
             Map,
-            Entries,
             Chrono,
             Lines,
             Paths
@@ -206,7 +205,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// Command line: <c>-projectTab tiles|map|entries|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
+        /// Command line: <c>-projectTab tiles|map|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
         /// <c>-tileFilter Text</c> types a text into the filter of the tile tab.
         /// </summary>
         private void RunProjectTabArguments(string[] args)
