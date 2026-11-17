@@ -256,7 +256,8 @@ namespace OmsiMapEditor.UI
 
         private bool EditingVariant => editedVariant != null && chronoDate != null && session != null && session.EditedVariant != null;
 
-        private bool ReadingMapInBackground => chronoTask != null || checkTask != null;
+        /// <summary>A map check, a chrono overlay or the opening of a map is reading on a worker thread; editing waits (label fields included).</summary>
+        private bool ReadingMapInBackground => chronoTask != null || checkTask != null || OpeningMap;
 
         // A routes build after edits waits for a pause, so a burst of edits or undos starts only one.
         private IVisualElementScheduledItem routesRebuild;
@@ -829,6 +830,7 @@ namespace OmsiMapEditor.UI
         {
             if (benchmarkFrames != null && Time.frameCount > benchmarkOpenFrame)
                 benchmarkFrames.Add(Time.unscaledDeltaTime * 1000.0);
+            EnforceTypePick();
             RefreshToolHint();
             ReloadAfterPendingRollBack();
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
@@ -1995,6 +1997,9 @@ namespace OmsiMapEditor.UI
             // A terrain or paint stroke still held is finished before the map is read, so the reading sees what it wrote.
             if (session != null && currentSummary != null && activeTool == EditorTool.Terrain)
                 ReleaseTerrain();
+            // Label lines typed in the map that is left are written through its session before the new one reads the files; reading
+            // first would show the state without them and a later edit of the same tile could overwrite them.
+            FlushLabelEdits();
             ShowMap(ReadMap(globalConfigPath, projectFilePath), projectName, keepView);
         }
 
@@ -2005,6 +2010,8 @@ namespace OmsiMapEditor.UI
             // A terrain or paint stroke still held belongs to the session that is leaving: it is finished there, before the new one takes over.
             if (session != null && currentSummary != null && activeTool == EditorTool.Terrain)
                 ReleaseTerrain();
+            // Label lines typed in the map that is left were written before it was read (LoadMap, OpenMapInBackground); nothing goes on into the new map.
+            ClearLabelEdits();
             UseSession(reading.Session);
             junctionTerrainState = null;
             junctionTerrainPlaces = null;
@@ -2225,6 +2232,8 @@ namespace OmsiMapEditor.UI
             // A road type being chosen for a spline of the variant ends with it.
             EndSplineTypePick(null);
             lineCandidates = null;
+            FlushLabelEdits();
+            ClearLabelEdits();
             editedVariant = null;
             session?.EditChronoVariant(null, null);
             // Edits go to the base map again; the next fit after a junction changed fits the whole map (RefitTerrainAtJunctions).
@@ -2252,6 +2261,8 @@ namespace OmsiMapEditor.UI
             projectTab = ProjectTab.Chrono;
             StopPlacement();
             ShowObjectsPanel(false);
+            // Label lines typed in the view that is left are written there first (also when no variant is left).
+            FlushLabelEdits();
             var wasEditing = editedVariant != null;
             LeaveEditedVariant();
             if (date == null)
@@ -2260,6 +2271,7 @@ namespace OmsiMapEditor.UI
                 if (chronoDate == null)
                     return;
                 chronoDate = null;
+                ClearLabelEdits();
                 PresentChrono(baseSummary, null);
                 SetStatusT(session.CanEdit ? "chrono.status.base_editable" : "chrono.status.base", ("wasEditing", wasEditing ? "yes" : "no")) /* i18n:keys */;
                 return;
@@ -2279,6 +2291,8 @@ namespace OmsiMapEditor.UI
             var task = Task.Run(() => OmsiChrono.Overlay(baseMap, source, active, out report));
             chronoTask = task;
             UpdateToolbar();
+            // The lines were written above; the inspector is drawn anew so its fields are disabled while the overlay is laid (CanEditObjects).
+            RenderInspector();
             SetStatusT("chrono.status.laying", ("count", active.Count), ("date", dateText));
 
             IVisualElementScheduledItem poll = null;
@@ -2295,14 +2309,20 @@ namespace OmsiMapEditor.UI
                 {
                     Debug.LogException(task.Exception);
                     SetStatusT("chrono.status.apply_failed", ("date", dateText), ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
+                    // The fields were disabled while the overlay was laid; they are drawn anew for the state that stays.
+                    RenderInspector();
                     return;
                 }
                 // Changes of the signals window made while the view was laid are asked about before the view replaces the crossing.
                 if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderProjectBrowser))
+                {
+                    RenderInspector();
                     return;
+                }
                 chronoDate = date.Value.Date;
                 StopPlacement();
                 ShowObjectsPanel(false);
+                ClearLabelEdits();
                 if (edit != null)
                 {
                     editedVariant = edit;
@@ -4836,6 +4856,8 @@ namespace OmsiMapEditor.UI
         /// <summary>Makes the last selected object the primary one, highlights the tile and refreshes the views.</summary>
         private void ApplySelection(OmsiTileSummary tile)
         {
+            // A type pick belongs to the selection it began with.
+            EnforceTypePick();
             // A menu open for the selection before would act on it. A right-click selects before its menu opens, so its own menu stays.
             CloseContextMenu();
             var previousTile = selectedTile;
@@ -6494,6 +6516,15 @@ namespace OmsiMapEditor.UI
                 SignalMayLeave(new SignalExit { Kind = SignalExitKind.Action, Payload = (Action)(() => StepHistory(from, to, false)) });
                 return;
             }
+            // Label lines typed and not yet written become their own step first, so the undo takes back that step and not an older one.
+            var redoBefore = !undo && from.Count > 0;
+            FlushLabelEdits();
+            if (redoBefore && from.Count == 0)
+            {
+                // The write pushed a new step, which cleared the redo steps.
+                SetStatusT("labels.status.redo_labels_first");
+                return;
+            }
             if (!CanEditObjects || from.Count == 0)
             {
                 SetStatus(from.Count > 0 && session != null && session.CanEdit ? ReadOnlyMessage(undo ? "readonly.action.undo" : "readonly.action.redo") : Loc.T(undo ? "history.nothing_undo" : "history.nothing_redo")) /* i18n:keys */;
@@ -6872,6 +6903,8 @@ namespace OmsiMapEditor.UI
         private bool ReloadAfterFailedRollBack()
         {
             pendingRollBackFailure = null;
+            // The workspace is considered damaged: typed label lines are not written into it, they are discarded with a note.
+            FlushLabelEdits(true);
             try
             {
                 ReloadMap();
@@ -6960,6 +6993,7 @@ namespace OmsiMapEditor.UI
             // The map is read again after the tile: with changes not applied in the signals window the question comes first.
             if (!SignalToolMayYield(SignalExitKind.ViewChange, () => AddTile(x, y)))
                 return;
+            FlushLabelEdits();
             OmsiTileChange change;
             try
             {
@@ -6990,6 +7024,7 @@ namespace OmsiMapEditor.UI
             }
             if (!SignalToolMayYield(SignalExitKind.ViewChange, () => DeleteTile(tile)))
                 return;
+            FlushLabelEdits();
             OmsiTileDeletionResult result;
             try
             {
@@ -7653,6 +7688,8 @@ namespace OmsiMapEditor.UI
             }
             if (!SignalToolMayYield(SignalExitKind.ViewChange, RevertSelectedTile))
                 return;
+            // Typed label lines become their own step before the tile's files go back.
+            FlushLabelEdits();
             var tile = selectedTile;
             // A terrain stroke still held has saved the heights it showed; it becomes its own step before the files go back.
             if (activeTool == EditorTool.Terrain)
@@ -8380,6 +8417,14 @@ namespace OmsiMapEditor.UI
         {
             if (statusLabel == null)
                 return;
+            // A notice about discarded label lines stays visible behind the status the caller of the reload sets afterwards (same frame).
+            if (discardNotice != null)
+            {
+                if (Time.frameCount != discardNoticeFrame)
+                    discardNotice = null;
+                else if (!message.Contains(discardNotice))
+                    message = message + " " + discardNotice;
+            }
             statusLabel.text = OneLine(message);
             statusLabel.tooltip = message;
         }
@@ -8765,6 +8810,9 @@ namespace OmsiMapEditor.UI
             if (inspectorPanel == null)
                 return;
 
+            // Label lines typed and not yet written are written first (EditorShellLabels.cs); the lines drawn now replace them.
+            FlushLabelEdits();
+            labelEdits.Clear();
             // Drawn again for the same tile and selection, such as after a click in the traffic rules editor, the inspector
             // keeps where it was scrolled to.
             var scrollKey = InspectorScrollKey();
@@ -8971,9 +9019,7 @@ namespace OmsiMapEditor.UI
                     if (CanEditObjects)
                     {
                         var typed = attached;
-                        var retype = new Button(() => PickElementType(tile, typed)) { text = Loc.T("inspector.type_short"), tooltip = Loc.T("labels.change_type.tooltip")};
-                        retype.AddToClassList("map-control-button");
-                        row.Add(retype);
+                        row.Add(NewChangeTypeButton(tile, typed));
                     }
                     if (canEdit)
                     {
@@ -8984,7 +9030,7 @@ namespace OmsiMapEditor.UI
                         row.Add(off);
                     }
                     body.Add(row);
-                    AddTypeAndLabels(body, tile, attached, true);
+                    AddLabelLines(body, tile, attached, true);
                     if (!EditingVariant)
                         AddVarParentEditor(body, tile, attached, true);
                 }
@@ -9047,7 +9093,12 @@ namespace OmsiMapEditor.UI
             var entryPoint = EditingVariant ? null : session?.EntryPointOf(currentSummary, holdingTile, item);
             if (entryPoint != null)
                 AddEntryPointGroup(editor, entryPoint);
-            AddInspectorGroup(editor, "object-type", Loc.T("inspector.group.type"), false, body => AddTypeAndLabels(body, holdingTile, item, false, true));
+            AddInspectorGroup(editor, "object-type", Loc.T("inspector.group.type"), false, body => AddLabelLines(body, holdingTile, item, false),
+                header =>
+                {
+                    if (CanEditObjects)
+                        header.Add(NewChangeTypeButton(holdingTile, item));
+                });
             if (!EditingVariant)
                 AddVarParentGroup(editor, holdingTile, item);
             if (!EditingVariant)

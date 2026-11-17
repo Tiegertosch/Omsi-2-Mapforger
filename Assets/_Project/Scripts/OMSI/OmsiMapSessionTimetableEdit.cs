@@ -50,11 +50,43 @@ namespace OmsiMapEditor.OMSI
             return result;
         }
 
-        /// <summary>The trips that stop at an object.</summary>
+        /// <summary>Per trip file of TTData: the workspace stamp it was read at and the object ids it stops at. Only files whose stamp changed are read again.</summary>
+        private readonly Dictionary<string, KeyValuePair<string, int[]>> tripStopCache = new Dictionary<string, KeyValuePair<string, int[]>>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The trips that stop at an object. Reads only the <c>.ttp</c> files, and of those only the ones that changed since the last call
+        /// (<see cref="OmsiMapWorkspace.Stamp"/> changes with every save, revert, undo and redo), so it is cheap enough to ask on every inspector draw.
+        /// </summary>
         public List<string> StopUsers(int objectId)
         {
-            return OmsiTimetable.Read(RequireWorkspace()).Trips.Values.Where(trip => trip.Stops.Any(stop => stop.ObjectId == objectId)).Select(trip => trip.Name)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+            var workspace = RequireWorkspace();
+            var result = new List<string>();
+            lock (tripStopCache)
+            {
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var path in workspace.EnumerateFiles("TTData", "*.ttp", false))
+                {
+                    if (!string.Equals(Path.GetExtension(path), ".ttp", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var stamp = workspace.Stamp(path);
+                    if (stamp == null)
+                        continue;
+                    seen.Add(path);
+                    var name = Path.GetFileNameWithoutExtension(path);
+                    if (!tripStopCache.TryGetValue(path, out var known) || known.Key != stamp)
+                    {
+                        known = new KeyValuePair<string, int[]>(stamp, OmsiTimetable.ReadTripStopIds(workspace.ReadAllBytes(path), name));
+                        tripStopCache[path] = known;
+                    }
+                    if (Array.IndexOf(known.Value, objectId) >= 0)
+                        result.Add(name);
+                }
+                if (seen.Count != tripStopCache.Count)
+                    foreach (var gone in tripStopCache.Keys.Where(key => !seen.Contains(key)).ToList())
+                        tripStopCache.Remove(gone);
+            }
+            result.Sort(StringComparer.OrdinalIgnoreCase);
+            return result;
         }
 
         /// <summary>The chrono variants that switch a line off.</summary>

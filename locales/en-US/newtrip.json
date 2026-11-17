@@ -4,7 +4,7 @@
   "newtrip.cancel": "Cancel",
   "newtrip.create": "Create trip",
   "newtrip.stops": "Stops ({count})",
-  "newtrip.stop.new.tooltip": "This object is not a stop of the timetable yet; it is added with the trip",
+  "newtrip.stop.new.tooltip": "This object is not in the stop list yet; it is added with the trip",
   "newtrip.stop.up": "Move up",
   "newtrip.stop.down": "Move down",
   "newtrip.stop.remove": "Remove this stop",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Give the line a name.",
   "newtrip.stop.name": "Name of a new stop",
   "newtrip.stop.object": "Stop object on the map",
-  "newtrip.stop.object.tooltip": "Makes this object a stop of the timetable, with the name typed above (else its file name and ID)",
+  "newtrip.stop.object.tooltip": "Adds this object to the stop list, with the name typed above (else its file name and ID)",
   "newtrip.stop.none": "The map has no stops yet. Place bus stop objects on the map first (the Objects tool), or select a stop object and use Add as stop.",
   "project.lines.none": "This map has no lines yet. Edit timetable... makes the first one."
 }

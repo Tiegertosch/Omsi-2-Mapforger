@@ -4,7 +4,7 @@
   "newtrip.cancel": "Annulla",
   "newtrip.create": "Crea corsa",
   "newtrip.stops": "Fermate ({count})",
-  "newtrip.stop.new.tooltip": "Questo oggetto non è ancora una fermata dell'orario; viene aggiunto con la corsa",
+  "newtrip.stop.new.tooltip": "Questo oggetto non è ancora nell'elenco delle fermate; viene aggiunto con la corsa",
   "newtrip.stop.up": "Su",
   "newtrip.stop.down": "Giù",
   "newtrip.stop.remove": "Rimuovi questa fermata",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Dai un nome alla linea.",
   "newtrip.stop.name": "Nome di una nuova fermata",
   "newtrip.stop.object": "Oggetto fermata della mappa",
-  "newtrip.stop.object.tooltip": "Fa di questo oggetto una fermata dell'orario, con il nome scritto sopra (altrimenti nome del file e ID)",
+  "newtrip.stop.object.tooltip": "Aggiunge questo oggetto all'elenco delle fermate, con il nome scritto sopra (altrimenti nome del file e ID)",
   "newtrip.stop.none": "La mappa non ha ancora fermate. Metti prima oggetti fermata sulla mappa (strumento Objects) oppure seleziona un oggetto fermata e usa Come fermata.",
   "project.lines.none": "Questa mappa non ha ancora linee. Modifica orario... crea la prima."
 }

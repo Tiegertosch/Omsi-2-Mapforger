@@ -4,7 +4,7 @@
   "newtrip.cancel": "Cancelar",
   "newtrip.create": "Crear viaje",
   "newtrip.stops": "Paradas ({count})",
-  "newtrip.stop.new.tooltip": "Este objeto aún no es una parada del horario; se añade con el viaje",
+  "newtrip.stop.new.tooltip": "Este objeto aún no está en la lista de paradas; se añade con el viaje",
   "newtrip.stop.up": "Subir",
   "newtrip.stop.down": "Bajar",
   "newtrip.stop.remove": "Quitar esta parada",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Dale un nombre a la línea.",
   "newtrip.stop.name": "Nombre de una parada nueva",
   "newtrip.stop.object": "Objeto de parada del mapa",
-  "newtrip.stop.object.tooltip": "Convierte este objeto en parada del horario, con el nombre escrito arriba (si no, nombre del archivo e ID)",
+  "newtrip.stop.object.tooltip": "Añade este objeto a la lista de paradas, con el nombre escrito arriba (si no, nombre del archivo e ID)",
   "newtrip.stop.none": "El mapa aún no tiene paradas. Coloca primero objetos de parada en el mapa (herramienta Objects) o selecciona un objeto de parada y usa Como parada.",
   "project.lines.none": "Este mapa aún no tiene líneas. Editar horario... crea la primera."
 }

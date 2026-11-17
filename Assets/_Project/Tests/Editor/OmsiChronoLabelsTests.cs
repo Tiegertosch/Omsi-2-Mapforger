@@ -358,7 +358,7 @@ namespace OmsiMapEditor.Tests
             Assert.Throws<ArgumentException>(() => session.SetElementType(tile, new OmsiObjectRecord { Id = 99, AssetPath = "x.sco" }, "y.sco"));
             Assert.Throws<ArgumentException>(() => session.SetElementType(tile, "not an element", "y.sco"));
             Assert.Throws<ArgumentException>(() => session.SetElementType(tile, tile.Objects[0], " "));
-            Assert.Throws<ArgumentException>(() => session.SetElementLabels(tile, tile.Objects[0], new string[0]));
+            Assert.Throws<ArgumentNullException>(() => session.SetElementLabels(tile, tile.Objects[0], null));
             Assert.Throws<ArgumentException>(() => session.SetElementLabels(tile, tile.Objects[0], new[] { "two\r\nlines" }));
             Assert.IsNull(session.SetElementLabels(tile, tile.Objects[0], tile.Objects[0].Labels));
         }

@@ -4,7 +4,7 @@
   "newtrip.cancel": "Zrušit",
   "newtrip.create": "Vytvořit spoj",
   "newtrip.stops": "Zastávky ({count})",
-  "newtrip.stop.new.tooltip": "Tento objekt ještě není zastávkou jízdního řádu; přidá se se spojem",
+  "newtrip.stop.new.tooltip": "Tento objekt ještě není v seznamu zastávek; přidá se se spojem",
   "newtrip.stop.up": "Nahoru",
   "newtrip.stop.down": "Dolů",
   "newtrip.stop.remove": "Odebrat tuto zastávku",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Dej lince název.",
   "newtrip.stop.name": "Název nové zastávky",
   "newtrip.stop.object": "Objekt zastávky na mapě",
-  "newtrip.stop.object.tooltip": "Udělá z tohoto objektu zastávku jízdního řádu s názvem napsaným výše (jinak název souboru a ID)",
+  "newtrip.stop.object.tooltip": "Přidá tento objekt do seznamu zastávek s názvem napsaným výše (jinak název souboru a ID)",
   "newtrip.stop.none": "Mapa zatím nemá žádné zastávky. Nejdřív umísti na mapu objekty zastávek (nástroj Objects) nebo vyber objekt zastávky a použij Jako zastávka.",
   "project.lines.none": "Tato mapa zatím nemá žádné linky. První vytvoří Upravit jízdní řád..."
 }

@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "A viagem {old} chama-se agora {name}.",
   "timetable.status.trip_deleted": "Viagem {name} eliminada.",
   "timetable.status.manage_failed": "Não foi possível: {reason}",
-  "busstop.remove": "Retirar do horário",
-  "busstop.remove.tooltip": "Retirar a paragem de Busstops.cfg e as suas ligações. O objeto fica no mapa. Não é possível enquanto uma viagem parar aqui.",
-  "busstop.remove.step": "Retirar a paragem {id} do horário",
-  "busstop.status.removed": "A paragem {id} já não faz parte do horário.",
+  "busstop.remove": "Retirar da lista de paragens",
+  "busstop.remove.tooltip": "Retirar a paragem de Busstops.cfg e as suas ligações. O objeto fica no mapa.",
+  "busstop.remove.used": "Há viagens que param aqui: {trips}. Retira primeiro a paragem dessas viagens.",
+  "busstop.remove.used_more": "{list} e mais {count, plural, one {# viagem} other {# viagens}}",
+  "busstop.remove.unknown": "Não foi possível ler as viagens.",
+  "busstop.remove.step": "Retirar a paragem {id} da lista de paragens",
+  "busstop.status.removed": "A paragem {id} já não está na lista de paragens.",
   "busstop.status.remove_failed": "Não foi possível retirar a paragem: {reason}"
 }

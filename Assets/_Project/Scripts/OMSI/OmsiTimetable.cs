@@ -207,6 +207,16 @@ namespace OmsiMapEditor.OMSI
             return trips;
         }
 
+        /// <summary>The object ids a trip file stops at, without reading anything else.</summary>
+        internal static int[] ReadTripStopIds(byte[] bytes, string name)
+        {
+            var stops = ReadTrip(bytes, name).Stops;
+            var ids = new int[stops.Count];
+            for (var index = 0; index < ids.Length; index++)
+                ids[index] = stops[index].ObjectId;
+            return ids;
+        }
+
         /// <summary>
         /// The timetable of a day: the base timetable with the timetables of the chrono variants active then, in their
         /// order. Stops and station links of a variant add to the earlier ones; a track, trip or line file with the name of

@@ -10,7 +10,6 @@
   "inspector.attach_hint_row": "Coloque un objeto en un punto libre del primer objeto de la fila para colgarlo allí; eliminar la fila los lleva consigo.",
   "inspector.attached_objects": "Objetos adjuntos",
   "inspector.attached_item": "Punto {n}: #{id} {name}",
-  "inspector.type_short": "Escribe...",
   "inspector.detach": "Eliminar",
   "inspector.detach.tooltip": "Se quita este objeto, con lo que cuelga de él.",
   "inspector.selected_object": "Objeto seleccionado",

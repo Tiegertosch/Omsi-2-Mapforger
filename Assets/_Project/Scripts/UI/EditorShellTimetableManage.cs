@@ -319,7 +319,7 @@ namespace OmsiMapEditor.UI
             OpenTimetable(showLine);
         }
 
-        /// <summary>The "Remove from timetable" button of the bus stop group in the inspector.</summary>
+        /// <summary>The "Remove from stop list" button of the bus stop group in the inspector.</summary>
         private void RemoveBusStopFromInspector(OmsiTileSummary tile, OmsiObjectRecord record)
         {
             if (!CanEdit || session == null)

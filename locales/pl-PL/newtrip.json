@@ -4,7 +4,7 @@
   "newtrip.cancel": "Anuluj",
   "newtrip.create": "Utwórz kurs",
   "newtrip.stops": "Przystanki ({count})",
-  "newtrip.stop.new.tooltip": "Ten obiekt nie jest jeszcze przystankiem rozkładu; zostanie dodany z kursem",
+  "newtrip.stop.new.tooltip": "Ten obiekt nie jest jeszcze na liście przystanków; zostanie dodany z kursem",
   "newtrip.stop.up": "W górę",
   "newtrip.stop.down": "W dół",
   "newtrip.stop.remove": "Usuń ten przystanek",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Nadaj linii nazwę.",
   "newtrip.stop.name": "Nazwa nowego przystanku",
   "newtrip.stop.object": "Obiekt przystanku na mapie",
-  "newtrip.stop.object.tooltip": "Robi z tego obiektu przystanek rozkładu z nazwą wpisaną powyżej (inaczej nazwa pliku i ID)",
+  "newtrip.stop.object.tooltip": "Dodaje ten obiekt do listy przystanków z nazwą wpisaną powyżej (inaczej nazwa pliku i ID)",
   "newtrip.stop.none": "Mapa nie ma jeszcze przystanków. Najpierw ustaw na mapie obiekty przystanków (narzędzie Objects) albo wybierz obiekt przystanku i użyj Jako przystanek.",
   "project.lines.none": "Ta mapa nie ma jeszcze linii. Pierwszą utworzy Edytuj rozkład..."
 }

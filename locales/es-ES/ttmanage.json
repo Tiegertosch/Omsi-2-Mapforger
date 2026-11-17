@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "El viaje {old} ahora se llama {name}.",
   "timetable.status.trip_deleted": "Viaje {name} eliminado.",
   "timetable.status.manage_failed": "No se pudo hacer: {reason}",
-  "busstop.remove": "Quitar del horario",
-  "busstop.remove.tooltip": "Quitar la parada de Busstops.cfg y sus enlaces. El objeto se queda en el mapa. No es posible mientras un viaje pare aquí.",
-  "busstop.remove.step": "Quitar la parada {id} del horario",
-  "busstop.status.removed": "La parada {id} ya no forma parte del horario.",
+  "busstop.remove": "Quitar de la lista de paradas",
+  "busstop.remove.tooltip": "Quitar la parada de Busstops.cfg y sus enlaces. El objeto se queda en el mapa.",
+  "busstop.remove.used": "Aquí paran viajes: {trips}. Quita primero la parada de esos viajes.",
+  "busstop.remove.used_more": "{list} y {count, plural, one {# viaje más} other {# viajes más}}",
+  "busstop.remove.unknown": "No se pudieron leer los viajes.",
+  "busstop.remove.step": "Quitar la parada {id} de la lista de paradas",
+  "busstop.status.removed": "La parada {id} ya no está en la lista de paradas.",
   "busstop.status.remove_failed": "No se pudo quitar la parada: {reason}"
 }

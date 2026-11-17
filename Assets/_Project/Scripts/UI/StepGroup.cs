@@ -11,6 +11,21 @@ namespace OmsiMapEditor.UI
     internal static class StepGroup
     {
         /// <summary>
+        /// One step for the changes of one user action: null when there are none, the part itself when there is one, otherwise a group
+        /// made by <paramref name="makeGroup"/> (undone in reverse order, redone in order, as one step).
+        /// </summary>
+        public static T Join<T>(IReadOnlyList<T> parts, Func<List<T>, T> makeGroup) where T : class
+        {
+            if (parts == null)
+                throw new ArgumentNullException(nameof(parts));
+            if (makeGroup == null)
+                throw new ArgumentNullException(nameof(makeGroup));
+            if (parts.Count == 0)
+                return null;
+            return parts.Count == 1 ? parts[0] : makeGroup(new List<T>(parts));
+        }
+
+        /// <summary>
         /// Applies <paramref name="parts"/> in the order given. When one fails with anything but an <see cref="OmsiRollBackFailedException"/>,
         /// the failed part is taken back first when its <paramref name="states"/> changed, then the parts done before it, the last first, and
         /// the failure is thrown as it was; so every part is in effect, or not, as before the call. When taking back fails too, an

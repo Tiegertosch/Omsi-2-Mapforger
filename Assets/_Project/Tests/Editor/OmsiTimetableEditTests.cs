@@ -63,6 +63,29 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void StopUsersAreReadAgainAfterATripFileChangesOrIsDeletedOrRestored()
+        {
+            CollectionAssert.AreEqual(new[] { "T1" }, session.StopUsers(stopId));
+            CollectionAssert.AreEqual(new[] { "T1" }, session.StopUsers(stopId), "From the cache.");
+
+            // A trip file rewritten through the workspace without the stop.
+            session.Workspace.Save("TTData\\T1.ttp", OmsiTimetableWriter.CreateTrip("Other", "1", new[] { 99 }, "standard", 4.0));
+            Assert.AreEqual(0, session.StopUsers(stopId).Count);
+
+            // A new trip file that stops there.
+            session.Workspace.Save("TTData\\T2.ttp", OmsiTimetableWriter.CreateTrip("Other", "1", new[] { stopId }, "standard", 4.0));
+            CollectionAssert.AreEqual(new[] { "T2" }, session.StopUsers(stopId));
+
+            // Deleting it and undoing the deletion.
+            var change = session.DeleteTrip("T2");
+            Assert.AreEqual(0, session.StopUsers(stopId).Count);
+            session.Undo(summary, change);
+            CollectionAssert.AreEqual(new[] { "T2" }, session.StopUsers(stopId));
+            session.Redo(summary, change);
+            Assert.AreEqual(0, session.StopUsers(stopId).Count);
+        }
+
+        [Test]
         public void ATripThatATourRunsIsKeptAndOneNoTourRunsGoes()
         {
             var refused = Assert.Throws<InvalidOperationException>(() => session.DeleteTrip("T1"));

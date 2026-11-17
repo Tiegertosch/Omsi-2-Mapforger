@@ -4,7 +4,7 @@
   "newtrip.cancel": "Annuler",
   "newtrip.create": "Créer la course",
   "newtrip.stops": "Arrêts ({count})",
-  "newtrip.stop.new.tooltip": "Cet objet n'est pas encore un arrêt de l'horaire ; il est ajouté avec la course",
+  "newtrip.stop.new.tooltip": "Cet objet n'est pas encore dans la liste des arrêts ; il est ajouté avec la course",
   "newtrip.stop.up": "Monter",
   "newtrip.stop.down": "Descendre",
   "newtrip.stop.remove": "Retirer cet arrêt",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Donne un nom à la ligne.",
   "newtrip.stop.name": "Nom d'un nouvel arrêt",
   "newtrip.stop.object": "Objet d'arrêt de la carte",
-  "newtrip.stop.object.tooltip": "Fait de cet objet un arrêt de l'horaire, avec le nom saisi ci-dessus (sinon nom du fichier et ID)",
+  "newtrip.stop.object.tooltip": "Ajoute cet objet à la liste des arrêts, avec le nom saisi ci-dessus (sinon nom du fichier et ID)",
   "newtrip.stop.none": "La carte n'a pas encore d'arrêts. Place d'abord des objets d'arrêt sur la carte (outil Objects) ou sélectionne un objet d'arrêt et utilise Comme arrêt.",
   "project.lines.none": "Cette carte n'a pas encore de lignes. Modifier l'horaire... crée la première."
 }

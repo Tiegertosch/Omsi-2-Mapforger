@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "La corsa {old} ora si chiama {name}.",
   "timetable.status.trip_deleted": "Corsa {name} eliminata.",
   "timetable.status.manage_failed": "Non è stato possibile: {reason}",
-  "busstop.remove": "Togli dall'orario",
-  "busstop.remove.tooltip": "Toglie la fermata da Busstops.cfg e i suoi collegamenti. L'oggetto resta sulla mappa. Non è possibile finché una corsa si ferma qui.",
-  "busstop.remove.step": "Togli la fermata {id} dall'orario",
-  "busstop.status.removed": "La fermata {id} non fa più parte dell'orario.",
+  "busstop.remove": "Togli dall'elenco delle fermate",
+  "busstop.remove.tooltip": "Toglie la fermata da Busstops.cfg e i suoi collegamenti. L'oggetto resta sulla mappa.",
+  "busstop.remove.used": "Qui si fermano delle corse: {trips}. Togli prima la fermata da queste corse.",
+  "busstop.remove.used_more": "{list} e altre {count, plural, one {# corsa} other {# corse}}",
+  "busstop.remove.unknown": "Impossibile leggere le corse.",
+  "busstop.remove.step": "Togli la fermata {id} dall'elenco delle fermate",
+  "busstop.status.removed": "La fermata {id} non è più nell'elenco delle fermate.",
   "busstop.status.remove_failed": "Impossibile togliere la fermata: {reason}"
 }

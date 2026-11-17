@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "Kurs {old} nazywa się teraz {name}.",
   "timetable.status.trip_deleted": "Kurs {name} usunięty.",
   "timetable.status.manage_failed": "Nie udało się: {reason}",
-  "busstop.remove": "Usuń z rozkładu",
-  "busstop.remove.tooltip": "Usuń przystanek z Busstops.cfg i jego połączenia. Obiekt zostaje na mapie. Niemożliwe, dopóki zatrzymuje się tu jakiś kurs.",
-  "busstop.remove.step": "Usuń przystanek {id} z rozkładu",
-  "busstop.status.removed": "Przystanek {id} nie należy już do rozkładu.",
+  "busstop.remove": "Usuń z listy przystanków",
+  "busstop.remove.tooltip": "Usuń przystanek z Busstops.cfg i jego połączenia. Obiekt zostaje na mapie.",
+  "busstop.remove.used": "Zatrzymują się tu kursy: {trips}. Najpierw usuń przystanek z tych kursów.",
+  "busstop.remove.used_more": "{list} i jeszcze {count, plural, one {# kurs} few {# kursy} many {# kursów} other {# kursu}}",
+  "busstop.remove.unknown": "Nie udało się odczytać kursów.",
+  "busstop.remove.step": "Usuń przystanek {id} z listy przystanków",
+  "busstop.status.removed": "Przystanek {id} nie jest już na liście przystanków.",
   "busstop.status.remove_failed": "Nie udało się usunąć przystanku: {reason}"
 }

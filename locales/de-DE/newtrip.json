@@ -4,7 +4,7 @@
   "newtrip.cancel": "Abbrechen",
   "newtrip.create": "Fahrt anlegen",
   "newtrip.stops": "Haltestellen ({count})",
-  "newtrip.stop.new.tooltip": "Dieses Objekt ist noch keine Haltestelle des Fahrplans; es wird mit der Fahrt hinzugefügt",
+  "newtrip.stop.new.tooltip": "Dieses Objekt ist noch nicht in der Haltestellenliste; es wird mit der Fahrt hinzugefügt",
   "newtrip.stop.up": "Nach oben",
   "newtrip.stop.down": "Nach unten",
   "newtrip.stop.remove": "Diese Haltestelle entfernen",
@@ -44,7 +44,7 @@
   "timetable.status.need_line_name": "Gib der Linie einen Namen.",
   "newtrip.stop.name": "Name einer neuen Haltestelle",
   "newtrip.stop.object": "Haltestellenobjekt der Karte",
-  "newtrip.stop.object.tooltip": "Macht dieses Objekt zur Haltestelle des Fahrplans, mit dem oben getippten Namen (sonst Dateiname und ID)",
+  "newtrip.stop.object.tooltip": "Nimmt dieses Objekt in die Haltestellenliste auf, mit dem oben getippten Namen (sonst Dateiname und ID)",
   "newtrip.stop.none": "Die Karte hat noch keine Haltestellen. Setze zuerst Haltestellenobjekte auf die Karte (Werkzeug Objects) oder wähle ein Haltestellenobjekt und nimm „Als Haltestelle“.",
   "project.lines.none": "Diese Karte hat noch keine Linien. „Fahrplan bearbeiten...“ legt die erste an."
 }

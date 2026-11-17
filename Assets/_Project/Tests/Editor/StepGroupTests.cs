@@ -153,5 +153,28 @@ namespace OmsiMapEditor.Tests
 
             CollectionAssert.AreEqual(new[] { "apply a", "apply b", "take back a" }, calls);
         }
+    
+        [Test]
+        public void JoinMakesOneStepOfTheChangesOfOneAction()
+        {
+            Assert.That(StepGroup.Join(new List<string>(), parts => string.Join("+", parts)), Is.Null);
+            Assert.That(StepGroup.Join(new[] { "labels" }, parts => string.Join("+", parts)), Is.EqualTo("labels"));
+            Assert.That(StepGroup.Join(new[] { "labels", "busstops" }, parts => string.Join("+", parts)), Is.EqualTo("labels+busstops"));
+        }
+
+        [Test]
+        public void ARenameStepTakesBackTheListLastAndPutsItBackFirstSoOneUndoRestoresBoth()
+        {
+            var group = StepGroup.Join(new[] { new Part { Name = "labels", Applied = true }, new Part { Name = "busstops", Applied = true } },
+                parts => new Part { Name = "group", Applied = true });
+            Assert.That(group.Name, Is.EqualTo("group"));
+
+            var calls = new List<string>();
+            var order = new List<Part> { new Part { Name = "labels" }, new Part { Name = "busstops" } };
+            order.Reverse();
+            StepGroup.Apply(order, part => calls.Add("undo " + part.Name), part => calls.Add("redo " + part.Name), part => new List<bool>(), exception => { });
+
+            CollectionAssert.AreEqual(new[] { "undo busstops", "undo labels" }, calls);
+        }
     }
 }

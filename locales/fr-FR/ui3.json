@@ -10,7 +10,6 @@
   "inspector.attach_hint_row": "Placez un objet sur un point libre du premier objet de la rangée pour l'y accrocher ; la suppression de la ligne les emporte avec elle.",
   "inspector.attached_objects": "Objets attachés",
   "inspector.attached_item": "Point {n} : #{id} {name}",
-  "inspector.type_short": "Tapez...",
   "inspector.detach": "Supprimer",
   "inspector.detach.tooltip": "Enlève cet objet, avec ce qui y est accroché",
   "inspector.selected_object": "Objet sélectionné",

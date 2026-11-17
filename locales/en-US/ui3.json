@@ -10,7 +10,6 @@
   "inspector.attach_hint_row": "Place an object on a free point of the row's first object to hang it there; deleting the row takes these with it.",
   "inspector.attached_objects": "Attached objects",
   "inspector.attached_item": "Point {n}: #{id}  {name}",
-  "inspector.type_short": "Type...",
   "inspector.detach": "Delete",
   "inspector.detach.tooltip": "Takes this object off, with what hangs on it",
   "inspector.selected_object": "Selected object",

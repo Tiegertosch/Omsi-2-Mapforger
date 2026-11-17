@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "Trip {old} is now {name}.",
   "timetable.status.trip_deleted": "Trip {name} deleted.",
   "timetable.status.manage_failed": "That could not be done: {reason}",
-  "busstop.remove": "Remove from timetable",
-  "busstop.remove.tooltip": "Take the stop out of Busstops.cfg and its station links. The object stays on the map. Not possible while a trip stops here.",
-  "busstop.remove.step": "Remove stop {id} from the timetable",
-  "busstop.status.removed": "Stop {id} is no stop of the timetable any more.",
+  "busstop.remove": "Remove from stop list",
+  "busstop.remove.tooltip": "Take the stop out of Busstops.cfg and its station links. The object stays on the map.",
+  "busstop.remove.used": "Trips stop here: {trips}. Remove the stop from those trips first.",
+  "busstop.remove.used_more": "{list} and {count, plural, one {# more trip} other {# more trips}}",
+  "busstop.remove.unknown": "Could not read the trips.",
+  "busstop.remove.step": "Remove stop {id} from the stop list",
+  "busstop.status.removed": "Stop {id} is no longer in the stop list.",
   "busstop.status.remove_failed": "The stop could not be taken out: {reason}"
 }

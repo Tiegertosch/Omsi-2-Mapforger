@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "Fahrt {old} heißt jetzt {name}.",
   "timetable.status.trip_deleted": "Fahrt {name} gelöscht.",
   "timetable.status.manage_failed": "Das ging nicht: {reason}",
-  "busstop.remove": "Aus dem Fahrplan nehmen",
-  "busstop.remove.tooltip": "Die Haltestelle aus Busstops.cfg und ihre Stationsverbindungen nehmen. Das Objekt bleibt auf der Karte. Nicht möglich, solange eine Fahrt hier hält.",
-  "busstop.remove.step": "Haltestelle {id} aus dem Fahrplan nehmen",
-  "busstop.status.removed": "Haltestelle {id} gehört nicht mehr zum Fahrplan.",
+  "busstop.remove": "Aus der Haltestellenliste nehmen",
+  "busstop.remove.tooltip": "Die Haltestelle aus Busstops.cfg und ihre Stationsverbindungen nehmen. Das Objekt bleibt auf der Karte.",
+  "busstop.remove.used": "Fahrten halten hier: {trips}. Nimm die Haltestelle zuerst aus diesen Fahrten.",
+  "busstop.remove.used_more": "{list} und {count, plural, one {# weitere Fahrt} other {# weitere Fahrten}}",
+  "busstop.remove.unknown": "Die Fahrten konnten nicht gelesen werden.",
+  "busstop.remove.step": "Haltestelle {id} aus der Haltestellenliste nehmen",
+  "busstop.status.removed": "Haltestelle {id} steht nicht mehr in der Haltestellenliste.",
   "busstop.status.remove_failed": "Die Haltestelle ließ sich nicht herausnehmen: {reason}"
 }

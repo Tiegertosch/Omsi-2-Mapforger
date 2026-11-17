@@ -45,6 +45,9 @@ namespace OmsiMapEditor.UI
             // The signals window floats beside the map and is not in the row of tool windows: it says its line while it is on screen.
             if (activeTool == EditorTool.Signals)
                 OpenToolHint(signalOptions, ref text, ref warning);
+            // Where a new type or new labels of the selected element go while a chrono variant is edited: only when no window says its line.
+            if (text.Length == 0)
+                text = VariantNoteHint();
             if (text == shownToolHint && warning == shownToolHintWarning)
                 return;
             shownToolHint = text;

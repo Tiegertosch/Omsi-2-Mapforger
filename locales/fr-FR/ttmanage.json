@@ -17,9 +17,12 @@
   "timetable.status.trip_renamed": "La course {old} s'appelle maintenant {name}.",
   "timetable.status.trip_deleted": "Course {name} supprimée.",
   "timetable.status.manage_failed": "Cela n'a pas pu être fait : {reason}",
-  "busstop.remove": "Retirer de l'horaire",
-  "busstop.remove.tooltip": "Retirer l'arrêt de Busstops.cfg et ses liaisons. L'objet reste sur la carte. Impossible tant qu'une course s'y arrête.",
-  "busstop.remove.step": "Retirer l'arrêt {id} de l'horaire",
-  "busstop.status.removed": "L'arrêt {id} ne fait plus partie de l'horaire.",
+  "busstop.remove": "Retirer de la liste des arrêts",
+  "busstop.remove.tooltip": "Retirer l'arrêt de Busstops.cfg et ses liaisons. L'objet reste sur la carte.",
+  "busstop.remove.used": "Des courses s'arrêtent ici : {trips}. Retire d'abord l'arrêt de ces courses.",
+  "busstop.remove.used_more": "{list} et {count, plural, one {# course} other {# courses}} de plus",
+  "busstop.remove.unknown": "Impossible de lire les courses.",
+  "busstop.remove.step": "Retirer l'arrêt {id} de la liste des arrêts",
+  "busstop.status.removed": "L'arrêt {id} ne figure plus dans la liste des arrêts.",
   "busstop.status.remove_failed": "L'arrêt n'a pas pu être retiré : {reason}"
 }
