@@ -31,8 +31,15 @@ namespace OmsiMapEditor.UI
         /// <summary>The space kept to the edges of the area at the first place and when the window is made fit.</summary>
         public const float EdgeMargin = 8f;
 
-        /// <summary>The room the bottom bar takes at the bottom of the area; the window stays above it.</summary>
-        public const float BottomBarHeight = 104f;
+        /// <summary>
+        /// The room the bottom bar takes at the bottom of the area, with its gap; the window stays above it. The shell sets it from
+        /// the measured height of the bar (<see cref="BottomBarLayout"/>).
+        /// </summary>
+        public float BottomInset
+        {
+            get => limits.BottomInset;
+            set => limits.BottomInset = value;
+        }
 
         private readonly FloatingWindow.Limits limits;
         private bool collapsed;
@@ -160,7 +167,6 @@ namespace OmsiMapEditor.UI
             {
                 Least = LeastSize,
                 Margin = EdgeMargin,
-                BottomInset = BottomBarHeight,
                 Collapsed = () => collapsed,
                 Height = () => collapsed ? expandedHeight : layout.height,
                 HeightFitted = height => expandedHeight = height
@@ -299,7 +305,7 @@ namespace OmsiMapEditor.UI
             if (parent == null)
                 return default;
             var area = parent.worldBound;
-            return Rect.MinMaxRect(area.xMin, area.yMin, area.xMax, Mathf.Max(area.yMin, area.yMax - BottomBarHeight));
+            return Rect.MinMaxRect(area.xMin, area.yMin, area.xMax, Mathf.Max(area.yMin, area.yMax - BottomInset));
         }
 
         /// <summary>
@@ -315,7 +321,7 @@ namespace OmsiMapEditor.UI
                 return;
             placed = true;
             const float Margin = EdgeMargin;
-            var size = FloatingWindowRules.ClampSize(new Vector2(780f, 640f), LeastSize, FloatingWindowRules.MaxSize(new Vector2(area.width, area.height), Margin, BottomBarHeight));
+            var size = FloatingWindowRules.ClampSize(new Vector2(780f, 640f), LeastSize, FloatingWindowRules.MaxSize(new Vector2(area.width, area.height), Margin, BottomInset));
             style.width = size.x;
             expandedHeight = size.y;
             // A window collapsed before it was first laid out stays as high as its title bar.

@@ -55,6 +55,7 @@ namespace OmsiMapEditor.UI
         {
             signalWindow = new SignalWindow(() => SetTool(EditorTool.Drag), ChooseSignalArea, ChooseSignalPage);
             signalOptions = signalWindow;
+            signalWindow.BottomInset = BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.ToolGap);
             signalOptions.style.display = DisplayStyle.None;
             signalEmptyNote = LocBindings.NewLabel("signals.click_junction");
             signalEmptyNote.AddToClassList("panel-info");

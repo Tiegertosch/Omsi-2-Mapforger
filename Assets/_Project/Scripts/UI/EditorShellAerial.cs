@@ -245,6 +245,7 @@ namespace OmsiMapEditor.UI
             imageryAttribution.AddToClassList("imagery-attribution");
             imageryAttribution.style.display = DisplayStyle.None;
             workspaceElement?.Add(imageryAttribution);
+            ApplyBottomBarHeight(bottomBarHeight);
 
             var menuItem = root.Q<Button>("satellite-menu-item");
             if (menuItem != null)

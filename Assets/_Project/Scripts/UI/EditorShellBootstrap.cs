@@ -8046,10 +8046,9 @@ namespace OmsiMapEditor.UI
                 return Vector4.zero;
             var canvas = mapCanvas.worldBound;
             var right = inspectorFrame != null && inspectorShown ? canvas.xMax - inspectorFrame.worldBound.xMin : 0f;
-            var bottom = bottomBar != null && bottomBar.resolvedStyle.display != DisplayStyle.None ? canvas.yMax - bottomBar.worldBound.yMin : 0f;
-            // Before the first layout the bounds are not known yet.
-            float Clean(float value) => float.IsNaN(value) ? 0f : Mathf.Max(0f, value);
-            return new Vector4(0f, 0f, Clean(right), Clean(bottom));
+            // The bar's height is the one measured for the windows above it (ApplyBottomBarHeight); 0 before the first layout.
+            var bottom = bottomBar != null && bottomBar.resolvedStyle.display != DisplayStyle.None ? bottomBarHeight : 0f;
+            return new Vector4(0f, 0f, BottomBarLayout.CleanHeight(right), bottom);
         }
 
         /// <summary>

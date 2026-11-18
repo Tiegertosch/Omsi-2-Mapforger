@@ -21,6 +21,8 @@ namespace OmsiMapEditor.UI
         private Label projectModeLabel;
         private readonly Dictionary<ProjectTab, Button> barButtons = new Dictionary<ProjectTab, Button>();
         private bool barPopupOpen;
+        // The height of the bar as laid out, in panel pixels (0 before the first layout); see ApplyBottomBarHeight.
+        private float bottomBarHeight;
 
         // Below this width of the window the bar uses its compact form.
         private const float CompactBarWidth = 1400f;
@@ -71,7 +73,10 @@ namespace OmsiMapEditor.UI
 
             // No media queries in USS: a narrow window gets a compact bar (shorter name pill, smaller round buttons).
             bottomBar.RegisterCallback<GeometryChangedEvent>(evt =>
-                bottomBar.EnableInClassList("bar-compact", evt.newRect.width > 0f && evt.newRect.width < CompactBarWidth));
+            {
+                bottomBar.EnableInClassList("bar-compact", evt.newRect.width > 0f && evt.newRect.width < CompactBarWidth);
+                ApplyBottomBarHeight(evt.newRect.height);
+            });
 
             var close = root.Q<Button>("project-collapse-button");
             if (close != null)
@@ -80,6 +85,28 @@ namespace OmsiMapEditor.UI
                 close.clicked += () => ShowBarPopup(false);
             }
             UpdateBarButtons();
+        }
+
+        /// <summary>
+        /// The one place that sets how far the windows above the bar keep from the bottom: the measured height of the bar plus the
+        /// gap of each kind (<see cref="BottomBarLayout"/>). Runs whenever the bar changes size (empty bar, map opened, resolution
+        /// or UI scale changed).
+        /// </summary>
+        private void ApplyBottomBarHeight(float measured)
+        {
+            bottomBarHeight = BottomBarLayout.CleanHeight(measured);
+            var popupBottom = BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.PopupGap);
+            var toolBottom = BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.ToolGap);
+            if (inspectorFrame != null)
+                inspectorFrame.style.bottom = popupBottom;
+            if (barPopup != null)
+                barPopup.style.bottom = popupBottom;
+            if (objectsPanelHost != null)
+                objectsPanelHost.style.bottom = toolBottom;
+            if (imageryAttribution != null)
+                imageryAttribution.style.bottom = toolBottom;
+            if (signalWindow != null)
+                signalWindow.BottomInset = toolBottom;
         }
 
         /// <summary>

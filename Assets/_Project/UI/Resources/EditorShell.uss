@@ -114,10 +114,10 @@
 
 /* Floating panels */
 .floating-panel { position: absolute; top: var(--mf-space-2); bottom: var(--mf-space-2); padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
-/* The inspector opens on demand (right-click, Properties...) and leaves room for the bottom bar. */
-.inspector-frame { right: var(--mf-space-2); bottom: 106px; width: 300px; }
+/* The inspector opens on demand (right-click, Properties...). Its bottom distance (like that of the popups, the tool windows and the attribution) is not set here: the shell measures the bottom bar and sets it (BottomBarLayout, ApplyBottomBarHeight). */
+.inspector-frame { right: var(--mf-space-2); width: 300px; }
 /* The popups of the bottom bar (tiles, map, entries, chrono, lines, paths) open above the bar, at its left or right end (ADR 098). */
-.bar-popup { top: auto; bottom: 106px; left: var(--mf-space-2); width: 320px; max-height: 70%; }
+.bar-popup { top: auto; left: var(--mf-space-2); width: 320px; max-height: 70%; }
 .bar-popup-right { left: auto; right: var(--mf-space-2); }
 .bar-popup-tall { height: 480px; }
 .bar-popup > .floating-panel-header { margin: -12px -12px var(--mf-space-2) -12px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-bg); border-bottom-width: 1px; border-bottom-color: var(--mf-color-border-subtle); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
@@ -142,6 +142,7 @@
 
 /* The bottom bar (ADR 098): view and zoom at the left, the tile button and the project name, the tools in the middle, the map's
    lists as round buttons at the right. The status bar runs below it. */
+/* The height below is the one number for the bar; everything above it follows its measured height. */
 .bottom-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 94px; flex-direction: row; align-items: stretch; background-color: var(--mf-color-bar-glass); border-top-width: 1px; border-top-color: rgba(65, 75, 89, 0.6); }
 .bottom-bar-empty { height: 34px; }
 .bar-main { flex-grow: 1; flex-shrink: 1; min-width: 0; justify-content: flex-end; }
@@ -228,7 +229,7 @@
 .context-menu-danger { color: var(--mf-color-error); }
 
 /* Tool panels open above the bottom bar */
-.tool-panel-host { position: absolute; left: 0; right: 0; bottom: 104px; flex-direction: row; justify-content: center; }
+.tool-panel-host { position: absolute; left: 0; right: 0; flex-direction: row; justify-content: center; }
 .tool-panel { width: 420px; height: 470px; padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .tool-panel-header { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-3); }
 .tool-panel-badge { width: 40px; height: 40px; margin-right: var(--mf-space-3); align-items: center; justify-content: center; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
@@ -799,7 +800,7 @@
 .satellite-foldout .unity-foldout__checkmark { -unity-background-image-tint-color: var(--mf-color-text-secondary); }
 .satellite-foldout > .unity-foldout__content { margin-left: 0; }
 .satellite-result-chosen, .satellite-result-chosen:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
-.imagery-attribution { position: absolute; right: var(--mf-space-2); bottom: 104px; padding: 2px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
+.imagery-attribution { position: absolute; right: var(--mf-space-2); padding: 2px 6px; font-size: 10px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 
 /* Road builder (ADR 049): a cross-section of lanes above the lane settings, in place of the road picker */
 .road-picker-new { flex-direction: row; align-items: center; flex-shrink: 0; margin: 0 0 0 var(--mf-space-2); }

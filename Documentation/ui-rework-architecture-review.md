@@ -39,7 +39,7 @@ Bausteine: `ToolCatalog` (Kopfzeile, Kachelbereich, Leer-Hinweis; `Options()` al
 - **`OptionControls` hat genau einen Nutzer** (Straße). Die Textzeile `picker-option` ist viermal kopiert (`TerrainToolOptions.cs:438`, `RowToolOptions.cs:182`, `LineToolPanel.cs:234`, `RoadBuilderPanel.cs:1049`).
 - **Kacheln siebenmal von Hand** (`picker-tile` in Objekte, Straße, Gelände, Markierungen, Straßenbauer). *Richtung:* `ToolCatalog.AddTile(...)`.
 - **Kopplung an die Kind-Reihenfolge:** `catalog.Panel.Insert(1, …)` in Objekten und Gelände hängt am inneren Aufbau von `ToolCatalog`. *Richtung:* benannter Platz („über den Kacheln“).
-- **Leistenhöhe an sechs Stellen** (94, 54, zweimal 106, zweimal 104 px). *Richtung:* die vier `bottom`-Werte beim `GeometryChangedEvent` der Leiste setzen; `FreeMapInsets()` (`:7394`) rechnet schon so.
+- **Erledigt (17. November 2026, nicht committet, Handtest offen): Leistenhöhe an sechs Stellen** (94, 54, zweimal 106, zweimal 104 px; dazu 104 als `SignalWindow.BottomBarHeight`). Jetzt eine Zahl (`height` von `.bottom-bar`), gemessen in `ApplyBottomBarHeight`, Lücken als `BottomBarLayout.PopupGap`/`ToolGap`. Ursprüngliche Richtung: *Richtung:* die vier `bottom`-Werte beim `GeometryChangedEvent` der Leiste setzen; `FreeMapInsets()` (`:7394`) rechnet schon so.
 - **Tooltip-Titel über Text und Regex:** `LocBindings.TitledTooltip` setzt „Name: Text“ zusammen, `EditorShellTooltip` zerlegt ihn wieder (höchstens drei Wörter). Ein längerer Reitername in einer Sprache wird stumm zu Fließtext. *Richtung (Vorschlag):* Titel getrennt mitgeben, Regex als Rückfall.
 
 ## 3. Dialoge und Überlagerungen
@@ -119,7 +119,7 @@ Die Rework-Logik steckt in privaten Instanzmethoden der Shell und ist deshalb un
 | Einträge des Kontextmenüs je Auswahl | `Fill…Menu` (`EditorShellContextMenu.cs:149–241`) | reine Funktion (Auswahlart und Schalter → Liste von Schlüsseln, gefährlich ja/nein) + `ContextMenuEntriesTests` |
 | Zerlegung der Tooltips | Regex in `ShowTooltip` (`EditorShellTooltip.cs:19`, `:82`) | `SplitTooltip` statisch + Test über alle Tooltips aller Sprachen |
 | Taste → Werkzeug, Esc-Reihenfolge | Kette in `OnShortcut` | Tabelle + `ShortcutMapTests` |
-| Leistenhöhe gegen USS-Abstände | sechs Zahlen | entfällt mit Abschnitt 2, sonst statischer Test |
+| Leistenhöhe gegen USS-Abstände | erledigt (17. November 2026, nicht committet): eine Zahl, gemessen; `BottomBarLayoutTests` | entfällt |
 | Verwaiste Textschlüssel | nur Konsolenausgabe | als Fehler, sobald die Altlast bereinigt ist |
 
 ## 10. Einstufung in einem Blick
