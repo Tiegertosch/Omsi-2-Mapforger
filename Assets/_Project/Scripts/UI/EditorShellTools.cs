@@ -148,17 +148,29 @@ namespace OmsiMapEditor.UI
         /// <summary>The pointer moved in the map's road mode: the active tool follows it.</summary>
         private void OnToolPointerMoved()
         {
+            if (EditorToolRules.SuspendsMapBuilding(activeTool, RoadBuilderShown))
+            {
+                mapCanvas?.ClearRoadPreview();
+                return;
+            }
             ToolEntryOf(activeTool).PointerMoved?.Invoke();
         }
 
         private void OnToolReleased()
         {
+            if (EditorToolRules.SuspendsMapBuilding(activeTool, RoadBuilderShown))
+                return;
             ToolEntryOf(activeTool).Released?.Invoke();
         }
 
         /// <summary>A click in the map's road mode goes to the active tool; a tool without clicks there builds nothing.</summary>
         private void OnToolClicked(double x, double y)
         {
+            if (EditorToolRules.SuspendsMapBuilding(activeTool, RoadBuilderShown))
+            {
+                SetStatusT("roadbuilder.status.map_suspended");
+                return;
+            }
             var clicked = ToolEntryOf(activeTool).Clicked;
             if (clicked != null)
                 clicked(x, y);
@@ -229,10 +241,7 @@ namespace OmsiMapEditor.UI
             if (pickingRowObject)
                 EndRowObjectPick(null);
             else if (RoadBuilderShown)
-            {
-                ShowRoadBuilder(false);
-                SetStatusT("roadbuilder.status.closed");
-            }
+                RequestCloseRoadBuilder();
             else if (roadControl.HasValue)
             {
                 roadControl = null;

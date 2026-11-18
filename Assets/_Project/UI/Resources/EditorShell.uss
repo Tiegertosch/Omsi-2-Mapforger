@@ -361,6 +361,128 @@
 .signal-footer-button:disabled { opacity: 0.45; }
 .signal-grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; border-right-width: 3px; border-bottom-width: 3px; border-right-color: var(--mf-color-text-muted); border-bottom-color: var(--mf-color-text-muted); border-bottom-right-radius: var(--mf-radius-lg); opacity: 0.7; }
 .signal-grip:hover { opacity: 1; }
+/* The road type window (ADR 098, road type editor): the frame is the signals window's (signal-* above); these are its own parts. */
+.road-window:focus { border-color: var(--mf-color-border); }
+.road-window-namerow { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
+.picker-field.road-window-name { width: 320px; min-width: 100px; flex-shrink: 1; margin: 0; }
+.picker-field.road-window-name-locked .unity-base-text-field__input { color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-raised); }
+.road-window-icon-button { width: 28px; height: 28px; margin: 0 0 0 var(--mf-space-1); padding: 0; align-items: center; justify-content: center; flex-shrink: 0; }
+.road-window-icon-button > .icon { width: 16px; height: 16px; }
+.road-window-icon-button:disabled { opacity: 0.45; }
+.road-window-templates-button { flex-direction: row; align-items: center; margin: 0 0 0 var(--mf-space-2); flex-shrink: 0; }
+.road-window-templates-button > .icon { width: 16px; height: 16px; margin-right: 6px; }
+.road-window-templates-button > Label { margin: 0; padding: 0; }
+.road-window-work { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.road-window-columns { flex-direction: row; align-items: flex-start; }
+.road-window-columns-narrow { flex-direction: column; align-items: stretch; }
+.road-window-left { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-right: var(--mf-space-3); }
+.road-window-columns-narrow > .road-window-left { margin-right: 0; }
+.road-window-inspector { width: 248px; flex-shrink: 0; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-md); }
+.road-window-columns-narrow > .road-window-inspector { width: auto; margin-top: var(--mf-space-2); }
+.road-window-head { flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: var(--mf-space-1); }
+.road-window-hint { margin: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); }
+.road-section { margin: 0; padding: 0; }
+.road-section:focus > .road-section-scroll { border-color: var(--mf-color-border); }
+.road-section-scroll { padding: var(--mf-space-1); background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); border-width: 1px; border-color: var(--mf-color-border-subtle); }
+.road-section-track { position: relative; margin: 0; padding: 0; }
+.road-section-element { position: absolute; top: 0; bottom: 0; margin: 0; align-items: center; justify-content: center; overflow: hidden; background-color: var(--mf-color-lane-asphalt); border-width: 2px; border-color: rgba(0, 0, 0, 0); -unity-background-scale-mode: scale-and-crop; }
+.road-section-element-walk { background-color: var(--mf-color-lane-walk); }
+.road-section-element-median { background-color: var(--mf-color-lane-grass); }
+.road-section-element-shoulder { background-color: var(--mf-color-lane-shoulder); }
+.road-section-element-bus { background-color: var(--mf-color-lane-bus); }
+.road-section-element-bike { background-color: var(--mf-color-lane-bike); }
+.road-section-element-parking { background-color: var(--mf-color-lane-parking); }
+.road-section-element-textured { background-color: var(--mf-color-lane-asphalt); }
+.road-section-element:hover { border-color: var(--mf-color-text-secondary); }
+.road-section-element-problem { border-color: var(--mf-color-error); }
+.road-section-element-selected, .road-section-element-selected:hover { border-color: var(--mf-color-accent); }
+.road-section-number { margin: 0 0 2px; padding: 0; font-size: 10px; color: var(--mf-color-text-secondary); white-space: nowrap; }
+.road-section-arrow { width: 16px; height: 16px; margin-bottom: 2px; color: var(--mf-color-text-primary); }
+.road-section-kind { margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); white-space: nowrap; }
+.road-section-width { margin: 0; padding: 0; font-size: 10px; color: var(--mf-color-text-primary); white-space: nowrap; }
+.road-section-element-walk > Label { color: var(--mf-color-bg); }
+.road-section-element-textured > Label, .road-section-element-textured > .icon { color: var(--mf-color-text-primary); background-color: rgba(23, 28, 35, 0.6); border-radius: var(--mf-radius-sm); padding: 0 3px; }
+.road-section-rail { position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--mf-color-lane-rail); }
+.road-section-rail-left { left: 18%; }
+.road-section-rail-right { right: 18%; }
+.road-section-row { position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; color: var(--mf-color-text-primary); }
+.road-section-markings { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.road-section-boundary { position: absolute; top: 0; bottom: 0; background-color: rgba(240, 138, 50, 0); }
+.road-section-boundary:hover { background-color: rgba(169, 173, 179, 0.35); }
+.road-section-boundary-selected, .road-section-boundary-selected:hover { background-color: rgba(240, 138, 50, 0.85); }
+.road-section-drop { position: absolute; top: 0; bottom: 0; width: 3px; background-color: var(--mf-color-accent); }
+.road-window-actions { flex-direction: row; align-items: center; flex-wrap: wrap; margin-top: var(--mf-space-2); }
+.road-window-selection { flex-grow: 1; flex-shrink: 1; min-width: 100px; margin-right: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.road-window-actions > .map-control-button { margin: 0 0 0 var(--mf-space-1); flex-shrink: 0; }
+.road-window-text-icon-button { flex-direction: row; align-items: center; }
+.road-window-text-icon-button > .icon { width: 14px; height: 14px; margin-right: 5px; }
+.road-window-text-icon-button > Label { margin: 0; padding: 0; }
+.map-control-button.road-window-danger { color: var(--mf-color-error); }
+.map-control-button.road-window-danger:disabled { color: var(--mf-color-text-muted); }
+.road-window-actions > .map-control-button:disabled { opacity: 0.45; }
+.road-window-add-toggle { flex-direction: row; align-items: center; justify-content: center; height: 30px; margin: var(--mf-space-2) 0 0 0; padding: 0 10px; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
+.road-window-add-toggle:hover { color: var(--mf-color-accent); background-color: var(--mf-color-panel-raised); }
+.road-window-add-toggle:disabled { opacity: 0.45; }
+.road-window-add-toggle > .icon { width: 14px; height: 14px; margin-right: 6px; }
+.road-window-add-toggle > Label { margin: 0; padding: 0; }
+.road-window-add-open { color: var(--mf-color-accent); }
+.road-window-palette { margin-top: var(--mf-space-1); padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-md); }
+.road-window-palette-top { flex-direction: row; align-items: center; flex-wrap: wrap; margin-bottom: var(--mf-space-1); }
+.road-window-palette-hint { flex-grow: 1; flex-shrink: 1; min-width: 120px; margin: 0 var(--mf-space-2) 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.panel-tabs.road-window-side { flex-grow: 0; flex-shrink: 0; width: 150px; margin: 0; }
+.road-window-segment { flex-direction: row; align-items: center; justify-content: center; }
+.road-window-segment > Label { margin: 0; padding: 0; font-size: 11px; }
+.road-window-segment-icon { width: 13px; height: 13px; margin-right: 4px; }
+.road-window-kinds { flex-direction: row; flex-wrap: wrap; }
+.road-window-kind { flex-direction: row; align-items: center; margin: 0 var(--mf-space-1) var(--mf-space-1) 0; padding-left: 6px; }
+.road-window-kind > Label { margin: 0; padding: 0; }
+.road-window-kind:disabled { opacity: 0.45; }
+.road-swatch { width: 12px; height: 12px; margin-right: 6px; border-radius: 2px; background-color: var(--mf-color-lane-asphalt); border-width: 1px; border-color: var(--mf-color-border); flex-shrink: 0; }
+.road-swatch-walk { background-color: var(--mf-color-lane-walk); }
+.road-swatch-median { background-color: var(--mf-color-lane-grass); }
+.road-swatch-shoulder { background-color: var(--mf-color-lane-shoulder); }
+.road-swatch-bus { background-color: var(--mf-color-lane-bus); }
+.road-swatch-bike { background-color: var(--mf-color-lane-bike); }
+.road-swatch-parking { background-color: var(--mf-color-lane-parking); }
+.road-swatch-tram { background-color: var(--mf-color-lane-asphalt); border-color: var(--mf-color-lane-rail); }
+.road-prop-heading { margin-top: 0; }
+.road-prop { margin-bottom: var(--mf-space-2); }
+.road-prop-label { margin: 0 0 2px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
+.road-prop-note { margin: 2px 0 0; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
+.road-prop-line { flex-direction: row; align-items: center; }
+.road-prop-dropdown { margin: 0; }
+.road-prop-dropdown .unity-base-popup-field__input { height: 28px; margin: 0; padding: 0 6px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
+.road-prop-dropdown .unity-base-popup-field__input:hover { border-color: var(--mf-color-accent); }
+.road-prop-dropdown .unity-base-popup-field__text { color: var(--mf-color-text-primary); }
+.picker-field.road-prop-number { flex-grow: 1; flex-shrink: 1; min-width: 40px; margin: 0 var(--mf-space-1); }
+.road-prop-step { width: 28px; height: 28px; margin: 0; padding: 0; flex-shrink: 0; -unity-text-align: middle-center; }
+.road-prop-invalid .unity-base-text-field__input { border-color: var(--mf-color-error); color: var(--mf-color-error); }
+.road-prop-surface { flex-grow: 1; flex-shrink: 1; min-width: 0; height: 28px; flex-direction: row; align-items: center; margin: 0; padding: 0 4px; overflow: hidden; }
+.road-prop-surface > .icon { width: 16px; height: 16px; margin-right: 6px; flex-shrink: 0; }
+.road-prop-swatch { width: 20px; height: 20px; margin-right: 6px; flex-shrink: 0; border-radius: 2px; border-width: 1px; border-color: var(--mf-color-border); background-color: var(--mf-color-lane-asphalt); -unity-background-scale-mode: scale-and-crop; }
+.road-prop-surface-name { flex-shrink: 1; height: 100%; margin: 0; padding: 0; -unity-text-align: middle-left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.road-prop-reset { height: 28px; margin: 0 0 0 var(--mf-space-1); flex-shrink: 0; }
+.road-prop-fold { flex-direction: row; align-items: center; height: 28px; margin: var(--mf-space-1) 0 0 0; padding: 0 4px; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); border-radius: 0; -unity-text-align: middle-left; }
+.road-prop-fold:hover { color: var(--mf-color-text-primary); }
+.road-prop-fold-icon { width: 14px; height: 14px; margin-right: 4px; flex-shrink: 0; }
+.road-prop-fold-text { flex-shrink: 1; margin: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.road-prop-fold-body { padding: var(--mf-space-1) 0 0; }
+.road-prop-styles { flex-direction: row; flex-wrap: wrap; }
+.road-prop-style { width: 46%; flex-grow: 1; margin: 0 var(--mf-space-1) var(--mf-space-1) 0; padding: 0 4px; font-size: var(--mf-font-secondary); }
+.road-prop-style > Label { margin: 0; padding: 0; font-size: var(--mf-font-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.road-prop-style.panel-tab-active, .road-prop-style.panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.road-window-surfaces { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.road-window-surfaces-header { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
+.road-window-surfaces-title { flex-grow: 1; flex-shrink: 1; margin: 0 var(--mf-space-2) 0 0; }
+.picker-field.road-window-surfaces-search { width: 200px; margin: 0 var(--mf-space-2) 0 0; flex-shrink: 1; }
+.road-window-surface-tiles { flex-grow: 1; min-height: 0; }
+.road-window-total { margin: var(--mf-space-1) 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); -unity-text-align: middle-right; }
+.road-window-templates { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.road-window-template-grid { flex-direction: row; flex-wrap: wrap; flex-grow: 1; align-content: flex-start; margin-top: var(--mf-space-2); }
+.road-window-template { width: 30%; min-width: 150px; height: 34px; margin: 0 var(--mf-space-2) var(--mf-space-2) 0; }
+.road-window-template-footer { flex-direction: row; align-items: center; flex-shrink: 0; padding-top: var(--mf-space-2); border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); }
+.road-window-template-info { flex-grow: 1; flex-shrink: 1; margin-right: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
+.road-window-template-footer > .map-control-button { margin: 0 0 0 var(--mf-space-1); flex-shrink: 0; }
 .signal-group-item { padding: 1px 2px; border-radius: var(--mf-radius-sm); }
 .signal-group-item:hover, .signal-group-selected { background-color: var(--mf-color-panel-hover); }
 .signal-group-selected { border-left-width: 3px; border-left-color: var(--mf-color-accent); }

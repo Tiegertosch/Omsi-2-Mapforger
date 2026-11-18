@@ -1379,6 +1379,7 @@ namespace OmsiMapEditor.UI
                     for (var frame = 0; frame < 60; frame++)
                         yield return null;
                 }
+                RunRoadWindowArguments(args);
             }
 
             var roadAt = Array.IndexOf(args, "-road");
@@ -1448,7 +1449,7 @@ namespace OmsiMapEditor.UI
                     roadPointer = points[index];
                     if (index < points.Count - 1 || build)
                     {
-                        BuildRoadTo(points[index].X, points[index].Y);
+                        OnToolClicked(points[index].X, points[index].Y);
                         // Later messages replace the status, so a check by command line reads each click's outcome in the log.
                         Debug.Log("Road click " + (index + 1) + ": " + statusLabel?.text);
                     }
@@ -3130,7 +3131,12 @@ namespace OmsiMapEditor.UI
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.None;
             if (roadBuilder != null)
+            {
+                // A way out that could not wait (another map): the window goes, its draft stays for the same map.
+                roadGuard.Clear();
+                roadBuilder.ShowPrompt(null, false);
                 roadBuilder.style.display = DisplayStyle.None;
+            }
             if (pickingRowObject)
             {
                 // The library stood in for the road builder to choose a row's object; it closes with the road tool.
@@ -6405,6 +6411,12 @@ namespace OmsiMapEditor.UI
             // except while it waits for a point to be clicked in the map.
             if (InTextInput(focused) || AnyModalDialogShown() || IsShown(satelliteWindow) && (placementPickFor >= 0 || mapCanvas != null && mapCanvas.IsPickingPoint))
                 return;
+            // With the focus anywhere in the road type window the tool keys, Delete and the map's Ctrl+Z/Y stay silent; Ctrl+Z/Y act on its draft.
+            if (RoadBuilderShown && focused != null && roadBuilder.HasFocusInside() && RoadTypeWindowRules.SwallowsShortcut(evt.keyCode))
+            {
+                roadBuilder.HandleKey(evt);
+                return;
+            }
 
             if (!(evt.ctrlKey || evt.commandKey))
             {
@@ -7969,6 +7981,10 @@ namespace OmsiMapEditor.UI
             }
             // The signals tool with a draft that has changes asks before it is left (the close button and Esc choose the drag tool).
             if (activeTool == EditorTool.Signals && tool != EditorTool.Signals && !SignalMayLeave(new SignalExit { Kind = SignalExitKind.OtherTool, Payload = tool }))
+                return;
+            // The road tool with a road type draft that has changes asks before another tool replaces it; the window stays open until answered.
+            if (activeTool == EditorTool.Road && tool != EditorTool.Road && roadBuilder != null &&
+                !RoadBuilderMayYield(new SignalExit { Kind = SignalExitKind.Action, Payload = (Action)(() => SetTool(tool)) }))
                 return;
             // Another tool ends placing and the picks waiting for a click, and closes the object library, the list above the bottom bar and the
             // context menu.

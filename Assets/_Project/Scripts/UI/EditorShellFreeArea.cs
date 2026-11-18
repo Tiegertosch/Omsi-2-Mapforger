@@ -50,7 +50,7 @@ namespace OmsiMapEditor.UI
         /// The same for a window that floats over the map (the signals window): the target is moved into the largest free part beside it,
         /// which a window that can stand anywhere asks for instead of "above". Waits until the window has its place.
         /// </summary>
-        private void KeepClearOfFloatingWindow(SignalWindow window, Func<bool> isOpen, Func<OmsiMapPoint?> target)
+        private void KeepClearOfFloatingWindow(FloatingWindowFrame window, Func<bool> isOpen, Func<OmsiMapPoint?> target)
         {
             KeepClear(window, isOpen, target, _ => window.IsLaidOut ? new List<Rect> { window.worldBound } : new List<Rect>(),
                 (point, rects) => mapCanvas.PanAroundWindow(point, rects[0], window.VisibleMapArea(), FreeAreaPan.MarginPixels));

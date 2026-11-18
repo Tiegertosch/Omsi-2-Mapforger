@@ -181,5 +181,15 @@ namespace OmsiMapEditor.Tests
                 Assert.That(builds, Is.EqualTo(tool == EditorTool.Road), tool.ToString());
             }
         }
+
+        [Test]
+        public void OnlyTheRoadToolIsHeldBackWhileTheRoadTypeWindowIsOpen()
+        {
+            foreach (var tool in Tools())
+            {
+                Assert.That(EditorToolRules.SuspendsMapBuilding(tool, false), Is.False, tool.ToString());
+                Assert.That(EditorToolRules.SuspendsMapBuilding(tool, true), Is.EqualTo(tool == EditorTool.Road), tool.ToString());
+            }
+        }
     }
 }

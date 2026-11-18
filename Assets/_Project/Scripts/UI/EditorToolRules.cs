@@ -85,6 +85,12 @@ namespace OmsiMapEditor.UI
             return tool == EditorTool.Road;
         }
 
+        /// <summary>Whether map clicks and the road preview are held back: the road tool while the road type window is open.</summary>
+        public static bool SuspendsMapBuilding(EditorTool tool, bool roadTypeWindowOpen)
+        {
+            return roadTypeWindowOpen && tool == EditorTool.Road;
+        }
+
         /// <summary>Whether the tool needs objects to be editable (<c>CanEditObjects</c>); the others need the whole map (<c>CanEdit</c>).</summary>
         public static bool NeedsObjectEditingOnly(EditorTool tool)
         {

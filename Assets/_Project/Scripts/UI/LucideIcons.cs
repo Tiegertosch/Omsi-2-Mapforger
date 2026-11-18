@@ -20,6 +20,10 @@ namespace OmsiMapEditor.UI
             {
                 "M12 2v20", "m15 19-3 3-3-3", "m19 9 3 3-3 3", "M2 12h20", "m5 9-3 3 3 3", "m9 5 3-3 3 3"
             },
+            ["rotate-ccw"] = new[]
+            {
+                "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"
+            },
             ["rotate-cw"] = new[]
             {
                 "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", "M21 3v5h-5"
@@ -222,6 +226,7 @@ namespace OmsiMapEditor.UI
             // The icons of the signals window (ADR 098, M4 step 7); circles and lines of Lucide are written here as path data.
             ["check"] = new[] { "M20 6 9 17l-5-5" },
             ["undo-2"] = new[] { "M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" },
+            ["redo-2"] = new[] { "m15 14 5-5-5-5", "M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" },
             ["save"] = new[] { "M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z", "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7", "M7 3v4a1 1 0 0 0 1 1h7" },
             ["list-ordered"] = new[] { "M10 12h11", "M10 18h11", "M10 6h11", "M4 10h2", "M4 6h1v4", "M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" },
             ["chart-gantt"] = new[] { "M10 6h8", "M12 16h6", "M3 3v16a2 2 0 0 0 2 2h16", "M8 11h7" },

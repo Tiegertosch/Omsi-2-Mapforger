@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using OmsiMapEditor.Core.Localization;
@@ -17,7 +18,13 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private RoadBuilderPanel roadBuilder;
+        private RoadTypeWindow roadBuilder;
+
+        // The question asked before the road type window closes, or another tool replaces it, with changes not saved (same rules as the signals window).
+        private readonly SignalLeaveGuard roadGuard = new SignalLeaveGuard();
+
+        // The map the draft of the road type window belongs to; another map starts a new draft.
+        private string roadBuilderMap;
 
         // Road types made in this session, offered before the installation scan lists them.
         private readonly HashSet<string> madeRoadTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -31,15 +38,19 @@ namespace OmsiMapEditor.UI
 
         private void CreateRoadBuilder()
         {
-            roadBuilder = new RoadBuilderPanel();
+            // The window floats over the map like the signals window: a child of the workspace, not of the row of the tool windows above the bar.
+            roadBuilder = new RoadTypeWindow(() => RequestCloseRoadBuilder());
+            roadBuilder.BottomInset = BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.ToolGap);
             roadBuilder.style.display = DisplayStyle.None;
             roadBuilder.SaveRequested += SaveRoadType;
             roadBuilder.ReplaceRequested += ReplaceRoadType;
             roadBuilder.DeleteRequested += DeleteRoadType;
             roadBuilder.FromChosenRequested += TakeChosenRoadApart;
             roadBuilder.RowObjectRequested += PickRowObject;
-            roadBuilder.CloseRequested += () => ShowRoadBuilder(false);
-            objectsPanelHost.Add(roadBuilder);
+            roadBuilder.Changed += OnRoadDraftChanged;
+            roadBuilder.PromptDiscard.clicked += () => AnswerRoadPrompt(SignalPromptChoice.Discard);
+            roadBuilder.PromptKeep.clicked += () => AnswerRoadPrompt(SignalPromptChoice.KeepEditing);
+            (objectsPanelHost.parent ?? objectsPanelHost).Add(roadBuilder);
             roadPanel.EditRoadTypeRequested += EditRoadType;
 
             rowPickOptions = ToolCatalog.Options();
@@ -371,15 +382,97 @@ namespace OmsiMapEditor.UI
                 var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
                 roadBuilder.SetInstallation(installation);
                 roadBuilder.SetExcludedFolders(ExcludedContentFolders(installation));
+                roadBuilder.SetProject(currentProjectName, () => CanEdit);
+                // The draft stays while the window is hidden and shown again; only another map starts a new one.
+                if (!string.Equals(roadBuilderMap, currentSummary.RootPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    roadBuilderMap = currentSummary.RootPath;
+                    roadBuilder.Reset();
+                }
             }
-            if (show && !RoadBuilderShown)
-                roadBuilder.Reset();
             if (show)
                 roadBuilder.SetChosenProfile(roadPanel.Profile);
             roadBuilder.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-            roadPanel.style.display = !show && activeTool == EditorTool.Road ? DisplayStyle.Flex : DisplayStyle.None;
+            // The road picker stays open beside the window, so the road to take apart can still be chosen there.
+            if (!show)
+            {
+                roadGuard.Clear();
+                roadBuilder.ShowPrompt(null, false);
+                roadPanel.style.display = activeTool == EditorTool.Road ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            mapCanvas?.ClearRoadPreview();
             if (show)
                 SetStatusT("roadbuilder.status.start");
+        }
+
+        /// <summary>
+        /// Closes the road type window, as its close button and Esc do. With changes not saved the question is asked inside the window
+        /// (keep working, discard and close) and the window stays open until it is answered.
+        /// </summary>
+        private void RequestCloseRoadBuilder()
+        {
+            if (!RoadBuilderShown)
+                return;
+            if (!RoadBuilderMayYield(new SignalExit { Kind = SignalExitKind.Action, Payload = (Action)CloseRoadBuilder }))
+                return;
+            CloseRoadBuilder();
+        }
+
+        private void CloseRoadBuilder()
+        {
+            ShowRoadBuilder(false);
+            SetStatusT("roadbuilder.status.closed");
+        }
+
+        /// <summary>
+        /// True when the road type window may go away or be replaced now. With changes not saved the question is asked inside the window and
+        /// the way out waits for the answer, so nothing is dropped unnoticed.
+        /// </summary>
+        private bool RoadBuilderMayYield(SignalExit exit)
+        {
+            if (roadBuilder == null)
+                return true;
+            if (roadGuard.Request(RoadBuilderShown && roadBuilder.HasUnsavedChanges, exit))
+            {
+                roadBuilder.ShowPrompt(null, false);
+                return true;
+            }
+            roadBuilder.Collapsed = false;
+            roadBuilder.ShowPrompt(Loc.T("roadbuilder.window.prompt"), true);
+            SetStatusT("roadbuilder.window.prompt.status");
+            return false;
+        }
+
+        private void AnswerRoadPrompt(SignalPromptChoice choice)
+        {
+            // Discard cleans the draft, which would make the question look stale before its answer is read.
+            roadGuard.BeginAnswer();
+            try
+            {
+                if (choice == SignalPromptChoice.Discard)
+                    roadBuilder.DiscardChanges();
+            }
+            finally
+            {
+                roadGuard.EndAnswer();
+            }
+            var waiting = roadGuard.Pending;
+            var exit = roadGuard.Answer(choice, roadBuilder.HasUnsavedChanges);
+            roadBuilder.ShowPrompt(null, roadGuard.Asking);
+            if (exit == null)
+            {
+                if (choice == SignalPromptChoice.KeepEditing)
+                    waiting?.Cancelled?.Invoke();
+                return;
+            }
+            ((Action)exit.Payload)();
+        }
+
+        /// <summary>The draft became clean by another way than the question (undo, discard, saved): the question is stale and goes away with the way out that waited.</summary>
+        private void OnRoadDraftChanged()
+        {
+            if (roadGuard.DropIfStale(roadBuilder.HasUnsavedChanges) != null)
+                roadBuilder.ShowPrompt(null, false);
         }
 
         /// <summary>The spline profiles to offer: the installation's and the road types made since it was listed, without those deleted since.</summary>
@@ -418,10 +511,12 @@ namespace OmsiMapEditor.UI
                 return;
             }
             madeRoadTypes.Add(path);
-            ShowRoadBuilder(false);
             UpdateRoadProfiles();
             roadPanel.ChooseProfile(path);
             roadPanel.ShowTab("My roads");
+            // The window stays open on the saved road type, now the saved state its changes are measured against.
+            roadBuilder.Saved(path);
+            roadBuilder.SetChosenProfile(roadPanel.Profile);
             SetStatusT("roadbuilder.status.made", ("name", Path.GetFileNameWithoutExtension(path)), ("width", type.Width), ("path", path));
         }
 
@@ -429,6 +524,9 @@ namespace OmsiMapEditor.UI
         private void EditRoadType(string path)
         {
             if (currentSummary == null || string.IsNullOrWhiteSpace(path))
+                return;
+            // Opening another road type replaces the draft: with changes not saved the window asks first and opens it after the answer.
+            if (RoadBuilderShown && !RoadBuilderMayYield(new SignalExit { Kind = SignalExitKind.Action, Payload = (Action)(() => EditRoadType(path)) }))
                 return;
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
             var name = Path.GetFileNameWithoutExtension(path);
@@ -569,8 +667,10 @@ namespace OmsiMapEditor.UI
             PushHistory(new ObjectEditStep { Group = parts, Description = Loc.T("roadbuilder.step.change", ("name", name)) });
             StartInstallationScan(true);
             RefreshAfterChange(null);
-            ShowRoadBuilder(false);
             roadPanel.ChooseProfile(path);
+            // The window stays open, its draft the saved state now.
+            roadBuilder.Saved(path);
+            roadBuilder.SetChosenProfile(roadPanel.Profile);
             var uses = SplinesUsing(path);
             var remade = junctions.Count - stayed.Count;
             SetStatus(Loc.T("roadbuilder.status.changed", ("name", name), ("width", type.Width), ("uses", uses), ("remade", remade), ("every", keepConnections ? "no" : "yes"),
@@ -798,6 +898,58 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
+        /// Command line, with <c>-roadBuilder</c>, for the window: <c>-roadBuilderWindowAt x y [width height]</c> puts it there (pixels of the
+        /// area around it), <c>-roadBuilderCollapse</c> collapses it, <c>-roadBuilderTemplates</c> shows the templates, <c>-roadBuilderPalette</c> opens Add element, <c>-roadBuilderEquipment</c> opens the properties' Equipment, <c>-roadBuilderDo cmd,cmd</c> does what a person would do (see <see cref="RoadTypeWindow.RunCommands"/>), <c>-roadBuilderUndo [n]</c>
+        /// and <c>-roadBuilderRedo [n]</c> act on its draft, <c>-roadBuilderDiscard</c> clicks Discard and <c>-roadBuilderClose</c> clicks its
+        /// close button (which asks when the draft has changes); <c>-roadBuilderPromptAnswer discard|keep</c> answers that question.
+        /// </summary>
+        private void RunRoadWindowArguments(string[] args)
+        {
+            if (roadBuilder == null)
+                return;
+            int Number(string text) => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : -1;
+            int Count(string name)
+            {
+                var at = Array.IndexOf(args, name);
+                return at >= 0 && at + 1 < args.Length && Number(args[at + 1]) > 0 ? Number(args[at + 1]) : 1;
+            }
+            var place = Array.IndexOf(args, "-roadBuilderWindowAt");
+            if (place >= 0 && place + 2 < args.Length)
+            {
+                var hasSize = place + 4 < args.Length && Number(args[place + 3]) > 0 && Number(args[place + 4]) > 0;
+                roadBuilder.PlaceAt(Number(args[place + 1]), Number(args[place + 2]), hasSize ? Number(args[place + 3]) : 0f, hasSize ? Number(args[place + 4]) : 0f);
+            }
+            if (Array.IndexOf(args, "-roadBuilderTemplates") >= 0)
+                roadBuilder.ShowTemplates(true);
+            if (Array.IndexOf(args, "-roadBuilderPalette") >= 0)
+                roadBuilder.ShowPalette();
+            if (Array.IndexOf(args, "-roadBuilderEquipment") >= 0)
+                roadBuilder.ShowEquipment();
+            var doAt = Array.IndexOf(args, "-roadBuilderDo");
+            if (doAt >= 0 && doAt + 1 < args.Length)
+                roadBuilder.RunCommands(args[doAt + 1]);
+            if (Array.IndexOf(args, "-roadBuilderUndo") >= 0)
+                for (var count = Count("-roadBuilderUndo"); count > 0; count--)
+                    roadBuilder.UndoDraft();
+            if (Array.IndexOf(args, "-roadBuilderRedo") >= 0)
+                for (var count = Count("-roadBuilderRedo"); count > 0; count--)
+                    roadBuilder.RedoDraft();
+            if (Array.IndexOf(args, "-roadBuilderDiscard") >= 0)
+                roadBuilder.DiscardChanges();
+            if (Array.IndexOf(args, "-roadBuilderCollapse") >= 0)
+                roadBuilder.Collapsed = true;
+            if (Array.IndexOf(args, "-roadBuilderClose") >= 0)
+                RequestCloseRoadBuilder();
+            var answerAt = Array.IndexOf(args, "-roadBuilderPromptAnswer");
+            var answer = answerAt >= 0 && answerAt + 1 < args.Length ? args[answerAt + 1] : null;
+            if (answer == "discard")
+                AnswerRoadPrompt(SignalPromptChoice.Discard);
+            else if (answer == "keep")
+                AnswerRoadPrompt(SignalPromptChoice.KeepEditing);
+            Debug.Log("Road builder window: " + roadBuilder.Type.Describe() + " | changes " + roadBuilder.HasUnsavedChanges + " | shown " + RoadBuilderShown + " | " + statusLabel?.text);
+        }
+
+        /// <summary>
         /// For command-line checks: opens the road builder, a road type made with it (<paramref name="edit"/>) or the lanes
         /// taken from a profile (<paramref name="from"/>), takes the lanes given (as in the .sli line, such as
         /// <c>"walk 3 | drive 3.25 back | drive 3.25 | walk 3"</c>), picks a lane or the line after lane n, and saves under
@@ -806,6 +958,8 @@ namespace OmsiMapEditor.UI
         private void RunRoadBuilderArgument(string lanes, string select, string line, string saveName, string edit, string from, bool replace, bool delete)
         {
             ShowRoadBuilder(true);
+            // The window keeps its draft when it is shown again; a check by command line starts from a new road type, as it always did.
+            roadBuilder.Reset();
             if (edit != null)
                 EditRoadType(edit.Trim());
             if (from != null)

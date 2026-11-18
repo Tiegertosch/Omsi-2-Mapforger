@@ -107,6 +107,8 @@ namespace OmsiMapEditor.UI
                 imageryAttribution.style.bottom = toolBottom;
             if (signalWindow != null)
                 signalWindow.BottomInset = toolBottom;
+            if (roadBuilder != null)
+                roadBuilder.BottomInset = toolBottom;
         }
 
         /// <summary>
