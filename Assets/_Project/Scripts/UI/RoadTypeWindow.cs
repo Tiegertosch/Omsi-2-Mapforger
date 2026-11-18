@@ -30,7 +30,6 @@ namespace OmsiMapEditor.UI
         private ICollection<string> excludedFolders;
         private string projectName = string.Empty;
         private Func<bool> canEdit = () => true;
-        private string templateChosen;
         private bool saving;
 
         private readonly TextField nameField;
@@ -56,10 +55,6 @@ namespace OmsiMapEditor.UI
         private readonly List<(Button Button, OmsiRoadLaneKind Kind)> kindButtons = new List<(Button, OmsiRoadLaneKind)>();
         private readonly VisualElement inspector;
         private readonly VisualElement templatesView;
-        private readonly VisualElement templateGrid;
-        private readonly Label templateInfo;
-        private readonly Button templateUse;
-        private readonly Button fromChosenButton;
         private bool paletteOpen;
         private OmsiRoadDraftSide addSide = OmsiRoadDraftSide.After;
         private Dictionary<int, string> problemTexts = new Dictionary<int, string>();
@@ -183,28 +178,7 @@ namespace OmsiMapEditor.UI
             schedule.Execute(() => surfaces.Pump()).Every(100);
 
             // The templates, in the same window in place of the work area.
-            templatesView = new VisualElement();
-            templatesView.AddToClassList("road-window-templates");
-            templatesView.style.display = DisplayStyle.None;
-            var templatesHint = LocBindings.NewLabel("roadbuilder.window.templates.hint");
-            templatesHint.AddToClassList("panel-info");
-            templatesView.Add(templatesHint);
-            templateGrid = new VisualElement();
-            templateGrid.AddToClassList("road-window-template-grid");
-            templatesView.Add(templateGrid);
-            var templateFooter = new VisualElement();
-            templateFooter.AddToClassList("road-window-template-footer");
-            templateInfo = new Label();
-            templateInfo.AddToClassList("road-window-template-info");
-            templateFooter.Add(templateInfo);
-            fromChosenButton = new Button(() => FromChosenRequested?.Invoke());
-            fromChosenButton.AddToClassList("map-control-button");
-            templateFooter.Add(fromChosenButton);
-            templateUse = LocBindings.NewButton("roadbuilder.window.templates.use", UseTemplate);
-            templateUse.AddToClassList("map-control-button");
-            templateUse.AddToClassList("dialog-primary");
-            templateFooter.Add(templateUse);
-            templatesView.Add(templateFooter);
+            templatesView = BuildTemplatesView();
             Content.Add(templatesView);
 
             // 4. The question and the footer, which the frame adds below the work area.
@@ -231,8 +205,11 @@ namespace OmsiMapEditor.UI
 
         public event Action DeleteRequested;
 
-        /// <summary>Templates, From the chosen road: the shell takes the road chosen in the road tool apart and calls <see cref="SetType"/>.</summary>
-        public event Action FromChosenRequested;
+        /// <summary>The window took the lanes of the road chosen in the road tool as its draft (Templates, From the chosen road); the shell tells so in its status line.</summary>
+        public event Action<RoadChosenSource> ChosenRoadTaken;
+
+        /// <summary>Takes the road chosen in the road tool apart without changing anything: the lanes and the remarks, or no lanes when it has none. Set by the shell.</summary>
+        public Func<string, RoadChosenSource> ChosenRoadResolver { get; set; }
 
         /// <summary>The object of the selected element's row is to be chosen in the object library.</summary>
         public event Action RowObjectRequested;
@@ -285,7 +262,11 @@ namespace OmsiMapEditor.UI
         /// <summary>The road chosen in the road tool, which From the chosen road takes apart; null for none.</summary>
         public void SetChosenProfile(string path)
         {
+            if (string.Equals(chosenProfile, path, StringComparison.Ordinal))
+                return;
             chosenProfile = path;
+            chosenSource = null;
+            chosenSourceFor = null;
             RenderTemplates();
         }
 
@@ -406,7 +387,12 @@ namespace OmsiMapEditor.UI
             LocBindings.Text(templatesButtonLabel, templates ? "roadbuilder.window.templates.back" : "roadbuilder.window.templates"); // i18n:keys
             LocBindings.Tooltip(templatesButton, templates ? "roadbuilder.window.templates.back.tooltip" : "roadbuilder.window.templates.tooltip"); // i18n:keys
             if (templates)
+            {
+                // The chosen road may have changed on disk or in the road tool since the page was last open.
+                chosenSource = null;
+                chosenSourceFor = null;
                 RenderTemplates();
+            }
             if (next == RoadWindowPage.Work && draft != null)
                 crossSection.Sync(true);
         }
@@ -634,17 +620,6 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void UseTemplate()
-        {
-            if (templateChosen == null)
-                return;
-            if (draft.ApplyTemplate(templateChosen))
-                draft.EndGesture();
-            ShowTemplates(false);
-            Render();
-            Changed?.Invoke();
-        }
-
         private void Save()
         {
             if (saving || SaveBlock() != RoadSaveBlock.None)
@@ -816,45 +791,6 @@ namespace OmsiMapEditor.UI
                 default:
                     return Loc.T(key, ("lane", problem.LaneIndex + 1), ("kind", kind)); // i18n:keys
             }
-        }
-
-        private void RenderTemplates()
-        {
-            if (templateGrid == null || draft == null)
-                return;
-            templateGrid.Clear();
-            foreach (var template in OmsiRoadTypeTemplate.All)
-            {
-                var chosen = template.Id;
-                var button = new Button(() =>
-                {
-                    templateChosen = chosen;
-                    RenderTemplates();
-                });
-                button.AddToClassList("map-control-button");
-                button.AddToClassList("road-window-template");
-                button.EnableInClassList("panel-tab-active", chosen == templateChosen);
-                var name = new Label(Loc.T(RoadTypeWindowRules.TemplateKey(template.Id))); // i18n:keys
-                name.pickingMode = PickingMode.Ignore;
-                button.Add(name);
-                templateGrid.Add(button);
-            }
-            var picked = templateChosen != null ? OmsiRoadTypeTemplate.Find(templateChosen) : null;
-            templateInfo.text = picked != null
-                ? Loc.T("roadbuilder.window.templates.info", ("width", picked.Width), ("count", picked.Elements))
-                : string.Empty;
-            templateUse.SetEnabled(picked != null);
-            fromChosenButton.Clear();
-            var chosenName = chosenProfile != null ? System.IO.Path.GetFileNameWithoutExtension(chosenProfile) : null;
-            var fromLabel = new Label();
-            fromLabel.pickingMode = PickingMode.Ignore;
-            LocBindings.Text(fromLabel, "roadbuilder.panel.from_chosen");
-            fromChosenButton.Add(fromLabel);
-            fromChosenButton.SetEnabled(chosenProfile != null);
-            if (chosenProfile != null)
-                LocBindings.Tooltip(fromChosenButton, "roadbuilder.panel.from_chosen.tooltip_on", ("name", chosenName));
-            else
-                LocBindings.Tooltip(fromChosenButton, "roadbuilder.panel.from_chosen.tooltip_off");
         }
 
         /// <summary>A narrow window puts the properties below the cross-section instead of beside it.</summary>

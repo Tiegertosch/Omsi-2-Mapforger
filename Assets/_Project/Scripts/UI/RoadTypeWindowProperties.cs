@@ -651,7 +651,7 @@ namespace OmsiMapEditor.UI
         /// Does what a person would do in the window, one step after the other, for command-line checks: <c>add:bus</c>, <c>side:left|right</c>,
         /// <c>dup</c>, <c>remove</c>, <c>left</c>, <c>right</c>, <c>sel:n</c>, <c>line:n</c>, <c>kind:tram</c>, <c>width:3,5</c> (typed), <c>plus</c>,
         /// <c>minus</c>, <c>dir:with|against</c>, <c>cars:on|off</c>, <c>marking:auto|solid|...</c>, <c>interval:n</c>, <c>turn:n</c>,
-        /// <c>place:kerb|middle|outer</c>, <c>object:Sceneryobjects/x.sco</c>, <c>undo</c>, <c>redo</c>. The commands go through the same handlers as the controls.
+        /// <c>place:kerb|middle|outer</c>, <c>object:Sceneryobjects/x.sco</c>, <c>templates</c>, <c>template:tram-in-the-street</c> (chooses a card), <c>fromroad</c> (chooses From the chosen road), <c>use</c> (Use template), <c>undo</c>, <c>redo</c>. The commands go through the same handlers as the controls.
         /// </summary>
         public void RunCommands(string list)
         {
@@ -700,6 +700,10 @@ namespace OmsiMapEditor.UI
                             ChangePlace(place);
                         break;
                     case "object": SetRowObject(value.Replace('/', '\\'), 0d); break;
+                    case "templates": ShowTemplates(true); break;
+                    case "template": ChooseTemplate(value); break;
+                    case "fromroad": ChooseTemplate(ChosenCardId); break;
+                    case "use": UseTemplate(); break;
                     case "undo": UndoDraft(); break;
                     case "redo": RedoDraft(); break;
                     default:

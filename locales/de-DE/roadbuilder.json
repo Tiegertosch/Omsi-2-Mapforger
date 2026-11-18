@@ -167,7 +167,7 @@
   "roadbuilder.window.templates.back": "Zurück zum Aufbau",
   "roadbuilder.window.templates.tooltip": "Mit einer Vorlage beginnen oder die gewählte Straße zerlegen.",
   "roadbuilder.window.templates.back.tooltip": "Zurück zum Straßenaufbau.",
-  "roadbuilder.window.templates.hint": "Vorlage wählen. Sie ersetzt den aktuellen Aufbau; Rückgängig bringt ihn zurück.",
+  "roadbuilder.window.templates.hint": "Vorlage zum Beginnen wählen oder die im Straßenwerkzeug gewählte Straße zerlegen.",
   "roadbuilder.window.templates.use": "Vorlage übernehmen",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# Element} other {# Elemente}}",
   "roadbuilder.window.section.title": "Straßenaufbau",
@@ -250,5 +250,12 @@
   "roadbuilder.window.place": "Lage",
   "roadbuilder.window.inspector.empty": "Der Straßentyp hat kein Element. Füge eines mit „Element hinzufügen“ hinzu.",
   "roadbuilder.window.surface.reset": "Auf Standard zurücksetzen",
-  "roadbuilder.status.map_suspended": "Straßentyp-Fenster schließen, um Straßen zu bauen."
+  "roadbuilder.status.map_suspended": "Straßentyp-Fenster schließen, um Straßen zu bauen.",
+  "roadbuilder.window.templates.pick": "Zuerst eine Vorlage wählen.",
+  "roadbuilder.window.templates.selection": "Auswahl: {name}",
+  "roadbuilder.window.templates.replace": "Ersetzt den aktuellen Aufbau. Rückgängig ist möglich.",
+  "roadbuilder.window.templates.from.none": "Keine Straße gewählt. Im Straßenwerkzeug eine Straße wählen, um ihre Spuren hier zu zerlegen.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} hat keine Fahrbahn und keinen Gehweg, der sich in Spuren zerlegen ließe.",
+  "roadbuilder.window.templates.from.source": "Übernimmt {name}; die Straße selbst bleibt unverändert.",
+  "roadbuilder.window.templates.from.notes": "Hinweise: {notes}"
 }

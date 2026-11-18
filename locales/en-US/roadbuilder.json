@@ -180,7 +180,7 @@
   "roadbuilder.window.templates.back": "Back to the cross-section",
   "roadbuilder.window.templates.tooltip": "Start from a template, or take the road chosen in the road tool apart.",
   "roadbuilder.window.templates.back.tooltip": "Back to the cross-section of the road type.",
-  "roadbuilder.window.templates.hint": "Choose a template. It replaces the current cross-section; undo brings it back.",
+  "roadbuilder.window.templates.hint": "Choose a template to start from, or take apart the road chosen in the road tool.",
   "roadbuilder.window.templates.use": "Use template",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# element} other {# elements}}",
   "roadbuilder.window.section.title": "Cross-section",
@@ -268,5 +268,14 @@
   "roadbuilder.window.place": "Position",
   "roadbuilder.window.inspector.empty": "The road type has no element. Add one with Add element.",
   "roadbuilder.window.surface.reset": "Reset to standard",
-  "roadbuilder.status.map_suspended": "Close the road type window to build roads."
+  "roadbuilder.status.map_suspended": "Close the road type window to build roads.",
+  "roadbuilder.window.templates.pick": "Select a template first.",
+  "roadbuilder.window.templates.selection": "Selection: {name}",
+  "@roadbuilder.window.templates.selection": "{name} is a template name, or From the chosen road: and the name of the road",
+  "roadbuilder.window.templates.replace": "Replaces the current cross-section. You can undo this.",
+  "roadbuilder.window.templates.from.none": "No road is chosen. Choose a road in the road tool to take its lanes apart here.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} has no carriageway or footpath to take apart into lanes.",
+  "roadbuilder.window.templates.from.source": "Takes over {name}; the road itself stays as it is.",
+  "roadbuilder.window.templates.from.notes": "Remarks: {notes}",
+  "@roadbuilder.window.templates.from.notes": "{notes} are remarks of MapWorks in English"
 }

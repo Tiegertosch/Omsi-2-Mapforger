@@ -179,7 +179,7 @@
   "roadbuilder.window.templates.back": "Torna alla sezione",
   "roadbuilder.window.templates.tooltip": "Iniziare da un modello o suddividere la strada scelta nello strumento stradale.",
   "roadbuilder.window.templates.back.tooltip": "Torna alla sezione trasversale del tipo di strada.",
-  "roadbuilder.window.templates.hint": "Scegli un modello. Sostituisce la sezione attuale; annulla la ripristina.",
+  "roadbuilder.window.templates.hint": "Scegli un modello da cui partire o suddividi la strada scelta nello strumento stradale.",
   "roadbuilder.window.templates.use": "Usa modello",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# elemento} other {# elementi}}",
   "roadbuilder.window.section.title": "Sezione trasversale",
@@ -262,5 +262,12 @@
   "roadbuilder.window.place": "Posizione",
   "roadbuilder.window.inspector.empty": "Il tipo di strada non ha elementi. Aggiungine uno con «Aggiungi elemento».",
   "roadbuilder.window.surface.reset": "Ripristina lo standard",
-  "roadbuilder.status.map_suspended": "Chiudi la finestra del tipo di strada per costruire strade."
+  "roadbuilder.status.map_suspended": "Chiudi la finestra del tipo di strada per costruire strade.",
+  "roadbuilder.window.templates.pick": "Scegli prima un modello.",
+  "roadbuilder.window.templates.selection": "Selezione: {name}",
+  "roadbuilder.window.templates.replace": "Sostituisce la sezione attuale. Puoi annullare.",
+  "roadbuilder.window.templates.from.none": "Nessuna strada scelta. Scegli una strada nello strumento stradale per suddividerne qui le corsie.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} non ha carreggiata né marciapiede da suddividere in corsie.",
+  "roadbuilder.window.templates.from.source": "Prende {name}; la strada stessa non cambia.",
+  "roadbuilder.window.templates.from.notes": "Note: {notes}"
 }

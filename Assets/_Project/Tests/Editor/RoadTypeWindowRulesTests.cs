@@ -11,6 +11,41 @@ namespace OmsiMapEditor.Tests
     /// <summary>The pure rules of the road type window (what the footer says, when saving is blocked, the actions, widths, labels, keys) and its frame built without a panel.</summary>
     public sealed class RoadTypeWindowRulesTests
     {
+        // ----- arrow keys in the template grid -----
+
+        // Wide card on top, then a grid of two columns and two rows (the second card of the first grid row is disabled in one test).
+        private static Rect[] CardGrid()
+        {
+            return new[]
+            {
+                new Rect(0, 0, 200, 40), new Rect(0, 50, 90, 60), new Rect(110, 50, 90, 60), new Rect(0, 120, 90, 60), new Rect(110, 120, 90, 60)
+            };
+        }
+
+        [Test]
+        public void OneArrowPressMovesToTheNextCardOnly()
+        {
+            var cards = CardGrid();
+            var enabled = new[] { true, true, true, true, true };
+            Assert.AreEqual(2, RoadTypeWindowRules.NextCard(cards, enabled, 1, 1, 0));
+            Assert.AreEqual(1, RoadTypeWindowRules.NextCard(cards, enabled, 2, -1, 0));
+            Assert.AreEqual(-1, RoadTypeWindowRules.NextCard(cards, enabled, 2, 1, 0));
+            Assert.AreEqual(3, RoadTypeWindowRules.NextCard(cards, enabled, 1, 0, 1));
+            Assert.AreEqual(2, RoadTypeWindowRules.NextCard(cards, enabled, 4, 0, -1));
+            Assert.AreEqual(1, RoadTypeWindowRules.NextCard(cards, enabled, 0, 0, 1));
+            Assert.AreEqual(0, RoadTypeWindowRules.NextCard(cards, enabled, 1, 0, -1));
+        }
+
+        [Test]
+        public void ArrowKeysSkipDisabledCardsAndNeverLeaveTheGrid()
+        {
+            var cards = CardGrid();
+            var enabled = new[] { false, true, true, true, true };
+            Assert.AreEqual(-1, RoadTypeWindowRules.NextCard(cards, enabled, 1, 0, -1));
+            Assert.AreEqual(1, RoadTypeWindowRules.NextCard(cards, enabled, 3, 0, -1));
+            Assert.AreEqual(-1, RoadTypeWindowRules.NextCard(cards, enabled, 3, -1, 0));
+        }
+
         // ----- the footer and saving -----
 
         [Test]

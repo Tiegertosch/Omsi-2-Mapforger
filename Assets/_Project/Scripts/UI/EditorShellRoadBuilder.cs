@@ -45,13 +45,16 @@ namespace OmsiMapEditor.UI
             roadBuilder.SaveRequested += SaveRoadType;
             roadBuilder.ReplaceRequested += ReplaceRoadType;
             roadBuilder.DeleteRequested += DeleteRoadType;
-            roadBuilder.FromChosenRequested += TakeChosenRoadApart;
+            roadBuilder.ChosenRoadResolver = ResolveChosenRoad;
+            roadBuilder.ChosenRoadTaken += OnChosenRoadTaken;
             roadBuilder.RowObjectRequested += PickRowObject;
             roadBuilder.Changed += OnRoadDraftChanged;
             roadBuilder.PromptDiscard.clicked += () => AnswerRoadPrompt(SignalPromptChoice.Discard);
             roadBuilder.PromptKeep.clicked += () => AnswerRoadPrompt(SignalPromptChoice.KeepEditing);
             (objectsPanelHost.parent ?? objectsPanelHost).Add(roadBuilder);
             roadPanel.EditRoadTypeRequested += EditRoadType;
+            // A click on another road in the list changes what Templates, From the chosen road offers.
+            roadPanel.SettingsChanged += () => roadBuilder.SetChosenProfile(roadPanel.Profile);
 
             rowPickOptions = ToolCatalog.Options();
             var hint = LocBindings.NewLabel("roadbuilder.row.hint");
@@ -862,44 +865,44 @@ namespace OmsiMapEditor.UI
             }).Every(100);
         }
 
-        /// <summary>Takes the road chosen in the road tool apart into lanes, as From the chosen road does.</summary>
-        private void TakeChosenRoadApart()
+        /// <summary>
+        /// Takes the road chosen in the road tool apart into lanes for From the chosen road: a road type made with the builder is read as it is,
+        /// any other profile is taken apart (ADR 049). Changes neither the road nor the window; the window decides what to do with the result.
+        /// </summary>
+        private RoadChosenSource ResolveChosenRoad(string path)
         {
-            var path = roadPanel?.Profile;
             if (currentSummary == null || path == null)
-                return;
-            var name = Path.GetFileNameWithoutExtension(path);
-            var notes = new List<string>();
-            OmsiRoadType type = null;
+                return null;
+            var source = new RoadChosenSource { Path = path, Name = Path.GetFileNameWithoutExtension(path) };
             if (OmsiRoadTypeStore.IsMade(path))
             {
                 try
                 {
-                    type = OmsiRoadTypeStore.Read(File.ReadAllBytes(OmsiRelativePath.Resolve(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath), path)));
+                    source.Type = OmsiRoadTypeStore.Read(File.ReadAllBytes(OmsiRelativePath.Resolve(OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath), path)));
                 }
                 catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
                 {
-                    type = null;
+                    source.Type = null;
                 }
             }
-            if (type == null)
+            if (source.Type == null)
             {
                 var profile = RoadProfiles().Get(path);
-                type = profile != null ? OmsiRoadType.FromProfile(profile, notes) : null;
+                source.Type = profile != null ? OmsiRoadType.FromProfile(profile, source.Notes) : null;
             }
-            if (type == null)
-            {
-                SetStatusT("roadbuilder.status.nothing_to_split", ("name", name));
-                return;
-            }
-            roadBuilder.SetType(type);
-            SetStatusT("roadbuilder.status.split", ("name", name), ("count", type.Lanes.Count), ("width", type.Width), ("hasNotes", notes.Count > 0 ? "yes" : "no"),
-                ("notes", string.Join(" ", notes)));
+            return source;
+        }
+
+        /// <summary>The window took the chosen road's lanes as its draft: the status line tells so, with the remarks of the taking apart.</summary>
+        private void OnChosenRoadTaken(RoadChosenSource source)
+        {
+            SetStatusT("roadbuilder.status.split", ("name", source.Name), ("count", source.Type.Lanes.Count), ("width", source.Type.Width),
+                ("hasNotes", source.Notes.Count > 0 ? "yes" : "no"), ("notes", string.Join(" ", source.Notes)));
         }
 
         /// <summary>
         /// Command line, with <c>-roadBuilder</c>, for the window: <c>-roadBuilderWindowAt x y [width height]</c> puts it there (pixels of the
-        /// area around it), <c>-roadBuilderCollapse</c> collapses it, <c>-roadBuilderTemplates</c> shows the templates, <c>-roadBuilderPalette</c> opens Add element, <c>-roadBuilderEquipment</c> opens the properties' Equipment, <c>-roadBuilderDo cmd,cmd</c> does what a person would do (see <see cref="RoadTypeWindow.RunCommands"/>), <c>-roadBuilderUndo [n]</c>
+        /// area around it), <c>-roadBuilderCollapse</c> collapses it, <c>-roadBuilderTemplates</c> shows the templates, <c>-roadBuilderChoose x.sli</c> chooses a road in the road list (for From the chosen road), <c>-roadBuilderPalette</c> opens Add element, <c>-roadBuilderEquipment</c> opens the properties' Equipment, <c>-roadBuilderDo cmd,cmd</c> does what a person would do (see <see cref="RoadTypeWindow.RunCommands"/>), <c>-roadBuilderUndo [n]</c>
         /// and <c>-roadBuilderRedo [n]</c> act on its draft, <c>-roadBuilderDiscard</c> clicks Discard and <c>-roadBuilderClose</c> clicks its
         /// close button (which asks when the draft has changes); <c>-roadBuilderPromptAnswer discard|keep</c> answers that question.
         /// </summary>
@@ -918,6 +921,12 @@ namespace OmsiMapEditor.UI
             {
                 var hasSize = place + 4 < args.Length && Number(args[place + 3]) > 0 && Number(args[place + 4]) > 0;
                 roadBuilder.PlaceAt(Number(args[place + 1]), Number(args[place + 2]), hasSize ? Number(args[place + 3]) : 0f, hasSize ? Number(args[place + 4]) : 0f);
+            }
+            var chooseAt = Array.IndexOf(args, "-roadBuilderChoose");
+            if (chooseAt >= 0 && chooseAt + 1 < args.Length && roadPanel != null)
+            {
+                roadPanel.ChooseProfile(args[chooseAt + 1]);
+                roadBuilder.SetChosenProfile(roadPanel.Profile);
             }
             if (Array.IndexOf(args, "-roadBuilderTemplates") >= 0)
                 roadBuilder.ShowTemplates(true);
@@ -966,7 +975,14 @@ namespace OmsiMapEditor.UI
             {
                 roadPanel.ChooseProfile(from.Trim());
                 roadBuilder.SetChosenProfile(roadPanel.Profile);
-                TakeChosenRoadApart();
+                var source = ResolveChosenRoad(roadPanel.Profile);
+                if (source?.Type != null)
+                {
+                    roadBuilder.SetType(source.Type);
+                    OnChosenRoadTaken(source);
+                }
+                else
+                    SetStatusT("roadbuilder.status.nothing_to_split", ("name", source?.Name ?? string.Empty));
             }
             if (!string.IsNullOrWhiteSpace(lanes))
             {

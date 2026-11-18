@@ -87,6 +87,43 @@ namespace OmsiMapEditor.UI
             "roadbuilder.panel.lane.bus.short", "roadbuilder.panel.lane.bike.short", "roadbuilder.panel.lane.parking.short", "roadbuilder.panel.lane.tram.short"
         };
 
+        /// <summary>
+        /// The card an arrow key moves to in a grid of cards: sideways the nearest enabled card in the same row, up and down the nearest row that
+        /// way and in it the nearest column. -1 when there is none. across/down are -1, 0 or 1 (one of them non-zero).
+        /// </summary>
+        public static int NextCard(UnityEngine.Rect[] bounds, bool[] enabled, int from, int across, int down)
+        {
+            var origin = bounds[from].center;
+            var half = bounds[from].height * 0.5f;
+            var best = -1;
+            var bestScore = float.MaxValue;
+            for (var i = 0; i < bounds.Length; i++)
+            {
+                if (i == from || !enabled[i])
+                    continue;
+                var delta = bounds[i].center - origin;
+                float score;
+                if (across != 0)
+                {
+                    if (UnityEngine.Mathf.Abs(delta.y) > half || delta.x * across <= 0f)
+                        continue;
+                    score = UnityEngine.Mathf.Abs(delta.x);
+                }
+                else
+                {
+                    if (UnityEngine.Mathf.Abs(delta.y) <= half || delta.y * down <= 0f)
+                        continue;
+                    score = UnityEngine.Mathf.Abs(delta.y) * 4f + UnityEngine.Mathf.Abs(delta.x);
+                }
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = i;
+                }
+            }
+            return best;
+        }
+
         /// <summary>The key of a kind's name, such as "Driving lane".</summary>
         public static string LaneKey(OmsiRoadLaneKind kind)
         {

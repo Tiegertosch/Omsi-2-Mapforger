@@ -179,7 +179,7 @@
   "roadbuilder.window.templates.back": "Zpět k řezu",
   "roadbuilder.window.templates.tooltip": "Začít od šablony nebo rozdělit silnici zvolenou v nástroji pro silnice.",
   "roadbuilder.window.templates.back.tooltip": "Zpět k příčnému řezu typu silnice.",
-  "roadbuilder.window.templates.hint": "Vyberte šablonu. Nahradí současný řez; zpět jej vrátí.",
+  "roadbuilder.window.templates.hint": "Vyberte šablonu, od které začnete, nebo rozdělte silnici zvolenou v nástroji pro silnice.",
   "roadbuilder.window.templates.use": "Použít šablonu",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# prvek} few {# prvky} many {# prvku} other {# prvků}}",
   "roadbuilder.window.section.title": "Příčný řez",
@@ -262,5 +262,12 @@
   "roadbuilder.window.place": "Poloha",
   "roadbuilder.window.inspector.empty": "Typ silnice nemá žádný prvek. Přidejte jej přes „Přidat prvek“.",
   "roadbuilder.window.surface.reset": "Obnovit standardní povrch",
-  "roadbuilder.status.map_suspended": "Zavřete okno typu silnice, abyste mohli stavět silnice."
+  "roadbuilder.status.map_suspended": "Zavřete okno typu silnice, abyste mohli stavět silnice.",
+  "roadbuilder.window.templates.pick": "Nejprve vyberte šablonu.",
+  "roadbuilder.window.templates.selection": "Výběr: {name}",
+  "roadbuilder.window.templates.replace": "Nahradí současný řez. Lze vrátit zpět.",
+  "roadbuilder.window.templates.from.none": "Není zvolena žádná silnice. Zvolte silnici v nástroji pro silnice, aby se její pruhy rozdělily zde.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} nemá vozovku ani chodník, které by šlo rozdělit na pruhy.",
+  "roadbuilder.window.templates.from.source": "Převezme {name}; samotná silnice zůstane beze změny.",
+  "roadbuilder.window.templates.from.notes": "Poznámky: {notes}"
 }

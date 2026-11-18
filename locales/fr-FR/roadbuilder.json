@@ -179,7 +179,7 @@
   "roadbuilder.window.templates.back": "Retour à la coupe",
   "roadbuilder.window.templates.tooltip": "Partir d'un modèle ou diviser la route choisie dans l'outil routier.",
   "roadbuilder.window.templates.back.tooltip": "Retour à la coupe transversale du type de route.",
-  "roadbuilder.window.templates.hint": "Choisissez un modèle. Il remplace la coupe actuelle ; annuler la rétablit.",
+  "roadbuilder.window.templates.hint": "Choisissez un modèle de départ ou divisez la route choisie dans l'outil routier.",
   "roadbuilder.window.templates.use": "Utiliser le modèle",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# élément} other {# éléments}}",
   "roadbuilder.window.section.title": "Coupe transversale",
@@ -262,5 +262,12 @@
   "roadbuilder.window.place": "Position",
   "roadbuilder.window.inspector.empty": "Le type de route n'a aucun élément. Ajoutez-en un avec « Ajouter un élément ».",
   "roadbuilder.window.surface.reset": "Rétablir le standard",
-  "roadbuilder.status.map_suspended": "Fermez la fenêtre du type de route pour construire des routes."
+  "roadbuilder.status.map_suspended": "Fermez la fenêtre du type de route pour construire des routes.",
+  "roadbuilder.window.templates.pick": "Choisissez d'abord un modèle.",
+  "roadbuilder.window.templates.selection": "Sélection : {name}",
+  "roadbuilder.window.templates.replace": "Remplace la coupe actuelle. Vous pouvez annuler.",
+  "roadbuilder.window.templates.from.none": "Aucune route n'est choisie. Choisissez une route dans l'outil routier pour diviser ici ses voies.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} n'a ni chaussée ni trottoir à diviser en voies.",
+  "roadbuilder.window.templates.from.source": "Reprend {name} ; la route elle-même ne change pas.",
+  "roadbuilder.window.templates.from.notes": "Remarques : {notes}"
 }

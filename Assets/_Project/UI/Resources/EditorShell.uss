@@ -478,10 +478,32 @@
 .road-window-surface-tiles { flex-grow: 1; min-height: 0; }
 .road-window-total { margin: var(--mf-space-1) 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); -unity-text-align: middle-right; }
 .road-window-templates { flex-grow: 1; flex-shrink: 1; min-height: 0; }
-.road-window-template-grid { flex-direction: row; flex-wrap: wrap; flex-grow: 1; align-content: flex-start; margin-top: var(--mf-space-2); }
-.road-window-template { width: 30%; min-width: 150px; height: 34px; margin: 0 var(--mf-space-2) var(--mf-space-2) 0; }
+.road-window-template-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; margin-top: var(--mf-space-2); }
+.road-window-template-grid { flex-direction: row; flex-wrap: wrap; align-content: flex-start; margin-right: -8px; }
+.map-control-button.road-window-template { width: 31%; min-width: 150px; flex-grow: 0; flex-direction: column; align-items: stretch; justify-content: flex-start; height: auto; margin: 0 var(--mf-space-2) var(--mf-space-2) 0; padding: var(--mf-space-2); border-width: 2px; border-color: var(--mf-color-border-subtle); -unity-text-align: upper-left; }
+.map-control-button.road-window-template:hover { border-color: var(--mf-color-text-secondary); }
+.map-control-button.road-window-template:focus { border-color: var(--mf-color-text-secondary); }
+.map-control-button.road-window-template-chosen, .map-control-button.road-window-template-chosen:hover, .map-control-button.road-window-template-chosen:focus { border-color: var(--mf-color-accent); }
+.map-control-button.road-window-template:disabled { opacity: 1; }
+.road-window-template:disabled > .road-window-template-name { color: var(--mf-color-text-muted); }
+.map-control-button.road-window-template-wide { width: auto; flex-grow: 0; margin-right: var(--mf-space-2); }
+.road-window-template-name { margin: 0 0 var(--mf-space-1); padding: 0; font-size: var(--mf-font-body); color: var(--mf-color-text-primary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); white-space: normal; }
+.road-window-template-detail { margin: 0 0 var(--mf-space-1); padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.road-window-template-small { margin: var(--mf-space-1) 0 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
+.road-mini { flex-direction: row; height: 26px; margin: 0; border-radius: 2px; overflow: hidden; background-color: var(--mf-color-field); }
+.road-mini-lane { height: 100%; flex-basis: 0; flex-shrink: 1; min-width: 1px; background-color: var(--mf-color-lane-asphalt); }
+.road-mini-lane-gap { border-left-width: 1px; border-left-color: rgba(23, 28, 35, 0.8); }
+.road-mini-lane-walk { background-color: var(--mf-color-lane-walk); }
+.road-mini-lane-median { background-color: var(--mf-color-lane-grass); }
+.road-mini-lane-shoulder { background-color: var(--mf-color-lane-shoulder); }
+.road-mini-lane-bus { background-color: var(--mf-color-lane-bus); }
+.road-mini-lane-bike { background-color: var(--mf-color-lane-bike); }
+.road-mini-lane-parking { background-color: var(--mf-color-lane-parking); }
+.road-mini-lane-tram { border-left-width: 2px; border-right-width: 2px; border-left-color: var(--mf-color-lane-rail); border-right-color: var(--mf-color-lane-rail); }
 .road-window-template-footer { flex-direction: row; align-items: center; flex-shrink: 0; padding-top: var(--mf-space-2); border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); }
-.road-window-template-info { flex-grow: 1; flex-shrink: 1; margin-right: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
+.road-window-template-texts { flex-grow: 1; flex-shrink: 1; min-width: 0; margin-right: var(--mf-space-2); }
+.road-window-template-selected { margin: 0; padding: 0; font-size: var(--mf-font-body); color: var(--mf-color-text-primary); white-space: normal; -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.road-window-template-info { margin: 2px 0 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .road-window-template-footer > .map-control-button { margin: 0 0 0 var(--mf-space-1); flex-shrink: 0; }
 .signal-group-item { padding: 1px 2px; border-radius: var(--mf-radius-sm); }
 .signal-group-item:hover, .signal-group-selected { background-color: var(--mf-color-panel-hover); }

@@ -179,7 +179,7 @@
   "roadbuilder.window.templates.back": "Volver a la sección",
   "roadbuilder.window.templates.tooltip": "Empezar desde una plantilla o separar la carretera elegida en la herramienta de carreteras.",
   "roadbuilder.window.templates.back.tooltip": "Volver a la sección transversal del tipo de carretera.",
-  "roadbuilder.window.templates.hint": "Elige una plantilla. Sustituye la sección actual; deshacer la recupera.",
+  "roadbuilder.window.templates.hint": "Elige una plantilla de partida o separa la carretera elegida en la herramienta de carreteras.",
   "roadbuilder.window.templates.use": "Usar plantilla",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# elemento} other {# elementos}}",
   "roadbuilder.window.section.title": "Sección transversal",
@@ -262,5 +262,12 @@
   "roadbuilder.window.place": "Posición",
   "roadbuilder.window.inspector.empty": "El tipo de carretera no tiene ningún elemento. Añade uno con «Añadir elemento».",
   "roadbuilder.window.surface.reset": "Restablecer al estándar",
-  "roadbuilder.status.map_suspended": "Cierra la ventana del tipo de carretera para construir carreteras."
+  "roadbuilder.status.map_suspended": "Cierra la ventana del tipo de carretera para construir carreteras.",
+  "roadbuilder.window.templates.pick": "Elige primero una plantilla.",
+  "roadbuilder.window.templates.selection": "Selección: {name}",
+  "roadbuilder.window.templates.replace": "Sustituye la sección actual. Se puede deshacer.",
+  "roadbuilder.window.templates.from.none": "No hay ninguna carretera elegida. Elige una en la herramienta de carreteras para separar aquí sus carriles.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} no tiene calzada ni acera que se pueda separar en carriles.",
+  "roadbuilder.window.templates.from.source": "Toma {name}; la carretera en sí no cambia.",
+  "roadbuilder.window.templates.from.notes": "Notas: {notes}"
 }

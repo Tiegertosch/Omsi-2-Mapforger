@@ -179,7 +179,7 @@
   "roadbuilder.window.templates.back": "Voltar à secção",
   "roadbuilder.window.templates.tooltip": "Começar a partir de um modelo ou separar a estrada escolhida na ferramenta de estrada.",
   "roadbuilder.window.templates.back.tooltip": "Voltar à secção transversal do tipo de estrada.",
-  "roadbuilder.window.templates.hint": "Escolha um modelo. Substitui a secção atual; desfazer repõe-na.",
+  "roadbuilder.window.templates.hint": "Escolha um modelo para começar ou separe a estrada escolhida na ferramenta de estrada.",
   "roadbuilder.window.templates.use": "Usar modelo",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# elemento} other {# elementos}}",
   "roadbuilder.window.section.title": "Secção transversal",
@@ -262,5 +262,12 @@
   "roadbuilder.window.place": "Posição",
   "roadbuilder.window.inspector.empty": "O tipo de estrada não tem elementos. Adicione um com «Adicionar elemento».",
   "roadbuilder.window.surface.reset": "Repor o padrão",
-  "roadbuilder.status.map_suspended": "Feche a janela do tipo de estrada para construir estradas."
+  "roadbuilder.status.map_suspended": "Feche a janela do tipo de estrada para construir estradas.",
+  "roadbuilder.window.templates.pick": "Escolha primeiro um modelo.",
+  "roadbuilder.window.templates.selection": "Seleção: {name}",
+  "roadbuilder.window.templates.replace": "Substitui a secção atual. Pode desfazer.",
+  "roadbuilder.window.templates.from.none": "Nenhuma estrada escolhida. Escolha uma na ferramenta de estrada para separar aqui as suas vias.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} não tem faixa de rodagem nem passeio que se possa separar em vias.",
+  "roadbuilder.window.templates.from.source": "Toma {name}; a própria estrada não muda.",
+  "roadbuilder.window.templates.from.notes": "Notas: {notes}"
 }

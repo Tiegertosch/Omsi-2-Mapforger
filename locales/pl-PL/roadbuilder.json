@@ -179,7 +179,7 @@
   "roadbuilder.window.templates.back": "Powrót do przekroju",
   "roadbuilder.window.templates.tooltip": "Zacznij od szablonu albo rozdziel drogę wybraną w narzędziu drogowym.",
   "roadbuilder.window.templates.back.tooltip": "Powrót do przekroju poprzecznego typu drogi.",
-  "roadbuilder.window.templates.hint": "Wybierz szablon. Zastępuje obecny przekrój; cofnięcie go przywraca.",
+  "roadbuilder.window.templates.hint": "Wybierz szablon na początek albo rozdziel drogę wybraną w narzędziu drogowym.",
   "roadbuilder.window.templates.use": "Użyj szablonu",
   "roadbuilder.window.templates.info": "{width, number, 0.00} m · {count, plural, one {# element} few {# elementy} many {# elementów} other {# elementu}}",
   "roadbuilder.window.section.title": "Przekrój poprzeczny",
@@ -262,5 +262,12 @@
   "roadbuilder.window.place": "Położenie",
   "roadbuilder.window.inspector.empty": "Typ drogi nie ma żadnego elementu. Dodaj jeden przez „Dodaj element”.",
   "roadbuilder.window.surface.reset": "Przywróć standard",
-  "roadbuilder.status.map_suspended": "Zamknij okno typu drogi, aby budować drogi."
+  "roadbuilder.status.map_suspended": "Zamknij okno typu drogi, aby budować drogi.",
+  "roadbuilder.window.templates.pick": "Najpierw wybierz szablon.",
+  "roadbuilder.window.templates.selection": "Wybór: {name}",
+  "roadbuilder.window.templates.replace": "Zastępuje obecny przekrój. Można to cofnąć.",
+  "roadbuilder.window.templates.from.none": "Nie wybrano drogi. Wybierz drogę w narzędziu drogowym, aby rozdzielić tu jej pasy.",
+  "roadbuilder.window.templates.from.unsuitable": "{name} nie ma jezdni ani chodnika, które można by rozdzielić na pasy.",
+  "roadbuilder.window.templates.from.source": "Przejmuje {name}; sama droga się nie zmienia.",
+  "roadbuilder.window.templates.from.notes": "Uwagi: {notes}"
 }
