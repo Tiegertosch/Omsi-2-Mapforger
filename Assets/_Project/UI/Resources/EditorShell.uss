@@ -287,6 +287,7 @@
 .signal-header { margin: 0; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-bg); border-bottom-width: 1px; border-bottom-color: var(--mf-color-border-subtle); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
 .signal-frame-collapsed > .signal-header { border-bottom-width: 0; border-bottom-left-radius: var(--mf-radius-lg); border-bottom-right-radius: var(--mf-radius-lg); }
 .signal-title { flex-grow: 0; flex-shrink: 0; }
+.signal-collapse-button { margin-left: auto; }
 .signal-title-detail { flex-grow: 1; flex-shrink: 1; margin: 0 var(--mf-space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .signal-content { padding: var(--mf-space-2) var(--mf-space-3) var(--mf-space-2); }
 .signal-nav { margin-bottom: var(--mf-space-1); flex-shrink: 0; }

@@ -66,6 +66,7 @@ namespace OmsiMapEditor.UI
             Header.Add(detailLabel);
             collapseButton = new Button(() => Collapsed = !Collapsed);
             collapseButton.AddToClassList("panel-collapse-button");
+            collapseButton.AddToClassList("signal-collapse-button");
             collapseButton.Add(new IconElement("minus"));
             LocBindings.Tooltip(collapseButton, "signals.window.collapse.tooltip");
             Header.Add(collapseButton);
