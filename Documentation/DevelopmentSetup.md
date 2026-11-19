@@ -4,6 +4,8 @@
 
 | Werkzeug | Befund |
 |---|---|
+| Stirnfläche an offenen Straßenenden (nur Editor-Darstellung, 0,5 m unter das Profil gezogen, höchste Profillage sichtbar), 19. November 2026 | EditMode 1254 von 1254 grün (neu: `ClosesOpenEndsWithAnUprightFaceBelowTheSurface`), Player-Build ok ohne neue Player-Dateien, 3D-Bilder Grundorf beide Enden (Orbit 90/270, Höhe 5 und 15 Grad) ohne Himmelsstreifen, Draufsicht unverändert; Gehwegflächen zeigen die Randzeile der Textur gestreckt |
+| Himmelsstreifen am offenen Straßenende (Gelände an freien Enden auf Fahrbahnhöhe, Ausrichtungsloch endet 0,3 m davor), 19. November 2026 | EditMode 1253 von 1253 grün (neu: `TerrainMeetsTheCarriagewayAtAnOpenEndAndTheKerbsAtAJoinedOne`, Lochende in `TerrainAlignmentCutsTheContourAndKeepsAVergeWithoutAStrip`), Player-Build ok, 3D-Bilder Grundorf vorher/nachher; Blick von außen aufs Ende noch mit schmalem Streifen |
 | Betriebssystem | Windows x64; PowerShell verfuegbar. Die CIM-Abfrage der Windows-Version wurde durch Berechtigungen verweigert. |
 | Git | Git 2.56.0.windows.2 installiert; Repository mit erstem Commit auf `main`. |
 | Unity Hub / Unity Editor | Unity Hub installiert; Editor `6000.6.6f1` unter `D:\Unity Hub\Unity 6.6\6000.6.6f1\Editor\Unity.exe`. |
@@ -30,6 +32,7 @@ Beim ersten Import erzeugt Unity unter anderem `ProjectSettings/ProjectSettings.
 
 | Pruefung | Status |
 |---|---|
+| USS-Aufräumen: `:last-child` in `EditorShell.uss` ersetzt (Klasse `browser-chrono-row-last`), 19. November 2026 | 1252 von 1252 EditMode-Tests grün, Player-Build in der Projektkopie ohne Meldung „Unknown pseudo class“, Bilder Grundorf `-projectTab chrono -language en-US` vorher/nachher (letzter Knopf der Chrono-Zeile ohne Restabstand, Datumsfeld entsprechend 6 px breiter); `PlayerAssetReview.txt` neu geschrieben (nur die USS-Zeile) |
 | Sprachwechsel bei offenen Rückfragen (Straßentyp- und Signalfenster) | Am 19. November 2026: 1252 von 1252 EditMode-Tests grün (neu: Frage des Fensterrahmens folgt dem Sprachwechsel und leert sich beim Entfernen; der Schlüsseltest verlangte den Marker `i18n:keys` am Aufruf mit Variable); Player-Build siehe Übergabe |
 | Straßentyp-Fenster, Handtest-Nachbesserung C9 (ADR 101): Objektwahl der Ausstattung zeigt nur den Objekt-Browser, 19. November 2026 | 1251 von 1251 EditMode-Tests grün, Player-Build ok, Bilder Grundorf `-language de-DE` (Rückfrage deutsch; Objektwahl ohne Straßen-Panels) in der Projektkopie |
 | Straßentyp-Fenster, C9 (ADR 101): altes `RoadBuilderPanel` samt `.road-builder*`-USS (39 Regeln) und 50 ungenutzten Schlüsseln aus `roadbuilder.json` (acht Sprachen) entfernt, 19. November 2026 | 1251 von 1251 EditMode-Tests grün (Projektkopie im Scratchpad); `LocaleCheck --strict` 8 Sprachen, 2872 Schlüssel, 0/0; `RecordReviewedPlayerAssets` im Batch-Mode auf der Kopie (nur `EditorShell.uss` geändert, Datei zurückkopiert); Player-Build ok; Player-Bilder en-US bei 1600 × 900 auf Grundorf (Vorlagenansicht, Querschnitt mit Linienwahl) wie vor C9, `-roadBuilder*` läuft („Road builder window:“ im Log). Handtest des Projektinhabers am 19. November 2026 bestanden |

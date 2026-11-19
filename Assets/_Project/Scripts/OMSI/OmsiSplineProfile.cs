@@ -417,9 +417,11 @@ namespace OmsiMapEditor.OMSI
         /// Builds the surfaces a spline shows from above, one per texture. Positions are in metres relative to the
         /// spline's tile corner: x east, y height (spline height plus profile height), z north. A mirrored spline turns
         /// its cross-section over. With <paramref name="includeUpright"/> strips that stand upright, such as kerb faces,
-        /// walls and fences, are built as well, for views from the side.
+        /// walls and fences, are built as well, for views from the side. With <paramref name="closeOpenEnds"/> an end without a
+        /// neighbour gets an upright face down below the terrain (editor view only, see <see cref="AddEndFace"/>).
         /// </summary>
-        public static List<OmsiSurfaceMesh> Build(OmsiSplineRecord spline, OmsiSplineProfile profile, bool includeUpright = false)
+        public static List<OmsiSurfaceMesh> Build(OmsiSplineRecord spline, OmsiSplineProfile profile, bool includeUpright = false,
+            bool closeOpenEnds = false)
         {
             if (spline == null)
                 throw new ArgumentNullException(nameof(spline));
@@ -459,11 +461,110 @@ namespace OmsiMapEditor.OMSI
                 }
             }
 
+            if (closeOpenEnds && profile.LineKind == OmsiSplineLineKind.None)
+            {
+                if (spline.PreviousId == 0)
+                    AddEndFace(meshes, spline, profile, mirror, 0.0);
+                if (spline.NextId == 0)
+                    AddEndFace(meshes, spline, profile, mirror, length);
+            }
+
             var result = new List<OmsiSurfaceMesh>();
             foreach (var mesh in meshes.Values)
                 if (mesh.Triangles.Count > 0)
                     result.Add(mesh);
             return result;
+        }
+
+        /// <summary>How far an end face reaches below the lowest point of the cross-section.</summary>
+        public const double EndFaceDepth = 0.5;
+
+        /// <summary>
+        /// An upright face across an open end of a spline, for the editor's views only (nothing of it reaches OMSI files): the contour
+        /// of the cross-section, kerbs and pavements included, pulled down <see cref="EndFaceDepth"/> below its lowest point, so nobody
+        /// looks under the surface into the terrain hole. Where strips overlap, the highest one shows. Faces are double-sided in the views.
+        /// </summary>
+        private static void AddEndFace(Dictionary<int, OmsiSurfaceMesh> meshes, OmsiSplineRecord spline, OmsiSplineProfile profile, double mirror, double distance)
+        {
+            var segments = new List<(int Texture, OmsiProfilePoint Left, OmsiProfilePoint Right, double ScaleV)>();
+            var lowest = 0.0;
+            var breaks = new List<double>();
+            foreach (var strip in profile.Strips)
+            {
+                if (strip.TextureIndex < 0 || strip.TextureIndex >= profile.Textures.Count)
+                    continue;
+                foreach (var point in strip.Points)
+                    lowest = Math.Min(lowest, point.Height);
+                for (var point = 0; point + 1 < strip.Points.Count; point++)
+                {
+                    var a = strip.Points[point];
+                    var b = strip.Points[point + 1];
+                    if (Math.Abs(b.X - a.X) < MinimumWidth)
+                        continue;
+                    segments.Add(a.X < b.X ? (strip.TextureIndex, a, b, 0.0) : (strip.TextureIndex, b, a, 0.0));
+                    breaks.Add(a.X);
+                    breaks.Add(b.X);
+                }
+            }
+            if (segments.Count == 0)
+                return;
+            breaks.Sort();
+            var floor = lowest - EndFaceDepth;
+            var offset = spline.ChainOffset ?? 0.0;
+            for (var index = 0; index + 1 < breaks.Count; index++)
+            {
+                double from = breaks[index], to = breaks[index + 1];
+                if (to - from < MinimumWidth)
+                    continue;
+                var middle = (from + to) * 0.5;
+                var best = -1;
+                var bestHeight = double.MinValue;
+                for (var candidate = 0; candidate < segments.Count; candidate++)
+                {
+                    var segment = segments[candidate];
+                    if (segment.Left.X > middle || segment.Right.X < middle)
+                        continue;
+                    var height = Interpolate(segment.Left, segment.Right, middle, point => point.Height);
+                    if (height > bestHeight)
+                    {
+                        bestHeight = height;
+                        best = candidate;
+                    }
+                }
+                if (best < 0)
+                    continue;
+                var chosen = segments[best];
+                if (!meshes.TryGetValue(chosen.Texture, out var mesh))
+                {
+                    mesh = new OmsiSurfaceMesh { TextureIndex = chosen.Texture };
+                    meshes.Add(chosen.Texture, mesh);
+                }
+                var first = mesh.VertexCount;
+                foreach (var x in new[] { from, to })
+                {
+                    var top = new OmsiProfilePoint
+                    {
+                        X = x,
+                        Height = Interpolate(chosen.Left, chosen.Right, x, point => point.Height),
+                        U = Interpolate(chosen.Left, chosen.Right, x, point => point.U),
+                        VPerMeter = chosen.Left.VPerMeter
+                    };
+                    var scaleByLength = profile.Textures[chosen.Texture].ScaleByLength;
+                    var v = scaleByLength ? distance / spline.LengthMeters * top.VPerMeter * mirror : top.VPerMeter * (distance + offset) * mirror;
+                    v -= Math.Floor(v);
+                    AddVertex(mesh, spline, Skewed(spline, distance, x * mirror), x * mirror, top, v);
+                    var bottom = new OmsiProfilePoint { X = x, Height = floor, U = top.U, VPerMeter = top.VPerMeter };
+                    AddVertex(mesh, spline, Skewed(spline, distance, x * mirror), x * mirror, bottom, v);
+                }
+                // Four vertices: top and bottom at each of the two edges; both faces are drawn, so the winding does not matter.
+                mesh.Triangles.AddRange(new[] { first, first + 1, first + 2, first + 2, first + 1, first + 3 });
+            }
+        }
+
+        private static double Interpolate(OmsiProfilePoint left, OmsiProfilePoint right, double x, Func<OmsiProfilePoint, double> value)
+        {
+            var share = Math.Max(0.0, Math.Min(1.0, (x - left.X) / (right.X - left.X)));
+            return value(left) + (value(right) - value(left)) * share;
         }
 
         /// <summary>
@@ -522,16 +623,21 @@ namespace OmsiMapEditor.OMSI
 
             var turn = Math.Abs(spline.RadiusMeters) > 0.001 ? length / Math.Abs(spline.RadiusMeters) : 0.0;
             var steps = Math.Max(1, Math.Min(512, (int)Math.Ceiling(turn / MaximumStepRadians)));
+            // An open end has no face down to the ground, so the terrain reaches under it like under the edges.
+            var startTrim = spline.PreviousId == 0 ? insetMeters : 0.0;
+            var endTrim = spline.NextId == 0 ? insetMeters : 0.0;
+            if (length - startTrim - endTrim < MinimumWidth)
+                return mesh;
             foreach (var width in merged)
                 if (width.Value - width.Key - 2.0 * insetMeters >= MinimumWidth)
                     AddRibbon(mesh, spline, new OmsiProfilePoint { X = width.Key + insetMeters }, new OmsiProfilePoint { X = width.Value - insetMeters },
-                        spline.IsMirrored ? -1.0 : 1.0, steps);
+                        spline.IsMirrored ? -1.0 : 1.0, steps, false, startTrim, endTrim);
             return mesh;
         }
 
         /// <summary>One piece of the cross-section swept along the spline as a band of quads.</summary>
         private static void AddRibbon(OmsiSurfaceMesh mesh, OmsiSplineRecord spline, OmsiProfilePoint left, OmsiProfilePoint right,
-            double mirror, int steps, bool scaleByLength = false)
+            double mirror, int steps, bool scaleByLength = false, double startTrim = 0.0, double endTrim = 0.0)
         {
             var first = mesh.VertexCount;
             var offset = spline.ChainOffset ?? 0.0;
@@ -539,7 +645,7 @@ namespace OmsiMapEditor.OMSI
             var whole = !scaleByLength && left.VPerMeter == right.VPerMeter ? Math.Floor(left.VPerMeter * offset * mirror) : 0.0;
             for (var step = 0; step <= steps; step++)
             {
-                var nominal = spline.LengthMeters * step / steps;
+                var nominal = startTrim + (spline.LengthMeters - startTrim - endTrim) * step / steps;
                 foreach (var point in new[] { left, right })
                 {
                     var across = point.X * mirror;

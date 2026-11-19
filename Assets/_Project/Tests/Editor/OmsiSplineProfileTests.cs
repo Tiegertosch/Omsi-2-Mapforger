@@ -78,6 +78,30 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ClosesOpenEndsWithAnUprightFaceBelowTheSurface()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(Street), @"Splines\Test\street.sli");
+            // Heading 90 runs east; 10 m long, level, both ends open.
+            var open = new OmsiSplineRecord { LocalX = 100, LocalY = 50, Height = 30, EndHeight = 30, HeadingDegrees = 90, LengthMeters = 10 };
+            var plain = OmsiSplineSurface.Build(open, profile, true).Sum(mesh => mesh.VertexCount);
+
+            var closed = OmsiSplineSurface.Build(open, profile, true, true);
+            // Contour x -4..-2 (sidewalk) and -2..1 (lane): two quads of four vertices at each of the two ends.
+            Assert.AreEqual(plain + 16, closed.Sum(mesh => mesh.VertexCount));
+            var sidewalk = closed.Single(mesh => mesh.TextureIndex == 0);
+            // The last quad of the sidewalk mesh belongs to the end: at x 110, from the sidewalk top 30.25 down to 29.5 (lowest 0, minus 0.5).
+            var tail = sidewalk.VertexCount - 4;
+            Assert.AreEqual(110.0, sidewalk.Positions[tail * 3], 1e-9);
+            Assert.AreEqual(30.25, sidewalk.Positions[tail * 3 + 1], 1e-9);
+            Assert.AreEqual(29.5, sidewalk.Positions[(tail + 1) * 3 + 1], 1e-9);
+
+            // A connected end gets no face.
+            var connected = new OmsiSplineRecord { LocalX = 100, LocalY = 50, Height = 30, EndHeight = 30, HeadingDegrees = 90, LengthMeters = 10,
+                PreviousId = 3, NextId = 4 };
+            Assert.AreEqual(plain, OmsiSplineSurface.Build(connected, profile, true, true).Sum(mesh => mesh.VertexCount));
+        }
+
+        [Test]
         public void TellsOverheadWiresAndFencesFromSplinesWithASurface()
         {
             const string wire = "[texture]\r\nkabel.tga\r\n[profile]\r\n0\r\n[profilepnt]\r\n0\r\n5.3\r\n0\r\n1\r\n[profilepnt]\r\n0\r\n7\r\n1\r\n1\r\n";
@@ -114,6 +138,15 @@ namespace OmsiMapEditor.Tests
             CollectionAssert.AreEqual(new[] { -9.5, -8.5, -3.5, -0.5 }, east);
             // A width too narrow for the inset is dropped.
             Assert.AreEqual(4, OmsiSplineSurface.BuildAlignmentHole(spline, profile, 1.5).VertexCount);
+            // Both ends are open, so the hole stops short of them by the inset too: the terrain reaches under the end of the
+            // road surface and no gap opens there.
+            var north = Enumerable.Range(0, hole.VertexCount).Select(vertex => Math.Round(hole.Positions[vertex * 3 + 2], 6)).Distinct().OrderBy(z => z).ToArray();
+            CollectionAssert.AreEqual(new[] { 0.5, 9.5 }, north);
+            // Joined ends go on in the next spline's hole.
+            var joined = new OmsiSplineRecord { HeadingDegrees = 0, LengthMeters = 10, PreviousId = 3, NextId = 4 };
+            var through = OmsiSplineSurface.BuildAlignmentHole(joined, profile, 0.5);
+            north = Enumerable.Range(0, through.VertexCount).Select(vertex => Math.Round(through.Positions[vertex * 3 + 2], 6)).Distinct().OrderBy(z => z).ToArray();
+            CollectionAssert.AreEqual(new[] { 0.0, 10.0 }, north);
         }
 
         [Test]

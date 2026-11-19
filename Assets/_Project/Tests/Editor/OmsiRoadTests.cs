@@ -543,8 +543,9 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10, Height(flat, 32, 30), 1e-5);
             // 11 m outside: the slope of 1:1.5 from the shoulder would end below the ground, so the ground stays.
             Assert.AreEqual(0.0, Height(flat, 33, 30), 1e-5);
-            // Beyond the north end on its line the shoulder and slopes round off around the end: flat at 5 m, ground at 15 m.
-            Assert.AreEqual(2.10, Height(flat, 30, 41), 1e-5);
+            // Beyond the open north end on its line the shoulder and slopes round off around the end, from the carriageway rather
+            // than the kerbs, so no gap opens below the end of the road surface: flat at 5 m, ground at 15 m.
+            Assert.AreEqual(1.95, Height(flat, 30, 41), 1e-5);
             Assert.AreEqual(0.0, Height(flat, 30, 43), 1e-5);
             // Far away nothing changes.
             Assert.AreEqual(0.0, Height(flat, 0, 0), 0.0);
@@ -556,6 +557,31 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10, Height(hill, 32, 30), 1e-5);
             Assert.AreEqual(2.10 + (11.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, Height(hill, 33, 30), 1e-5);
             Assert.AreEqual(6.0, Height(hill, 36, 30), 1e-5);
+        }
+
+        [Test]
+        public void TerrainMeetsTheCarriagewayAtAnOpenEndAndTheKerbsAtAJoinedOne()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(
+                "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n"), @"Splines\road.sli");
+            var tile = new OmsiTileSummary();
+            // A road 2 m high running north from 150, 100 to 150, 200, open at its start and joined to a spline at its end.
+            var spline = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 150, StartY = 100, StartHeight = 2, EndX = 150, EndY = 200, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual,
+                MaximumPieceLength = 200
+            }, null).Pieces[0].AsRecord();
+            spline.NextId = 7;
+            var heights = new float[OmsiTerrain.Resolution * OmsiTerrain.Resolution];
+            OmsiTerrainShaping.Shape(heights, 0, 0, 300, new[] { new OmsiShapedRoad(tile, spline, profile, 300) }, new OmsiTerrainShapeSettings());
+            // Open start: under the road at the end and 5 m beyond it the terrain lies just below the carriageway, not the kerbs.
+            Assert.AreEqual(1.95, Height(heights, 30, 20), 1e-5);
+            Assert.AreEqual(1.95, Height(heights, 30, 19), 1e-5);
+            // Joined end: the next spline goes on, so the terrain keeps to the kerbs there.
+            Assert.AreEqual(2.10, Height(heights, 30, 40), 1e-5);
+            Assert.AreEqual(2.10, Height(heights, 30, 41), 1e-5);
+            // Halfway along nothing changes.
+            Assert.AreEqual(2.10, Height(heights, 30, 30), 1e-5);
         }
 
         [Test]
@@ -761,8 +787,8 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10, terrain[21, 51], 1e-4);
             // 5 m beyond the end, inside the junction, the ground stays as it was.
             Assert.AreEqual(5.0, terrain[20, 53], 1e-4);
-            // The start is free, so slopes still round off around it.
-            Assert.AreEqual(2.10, terrain[20, 39], 1e-4);
+            // The start is free, so slopes still round off around it, from the carriageway at an open end.
+            Assert.AreEqual(1.95, terrain[20, 39], 1e-4);
         }
 
         [Test]
@@ -795,11 +821,11 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[24, 54], 1e-4);
 
             // Moved away from the road end, the junction is no longer joined: fitted again, the free road end rounds its
-            // shoulder and slopes off around itself there instead.
+            // shoulder and slopes off around itself there instead, from the carriageway.
             junction.LocalX = 150;
             Assert.AreEqual(1, session.RefitAllTerrain(summary).Count);
             terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
-            Assert.AreEqual(2.10 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[20, 54], 1e-4);
+            Assert.AreEqual(1.95 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[20, 54], 1e-4);
             // A junction of the original map keeps its terrain even when a fitted road joins it.
             junction.LocalX = 100;
             junction.Id = 90;

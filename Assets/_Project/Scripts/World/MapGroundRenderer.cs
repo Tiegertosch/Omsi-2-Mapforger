@@ -1055,7 +1055,7 @@ namespace OmsiMapEditor.World
                 }
                 var drawn = false;
                 // Upright strips, such as walls of cuttings, kerb faces and fences, matter in the 3D view.
-                foreach (var surface in OmsiSplineSurface.Build(spline, profile, true))
+                foreach (var surface in OmsiSplineSurface.Build(spline, profile, true, true))
                 {
                     var texture = profile.Textures[surface.TextureIndex];
                     var key = texture.Path + (texture.UsesAlpha ? "|alpha" : string.Empty);

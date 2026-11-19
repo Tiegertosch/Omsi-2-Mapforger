@@ -8681,6 +8681,7 @@ namespace OmsiMapEditor.UI
             row.Add(show);
             var back = new Button(() => ShowChronoDate(null)) { text = Loc.T("chrono.base"), tooltip = Loc.T("chrono.base.tooltip")};
             back.AddToClassList("map-control-button");
+            back.AddToClassList("browser-chrono-row-last");
             back.SetEnabled(chronoDate != null);
             row.Add(back);
             section.Add(row);
@@ -8795,6 +8796,7 @@ namespace OmsiMapEditor.UI
                 RenderProjectBrowser();
             }) { text = Loc.T("chrono.cancel")};
             cancel.AddToClassList("map-control-button");
+            cancel.AddToClassList("browser-chrono-row-last");
             buttons.Add(cancel);
             box.Add(buttons);
             return box;
