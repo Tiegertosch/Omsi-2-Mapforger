@@ -533,7 +533,7 @@ namespace OmsiMapEditor.UI
             top.Add(addHint);
             var sides = new VisualElement();
             sides.AddToClassList("panel-tabs");
-            sides.AddToClassList("picker-segmented");
+            sides.AddToClassList("road-segmented");
             sides.AddToClassList("road-window-side");
             foreach (var side in new[] { OmsiRoadDraftSide.Before, OmsiRoadDraftSide.After })
             {

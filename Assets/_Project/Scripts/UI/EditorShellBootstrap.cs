@@ -1571,6 +1571,16 @@ namespace OmsiMapEditor.UI
             // [-heightmapLowest m] [-heightmapHighest m]: lays a picture over the map as the import's settings would.
             var heightmapExport = Argument("-heightmapExport", 1);
             var heightmapImport = Argument("-heightmapImport", 1);
+            // -heightmapShow <file>: reads the picture and shows its import box without laying it, for screenshots.
+            var heightmapShow = Argument("-heightmapShow", 1);
+            if (heightmapShow != null && heightmapImport == null)
+            {
+                var showWait = Time.realtimeSinceStartup;
+                while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - showWait < 300f)
+                    yield return null;
+                SetTool(EditorTool.Terrain);
+                ChooseHeightMap(heightmapShow);
+            }
             if (heightmapExport != null || heightmapImport != null)
             {
                 var heightWait = Time.realtimeSinceStartup;

@@ -5,6 +5,7 @@
   "filedialog.png": "Immagine PNG (*.png)",
   "filedialog.heightmaps": "Mappe altimetriche (*.png, *.tif, *.tiff)",
   "filedialog.pictures": "Immagini (*.jpg, *.jpeg, *.png, *.bmp, *.tga)",
+  "filedialog.groundtextures": "Texture del terreno (*.bmp, *.tga, *.dds)",
   "filedialog.open_config": "Apri una configurazione della mappa OMSI",
   "filedialog.open_project": "Apri un progetto MapWorks",
   "filedialog.save_project": "Salva progetto MapWorks",

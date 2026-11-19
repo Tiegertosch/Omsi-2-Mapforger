@@ -15,7 +15,7 @@ namespace OmsiMapEditor.UI
     {
         private VisualElement settingsDialog;
         private VisualElement languageSlot;
-        private readonly DropdownField languageDropdown = new DropdownField();
+        private DropdownField languageDropdown;
         private List<LocaleInfo> languageChoices = new List<LocaleInfo>();
         private const string HideDlcKey = "Mapforge.HideDlcObjects";
         private Toggle hideDlcToggle;
@@ -27,6 +27,7 @@ namespace OmsiMapEditor.UI
         private void SetUpSettings(VisualElement root)
         {
             settingsDialog = root.Q<VisualElement>("settings-dialog");
+            languageDropdown = new DropdownField();
             RegisterOverlay(settingsDialog, true);
             languageSlot = root.Q<VisualElement>("settings-language-list");
             if (languageSlot != null)

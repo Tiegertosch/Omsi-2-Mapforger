@@ -796,8 +796,7 @@ namespace OmsiMapEditor.UI
             var show = new Toggle { value = factor > 0f };
             LocBindings.Text(show, "aerial.tile.show");
             LocBindings.Tooltip(show, "aerial.tile.show.tooltip");
-            show.AddToClassList("picker-option-toggle");
-            show.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(show);
             row.Add(show);
             var slider = new Slider(0f, 1f) { value = factor > 0f ? factor : 1f };
             LocBindings.Tooltip(slider, "aerial.tile.opacity.tooltip");

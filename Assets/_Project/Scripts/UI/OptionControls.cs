@@ -21,6 +21,36 @@ namespace OmsiMapEditor.UI
             return row;
         }
 
+        /// <summary>
+        /// A row like <see cref="Row(VisualElement, string)"/> for windows with more room: <paramref name="wide"/> gives the label 120 px
+        /// instead of 88, <paramref name="free"/> lets the row grow beyond one line (notes, wrapping choices).
+        /// </summary>
+        public static VisualElement Row(VisualElement parent, string labelKey, bool wide, bool free)
+        {
+            var row = Row(parent, labelKey);
+            Shape(row, wide, free);
+            return row;
+        }
+
+        /// <summary>A row whose label is text of the data, not of the language files; the label is the row's first child.</summary>
+        public static VisualElement RowText(VisualElement parent, string label, bool wide, bool free)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("option-row");
+            var text = new Label(label);
+            text.AddToClassList("option-row-label");
+            row.Add(text);
+            parent.Add(row);
+            Shape(row, wide, free);
+            return row;
+        }
+
+        private static void Shape(VisualElement row, bool wide, bool free)
+        {
+            row.EnableInClassList("option-row-wide", wide);
+            row.EnableInClassList("option-row-free", free);
+        }
+
         /// <summary>A group of choices standing together, such as the modes of a tool.</summary>
         public static VisualElement Group(VisualElement row)
         {
@@ -39,6 +69,38 @@ namespace OmsiMapEditor.UI
             button.Add(new IconElement(icon));
             group.Add(button);
             return button;
+        }
+
+        /// <summary>
+        /// One choice or action as a short text, for values that have no icon (sizes, seasons, levels, Cancel/Add). The caller sets the
+        /// text (or passes a key) and marks the chosen one with <c>panel-tab-active</c>; a primary action also gets <c>option-icon-primary</c>.
+        /// </summary>
+        public static Button TextChoice(VisualElement group, string textKey, string tooltipKey, Action clicked)
+        {
+            var button = new Button(clicked);
+            if (textKey != null)
+                LocBindings.Text(button, textKey); // i18n:keys
+            if (tooltipKey != null)
+                LocBindings.Tooltip(button, tooltipKey); // i18n:keys
+            AsTextChoice(button);
+            group.Add(button);
+            return button;
+        }
+
+        /// <summary>Gives a button made elsewhere the look of <see cref="TextChoice"/>.</summary>
+        public static Button AsTextChoice(Button button)
+        {
+            button.AddToClassList("option-icon");
+            button.AddToClassList("option-text-choice");
+            return button;
+        }
+
+        /// <summary>A checkbox with a sentence for its label, where an icon switch has no room; keeps its <see cref="Toggle"/> text and events.</summary>
+        public static Toggle AsCheck(Toggle toggle)
+        {
+            toggle.AddToClassList("panel-toggle");
+            toggle.AddToClassList("option-check");
+            return toggle;
         }
 
         /// <summary>A switch drawn as an icon that lights up while on; it stays a <see cref="Toggle"/> for its value and events.</summary>

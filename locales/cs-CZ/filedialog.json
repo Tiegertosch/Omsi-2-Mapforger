@@ -5,6 +5,7 @@
   "filedialog.png": "Obrázek PNG (*.png)",
   "filedialog.heightmaps": "Výškové mapy (*.png, *.tif, *.tiff)",
   "filedialog.pictures": "Obrázky (*.jpg, *.jpeg, *.png, *.bmp, *.tga)",
+  "filedialog.groundtextures": "Textury podkladu (*.bmp, *.tga, *.dds)",
   "filedialog.open_config": "Otevřete konfiguraci mapy OMSI",
   "filedialog.open_project": "Otevřít projekt MapWorks",
   "filedialog.save_project": "Uložit projekt MapWorks",

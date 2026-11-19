@@ -424,15 +424,12 @@ namespace OmsiMapEditor.UI
             var level = Array.FindIndex(TrafficLevels, pair => pair.Value.HasValue == density.HasValue && (!density.HasValue || Math.Abs(pair.Value.Value - density.Value) < 1e-6));
 
             var limitRow = RuleRow(container, "paths.speed");
-            var limitField = new TextField { value = limit.HasValue ? limit.Value.ToString("0.#", CultureInfo.InvariantCulture) : string.Empty };
-            LocBindings.Tooltip(limitField, "paths.speed.tooltip");
-            limitField.AddToClassList("picker-field");
-            limitRow.Add(limitField);
+            var limitField = OptionControls.Value(limitRow, "gauge", limit.HasValue ? limit.Value.ToString("0.#", CultureInfo.InvariantCulture) : string.Empty,
+                string.Empty, "paths.speed", "paths.speed.tooltip");
 
             var trafficRow = RuleRow(container, "paths.traffic");
-            var levels = new VisualElement();
-            levels.AddToClassList("panel-tabs");
-            levels.AddToClassList("picker-segmented");
+            var levels = OptionControls.Group(trafficRow);
+            levels.AddToClassList("option-icons-wrap");
             var chosenLevel = level;
             var levelButtons = new List<Button>();
             for (var index = 0; index < TrafficLevels.Length; index++)
@@ -444,7 +441,7 @@ namespace OmsiMapEditor.UI
                     LocBindings.Tooltip(button, "paths.level.factor", ("factor", TrafficLevels[index].Value.Value));
                 else
                     LocBindings.Tooltip(button, "paths.level.normal");
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 button.clicked += () =>
                 {
                     chosenLevel = each;
@@ -455,12 +452,11 @@ namespace OmsiMapEditor.UI
                 levelButtons.Add(button);
                 levels.Add(button);
             }
-            trafficRow.Add(levels);
 
-            var cars = RuleToggle(container, "paths.cars", "paths.cars.tooltip", !Rule("no_cars").HasValue);
-            var buses = RuleToggle(container, "paths.buses", "paths.buses.tooltip", Rule("bus").HasValue);
-            var trucks = RuleToggle(container, "paths.trucks", "paths.trucks.tooltip", Rule("trucks").HasValue);
-            var noOvertaking = RuleToggle(container, "paths.overtaking", "paths.overtaking.tooltip", Rule("overtaking_prohib").HasValue);
+            var cars = RuleToggle(container, "car", "paths.cars", "paths.cars.tooltip", !Rule("no_cars").HasValue);
+            var buses = RuleToggle(container, "bus-front", "paths.buses", "paths.buses.tooltip", Rule("bus").HasValue);
+            var trucks = RuleToggle(container, "truck", "paths.trucks", "paths.trucks.tooltip", Rule("trucks").HasValue);
+            var noOvertaking = RuleToggle(container, "ban", "paths.overtaking", "paths.overtaking.tooltip", Rule("overtaking_prohib").HasValue);
 
             var apply = new Button(() =>
             {
@@ -515,24 +511,14 @@ namespace OmsiMapEditor.UI
 
         private static VisualElement RuleRow(VisualElement container, string labelKey)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            row.Add(text);
-            container.Add(row);
-            return row;
+            return OptionControls.Row(container, labelKey, true, true);
         }
 
-        private static Toggle RuleToggle(VisualElement container, string labelKey, string tooltipKey, bool value)
+        private static Toggle RuleToggle(VisualElement container, string icon, string labelKey, string tooltipKey, bool value)
         {
             var row = RuleRow(container, labelKey);
             LocBindings.Tooltip(row, tooltipKey); // i18n:keys
-            var toggle = new Toggle { value = value };
-            LocBindings.Tooltip(toggle, tooltipKey); // i18n:keys
-            toggle.AddToClassList("picker-option-toggle");
-            row.Add(toggle);
-            return toggle;
+            return OptionControls.Switch(row, icon, labelKey, tooltipKey, value);
         }
 
         /// <summary>For command-line checks: writes traffic rules of the selected object's or spline's road lanes from six arguments.</summary>

@@ -189,7 +189,7 @@ namespace OmsiMapEditor.UI
             directionBox = PropRow(elementBox, "roadbuilder.panel.direction");
             var directions = new VisualElement();
             directions.AddToClassList("panel-tabs");
-            directions.AddToClassList("picker-segmented");
+            directions.AddToClassList("road-segmented");
             againstButton = SegmentButton("arrow-down", "roadbuilder.window.direction.against", "roadbuilder.panel.backward.tooltip", () => ChangeDirection(OmsiRoadLaneDirection.Backward));
             withButton = SegmentButton("arrow-up", "roadbuilder.window.direction.with", "roadbuilder.panel.forward.tooltip", () => ChangeDirection(OmsiRoadLaneDirection.Forward));
             directions.Add(againstButton);
@@ -284,7 +284,7 @@ namespace OmsiMapEditor.UI
             var placeRow = PropRow(rowFields, "roadbuilder.window.place");
             var places = new VisualElement();
             places.AddToClassList("panel-tabs");
-            places.AddToClassList("picker-segmented");
+            places.AddToClassList("road-segmented");
             foreach (OmsiRoadRowPlace place in Enum.GetValues(typeof(OmsiRoadRowPlace)))
             {
                 var chosen = place;
@@ -499,7 +499,7 @@ namespace OmsiMapEditor.UI
 
             directionBox.style.display = DisplayStyle.Flex;
             var directed = lane.HasDirection;
-            directionBox.Q<VisualElement>(className: "picker-segmented").style.display = directed ? DisplayStyle.Flex : DisplayStyle.None;
+            directionBox.Q<VisualElement>(className: "road-segmented").style.display = directed ? DisplayStyle.Flex : DisplayStyle.None;
             directionNone.style.display = directed ? DisplayStyle.None : DisplayStyle.Flex;
             againstButton.EnableInClassList("panel-tab-active", directed && lane.Direction == OmsiRoadLaneDirection.Backward);
             withButton.EnableInClassList("panel-tab-active", directed && lane.Direction == OmsiRoadLaneDirection.Forward);

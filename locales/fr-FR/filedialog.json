@@ -5,6 +5,7 @@
   "filedialog.png": "Image PNG (*.png)",
   "filedialog.heightmaps": "Cartes de hauteur (*.png, *.tif, *.tiff)",
   "filedialog.pictures": "Images (*.jpg, *.jpeg, *.png, *.bmp, *.tga)",
+  "filedialog.groundtextures": "Textures de sol (*.bmp, *.tga, *.dds)",
   "filedialog.open_config": "Ouvrir une configuration de carte OMSI",
   "filedialog.open_project": "Ouvrir un projet MapWorks",
   "filedialog.save_project": "Enregistrer le projet MapWorks",

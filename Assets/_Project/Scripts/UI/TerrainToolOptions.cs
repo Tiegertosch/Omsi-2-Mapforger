@@ -27,7 +27,7 @@ namespace OmsiMapEditor.UI
         private readonly VisualElement options;
         private readonly ToolCatalog catalog;
         private readonly VisualElement brushPage;
-        private readonly VisualElement heightMapPage;
+        private readonly ScrollView heightMapPage;
         private readonly Button brushTab;
         private readonly Button paintTab;
         private readonly Button heightMapTab;
@@ -92,7 +92,8 @@ namespace OmsiMapEditor.UI
             Paint.style.display = DisplayStyle.None;
             Paint.TextureChosen += () => SettingsChanged?.Invoke();
             catalog.Panel.Insert(2, Paint.Page);
-            heightMapPage = new VisualElement();
+            // A scrolling page: with the import box open it is taller than the panel, and its buttons must stay in reach.
+            heightMapPage = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             heightMapPage.AddToClassList("terrain-page");
             catalog.Panel.Insert(3, heightMapPage);
             Add(catalog.Panel);
@@ -129,23 +130,21 @@ namespace OmsiMapEditor.UI
             var heightMapHint = LocBindings.NewLabel("terrain.heightmap.hint");
             heightMapHint.AddToClassList("panel-info");
             heightMapPage.Add(heightMapHint);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("panel-tabs");
-            buttons.AddToClassList("picker-segmented");
+            var buttons = OptionControls.Group(heightMapPage);
+            buttons.AddToClassList("option-icons-block");
             var exportButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.export", () => ExportRequested?.Invoke()), "terrain.export.tooltip");
             var importButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.import", () => ImportRequested?.Invoke()), "terrain.import.tooltip");
             foreach (var button in new[] { exportButton, importButton })
             {
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 buttons.Add(button);
             }
-            heightMapPage.Add(buttons);
 
             importBox = new VisualElement();
             importBox.style.display = DisplayStyle.None;
             heightMapPage.Add(importBox);
             importName = new Label();
-            importName.AddToClassList("picker-options-title");
+            importName.AddToClassList("option-heading");
             importBox.Add(importName);
             importInfo = new Label();
             importInfo.AddToClassList("panel-info");
@@ -163,40 +162,34 @@ namespace OmsiMapEditor.UI
             smoothingSlider = new SliderInt(0, 6);
             LocBindings.Tooltip(smoothingSlider, "terrain.smoothing.tooltip");
             smoothingLabel = new Label();
-            smoothingSlider.AddToClassList("new-map-slider");
             smoothingSlider.RegisterValueChangedCallback(_ => smoothingLabel.text = smoothingSlider.value.ToString(CultureInfo.InvariantCulture));
             var smoothingRow = Row(importBox, "terrain.smoothing", out _);
-            smoothingRow.Add(smoothingSlider);
-            smoothingLabel.AddToClassList("new-map-factor");
-            smoothingRow.Add(smoothingLabel);
-            var how = new VisualElement();
-            how.AddToClassList("panel-tabs");
-            how.AddToClassList("picker-segmented");
+            OptionControls.SliderBox(smoothingRow, "blend", smoothingSlider, smoothingLabel, "terrain.smoothing", "terrain.smoothing.tooltip");
+            var how = OptionControls.Group(importBox);
+            how.AddToClassList("option-icons-block");
             replaceButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.replace", () => SetAdd(false)), "terrain.replace.tooltip");
             addButton = LocBindings.WithTooltip(LocBindings.NewButton("terrain.add", () => SetAdd(true)), "terrain.add.tooltip");
             foreach (var button in new[] { replaceButton, addButton })
             {
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 how.Add(button);
             }
-            importBox.Add(how);
             var keep = LocBindings.NewLabel("terrain.keep");
             keep.AddToClassList("panel-info");
             importBox.Add(keep);
             coarseLabel = LocBindings.NewLabel("terrain.coarse");
             coarseLabel.AddToClassList("panel-info");
             importBox.Add(coarseLabel);
-            var actions = new VisualElement();
-            actions.AddToClassList("panel-tabs");
-            actions.AddToClassList("picker-segmented");
+            var actions = OptionControls.Group(importBox);
+            actions.AddToClassList("option-icons-block");
             var lay = LocBindings.NewButton("terrain.lay", () => ImportConfirmed?.Invoke());
             var cancel = LocBindings.NewButton("terrain.cancel", HideImport);
             foreach (var button in new[] { lay, cancel })
             {
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 actions.Add(button);
             }
-            importBox.Add(actions);
+            lay.AddToClassList("option-icon-primary");
 
             radiusSlider.SetValueWithoutNotify(RadiusToSlider(25.0));
             strengthSlider.SetValueWithoutNotify(0.5f);
@@ -469,12 +462,8 @@ namespace OmsiMapEditor.UI
 
         private static VisualElement Row(VisualElement parent, string labelKey, out Label text)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            text = labelKey.Length == 0 ? new Label() : LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            row.Add(text);
-            parent.Add(row);
+            var row = labelKey.Length == 0 ? OptionControls.RowText(parent, string.Empty, true, true) : OptionControls.Row(parent, labelKey, true, true);
+            text = row.Q<Label>(className: "option-row-label");
             return row;
         }
     }

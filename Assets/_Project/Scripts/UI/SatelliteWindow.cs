@@ -259,8 +259,7 @@ namespace OmsiMapEditor.UI
             detailLabel.AddToClassList("satellite-note");
             picturesTab.Add(detailLabel);
             LocBindings.Text(heightsToggle, "satellite.with_heights");
-            heightsToggle.AddToClassList("picker-option-toggle");
-            heightsToggle.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(heightsToggle);
             LocBindings.Tooltip(heightsToggle, "satellite.with_heights.tooltip");
             heightsToggle.RegisterValueChangedCallback(evt => TicksChanged?.Invoke(evt.newValue, autoToggle.value));
             picturesTab.Add(heightsToggle);
@@ -278,8 +277,7 @@ namespace OmsiMapEditor.UI
             Section(terrainTab, "satellite.section.terrain");
             terrainTab.Add(heightsOnlyButton);
             LocBindings.Text(autoToggle, "satellite.auto");
-            autoToggle.AddToClassList("picker-option-toggle");
-            autoToggle.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(autoToggle);
             LocBindings.Tooltip(autoToggle, "satellite.auto.tooltip");
             autoToggle.RegisterValueChangedCallback(evt => TicksChanged?.Invoke(heightsToggle.value, evt.newValue));
             picturesTab.Add(autoToggle);
@@ -303,14 +301,12 @@ namespace OmsiMapEditor.UI
 
             Section(terrainTab, "satellite.section.height_options");
             LocBindings.Text(relativeToggle, "satellite.relative");
-            relativeToggle.AddToClassList("picker-option-toggle");
-            relativeToggle.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(relativeToggle);
             LocBindings.Tooltip(relativeToggle, "satellite.relative.tooltip");
             relativeToggle.RegisterValueChangedCallback(_ => HeightOptionsChanged?.Invoke());
             terrainTab.Add(relativeToggle);
             LocBindings.Text(levelWaterToggle, "satellite.level_water");
-            levelWaterToggle.AddToClassList("picker-option-toggle");
-            levelWaterToggle.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(levelWaterToggle);
             LocBindings.Tooltip(levelWaterToggle, "satellite.level_water.tooltip");
             levelWaterToggle.RegisterValueChangedCallback(_ => HeightOptionsChanged?.Invoke());
             terrainTab.Add(levelWaterToggle);
@@ -334,8 +330,7 @@ namespace OmsiMapEditor.UI
             var showRow = new VisualElement();
             showRow.AddToClassList("satellite-row");
             LocBindings.Text(showToggle, "satellite.show");
-            showToggle.AddToClassList("picker-option-toggle");
-            showToggle.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(showToggle);
             showToggle.RegisterValueChangedCallback(evt => OverlayChanged?.Invoke(evt.newValue, opacitySlider.value));
             showRow.Add(showToggle);
             opacitySlider.AddToClassList("new-map-slider");
@@ -373,8 +368,7 @@ namespace OmsiMapEditor.UI
             mirrorRow.AddToClassList("satellite-row");
             foreach (var toggle in new[] { mirrorXToggle, mirrorYToggle })
             {
-                toggle.AddToClassList("picker-option-toggle");
-                toggle.AddToClassList("panel-toggle");
+                OptionControls.AsCheck(toggle);
                 toggle.AddToClassList("satellite-mirror");
                 mirrorRow.Add(toggle);
             }
@@ -431,17 +425,15 @@ namespace OmsiMapEditor.UI
             Field(Row(own, "satellite.own.attribution"), ownAttributionField, "satellite.own.attribution.tooltip");
             foreach (var field in new[] { ownNameField, ownUrlField, ownAttributionField })
                 field.AddToClassList("satellite-wide-field");
-            var zoomRow = new VisualElement();
-            zoomRow.AddToClassList("satellite-row");
-            ownZoomField.AddToClassList("satellite-number");
-            LocBindings.Text(ownZoomField, "satellite.own.zoom");
+            // The finest zoom is a row like the ones above it (label column, field), the WMS switch follows on its own line.
+            var zoomRow = Row(own, "satellite.own.zoom");
+            ownZoomField.AddToClassList("picker-field");
+            ownZoomField.AddToClassList("new-map-number");
             LocBindings.Tooltip(ownZoomField, "satellite.own.zoom.tooltip");
-            LocBindings.Text(ownWmsToggle, "satellite.own.wms", ("bbox", "{bbox}"));
             zoomRow.Add(ownZoomField);
-            ownWmsToggle.AddToClassList("picker-option-toggle");
-            ownWmsToggle.AddToClassList("panel-toggle");
-            zoomRow.Add(ownWmsToggle);
-            own.Add(zoomRow);
+            LocBindings.Text(ownWmsToggle, "satellite.own.wms", ("bbox", "{bbox}"));
+            OptionControls.AsCheck(ownWmsToggle);
+            own.Add(ownWmsToggle);
             var serverNote = new Label();
             LocBindings.Text(serverNote, "satellite.own.url_note", ("zxy", "{z} {x} {y}"), ("bbox", "{bbox}"), ("widthHeight", "{width} {height}"), ("key", "{key}"));
             serverNote.AddToClassList("satellite-note");
@@ -961,8 +953,7 @@ namespace OmsiMapEditor.UI
             var fitRow = new VisualElement();
             fitRow.AddToClassList("satellite-row");
             // Like the other ticks of the window, not the bare toggle (which draws a white box).
-            fitScaleToggle.AddToClassList("picker-option-toggle");
-            fitScaleToggle.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(fitScaleToggle);
             LocBindings.Text(fitScaleToggle, "satellite.fit.scale");
             LocBindings.Tooltip(fitScaleToggle, "satellite.fit.scale.tooltip");
             fitRow.Add(fitScaleToggle);
@@ -1037,11 +1028,12 @@ namespace OmsiMapEditor.UI
         private static VisualElement Row(VisualElement parent, Label text, string labelKey)
         {
             var row = new VisualElement();
-            row.AddToClassList("picker-option");
+            row.AddToClassList("option-row");
+            row.AddToClassList("option-row-wide");
+            row.AddToClassList("option-row-free");
             if (labelKey != null)
                 LocBindings.Text(text, labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            text.AddToClassList("satellite-label");
+            text.AddToClassList("option-row-label");
             row.Add(text);
             parent.Add(row);
             return row;

@@ -33,7 +33,7 @@ namespace OmsiMapEditor.UI
         private readonly Slider passengerSlider = new Slider(0f, 2f);
         private readonly Label carLabel = new Label();
         private readonly Label passengerLabel = new Label();
-        private readonly Toggle railToggle = new Toggle();
+        private Toggle railToggle;
         private readonly TextField firstYearField = new TextField();
         private readonly TextField lastYearField = new TextField();
         private readonly TextField offsetField = new TextField();
@@ -125,7 +125,7 @@ namespace OmsiMapEditor.UI
             {
                 var captured = size;
                 var button = new Button(() => SetSize(captured)) { text = size + "×" + size };
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 sizes.Add(button);
                 sizeButtons[size] = button;
             }
@@ -148,18 +148,16 @@ namespace OmsiMapEditor.UI
             LocBindings.Tooltip(leftButton, "newmap.traffic.left.tooltip");
             foreach (var button in new[] { rightButton, leftButton })
             {
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 sides.Add(button);
             }
             var carRow = Row(right, "newmap.cars");
             var passengerRow = Row(right, "newmap.passengers");
             trafficRows.Add(carRow);
             trafficRows.Add(passengerRow);
-            AddSlider(carRow, carSlider, carLabel, "newmap.cars.tooltip");
-            AddSlider(passengerRow, passengerSlider, passengerLabel, "newmap.passengers.tooltip");
-            railToggle.AddToClassList("picker-option-toggle");
-            LocBindings.Tooltip(railToggle, "newmap.real_rail.tooltip");
-            Row(right, "newmap.real_rail").Add(railToggle);
+            AddSlider(carRow, "car", carSlider, carLabel, "newmap.cars", "newmap.cars.tooltip");
+            AddSlider(passengerRow, "user", passengerSlider, passengerLabel, "newmap.passengers", "newmap.passengers.tooltip");
+            railToggle = OptionControls.Switch(Row(right, "newmap.real_rail"), "train-front", "newmap.real_rail", "newmap.real_rail.tooltip", false);
 
             // Era and money.
             Section(right, "newmap.section.era");
@@ -183,6 +181,7 @@ namespace OmsiMapEditor.UI
             Section(right, "newmap.section.seasons");
             var seasons = Segmented(right);
             seasons.AddToClassList("new-map-seasons");
+            seasons.AddToClassList("option-icons-wrap");
             AddSeason(seasons, OmsiSeasonPreset.Template, "newmap.season.template", "newmap.season.template.tooltip");
             seasonKeepButton = seasonButtons[OmsiSeasonPreset.Template];
             AddSeason(seasons, OmsiSeasonPreset.FourWithSnow, "newmap.season.snow", "newmap.season.snow.tooltip");
@@ -195,6 +194,7 @@ namespace OmsiMapEditor.UI
             swatches.contentContainer.AddToClassList("new-map-swatches-content");
             body.Add(swatches);
             groundLabel.AddToClassList("new-map-hint");
+            groundLabel.AddToClassList("new-map-hint-flush");
             body.Add(groundLabel);
 
             targetLabel.AddToClassList("popup-description");
@@ -382,7 +382,7 @@ namespace OmsiMapEditor.UI
         private void AddSeason(VisualElement parent, OmsiSeasonPreset preset, string textKey, string tooltipKey)
         {
             var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => SetSeasons(preset)), tooltipKey); // i18n:keys
-            button.AddToClassList("panel-tab");
+            OptionControls.AsTextChoice(button);
             parent.Add(button);
             seasonButtons[preset] = button;
         }
@@ -639,24 +639,12 @@ namespace OmsiMapEditor.UI
 
         private static VisualElement Row(VisualElement parent, string labelKey)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            row.AddToClassList("new-map-row");
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            text.AddToClassList("new-map-label");
-            row.Add(text);
-            parent.Add(row);
-            return row;
+            return OptionControls.Row(parent, labelKey, true, true);
         }
 
         private static VisualElement Segmented(VisualElement parent)
         {
-            var group = new VisualElement();
-            group.AddToClassList("panel-tabs");
-            group.AddToClassList("picker-segmented");
-            parent.Add(group);
-            return group;
+            return OptionControls.Group(parent);
         }
 
         private static void AddField(VisualElement row, TextField field, string tooltipKey)
@@ -668,15 +656,10 @@ namespace OmsiMapEditor.UI
             row.Add(field);
         }
 
-        private void AddSlider(VisualElement row, Slider slider, Label value, string tooltipKey)
+        private void AddSlider(VisualElement row, string icon, Slider slider, Label value, string nameKey, string tooltipKey)
         {
-            slider.AddToClassList("new-map-slider");
-            LocBindings.Tooltip(slider, tooltipKey); // i18n:keys
-            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             slider.RegisterValueChangedCallback(evt => ShowFactor(value, evt.newValue));
-            row.Add(slider);
-            value.AddToClassList("new-map-factor");
-            row.Add(value);
+            OptionControls.SliderBox(row, icon, slider, value, nameKey, tooltipKey);
         }
 
         private static void AddDropdown(VisualElement row, DropdownField field, string tooltipKey)

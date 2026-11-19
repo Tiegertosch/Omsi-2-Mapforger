@@ -83,7 +83,7 @@ namespace OmsiMapEditor.UI
             ShowTileModeBrush();
         }
 
-        /// <summary>Lists the map's ground textures and the files a new one can be chosen from.</summary>
+        /// <summary>Lists the map's ground textures and tells the form that adds one where the installation is.</summary>
         private void RefreshPaintTextures()
         {
             if (session == null || currentSummary == null || terrainOptions == null || !CanEdit)
@@ -108,21 +108,7 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
             }
             terrainOptions.Paint.SetTextures(choices);
-            var files = new List<string>();
-            try
-            {
-                var folder = installation == null ? null : Path.Combine(installation, "Texture");
-                if (folder != null && Directory.Exists(folder))
-                    foreach (var pattern in new[] { "*.bmp", "*.tga", "*.dds" })
-                        foreach (var file in Directory.GetFiles(folder, pattern, SearchOption.TopDirectoryOnly))
-                            files.Add("texture\\" + Path.GetFileName(file));
-                files.Sort(StringComparer.OrdinalIgnoreCase);
-            }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
-            {
-                Debug.LogException(exception);
-            }
-            terrainOptions.Paint.SetAvailable(files);
+            terrainOptions.Paint.SetInstallation(installation);
         }
 
         /// <summary>
@@ -319,7 +305,7 @@ namespace OmsiMapEditor.UI
                 groundRenderer?.RefreshMasks(change.Tiles);
         }
 
-        /// <summary>Texture, kind and hardness of the brush from the command line, for checks: -paintTexture N, -paintMode paint|erase|soften, -paintHardness 0-1, -paintAddForm.</summary>
+        /// <summary>Texture, kind and hardness of the brush from the command line, for checks: -paintTexture N, -paintMode paint|erase|soften, -paintHardness 0-1, -paintAddForm, -paintAddPick.</summary>
         private void ApplyPaintArguments(Func<string, int, string> Argument)
         {
             if (terrainOptions == null || !terrainOptions.Painting)
@@ -333,6 +319,17 @@ namespace OmsiMapEditor.UI
             // -paintAddForm: opens the form of the add tile, in place of the tiles.
             if (Argument("-paintAddForm", 0) != null)
                 terrainOptions.Paint.OpenAddForm();
+            // -paintAddPick <texture file> [<detail file>]: chooses these files (full paths) in the form as Browse would, with the same
+            // rules; one outside the installation shows the form's message and is not taken over.
+            var picked = Argument("-paintAddPick", 1);
+            if (picked != null)
+            {
+                terrainOptions.Paint.OpenAddForm();
+                terrainOptions.Paint.PickFile(false, picked);
+                var pickedDetail = Argument("-paintAddPick", 2);
+                if (pickedDetail != null && !pickedDetail.StartsWith("-", StringComparison.Ordinal))
+                    terrainOptions.Paint.PickFile(true, pickedDetail);
+            }
             if (int.TryParse(Argument("-paintTexture", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var texture))
             {
                 // The list only offers textures the map has; a number it has not is refused here as it cannot be clicked.

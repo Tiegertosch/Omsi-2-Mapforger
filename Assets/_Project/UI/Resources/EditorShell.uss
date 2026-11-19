@@ -231,7 +231,6 @@
 /* Tool panels open above the bottom bar */
 .tool-panel-host { position: absolute; left: 0; right: 0; flex-direction: row; justify-content: center; }
 .tool-panel { width: 420px; height: 470px; padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
-.tool-panel-header { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-3); }
 .tool-panel-badge { width: 40px; height: 40px; margin-right: var(--mf-space-3); align-items: center; justify-content: center; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
 .tool-panel-badge > .icon { width: 24px; height: 24px; }
 .tool-panel-titles { flex-grow: 1; }
@@ -596,13 +595,8 @@
 /* Options column and catalog stand side by side with the same top and bottom edge; a tool without a catalog is not a picker-tool and keeps the height of its content. */
 .picker-tool { flex-direction: row; align-items: stretch; flex-shrink: 1; }
 .picker-options { width: 236px; min-width: 236px; max-width: 236px; height: auto; margin-right: var(--mf-space-2); flex-shrink: 0; flex-grow: 0; }
-.picker-options-title { margin: 0 0 var(--mf-space-2); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
-.picker-option { flex-direction: row; align-items: center; justify-content: space-between; min-height: 30px; margin-bottom: var(--mf-space-1); }
-.picker-option:disabled { opacity: 0.45; }
-.picker-option-label { flex-shrink: 0; margin: 0 var(--mf-space-2) 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
-.picker-segmented { flex-grow: 1; margin: 0; padding: 2px; }
-.picker-segmented > .panel-tab { height: 24px; padding: 0 4px; font-size: 11px; }
-.picker-option-toggle { margin: 0; }
+.road-segmented { flex-grow: 1; margin: 0; padding: 2px; }
+.road-segmented > .panel-tab { height: 24px; padding: 0 4px; font-size: 11px; }
 .picker-field { width: 76px; height: 26px; margin: 0; flex-shrink: 0; }
 .picker-field TextElement { margin: 0; padding: 0; font-size: 12px; }
 .picker-field .unity-base-text-field__input { height: 26px; margin: 0; padding: 0 6px; -unity-text-align: middle-left; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
@@ -637,7 +631,7 @@
 .picker-tile-icon { align-items: center; justify-content: center; color: var(--mf-color-text-primary); }
 .picker-tile-icon > .icon { width: 28px; height: 28px; }
 .picker-tile-selected .picker-tile-icon { color: var(--mf-color-accent); }
-.terrain-page { padding: var(--mf-space-2); }
+.terrain-page { flex-grow: 1; min-height: 0; padding: var(--mf-space-2); }
 .picker-panel > .panel-folder-bar { margin: var(--mf-space-1) var(--mf-space-2) 0; }
 /* The menus of the bar are at most 210 px tall, as in the references (ADR 098, stage 2): a flat header, flat tabs, two rows of small
    tiles that scroll, and option columns that scroll once they are taller. */
@@ -652,14 +646,18 @@
 .picker-search-open { color: var(--mf-color-accent); }
 .status-hint.status-warning { color: var(--mf-color-warning); }
 .tool-options-scroll { max-height: 210px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); }
-.tool-options-scroll .picker-option { min-height: 26px; margin-bottom: 2px; }
 /* Option columns of icons (ADR 098, stage 2): rows of a short label and icons, all in view without scrolling. */
 .icon-options { width: 336px; min-width: 336px; max-width: 336px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
 .option-row { flex-direction: row; align-items: center; height: 30px; margin-bottom: 2px; }
 .option-row:disabled { opacity: 0.45; }
+.option-row-free { height: auto; min-height: 30px; }
 .option-row-label { width: 88px; flex-shrink: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.option-row-wide > .option-row-label { width: 120px; min-width: 120px; }
 .option-row-text { flex-grow: 1; flex-shrink: 1; min-width: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .option-icons { flex-direction: row; margin: 0 2px 0 0; padding: 0; }
+.option-icons-block { margin-bottom: var(--mf-space-2); }
+.option-icons-wrap { flex-wrap: wrap; flex-shrink: 1; }
+.option-icons-wrap > .option-icon { margin-bottom: 2px; }
 .option-icon { width: 28px; height: 28px; margin: 0 2px 0 0; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-field); border-width: 0; border-radius: var(--mf-radius-md); }
 .option-icon.option-icon-locked { opacity: 0.45; }
 .option-icon:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
@@ -668,6 +666,8 @@
 .option-icon.panel-tab-active, .option-icon.panel-tab-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
 /* Every icon of an option column is 16 x 16 px in a box of 28 x 28 px, whatever kind of control holds it. */
 .option-icon > .icon, .option-switch .icon, .option-value-icon { flex-grow: 0; flex-shrink: 0; width: 16px; height: 16px; }
+.option-text-choice { width: auto; min-width: 28px; padding: 0 var(--mf-space-2); font-size: var(--mf-font-secondary); }
+.option-check { margin: 0; }
 .option-switch { margin: 0 2px 0 0; padding: 0; }
 .option-switch > .unity-toggle__input { width: 28px; height: 28px; padding: 0; align-items: center; justify-content: center; color: var(--mf-color-text-secondary); background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); }
 .option-switch > .unity-toggle__input > .unity-toggle__checkmark { display: none; }
@@ -861,9 +861,7 @@
 .new-map-columns { flex-direction: row; }
 .new-map-column { flex-grow: 1; flex-basis: 0; margin: 0 var(--mf-space-2); }
 .new-map-section { margin: var(--mf-space-3) var(--mf-space-2) var(--mf-space-1); }
-.new-map-row { min-height: 28px; justify-content: flex-start; }
 .new-map-row-tall { align-items: flex-start; }
-.new-map-label { width: 120px; min-width: 120px; }
 .new-map-value { flex-grow: 1; flex-shrink: 1; margin: 0 var(--mf-space-2) 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mf-color-text-primary); }
 .new-map-small-button { height: 26px; margin: 0; }
 .new-map-field { flex-grow: 1; flex-shrink: 1; width: auto; }
@@ -871,6 +869,7 @@
 .new-map-description { height: 58px; }
 .new-map-description .unity-base-text-field__input { height: 58px; padding: 4px 6px; -unity-text-align: upper-left; white-space: normal; }
 .new-map-hint { margin: 0 0 var(--mf-space-1) 120px; font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
+.new-map-hint-flush { margin: var(--mf-space-1) var(--mf-space-2) var(--mf-space-2); }
 .new-map-dash { margin: 0 6px; color: var(--mf-color-text-secondary); }
 .new-map-slider { flex-grow: 1; margin: 0 var(--mf-space-2) 0 0; }
 .new-map-slider .unity-base-slider__tracker { height: 4px; margin-top: -2px; background-color: var(--mf-color-field); border-color: var(--mf-color-border); border-radius: 2px; }
@@ -922,10 +921,12 @@
 .satellite-tabs { margin: 0 var(--mf-space-2) var(--mf-space-2); }
 .satellite-footer { margin: 0 var(--mf-space-2) var(--mf-space-2); }
 .satellite-column { flex-grow: 1; flex-basis: 0; min-width: 0; margin: 0 var(--mf-space-2); }
-.satellite-row { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-1); }
+.satellite-row { flex-direction: row; align-items: center; min-height: 30px; margin-bottom: 2px; }
+.satellite-row > .satellite-button { margin-bottom: 0; }
+.satellite-tab .option-check { min-height: 30px; margin: 0 0 2px; align-items: center; }
 .satellite-wrap { flex-wrap: wrap; }
 .satellite-search { flex-grow: 1; flex-shrink: 1; width: auto; margin-right: 6px; }
-.satellite-button { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-1); }
+.satellite-button { flex-direction: row; align-items: center; margin-top: 0; margin-left: 0; margin-bottom: var(--mf-space-1); }
 .satellite-button > .icon { width: 16px; height: 16px; margin-right: 6px; }
 .satellite-button > Label { margin: 0; padding: 0; }
 .satellite-results { margin-bottom: var(--mf-space-1); }
@@ -934,7 +935,6 @@
 .world-map { height: 230px; flex-shrink: 0; margin: var(--mf-space-1) 0 2px; background-color: var(--mf-color-field); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); --world-map-outline: var(--mf-color-text-primary); --world-map-anchor: var(--mf-color-accent); }
 .satellite-attribution { margin-bottom: var(--mf-space-1); font-size: 10px; color: var(--mf-color-text-muted); white-space: normal; }
 .satellite-note { margin: 2px 0 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
-.satellite-label { width: 120px; min-width: 120px; }
 .satellite-progress { flex-grow: 1; flex-shrink: 1; margin-right: 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); white-space: normal; }
 .satellite-grow { flex-grow: 1; flex-shrink: 1; }
 .satellite-inline-label { margin: 0 6px 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
@@ -964,11 +964,13 @@
 /* Ground texture painting (ADR 091) */
 .picker-tile-captioned { height: 88px; }
 .picker-tile-captioned > .picker-tile-name { display: flex; position: relative; left: auto; right: auto; bottom: auto; width: 100%; margin: 2px 0 0 0; padding: 0; background-color: rgba(0, 0, 0, 0); border-radius: 0; }
-.paint-add-form { flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
-.paint-add-field { width: 236px; margin: 0 var(--mf-space-2) var(--mf-space-1) 0; }
-.paint-add-field > .picker-option-label { margin: 0 0 2px 0; }
-.paint-add-field > .new-map-dropdown, .paint-add-field > .picker-field { width: 100%; flex-grow: 0; }
-.paint-add-actions { width: 236px; flex-grow: 0; margin: 0 var(--mf-space-2) var(--mf-space-1) 0; }
+.paint-add-form { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+.paint-add-form > .option-row { width: 330px; flex-grow: 1; margin-right: var(--mf-space-2); }
+.paint-add-form > .option-row > .option-row-label { width: 150px; min-width: 150px; }
+.paint-add-none { color: var(--mf-color-text-muted); }
+.paint-add-form > .paint-add-wide { width: auto; flex-basis: 100%; flex-shrink: 1; }
+.paint-add-problem { flex-basis: 100%; margin: 0 var(--mf-space-2) var(--mf-space-2) 0; font-size: var(--mf-font-secondary); color: var(--mf-color-error); white-space: normal; }
+.paint-add-actions { width: 330px; flex-grow: 1; margin-right: var(--mf-space-2); }
 
 /* The traffic rules tool (ADR 098, M4): sign tiles that can be dragged to the map, and the sign that follows the pointer meanwhile. */
 .traffic-tile:focus { border-color: var(--mf-color-text-secondary); }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
@@ -41,15 +42,18 @@ namespace OmsiMapEditor.UI
         private readonly Slider hardnessSlider = new Slider(0f, 1f);
         private readonly Label hardnessLabel = new Label();
         private readonly VisualElement addBox = new VisualElement();
-        private readonly DropdownField textureField = new DropdownField();
-        private readonly DropdownField detailField = new DropdownField();
+        private readonly TextureChoiceRow textureRow = new TextureChoiceRow("paint.add.none_chosen");
+        private readonly TextureChoiceRow detailRow = new TextureChoiceRow("paint.add.no_detail");
+        private readonly Label addProblem = new Label();
+        private Button confirmButton;
         private readonly DropdownField sizeField = new DropdownField();
         private readonly TextField repeatsField = new TextField { value = "1" };
         private readonly TextField detailRepeatsField = new TextField { value = "30" };
         private readonly Button coverButton;
         private readonly Button clearButton;
         private readonly Dictionary<int, string> textureNames = new Dictionary<int, string>();
-        private List<string> available = new List<string>();
+        private string installation;
+        private string lastFolder;
 
         public GroundPaintOptions()
         {
@@ -83,23 +87,22 @@ namespace OmsiMapEditor.UI
             addBox.AddToClassList("paint-add-form");
             addBox.style.display = DisplayStyle.None;
             Page.Add(addBox);
-            AddField(addBox, "paint.add.texture", textureField);
-            AddField(addBox, "paint.add.detail", detailField);
+            AddTexturePicker(addBox, "paint.add.texture", textureRow, false);
+            AddTexturePicker(addBox, "paint.add.detail", detailRow, true);
+            addProblem.AddToClassList("paint-add-problem");
+            addProblem.style.display = DisplayStyle.None;
+            addBox.Add(addProblem);
             AddField(addBox, "paint.add.size", sizeField);
             sizeField.choices = new List<string> { "256", "512", "1024" };
             sizeField.index = 1;
             AddText(addBox, "paint.add.repeats", repeatsField);
             AddText(addBox, "paint.add.detail_repeats", detailRepeatsField);
-            var actions = new VisualElement();
-            actions.AddToClassList("panel-tabs");
-            actions.AddToClassList("picker-segmented");
+            var actions = OptionControls.Group(addBox);
             actions.AddToClassList("paint-add-actions");
-            foreach (var button in new[] { LocBindings.NewButton("paint.add.confirm", Confirm), LocBindings.NewButton("paint.add.cancel", () => ToggleAdd(false)) })
-            {
-                button.AddToClassList("panel-tab");
-                actions.Add(button);
-            }
-            addBox.Add(actions);
+            confirmButton = OptionControls.TextChoice(actions, "paint.add.confirm", null, Confirm);
+            confirmButton.AddToClassList("option-icon-primary");
+            confirmButton.SetEnabled(false);
+            OptionControls.TextChoice(actions, "paint.add.cancel", null, () => ToggleAdd(false));
 
             SetPaintMode(OmsiPaintMode.Paint);
         }
@@ -177,18 +180,32 @@ namespace OmsiMapEditor.UI
             MarkChosen();
         }
 
-        /// <summary>The picture files of the installation's Texture folder a texture can be added from, relative to the installation.</summary>
-        public void SetAvailable(List<string> files)
+        /// <summary>The OMSI installation the textures are chosen in (its Texture folder is where the file dialog starts), or null for none.</summary>
+        public void SetInstallation(string installationRoot)
         {
-            available = files ?? new List<string>();
-            textureField.choices = new List<string>(available);
-            var detail = new List<string> { Loc.T("paint.add.no_detail") };
-            detail.AddRange(available);
-            detailField.choices = detail;
-            if (available.Count > 0 && textureField.index < 0)
-                textureField.index = 0;
-            if (detailField.index < 0)
-                detailField.index = 0;
+            installation = installationRoot;
+        }
+
+        /// <summary>
+        /// Takes a file chosen as the texture (or, with <paramref name="detail"/>, the detail texture) of the form, by its full path. A file
+        /// outside the installation or of a format the editor does not read is refused with a message in the form and nothing is taken over.
+        /// </summary>
+        public bool PickFile(bool detail, string fullPath)
+        {
+            if (!OmsiGroundTexturePath.TryMakeRelative(installation, fullPath, out var relative, out var problem))
+            {
+                if (problem == OmsiGroundTexturePathProblem.UnsupportedType)
+                    LocBindings.Text(addProblem, "paint.add.bad_type");
+                else
+                    LocBindings.Text(addProblem, "paint.add.outside", ("folder", installation ?? string.Empty));
+                addProblem.style.display = DisplayStyle.Flex;
+                return false;
+            }
+            addProblem.style.display = DisplayStyle.None;
+            (detail ? detailRow : textureRow).Set(relative);
+            lastFolder = Path.GetDirectoryName(Path.GetFullPath(fullPath));
+            confirmButton.SetEnabled(textureRow.Value != null);
+            return true;
         }
 
         /// <summary>True when the map has a ground texture with this number, so the list has a tile for it.</summary>
@@ -246,14 +263,76 @@ namespace OmsiMapEditor.UI
 
         private void Confirm()
         {
-            if (textureField.index < 0 || textureField.index >= available.Count)
+            if (textureRow.Value == null)
                 return;
-            var detail = detailField.index > 0 && detailField.index - 1 < available.Count ? available[detailField.index - 1] : string.Empty;
             var repeats = Number(repeatsField.value, 1.0);
             var detailRepeats = Number(detailRepeatsField.value, 30.0);
             var exponent = MaskExponents[Math.Max(0, Math.Min(MaskExponents.Length - 1, sizeField.index))];
+            var texture = textureRow.Value;
+            var detail = detailRow.Value ?? string.Empty;
             ToggleAdd(false);
-            AddConfirmed?.Invoke(available[textureField.index], detail, exponent, repeats, detailRepeats);
+            AddConfirmed?.Invoke(texture, detail, exponent, repeats, detailRepeats);
+        }
+
+        private void Browse(bool detail)
+        {
+            string chosen;
+            try
+            {
+                var folder = OmsiGroundTexturePath.ChooseStartFolder(lastFolder, installation, Directory.Exists);
+                chosen = WindowsFileDialog.OpenFile(detail ? Loc.T("paint.add.title.detail") : Loc.T("paint.add.title.texture"), WindowsFileDialog.GroundTextureFilter, folder);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException || exception is PlatformNotSupportedException)
+            {
+                Debug.LogException(exception);
+                return;
+            }
+            if (!string.IsNullOrEmpty(chosen))
+                PickFile(detail, chosen);
+        }
+
+        /// <summary>The chosen file of a texture row in the form, or the text that says nothing is chosen.</summary>
+        private sealed class TextureChoiceRow
+        {
+            public TextureChoiceRow(string noneKey)
+            {
+                NoneLabel = LocBindings.NewLabel(noneKey); // i18n:keys
+                NoneLabel.AddToClassList("option-row-text");
+                NoneLabel.AddToClassList("paint-add-none");
+                ValueLabel.AddToClassList("option-row-text");
+                ValueLabel.style.display = DisplayStyle.None;
+            }
+
+            public string Value { get; private set; }
+
+            public Label NoneLabel { get; }
+
+            public Label ValueLabel { get; } = new Label();
+
+            public void Set(string relative)
+            {
+                Value = relative;
+                ValueLabel.text = relative ?? string.Empty;
+                ValueLabel.tooltip = relative ?? string.Empty;
+                ValueLabel.style.display = relative == null ? DisplayStyle.None : DisplayStyle.Flex;
+                NoneLabel.style.display = relative == null ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+        }
+
+        private void AddTexturePicker(VisualElement parent, string labelKey, TextureChoiceRow choice, bool detail)
+        {
+            var row = OptionControls.Row(parent, labelKey, true, true);
+            row.AddToClassList("paint-add-wide");
+            row.Add(choice.NoneLabel);
+            row.Add(choice.ValueLabel);
+            var group = OptionControls.Group(row);
+            OptionControls.TextChoice(group, "paint.add.browse", null, () => Browse(detail));
+            OptionControls.TextChoice(group, "paint.add.clear", null, () =>
+            {
+                choice.Set(null);
+                addProblem.style.display = DisplayStyle.None;
+                confirmButton.SetEnabled(textureRow.Value != null);
+            });
         }
 
         private static double Number(string text, double fallback)
@@ -265,26 +344,16 @@ namespace OmsiMapEditor.UI
 
         private static void AddField(VisualElement parent, string labelKey, DropdownField field)
         {
-            var row = new VisualElement();
-            row.AddToClassList("paint-add-field");
-            var label = LocBindings.NewLabel(labelKey); // i18n:keys
-            label.AddToClassList("picker-option-label");
-            row.Add(label);
+            var row = OptionControls.Row(parent, labelKey, true, true);
             field.AddToClassList("new-map-dropdown");
             row.Add(field);
-            parent.Add(row);
         }
 
         private static void AddText(VisualElement parent, string labelKey, TextField field)
         {
-            var row = new VisualElement();
-            row.AddToClassList("paint-add-field");
-            var label = LocBindings.NewLabel(labelKey); // i18n:keys
-            label.AddToClassList("picker-option-label");
-            row.Add(label);
+            var row = OptionControls.Row(parent, labelKey, true, true);
             field.AddToClassList("picker-field");
             row.Add(field);
-            parent.Add(row);
         }
     }
 }
