@@ -39,6 +39,34 @@ namespace OmsiMapEditor.Tests
                 Directory.Delete(root, true);
         }
 
+        private sealed class PromptFrame : FloatingWindowFrame
+        {
+            public PromptFrame() : base(new FloatingWindowOptions { Icon = "minus", TitleKey = "t.other" }, null)
+            {
+                CompleteFrame();
+            }
+
+            public string PromptText => this.Q<Label>(className: "signal-prompt-text").text;
+        }
+
+        [Test]
+        public void AWindowQuestionFollowsALanguageChangeAndEmptiesWhenTaken()
+        {
+            var frame = new PromptFrame();
+            var parent = new VisualElement();
+            parent.Add(frame);
+            frame.ShowPrompt("t.tip", true);
+            Assert.AreEqual("A tip", frame.PromptText);
+
+            Loc.Manager.SetLanguage("de-DE");
+            LocBindings.Refresh(parent);
+            Assert.AreEqual("Ein Tipp", frame.PromptText);
+
+            frame.ShowPrompt(null, false);
+            LocBindings.Refresh(parent);
+            Assert.AreEqual(string.Empty, frame.PromptText);
+        }
+
         [Test]
         public void ABoundLabelWritesItsTextAnewWhenTheTreeIsRefreshed()
         {

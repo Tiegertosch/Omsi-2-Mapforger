@@ -403,7 +403,7 @@ namespace OmsiMapEditor.UI
             if (signalWindow == null)
                 return;
             signalWindow.Collapsed = false;
-            signalWindow.ShowPrompt(Loc.T(SignalWindowRules.PromptKey(signalGuard.Pending?.Kind)), true); // i18n:keys
+            signalWindow.ShowPrompt(SignalWindowRules.PromptKey(signalGuard.Pending?.Kind), true); // i18n:keys
             SetStatusT("signals.prompt.status");
         }
 

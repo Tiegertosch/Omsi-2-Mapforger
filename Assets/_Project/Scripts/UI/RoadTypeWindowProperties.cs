@@ -700,6 +700,7 @@ namespace OmsiMapEditor.UI
                             ChangePlace(place);
                         break;
                     case "object": SetRowObject(value.Replace('/', '\\'), 0d); break;
+                    case "pickobject": RowObjectRequested?.Invoke(); break;
                     case "templates": ShowTemplates(true); break;
                     case "template": ChooseTemplate(value); break;
                     case "fromroad": ChooseTemplate(ChosenCardId); break;

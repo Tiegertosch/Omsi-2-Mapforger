@@ -34,7 +34,7 @@ namespace OmsiMapEditor.UI
     internal sealed partial class RoadTypeWindow
     {
         private RoadNotice pending;
-        private string pendingText = string.Empty;
+        private Func<string> pendingText = () => string.Empty;
         private Action retry;
         private bool savedMissing;
         private VisualElement noticeRow;
@@ -150,7 +150,7 @@ namespace OmsiMapEditor.UI
                     var usage = UsageProvider?.Invoke();
                     if (usage != null && RoadTypeWindowRules.AsksBeforeOverwrite(usage.Pieces, usage.JunctionCount))
                     {
-                        SetPending(RoadNotice.SaveChoice, Loc.T("roadbuilder.window.save.used", ("pieces", usage.Pieces), ("junctions", usage.JunctionCount)));
+                        SetPending(RoadNotice.SaveChoice, () => Loc.T("roadbuilder.window.save.used", ("pieces", usage.Pieces), ("junctions", usage.JunctionCount)));
                         noticeFirstAction = UpdateAll;
                         noticeSecondAction = OpenNameBar;
                         noticeThirdAction = ClearNotice;
@@ -198,7 +198,7 @@ namespace OmsiMapEditor.UI
         {
             if (Busy || SaveAsNewBlockNow() != RoadSaveBlock.None)
                 return;
-            SetPending(RoadNotice.SaveName, Loc.T("roadbuilder.window.save_new.prompt"));
+            SetPending(RoadNotice.SaveName, () => Loc.T("roadbuilder.window.save_new.prompt"));
             noticeName.SetValueWithoutNotify(RoadTypeWindowRules.CopyName(draft.IsNew ? RoadName : System.IO.Path.GetFileNameWithoutExtension(draft.AssetPath), Loc.T("roadbuilder.window.save_new.copy")));
             noticeFirstAction = ConfirmName;
             noticeSecondAction = null;
@@ -278,14 +278,14 @@ namespace OmsiMapEditor.UI
             var name = System.IO.Path.GetFileNameWithoutExtension(draft.AssetPath);
             if (!RoadTypeWindowRules.MayDelete(usage.Pieces, usage.JunctionCount))
             {
-                SetPending(RoadNotice.DeleteBlocked, Loc.T("roadbuilder.window.delete.blocked", ("name", name), ("pieces", usage.Pieces), ("junctions", usage.JunctionCount)));
+                SetPending(RoadNotice.DeleteBlocked, () => Loc.T("roadbuilder.window.delete.blocked", ("name", name), ("pieces", usage.Pieces), ("junctions", usage.JunctionCount)));
                 noticeFirstAction = null;
                 noticeSecondAction = null;
                 noticeThirdAction = ClearNotice;
                 Render();
                 return;
             }
-            SetPending(RoadNotice.DeleteConfirm, Loc.T("roadbuilder.window.delete.confirm", ("name", name)));
+            SetPending(RoadNotice.DeleteConfirm, () => Loc.T("roadbuilder.window.delete.confirm", ("name", name)));
             noticeFirstAction = ConfirmDelete;
             noticeSecondAction = null;
             noticeThirdAction = ClearNotice;
@@ -301,7 +301,8 @@ namespace OmsiMapEditor.UI
         private void StartDeleteSearch()
         {
             // The search of the other maps takes a moment: the bar shows it and has no button, so a second click cannot start another.
-            SetPending(RoadNotice.Searching, Loc.T("roadbuilder.window.delete.searching", ("name", System.IO.Path.GetFileNameWithoutExtension(draft.AssetPath))));
+            var searched = System.IO.Path.GetFileNameWithoutExtension(draft.AssetPath);
+            SetPending(RoadNotice.Searching, () => Loc.T("roadbuilder.window.delete.searching", ("name", searched)));
             noticeFirstAction = null;
             noticeSecondAction = null;
             noticeThirdAction = null;
@@ -362,6 +363,12 @@ namespace OmsiMapEditor.UI
         // clicked goes away with its question.
         private void SetPending(RoadNotice kind, string text)
         {
+            SetPending(kind, () => text);
+        }
+
+        // The text is made again at every drawing, so an open question follows a language change.
+        private void SetPending(RoadNotice kind, Func<string> text)
+        {
             pending = kind;
             pendingText = text;
             Render();
@@ -378,7 +385,7 @@ namespace OmsiMapEditor.UI
         private void DropNotice()
         {
             pending = RoadNotice.None;
-            pendingText = string.Empty;
+            pendingText = () => string.Empty;
             retry = null;
             noticeFirstAction = null;
             noticeSecondAction = null;
@@ -417,7 +424,7 @@ namespace OmsiMapEditor.UI
                     noticeThirdAction = null;
                     break;
                 default:
-                    text = pendingText;
+                    text = pendingText();
                     break;
             }
             noticeLabel.text = text;

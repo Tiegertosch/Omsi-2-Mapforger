@@ -217,10 +217,12 @@ namespace OmsiMapEditor.UI
             detailLabel.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        /// <summary>The question about unsaved changes: shown while one waits for an answer.</summary>
-        public void ShowPrompt(string text, bool show)
+        /// <summary>The question about unsaved changes, given as its translation key so it follows a language change: shown while one waits for an answer.</summary>
+        public void ShowPrompt(string key, bool show)
         {
-            promptLabel.text = text ?? string.Empty;
+            LocBindings.Text(promptLabel, key); // i18n:keys
+            if (key == null)
+                promptLabel.text = string.Empty;
             promptRow.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         }
 

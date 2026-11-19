@@ -78,6 +78,9 @@ namespace OmsiMapEditor.UI
             objectsPanel.UseOptions(rowPickOptions, Loc.T("roadbuilder.row.panel", ("lane", roadBuilder.SelectedLane + 1)));
             objectsPanel.ShowState(OmsiObjectCategories.Name(OmsiObjectCategory.Trees), null, null);
             roadBuilder.style.display = DisplayStyle.None;
+            // The road options and the road list would sit beside the library and squeeze it: only the library shows while a row's object is chosen.
+            if (roadPanel != null)
+                roadPanel.style.display = DisplayStyle.None;
             objectsPanel.style.display = DisplayStyle.Flex;
             SetStatusT("roadbuilder.status.pick_row", ("lane", roadBuilder.SelectedLane + 1));
         }
@@ -90,6 +93,8 @@ namespace OmsiMapEditor.UI
             pickingRowObject = false;
             objectsPanel.style.display = DisplayStyle.None;
             objectsPanel.UseOptions(null, null);
+            if (roadPanel != null)
+                roadPanel.style.display = DisplayStyle.Flex;
             roadBuilder.style.display = DisplayStyle.Flex;
             if (assetPath != null)
             {
@@ -444,7 +449,7 @@ namespace OmsiMapEditor.UI
                 return true;
             }
             roadBuilder.Collapsed = false;
-            roadBuilder.ShowPrompt(Loc.T("roadbuilder.window.prompt"), true);
+            roadBuilder.ShowPrompt("roadbuilder.window.prompt", true);
             SetStatusT("roadbuilder.window.prompt.status");
             return false;
         }
