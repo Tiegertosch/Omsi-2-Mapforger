@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.IO;
 using OmsiMapEditor.OMSI;
 using UnityEngine;
 
@@ -44,6 +45,52 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The road type lies outside the open project's own folder: it may only be saved as a new type (decision 1).</summary>
         NotOwned
+    }
+
+    /// <summary>What the main button of the footer does with the draft.</summary>
+    internal enum RoadPrimarySave
+    {
+        /// <summary>A new road type is made.</summary>
+        Create,
+
+        /// <summary>A saved road type of the open project is written anew, after asking when the map uses it.</summary>
+        Overwrite,
+
+        /// <summary>A saved road type of another project, or not made by MapWorks, can only be saved as a new type of the open project.</summary>
+        SaveAsNew
+    }
+
+    /// <summary>What the bar between the work area and the footer says or asks, in the order of what matters most.</summary>
+    internal enum RoadNotice
+    {
+        None,
+
+        /// <summary>The road type is used by the open map: update all uses, save as a new type, or cancel.</summary>
+        SaveChoice,
+
+        /// <summary>The name of the new road type to save as.</summary>
+        SaveName,
+
+        /// <summary>Delete the road type? Yes or cancel.</summary>
+        DeleteConfirm,
+
+        /// <summary>The road type cannot be deleted, and why.</summary>
+        DeleteBlocked,
+
+        /// <summary>The search of the other maps before deleting is running.</summary>
+        Searching,
+
+        /// <summary>Saving or deleting failed; the draft stays and it can be tried again.</summary>
+        Error,
+
+        /// <summary>The saved road type changed outside the window: reload it or keep the draft and save it as a new type.</summary>
+        Stale,
+
+        /// <summary>The saved road type is gone: keep the draft and save it as a new type.</summary>
+        Missing,
+
+        /// <summary>The road type lies outside the open project's folder: it opens to be saved as a new type only.</summary>
+        Foreign
     }
 
     /// <summary>How much of an element's label fits into its drawn width.</summary>
@@ -209,6 +256,107 @@ namespace OmsiMapEditor.UI
             if (!ownedByProject)
                 return RoadSaveBlock.NotOwned;
             return dirty ? RoadSaveBlock.None : RoadSaveBlock.NoChanges;
+        }
+
+        /// <summary>What the main button of the footer does: a new road type is made, a saved one of the project is written anew, any other can only be saved as new.</summary>
+        public static RoadPrimarySave PrimarySave(bool isNew, bool ownedByProject)
+        {
+            if (isNew)
+                return RoadPrimarySave.Create;
+            return ownedByProject ? RoadPrimarySave.Overwrite : RoadPrimarySave.SaveAsNew;
+        }
+
+        /// <summary>Whether the footer has a second button, Save as new type: next to the main one for a saved road type of the project.</summary>
+        public static bool ShowsSaveAsNew(bool isNew, bool ownedByProject)
+        {
+            return !isNew && ownedByProject;
+        }
+
+        /// <summary>
+        /// Why a road type cannot be saved as a new one: not while the window is read-only or the draft has problems. Changes are not needed (a
+        /// copy of a road type is one), and a stale draft may be kept this way.
+        /// </summary>
+        public static RoadSaveBlock SaveAsNewBlock(int problems, bool canEdit)
+        {
+            if (!canEdit)
+                return RoadSaveBlock.ReadOnly;
+            return problems > 0 ? RoadSaveBlock.Problems : RoadSaveBlock.None;
+        }
+
+        /// <summary>Why the main button of the footer is blocked, or None: the rules of the action it has (<see cref="PrimarySave"/>).</summary>
+        public static RoadSaveBlock PrimaryBlock(bool isNew, bool dirty, bool stale, int problems, bool canEdit, bool ownedByProject)
+        {
+            return PrimarySave(isNew, ownedByProject) == RoadPrimarySave.SaveAsNew
+                ? SaveAsNewBlock(problems, canEdit)
+                : SaveBlock(isNew, dirty, stale, problems, canEdit, ownedByProject);
+        }
+
+        /// <summary>Whether Save asks first: when the open map uses the road type, so a person sees what changes with it. Nothing in the map changes otherwise.</summary>
+        public static bool AsksBeforeOverwrite(int pieces, int junctions)
+        {
+            return pieces > 0 || junctions > 0;
+        }
+
+        /// <summary>Whether the road type can be deleted at all: a saved one of the project's folder, in a map that may change.</summary>
+        public static bool CanDelete(bool isNew, bool ownedByProject, bool canEdit)
+        {
+            return !isNew && ownedByProject && canEdit;
+        }
+
+        /// <summary>Whether the road type may be deleted now: the open map must not use it (ADR 049); the window names the reason otherwise.</summary>
+        public static bool MayDelete(int pieces, int junctions)
+        {
+            return pieces == 0 && junctions == 0;
+        }
+
+        /// <summary>What the bar shows: a question or message of its own first, then what the state of the road type asks for.</summary>
+        /// <summary>Whether a question or message about the old state of the saved road type goes away when the road type turns stale: the questions and a failure whose Try again would write over it.</summary>
+        public static bool DropsPendingWhenStale(RoadNotice pending)
+        {
+            return pending == RoadNotice.SaveChoice || pending == RoadNotice.DeleteConfirm || pending == RoadNotice.Error;
+        }
+
+        public static RoadNotice Notice(RoadNotice pending, bool isNew, bool stale, bool missing, bool ownedByProject)
+        {
+            if (pending != RoadNotice.None)
+                return pending;
+            if (isNew)
+                return RoadNotice.None;
+            if (stale)
+                return missing ? RoadNotice.Missing : RoadNotice.Stale;
+            return ownedByProject ? RoadNotice.None : RoadNotice.Foreign;
+        }
+
+        /// <summary>The key of the text for a failed save or delete, by what failed; the reason of the system goes in as {reason}, a missing file as {file}.</summary>
+        public static string SaveFailureKey(Exception exception)
+        {
+            if (exception is FileNotFoundException)
+                return "roadbuilder.window.error.missing";
+            if (exception is UnauthorizedAccessException)
+                return "roadbuilder.window.error.denied";
+            if (exception is DirectoryNotFoundException)
+                return "roadbuilder.window.error.folder";
+            if (exception is IOException)
+                return "roadbuilder.window.error.io";
+            return "roadbuilder.window.error.invalid";
+        }
+
+        /// <summary>The key of the text for a remark of taking a road apart into lanes.</summary>
+        public static string NoteKey(OmsiRoadTypeNoteCode code)
+        {
+            switch (code)
+            {
+                case OmsiRoadTypeNoteCode.WidthFitted: return "roadbuilder.window.note.width";
+                case OmsiRoadTypeNoteCode.LanesLimited: return "roadbuilder.window.note.lanes";
+                default: return "roadbuilder.window.note.tracks";
+            }
+        }
+
+        /// <summary>The name offered for a copy of a saved road type: its file name and the word for copy, within the length of the name field.</summary>
+        public static string CopyName(string fileName, string copyWord)
+        {
+            var name = ((fileName ?? string.Empty).Trim() + " " + (copyWord ?? string.Empty).Trim()).Trim();
+            return name.Length > 60 ? name.Substring(name.Length - 60).TrimStart() : name;
         }
 
         public static string SaveBlockKey(RoadSaveBlock block)

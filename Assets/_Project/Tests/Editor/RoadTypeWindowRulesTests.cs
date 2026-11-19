@@ -85,6 +85,120 @@ namespace OmsiMapEditor.Tests
                 Assert.IsNotNull(RoadTypeWindowRules.SaveBlockKey(block), block.ToString());
         }
 
+        // ----- saving, deleting and the bar (C8) -----
+
+        [Test]
+        public void TheMainButtonMakesOverwritesOrSavesAsNewByWhoseRoadTypeItIs()
+        {
+            Assert.AreEqual(RoadPrimarySave.Create, RoadTypeWindowRules.PrimarySave(true, false));
+            Assert.AreEqual(RoadPrimarySave.Overwrite, RoadTypeWindowRules.PrimarySave(false, true));
+            Assert.AreEqual(RoadPrimarySave.SaveAsNew, RoadTypeWindowRules.PrimarySave(false, false), "another project or not made here: only as new");
+            Assert.IsTrue(RoadTypeWindowRules.ShowsSaveAsNew(false, true), "next to Save for a road type of the project");
+            Assert.IsFalse(RoadTypeWindowRules.ShowsSaveAsNew(true, false));
+            Assert.IsFalse(RoadTypeWindowRules.ShowsSaveAsNew(false, false), "it is the main button then");
+        }
+
+        [Test]
+        public void SavingAsNewNeedsNoChangesButNoProblemsAndAMapThatMayChange()
+        {
+            Assert.AreEqual(RoadSaveBlock.None, RoadTypeWindowRules.SaveAsNewBlock(0, true));
+            Assert.AreEqual(RoadSaveBlock.Problems, RoadTypeWindowRules.SaveAsNewBlock(2, true));
+            Assert.AreEqual(RoadSaveBlock.ReadOnly, RoadTypeWindowRules.SaveAsNewBlock(0, false));
+        }
+
+        [Test]
+        public void TheMainButtonIsBlockedByTheRulesOfItsAction()
+        {
+            // Overwrite: changes needed, not stale.
+            Assert.AreEqual(RoadSaveBlock.NoChanges, RoadTypeWindowRules.PrimaryBlock(false, false, false, 0, true, true));
+            Assert.AreEqual(RoadSaveBlock.Stale, RoadTypeWindowRules.PrimaryBlock(false, true, true, 0, true, true));
+            Assert.AreEqual(RoadSaveBlock.None, RoadTypeWindowRules.PrimaryBlock(false, true, false, 0, true, true));
+            // Save as new: a stale or unchanged copy is allowed, the foreign road type can be saved at once.
+            Assert.AreEqual(RoadSaveBlock.None, RoadTypeWindowRules.PrimaryBlock(false, false, true, 0, true, false));
+            Assert.AreEqual(RoadSaveBlock.Problems, RoadTypeWindowRules.PrimaryBlock(false, true, false, 1, true, false));
+            Assert.AreEqual(RoadSaveBlock.ReadOnly, RoadTypeWindowRules.PrimaryBlock(false, true, false, 0, false, false));
+        }
+
+        [Test]
+        public void SaveAsksOnlyWhenTheOpenMapUsesTheRoadType()
+        {
+            Assert.IsFalse(RoadTypeWindowRules.AsksBeforeOverwrite(0, 0));
+            Assert.IsTrue(RoadTypeWindowRules.AsksBeforeOverwrite(1, 0));
+            Assert.IsTrue(RoadTypeWindowRules.AsksBeforeOverwrite(0, 2));
+            Assert.IsTrue(RoadTypeWindowRules.AsksBeforeOverwrite(5, 2));
+        }
+
+        [Test]
+        public void OnlyAnUnusedRoadTypeOfTheProjectOnAMapThatMayChangeCanBeDeleted()
+        {
+            Assert.IsTrue(RoadTypeWindowRules.CanDelete(false, true, true));
+            Assert.IsFalse(RoadTypeWindowRules.CanDelete(true, true, true), "not saved yet");
+            Assert.IsFalse(RoadTypeWindowRules.CanDelete(false, false, true), "another project's");
+            Assert.IsFalse(RoadTypeWindowRules.CanDelete(false, true, false), "read-only map");
+            Assert.IsTrue(RoadTypeWindowRules.MayDelete(0, 0));
+            Assert.IsFalse(RoadTypeWindowRules.MayDelete(1, 0));
+            Assert.IsFalse(RoadTypeWindowRules.MayDelete(0, 1));
+        }
+
+        [Test]
+        public void ARoadTypeThatTurnsStaleTakesAwayTheQuestionsAndAFailureWhoseRetryWouldOverwriteIt()
+        {
+            Assert.IsTrue(RoadTypeWindowRules.DropsPendingWhenStale(RoadNotice.SaveChoice));
+            Assert.IsTrue(RoadTypeWindowRules.DropsPendingWhenStale(RoadNotice.DeleteConfirm));
+            Assert.IsTrue(RoadTypeWindowRules.DropsPendingWhenStale(RoadNotice.Error));
+            Assert.IsFalse(RoadTypeWindowRules.DropsPendingWhenStale(RoadNotice.None));
+            Assert.IsFalse(RoadTypeWindowRules.DropsPendingWhenStale(RoadNotice.DeleteBlocked));
+        }
+
+        [Test]
+        public void TheBarShowsAQuestionOfItsOwnFirstThenTheStateOfTheRoadType()
+        {
+            // A new road type has nothing to say; a question or message always wins.
+            Assert.AreEqual(RoadNotice.None, RoadTypeWindowRules.Notice(RoadNotice.None, true, false, false, false));
+            Assert.AreEqual(RoadNotice.SaveChoice, RoadTypeWindowRules.Notice(RoadNotice.SaveChoice, false, true, false, true));
+            Assert.AreEqual(RoadNotice.Error, RoadTypeWindowRules.Notice(RoadNotice.Error, true, false, false, false));
+            // A saved road type: stale (or gone), then another project's, then nothing.
+            Assert.AreEqual(RoadNotice.Stale, RoadTypeWindowRules.Notice(RoadNotice.None, false, true, false, true));
+            Assert.AreEqual(RoadNotice.Missing, RoadTypeWindowRules.Notice(RoadNotice.None, false, true, true, true));
+            Assert.AreEqual(RoadNotice.Stale, RoadTypeWindowRules.Notice(RoadNotice.None, false, true, false, false), "stale outweighs the hint");
+            Assert.AreEqual(RoadNotice.Foreign, RoadTypeWindowRules.Notice(RoadNotice.None, false, false, false, false));
+            Assert.AreEqual(RoadNotice.None, RoadTypeWindowRules.Notice(RoadNotice.None, false, false, false, true));
+        }
+
+        [Test]
+        public void EachWayASaveFailsHasItsOwnText()
+        {
+            Assert.AreEqual("roadbuilder.window.error.missing", RoadTypeWindowRules.SaveFailureKey(new System.IO.FileNotFoundException("x", "a.bmp")));
+            Assert.AreEqual("roadbuilder.window.error.denied", RoadTypeWindowRules.SaveFailureKey(new System.UnauthorizedAccessException()));
+            Assert.AreEqual("roadbuilder.window.error.folder", RoadTypeWindowRules.SaveFailureKey(new System.IO.DirectoryNotFoundException()));
+            Assert.AreEqual("roadbuilder.window.error.io", RoadTypeWindowRules.SaveFailureKey(new System.IO.IOException()));
+            Assert.AreEqual("roadbuilder.window.error.invalid", RoadTypeWindowRules.SaveFailureKey(new System.ArgumentException()));
+        }
+
+        [Test]
+        public void ACopyIsNamedAfterTheRoadTypeAndStaysWithinTheFieldLength()
+        {
+            Assert.AreEqual("Town road copy", RoadTypeWindowRules.CopyName("Town road", "copy"));
+            Assert.AreEqual("Town road", RoadTypeWindowRules.CopyName("Town road", string.Empty));
+            var long60 = new string('a', 70);
+            var name = RoadTypeWindowRules.CopyName(long60, "copy");
+            Assert.LessOrEqual(name.Length, 60);
+            StringAssert.EndsWith("copy", name);
+        }
+
+        [Test]
+        public void EveryNoteOfTakingARoadApartHasItsOwnKeyAndAnEnglishText()
+        {
+            var codes = System.Enum.GetValues(typeof(OmsiRoadTypeNoteCode)).Cast<OmsiRoadTypeNoteCode>().ToList();
+            var keys = codes.Select(RoadTypeWindowRules.NoteKey).ToList();
+            Assert.AreEqual(codes.Count, keys.Distinct().Count());
+            using var english = EnglishTexts.Use();
+            Assert.AreEqual("Sidewalk 2 is 4.90 m wide instead of 9.80 m, as its kind allows.",
+                RoadTypeWindow.NoteText(OmsiRoadTypeNote.WidthFitted(OmsiRoadLaneKind.Sidewalk, 2, 4.9, 9.8)));
+            Assert.AreEqual("Only the first 16 lanes are taken.", RoadTypeWindow.NoteText(OmsiRoadTypeNote.LanesLimited(16)));
+            Assert.AreEqual("Tracks outside the carriageway are left out.", RoadTypeWindow.NoteText(OmsiRoadTypeNote.TracksLeftOut()));
+        }
+
         // ----- the actions under the preview -----
 
         [Test]

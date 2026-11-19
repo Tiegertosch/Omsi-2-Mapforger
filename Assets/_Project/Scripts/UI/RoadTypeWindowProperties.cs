@@ -651,7 +651,7 @@ namespace OmsiMapEditor.UI
         /// Does what a person would do in the window, one step after the other, for command-line checks: <c>add:bus</c>, <c>side:left|right</c>,
         /// <c>dup</c>, <c>remove</c>, <c>left</c>, <c>right</c>, <c>sel:n</c>, <c>line:n</c>, <c>kind:tram</c>, <c>width:3,5</c> (typed), <c>plus</c>,
         /// <c>minus</c>, <c>dir:with|against</c>, <c>cars:on|off</c>, <c>marking:auto|solid|...</c>, <c>interval:n</c>, <c>turn:n</c>,
-        /// <c>place:kerb|middle|outer</c>, <c>object:Sceneryobjects/x.sco</c>, <c>templates</c>, <c>template:tram-in-the-street</c> (chooses a card), <c>fromroad</c> (chooses From the chosen road), <c>use</c> (Use template), <c>undo</c>, <c>redo</c>. The commands go through the same handlers as the controls.
+        /// <c>place:kerb|middle|outer</c>, <c>object:Sceneryobjects/x.sco</c>, <c>templates</c>, <c>template:tram-in-the-street</c> (chooses a card), <c>fromroad</c> (chooses From the chosen road), <c>use</c> (Use template), <c>undo</c>, <c>redo</c>, <c>save</c> (the main button of the footer), <c>savenew</c> (Save as new type), <c>delete</c>, <c>barname:text</c> (the name field of the bar) and <c>bar:1|2|3</c> (a button of the bar under the work area). The commands go through the same handlers as the controls.
         /// </summary>
         public void RunCommands(string list)
         {
@@ -706,6 +706,17 @@ namespace OmsiMapEditor.UI
                     case "use": UseTemplate(); break;
                     case "undo": UndoDraft(); break;
                     case "redo": RedoDraft(); break;
+                    case "save": Save(); break;
+                    case "savenew": SaveAsNewClicked(); break;
+                    case "delete": AskDelete(); break;
+                    case "barname":
+                        noticeName.SetValueWithoutNotify(value);
+                        RenderNotice();
+                        break;
+                    case "bar":
+                        // The button of the bar a person would click: 1 first, 2 second, 3 third.
+                        (number == 1 ? noticeFirstAction : number == 2 ? noticeSecondAction : noticeThirdAction)?.Invoke();
+                        break;
                     default:
                         Debug.LogWarning("Road builder: unknown command \"" + token + "\".");
                         break;

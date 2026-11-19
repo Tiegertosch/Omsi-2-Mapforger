@@ -219,6 +219,12 @@ namespace OmsiMapEditor.World
         /// <summary>What the holes of the open map were built from; null until the ground is read.</summary>
         private HoleSources holes;
 
+        /// <summary>The newest map summary the renderer saw, so a changed road type can cut the holes again by itself.</summary>
+        private OmsiMapSummary holeSummary;
+
+        /// <summary>A road type changed while the ground was loading; the holes need fresh profiles once it is done.</summary>
+        private bool holeProfilesStale;
+
         private sealed class HoleSources
         {
             public OmsiTerrainHoleCatalog Catalog;
@@ -307,6 +313,7 @@ namespace OmsiMapEditor.World
             if (summary == null || source == null)
                 return;
 
+            holeSummary = summary;
             tileSize = summary.TileSizeMeters;
             loadedInstallationRoot = installationRoot;
             this.originX = originX;
@@ -346,6 +353,8 @@ namespace OmsiMapEditor.World
         /// </summary>
         public void RefreshTerrainHoles(OmsiMapSummary summary)
         {
+            if (summary != null)
+                holeSummary = summary;
             if (holes == null || summary == null || loading != null || pending != null)
                 return;
             // Only objects with a hole cut the ground; the others are left out before the signature, as Build skips them.
@@ -475,6 +484,8 @@ namespace OmsiMapEditor.World
             queuedSplineTiles.Clear();
             queuedTerrainTiles.Clear();
             refreshProfiles = null;
+            holeSummary = null;
+            holeProfilesStale = false;
             refreshTextures.Clear();
         }
 
@@ -500,6 +511,8 @@ namespace OmsiMapEditor.World
                 queuedSplineTiles.Clear();
                 RefreshSplines(splines);
             }
+            if (holeProfilesStale)
+                RecutHolesWithFreshProfiles();
         }
 
         /// <summary>
@@ -560,7 +573,27 @@ namespace OmsiMapEditor.World
         public bool RefreshProfiles(IEnumerable<OmsiTileSummary> tiles)
         {
             refreshProfiles = null;
-            return RefreshSplines(tiles);
+            var drawn = RefreshSplines(tiles);
+            // The hole catalog caches every profile it read, so the outline of a changed road type would stay old.
+            if (!RecutHolesWithFreshProfiles())
+                holeProfilesStale = true;
+            return drawn;
+        }
+
+        /// <summary>
+        /// Drops the cached profiles of the terrain holes and cuts the holes again from the files as they are now.
+        /// Returns false when that is not possible yet (still loading, or no summary known); the caller then keeps
+        /// the request until the ground is loaded.
+        /// </summary>
+        private bool RecutHolesWithFreshProfiles()
+        {
+            if (holes == null || holeSummary == null || loading != null || pending != null || string.IsNullOrEmpty(loadedInstallationRoot))
+                return false;
+            holes.Profiles = new OmsiSplineProfileCatalog(loadedInstallationRoot);
+            holes.Signature = null;
+            holeProfilesStale = false;
+            RefreshTerrainHoles(holeSummary);
+            return true;
         }
 
         /// <summary>

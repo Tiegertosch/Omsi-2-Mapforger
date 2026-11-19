@@ -419,6 +419,11 @@
 .road-window-text-icon-button > Label { margin: 0; padding: 0; }
 .map-control-button.road-window-danger { color: var(--mf-color-error); }
 .map-control-button.road-window-danger:disabled { color: var(--mf-color-text-muted); }
+.road-window-notice { flex-direction: row; align-items: center; flex-wrap: wrap; flex-shrink: 0; margin: var(--mf-space-1) 0; padding: var(--mf-space-1) var(--mf-space-2); background-color: rgba(230, 180, 80, 0.12); border-width: 1px; border-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); }
+.road-window-notice-info { background-color: rgba(100, 160, 230, 0.10); border-color: var(--mf-color-info); }
+.road-window-notice-error { background-color: rgba(224, 100, 100, 0.12); border-color: var(--mf-color-error); }
+.picker-field.road-window-notice-name { flex-grow: 1; flex-shrink: 1; min-width: 140px; margin: 2px 4px; }
+.road-window-delete { margin: 0 0 0 var(--mf-space-2); flex-shrink: 0; }
 .road-window-actions > .map-control-button:disabled { opacity: 0.45; }
 .road-window-add-toggle { flex-direction: row; align-items: center; justify-content: center; height: 30px; margin: var(--mf-space-2) 0 0 0; padding: 0 10px; color: var(--mf-color-text-secondary); background-color: rgba(0, 0, 0, 0); border-width: 0; border-radius: var(--mf-radius-sm); }
 .road-window-add-toggle:hover { color: var(--mf-color-accent); background-color: var(--mf-color-panel-raised); }

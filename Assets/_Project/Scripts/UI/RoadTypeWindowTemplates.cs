@@ -15,8 +15,14 @@ namespace OmsiMapEditor.UI
         /// <summary>The lanes, or null when the road has no carriageway or footpath to take apart.</summary>
         public OmsiRoadType Type;
 
-        /// <summary>What was left out or changed while taking it apart; the remarks of the taking apart are English like all texts of the OMSI module.</summary>
-        public readonly List<string> Notes = new List<string>();
+        /// <summary>What was left out or changed while taking it apart, as codes with their values; <see cref="NotesText"/> translates them.</summary>
+        public readonly List<OmsiRoadTypeNote> Notes = new List<OmsiRoadTypeNote>();
+
+        /// <summary>The remarks in the language of the window, in one line.</summary>
+        public string NotesText()
+        {
+            return string.Join(" ", Notes.ConvertAll(RoadTypeWindow.NoteText));
+        }
     }
 
     /// <summary>
@@ -172,7 +178,7 @@ namespace OmsiMapEditor.UI
             var picked = name != null;
             templateSelected.text = picked ? Loc.T("roadbuilder.window.templates.selection", ("name", name)) : Loc.T("roadbuilder.window.templates.pick");
             templateReplace.style.display = picked ? DisplayStyle.Flex : DisplayStyle.None;
-            var notes = picked && templateChosen == ChosenCardId && source.Notes.Count > 0 ? string.Join(" ", source.Notes) : null;
+            var notes = picked && templateChosen == ChosenCardId && source.Notes.Count > 0 ? source.NotesText() : null;
             templateNotes.style.display = notes != null ? DisplayStyle.Flex : DisplayStyle.None;
             templateNotes.text = notes != null ? Loc.T("roadbuilder.window.templates.from.notes", ("notes", notes)) : string.Empty;
             templateUse.SetEnabled(picked);

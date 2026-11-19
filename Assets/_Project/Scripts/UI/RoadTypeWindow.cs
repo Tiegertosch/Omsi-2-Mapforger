@@ -93,6 +93,7 @@ namespace OmsiMapEditor.UI
                 RenderStatus();
             });
             nameRow.Add(nameField);
+            BuildDeleteButton(nameRow);
             var spacer = new VisualElement();
             spacer.style.flexGrow = 1f;
             nameRow.Add(spacer);
@@ -180,14 +181,15 @@ namespace OmsiMapEditor.UI
             // The templates, in the same window in place of the work area.
             templatesView = BuildTemplatesView();
             Content.Add(templatesView);
+            BuildNotice();
 
             // 4. The question and the footer, which the frame adds below the work area.
             CompleteFrame();
             LocBindings.Text(DiscardButton, "roadbuilder.window.discard");
             LocBindings.Tooltip(DiscardButton, "roadbuilder.window.discard.tooltip");
             DiscardButton.clicked += DiscardChanges;
-            LocBindings.Text(ApplyButton, "roadbuilder.window.save");
             ApplyButton.clicked += Save;
+            BuildSaveAsNewButton();
             LocBindings.Text(PromptDiscard, "roadbuilder.window.prompt.discard");
             LocBindings.Text(PromptKeep, "roadbuilder.window.prompt.keep");
             PromptApply.style.display = DisplayStyle.None;
@@ -196,14 +198,6 @@ namespace OmsiMapEditor.UI
         }
 
         // ----- events for the shell -----
-
-        /// <summary>Save road type for a road type not saved yet: the name and the road type.</summary>
-        public event Action<string, OmsiRoadType> SaveRequested;
-
-        /// <summary>Save road type for a saved one: writes it anew, so every spline of it changes.</summary>
-        public event Action<OmsiRoadType> ReplaceRequested;
-
-        public event Action DeleteRequested;
 
         /// <summary>The window took the lanes of the road chosen in the road tool as its draft (Templates, From the chosen road); the shell tells so in its status line.</summary>
         public event Action<RoadChosenSource> ChosenRoadTaken;
@@ -277,6 +271,8 @@ namespace OmsiMapEditor.UI
         {
             nameTyped = false;
             uses = 0;
+            savedMissing = false;
+            DropNotice();
             nameField.SetValueWithoutNotify(string.Empty);
             draft = new OmsiRoadTypeDraft(OmsiRoadTypeTemplate.Find("2-lanes").Type());
             crossSection.SetDraft(draft);
@@ -302,7 +298,9 @@ namespace OmsiMapEditor.UI
         {
             this.uses = uses;
             nameTyped = false;
+            savedMissing = false;
             draft = new OmsiRoadTypeDraft(road, assetPath);
+            DropNotice();
             crossSection.SetDraft(draft);
             ShowTemplates(false);
             Render();
@@ -313,6 +311,10 @@ namespace OmsiMapEditor.UI
         public void Saved(string assetPath)
         {
             draft.Rebase(assetPath);
+            savedMissing = false;
+            uses = UsageProvider?.Invoke()?.Pieces ?? 0;
+            nameTyped = false;
+            DropNotice();
             Render();
             Changed?.Invoke();
         }
@@ -620,32 +622,6 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private void Save()
-        {
-            if (saving || SaveBlock() != RoadSaveBlock.None)
-                return;
-            // The shell writes at once; a second click while it does (or after, when nothing is left to save) finds the button blocked.
-            saving = true;
-            try
-            {
-                if (draft.IsNew)
-                    SaveRequested?.Invoke(RoadName, draft.ToRoadType());
-                else
-                    ReplaceRequested?.Invoke(draft.ToRoadType());
-            }
-            finally
-            {
-                saving = false;
-                Render();
-            }
-        }
-
-        private RoadSaveBlock SaveBlock()
-        {
-            return RoadTypeWindowRules.SaveBlock(draft.IsNew, draft.IsDirty, draft.IsStale, draft.Problems().Count, canEdit(),
-                !draft.IsNew && OmsiRoadTypeOwnership.InProjectFolder(draft.AssetPath, projectName));
-        }
-
         // ----- drawing -----
 
         private Button IconButton(string icon, string tooltipKey, Action clicked)
@@ -702,6 +678,7 @@ namespace OmsiMapEditor.UI
             RenderAdding();
             SyncInspector();
             RenderStatus();
+            RenderNotice();
             RenderTemplates();
             if (page == RoadWindowPage.Surfaces)
                 RenderSurfacesHeader();
@@ -756,22 +733,18 @@ namespace OmsiMapEditor.UI
                 return;
             var problems = draft.Problems();
             var state = RoadTypeWindowRules.Footer(draft.IsNew, draft.IsDirty, draft.IsStale, problems.Count);
-            var block = SaveBlock();
+            var block = PrimaryBlock();
             var text = state == RoadFooterState.Invalid ? Loc.T(RoadTypeWindowRules.FooterKey(state), ("problem", ProblemText(problems[0]))) // i18n:keys
                 : Loc.T(RoadTypeWindowRules.FooterKey(state)); // i18n:keys
             // The reason Save is blocked that the state does not say already.
-            if (block == RoadSaveBlock.ReadOnly || block == RoadSaveBlock.NotOwned)
+            if (block == RoadSaveBlock.ReadOnly)
                 text += " " + Loc.T(RoadTypeWindowRules.SaveBlockKey(block)); // i18n:keys
             StatusLabel.text = text;
             StatusLabel.tooltip = state == RoadFooterState.Invalid ? LocBindings.CardTooltip(text, string.Join("\n", problems.ConvertAll(ProblemText))) : text;
             StatusLabel.EnableInClassList("signal-footer-dirty", state == RoadFooterState.Changed || state == RoadFooterState.NewUnsaved);
             StatusLabel.EnableInClassList("signal-footer-warning", state == RoadFooterState.Invalid || state == RoadFooterState.Stale);
             DiscardButton.SetEnabled(draft.IsDirty);
-            ApplyButton.SetEnabled(block == RoadSaveBlock.None && !saving);
-            if (block == RoadSaveBlock.None)
-                LocBindings.Tooltip(ApplyButton, draft.IsNew ? "roadbuilder.window.save.tooltip_new" : "roadbuilder.window.save.tooltip_edit", ("name", RoadName), ("uses", uses)); // i18n:keys
-            else
-                LocBindings.Tooltip(ApplyButton, RoadTypeWindowRules.SaveBlockKey(block)); // i18n:keys
+            RenderSaveButtons();
         }
 
         private static string ProblemText(OmsiRoadTypeProblem problem)

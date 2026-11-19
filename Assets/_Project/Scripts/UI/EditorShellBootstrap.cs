@@ -6697,6 +6697,7 @@ namespace OmsiMapEditor.UI
                 else
                     step.RoadTypeChange.Redo();
                 AfterRoadTypeChange(step.RoadTypeChange.AssetPath);
+                CheckRoadDraftStale(step.RoadTypeChange.AssetPath);
                 return;
             }
 

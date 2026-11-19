@@ -793,16 +793,20 @@ namespace OmsiMapEditor.OMSI
             Version++;
         }
 
-        /// <summary>Marks the draft stale when the saved road type now reads otherwise than its baseline, such as after an undo on the map.</summary>
+        /// <summary>
+        /// Marks the draft stale when the saved road type now reads otherwise than its baseline, such as after an undo on the map, and
+        /// clears the mark when it reads as the baseline again, such as after the redo.
+        /// </summary>
+        /// <param name="onDisk">The saved road type as the file holds it now; null when the file is gone or holds none.</param>
         /// <returns>Whether it is stale now.</returns>
         public bool CheckSaved(OmsiRoadType onDisk)
         {
             var description = onDisk == null ? null : onDisk.Describe();
-            if (!string.Equals(description, baselineDescription, StringComparison.Ordinal))
+            var stale = !string.Equals(description, baselineDescription, StringComparison.Ordinal);
+            if (stale != IsStale)
             {
-                if (!IsStale)
-                    Version++;
-                IsStale = true;
+                IsStale = stale;
+                Version++;
             }
             return IsStale;
         }
