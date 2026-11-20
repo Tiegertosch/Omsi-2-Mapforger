@@ -29,6 +29,7 @@
   "context.copy": "Copy",
   "context.duplicate": "Duplicate",
   "context.level": "Level ground",
+  "context.randomize": "Randomize headings",
   "context.delete": "Delete",
   "context.delete_entry": "Delete entry point",
   "context.delete_many": "Delete {count} objects",

@@ -97,7 +97,7 @@ namespace OmsiMapEditor.UI
             bottomBarHeight = BottomBarLayout.CleanHeight(measured);
             var popupBottom = BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.PopupGap);
             var toolBottom = BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.ToolGap);
-            if (inspectorFrame != null)
+            if (inspectorFrame != null && !inspectorAtPointer) // the floating inspector sizes itself (UpdateInspectorPlace)
                 inspectorFrame.style.bottom = popupBottom;
             if (barPopup != null)
                 barPopup.style.bottom = popupBottom;

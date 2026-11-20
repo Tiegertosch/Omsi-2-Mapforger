@@ -145,13 +145,13 @@ namespace OmsiMapEditor.UI
                 chevron.SetIcon(open ? "chevron-down" : "chevron-right");
             }
 
-            Show(!IsFolded(id, defaultOpen));
+            Show(InspectorGroupStartsOpen(id, defaultOpen));
             header.userData = (Action<bool>)Show;
             header.RegisterCallback<ClickEvent>(_ =>
             {
                 var open = body.resolvedStyle.display == DisplayStyle.None;
                 Show(open);
-                RememberFold(id, open);
+                RememberInspectorGroup(id, open);
             });
             fill(body);
             if (body.childCount > 0 || hasHeaderTools)

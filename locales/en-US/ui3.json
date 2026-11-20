@@ -54,5 +54,11 @@
   "@export.created_open_prefix": "The text ends with a colon and a space: a reason follows",
   "map.status.opening": "Opening {name}: reading the map...",
   "map.status.own_project_failed": "The project of this map could not be made in {folder}: {reason}",
-  "@map.status.own_project_failed": "{reason} is a message from the system, in English"
+  "@map.status.own_project_failed": "{reason} is a message from the system, in English",
+  "inspector.selected_splines": "Selected splines",
+  "inspector.count_objects": "{count, plural, one {# object} other {# objects}}",
+  "inspector.count_splines": "{count, plural, one {# spline} other {# splines}}",
+  "inspector.delete_splines": "Delete {count, plural, one {# spline} other {# splines}}",
+  "inspector.view.full": "Show the full inspector",
+  "inspector.view.compact": "Show the compact inspector"
 }

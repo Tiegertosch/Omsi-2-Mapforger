@@ -29,6 +29,7 @@
   "context.copy": "Kopieren",
   "context.duplicate": "Duplizieren",
   "context.level": "Boden einebnen",
+  "context.randomize": "Ausrichtungen würfeln",
   "context.delete": "Löschen",
   "context.delete_entry": "Einstiegspunkt löschen",
   "context.delete_many": "{count} Objekte löschen",

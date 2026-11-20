@@ -90,6 +90,12 @@ namespace OmsiMapEditor.UI
                 openPathsGroupWhenRead = false;
             if (inspectorFrame != null)
                 inspectorFrame.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (show)
+            {
+                // Above the tool windows: hanging at a row or object under the object window or the tool options, it would stay hidden behind them.
+                inspectorFrame?.BringToFront();
+                UpdateInspectorPlace(); // beside the element at once; the layout and the tick correct it
+            }
             // Drawn for what was selected while it was hidden (RenderInspector leaves a hidden inspector empty).
             if (show && draw && inspectorStale)
                 RenderInspector();
@@ -121,6 +127,9 @@ namespace OmsiMapEditor.UI
             if (group == null || records == null)
                 return;
             (group.Q(className: "inspector-group-header")?.userData as Action<bool>)?.Invoke(true);
+            // The compact window keeps the group open when it is drawn again (the full view keeps its folds as the owner left them).
+            if (!inspectorFull)
+                compactGroupChoice[groupId] = true;
             // The group has its place only after the next layout, and a frame that was hidden lays out late; the later run wins over the
             // scroll position RenderInspector keeps for the same selection.
             void Scroll()
@@ -211,7 +220,7 @@ namespace OmsiMapEditor.UI
             else if (hit.Object != null)
                 FillObjectMenu(menu, hit.Tile, hit.Object);
             else if (onRow)
-                FillRowMenu(menu, hit.Row.Value);
+                FillRowMenu(menu, hit.Row.Value, OmsiMapGeometry.TileLocalToWorld(hit.Tile.X, hit.Tile.Y, hit.LocalX, hit.LocalY, currentSummary.TileSizeMeters));
             else if (hit.Spline != null)
                 FillSplineMenu(menu, hit.Spline);
             else
@@ -273,6 +282,7 @@ namespace OmsiMapEditor.UI
                     case ContextMenuAction.Copy: return () => CopySelection();
                     case ContextMenuAction.Duplicate: return DuplicateSelection;
                     case ContextMenuAction.LevelGround: return LevelSelectedGround;
+                    case ContextMenuAction.RandomizeHeadings: return RandomizeSelectedHeadings;
                     default: return DeleteSelectedObjects;
                 }
             });
@@ -418,25 +428,25 @@ namespace OmsiMapEditor.UI
             return new Vector3((float)profile.LeftEdge, (float)profile.RightEdge, (float)lift);
         }
 
-        private void FillRowMenu(VisualElement menu, KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row)
+        private void FillRowMenu(VisualElement menu, KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row, OmsiMapPoint clickedAt)
         {
             AddContextHeader(menu, Loc.T("context.row", ("id", row.Value.Id), ("name", Path.GetFileName(row.Value.AssetPath ?? string.Empty))));
             var state = new ContextMenuState { CanEdit = CanEdit };
             AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Row, state), action =>
             {
                 if (action == ContextMenuAction.EditRow)
-                    return () => EditRowFromMenu(row);
+                    return () => EditRowFromMenu(row, clickedAt);
                 return () => DeleteRowFromMenu(row);
             });
         }
 
         /// <summary>"Edit row": the rows tool with the row selected, as a click on it in the tool does.</summary>
-        private void EditRowFromMenu(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row)
+        private void EditRowFromMenu(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row, OmsiMapPoint? clickedAt = null)
         {
             SetTool(EditorTool.Rows);
             if (activeTool != EditorTool.Rows)
                 return;
-            SelectRow(row);
+            SelectRow(row, clickedAt);
             UpdateRowPreview();
             if (selectedRow != null)
                 SetStatusT("rows.status.selected", ("path", row.Value.AssetPath), ("id", row.Value.Id));

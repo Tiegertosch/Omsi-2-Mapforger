@@ -54,6 +54,7 @@ namespace OmsiMapEditor.UI
                     ApplyHideDlc();
                 });
             }
+            SetUpInspectorEdgeSetting(root);
             var menuItem = root.Q<Button>("settings-menu-item");
             var close = root.Q<Button>("settings-close-button");
             var fileMenu = root.Q<VisualElement>("file-menu");

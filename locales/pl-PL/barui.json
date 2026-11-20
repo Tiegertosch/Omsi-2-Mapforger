@@ -29,6 +29,7 @@
   "context.copy": "Kopiuj",
   "context.duplicate": "Duplikuj",
   "context.level": "Wyrównaj teren",
+  "context.randomize": "Losuj kierunki",
   "context.delete": "Usuń",
   "context.delete_entry": "Usuń punkt wejścia",
   "context.delete_many": "Usuń obiekty: {count}",

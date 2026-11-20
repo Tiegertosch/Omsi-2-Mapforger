@@ -22,6 +22,8 @@ namespace OmsiMapEditor.UI
         /// <summary>Stops placing and says so in the status bar.</summary>
         StopPlacementWithStatus,
         CloseObjectsPanel,
+        /// <summary>Closes the inspector window (M5 step 3), before the selection is let go of.</summary>
+        CloseInspector,
         ClearSelection,
     }
 
@@ -106,6 +108,8 @@ namespace OmsiMapEditor.UI
         /// <summary>The Objects window is in Row mode (the rows tool is active); it is not <see cref="ObjectsPanelOpen"/> then.</summary>
         public bool RowToolActive;
         public bool SelectionNotEmpty;
+        /// <summary>The inspector window is open and nothing is being dragged in the map (a drag takes Esc to cancel itself).</summary>
+        public bool InspectorShown;
     }
 
     /// <summary>
@@ -162,6 +166,7 @@ namespace OmsiMapEditor.UI
                 order.Add(EscapeAction.EscapeActiveTool);
                 order.Add(state.MapPlacing ? EscapeAction.StopPlacementWithStatus
                     : state.ObjectsPanelOpen ? EscapeAction.CloseObjectsPanel
+                    : state.InspectorShown ? EscapeAction.CloseInspector
                     : state.SelectionNotEmpty ? EscapeAction.ClearSelection
                     : EscapeAction.None);
             }

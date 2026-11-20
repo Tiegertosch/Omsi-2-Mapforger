@@ -112,7 +112,7 @@ namespace OmsiMapEditor.Tests
             var state = new ContextMenuState { CanEditObjects = true };
 
             Assert.That(Describe(ContextMenuKind.Object, state), Is.EqualTo("properties change_type labels --- copy duplicate --- delete!"));
-            Assert.That(Describe(ContextMenuKind.Selection, state), Is.EqualTo("properties --- copy duplicate --- delete_many!"));
+            Assert.That(Describe(ContextMenuKind.Selection, state), Is.EqualTo("properties --- copy duplicate randomize --- delete_many!"));
         }
 
         [Test]
@@ -129,13 +129,24 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
-        public void SeveralSelectedObjectsOfferCopyDuplicateLevelAndDeleteAll()
+        public void SeveralSelectedObjectsOfferCopyDuplicateLevelRandomizeAndDeleteAll()
         {
             var entries = ContextMenuEntries.For(ContextMenuKind.Selection, Editable());
 
-            Assert.That(Describe(ContextMenuKind.Selection, Editable()), Is.EqualTo("properties --- copy duplicate level --- delete_many!"));
+            Assert.That(Describe(ContextMenuKind.Selection, Editable()), Is.EqualTo("properties --- copy duplicate level randomize --- delete_many!"));
             Assert.That(entries.Where(entry => entry.Type == ContextMenuEntryType.Item).Select(entry => entry.Shortcut),
-                Is.EqualTo(new[] { null, "Ctrl+C", "Ctrl+D", null, "Del" }));
+                Is.EqualTo(new[] { null, "Ctrl+C", "Ctrl+D", null, null, "Del" }));
+        }
+
+        [Test]
+        public void RandomizingHeadingsIsOnlyOfferedForSeveralObjectsAndNeedsEditableObjects()
+        {
+            foreach (var kind in new[] { ContextMenuKind.Object, ContextMenuKind.Spline, ContextMenuKind.Tile, ContextMenuKind.Row })
+                Assert.That(ContextMenuEntries.For(kind, Editable()).Any(entry => entry.Action == ContextMenuAction.RandomizeHeadings), Is.False, kind.ToString());
+            Assert.That(ContextMenuEntries.For(ContextMenuKind.Selection, new ContextMenuState()).Any(entry => entry.Action == ContextMenuAction.RandomizeHeadings), Is.False);
+            var randomize = ContextMenuEntries.For(ContextMenuKind.Selection, new ContextMenuState { CanEditObjects = true }).Single(entry => entry.Action == ContextMenuAction.RandomizeHeadings);
+            Assert.That(randomize.Danger, Is.False);
+            Assert.That(randomize.DisabledReasonKey, Is.Null);
         }
 
         private static ContextMenuState MadeJunction()

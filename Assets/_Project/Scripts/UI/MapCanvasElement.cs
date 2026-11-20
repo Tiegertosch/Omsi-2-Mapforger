@@ -843,6 +843,25 @@ namespace OmsiMapEditor.UI
 
         public bool IsPlacing => placementAsset != null;
 
+        /// <summary>The pointer is held down and has begun to move something (not a mere press on an object): an object, a handle, the view (pan, orbit) or a selection box. The inspector dims while it is.</summary>
+        public bool IsMovingWithPointer
+        {
+            get
+            {
+                if (dragMode == DragMode.None || dragMode == DragMode.MovePending)
+                    return false;
+                // A camera drag counts once the pointer has really moved (latched, so it cannot switch back and forth); a mere right or middle press does not.
+                if (dragMode == DragMode.Pan || dragMode == DragMode.Orbit || dragMode == DragMode.OrbitPan)
+                    return cameraDragMoved;
+                return true;
+            }
+        }
+
+        private bool cameraDragMoved;
+
+        /// <summary>The camera as one value (2D centre and zoom, 3D target, angles and distance); it changes whenever the view moves, however it was moved.</summary>
+        public int CameraStamp => HashCode.Combine(center.x, center.y, metersPerPixel, OrbitTarget.x, OrbitTarget.y, OrbitYaw, OrbitPitch, OrbitDistance);
+
         /// <summary>Several objects are being placed together, as pasted from the clipboard; the pointer holds their middle.</summary>
         public bool IsPlacingGroup => placementGroup != null;
 
@@ -3997,6 +4016,7 @@ namespace OmsiMapEditor.UI
             dragPointerId = pointerId;
             dragStartPointer = position;
             dragLastPointer = position;
+            cameraDragMoved = false;
             this.CapturePointer(pointerId);
         }
 
@@ -4103,6 +4123,8 @@ namespace OmsiMapEditor.UI
             }
 
             dragLastPointer = position;
+            if (!cameraDragMoved && Vector2.Distance(position, dragStartPointer) >= DragThreshold)
+                cameraDragMoved = true;
             if (dragMode == DragMode.Move)
                 MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY, previewHeightOffset);
             else if (IsTurningGroup)

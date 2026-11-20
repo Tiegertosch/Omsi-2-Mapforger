@@ -29,6 +29,7 @@
   "context.copy": "Copia",
   "context.duplicate": "Duplica",
   "context.level": "Livella il terreno",
+  "context.randomize": "Orientamenti casuali",
   "context.delete": "Elimina",
   "context.delete_entry": "Elimina punto di ingresso",
   "context.delete_many": "Elimina {count} oggetti",

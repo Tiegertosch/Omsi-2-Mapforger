@@ -34,6 +34,7 @@ namespace OmsiMapEditor.UI
         Copy,
         Duplicate,
         LevelGround,
+        RandomizeHeadings,
         DeleteObjects,
         DeleteEntryPoint,
         EditSplineHeights,
@@ -159,6 +160,8 @@ namespace OmsiMapEditor.UI
             Item(entries, ContextMenuAction.Duplicate, "context.duplicate", "Ctrl+D");
             if (state.CanEdit)
                 Item(entries, ContextMenuAction.LevelGround, "context.level");
+            // The compact inspector gives only the sum and the delete button of a group; these two actions live here and in the full view (ADR 098).
+            Item(entries, ContextMenuAction.RandomizeHeadings, "context.randomize");
             Divider(entries);
             Item(entries, ContextMenuAction.DeleteObjects, "context.delete_many", "Del", true);
         }

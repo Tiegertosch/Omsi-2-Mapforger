@@ -836,6 +836,7 @@ namespace OmsiMapEditor.UI
             EnforceTypePick();
             RefreshToolHint();
             ReloadAfterPendingRollBack();
+            FollowInspectorWithCamera();
             if (groundRenderer == null || mapCanvas == null || rootElement == null)
                 return;
             TickSignalPreview(Time.unscaledDeltaTime);
@@ -976,6 +977,7 @@ namespace OmsiMapEditor.UI
             var projectPath = Argument("-openProject", 1);
             var quit = Array.IndexOf(args, "-quit") >= 0;
             RunLocalizationArguments(args);
+            ConfigureInspectorPlacement(args); // M5 step 3: the inspector beside the element
             // A session that ended without quitting asks for a bug report (ADR 053); -bugReport [crash] opens the form for a
             // check, with -bugReportTitle and -bugReportSend, which then only writes the files and logs the address.
             var crashed = BeginSession(quit);
@@ -1118,6 +1120,17 @@ namespace OmsiMapEditor.UI
                         ToggleObject(tile, item);
                     break;
                 }
+            }
+
+            // -selectTile <x> <y>: chooses the tile on its own, as a click on empty ground or Esc does.
+            if (int.TryParse(Argument("-selectTile", 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var chooseTileX) &&
+                int.TryParse(Argument("-selectTile", 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out var chooseTileY))
+            {
+                var chosenTile = currentSummary.Tiles.Find(candidate => candidate.X == chooseTileX && candidate.Y == chooseTileY);
+                if (chosenTile != null)
+                    SelectTile(chosenTile, false);
+                else
+                    Debug.LogWarning("-selectTile: the map has no tile " + chooseTileX + "," + chooseTileY + ".");
             }
 
             var toolName = Argument("-tool", 1);
@@ -1890,6 +1903,9 @@ namespace OmsiMapEditor.UI
                             yield return null;
                     }
                 }
+                // -inspectorWait <seconds> lets the window's placement run for a while first (its timing is logged as "Inspector placement:").
+                if (Argument("-inspectorWait", 1) is string waitText && float.TryParse(waitText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var waitSeconds))
+                    yield return new WaitForSecondsRealtime(waitSeconds);
                 // At the end of the frame the screen holds the cameras and the UI on top.
                 yield return new WaitForEndOfFrame();
                 SaveScreenshot(screenshot);
@@ -2092,6 +2108,8 @@ namespace OmsiMapEditor.UI
             junctionTerrainPlaces = null;
             selectedTile = null;
             selectedObject = null;
+            if (!keepView)
+                tileChosen = false;
             if (keepView && previousTile != null)
                 selectedTile = summary.Tiles.Find(tile => tile.X == previousTile.X && tile.Y == previousTile.Y);
             if (selectedTile != null && previousObjectId.HasValue)
@@ -4944,6 +4962,7 @@ namespace OmsiMapEditor.UI
 
             selection.Clear();
             ClearSelectedSpline();
+            tileChosen = true;
             ApplySelection(tile);
             if (centerView)
                 mapCanvas?.CenterOn(tile, null);
@@ -5751,7 +5770,7 @@ namespace OmsiMapEditor.UI
             row.style.flexDirection = FlexDirection.Row;
             var set = new Button(() =>
             {
-                if (double.TryParse(field.value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
+                if (double.TryParse(AppliedText(field).Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
                     SetTileWater(tile, height);
                 else
                     SetStatusT("water.status.height_number");
@@ -5783,7 +5802,7 @@ namespace OmsiMapEditor.UI
             {
                 var heights = new float[4];
                 for (var corner = 0; corner < 4; corner++)
-                    if (double.TryParse(corners[corner].value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
+                    if (double.TryParse(AppliedText(corners[corner]).Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var height))
                         heights[corner] = (float)height;
                     else
                     {
@@ -6070,7 +6089,7 @@ namespace OmsiMapEditor.UI
                 var hovered = RowAt(pointer);
                 if (hovered.HasValue)
                 {
-                    SelectRow(hovered.Value);
+                    SelectRow(hovered.Value, pointer);
                     UpdateRowPreview();
                     if (selectedRow != null)
                         SetStatusT("rows.status.selected", ("path", hovered.Value.Value.AssetPath), ("id", hovered.Value.Value.Id));
@@ -6192,9 +6211,11 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Selects the row a record belongs to and shows its values in the options.</summary>
-        private void SelectRow(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> record)
+        private void SelectRow(KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> record, OmsiMapPoint? clickedAt = null)
         {
             selectedRow = RowOf(record);
+            // The inspector hangs at the object that was clicked; without a click it hangs at the first object of the row.
+            rowClickedAt = clickedAt;
             if (selectedRow == null)
             {
                 DeselectRow();
@@ -6212,6 +6233,7 @@ namespace OmsiMapEditor.UI
         private void DeselectRow()
         {
             selectedRow = null;
+            rowClickedAt = null;
             rowOptions?.EndEditing();
             rowOptions?.ShowObject(rowAsset);
         }
@@ -6259,6 +6281,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             var id = selectedRow.Records[0].Value.Id;
+            var keptClick = rowClickedAt;
             rowLayout = null;
             rowObjects = null;
             PushHistory(new ObjectEditStep { AttachmentChange = result.Change });
@@ -6266,7 +6289,7 @@ namespace OmsiMapEditor.UI
             var kept = result.Change.Added.Find(item => !item.Value.IsRepeater && item.Value.Id == id);
             if (kept.Value == null)
                 kept = result.Change.Added.Find(item => !item.Value.IsRepeater);
-            SelectRow(kept);
+            SelectRow(kept, keptClick);
             UpdateRowPreview();
             SetStatusT("rows.status.changed", ("name", Path.GetFileNameWithoutExtension(request.AssetPath)), ("hasCount", selectedRow != null ? "yes" : "no"), ("count", selectedRow?.ObjectCount ?? 0));
         }
@@ -6449,6 +6472,7 @@ namespace OmsiMapEditor.UI
                 ObjectsPanelOpen = objectsPanelOpen,
                 RowToolActive = activeTool == EditorTool.Rows,
                 SelectionNotEmpty = selection.Count > 0,
+                InspectorShown = inspectorShown && (mapCanvas == null || !mapCanvas.IsDragging),
             };
             foreach (var action in EscapeOrder.Order(state))
             {
@@ -6490,6 +6514,9 @@ namespace OmsiMapEditor.UI
                     return true;
                 case EscapeAction.CloseObjectsPanel:
                     ShowObjectsPanel(false);
+                    return true;
+                case EscapeAction.CloseInspector:
+                    ShowInspector(false);
                     return true;
                 case EscapeAction.ClearSelection:
                     SelectTile(selectedTile, false);
@@ -7805,7 +7832,9 @@ namespace OmsiMapEditor.UI
 
         private bool TryParseField(TextField field, string name, out double value)
         {
-            var text = (field.value ?? string.Empty).Trim().Replace(',', '.');
+            // A field that still shows its rounded display applies the stored full value, not the rounded one.
+            var shown = RoundedFieldValue.TryOriginal(field, out var original) ? original : field.value;
+            var text = (shown ?? string.Empty).Trim().Replace(',', '.');
             if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
                 !double.IsNaN(value) && !double.IsInfinity(value))
                 return true;
@@ -8178,7 +8207,7 @@ namespace OmsiMapEditor.UI
             if (mapCanvas == null)
                 return Vector4.zero;
             var canvas = mapCanvas.worldBound;
-            var right = inspectorFrame != null && inspectorShown ? canvas.xMax - inspectorFrame.worldBound.xMin : 0f;
+            var right = inspectorFrame != null && inspectorShown && !inspectorAtPointer ? canvas.xMax - inspectorFrame.worldBound.xMin : 0f;
             // The bar's height is the one measured for the windows above it (ApplyBottomBarHeight); 0 before the first layout.
             var bottom = bottomBar != null && bottomBar.resolvedStyle.display != DisplayStyle.None ? bottomBarHeight : 0f;
             return new Vector4(0f, 0f, BottomBarLayout.CleanHeight(right), bottom);
@@ -8989,6 +9018,8 @@ namespace OmsiMapEditor.UI
             inspectorPanel.Add(InspectorTileSummary(selectedTile));
 
             ChooseInspectorTab();
+            // The compact window hides the tile's title and tabs only while something is selected (USS: inspector-frame-selection).
+            inspectorFrame?.EnableInClassList("inspector-frame-selection", HasInspectorSelection);
             if (HasInspectorSelection)
                 inspectorPanel.Add(InspectorTabStrip());
             inspectorActions = new VisualElement();
@@ -9005,11 +9036,13 @@ namespace OmsiMapEditor.UI
                     AddSelectionSummary(records);
                 else if (selectedObject != null)
                     AddObjectEditor(records, selectedObject);
+                else if (selectedSpline != null && InspectorShowsSumOnly)
+                    AddSplineSummary(records);
                 else if (selectedSpline != null)
                     AddSplineDetails(records, selectedSpline);
                 else if (selectedRow != null && activeTool == EditorTool.Rows)
                     AddRowAttachedObjects(records);
-                if (pathsShown && mapPaths != null && selection.Count <= 1 && (selectedObject != null || selectedSpline != null))
+                if (pathsShown && mapPaths != null && selection.Count <= 1 && !InspectorShowsSumOnly && (selectedObject != null || selectedSpline != null))
                     AddPathDetails(records, selectedTile, selectedObject?.Id ?? selectedSpline.Id, selectedObject == null);
             }
             inspectorPanel.Add(records);
@@ -9079,14 +9112,19 @@ namespace OmsiMapEditor.UI
             var ids = new List<string>();
             foreach (var entry in selection)
                 ids.Add("#" + entry.Record.Id);
-            var names = new Label(Loc.T("inspector.selected_ids", ("count", selection.Count), ("ids", string.Join(", ", ids.GetRange(0, Math.Min(12, ids.Count)))), ("more", ids.Count > 12 ? "yes" : "no")));
+            // The compact window gives the number only; the full view also names the first IDs.
+            var names = new Label(InspectorShowsSumOnly
+                ? Loc.T("inspector.count_objects", ("count", selection.Count))
+                : Loc.T("inspector.selected_ids", ("count", selection.Count), ("ids", string.Join(", ", ids.GetRange(0, Math.Min(12, ids.Count)))), ("more", ids.Count > 12 ? "yes" : "no")));
             names.AddToClassList("inspector-edit-name");
             editor.Add(names);
 
             var canEdit = CanEditObjects;
             if (canEdit)
             {
-                if (CanEdit)
+                // The compact window gives the sum and the delete button only (owner, 20 November 2026); levelling and randomizing
+                // stay in the full view and in the right-click menu of the selection.
+                if (CanEdit && !InspectorShowsSumOnly)
                 {
                     var level = new Button(LevelSelectedGround)
                     {
@@ -9096,22 +9134,57 @@ namespace OmsiMapEditor.UI
                     level.AddToClassList("inspector-edit-apply");
                     inspectorActions.Add(level);
                 }
-                var randomize = new Button(RandomizeSelectedHeadings)
+                if (!InspectorShowsSumOnly)
                 {
-                    text = Loc.T("inspector.randomize_headings"),
-                    tooltip = Loc.T("inspector.randomize_headings.tooltip")};
-                randomize.AddToClassList("map-control-button");
-                randomize.AddToClassList("inspector-edit-apply");
-                inspectorActions.Add(randomize);
+                    var randomize = new Button(RandomizeSelectedHeadings)
+                    {
+                        text = Loc.T("inspector.randomize_headings"),
+                        tooltip = Loc.T("inspector.randomize_headings.tooltip")};
+                    randomize.AddToClassList("map-control-button");
+                    randomize.AddToClassList("inspector-edit-apply");
+                    inspectorActions.Add(randomize);
+                }
                 var delete = new Button(DeleteSelectedObjects) { text = Loc.T("inspector.delete_many", ("count", selection.Count))};
                 delete.AddToClassList("map-control-button");
                 delete.AddToClassList("inspector-edit-delete");
                 inspectorActions.Add(delete);
             }
-            var hint = new Label(Loc.T(canEdit ? "inspector.group_hint" : "inspector.readonly")) /* i18n:keys */;
-            hint.AddToClassList("muted");
-            hint.AddToClassList("inspector-edit-hint");
-            editor.Add(hint);
+            if (!InspectorShowsSumOnly || !canEdit)
+            {
+                var hint = new Label(Loc.T(canEdit ? "inspector.group_hint" : "inspector.readonly")) /* i18n:keys */;
+                hint.AddToClassList("muted");
+                hint.AddToClassList("inspector-edit-hint");
+                editor.Add(hint);
+            }
+            container.Add(editor);
+        }
+
+        /// <summary>Several splines selected, in the compact window: their number and the way to delete them all (the full view shows the first one's details).</summary>
+        private void AddSplineSummary(VisualElement container)
+        {
+            var editor = new VisualElement();
+            editor.AddToClassList("inspector-edit");
+            var heading = UpperLabel("inspector.selected_splines");
+            heading.AddToClassList("inspector-section-heading");
+            editor.Add(heading);
+            var count = moreSplines.Count + 1;
+            var names = new Label(Loc.T("inspector.count_splines", ("count", count)));
+            names.AddToClassList("inspector-edit-name");
+            editor.Add(names);
+            if (CanEdit)
+            {
+                var delete = new Button(DeleteSelectedSpline) { text = Loc.T("inspector.delete_splines", ("count", count)) };
+                delete.AddToClassList("map-control-button");
+                delete.AddToClassList("inspector-edit-delete");
+                inspectorActions.Add(delete);
+            }
+            else
+            {
+                var hint = new Label(Loc.T("inspector.readonly"));
+                hint.AddToClassList("muted");
+                hint.AddToClassList("inspector-edit-hint");
+                editor.Add(hint);
+            }
             container.Add(editor);
         }
 
@@ -9209,6 +9282,8 @@ namespace OmsiMapEditor.UI
             editor.Add(name);
             AddChronoOrigin(editor, item);
 
+            // Three fields to a line in 300 px: a value like 289.47708489 would be cut, so the fields show it to three decimals
+            // and keep the full value (RoundedFieldValue) for editing and for Apply.
             var position = AddEditRow(editor, ("inspector.field.x", item.LocalX), ("inspector.field.y", item.LocalY), ("inspector.field.height", item.Height));
             var xField = position[0];
             var yField = position[1];
@@ -9366,7 +9441,15 @@ namespace OmsiMapEditor.UI
             LocBindings.Text(field, labelKey); // i18n:keys
             field.AddToClassList("inspector-edit-field");
             container.Add(field);
+            // Every number field of the inspector shows three decimals and keeps the full value (RoundedFieldValue).
+            RoundedFieldValue.Attach(field);
             return field;
+        }
+
+        /// <summary>The text of a number field of the inspector as it applies: the full stored text while the field still shows its rounded display.</summary>
+        private static string AppliedText(TextField field)
+        {
+            return RoundedFieldValue.TryOriginal(field, out var original) ? original : field.value ?? string.Empty;
         }
 
         /// <summary>The spline joined at an end of the selected spline: by ID, or touching it without one, or open.</summary>

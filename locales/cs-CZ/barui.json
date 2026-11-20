@@ -29,6 +29,7 @@
   "context.copy": "Kopírovat",
   "context.duplicate": "Duplikovat",
   "context.level": "Srovnat terén",
+  "context.randomize": "Náhodné směry",
   "context.delete": "Smazat",
   "context.delete_entry": "Smazat vstupní bod",
   "context.delete_many": "Smazat objekty: {count}",

@@ -10,5 +10,6 @@
   "settings.hide_dlc.hint": "Skryje objekty a typy silnic patřící k DLC ve všech seznamech kromě seznamu mapy, takže mapa potřebuje jen základní hru a freeware. {origin} Složky doplňků koupených mimo Steam lze v knihovně objektů označit jako DLC tlačítkem štítku.",
   "settings.language.changed": "Jazyk rozhraní je nyní {language}.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
-  "settings.close": "Zavřít"
+  "settings.close": "Zavřít",
+  "settings.inspector_at_edge": "Držet inspektor u pravého okraje místo u vybraného prvku"
 }

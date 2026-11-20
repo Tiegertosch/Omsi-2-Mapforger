@@ -114,6 +114,21 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void TheInspectorClosesBeforeTheSelectionIsLetGoOfButAfterThePlacingAndThePanel()
+        {
+            var state = new EscapeState { InspectorShown = true, SelectionNotEmpty = true };
+
+            Assert.That(Order(state), Is.EqualTo(new[] { EscapeAction.CloseTopOverlay, EscapeAction.EscapeActiveTool, EscapeAction.CloseInspector }));
+            state.ObjectsPanelOpen = true;
+            Assert.That(Order(state)[2], Is.EqualTo(EscapeAction.CloseObjectsPanel));
+            state.MapPlacing = true;
+            Assert.That(Order(state)[2], Is.EqualTo(EscapeAction.StopPlacementWithStatus));
+            // The context menu keeps its priority; with no inspector the selection goes as before.
+            Assert.That(Order(new EscapeState { ContextMenuOpen = true, InspectorShown = true }), Is.EqualTo(new[] { EscapeAction.CloseContextMenu }));
+            Assert.That(Order(new EscapeState { SelectionNotEmpty = true })[2], Is.EqualTo(EscapeAction.ClearSelection));
+        }
+
+        [Test]
         public void OnlyTheOverlayAndTheToolCanDeclineAndEveryOrderEndsWithAnActionThatCannot()
         {
             foreach (EscapeAction action in Enum.GetValues(typeof(EscapeAction)))
@@ -122,7 +137,7 @@ namespace OmsiMapEditor.Tests
                 Assert.That(EscapeOrder.CanDecline(action), Is.EqualTo(declines), action.ToString());
             }
 
-            for (var bits = 0; bits < 1 << 15; bits++)
+            for (var bits = 0; bits < 1 << 16; bits++)
             {
                 var state = new EscapeState
                 {
@@ -130,7 +145,7 @@ namespace OmsiMapEditor.Tests
                     PickingElementType = (bits & 8) != 0, PickingVarParent = (bits & 16) != 0, PickingSplineType = (bits & 32) != 0,
                     PlacementAssetChosen = (bits & 64) != 0, MapPlacing = (bits & 128) != 0, TypingInField = (bits & 256) != 0,
                     ModalDialogShown = (bits & 512) != 0, SatelliteWaitsForPick = (bits & 1024) != 0, ControlHeld = (bits & 2048) != 0,
-                    ObjectsPanelOpen = (bits & 4096) != 0, SelectionNotEmpty = (bits & 8192) != 0, RowToolActive = (bits & 16384) != 0,
+                    ObjectsPanelOpen = (bits & 4096) != 0, SelectionNotEmpty = (bits & 8192) != 0, RowToolActive = (bits & 16384) != 0, InspectorShown = (bits & 32768) != 0,
                 };
                 var order = EscapeOrder.Order(state);
                 Assert.That(EscapeOrder.CanDecline(order[order.Count - 1]), Is.False, bits.ToString());
