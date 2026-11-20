@@ -52,6 +52,8 @@
   "@spline.status.selected": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "spline.status.refs": "Spline #{id} permanece: {count, plural, one {# referência ainda precisa} other {# referências ainda precisam}}, como {reasons}.",
   "spline.status.deleted": "Eliminado spline #{id}; Ctrl+Z traz isso de volta.",
+  "spline.status.deleted_many": "Eliminados {count} splines; Ctrl+Z traz-os de volta.",
+  "spline.status.deleted_some": "Eliminados {count} de {total} splines; os restantes permanecem porque ainda há referências que os necessitam, como {reasons}. Ctrl+Z traz de volta os eliminados.",
   "spline.drag.bend": "{alt, select, yes {Alisamento spline #{id}} other {Dobrar spline #{id}; Alt executa direto}}",
   "spline.drag.move": "Mover o {which, select, end {fim} other {começar}} de spline #{id}{joined, select, yes { e o spline juntou-se lá} other {}}{alt, select, yes { sem torções} other {; Alt mantém a estrada livre de dobras}}",
   "spline.status.stays": "Spline #{id} permanece: {reason}",

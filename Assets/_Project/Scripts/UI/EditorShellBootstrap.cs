@@ -543,6 +543,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas.TileAddRequested += AddTile;
                 mapCanvas.ObjectToggled += ToggleObject;
                 mapCanvas.ObjectsBoxSelected += AddToSelection;
+                mapCanvas.SplinesBoxSelected += AddSplinesToSelection;
                 mapCanvas.ObjectsEdited += CommitEdits;
                 mapCanvas.PlacementRequested += PlaceChosenObject;
                 mapCanvas.SplineClicked += SelectSpline;
@@ -822,6 +823,7 @@ namespace OmsiMapEditor.UI
                 objectRenderer.PreviewReady += (path, image) => objectsPanel?.SetPreview(path, image);
                 objectRenderer.PreviewInUse = path => objectsPanel != null && objectsPanel.ShowsPreview(path);
                 mapCanvas.GroundHeight = groundRenderer.HeightAt;
+                mapCanvas.SplineExtent = SplineExtentOf;
                 mapCanvas.GroundVersion = () => groundRenderer.TerrainVersion;
             }
         }
@@ -889,7 +891,8 @@ namespace OmsiMapEditor.UI
             }
             groundToggleButton?.SetEnabled(!mapCanvas.ThreeDimensional);
             routesToggleButton?.SetEnabled(routes != null && !mapCanvas.ThreeDimensional);
-            pathsToggleButton?.SetEnabled(!mapCanvas.ThreeDimensional);
+            // The paths are drawn in 3D too (DrawPaths3D), so the Paths view and the Paths entry of the spline menu work there.
+            pathsToggleButton?.SetEnabled(true);
             groundRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
             if (objectRenderer != null)
                 objectRenderer.ThreeDimensional = mapCanvas.ThreeDimensional;
@@ -1496,6 +1499,11 @@ namespace OmsiMapEditor.UI
                     RunSplineLookArguments(args);
                 }
             }
+
+            // -alsoSpline id,id,... adds splines to the chosen one as Ctrl+click does; -deleteSpline deletes the chosen splines as Delete does, and
+            // -deleteSplineUndo / -deleteSplineRedo step through the history afterwards (ADR 098, M5 step 2); the status goes to the log as
+            // "Delete spline:", "Delete spline undo:" and "Delete spline redo:". Nothing is written without a project.
+            RunSplineDeleteArguments(args);
 
             // -trafficTab, -trafficArm, -trafficSign, -trafficSpeed and -trafficPointer check the traffic rules tool on the junction or spline chosen above (ADR 098, M4).
             RunTrafficArguments(args);
@@ -2532,6 +2540,26 @@ namespace OmsiMapEditor.UI
             SetStatusT("spline.status.many", ("count", moreSplines.Count + 1));
         }
 
+        /// <summary>
+        /// The splines a Ctrl+drag box touched join the selected splines; the first becomes the selected one when none is. They are selected
+        /// like the Ctrl+clicked ones, so Delete takes them all in one step.
+        /// </summary>
+        private void AddSplinesToSelection(List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> found)
+        {
+            if (found == null || found.Count == 0)
+                return;
+            foreach (var pair in found)
+            {
+                if (selectedSpline == null)
+                    SelectSpline(pair.Key, pair.Value);
+                else if (!ReferenceEquals(pair.Value, selectedSpline) && !moreSplines.Exists(other => ReferenceEquals(other.Value, pair.Value)))
+                    moreSplines.Add(pair);
+            }
+            mapCanvas?.SetMoreSelectedSplines(moreSplines.ConvertAll(pair => pair.Value));
+            RenderInspector();
+            SetStatusT("spline.status.many", ("count", moreSplines.Count + 1));
+        }
+
         /// <summary>Chooses splines besides the selected one, as Ctrl+click does, such as all pieces of its road.</summary>
         private void SetMoreSplines(IEnumerable<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> splines)
         {
@@ -2565,7 +2593,10 @@ namespace OmsiMapEditor.UI
             mapCanvas?.SetSelectedSpline(null);
         }
 
-        /// <summary>Deletes the selected spline as one undo step; joined splines get an open end, references keep it.</summary>
+        /// <summary>
+        /// Deletes the selected splines (the one and those chosen with Ctrl besides it) as one undo step; joined splines get an open
+        /// end. A spline that references still need stays, as in the view from above, and the others go (ADR 011).
+        /// </summary>
         private void DeleteSelectedSpline()
         {
             if (selectedSpline == null || selectedSplineTile == null)
@@ -2580,32 +2611,78 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.delete_splines"));
                 return;
             }
-            OmsiSplineChangeResult result;
-            try
+            // Deleting one spline reads the tiles again, so the others are looked up by their ID each time.
+            var ids = new List<int> { selectedSpline.Id };
+            foreach (var pair in moreSplines)
+                if (!ids.Contains(pair.Value.Id))
+                    ids.Add(pair.Value.Id);
+            var steps = new List<ObjectEditStep>();
+            var changes = new List<OmsiSplineChange>();
+            var reasons = new List<string>();
+            var refusedCount = 0;
+            var refusedId = 0;
+            var missingCount = 0;
+            string abortMessage = null;
+            foreach (var id in ids)
             {
-                result = session.DeleteSpline(currentSummary, selectedSplineTile, selectedSpline);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                SetStatusT("splinevar.status.delete_failed", ("id", selectedSpline.Id), ("reason", exception.Message));
-                return;
-            }
-            if (!result.Succeeded)
-            {
-                var reasons = new List<string>();
-                foreach (var blocker in result.Blockers)
+                var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+                var record = tile?.Splines.Find(candidate => candidate.Id == id);
+                if (record == null)
+                {
+                    // Not deleted: the spline is no longer in the map.
+                    missingCount++;
                     if (reasons.Count < 3)
-                        reasons.Add(blocker.ToString());
-                SetStatusT("spline.status.refs", ("id", selectedSpline.Id), ("count", result.Blockers.Count), ("reasons", string.Join("; ", reasons)));
+                        reasons.Add(Loc.T("splinevar.status.gone_in_map", ("id", id)));
+                    continue;
+                }
+                OmsiSplineChangeResult result;
+                try
+                {
+                    result = session.DeleteSpline(currentSummary, tile, record);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                    abortMessage = Loc.T("splinevar.status.delete_failed", ("id", id), ("reason", exception.Message));
+                    break;
+                }
+                if (!result.Succeeded)
+                {
+                    if (refusedCount == 0)
+                        refusedId = id;
+                    refusedCount += result.Blockers.Count;
+                    foreach (var blocker in result.Blockers)
+                        if (reasons.Count < 3)
+                            reasons.Add(blocker.ToString());
+                    continue;
+                }
+                steps.Add(new ObjectEditStep { SplineChange = result.Change });
+                changes.Add(result.Change);
+            }
+            if (steps.Count == 0)
+            {
+                if (abortMessage != null)
+                    SetStatus(abortMessage);
+                else if (refusedCount > 0)
+                    SetStatusT("spline.status.refs", ("id", refusedId), ("count", refusedCount), ("reasons", string.Join("; ", reasons)));
+                else if (missingCount > 0)
+                    SetStatusT("splinevar.status.delete_failed", ("id", ids[0]), ("reason", string.Join("; ", reasons)));
                 return;
             }
-            var id = selectedSpline.Id;
-            PushHistory(new ObjectEditStep { SplineChange = result.Change });
+            PushHistory(steps.Count == 1 ? steps[0] : new ObjectEditStep { Group = steps });
+            var deletedId = changes[0].SplineIds.Count > 0 ? changes[0].SplineIds[0] : 0;
             ClearSelectedSpline();
-            RefreshSplineViews(result.Change);
+            foreach (var change in changes)
+                RefreshSplineViews(change);
             RenderInspector();
-            SetStatusT("spline.status.deleted", ("id", id));
+            if (abortMessage != null)
+                SetStatus(abortMessage);
+            else if (ids.Count == 1)
+                SetStatusT("spline.status.deleted", ("id", deletedId));
+            else if (refusedCount == 0 && missingCount == 0)
+                SetStatusT("spline.status.deleted_many", ("count", steps.Count));
+            else
+                SetStatusT("spline.status.deleted_some", ("count", steps.Count), ("total", ids.Count), ("reasons", string.Join("; ", reasons)));
         }
 
         /// <summary>
@@ -4249,7 +4326,7 @@ namespace OmsiMapEditor.UI
 
         private static string DescribeSplines(List<int> ids)
         {
-            return Loc.T("roadbuild.splines", ("count", ids.Count), ("ids", string.Join(", #", ids)));
+            return Loc.T("roadbuild.splines", ("count", ids.Count), ("ids", "#" + string.Join(", #", ids))); // the # is part of the text: in a plural form a # in the template is the count
         }
 
         /// <summary>The spline end the road started from, found again by its ID after splines were read again; null when it went.</summary>
@@ -4877,6 +4954,9 @@ namespace OmsiMapEditor.UI
         private void ApplySelection(OmsiTileSummary tile)
         {
             // A type pick belongs to the selection it began with.
+            var phase = System.Diagnostics.Stopwatch.StartNew();
+            // A jump to the paths group belongs to the selection it was asked for.
+            openPathsGroupWhenRead = false;
             EnforceTypePick();
             // A menu open for the selection before would act on it. A right-click selects before its menu opens, so its own menu stays.
             CloseContextMenu();
@@ -4895,10 +4975,22 @@ namespace OmsiMapEditor.UI
             mapCanvas?.SetSelection(tile, selection);
             if (selectionInfoLabel != null)
                 selectionInfoLabel.text = selection.Count == 0 ? string.Empty : Loc.T("selection.count", ("count", selection.Count));
+            var before = phase.Elapsed.TotalMilliseconds;
             UpdateToolbar();
+            var toolbar = phase.Elapsed.TotalMilliseconds;
             RenderInspector();
+            var inspector = phase.Elapsed.TotalMilliseconds;
             UpdateArmHandles();
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            lastSelectionTimings = "selection " + before.ToString("0.0", culture) + " ms, toolbar " + (toolbar - before).ToString("0.0", culture) + ", inspector " +
+                                   (inspector - toolbar).ToString("0.0", culture) + ", arm handles " + (phase.Elapsed.TotalMilliseconds - inspector).ToString("0.0", culture);
         }
+
+        /// <summary>How long the parts of the last <see cref="ApplySelection"/> took, for the log line of the context menu.</summary>
+        private string lastSelectionTimings = string.Empty;
+
+        /// <summary>How long the neighbour search of the spline details took the last time (diagnostics).</summary>
+        private double lastJoinMilliseconds;
 
         private string DescribeSelection()
         {
@@ -8874,6 +8966,15 @@ namespace OmsiMapEditor.UI
             mapCanvas?.SetHighlightedPaths(null);
             RefreshJunctionMarkers();
 
+            // A hidden inspector is not built: it is drawn when it opens (ShowInspector). Building it for every right-click cost 1 to 120 ms
+            // on Berlin-Spandau for an inspector nobody sees (ADR 098, M5 step 2).
+            if (!inspectorShown)
+            {
+                inspectorStale = true;
+                return;
+            }
+            inspectorStale = false;
+
             if (selectedTile == null)
             {
                 var empty = new Label(Loc.T(currentSummary == null ? "project.no_map" : "project.no_tiles")) /* i18n:keys */;
@@ -9289,9 +9390,13 @@ namespace OmsiMapEditor.UI
             heading.AddToClassList("inspector-section-heading");
             editor.Add(heading);
             var gradient = spline.LengthMeters > 0 ? (spline.EndHeight - spline.Height) / spline.LengthMeters * 100.0 : 0.0;
+            var joinWatch = System.Diagnostics.Stopwatch.StartNew();
+            var startJoin = DescribeJoin(spline, false);
+            var endJoin = DescribeJoin(spline, true);
+            lastJoinMilliseconds = joinWatch.Elapsed.TotalMilliseconds;
             var text = Loc.T("inspector.spline_info", ("id", spline.Id), ("path", spline.AssetPath), ("length", spline.LengthMeters), ("straight", spline.RadiusMeters == 0 ? "yes" : "no"),
                     ("radius", spline.RadiusMeters), ("heading", spline.HeadingDegrees), ("from", spline.Height), ("to", spline.EndHeight), ("gradient", gradient),
-                    ("startJoin", DescribeJoin(spline, false)), ("endJoin", DescribeJoin(spline, true)),
+                    ("startJoin", startJoin), ("endJoin", endJoin),
                     ("terrain", !spline.AlignsTerrain ? "none" : session != null && session.IsBuiltHere(spline) ? "here" : "original"));
             var details = new Label(text);
             details.AddToClassList("inspector-edit-name");

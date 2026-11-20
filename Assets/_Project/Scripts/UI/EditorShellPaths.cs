@@ -77,6 +77,7 @@ namespace OmsiMapEditor.UI
             mapPaths = null;
             pathsTask = null;
             pathsGeneration++;
+            openPathsGroupWhenRead = false;
             openEndCursor = -1;
             mapCanvas?.SetPaths(null);
             if (pathsShown)
@@ -107,6 +108,7 @@ namespace OmsiMapEditor.UI
                 pathsTask = null;
                 if (task.IsFaulted)
                 {
+                    openPathsGroupWhenRead = false;
                     Debug.LogException(task.Exception);
                     SetStatusT("paths.status.read_failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
@@ -120,6 +122,12 @@ namespace OmsiMapEditor.UI
                         SetStatus(DescribePaths());
                     RenderProjectBrowser();
                     RenderInspector();
+                    if (openPathsGroupWhenRead)
+                    {
+                        openPathsGroupWhenRead = false;
+                        if (inspectorShown)
+                            ScrollInspectorToGroup("paths");
+                    }
                 }
             }).Every(150);
         }

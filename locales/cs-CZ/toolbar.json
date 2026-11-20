@@ -1,6 +1,6 @@
 {
   "toolbar.drag": "Přetáhnout",
-  "toolbar.drag.tooltip": "Přetáhnout (Q): Kliknutím vyberete objekty a přetažením je volně přesunete; Ctrl+kliknutí a Ctrl+přetažení vyberou více objektů.",
+  "toolbar.drag.tooltip": "Přetáhnout (Q): Kliknutím vyberete objekty a přetažením je volně přesunete; Ctrl+kliknutí a Ctrl+přetažení vyberou více objektů. Shift+přetažení vybere jen silnice.",
   "@toolbar.drag.tooltip": "The shortcut key in the tooltip is the same in every language",
   "toolbar.move": "Přesunout",
   "toolbar.move.tooltip": "Přesunout (W): Přesouvejte výběr podél šipek os: na východ, na sever a v 3D také nahoru. Shift posouvá po celých metrech.",

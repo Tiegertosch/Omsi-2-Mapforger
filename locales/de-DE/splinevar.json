@@ -17,6 +17,7 @@
   "splinevar.built.done": "{built}.",
   "splinevar.spline": "Spline #{id}",
   "splinevar.status.delete_failed": "Spline #{id} konnte nicht gelöscht werden: {reason}",
+  "splinevar.status.gone_in_map": "#{id}: nicht mehr in der Karte",
   "splinevar.step.delete": "Löschen von Spline #{id} in der Variante",
   "splinevar.rest.rows": "{count, plural, one {# Objektreihe entlang davon verschwindet mit ihm} other {# Objektreihen entlang davon verschwinden mit ihm}}",
   "splinevar.rest.named": "er wird noch genannt von {names}",

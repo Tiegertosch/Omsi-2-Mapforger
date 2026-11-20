@@ -52,6 +52,8 @@
   "@spline.status.selected": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "spline.status.refs": "Spline #{id} stays: {count, plural, one {# reference still needs it} other {# references still need it}}, such as {reasons}.",
   "spline.status.deleted": "Deleted spline #{id}; Ctrl+Z brings it back.",
+  "spline.status.deleted_many": "Deleted {count} splines; Ctrl+Z brings them back.",
+  "spline.status.deleted_some": "Deleted {count} of {total} splines; the others stay because references still need them, such as {reasons}. Ctrl+Z brings the deleted ones back.",
   "spline.drag.bend": "{alt, select, yes {Straightening spline #{id}} other {Bending spline #{id}; Alt runs it straight}}",
   "spline.drag.move": "Moving the {which, select, end {end} other {start}} of spline #{id}{joined, select, yes { and the spline joined there} other {}}{alt, select, yes { without kinks} other {; Alt keeps the road free of kinks}}",
   "spline.status.stays": "Spline #{id} stays: {reason}",

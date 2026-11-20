@@ -20,7 +20,7 @@
   "roadbuild.junction.tee": "T křižovatka",
   "roadbuild.junction.and": " a ",
   "roadbuild.junction.whole": "{what} a silnice {tail, select, to {k tomu} other {jejich prostřednictvím}}",
-  "roadbuild.splines": "{count, plural, one {spline #{ids}} few {splines #{ids}} many {splines #{ids}} other {splines #{ids}}}",
+  "roadbuild.splines": "{count, plural, one {spline {ids}} few {splines {ids}} many {splines {ids}} other {splines {ids}}}",
   "@roadbuild.splines": "{ids} is a list of numbers separated by \", #\"",
   "roadbuild.plan.continue": "Klikněte pro pokračování spline #{id} z jeho {end, select, end {konec} other {začít}}.",
   "roadbuild.plan.start_port": "Klikněte pro zahájení cesty na {port}; naznačuje to profil {profile}.",

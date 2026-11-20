@@ -104,6 +104,24 @@ namespace OmsiMapEditor.Tests
             Assert.Throws<InvalidOperationException>(() => readOnly.SetBusStopName(readOnlySummary, readOnlySummary.Tiles[0], Find(readOnlySummary.Tiles[0], 5), "Church"));
         }
 
+        [Test]
+        public void TheLookupIsKeptBetweenAsksButFollowsEveryWriteAndUndo()
+        {
+            WriteStopList();
+            var session = OmsiMapSession.OpenProject(Path.Combine(map, "global.cfg"), Path.Combine(root, "Projects", "Stops.omproj"));
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+
+            // Asked twice before any change (the second answer comes from what the first read), then after the change and after taking it back.
+            Assert.IsNull(session.BusStopName(summary, tile, Find(tile, 5)));
+            Assert.IsNull(session.BusStopName(summary, tile, Find(tile, 5)));
+            var change = session.SetBusStopName(summary, tile, Find(tile, 5), "Church");
+            Assert.AreEqual("Church", session.BusStopName(summary, tile, Find(tile, 5)));
+            session.Undo(summary, change);
+            Assert.IsNull(session.BusStopName(summary, tile, Find(tile, 5)));
+            Assert.AreEqual("Market", session.BusStopName(summary, tile, Find(tile, 7)));
+        }
+
         private static OmsiObjectRecord Find(OmsiTileSummary tile, int id)
         {
             return tile.Objects.Single(each => each.Id == id);

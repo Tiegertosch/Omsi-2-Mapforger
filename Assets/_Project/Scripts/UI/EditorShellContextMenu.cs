@@ -55,23 +55,55 @@ namespace OmsiMapEditor.UI
             root.RegisterCallback<NavigationCancelEvent>(SwallowNavigationForMenu, TrickleDown.TrickleDown);
         }
 
-        /// <summary>Whether the inspector has the group of paths that "AI paths and rules..." opens: only once the paths are read.</summary>
-        private bool PathsGroupShown => pathsShown && mapPaths != null;
+        /// <summary>
+        /// Whether the menu offers "Paths": always, with a map open. Choosing it switches the paths layer on and, while the paths are still
+        /// being read, opens the group once they are (<see cref="openPathsGroupWhenRead"/>).
+        /// </summary>
+        private bool PathsGroupShown => currentSummary != null;
+
+        private bool openPathsGroupWhenRead;
+
+        /// <summary>How long finding out what an object's menu offers took the last time (diagnostics).</summary>
+        private double lastObjectMenuStateMilliseconds;
+
+        /// <summary>"Paths" of the context menu: the paths layer on, the inspector open at the group of the selection's paths.</summary>
+        private void OpenPathsFromMenu()
+        {
+            if (!pathsShown)
+                ShowPaths(true);
+            if (mapPaths == null)
+            {
+                // The paths are read on a worker thread; the inspector shows the selection meanwhile and goes to the group when they arrive.
+                openPathsGroupWhenRead = true;
+                OpenInspector(InspectorTab.Selection);
+                return;
+            }
+            openPathsGroupWhenRead = false;
+            OpenInspector(InspectorTab.Selection, "paths");
+        }
 
         /// <summary>Shows or hides the inspector; it is drawn for the selection either way.</summary>
-        private void ShowInspector(bool show)
+        private void ShowInspector(bool show, bool draw = true)
         {
             inspectorShown = show;
+            if (!show)
+                openPathsGroupWhenRead = false;
             if (inspectorFrame != null)
                 inspectorFrame.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            // Drawn for what was selected while it was hidden (RenderInspector leaves a hidden inspector empty).
+            if (show && draw && inspectorStale)
+                RenderInspector();
         }
+
+        /// <summary>The inspector was not drawn since the selection changed because it was hidden.</summary>
+        private bool inspectorStale;
 
         /// <summary>
         /// Opens the inspector on a tab and, if given, unfolds a group and scrolls to it, such as "bus-stop" for the name of a bus stop.
         /// </summary>
         private void OpenInspector(InspectorTab? tab = null, string groupId = null)
         {
-            ShowInspector(true);
+            ShowInspector(true, false);
             if (tab.HasValue)
             {
                 inspectorTab = tab.Value;
@@ -124,11 +156,16 @@ namespace OmsiMapEditor.UI
             CloseContextMenu();
             if (workspaceElement == null || currentSummary == null || hit?.Tile == null)
                 return;
+            var phases = System.Diagnostics.Stopwatch.StartNew();
+            var startTime = Time.realtimeSinceStartupAsDouble;
+            var startFrame = Time.frameCount;
 
             // A row of objects along a road lies under an object-free pointer first, then the spline; only where rows can be edited.
             if (hit.Object == null && !hit.Row.HasValue && CanEdit)
                 hit.Row = RowUnderContext(hit);
             var onRow = hit.Object == null && hit.Row.HasValue;
+            var rowMilliseconds = phases.Elapsed.TotalMilliseconds;
+            phases.Restart();
 
             // The element under the pointer becomes the selection, unless it is one of several selected objects: the menu then acts on all of them.
             if (hit.Object != null)
@@ -156,6 +193,8 @@ namespace OmsiMapEditor.UI
                     return;
             }
 
+            var selectMilliseconds = phases.Elapsed.TotalMilliseconds;
+            phases.Restart();
             var overlay = new VisualElement();
             overlay.AddToClassList("context-menu-overlay");
             overlay.RegisterCallback<PointerDownEvent>(evt =>
@@ -184,8 +223,34 @@ namespace OmsiMapEditor.UI
             var local = workspaceElement.WorldToLocal(hit.ScreenPosition);
             menu.style.left = local.x;
             menu.style.top = local.y;
+            var fillMilliseconds = phases.Elapsed.TotalMilliseconds;
+            var syncMilliseconds = (Time.realtimeSinceStartupAsDouble - startTime) * 1000.0;
+            var laidOut = false;
             menu.RegisterCallback<GeometryChangedEvent>(_ =>
             {
+                if (!laidOut && mapCanvas != null)
+                {
+                    laidOut = true;
+                    var culture = System.Globalization.CultureInfo.InvariantCulture;
+                    Debug.Log("Context menu timing: pick " + mapCanvas.LastHitMilliseconds.ToString("0.0", culture) + " ms (ground " +
+                              mapCanvas.LastGroundMilliseconds.ToString("0.0", culture) + ", objects " + mapCanvas.LastObjectPickMilliseconds.ToString("0.0", culture) +
+                              ", splines " + mapCanvas.LastSplinePickMilliseconds.ToString("0.0", culture) + "), rows " + rowMilliseconds.ToString("0.0", culture) +
+                              " ms, select " + selectMilliseconds.ToString("0.0", culture) + " ms (" + lastSelectionTimings + "; spline neighbours " +
+                              lastJoinMilliseconds.ToString("0.0", culture) + "), menu " + fillMilliseconds.ToString("0.0", culture) + " ms (object state " + lastObjectMenuStateMilliseconds.ToString("0.0", culture) + ")" +
+                              ", shell total " + syncMilliseconds.ToString("0.0", culture) + " ms, until laid out " +
+                              ((Time.realtimeSinceStartupAsDouble - startTime) * 1000.0).ToString("0.0", culture) + " ms in " + (Time.frameCount - startFrame) + " frames.");
+                    // What the frames after the click cost: the menu appears on the first of them, drawn with the map.
+                    var frames = new System.Text.StringBuilder();
+                    var counted = 0;
+                    var clickTime = startTime;
+                    mapCanvas.schedule.Execute(() =>
+                    {
+                        if (counted < 8)
+                            frames.Append(' ').Append((Time.unscaledDeltaTime * 1000f).ToString("0", culture));
+                        if (++counted == 8)
+                            Debug.Log("Context menu frames after the click (ms):" + frames + "; " + ((Time.realtimeSinceStartupAsDouble - clickTime) * 1000.0).ToString("0", culture) + " ms in all.");
+                    }).Every(0).Until(() => counted >= 8);
+                }
                 // Once its size is known, the menu stays inside the workspace and above the bottom bar; near the bar it opens upwards.
                 var bounds = workspaceElement.layout;
                 var height = menu.layout.height;
@@ -216,6 +281,7 @@ namespace OmsiMapEditor.UI
         private void FillObjectMenu(VisualElement menu, OmsiTileSummary tile, OmsiObjectRecord item)
         {
             AddContextHeader(menu, Loc.T("context.object", ("id", item.Id), ("name", Path.GetFileName(item.AssetPath ?? string.Empty))));
+            var stateWatch = System.Diagnostics.Stopwatch.StartNew();
             var holdingTile = TileHolding(new MapSelectionItem { Tile = tile, Record = item }) ?? tile;
             var entryPoint = EditingVariant ? null : session?.EntryPointOf(currentSummary, holdingTile, item);
             var scenery = PrioritySceneryObject(item.AssetPath);
@@ -236,6 +302,7 @@ namespace OmsiMapEditor.UI
                 HasSignalArms = scenery != null && OmsiJunctionPriorities.Arms(scenery, null).Count >= 2,
                 IsHeadOfMadeCrossing = headOfMadeCrossing,
             };
+            lastObjectMenuStateMilliseconds = stateWatch.Elapsed.TotalMilliseconds;
             AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Object, state), action =>
             {
                 switch (action)
@@ -245,7 +312,7 @@ namespace OmsiMapEditor.UI
                     case ContextMenuAction.RenameBusStop: return () => OpenInspector(InspectorTab.Selection, "bus-stop");
                     case ContextMenuAction.ChangeType: return () => PickElementType(holdingTile, item);
                     case ContextMenuAction.EditLabels: return () => OpenInspector(InspectorTab.Selection, "object-type");
-                    case ContextMenuAction.OpenPaths: return () => OpenInspector(InspectorTab.Selection, "paths");
+                    case ContextMenuAction.OpenPaths: return OpenPathsFromMenu;
                     // The junction is the selection; each tool begins on the one selected object (the same as choosing its button).
                     case ContextMenuAction.OpenMarkings: return () => SetTool(EditorTool.Markings);
                     case ContextMenuAction.OpenTrafficRules: return () => SetTool(EditorTool.Priorities);
@@ -336,6 +403,21 @@ namespace OmsiMapEditor.UI
             return best;
         }
 
+        /// <summary>
+        /// How far the cross-section of a spline type reaches (left edge, right edge, height of its surface over the spline), for pointing at
+        /// splines in 3D; null for a type without a surface or one that cannot be read.
+        /// </summary>
+        private Vector3? SplineExtentOf(string assetPath)
+        {
+            if (currentSummary == null || string.IsNullOrEmpty(assetPath))
+                return null;
+            var profile = RoadProfiles().Get(assetPath);
+            if (profile == null || profile.EditorOnly || profile.Strips.Count == 0)
+                return null;
+            var lift = profile.LineKind == OmsiSplineLineKind.Overhead ? OmsiSplineProfile.OverheadHeight : profile.EdgeHeight;
+            return new Vector3((float)profile.LeftEdge, (float)profile.RightEdge, (float)lift);
+        }
+
         private void FillRowMenu(VisualElement menu, KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row)
         {
             AddContextHeader(menu, Loc.T("context.row", ("id", row.Value.Id), ("name", Path.GetFileName(row.Value.AssetPath ?? string.Empty))));
@@ -408,7 +490,7 @@ namespace OmsiMapEditor.UI
                 {
                     case ContextMenuAction.OpenProperties: return () => OpenInspector(InspectorTab.Selection);
                     case ContextMenuAction.EditSplineHeights: return () => OpenInspector(InspectorTab.Selection, "spline-heights");
-                    case ContextMenuAction.OpenPaths: return () => OpenInspector(InspectorTab.Selection, "paths");
+                    case ContextMenuAction.OpenPaths: return OpenPathsFromMenu;
                     case ContextMenuAction.DeleteSpline: return DeleteSelectedSpline;
                     case ContextMenuAction.ChangeSplineType: return PickSplineType;
                     default: return DeleteSelectedSplineInVariant;
@@ -584,19 +666,36 @@ namespace OmsiMapEditor.UI
             if (Array.IndexOf(args, "-inspector") >= 0)
                 ShowInspector(true);
             var index = Array.IndexOf(args, "-contextMenu");
-            if (index < 0 || index + 1 >= args.Length || currentSummary == null || mapCanvas == null)
+            var pixelIndex = Array.IndexOf(args, "-contextPixel");
+            if (currentSummary == null || mapCanvas == null || index < 0 && pixelIndex < 0)
                 return;
-            var target = args[index + 1];
-            if (!TryContextHitOfArgument(target, out var hit))
-                return;
-            var world = OmsiMapGeometry.TileLocalToWorld(hit.Tile.X, hit.Tile.Y, hit.LocalX, hit.LocalY, currentSummary.TileSizeMeters);
-            if (!mapCanvas.TryScreenPosition(world, out var screen))
+            string target;
+            MapContextHit hit;
+            if (mapCanvas.ThreeDimensional)
             {
-                Debug.LogWarning("Context menu: " + target + " has no place on the screen (3D view?).");
-                return;
+                // In 3D the place of the target on the screen is found by projecting it and the menu opens for what the pointer ray finds there.
+                if (!TryContextHitIn3D(args, index, pixelIndex, out hit, out target))
+                    return;
             }
-            hit.ScreenPosition = screen;
+            else
+            {
+                if (index < 0 || index + 1 >= args.Length)
+                    return;
+                target = args[index + 1];
+                if (!TryContextHitOfArgument(target, out hit))
+                    return;
+                var world = OmsiMapGeometry.TileLocalToWorld(hit.Tile.X, hit.Tile.Y, hit.LocalX, hit.LocalY, currentSummary.TileSizeMeters);
+                if (!mapCanvas.TryScreenPosition(world, out var screen))
+                {
+                    Debug.LogWarning("Context menu: " + target + " has no place on the screen.");
+                    return;
+                }
+                hit.ScreenPosition = screen;
+            }
             ShowContextMenu(hit);
+            // -contextRepeat opens the same menu a second time, which shows what a right-click costs once everything it reads is known.
+            if (Array.IndexOf(args, "-contextRepeat") >= 0)
+                ShowContextMenu(hit);
             Debug.Log("Context menu: shown for " + target + (ContextMenuOpen ? "." : " was refused."));
             var focusIndex = Array.IndexOf(args, "-contextFocus");
             if (focusIndex >= 0 && focusIndex + 1 < args.Length &&
@@ -606,6 +705,60 @@ namespace OmsiMapEditor.UI
                     MoveContextMenuFocus(1);
             }
             ChooseContextEntry(args);
+        }
+
+        /// <summary>
+        /// The hit a right-click in the 3D view gives, for <c>-contextPixel x y</c> (a panel position) or for <c>-contextMenu target</c> at the place
+        /// where the target is drawn. The pick is timed (the first, then the average of 100) and what it found is logged next to what was expected.
+        /// </summary>
+        private bool TryContextHitIn3D(string[] args, int menuIndex, int pixelIndex, out MapContextHit hit, out string target)
+        {
+            hit = null;
+            target = string.Empty;
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var floats = System.Globalization.NumberStyles.Float;
+            Vector2 screen;
+            MapContextHit expected = null;
+            if (pixelIndex >= 0 && pixelIndex + 2 < args.Length && float.TryParse(args[pixelIndex + 1], floats, culture, out var pixelX) &&
+                float.TryParse(args[pixelIndex + 2], floats, culture, out var pixelY))
+            {
+                screen = new Vector2(pixelX, pixelY);
+                target = "pixel " + args[pixelIndex + 1] + " " + args[pixelIndex + 2];
+            }
+            else
+            {
+                if (menuIndex < 0 || menuIndex + 1 >= args.Length)
+                    return false;
+                target = args[menuIndex + 1];
+                if (!TryContextHitOfArgument(target, out expected))
+                    return false;
+                var map = OmsiMapGeometry.TileLocalToWorld(expected.Tile.X, expected.Tile.Y, expected.LocalX, expected.LocalY, currentSummary.TileSizeMeters);
+                var height = expected.Spline != null
+                    ? expected.Spline.Height + (expected.Spline.EndHeight - expected.Spline.Height) / 2.0 + 0.1
+                    : (double)mapCanvas.GroundAtWorld(map) +(expected.Object != null ? expected.Object.Height : 0.0);
+                if (!mapCanvas.TryScreenPosition3D(expected.Tile, expected.LocalX, expected.LocalY, height, out screen))
+                {
+                    Debug.LogWarning("Context menu: " + target + " has no place on the screen in 3D.");
+                    return false;
+                }
+            }
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            hit = mapCanvas.ContextHitAtPanel(screen);
+            var first = watch.Elapsed.TotalMilliseconds;
+            watch.Restart();
+            for (var repeat = 0; repeat < 100; repeat++)
+                mapCanvas.ContextHitAtPanel(screen);
+            var average = watch.Elapsed.TotalMilliseconds / 100.0;
+            var found = hit == null ? "nothing"
+                : hit.Object != null ? "object " + hit.Object.Id
+                : hit.Spline != null ? "spline " + hit.Spline.Id
+                : "tile " + hit.Tile.X + "," + hit.Tile.Y;
+            Debug.Log("Context menu 3D: " + target + " at pixel " + screen.x.ToString("0", culture) + "," + screen.y.ToString("0", culture) + " found " + found +
+                      "; first pick " + first.ToString("0.00", culture) + " ms, average of 100 " + average.ToString("0.000", culture) + " ms (spline part " +
+                      mapCanvas.LastSplinePickMilliseconds.ToString("0.000", culture) + " ms, ribbons built in " +
+                      mapCanvas.LastRibbonBuildMilliseconds.ToString("0.0", culture) + " ms once).");
+            return hit != null;
         }
 
         /// <summary>The hit a right-click on the target of <c>-contextMenu</c> would give (see <see cref="RunContextMenuArguments"/>); false with a warning when it is not in the map.</summary>

@@ -1,6 +1,6 @@
 {
   "toolbar.drag": "Ziehen",
-  "toolbar.drag.tooltip": "Ziehen (Q): Objekte anklicken, um sie zu wählen, und ziehen, um sie frei zu verschieben; Strg+Klick und Strg+Ziehen wählen mehrere.",
+  "toolbar.drag.tooltip": "Ziehen (Q): Objekte anklicken, um sie zu wählen, und ziehen, um sie frei zu verschieben; Strg+Klick und Strg+Ziehen wählen mehrere. Umschalt+Ziehen wählt nur Straßen.",
   "toolbar.move": "Verschieben",
   "toolbar.move.tooltip": "Verschieben (W): Die Auswahl entlang der Achsenpfeile bewegen: nach Osten, Norden und in 3D nach oben. Umschalt verschiebt in ganzen Metern. Nochmal W lässt die Pfeile der Drehung des Objekts folgen.",
   "toolbar.rotate": "Drehen",

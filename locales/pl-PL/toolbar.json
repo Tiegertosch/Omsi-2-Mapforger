@@ -1,6 +1,6 @@
 {
   "toolbar.drag": "Przeciągnij",
-  "toolbar.drag.tooltip": "Przeciągnij (Q): Klikaj obiekty, aby je zaznaczać, i przeciągaj, aby swobodnie je przesuwać; Ctrl+kliknięcie i Ctrl+przeciągnięcie zaznaczają wiele obiektów.",
+  "toolbar.drag.tooltip": "Przeciągnij (Q): Klikaj obiekty, aby je zaznaczać, i przeciągaj, aby swobodnie je przesuwać; Ctrl+kliknięcie i Ctrl+przeciągnięcie zaznaczają wiele obiektów. Shift+przeciągnięcie zaznacza tylko drogi.",
   "@toolbar.drag.tooltip": "The shortcut key in the tooltip is the same in every language",
   "toolbar.move": "Przesuń",
   "toolbar.move.tooltip": "Przesuń (W): Przesuwaj zaznaczenie wzdłuż strzałek osi: na wschód, na północ, a w 3D także w górę. Shift przesuwa o pełne metry.",

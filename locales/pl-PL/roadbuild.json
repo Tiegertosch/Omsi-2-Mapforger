@@ -20,7 +20,7 @@
   "roadbuild.junction.tee": "skrzyżowanie T",
   "roadbuild.junction.and": " i ",
   "roadbuild.junction.whole": "{what} i droga {tail, select, to {do tego} other {przez nich}}",
-  "roadbuild.splines": "{count, plural, one {spline #{ids}} few {splines #{ids}} many {splines #{ids}} other {splines #{ids}}}",
+  "roadbuild.splines": "{count, plural, one {spline {ids}} few {splines {ids}} many {splines {ids}} other {splines {ids}}}",
   "@roadbuild.splines": "{ids} is a list of numbers separated by \", #\"",
   "roadbuild.plan.continue": "Kliknij, aby kontynuować spline #{id} z {end, select, end {koniec} other {zacznij}}.",
   "roadbuild.plan.start_port": "Kliknij, aby rozpocząć drogę w {port}; sugeruje profil {profile}.",

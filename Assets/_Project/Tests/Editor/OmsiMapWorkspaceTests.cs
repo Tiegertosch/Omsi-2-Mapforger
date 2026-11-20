@@ -116,6 +116,34 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void AFailedEarlyReadOfTheIdBoundaryIsReadAgainInsteadOfThrowingForever()
+        {
+            var made = OmsiNewMap.Create(Path.Combine(original, "global.cfg"), "Own map 2", "Own Map 2", new DateTime(2026, 10, 30));
+            var session = OmsiMapSession.OpenProject(made.GlobalConfigPath, Path.Combine(testRoot, "Projects", "Own2.omproj"));
+            var summary = session.Read();
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 50, StartY = 150, StartHeight = 0, EndX = 250, EndY = 150, EndHeight = 0, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+            var spline = summary.Tiles[0].Splines.Last();
+
+            var faulted = System.Threading.Tasks.Task.FromException<int>(new IOException("simulated read failure"));
+            session.SetIdBoundaryTask(faulted);
+            var originalError = Console.Error;
+            Console.SetError(new StringWriter());
+            try
+            {
+                Assert.IsTrue(session.ShapesTerrain(spline));
+                Assert.IsTrue(session.ShapesTerrain(spline));
+            }
+            finally
+            {
+                Console.SetError(originalError);
+            }
+        }
+
+        [Test]
         public void RejectsWorkspacesAndPathsThatCouldTouchTheOriginal()
         {
             Assert.Throws<ArgumentException>(() => new OmsiMapWorkspace(original, Path.Combine(original, "edits")));

@@ -1,6 +1,6 @@
 {
   "toolbar.drag": "Faire glisser",
-  "toolbar.drag.tooltip": "Faire glisser (Q) : cliquez sur les objets pour les sélectionner et faites-les glisser pour les déplacer librement ; Ctrl+clic et Ctrl+glisser permettent une sélection multiple.",
+  "toolbar.drag.tooltip": "Faire glisser (Q) : cliquez sur les objets pour les sélectionner et faites-les glisser pour les déplacer librement ; Ctrl+clic et Ctrl+glisser permettent une sélection multiple. Maj+glisser ne sélectionne que les routes.",
   "@toolbar.drag.tooltip": "The shortcut key in the tooltip is the same in every language",
   "toolbar.move": "Déplacer",
   "toolbar.move.tooltip": "Déplacer (W) : déplacez la sélection le long des flèches des axes : vers l'est, le nord et, en 3D, vers le haut. Shift déplace par mètres entiers.",

@@ -906,10 +906,44 @@ namespace OmsiMapEditor.OMSI
         {
             if (!firstNewId.HasValue)
             {
-                var original = new OmsiFolderSource(RequireWorkspace().RootPath);
-                firstNewId = OmsiNewMap.IsMadeHere(RequireWorkspace().RootPath) ? OmsiNewMap.FirstBuiltId : OmsiIdAllocator.ForMap(original, GlobalConfigFileName).NextFreeId;
+                var task = firstNewIdTask;
+                if (task != null && task.IsFaulted)
+                {
+                    // The early read failed: report it once, drop it and read again here, so the next call does not throw the same error forever.
+                    Console.Error.WriteLine("Reading the first new ID in the background failed: " + task.Exception?.GetBaseException());
+                    firstNewIdTask = task = null;
+                }
+                firstNewId = task != null ? task.GetAwaiter().GetResult() : ReadFirstNewId(RequireWorkspace().RootPath, GlobalConfigFileName);
             }
             return firstNewId.Value;
+        }
+
+        private static int ReadFirstNewId(string rootPath, string globalConfigFileName)
+        {
+            return OmsiNewMap.IsMadeHere(rootPath) ? OmsiNewMap.FirstBuiltId : OmsiIdAllocator.ForMap(new OmsiFolderSource(rootPath), globalConfigFileName).NextFreeId;
+        }
+
+        private System.Threading.Tasks.Task<int> firstNewIdTask;
+
+        /// <summary>For tests: replaces the early read of the ID boundary.</summary>
+        internal void SetIdBoundaryTask(System.Threading.Tasks.Task<int> task)
+        {
+            firstNewId = null;
+            firstNewIdTask = task;
+        }
+
+        /// <summary>
+        /// Starts reading the first ID the original map does not use on a worker thread. Without it the first spline selected in a session
+        /// read every tile of the original map (about half a second on Berlin-Spandau) to tell built-here splines from original ones; the
+        /// original map never changes, so the answer can be had early. Nothing happens without a workspace or when it is known already.
+        /// </summary>
+        public void WarmUpIdBoundary()
+        {
+            if (firstNewId.HasValue || firstNewIdTask != null || Workspace == null)
+                return;
+            var root = Workspace.RootPath;
+            var name = GlobalConfigFileName;
+            firstNewIdTask = System.Threading.Tasks.Task.Run(() => ReadFirstNewId(root, name));
         }
 
         /// <summary>

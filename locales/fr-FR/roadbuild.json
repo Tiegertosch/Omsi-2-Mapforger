@@ -20,7 +20,7 @@
   "roadbuild.junction.tee": "le carrefour en T",
   "roadbuild.junction.and": " et ",
   "roadbuild.junction.whole": "{what} et la route {tail, select, to {à cela} other {à travers eux}}",
-  "roadbuild.splines": "{count, plural, one {spline #{ids}} other {splines #{ids}}}",
+  "roadbuild.splines": "{count, plural, one {spline {ids}} other {splines {ids}}}",
   "@roadbuild.splines": "{ids} is a list of numbers separated by \", #\"",
   "roadbuild.plan.continue": "Cliquez pour continuer spline #{id} depuis son {end, select, end {fin} other {commencer}}.",
   "roadbuild.plan.start_port": "Cliquez pour démarrer une route à {port} ; il suggère le profil {profile}.",

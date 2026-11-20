@@ -440,6 +440,52 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void SeveralSplinesDeletedOneAfterAnotherLeaveOnlyTheBlockedOnesAndUndoInReverseOrder()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var first = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 170, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2
+            }, null);
+            var roadA = session.CreateRoad(summary, first, @"Splines\road.sli", OmsiSplineEnd.FindFree(summary, 100, 150, 1.0), null);
+            var second = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 140, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 140, EndY = 170, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2
+            }, null);
+            var roadB = session.CreateRoad(summary, second, @"Splines\road.sli", null, null);
+            var idA = roadA.SplineIds[0];
+            var idB = roadB.SplineIds[0];
+
+            // As the shell does: each spline is looked up by its ID again, as a deletion reads the tiles again; spline 11 is held by a row of lamps.
+            var steps = new List<OmsiSplineChange>();
+            var refused = 0;
+            foreach (var id in new[] { idA, 11, idB })
+            {
+                var tile = summary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+                var result = session.DeleteSpline(summary, tile, tile.Splines.Single(spline => spline.Id == id));
+                if (result.Succeeded)
+                    steps.Add(result.Change);
+                else
+                    refused++;
+            }
+            Assert.AreEqual(2, steps.Count);
+            Assert.AreEqual(1, refused);
+            Assert.IsFalse(summary.Tiles.SelectMany(tile => tile.Splines).Any(spline => spline.Id == idA || spline.Id == idB));
+            Assert.IsTrue(summary.Tiles.SelectMany(tile => tile.Splines).Any(spline => spline.Id == 11));
+
+            for (var index = steps.Count - 1; index >= 0; index--)
+                session.Undo(summary, steps[index]);
+            var present = summary.Tiles.SelectMany(tile => tile.Splines).Select(spline => spline.Id).ToList();
+            CollectionAssert.IsSupersetOf(present, new[] { idA, idB, 10, 11 });
+            foreach (var step in steps)
+                session.Redo(summary, step);
+            Assert.IsFalse(summary.Tiles.SelectMany(tile => tile.Splines).Any(spline => spline.Id == idA || spline.Id == idB));
+        }
+
+        [Test]
         public void RulesOfSplinePathsAreSetForSeveralSplinesAsOneUndoStep()
         {
             var session = OpenProject();

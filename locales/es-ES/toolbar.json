@@ -1,6 +1,6 @@
 {
   "toolbar.drag": "Arrastrar",
-  "toolbar.drag.tooltip": "Arrastrar (Q): Haz clic en los objetos para seleccionarlos y arrástralos para moverlos libremente; Ctrl+clic y Ctrl+arrastrar permiten seleccionar varios.",
+  "toolbar.drag.tooltip": "Arrastrar (Q): Haz clic en los objetos para seleccionarlos y arrástralos para moverlos libremente; Ctrl+clic y Ctrl+arrastrar permiten seleccionar varios. Mayús+arrastrar selecciona solo carreteras.",
   "@toolbar.drag.tooltip": "The shortcut key in the tooltip is the same in every language",
   "toolbar.move": "Mover",
   "toolbar.move.tooltip": "Mover (W): Mueve la selección a lo largo de las flechas de los ejes: al este, al norte y, en 3D, hacia arriba. Shift mueve en pasos de un metro.",

@@ -1,6 +1,6 @@
 {
   "toolbar.drag": "Trascina",
-  "toolbar.drag.tooltip": "Trascina (Q): Fai clic sugli oggetti per selezionarli e trascinali per spostarli liberamente; Ctrl+clic e Ctrl+trascinamento selezionano più oggetti.",
+  "toolbar.drag.tooltip": "Trascina (Q): Fai clic sugli oggetti per selezionarli e trascinali per spostarli liberamente; Ctrl+clic e Ctrl+trascinamento selezionano più oggetti. Maiusc+trascinamento seleziona solo strade.",
   "@toolbar.drag.tooltip": "The shortcut key in the tooltip is the same in every language",
   "toolbar.move": "Sposta",
   "toolbar.move.tooltip": "Sposta (W): Sposta la selezione lungo le frecce degli assi: verso est, nord e, in 3D, verso l'alto. Shift sposta a passi di un metro.",

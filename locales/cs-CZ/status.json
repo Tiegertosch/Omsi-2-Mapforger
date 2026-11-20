@@ -52,6 +52,8 @@
   "@spline.status.selected": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "spline.status.refs": "Spline #{id} zůstává: {count, plural, one {# reference to stále potřebuje} few {# reference to ještě potřebují} many {# reference to stále potřebují} other {# referencí to ještě potřebuje}}, například {reasons}.",
   "spline.status.deleted": "Smazáno spline #{id}; Ctrl+Z to vrací zpět.",
+  "spline.status.deleted_many": "Smazáno {count} spline; Ctrl+Z je vrací zpět.",
+  "spline.status.deleted_some": "Smazáno {count} z {total} spline; ostatní zůstávají, protože je ještě potřebují reference, například {reasons}. Ctrl+Z vrací smazané zpět.",
   "spline.drag.bend": "{alt, select, yes {Rovnání spline #{id}} other {Ohýbání spline #{id}; Alt to vede rovně}}",
   "spline.drag.move": "Přesunutí {which, select, end {konec} other {začít}} z spline #{id}{joined, select, yes { a spline se tam připojil} other {}}{alt, select, yes { bez zauzlení} other {; Alt udržuje vozovku bez zauzlování}}",
   "spline.status.stays": "Spline #{id} zůstává: {reason}",

@@ -78,8 +78,20 @@ namespace OmsiMapEditor.OMSI
             if (summary == null || tile == null || item == null)
                 return null;
             var tileIndex = summary.Tiles.IndexOf(tile);
-            return ReadEntryPoints(summary).Find(entry => entry.TileIndex == tileIndex && entry.ObjectId == item.Id);
+            var stamp = Workspace != null ? Workspace.WriteCount : 0;
+            // global.cfg is read again only after a write through the workspace; the context menu asks at every right-click on an object.
+            if (entryPointCache == null || entryPointCacheStamp != stamp || !ReferenceEquals(entryPointCacheSummary, summary))
+            {
+                entryPointCache = ReadEntryPoints(summary);
+                entryPointCacheStamp = stamp;
+                entryPointCacheSummary = summary;
+            }
+            return entryPointCache.Find(entry => entry.TileIndex == tileIndex && entry.ObjectId == item.Id);
         }
+
+        private List<OmsiEntryPoint> entryPointCache;
+        private int entryPointCacheStamp = -1;
+        private OmsiMapSummary entryPointCacheSummary;
 
         /// <summary>
         /// Puts a new entry point into a tile: an <see cref="OmsiNewMap.EntryPointObject"/> that carries the name as its label, and the line in

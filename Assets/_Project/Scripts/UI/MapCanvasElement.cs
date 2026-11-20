@@ -237,6 +237,11 @@ namespace OmsiMapEditor.UI
 
             /// <summary>Overhead lines and fences are drawn as thin lines instead of road lines.</summary>
             public OmsiSplineLineKind LineKind;
+
+            /// <summary>What the 3D pick takes the spline for; built on demand, null without a surface.</summary>
+            public OmsiSplineRibbon Ribbon;
+
+            public bool RibbonBuilt;
         }
 
         private IReadOnlyDictionary<string, OmsiSplineLineKind> splineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
@@ -339,6 +344,9 @@ namespace OmsiMapEditor.UI
         private DragMode dragMode;
         private int dragPointerId = -1;
         private Vector2 dragStartPointer;
+
+        /// <summary>True while the selection box in progress was started with Shift: it takes only splines, even over objects.</summary>
+        private bool boxSplinesOnly;
 
         // A right button press that may end as a right-click: it opens the context menu if the pointer barely moves until release.
         private bool rightClickCandidate;
@@ -541,6 +549,9 @@ namespace OmsiMapEditor.UI
         /// <summary>A box was dragged with Ctrl; the objects inside it, to add to the selection.</summary>
         public event Action<List<MapSelectionItem>> ObjectsBoxSelected;
 
+        /// <summary>A box was dragged with Ctrl that holds no object but touches splines; they are to be added to the selection.</summary>
+        public event Action<List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>> SplinesBoxSelected;
+
         /// <summary>Empty space inside a tile was clicked.</summary>
         public event Action<OmsiTileSummary> TileClicked;
 
@@ -702,6 +713,27 @@ namespace OmsiMapEditor.UI
 
         /// <summary>Ground height at a map position, for the point the 3D camera looks at.</summary>
         public Func<Vector2, float> GroundHeight { get; set; }
+
+        /// <summary>
+        /// How far the cross-section of a spline type reaches, for pointing at splines in 3D: x the left edge (negative), y the right edge,
+        /// z how high its surface lies above the spline; null for a type that has no surface. Null leaves splines out of 3D picking.
+        /// </summary>
+        public Func<string, Vector3?> SplineExtent
+        {
+            get => splineExtent;
+            set
+            {
+                splineExtent = value;
+                splineRibbons = null;
+                foreach (var path in splines)
+                    path.RibbonBuilt = false;
+            }
+        }
+
+        private Func<string, Vector3?> splineExtent;
+
+        /// <summary>The ribbons of all splines for the 3D pick, built on the first pick after the splines changed.</summary>
+        private List<OmsiSplineRibbon> splineRibbons;
 
         /// <summary>Changes whenever the heights <see cref="GroundHeight"/> gives change, so heights kept for drawing are taken anew.</summary>
         public Func<int> GroundVersion { get; set; }
@@ -1148,6 +1180,7 @@ namespace OmsiMapEditor.UI
         public void RefreshSplines()
         {
             splines.Clear();
+            splineRibbons = null;
             if (summary != null)
                 foreach (var tile in summary.Tiles)
                     foreach (var spline in tile.Splines)
@@ -1460,6 +1493,7 @@ namespace OmsiMapEditor.UI
         private void BuildCaches()
         {
             splines.Clear();
+            splineRibbons = null;
             mapBounds = Rect.zero;
             if (summary == null || summary.Tiles.Count == 0)
                 return;
@@ -2890,8 +2924,10 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (toggle)
+            // Shift (alone, or with Ctrl) starts a box that takes only splines, where no object is under the pointer.
+            if (toggle || evt.shiftKey)
             {
+                boxSplinesOnly = evt.shiftKey;
                 BeginDrag(DragMode.Box, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
@@ -2994,8 +3030,27 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            // Shift on empty space or a road starts a box that takes only splines (as from above).
+            if (keepPlacing && !toggle)
+            {
+                boxSplinesOnly = true;
+                BeginDrag(DragMode.Box, pointerId, position);
+                return;
+            }
+
+            // As from above, a spline is taken where no object is: Ctrl adds or removes it, else it becomes the selection.
+            if (TryPickSpline3D(camera, ray, ground, out var splineTile, out var spline, out _))
+            {
+                if (toggle)
+                    SplineToggled?.Invoke(splineTile, spline);
+                else
+                    SplineClicked?.Invoke(splineTile, spline);
+                return;
+            }
+
             if (toggle)
             {
+                boxSplinesOnly = keepPlacing;
                 BeginDrag(DragMode.Box, pointerId, position);
                 return;
             }
@@ -3035,6 +3090,116 @@ namespace OmsiMapEditor.UI
                 grabPoint = marker.World;
             }
             return item != null;
+        }
+
+        /// <summary>The spline pick of the 3D view counts a hit this far beyond the edge of the cross-section, plus the pick radius in pixels, halved.</summary>
+        private const float SplinePickMarginMeters = 0.3f;
+
+        /// <summary>
+        /// The spline under an element position in 3D, for clicks where no object is: the ray from the camera against the surface of each
+        /// spline (cross-section from its profile, height along the spline), the nearest first. <paramref name="ground"/> is where the
+        /// ray meets the terrain; surfaces further than that, in tunnels, are not taken. Null spline when none (ADR 098, M5).
+        /// </summary>
+        private bool TryPickSpline3D(MapOrbitCamera camera, Ray ray, Vector3? ground, out OmsiTileSummary pickedTile,
+            out OmsiSplineRecord pickedSpline, out Vector3 point)
+        {
+            pickedTile = null;
+            pickedSpline = null;
+            point = default;
+            if (splineExtent == null || summary == null)
+                return false;
+            var maxDistance = ground.HasValue ? Vector3.Distance(ray.origin, ground.Value) + 2f : 4000f;
+            var origin = ray.origin;
+            var direction = ray.direction;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var ribbons = SplineRibbons();
+            watch.Restart();
+            var hit = OmsiSplineRayPicker.Pick(ribbons, origin.x, origin.y, origin.z, direction.x, direction.y, direction.z, maxDistance,
+                SplinePickMarginMeters, PickRadius * 0.5f / camera.PixelsPerMeter(1f), out var distance);
+            LastSplinePickMilliseconds = watch.Elapsed.TotalMilliseconds;
+            if (!(hit?.Owner is SplinePath path))
+                return false;
+            pickedTile = path.Tile;
+            pickedSpline = path.Record;
+            point = ray.GetPoint((float)distance);
+            return true;
+        }
+
+        /// <summary>Milliseconds the last pointer ray took to find the ground, and the last object pick in 3D (diagnostics for the player log).</summary>
+        public double LastGroundMilliseconds { get; private set; }
+
+        public double LastObjectPickMilliseconds { get; private set; }
+
+        /// <summary>Milliseconds the last right-click took to find what is under the pointer, in total.</summary>
+        public double LastHitMilliseconds { get; private set; }
+
+        /// <summary>Milliseconds the last spline pick in 3D took, without building the ribbons (diagnostics for the player log).</summary>
+        public double LastSplinePickMilliseconds { get; private set; }
+
+        /// <summary>Milliseconds the last build of the ribbons took, once after the splines changed (diagnostics).</summary>
+        public double LastRibbonBuildMilliseconds { get; private set; }
+
+        /// <summary>The ribbons of the splines that have a surface; built once after the splines change, as the profiles are read from files.</summary>
+        private List<OmsiSplineRibbon> SplineRibbons()
+        {
+            if (splineRibbons != null)
+                return splineRibbons;
+            var buildWatch = System.Diagnostics.Stopwatch.StartNew();
+            var ribbons = new List<OmsiSplineRibbon>(splines.Count);
+            foreach (var path in splines)
+            {
+                if (!path.RibbonBuilt)
+                {
+                    path.RibbonBuilt = true;
+                    path.Ribbon = null;
+                    var extent = splineExtent(path.AssetPath ?? string.Empty);
+                    if (extent.HasValue)
+                    {
+                        var x = new double[path.Points.Length];
+                        var y = new double[path.Points.Length];
+                        for (var index = 0; index < x.Length; index++)
+                        {
+                            x[index] = path.Points[index].x;
+                            y[index] = path.Points[index].y;
+                        }
+                        // A mirrored spline shows its cross-section turned over.
+                        var mirrored = path.Record.IsMirrored;
+                        path.Ribbon = new OmsiSplineRibbon(path, x, y, path.StartHeight, path.EndHeight, mirrored ? -extent.Value.y : extent.Value.x,
+                            mirrored ? -extent.Value.x : extent.Value.y, extent.Value.z);
+                    }
+                }
+                if (path.Ribbon != null)
+                    ribbons.Add(path.Ribbon);
+            }
+            splineRibbons = ribbons;
+            LastRibbonBuildMilliseconds = buildWatch.Elapsed.TotalMilliseconds;
+            return ribbons;
+        }
+
+        /// <summary>The ground height under a world position of the map (0 without a ground).</summary>
+        public float GroundAtWorld(OmsiMapPoint world)
+        {
+            return GroundAt(WorldToMap(world));
+        }
+
+        /// <summary>What lies under a panel position, as a right-click there would find it (for the command line and timing).</summary>
+        internal MapContextHit ContextHitAtPanel(Vector2 panelPosition)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var hit = HitAt(this.WorldToLocal(panelPosition));
+            LastHitMilliseconds = watch.Elapsed.TotalMilliseconds;
+            return hit;
+        }
+
+        /// <summary>Where a point of the map lies on the screen in 3D, in panel coordinates, at the given absolute height; false in the view from above or behind the camera.</summary>
+        public bool TryScreenPosition3D(OmsiTileSummary tile, double localX, double localY, double height, out Vector2 screen)
+        {
+            screen = default;
+            if (summary == null || !hasView || !ThreeDimensional || tile == null || !OrbitCamera().TryProject(
+                    new Vector3(ToMap(tile, localX, localY).x, (float)height, ToMap(tile, localX, localY).y), out var local))
+                return false;
+            screen = this.LocalToWorld(local);
+            return true;
         }
 
         private struct Marker
@@ -3620,6 +3785,7 @@ namespace OmsiMapEditor.UI
             DrawTrafficLabels3D(painter, camera);
             DrawLaneEnds(painter, camera);
             DrawBox(painter);
+            DrawSelectedSplines3D(painter, camera);
             painter.lineWidth = 1.5f;
             painter.strokeColor = selectedObjectColor;
             for (var index = 0; index < selection.Count && index < 200; index++)
@@ -3640,6 +3806,29 @@ namespace OmsiMapEditor.UI
                 painter.strokeColor = colour;
                 painter.lineWidth = emphasised ? 4f : 2.5f;
                 StrokeWorldLine(painter, camera, RingPoints(centre, RingNormal(axis, heading, pitch), radius));
+            }
+        }
+
+        /// <summary>The selected splines as a line along their centre, at their height just above the surface (ADR 098, M5).</summary>
+        private void DrawSelectedSplines3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            if (selectedSpline == null && moreSelectedSplines.Count == 0)
+                return;
+            painter.strokeColor = selectedObjectColor;
+            painter.lineWidth = 4f;
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
+            foreach (var path in splines)
+            {
+                if (!ReferenceEquals(path.Record, selectedSpline) && !moreSelectedSplines.Contains(path.Record))
+                    continue;
+                var lift = path.Ribbon != null ? (float)path.Ribbon.Lift : 0f;
+                var last = path.Points.Length - 1;
+                var heights = new List<Vector3>(path.Points.Length);
+                for (var index = 0; index <= last; index++)
+                    heights.Add(new Vector3(path.Points[index].x, Mathf.Lerp(path.StartHeight, path.EndHeight, (float)index / last) + lift + 0.15f,
+                        path.Points[index].y));
+                StrokeWorldLine(painter, camera, heights);
             }
         }
 
@@ -4001,9 +4190,16 @@ namespace OmsiMapEditor.UI
                     }
                 };
             }
+            var splinesOnly = finished == DragMode.Box && boxSplinesOnly;
             var boxed = finished != DragMode.Box ? null
+                : splinesOnly ? new List<MapSelectionItem>()
                 : ThreeDimensional ? ObjectsInBox3D(dragStartPointer, dragLastPointer)
                 : ObjectsInBox(dragStartPointer, dragLastPointer);
+            // A box with no objects in it takes the splines it touches (objects come first: a box over a town would otherwise take every road);
+            // a Shift box skips the objects and takes the splines alone.
+            var boxedSplines = boxed != null && boxed.Count == 0
+                ? (ThreeDimensional ? SplinesInBox3D(dragStartPointer, dragLastPointer) : SplinesInBox(dragStartPointer, dragLastPointer))
+                : null;
             var member = finished == DragMode.MovePending ? clickedMember : null;
             var position = (Vector2)evt.localPosition;
             var rightClick = evt.button == 1 && rightClickCandidate && (finished == DragMode.Pan || finished == DragMode.Orbit) &&
@@ -4013,7 +4209,9 @@ namespace OmsiMapEditor.UI
 
             if (edits != null)
                 ObjectsEdited?.Invoke(edits);
-            if (boxed != null)
+            if (boxedSplines != null && boxedSplines.Count > 0)
+                SplinesBoxSelected?.Invoke(boxedSplines);
+            else if (boxed != null)
                 ObjectsBoxSelected?.Invoke(boxed);
             if (member != null)
                 ObjectSelected?.Invoke(member.Tile, member.Record);
@@ -4033,7 +4231,9 @@ namespace OmsiMapEditor.UI
         /// <summary>Finds what lies under a right-click, from above or in 3D, and asks the shell for its context menu.</summary>
         private void RequestContext(Vector2 position)
         {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             var hit = HitAt(position);
+            LastHitMilliseconds = watch.Elapsed.TotalMilliseconds;
             if (hit != null)
                 ContextRequested?.Invoke(hit);
         }
@@ -4060,20 +4260,34 @@ namespace OmsiMapEditor.UI
             if (ThreeDimensional)
             {
                 var camera = OrbitCamera();
+                var phase = System.Diagnostics.Stopwatch.StartNew();
                 var ground = GroundPoint(camera.RayThrough(position));
-                if (TryPick3D(camera, position, out var tile3D, out var item3D, out _))
+                LastGroundMilliseconds = phase.Elapsed.TotalMilliseconds;
+                phase.Restart();
+                var spot = ground;
+                var objectPicked = TryPick3D(camera, position, out var tile3D, out var item3D, out _);
+                LastObjectPickMilliseconds = phase.Elapsed.TotalMilliseconds;
+                LastSplinePickMilliseconds = 0.0;
+                if (objectPicked)
                 {
                     hit.Tile = tile3D;
                     hit.Object = item3D;
                 }
-                if (!ground.HasValue)
+                else if (TryPickSpline3D(camera, camera.RayThrough(position), ground, out var splineTile3D, out var spline3D, out var splinePoint))
+                {
+                    // The spot on the road surface, which differs from the ground under the pointer on a bridge.
+                    hit.Tile = splineTile3D;
+                    hit.Spline = spline3D;
+                    spot = splinePoint;
+                }
+                if (!spot.HasValue)
                 {
                     if (hit.Object == null)
                         return null;
                     map = ToMap(hit.Tile, hit.Object.LocalX, hit.Object.LocalY);
                 }
                 else
-                    map = new Vector2(ground.Value.x, ground.Value.z);
+                    map = new Vector2(spot.Value.x, spot.Value.z);
             }
             else
             {
@@ -4107,6 +4321,84 @@ namespace OmsiMapEditor.UI
                 return false;
             screen = this.LocalToWorld(MapToScreen(ToMap(tile, item.LocalX, item.LocalY)));
             return true;
+        }
+
+        /// <summary>
+        /// The selection box of a Ctrl+drag, or of a Shift+drag with <paramref name="splinesOnly"/>, between two panel positions, for the
+        /// command line (<c>-boxSelect</c>); same result as dragging.
+        /// </summary>
+        internal void SelectBoxAtPanel(Vector2 firstPanel, Vector2 secondPanel, bool splinesOnly = false)
+        {
+            if (summary == null || !hasView)
+                return;
+            var first = this.WorldToLocal(firstPanel);
+            var second = this.WorldToLocal(secondPanel);
+            var objects = splinesOnly ? new List<MapSelectionItem>() : ThreeDimensional ? ObjectsInBox3D(first, second) : ObjectsInBox(first, second);
+            if (objects.Count == 0)
+            {
+                var found = ThreeDimensional ? SplinesInBox3D(first, second) : SplinesInBox(first, second);
+                if (found.Count > 0)
+                {
+                    SplinesBoxSelected?.Invoke(found);
+                    return;
+                }
+            }
+            ObjectsBoxSelected?.Invoke(objects);
+        }
+
+        /// <summary>Splines whose line touches the box between two screen points, seen from above.</summary>
+        private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> SplinesInBox(Vector2 first, Vector2 second)
+        {
+            var a = ScreenToMap(first);
+            var b = ScreenToMap(second);
+            var box = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+            var result = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            foreach (var spline in splines)
+            {
+                if (!spline.Bounds.Overlaps(box))
+                    continue;
+                for (var index = 1; index < spline.Points.Length; index++)
+                {
+                    var from = spline.Points[index - 1];
+                    var to = spline.Points[index];
+                    if (OmsiSplineRayPicker.SegmentTouchesRectangle(box.xMin, box.yMin, box.xMax, box.yMax, from.x, from.y, to.x, to.y))
+                    {
+                        result.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(spline.Tile, spline.Record));
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Splines whose line, projected onto the screen, touches the box between two element positions in 3D.</summary>
+        private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> SplinesInBox3D(Vector2 first, Vector2 second)
+        {
+            var box = Rect.MinMaxRect(Mathf.Min(first.x, second.x), Mathf.Min(first.y, second.y), Mathf.Max(first.x, second.x),
+                Mathf.Max(first.y, second.y));
+            var camera = OrbitCamera();
+            var result = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            foreach (var spline in splines)
+            {
+                var count = spline.Points.Length;
+                Vector2? previous = null;
+                for (var index = 0; index < count; index++)
+                {
+                    var height = Mathf.Lerp(spline.StartHeight, spline.EndHeight, count > 1 ? index / (float)(count - 1) : 0f);
+                    var point = spline.Points[index];
+                    Vector2? current = camera.TryProject(new Vector3(point.x, height, point.y), out var screen) ? screen : (Vector2?)null;
+                    var touches = current.HasValue && (previous.HasValue
+                        ? OmsiSplineRayPicker.SegmentTouchesRectangle(box.xMin, box.yMin, box.xMax, box.yMax, previous.Value.x, previous.Value.y, current.Value.x, current.Value.y)
+                        : box.Contains(current.Value));
+                    previous = current;
+                    if (touches)
+                    {
+                        result.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(spline.Tile, spline.Record));
+                        break;
+                    }
+                }
+            }
+            return result;
         }
 
         /// <summary>Objects whose position lies inside the box between two screen points.</summary>

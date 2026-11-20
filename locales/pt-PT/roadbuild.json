@@ -20,7 +20,7 @@
   "roadbuild.junction.tee": "a junção T",
   "roadbuild.junction.and": " e ",
   "roadbuild.junction.whole": "{what} e a estrada {tail, select, to {para isso} other {através deles}}",
-  "roadbuild.splines": "{count, plural, one {spline #{ids}} other {splines #{ids}}}",
+  "roadbuild.splines": "{count, plural, one {spline {ids}} other {splines {ids}}}",
   "@roadbuild.splines": "{ids} is a list of numbers separated by \", #\"",
   "roadbuild.plan.continue": "Clique para continuar spline #{id} do seu {end, select, end {fim} other {começar}}.",
   "roadbuild.plan.start_port": "Clique para iniciar uma estrada em {port}; sugere o perfil {profile}.",

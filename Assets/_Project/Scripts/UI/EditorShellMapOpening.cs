@@ -40,10 +40,12 @@ namespace OmsiMapEditor.UI
             var session = string.IsNullOrEmpty(projectFilePath)
                 ? OmsiMapSession.OpenReadOnly(globalConfigPath)
                 : OmsiMapSession.OpenProject(globalConfigPath, projectFilePath);
+            var summary = session.Read();
+            session.WarmUpIdBoundary();
             return new MapReading
             {
                 Session = session,
-                Summary = session.Read(),
+                Summary = summary,
                 ChronoVariants = ReadChronoVariants(session.Source),
                 ImageryKey = globalConfigPath + "|" + projectFilePath
             };

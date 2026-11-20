@@ -148,6 +148,46 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual("Bereit", german.T("status.ready"));
         }
 
+        [Test]
+        public void ASingleSplineIsNamedByItsIdInEveryLanguageNotByTheCount()
+        {
+            var shipped = new TranslationManager(RepositoryLocales());
+            foreach (var language in new[] { "cs-CZ", "de-DE", "en-US", "es-ES", "fr-FR", "it-IT", "pl-PL", "pt-PT" })
+            {
+                Assert.IsTrue(shipped.SetLanguage(language), language);
+                foreach (var key in new[] { "history.step.spline_move", "history.step.road_of", "history.step.spline_deleted" })
+                {
+                    var text = shipped.T(key, ("count", 1), ("id", 4186));
+                    Assert.That(text, Does.Contain("4186"), language + " " + key + ": " + text);
+                    Assert.That(text, Does.Not.Contain("14186"), language + " " + key + ": " + text);
+                    Assert.That(text, Does.Not.Contain("1{id}"), language + " " + key + ": " + text);
+                }
+                var list = shipped.T("roadbuild.splines", ("count", 2), ("ids", "#7, #9"));
+                Assert.That(list, Does.Contain("#7, #9"), language + ": " + list);
+                Assert.That(list, Does.Not.Contain("2 #7"), language + ": " + list);
+            }
+        }
+
+        [Test]
+        public void AMissingSplineReasonAndTheShiftBoxHintAreTranslatedInEveryLanguage()
+        {
+            var shipped = new TranslationManager(RepositoryLocales());
+            var english = new TranslationManager(RepositoryLocales());
+            Assert.IsTrue(english.SetLanguage("en-US"));
+            Assert.AreEqual("#4186: not in the map any more", english.T("splinevar.status.gone_in_map", ("id", 4186)));
+            foreach (var language in new[] { "cs-CZ", "de-DE", "en-US", "es-ES", "fr-FR", "it-IT", "pl-PL", "pt-PT" })
+            {
+                Assert.IsTrue(shipped.SetLanguage(language), language);
+                var reason = shipped.T("splinevar.status.gone_in_map", ("id", 4186));
+                Assert.That(reason, Does.Contain("4186"), language + ": " + reason);
+                Assert.That(reason, Does.Not.Contain("{id}"), language + ": " + reason);
+                if (language != "en-US")
+                    Assert.AreNotEqual(english.T("splinevar.status.gone_in_map", ("id", 4186)), reason, language);
+                Assert.That(shipped.T("toolbar.drag.tooltip"), Does.Contain("Shift").Or.Contain("Umschalt").Or.Contain("Maj").Or.Contain("Mayús")
+                    .Or.Contain("Maiusc"), language);
+            }
+        }
+
         private void Language(string code, string name)
         {
             Directory.CreateDirectory(Path.Combine(root, code));

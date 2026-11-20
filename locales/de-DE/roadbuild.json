@@ -19,7 +19,7 @@
   "roadbuild.junction.tee": "die T-Kreuzung",
   "roadbuild.junction.and": " und ",
   "roadbuild.junction.whole": "{what} und die Straße {tail, select, to {dorthin} other {durch sie}}",
-  "roadbuild.splines": "{count, plural, one {Spline #{ids}} other {Splines #{ids}}}",
+  "roadbuild.splines": "{count, plural, one {Spline {ids}} other {Splines {ids}}}",
   "roadbuild.plan.continue": "Klicke, um Spline #{id} von seinem {end, select, end {Ende} other {Anfang}} aus fortzusetzen.",
   "roadbuild.plan.start_port": "Klicke, um eine Straße bei {port} zu beginnen; sie schlägt das Profil {profile} vor.",
   "roadbuild.plan.start": "Klicke, um eine Straße zu beginnen. Freie Spline-Enden erscheinen als Kreise und freie Anschlusspunkte von Kreuzungen als Rauten; auf einem zu beginnen setzt ihn fort.",
