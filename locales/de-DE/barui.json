@@ -18,6 +18,14 @@
   "context.labels": "Beschriftungen...",
   "context.attached": "Angehängte Objekte...",
   "context.paths": "KI-Pfade und Regeln...",
+  "context.row": "Reihe #{id}  {name}",
+  "context.markings": "Markierungen...",
+  "context.traffic_rules": "Verkehrsregeln...",
+  "context.lanes": "Spuren...",
+  "context.traffic_lights": "Ampeln...",
+  "context.edit_traffic_lights": "Ampeln bearbeiten...",
+  "context.edit_row": "Reihe bearbeiten",
+  "context.delete_row": "Reihe löschen",
   "context.copy": "Kopieren",
   "context.duplicate": "Duplizieren",
   "context.level": "Boden einebnen",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Kacheleigenschaften...",
   "context.paste": "Hier einfügen",
   "context.revert_tile": "Kachelbearbeitungen zurücknehmen",
-  "context.readonly": "Nur lesen: ein MapWorks-Projekt speichern, um zu bearbeiten."
+  "context.readonly": "Nur lesen: ein MapWorks-Projekt speichern, um zu bearbeiten.",
+  "context.traffic_lights_view": "Ampeln (nur lesen)...",
+  "context.reason.foreign_junction": "Nur mit MapWorks erstellte Kreuzungen lassen sich ändern.",
+  "context.reason.readonly_map": "In einer schreibgeschützten Karte oder Chrono-Variante nicht verfügbar.",
+  "context.reason.few_arms": "Braucht eine Kreuzung mit mindestens zwei Zufahrten."
 }

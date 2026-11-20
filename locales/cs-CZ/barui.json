@@ -18,6 +18,14 @@
   "context.labels": "Popisky...",
   "context.attached": "Připojené objekty...",
   "context.paths": "Cesty AI a pravidla...",
+  "context.row": "Řádek #{id}  {name}",
+  "context.markings": "Značení...",
+  "context.traffic_rules": "Dopravní pravidla...",
+  "context.lanes": "Jízdní pruhy...",
+  "context.traffic_lights": "Semafory...",
+  "context.edit_traffic_lights": "Upravit semafory...",
+  "context.edit_row": "Upravit řádek",
+  "context.delete_row": "Smazat řádek",
   "context.copy": "Kopírovat",
   "context.duplicate": "Duplikovat",
   "context.level": "Srovnat terén",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Vlastnosti dlaždice...",
   "context.paste": "Vložit sem",
   "context.revert_tile": "Vrátit úpravy dlaždice",
-  "context.readonly": "Jen pro čtení: pro úpravy uložte projekt MapWorks."
+  "context.readonly": "Jen pro čtení: pro úpravy uložte projekt MapWorks.",
+  "context.traffic_lights_view": "Semafory (jen pro čtení)...",
+  "context.reason.foreign_junction": "Změnit lze jen křižovatky vytvořené v MapWorks.",
+  "context.reason.readonly_map": "V mapě jen pro čtení nebo ve variantě chrono není k dispozici.",
+  "context.reason.few_arms": "Vyžaduje křižovatku s alespoň dvěma rameny."
 }

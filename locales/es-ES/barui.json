@@ -18,6 +18,14 @@
   "context.labels": "Etiquetas...",
   "context.attached": "Objetos adjuntos...",
   "context.paths": "Rutas de IA y reglas...",
+  "context.row": "Fila #{id}  {name}",
+  "context.markings": "Marcas viales...",
+  "context.traffic_rules": "Reglas de tráfico...",
+  "context.lanes": "Carriles...",
+  "context.traffic_lights": "Semáforos...",
+  "context.edit_traffic_lights": "Editar semáforos...",
+  "context.edit_row": "Editar fila",
+  "context.delete_row": "Eliminar fila",
   "context.copy": "Copiar",
   "context.duplicate": "Duplicar",
   "context.level": "Nivelar el terreno",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Propiedades de la casilla...",
   "context.paste": "Pegar aquí",
   "context.revert_tile": "Deshacer los cambios de la casilla",
-  "context.readonly": "Solo lectura: guarda un proyecto MapWorks para editar."
+  "context.readonly": "Solo lectura: guarda un proyecto MapWorks para editar.",
+  "context.traffic_lights_view": "Semáforos (solo lectura)...",
+  "context.reason.foreign_junction": "Solo se pueden cambiar los cruces creados con MapWorks.",
+  "context.reason.readonly_map": "No disponible en un mapa de solo lectura ni en una variante cronológica.",
+  "context.reason.few_arms": "Requiere un cruce con al menos dos accesos."
 }

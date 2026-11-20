@@ -18,6 +18,14 @@
   "context.labels": "Etykiety...",
   "context.attached": "Dołączone obiekty...",
   "context.paths": "Ścieżki AI i reguły...",
+  "context.row": "Wiersz #{id}  {name}",
+  "context.markings": "Oznakowanie...",
+  "context.traffic_rules": "Przepisy ruchu...",
+  "context.lanes": "Pasy ruchu...",
+  "context.traffic_lights": "Sygnalizacja...",
+  "context.edit_traffic_lights": "Edytuj sygnalizację...",
+  "context.edit_row": "Edytuj wiersz",
+  "context.delete_row": "Usuń wiersz",
   "context.copy": "Kopiuj",
   "context.duplicate": "Duplikuj",
   "context.level": "Wyrównaj teren",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Właściwości kafelka...",
   "context.paste": "Wklej tutaj",
   "context.revert_tile": "Cofnij zmiany kafelka",
-  "context.readonly": "Tylko do odczytu: zapisz projekt MapWorks, aby edytować."
+  "context.readonly": "Tylko do odczytu: zapisz projekt MapWorks, aby edytować.",
+  "context.traffic_lights_view": "Sygnalizacja (tylko do odczytu)...",
+  "context.reason.foreign_junction": "Można zmieniać tylko skrzyżowania utworzone w MapWorks.",
+  "context.reason.readonly_map": "Niedostępne w mapie tylko do odczytu ani w wariancie chrono.",
+  "context.reason.few_arms": "Wymaga skrzyżowania z co najmniej dwoma dojazdami."
 }

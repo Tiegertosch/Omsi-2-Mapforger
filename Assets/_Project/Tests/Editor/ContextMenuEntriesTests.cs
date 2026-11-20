@@ -19,7 +19,7 @@ namespace OmsiMapEditor.Tests
             return new ContextMenuState { CanEdit = true, CanEditObjects = true };
         }
 
-        /// <summary>The entries as one readable line: keys, "---" for a divider, "!" after a dangerous entry, "(note)" for the read-only note.</summary>
+        /// <summary>The entries as one readable line: keys, "---" for a divider, "!" after a dangerous entry, "~" after one greyed with its reason, "(note)" for the read-only note.</summary>
         private static string Describe(ContextMenuKind kind, ContextMenuState state)
         {
             return string.Join(" ", ContextMenuEntries.For(kind, state).Select(entry =>
@@ -28,14 +28,14 @@ namespace OmsiMapEditor.Tests
                 {
                     case ContextMenuEntryType.Divider: return "---";
                     case ContextMenuEntryType.ReadOnlyNote: return "(note)";
-                    default: return entry.TextKey.Substring("context.".Length) + (entry.Danger ? "!" : string.Empty);
+                    default: return entry.TextKey.Substring("context.".Length) + (entry.Danger ? "!" : string.Empty) + (entry.DisabledReasonKey != null ? "~" : string.Empty);
                 }
             }));
         }
 
         private static IEnumerable<ContextMenuState> AllStates()
         {
-            for (var bits = 0; bits < 256; bits++)
+            for (var bits = 0; bits < 4096; bits++)
             {
                 yield return new ContextMenuState
                 {
@@ -47,6 +47,10 @@ namespace OmsiMapEditor.Tests
                     IsBusStop = (bits & 32) != 0,
                     ClipboardFilled = (bits & 64) != 0,
                     TileRevertible = (bits & 128) != 0,
+                    IsMadeJunction = (bits & 256) != 0,
+                    HasPriorityArms = (bits & 512) != 0,
+                    IsHeadOfMadeCrossing = (bits & 1024) != 0,
+                    HasSignalArms = (bits & 2048) != 0,
                 };
             }
         }
@@ -134,6 +138,157 @@ namespace OmsiMapEditor.Tests
                 Is.EqualTo(new[] { null, "Ctrl+C", "Ctrl+D", null, "Del" }));
         }
 
+        private static ContextMenuState MadeJunction()
+        {
+            var state = Editable();
+            state.IsMadeJunction = true;
+            state.HasPriorityArms = true;
+            return state;
+        }
+
+        [Test]
+        public void AJunctionTheEditorMadeOpensFourToolsOnItselfAfterADivider()
+        {
+            Assert.That(Describe(ContextMenuKind.Object, MadeJunction()),
+                Is.EqualTo("properties change_type labels --- markings traffic_rules lanes traffic_lights --- copy duplicate level --- delete!"));
+            var actions = ContextMenuEntries.For(ContextMenuKind.Object, MadeJunction()).Select(entry => entry.Action).ToList();
+            Assert.That(actions, Does.Contain(ContextMenuAction.OpenMarkings));
+            Assert.That(actions, Does.Contain(ContextMenuAction.OpenTrafficRules));
+            Assert.That(actions, Does.Contain(ContextMenuAction.OpenLanes));
+            Assert.That(actions, Does.Contain(ContextMenuAction.OpenTrafficLights));
+        }
+
+        [Test]
+        public void TheToolsStandAfterThePathsEntry()
+        {
+            var state = MadeJunction();
+            state.PathsGroupShown = true;
+
+            Assert.That(Describe(ContextMenuKind.Object, state),
+                Is.EqualTo("properties change_type labels paths --- markings traffic_rules lanes traffic_lights --- copy duplicate level --- delete!"));
+        }
+
+        [Test]
+        public void OnlyTheTrafficRulesWorkOnAnyObjectWithArmsTheOthersAreGreyedWithTheirReason()
+        {
+            var state = Editable();
+            state.HasPriorityArms = true;
+
+            Assert.That(Describe(ContextMenuKind.Object, state),
+                Is.EqualTo("properties change_type labels --- markings~ traffic_rules lanes~ traffic_lights~ --- copy duplicate level --- delete!"));
+            var entries = ContextMenuEntries.For(ContextMenuKind.Object, state);
+            Assert.That(entries.Single(entry => entry.Action == ContextMenuAction.OpenMarkings).DisabledReasonKey, Is.EqualTo(ContextMenuEntries.ReasonForeignJunction));
+            Assert.That(entries.Single(entry => entry.Action == ContextMenuAction.OpenLanes).DisabledReasonKey, Is.EqualTo(ContextMenuEntries.ReasonForeignJunction));
+            Assert.That(entries.Single(entry => entry.Action == ContextMenuAction.OpenTrafficLights).DisabledReasonKey, Is.EqualTo(ContextMenuEntries.ReasonFewArms),
+                "one arm is no crossing for the lights");
+            Assert.That(entries.Single(entry => entry.Action == ContextMenuAction.OpenTrafficRules).DisabledReasonKey, Is.Null);
+        }
+
+        [Test]
+        public void ALightsToolOnAForeignCrossingOpensReadOnly()
+        {
+            var state = Editable();
+            state.HasPriorityArms = true;
+            state.HasSignalArms = true;
+
+            Assert.That(Describe(ContextMenuKind.Object, state),
+                Is.EqualTo("properties change_type labels --- markings~ traffic_rules lanes~ traffic_lights_view --- copy duplicate level --- delete!"));
+            var lights = ContextMenuEntries.For(ContextMenuKind.Object, state).Single(entry => entry.Action == ContextMenuAction.OpenTrafficLights);
+            Assert.That(lights.DisabledReasonKey, Is.Null, "it can be chosen: the window shows the crossing and changes nothing");
+        }
+
+        [Test]
+        public void AForeignCrossingOfAMapThatCannotBeEditedGreysTheLightsToo()
+        {
+            var state = new ContextMenuState { CanEditObjects = true, HasPriorityArms = true, HasSignalArms = true };
+
+            var lights = ContextMenuEntries.For(ContextMenuKind.Object, state).Single(entry => entry.Action == ContextMenuAction.OpenTrafficLights);
+            Assert.That(lights.DisabledReasonKey, Is.EqualTo(ContextMenuEntries.ReasonReadOnlyMap));
+        }
+
+        [Test]
+        public void AnObjectWithoutArmsAndNotMadeOffersNoTool()
+        {
+            Assert.That(Describe(ContextMenuKind.Object, Editable()), Does.Not.Contain("traffic_rules"));
+            Assert.That(Describe(ContextMenuKind.Object, Editable()), Does.Not.Contain("markings"));
+        }
+
+        [Test]
+        public void InAVariantOnlyTheTrafficRulesAreChoosable()
+        {
+            var state = MadeJunction();
+            state.CanEdit = false;
+
+            Assert.That(Describe(ContextMenuKind.Object, state),
+                Is.EqualTo("properties change_type labels --- markings~ traffic_rules lanes~ traffic_lights~ --- copy duplicate --- delete!"));
+            Assert.That(ContextMenuEntries.For(ContextMenuKind.Object, state).Single(entry => entry.Action == ContextMenuAction.OpenMarkings).DisabledReasonKey,
+                Is.EqualTo(ContextMenuEntries.ReasonReadOnlyMap));
+        }
+
+        [Test]
+        public void AReadOnlyMapOffersNoToolOnAJunction()
+        {
+            var state = new ContextMenuState { IsMadeJunction = true, HasPriorityArms = true, IsHeadOfMadeCrossing = true };
+
+            Assert.That(Describe(ContextMenuKind.Object, state), Is.EqualTo("properties (note)"));
+        }
+
+        [Test]
+        public void ASignalHeadOffersTheLightsOfItsCrossing()
+        {
+            var state = Editable();
+            state.IsHeadOfMadeCrossing = true;
+
+            Assert.That(Describe(ContextMenuKind.Object, state),
+                Is.EqualTo("properties change_type labels --- edit_traffic_lights --- copy duplicate level --- delete!"));
+            Assert.That(ContextMenuEntries.For(ContextMenuKind.Object, state).Any(entry => entry.Action == ContextMenuAction.OpenTrafficLightsOfHead), Is.True);
+        }
+
+        [Test]
+        public void ARowOffersEditingAndADangerousDeleteWithoutAKey()
+        {
+            Assert.That(Describe(ContextMenuKind.Row, Editable()), Is.EqualTo("edit_row --- delete_row!"));
+            var entries = ContextMenuEntries.For(ContextMenuKind.Row, Editable());
+            Assert.That(entries[0].Action, Is.EqualTo(ContextMenuAction.EditRow));
+            Assert.That(entries.Last().Action, Is.EqualTo(ContextMenuAction.DeleteRow));
+            Assert.That(entries.Last().Shortcut, Is.Null, "Delete takes a row only in the rows tool");
+        }
+
+        [Test]
+        public void ARowOfAReadOnlyMapOffersOnlyTheNote()
+        {
+            Assert.That(Describe(ContextMenuKind.Row, new ContextMenuState { CanEditObjects = true }), Is.EqualTo("(note)"));
+        }
+
+        [Test]
+        public void TheFocusMovesOverActiveEntriesAndSkipsTheOthers()
+        {
+            var active = new[] { true, false, true, true, false };
+
+            Assert.That(ContextMenuNavigation.Next(active, -1, 1), Is.EqualTo(0), "down without a focus: the first");
+            Assert.That(ContextMenuNavigation.Next(active, 0, 1), Is.EqualTo(2), "a disabled entry is skipped");
+            Assert.That(ContextMenuNavigation.Next(active, 2, 1), Is.EqualTo(3));
+            Assert.That(ContextMenuNavigation.Next(active, 3, 1), Is.EqualTo(0), "wraps round at the end");
+            Assert.That(ContextMenuNavigation.Next(active, -1, -1), Is.EqualTo(3), "up without a focus: the last active");
+            Assert.That(ContextMenuNavigation.Next(active, 0, -1), Is.EqualTo(3), "wraps round at the start");
+            Assert.That(ContextMenuNavigation.Next(active, 3, -1), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TheFocusStaysOnALoneActiveEntryAndIsNoneWithoutAny()
+        {
+            Assert.That(ContextMenuNavigation.Next(new[] { false, true, false }, 1, 1), Is.EqualTo(1));
+            Assert.That(ContextMenuNavigation.Next(new[] { false, true, false }, 1, -1), Is.EqualTo(1));
+            Assert.That(ContextMenuNavigation.Next(new[] { false, false }, -1, 1), Is.EqualTo(-1));
+            Assert.That(ContextMenuNavigation.Next(new bool[0], -1, 1), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void AFocusPastTheEndCountsAsNone()
+        {
+            Assert.That(ContextMenuNavigation.Next(new[] { true, true }, 7, 1), Is.EqualTo(0));
+        }
+
         [Test]
         public void ASplineOfAnEditableMapOffersHeightsAndDelete()
         {
@@ -200,8 +355,11 @@ namespace OmsiMapEditor.Tests
                     var where = kind + " " + Describe(kind, state);
 
                     Assert.That(entries.Count, Is.GreaterThan(0), where);
-                    Assert.That(entries[0].Type, Is.EqualTo(ContextMenuEntryType.Item), where);
-                    Assert.That(entries[0].Action == ContextMenuAction.OpenProperties || entries[0].Action == ContextMenuAction.OpenTileProperties, Is.True, where);
+                    // A row has no properties: it offers editing, or only the note on a map that is read-only.
+                    var firstOfRow = kind == ContextMenuKind.Row;
+                    Assert.That(entries[0].Type, Is.EqualTo(firstOfRow && !state.CanEdit ? ContextMenuEntryType.ReadOnlyNote : ContextMenuEntryType.Item), where);
+                    if (!firstOfRow)
+                        Assert.That(entries[0].Action == ContextMenuAction.OpenProperties || entries[0].Action == ContextMenuAction.OpenTileProperties, Is.True, where);
                     for (var index = 0; index < entries.Count; index++)
                     {
                         if (entries[index].Type != ContextMenuEntryType.Divider)
@@ -219,6 +377,9 @@ namespace OmsiMapEditor.Tests
                     if (notes == 1)
                         Assert.That(entries.Last().Type, Is.EqualTo(ContextMenuEntryType.ReadOnlyNote), "the note is last: " + where);
                     Assert.That(entries.Where(entry => entry.Type == ContextMenuEntryType.Item).All(entry => entry.TextKey != null && entry.Action != ContextMenuAction.None), Is.True, where);
+                    Assert.That(entries.Where(entry => entry.DisabledReasonKey != null).All(entry => entry.Type == ContextMenuEntryType.Item && !entry.Danger), Is.True,
+                        "only an entry can be greyed, and not a dangerous one: " + where);
+                    Assert.That(firstOfRow && !state.CanEdit || entries.Any(entry => entry.Type == ContextMenuEntryType.Item && entry.DisabledReasonKey == null), Is.True, "something can be chosen: " + where);
                 }
             }
         }
@@ -243,10 +404,14 @@ namespace OmsiMapEditor.Tests
             foreach (var kind in (ContextMenuKind[])Enum.GetValues(typeof(ContextMenuKind)))
                 foreach (var state in AllStates())
                     foreach (var entry in ContextMenuEntries.For(kind, state))
+                    {
                         if (entry.TextKey != null)
                             keys.Add(entry.TextKey);
+                        if (entry.DisabledReasonKey != null)
+                            keys.Add(entry.DisabledReasonKey);
+                    }
 
-            Assert.That(keys.Count, Is.GreaterThan(15));
+            Assert.That(keys.Count, Is.GreaterThan(20));
             foreach (var key in keys)
                 Assert.That(english.ContainsKey(key), Is.True, key + " is not in locales/en-US");
         }

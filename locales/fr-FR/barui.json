@@ -18,6 +18,14 @@
   "context.labels": "Étiquettes...",
   "context.attached": "Objets attachés...",
   "context.paths": "Chemins IA et règles...",
+  "context.row": "Ligne #{id}  {name}",
+  "context.markings": "Marquages...",
+  "context.traffic_rules": "Règles de circulation...",
+  "context.lanes": "Voies...",
+  "context.traffic_lights": "Feux...",
+  "context.edit_traffic_lights": "Modifier les feux...",
+  "context.edit_row": "Modifier la ligne",
+  "context.delete_row": "Supprimer la ligne",
   "context.copy": "Copier",
   "context.duplicate": "Dupliquer",
   "context.level": "Niveler le sol",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Propriétés de la tuile...",
   "context.paste": "Coller ici",
   "context.revert_tile": "Annuler les modifications de la tuile",
-  "context.readonly": "Lecture seule : enregistrer un projet MapWorks pour modifier."
+  "context.readonly": "Lecture seule : enregistrer un projet MapWorks pour modifier.",
+  "context.traffic_lights_view": "Feux (lecture seule)...",
+  "context.reason.foreign_junction": "Seuls les carrefours créés avec MapWorks peuvent être modifiés.",
+  "context.reason.readonly_map": "Indisponible dans une carte en lecture seule ou une variante chrono.",
+  "context.reason.few_arms": "Nécessite un carrefour avec au moins deux branches."
 }

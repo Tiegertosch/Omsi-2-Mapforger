@@ -18,6 +18,14 @@
   "context.labels": "Etichette...",
   "context.attached": "Oggetti collegati...",
   "context.paths": "Percorsi IA e regole...",
+  "context.row": "Riga #{id}  {name}",
+  "context.markings": "Segnaletica...",
+  "context.traffic_rules": "Regole del traffico...",
+  "context.lanes": "Corsie...",
+  "context.traffic_lights": "Semafori...",
+  "context.edit_traffic_lights": "Modifica i semafori...",
+  "context.edit_row": "Modifica riga",
+  "context.delete_row": "Elimina riga",
   "context.copy": "Copia",
   "context.duplicate": "Duplica",
   "context.level": "Livella il terreno",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Proprietà della tessera...",
   "context.paste": "Incolla qui",
   "context.revert_tile": "Annulla le modifiche della tessera",
-  "context.readonly": "Sola lettura: salva un progetto MapWorks per modificare."
+  "context.readonly": "Sola lettura: salva un progetto MapWorks per modificare.",
+  "context.traffic_lights_view": "Semafori (sola lettura)...",
+  "context.reason.foreign_junction": "Si possono modificare solo gli incroci creati con MapWorks.",
+  "context.reason.readonly_map": "Non disponibile in una mappa di sola lettura o in una variante cronologica.",
+  "context.reason.few_arms": "Richiede un incrocio con almeno due accessi."
 }

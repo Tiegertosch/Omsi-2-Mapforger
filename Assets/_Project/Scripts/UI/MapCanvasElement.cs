@@ -64,6 +64,9 @@ namespace OmsiMapEditor.UI
         public OmsiTileSummary Tile;
         public OmsiObjectRecord Object;
         public OmsiSplineRecord Spline;
+
+        /// <summary>A row of objects along a road under the pointer; not found by the map but by the shell, which knows the rows (M5).</summary>
+        public KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>? Row;
         public double LocalX;
         public double LocalY;
         public Vector2 ScreenPosition;
@@ -392,6 +395,7 @@ namespace OmsiMapEditor.UI
             generateVisualContent += Draw;
             RegisterCallback<PointerDownEvent>(OnPointerDown);
             RegisterCallback<PointerMoveEvent>(OnPointerMove);
+            RegisterCallback<PointerLeaveEvent>(_ => hoverPosition = null);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
             RegisterCallback<PointerCaptureOutEvent>(_ => CancelDrag());
             RegisterCallback<PointerLeaveEvent>(_ =>
@@ -3810,6 +3814,7 @@ namespace OmsiMapEditor.UI
         private void OnPointerMove(PointerMoveEvent evt)
         {
             var position = (Vector2)evt.localPosition;
+            hoverPosition = position;
             if (pointerBadge != null && pointerBadgeIcon != null)
                 MovePointerBadge(position);
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
@@ -4028,8 +4033,28 @@ namespace OmsiMapEditor.UI
         /// <summary>Finds what lies under a right-click, from above or in 3D, and asks the shell for its context menu.</summary>
         private void RequestContext(Vector2 position)
         {
+            var hit = HitAt(position);
+            if (hit != null)
+                ContextRequested?.Invoke(hit);
+        }
+
+        /// <summary>
+        /// What lies under the pointer if it is over the map (the hit a right-click there would give; its tile and tile-local position are set
+        /// even for empty ground), for keys that act on the element under the pointer. False when the pointer is elsewhere or off the tiles.
+        /// </summary>
+        public bool TryPointerHit(out MapContextHit hit)
+        {
+            hit = hoverPosition.HasValue ? HitAt(hoverPosition.Value) : null;
+            return hit != null;
+        }
+
+        /// <summary>The last place of the pointer over the map in the map's own coordinates; null while it is outside.</summary>
+        private Vector2? hoverPosition;
+
+        private MapContextHit HitAt(Vector2 position)
+        {
             if (summary == null || !hasView)
-                return;
+                return null;
             var hit = new MapContextHit { ScreenPosition = this.LocalToWorld(position) };
             Vector2 map;
             if (ThreeDimensional)
@@ -4044,7 +4069,7 @@ namespace OmsiMapEditor.UI
                 if (!ground.HasValue)
                 {
                     if (hit.Object == null)
-                        return;
+                        return null;
                     map = ToMap(hit.Tile, hit.Object.LocalX, hit.Object.LocalY);
                 }
                 else
@@ -4067,11 +4092,11 @@ namespace OmsiMapEditor.UI
             if (hit.Tile == null)
                 hit.Tile = TileAt(map);
             if (hit.Tile == null)
-                return;
+                return null;
             var rect = TileRect(hit.Tile);
             hit.LocalX = Math.Round(map.x - rect.xMin, 2);
             hit.LocalY = Math.Round(map.y - rect.yMin, 2);
-            ContextRequested?.Invoke(hit);
+            return hit;
         }
 
         /// <summary>Where an object stands on the screen in the view from above, in panel coordinates; false in 3D or before the first view.</summary>

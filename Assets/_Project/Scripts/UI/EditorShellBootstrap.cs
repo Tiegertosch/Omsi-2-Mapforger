@@ -756,6 +756,7 @@ namespace OmsiMapEditor.UI
 
             // Shortcuts work anywhere except inside a text field, which keeps its own text undo and Delete key.
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
+            RegisterContextMenuNavigation(root);
 
             CreateBackgroundCamera();
             groundRenderer = new GameObject("Map Ground").AddComponent<MapGroundRenderer>();
@@ -6410,7 +6411,15 @@ namespace OmsiMapEditor.UI
         {
             if (evt.keyCode == KeyCode.Escape)
             {
+                if (ContextMenuOpen)
+                    contextMenuKeyFrame = Time.frameCount;
                 OnEscape(evt);
+                return;
+            }
+            // Up, Down, Enter and Space work the open menu (ADR 098, M5); in a field that takes typed text they are typing.
+            if (ContextMenuOpen && !(evt.ctrlKey || evt.commandKey || evt.altKey) && !InTextInput(evt.target as VisualElement) && HandleContextMenuKey(evt))
+            {
+                evt.StopPropagation();
                 return;
             }
             // Any other key closes the menu first, as its entries were made for the state before, and then does what it always does.
@@ -6473,6 +6482,11 @@ namespace OmsiMapEditor.UI
                 else if (evt.keyCode == KeyCode.Delete && selectedSpline != null)
                 {
                     DeleteSelectedSpline();
+                    evt.StopPropagation();
+                }
+                // Nothing selected that Delete takes: a row of objects along a road under the pointer goes, as with "Delete row" in the menu.
+                else if (evt.keyCode == KeyCode.Delete && DeleteRowUnderPointer())
+                {
                     evt.StopPropagation();
                 }
                 else if (evt.keyCode == KeyCode.W && activeTool == EditorTool.Move && mapCanvas != null)

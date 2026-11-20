@@ -18,6 +18,14 @@
   "context.labels": "Etiquetas...",
   "context.attached": "Objetos anexados...",
   "context.paths": "Caminhos de IA e regras...",
+  "context.row": "Linha #{id}  {name}",
+  "context.markings": "Marcações...",
+  "context.traffic_rules": "Regras de trânsito...",
+  "context.lanes": "Vias de trânsito...",
+  "context.traffic_lights": "Semáforos...",
+  "context.edit_traffic_lights": "Editar semáforos...",
+  "context.edit_row": "Editar linha",
+  "context.delete_row": "Eliminar linha",
   "context.copy": "Copiar",
   "context.duplicate": "Duplicar",
   "context.level": "Nivelar o terreno",
@@ -31,5 +39,9 @@
   "context.tile_properties": "Propriedades do mosaico...",
   "context.paste": "Colar aqui",
   "context.revert_tile": "Reverter as edições do mosaico",
-  "context.readonly": "Só leitura: guarde um projeto MapWorks para editar."
+  "context.readonly": "Só leitura: guarde um projeto MapWorks para editar.",
+  "context.traffic_lights_view": "Semáforos (só leitura)...",
+  "context.reason.foreign_junction": "Só se podem alterar cruzamentos criados com o MapWorks.",
+  "context.reason.readonly_map": "Indisponível num mapa só de leitura ou numa variante cronológica.",
+  "context.reason.few_arms": "Requer um cruzamento com pelo menos dois acessos."
 }
