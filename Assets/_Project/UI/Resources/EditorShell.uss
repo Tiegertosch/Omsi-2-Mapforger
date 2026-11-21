@@ -88,11 +88,12 @@
 .menu-bar-map { flex-grow: 1; -unity-text-align: middle-right; color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Menus and popups */
-.menu-popup { position: absolute; top: 38px; min-width: 230px; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); display: none; }
+.menu-popup { position: absolute; top: 38px; min-width: 230px; max-height: 86%; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); display: none; }
 .file-menu { left: 168px; }
 .edit-menu { left: 222px; }
 .view-menu { left: 276px; }
-.help-menu { left: 384px; width: 360px; }
+.help-menu { left: 384px; width: 360px; max-width: 94%; }
+.help-menu-scroll { flex-shrink: 1; min-height: 0; }
 .menu-popup-item { height: 32px; -unity-text-align: middle-left; padding-left: 10px; background-color: var(--mf-color-clear); border-width: 0; border-radius: var(--mf-radius-sm); color: var(--mf-color-text-primary); }
 .menu-popup-item:hover { background-color: var(--mf-color-panel-hover); }
 .menu-popup-item:disabled { color: var(--mf-color-text-disabled); }
@@ -111,13 +112,13 @@
 .map-pointer-badge { position: absolute; width: 30px; height: 30px; padding: 3px; color: var(--mf-color-accent); background-color: var(--mf-color-panel-glass); border-radius: 15px; }
 .map-pointer-badge > .icon { flex-grow: 1; }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
-.empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
+.empty-state { position: absolute; left: 0; top: 0; right: 0; bottom: 0; padding: var(--mf-space-2) var(--mf-space-2) 46px var(--mf-space-2); align-items: center; justify-content: center; }
 /* Welcome screen in the middle of the empty map */
-.welcome { width: 720px; align-items: stretch; }
-.welcome-title { font-size: var(--mf-font-display); -unity-font: url("Fonts/Inter-SemiBold.ttf"); -unity-text-align: middle-center; }
-.welcome-tagline { margin-top: var(--mf-space-1); margin-bottom: 28px; -unity-text-align: middle-center; color: var(--mf-color-text-secondary); }
-.welcome-cards { flex-direction: row; justify-content: space-between; margin-bottom: 28px; }
-.welcome-card { width: 228px; height: 168px; margin: 0; padding: var(--mf-space-4); flex-direction: column; align-items: flex-start; justify-content: flex-start; color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
+.welcome { width: 720px; max-width: 100%; max-height: 100%; align-items: stretch; }
+.welcome-title { flex-shrink: 0; font-size: var(--mf-font-display); -unity-font: url("Fonts/Inter-SemiBold.ttf"); -unity-text-align: middle-center; }
+.welcome-tagline { flex-shrink: 0; margin-top: var(--mf-space-1); margin-bottom: 28px; -unity-text-align: middle-center; color: var(--mf-color-text-secondary); }
+.welcome-cards { flex-shrink: 0; flex-direction: row; justify-content: space-between; margin-bottom: 28px; }
+.welcome-card { width: 228px; flex-shrink: 1; min-width: 0; height: 168px; margin: 0; padding: var(--mf-space-4); flex-direction: column; align-items: flex-start; justify-content: flex-start; color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .welcome-card:hover { border-color: var(--mf-color-accent); background-color: var(--mf-color-panel-raised); }
 .welcome-card:disabled { color: var(--mf-color-text-disabled); }
 .welcome-card-icon { width: 40px; height: 40px; margin-bottom: var(--mf-space-3); padding: 9px; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
@@ -127,8 +128,8 @@
 .welcome-card-text { margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; -unity-text-align: upper-left; }
 .welcome-card:disabled .welcome-card-text { color: var(--mf-color-text-disabled); }
 .welcome-card-badge { position: absolute; top: var(--mf-space-4); right: var(--mf-space-4); padding: 1px 6px; font-size: var(--mf-font-mark); color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-raised); border-radius: var(--mf-radius-sm); }
-.welcome-section { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
-.welcome-recent { padding: var(--mf-space-1); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
+.welcome-section { flex-shrink: 0; margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
+.welcome-recent { flex-shrink: 1; min-height: 0; padding: var(--mf-space-1); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .welcome-empty { padding: var(--mf-space-3); color: var(--mf-color-text-muted); }
 .welcome-recent-row { height: 46px; margin: 0; padding: 0 var(--mf-space-3); flex-direction: row; align-items: center; color: var(--mf-color-text-primary); background-color: var(--mf-color-clear); border-width: 0; border-radius: var(--mf-radius-md); }
 .welcome-recent-row:hover { background-color: var(--mf-color-panel-hover); }
@@ -146,10 +147,10 @@
 /* Floating panels */
 .floating-panel { position: absolute; top: var(--mf-space-2); bottom: var(--mf-space-2); padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 /* The inspector opens on demand (right-click, Properties...). Its bottom distance (like that of the popups, the tool windows and the attribution) is not set here: the shell measures the bottom bar and sets it (BottomBarLayout, ApplyBottomBarHeight). */
-.inspector-frame { right: var(--mf-space-2); width: 300px; }
+.inspector-frame { right: var(--mf-space-2); width: 300px; max-width: 94%; }
 /* M5 step 3: the inspector hangs at the selected element (the shell sets left, top and max-height); the compact window is the default, 400 px high at most. */
 .inspector-frame-pointer { right: auto; bottom: auto; height: auto; }
-.inspector-frame-compact { width: 300px; }
+.inspector-frame-compact { width: 300px; max-width: 94%; }
 .inspector-frame-compact.inspector-frame-selection .inspector-title, .inspector-frame-compact.inspector-frame-selection .inspector-tile-summary, .inspector-frame-compact.inspector-frame-selection .inspector-tabs { display: none; }
 /* While the pointer drags in the map the window is transparent (the shell also lets the pointer through). */
 .inspector-frame-busy { opacity: 0.25; }
@@ -157,7 +158,7 @@
 .inspector-link { position: absolute; height: 1px; transform-origin: left center; background-color: var(--mf-color-accent); }
 .inspector-link-dot { position: absolute; width: 7px; height: 7px; border-radius: 4px; background-color: var(--mf-color-accent); }
 /* The popups of the bottom bar (tiles, map, entries, chrono, lines, paths) open above the bar, at its left or right end (ADR 098). */
-.bar-popup { top: auto; left: var(--mf-space-2); width: 320px; max-height: 70%; }
+.bar-popup { top: auto; left: var(--mf-space-2); width: 320px; max-width: 94%; max-height: 70%; }
 .bar-popup-right { left: auto; right: var(--mf-space-2); }
 .bar-popup-tall { height: 480px; }
 .bar-popup > .floating-panel-header { margin: -12px -12px var(--mf-space-2) -12px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-bg); border-bottom-width: 1px; border-bottom-color: var(--mf-color-border-subtle); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
@@ -222,7 +223,7 @@
 .bar-compact .bar-round-button { width: 32px; height: 32px; margin: 0 3px; padding: 7px; border-radius: 16px; }
 .bar-compact .view-controls { width: 180px; padding: 4px 6px; }
 .bar-compact .view-controls-row > .view-control-button { padding-left: 4px; padding-right: 4px; }
-.bar-compact .bar-row { padding-right: var(--mf-space-1); }
+.bar-compact .bar-row { padding-right: var(--mf-space-2); }
 .bar-compact .tool-button { flex-basis: 32px; min-width: 26px; height: 32px; margin: 0 2px; border-radius: 16px; }
 .bar-compact .tool-icon { width: 18px; height: 18px; }
 
@@ -271,7 +272,12 @@
 .menu-popup-item.context-menu-item-focused { background-color: var(--mf-color-panel-hover); border-width: 1px; border-color: var(--mf-color-accent); }
 
 /* Tool panels open above the bottom bar */
-.tool-panel-host { position: absolute; left: 0; right: 0; flex-direction: row; justify-content: center; }
+.tool-panel-host { position: absolute; left: 0; right: 0; padding: 0 var(--mf-space-2); flex-direction: row; justify-content: center; }
+/* The road type window stands right of the picker: the picker moves to the left edge (EditorShellRoadDock). */
+.tool-panel-host-docked { justify-content: flex-start; }
+/* The picker beside the road type window can get as narrow as 396 px: its tabs shrink so that all of them and the X still fit. */
+.picker-panel-compact .picker-icon-tab { width: 26px; height: 30px; margin: 0 1px 0 0; }
+.picker-panel-compact .picker-icon-tab > .icon { width: 16px; height: 16px; }
 .tool-panel { width: 420px; height: 470px; padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .tool-panel-badge { width: 40px; height: 40px; margin-right: var(--mf-space-3); align-items: center; justify-content: center; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
 .tool-panel-badge > .icon { width: 24px; height: 24px; }
@@ -299,7 +305,9 @@
 .panel-row { flex-grow: 1; flex-direction: row; align-items: center; padding-left: var(--mf-space-1); padding-right: var(--mf-space-1); }
 .panel-row-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-text-secondary); flex-shrink: 0; }
 .dialog-row { flex-direction: row; align-items: center; margin: 4px 0; }
-.check-dialog { width: 760px; max-height: 86%; }
+/* Every dialog may use at most 94 % of the window; this rule stands before the dialogs' own rules, so a dialog with its own maximum (below, by name) keeps it (M6 step 4). */
+.dialog { max-width: 94%; max-height: 94%; }
+.check-dialog { width: 760px; max-width: 94%; max-height: 86%; }
 .check-sections { flex-shrink: 1; min-height: 120px; max-height: 560px; margin: 4px 0 8px; }
 .check-section { margin: 0 0 var(--mf-space-2); padding: var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-md); }
 .check-section-header { flex-direction: row; align-items: center; }
@@ -636,14 +644,14 @@
 .panel-toggle { margin: 0 0 var(--mf-space-2); }
 /* Options column and catalog stand side by side with the same top and bottom edge; a tool without a catalog is not a picker-tool and keeps the height of its content. */
 .picker-tool { flex-direction: row; align-items: stretch; flex-shrink: 1; }
-.picker-options { width: 236px; min-width: 236px; max-width: 236px; height: auto; margin-right: var(--mf-space-2); flex-shrink: 0; flex-grow: 0; }
+.picker-options { width: 236px; min-width: 200px; max-width: 236px; height: auto; margin-right: var(--mf-space-2); flex-shrink: 1; flex-grow: 0; }
 .road-segmented { flex-grow: 1; margin: 0; padding: 2px; }
 .road-segmented > .panel-tab { height: 24px; padding: 0 4px; font-size: 11px; }
 .picker-field { width: 76px; height: 26px; margin: 0; flex-shrink: 0; }
 .picker-field TextElement { margin: 0; padding: 0; font-size: 12px; }
 .picker-field .unity-base-text-field__input { height: 26px; margin: 0; padding: 0 6px; -unity-text-align: middle-left; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
 .picker-field .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
-.picker-panel { width: 780px; min-width: 700px; max-width: 780px; height: 210px; padding: 0; flex-shrink: 1; flex-grow: 0; background-color: var(--mf-color-bar-glass); }
+.picker-panel { width: 780px; min-width: 380px; max-width: 780px; height: 210px; padding: 0; flex-shrink: 1000; flex-grow: 0; background-color: var(--mf-color-bar-glass); }
 .picker-header { height: 44px; flex-shrink: 0; margin: 0; padding: 0 var(--mf-space-2); background-color: var(--mf-color-panel); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
 .picker-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -689,7 +697,7 @@
 .status-hint.status-warning { color: var(--mf-color-warning); }
 .tool-options-scroll { max-height: 210px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); }
 /* Option columns of icons (ADR 098, stage 2): rows of a short label and icons, all in view without scrolling. */
-.icon-options { width: 336px; min-width: 336px; max-width: 336px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
+.icon-options { width: 336px; min-width: 240px; max-width: 336px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-1) var(--mf-space-3); }
 .option-row { flex-direction: row; align-items: center; height: 30px; margin-bottom: 2px; }
 .option-row:disabled { opacity: 0.45; }
 .option-row-free { height: auto; min-height: 30px; }
@@ -878,6 +886,8 @@
 .dialog-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; background-color: var(--mf-color-overlay); }
 .dialog { width: 560px; padding: var(--mf-space-4); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .dialog-field { margin: 4px 8px; }
+/* The middle of a dialog scrolls inside it when the window is too small; the title and the buttons stay (M6 step 4). */
+.dialog-scroll { flex-grow: 0; flex-shrink: 1; min-height: 0; }
 .entry-name-error { color: var(--mf-color-error); }
 .entry-name-taken { color: var(--mf-color-warning); }
 .dialog-field > Label { min-width: 110px; width: 110px; color: var(--mf-color-text-secondary); }
@@ -901,7 +911,7 @@
 .status-map-state { display: none; }
 
 /* New map dialog (ADR 032) */
-.new-map-dialog { width: 880px; max-height: 94%; }
+.new-map-dialog { width: 880px; max-width: 94%; max-height: 94%; }
 .new-map-body { flex-shrink: 1; min-height: 0; margin-top: var(--mf-space-1); }
 .new-map-columns { flex-direction: row; }
 .new-map-column { flex-grow: 1; flex-basis: 0; margin: 0 var(--mf-space-2); }
@@ -937,7 +947,7 @@
 .new-map-swatch-image { width: 64px; height: 64px; align-items: center; justify-content: center; border-radius: var(--mf-radius-sm); -unity-background-scale-mode: scale-and-crop; }
 .new-map-swatch-image > .spinner { width: 20px; height: 20px; color: var(--mf-color-accent); }
 .new-map-swatch-name { max-width: 70px; margin-top: 2px; font-size: var(--mf-font-caption); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bug-report-dialog { width: 640px; max-height: 94%; }
+.bug-report-dialog { width: 640px; max-width: 94%; max-height: 94%; }
 .bug-report-row { flex-direction: row; align-items: center; min-height: 30px; margin: 2px 8px; }
 .bug-report-row-tall { align-items: flex-start; }
 .bug-report-row-tall > .bug-report-label { margin-top: 6px; }
@@ -947,7 +957,7 @@
 .bug-report-text .unity-base-text-field__input { height: 72px; padding: 4px 6px; -unity-text-align: upper-left; white-space: normal; }
 .bug-report-toggle { margin: 0; color: var(--mf-color-text-primary); }
 .bug-report-hint { margin: 2px 8px 0 126px; font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); white-space: normal; }
-.update-dialog { width: 560px; max-height: 90%; }
+.update-dialog { width: 560px; max-width: 94%; max-height: 90%; }
 .update-message-row { flex-direction: row; align-items: center; }
 .update-spinner { width: 18px; height: 18px; margin-left: 8px; flex-shrink: 0; color: var(--mf-color-accent); }
 .update-message { flex-grow: 1; flex-shrink: 1; }
@@ -959,11 +969,11 @@
 .update-hint { margin: 4px 8px; font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); white-space: normal; }
 .update-toggle { margin: 8px 8px 0; color: var(--mf-color-text-secondary); }
 .update-skip { margin-right: auto; }
-.satellite-frame { left: var(--mf-space-2); bottom: auto; width: 480px; max-height: 86%; }
+.satellite-frame { left: var(--mf-space-2); bottom: auto; width: 480px; max-width: 94%; max-height: 86%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }
 .satellite-columns { flex-direction: row; }
 .satellite-tab { margin: 0 var(--mf-space-2); }
-.satellite-tabs { margin: 0 var(--mf-space-2) var(--mf-space-2); }
+.satellite-tabs { flex-shrink: 0; margin: 0 var(--mf-space-2) var(--mf-space-2); }
 .satellite-footer { margin: 0 var(--mf-space-2) var(--mf-space-2); }
 .satellite-column { flex-grow: 1; flex-basis: 0; min-width: 0; margin: 0 var(--mf-space-2); }
 .satellite-row { flex-direction: row; align-items: center; min-height: 30px; margin-bottom: 2px; }

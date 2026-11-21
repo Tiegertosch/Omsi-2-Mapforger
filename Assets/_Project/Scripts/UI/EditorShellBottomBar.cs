@@ -109,6 +109,37 @@ namespace OmsiMapEditor.UI
                 signalWindow.BottomInset = toolBottom;
             if (roadBuilder != null)
                 roadBuilder.BottomInset = toolBottom;
+            UpdateRoadDock();
+            KeepSatelliteWindowAboveBar();
+        }
+
+        private bool satelliteLimitRegistered;
+        private float satelliteMaxHeight = -1f;
+
+        /// <summary>
+        /// The window for pictures from the air stands at the left and grows with its content up to 86 % of the area (USS); on a low area
+        /// that reaches into the bottom bar, so its maximum height is the room between its top edge and the bar (M6 step 4).
+        /// </summary>
+        private void KeepSatelliteWindowAboveBar()
+        {
+            if (satelliteWindow == null || workspaceElement == null)
+                return;
+            if (!satelliteLimitRegistered)
+            {
+                satelliteLimitRegistered = true;
+                satelliteWindow.RegisterCallback<GeometryChangedEvent>(_ => KeepSatelliteWindowAboveBar());
+                workspaceElement.RegisterCallback<GeometryChangedEvent>(_ => KeepSatelliteWindowAboveBar());
+            }
+            var area = workspaceElement.resolvedStyle.height;
+            var top = satelliteWindow.resolvedStyle.top;
+            if (float.IsNaN(area) || float.IsNaN(top) || area <= 0f)
+                return;
+            var room = System.Math.Max(200f, area - top - BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.ToolGap));
+            if (System.Math.Abs(room - satelliteMaxHeight) > 0.5f)
+            {
+                satelliteMaxHeight = room;
+                satelliteWindow.style.maxHeight = room;
+            }
         }
 
         /// <summary>

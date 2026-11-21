@@ -11,5 +11,11 @@
   "settings.language.changed": "The interface language is {language} now.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
   "settings.close": "Close",
-  "settings.inspector_at_edge": "Keep the inspector at the right edge instead of at the selected element"
+  "settings.inspector_at_edge": "Keep the inspector at the right edge instead of at the selected element",
+  "settings.interface_size.label": "Interface size (%)",
+  "@settings.interface_size.label": "Label of the drop-down list of interface sizes (90 to 200 %) in the settings dialog",
+  "settings.interface_size.hint": "Scales the whole interface on top of the Windows display scale. A window too small for the chosen size shows it smaller.",
+  "@settings.interface_size.hint": "Explains the interface size under the list; 'smaller' because a small window limits the scale",
+  "settings.interface_size.tooltip": "Makes the interface larger or smaller. 100 % follows the Windows display scale.",
+  "@settings.interface_size.tooltip": "Tooltip of the interface size list"
 }

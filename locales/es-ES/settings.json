@@ -11,5 +11,8 @@
   "settings.language.changed": "El idioma de la interfaz ahora es {language}.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
   "settings.close": "Cerrar",
-  "settings.inspector_at_edge": "Mantener el inspector en el borde derecho en lugar de junto al elemento seleccionado"
+  "settings.inspector_at_edge": "Mantener el inspector en el borde derecho en lugar de junto al elemento seleccionado",
+  "settings.interface_size.label": "Tamaño de la interfaz (%)",
+  "settings.interface_size.hint": "Escala toda la interfaz además de la escala de pantalla de Windows. Una ventana demasiado pequeña para el tamaño elegido lo muestra más pequeño.",
+  "settings.interface_size.tooltip": "Hace la interfaz más grande o más pequeña. 100 % sigue la escala de pantalla de Windows."
 }

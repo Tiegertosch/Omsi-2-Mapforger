@@ -331,7 +331,9 @@ namespace OmsiMapEditor.UI
             var document = uiObject.AddComponent<UIDocument>();
             var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
             panelSettings.renderMode = PanelRenderMode.ScreenSpaceOverlay;
-            EditorShellScale.Apply(panelSettings, LoadSettings().@interface.scale, Environment.GetCommandLineArgs());
+            interfacePanelSettings = panelSettings;
+            configuredInterfaceScale = LoadSettings().@interface.scale;
+            ApplyInterfaceScale();
             panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("EditorRuntimeTheme");
             if (panelSettings.themeStyleSheet == null)
                 Debug.LogError("EditorRuntimeTheme.tss was not found in Resources.");
@@ -347,6 +349,7 @@ namespace OmsiMapEditor.UI
             var root = document.rootVisualElement;
             rootElement = root;
             SetUpLocalization(root);
+            SetUpMenuPlacement(root);
             SetUpSettings(root);
             SetUpContentFolders(root);
             SetUpParkList(root);
@@ -835,6 +838,7 @@ namespace OmsiMapEditor.UI
             if (benchmarkFrames != null && Time.frameCount > benchmarkOpenFrame)
                 benchmarkFrames.Add(Time.unscaledDeltaTime * 1000.0);
             EnforceTypePick();
+            KeepInterfaceScaleForWindow();
             RefreshToolHint();
             ReloadAfterPendingRollBack();
             FollowInspectorWithCamera();
@@ -978,6 +982,7 @@ namespace OmsiMapEditor.UI
             var projectPath = Argument("-openProject", 1);
             var quit = Array.IndexOf(args, "-quit") >= 0;
             RunLocalizationArguments(args);
+            RunMenuArgument(args);
             ConfigureInspectorPlacement(args); // M5 step 3: the inspector beside the element
             // A session that ended without quitting asks for a bug report (ADR 053); -bugReport [crash] opens the form for a
             // check, with -bugReportTitle and -bugReportSend, which then only writes the files and logs the address.
@@ -3243,6 +3248,7 @@ namespace OmsiMapEditor.UI
                 roadGuard.Clear();
                 roadBuilder.ShowPrompt(null, false);
                 roadBuilder.style.display = DisplayStyle.None;
+                UpdateRoadDock();
             }
             if (pickingRowObject)
             {

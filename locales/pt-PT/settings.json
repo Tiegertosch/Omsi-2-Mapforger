@@ -11,5 +11,8 @@
   "settings.language.changed": "O idioma da interface passou a ser {language}.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
   "settings.close": "Fechar",
-  "settings.inspector_at_edge": "Manter o inspetor na margem direita em vez de junto ao elemento selecionado"
+  "settings.inspector_at_edge": "Manter o inspetor na margem direita em vez de junto ao elemento selecionado",
+  "settings.interface_size.label": "Tamanho da interface (%)",
+  "settings.interface_size.hint": "Dimensiona toda a interface além da escala de ecrã do Windows. Uma janela demasiado pequena para o tamanho escolhido mostra-o mais pequeno.",
+  "settings.interface_size.tooltip": "Torna a interface maior ou menor. 100 % segue a escala de ecrã do Windows."
 }

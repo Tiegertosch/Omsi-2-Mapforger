@@ -97,6 +97,7 @@
         </ui:VisualElement>
         <ui:VisualElement name="help-menu" class="menu-popup help-menu">
             <ui:Label text="OMSI MapWorks" class="popup-title" />
+            <ui:ScrollView class="help-menu-scroll">
             <ui:Label name="map-hint" class="popup-description help-controls" style="display: none;" />
             <ui:Label name="help-text-open" text="Select File, then Open OMSI map... to read a global.cfg directly from the OMSI installation." class="popup-description" />
             <ui:Label name="help-text-save" text="Save map project as... stores a small project file that points back to this external global.cfg." class="popup-description" />
@@ -105,6 +106,7 @@
             <ui:Label name="help-text-selection" text="Ctrl+click adds objects to the selection or removes them; Ctrl+drag on empty space selects all objects in a box. Dragging one selected object moves all of them. An object moved over a tile border moves into that tile." class="popup-description" />
             <ui:Label name="help-text-export" text="Export to OMSI... writes the original map plus your edits as a separate map folder next to the original." class="popup-description" />
             <ui:Label name="help-text-files" text="OMSI game files are read in place and are not bundled with the application." class="popup-description" />
+            </ui:ScrollView>
             <ui:Label class="menu-divider" />
             <ui:Button name="check-updates-menu-item" text="Check for updates..." class="menu-popup-item" tooltip="Look on GitHub for a newer release of MapWorks and install it" />
             <ui:Button name="report-bug-menu-item" text="Report a bug..." class="menu-popup-item" tooltip="Describe a problem and open it as a new issue on GitHub, with the log attached" />
@@ -113,10 +115,12 @@
         <ui:VisualElement name="export-dialog" class="dialog-overlay" style="display: none;">
             <ui:VisualElement class="dialog">
                 <ui:Label name="export-title" text="Export to OMSI" class="popup-title" />
+                <ui:ScrollView class="dialog-scroll">
                 <ui:Label name="export-description" text="Writes the original map plus the edits of this project as a separate map folder next to the original. The original map is not changed." class="popup-description" />
                 <ui:TextField name="export-folder-field" label="Folder name" class="dialog-field" />
                 <ui:TextField name="export-name-field" label="Name in OMSI" class="dialog-field" />
                 <ui:Label name="export-target-label" class="popup-description export-target" />
+                </ui:ScrollView>
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="export-cancel-button" text="Cancel" class="map-control-button" />
                     <ui:Button name="export-confirm-button" text="Export" class="map-control-button dialog-primary" />
@@ -126,16 +130,23 @@
         <ui:VisualElement name="settings-dialog" class="dialog-overlay" style="display: none;">
             <ui:VisualElement class="dialog">
                 <ui:Label name="settings-title" text="Settings" class="popup-title" />
+                <ui:ScrollView class="dialog-scroll">
                 <ui:Label name="settings-general-heading" text="General" class="inspector-section-heading" />
                 <ui:VisualElement class="dialog-row">
                     <ui:Label name="settings-language-label" text="Language" class="dialog-row-text" />
                     <ui:VisualElement name="settings-language-list" class="settings-language-slot" />
                 </ui:VisualElement>
                 <ui:Label name="settings-language-hint" text="The language of the program's interface. Maps, projects and exports do not depend on it; the choice is kept for the next start." class="popup-description" />
+                <ui:VisualElement class="dialog-row">
+                    <ui:Label name="settings-interface-size-label" text="Interface size (%)" class="dialog-row-text" />
+                    <ui:VisualElement name="settings-interface-size-list" class="settings-language-slot" />
+                </ui:VisualElement>
+                <ui:Label name="settings-interface-size-hint" text="Scales the whole interface on top of the Windows display scale. A window too small for the chosen size shows it smaller." class="popup-description" />
                 <ui:Toggle name="settings-inspector-edge" text="Keep the inspector at the right edge" class="settings-toggle" />
                 <ui:Label name="settings-content-heading" text="Content" class="inspector-section-heading" />
                 <ui:Toggle name="settings-hide-dlc" text="Hide DLC content" class="settings-toggle" />
                 <ui:Label name="settings-hide-dlc-hint" class="popup-description" />
+                </ui:ScrollView>
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="settings-close-button" text="Close" class="map-control-button dialog-primary" />
                 </ui:VisualElement>

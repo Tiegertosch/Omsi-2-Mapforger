@@ -296,6 +296,11 @@ namespace OmsiMapEditor.UI
         {
             if (!TryScreenPosition(world, out var screen))
                 return false;
+            // On a low area (a high interface scale) the free part above the windows is shorter than three margins; the margin then shrinks
+            // with it, so the point still moves up instead of staying under the window (M6 step 4).
+            var freeHeight = FreeAreaPan.FreeBottom(windows) - worldBound.yMin;
+            if (!float.IsNaN(freeHeight) && freeHeight < margin * 3.5f)
+                margin = Mathf.Max(0f, freeHeight * 0.28f);
             var shift = FreeAreaPan.ShiftFor(screen.x, screen.y, windows, worldBound.yMin, margin);
             if (shift == 0f)
                 return false;

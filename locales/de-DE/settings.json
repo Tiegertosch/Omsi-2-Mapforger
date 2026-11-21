@@ -8,5 +8,8 @@
   "settings.hide_dlc.hint": "Blendet Objekte und Straßentypen, die zu einem DLC gehören, in allen Listen außer der eigenen der Karte aus, damit die Karte nur das Basisspiel und Freeware braucht. {origin} Ordner von außerhalb von Steam gekauften Add-ons lassen sich in der Objektbibliothek mit der Etikett-Schaltfläche als DLC markieren.",
   "settings.language.changed": "Die Oberflächensprache ist jetzt {language}.",
   "settings.close": "Schließen",
-  "settings.inspector_at_edge": "Inspector am rechten Rand halten statt am gewählten Element"
+  "settings.inspector_at_edge": "Inspector am rechten Rand halten statt am gewählten Element",
+  "settings.interface_size.label": "Oberflächengröße (%)",
+  "settings.interface_size.hint": "Skaliert die ganze Oberfläche zusätzlich zur Windows-Anzeigeskalierung. Ein Fenster, das für die gewählte Größe zu klein ist, zeigt sie kleiner.",
+  "settings.interface_size.tooltip": "Macht die Oberfläche größer oder kleiner. 100 % folgt der Windows-Anzeigeskalierung."
 }

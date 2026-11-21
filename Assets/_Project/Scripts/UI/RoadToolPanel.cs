@@ -241,6 +241,20 @@ namespace OmsiMapEditor.UI
             ShowHint(title + ": " + hint, false);
         }
 
+        private bool docked;
+
+        /// <summary>
+        /// Makes room for the road type window beside the picker: the options column goes and the picker takes the given width, or
+        /// both return to their own with null.
+        /// </summary>
+        public void Dock(float? pickerWidth)
+        {
+            docked = pickerWidth.HasValue;
+            optionsColumn.style.display = docked || Picking ? DisplayStyle.None : DisplayStyle.Flex;
+            catalog.Panel.EnableInClassList("picker-panel-compact", pickerWidth.HasValue && pickerWidth.Value < 520f);
+            catalog.Panel.style.width = pickerWidth.HasValue ? new StyleLength(pickerWidth.Value) : new StyleLength(StyleKeyword.Null);
+        }
+
         // The controls only the base map has, with the tooltip they show again once the road tool builds there.
         private readonly List<(VisualElement Element, string NameKey, string TooltipKey)> baseMapOnly = new List<(VisualElement, string, string)>();
 
@@ -273,7 +287,7 @@ namespace OmsiMapEditor.UI
             if (!Picking)
                 return;
             Picking = false;
-            optionsColumn.style.display = DisplayStyle.Flex;
+            optionsColumn.style.display = docked ? DisplayStyle.None : DisplayStyle.Flex;
             ShowHint(pickedHint, false);
         }
 

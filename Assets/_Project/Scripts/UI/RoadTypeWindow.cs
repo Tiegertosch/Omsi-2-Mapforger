@@ -18,7 +18,10 @@ namespace OmsiMapEditor.UI
     internal sealed partial class RoadTypeWindow : FloatingWindowFrame
     {
         /// <summary>The window is not made smaller than this by its grip.</summary>
-        public static readonly Vector2 LeastSize = new Vector2(520f, 340f);
+        public static readonly Vector2 LeastSize = new Vector2(460f, 340f);
+
+        /// <summary>The size the window asks for at its first place.</summary>
+        public static readonly Vector2 PreferredSize = new Vector2(860f, 780f);
 
         private const float NarrowWidth = 640f;
 
@@ -69,7 +72,7 @@ namespace OmsiMapEditor.UI
                 ExpandTooltipKey = "roadbuilder.window.expand.tooltip",
                 CloseTooltipKey = "roadbuilder.window.close.tooltip",
                 ResizeTooltipKey = "roadbuilder.window.resize.tooltip",
-                DefaultSize = new Vector2(860f, 780f),
+                DefaultSize = PreferredSize,
                 LeastSize = LeastSize
             }, close)
         {

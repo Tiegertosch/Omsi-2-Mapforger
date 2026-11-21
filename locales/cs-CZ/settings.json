@@ -11,5 +11,8 @@
   "settings.language.changed": "Jazyk rozhraní je nyní {language}.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
   "settings.close": "Zavřít",
-  "settings.inspector_at_edge": "Držet inspektor u pravého okraje místo u vybraného prvku"
+  "settings.inspector_at_edge": "Držet inspektor u pravého okraje místo u vybraného prvku",
+  "settings.interface_size.label": "Velikost rozhraní (%)",
+  "settings.interface_size.hint": "Změní velikost celého rozhraní nad rámec škálování zobrazení ve Windows. Okno příliš malé pro zvolenou velikost ji zobrazí menší.",
+  "settings.interface_size.tooltip": "Zvětší nebo zmenší rozhraní. 100 % odpovídá škálování zobrazení ve Windows."
 }

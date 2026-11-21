@@ -24,6 +24,61 @@ namespace OmsiMapEditor.UI
         /// <summary>Whether the lists of objects and road types leave out what belongs to a DLC (kept under the key the object menu used).</summary>
         private bool HideDlcContent => PlayerPrefs.GetInt(HideDlcKey, 0) != 0;
 
+        private PanelSettings interfacePanelSettings;
+        private float configuredInterfaceScale = 1f;
+        private EditorShellScale.Result? interfaceScaleResult;
+        private int interfaceScaleWindowWidth;
+        private DropdownField interfaceSizeDropdown;
+
+        /// <summary>Calculates and sets the panel scale (Windows dpi, "Interface size", default factor, window limit).</summary>
+        private void ApplyInterfaceScale()
+        {
+            if (interfacePanelSettings == null)
+                return;
+            interfaceScaleResult = EditorShellScale.Apply(interfacePanelSettings, configuredInterfaceScale, Environment.GetCommandLineArgs(), interfaceScaleResult);
+            interfaceScaleWindowWidth = Screen.width;
+        }
+
+        /// <summary>The window limit depends on the width: calculate again when the window changed its size.</summary>
+        private void KeepInterfaceScaleForWindow()
+        {
+            if (interfacePanelSettings != null && interfaceScaleWindowWidth != Screen.width)
+                ApplyInterfaceScale();
+        }
+
+        /// <summary>The choice as a plain number: the drop-down field did not show a trailing " %", so the unit stands in the label.</summary>
+        private static string PercentText(int percent)
+        {
+            return percent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private void SetUpInterfaceSizeSetting(VisualElement root)
+        {
+            var slot = root.Q<VisualElement>("settings-interface-size-list");
+            if (slot == null)
+                return;
+            interfaceSizeDropdown = new DropdownField();
+            interfaceSizeDropdown.AddToClassList("new-map-dropdown");
+            interfaceSizeDropdown.AddToClassList("settings-dropdown");
+            var choices = new List<string>();
+            for (var percent = EditorShellScale.MinUserPercent; percent <= EditorShellScale.MaxUserPercent; percent += EditorShellScale.UserPercentStep)
+                choices.Add(PercentText(percent));
+            interfaceSizeDropdown.choices = choices;
+            interfaceSizeDropdown.SetValueWithoutNotify(PercentText(EditorShellScale.LoadUserPercent()));
+            interfaceSizeDropdown.RegisterValueChangedCallback(_ =>
+            {
+                var index = interfaceSizeDropdown.index;
+                if (index < 0 || index >= choices.Count)
+                    return;
+                EditorShellScale.SaveUserPercent(EditorShellScale.MinUserPercent + index * EditorShellScale.UserPercentStep);
+                ApplyInterfaceScale();
+            });
+            slot.Add(interfaceSizeDropdown);
+            LocBindings.Tooltip(slot, "settings.interface_size.tooltip");
+            LocBindings.Text(root.Q<Label>("settings-interface-size-label"), "settings.interface_size.label");
+            LocBindings.Text(root.Q<Label>("settings-interface-size-hint"), "settings.interface_size.hint");
+        }
+
         private void SetUpSettings(VisualElement root)
         {
             settingsDialog = root.Q<VisualElement>("settings-dialog");
@@ -54,6 +109,7 @@ namespace OmsiMapEditor.UI
                     ApplyHideDlc();
                 });
             }
+            SetUpInterfaceSizeSetting(root);
             SetUpInspectorEdgeSetting(root);
             var menuItem = root.Q<Button>("settings-menu-item");
             var close = root.Q<Button>("settings-close-button");

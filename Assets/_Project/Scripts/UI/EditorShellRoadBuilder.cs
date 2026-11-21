@@ -78,6 +78,7 @@ namespace OmsiMapEditor.UI
             objectsPanel.UseOptions(rowPickOptions, Loc.T("roadbuilder.row.panel", ("lane", roadBuilder.SelectedLane + 1)));
             objectsPanel.ShowState(OmsiObjectCategories.Name(OmsiObjectCategory.Trees), null, null);
             roadBuilder.style.display = DisplayStyle.None;
+            UpdateRoadDock();
             // The road options and the road list would sit beside the library and squeeze it: only the library shows while a row's object is chosen.
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.None;
@@ -96,6 +97,7 @@ namespace OmsiMapEditor.UI
             if (roadPanel != null)
                 roadPanel.style.display = DisplayStyle.Flex;
             roadBuilder.style.display = DisplayStyle.Flex;
+            UpdateRoadDock();
             if (assetPath != null)
             {
                 var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(currentSummary.RootPath);
@@ -403,7 +405,8 @@ namespace OmsiMapEditor.UI
             if (show)
                 roadBuilder.SetChosenProfile(roadPanel.Profile);
             roadBuilder.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-            // The road picker stays open beside the window, so the road to take apart can still be chosen there.
+            UpdateRoadDock();
+            // The road picker stays open beside the window (docked at the left edge, M6 step 4), so the road to take apart can still be chosen there.
             if (!show)
             {
                 roadGuard.Clear();
