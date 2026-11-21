@@ -41,7 +41,7 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void ColorTokensAreParsed()
         {
-            foreach (var name in new[] { "bg", "panel", "panel-raised", "panel-hover", "field", "text-primary", "text-secondary", "text-muted", "text-disabled", "accent", "accent-hover", "success", "warning", "error", "info", "bar-glass", "tool-glass", "panel-glass" })
+            foreach (var name in new[] { "bg", "panel", "panel-raised", "panel-hover", "field", "text-primary", "text-secondary", "text-muted", "text-disabled", "accent", "accent-hover", "success", "warning", "error", "info", "bar-glass", "tool-glass", "panel-glass", "panel-pressed", "accent-pressed", "clear", "on-fill" })
                 Assert.IsTrue(tokens.ContainsKey(name), "Missing token --mf-color-" + name);
         }
 
@@ -61,6 +61,8 @@ namespace OmsiMapEditor.Tests
             var failures = new StringBuilder();
             Check(failures, "text-primary", "panel-hover", TextRatio);
             Check(failures, "text-secondary", "panel-hover", TextRatio);
+            Check(failures, "text-primary", "panel-pressed", TextRatio);
+            Check(failures, "text-secondary", "panel-pressed", TextRatio);
             Assert.AreEqual(string.Empty, failures.ToString(), failures.ToString());
         }
 
@@ -86,7 +88,7 @@ namespace OmsiMapEditor.Tests
         public void DarkTextOnAccentAndStatusFillsReachFourPointFive()
         {
             var failures = new StringBuilder();
-            foreach (var fill in new[] { "accent", "accent-hover", "success", "warning", "error" })
+            foreach (var fill in new[] { "accent", "accent-hover", "accent-pressed", "success", "warning", "error" })
                 Check(failures, "bg", fill, TextRatio);
             Assert.AreEqual(string.Empty, failures.ToString(), failures.ToString());
         }
@@ -136,6 +138,81 @@ namespace OmsiMapEditor.Tests
                 if (match.Groups[2].Value.Contains("var(--mf-color-text-muted)"))
                     offenders.Add(match.Groups[1].Value.Trim());
             Assert.IsEmpty(offenders, ":disabled rules that still use text-muted: " + string.Join(" | ", offenders));
+        }
+
+        [Test]
+        public void NoFontSizeBelowElevenPixelsExceptTheMarkToken()
+        {
+            var offenders = new List<string>();
+            foreach (Match match in Regex.Matches(WithoutComments(stylesheet), @"font-size\s*:\s*(\d+(?:\.\d+)?)px"))
+                if (double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) < 11)
+                    offenders.Add(match.Value);
+            Assert.IsEmpty(offenders, "Literal font sizes under 11 px (use --mf-font-caption): " + string.Join(" | ", offenders));
+
+            foreach (Match match in Regex.Matches(RootBlock(), @"--mf-font-([\w-]+)\s*:\s*(\d+)px"))
+                if (int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) < 11)
+                    Assert.AreEqual("mark", match.Groups[1].Value, "--mf-font-" + match.Groups[1].Value + " is below 11 px; only the mark token (key caps, counters) may be");
+        }
+
+        [Test]
+        public void FontTokensExist()
+        {
+            var root = RootBlock();
+            foreach (var name in new[] { "caption", "mark", "display" })
+                StringAssert.Contains("--mf-font-" + name + ":", root);
+        }
+
+        [Test]
+        public void ColorLiteralsLiveOnlyInTheTokenDefinitions()
+        {
+            var css = WithoutComments(stylesheet);
+            var rootStart = css.IndexOf(":root", StringComparison.Ordinal);
+            var rootEnd = css.IndexOf("\n}", rootStart, StringComparison.Ordinal) + 2;
+            var outside = css.Remove(rootStart, rootEnd - rootStart);
+            var offenders = new List<string>();
+            foreach (Match match in Regex.Matches(outside, @"(?<=:)[^;{}]*?(rgba?\([^)]*\)|#[0-9A-Fa-f]{3,8})"))
+                offenders.Add(match.Groups[1].Value);
+            Assert.IsEmpty(offenders, "Raw colour literals outside :root (use --mf-color-* tokens): " + string.Join(" | ", offenders));
+        }
+
+        [Test]
+        public void EveryButtonClassWithAHoverRuleHasAPressedRule()
+        {
+            var css = WithoutComments(stylesheet);
+            var offenders = new List<string>();
+            foreach (var cls in new[] { "toolbar-menu-button", "menu-popup-item", "welcome-card", "welcome-recent-row", "primary-button", "panel-collapse-button", "bar-tile-button", "bar-round-button", "view-control-button", "tool-button", "panel-icon-button", "panel-tab", "option-icon", "picker-tile", "map-control-button", "dialog-primary" })
+                if (css.IndexOf("." + cls + ":active", StringComparison.Ordinal) < 0)
+                    offenders.Add(cls);
+            Assert.IsEmpty(offenders, "No :active rule for: " + string.Join(", ", offenders));
+        }
+
+        [Test]
+        public void FocusRulesOfButtonsApplyOnlyUnderTheKeyboardClass()
+        {
+            var offenders = new List<string>();
+            foreach (Match match in Regex.Matches(WithoutComments(stylesheet), @"(?m)^([^{\n]*:focus[^{\n]*)\{"))
+                foreach (var selector in match.Groups[1].Value.Split(','))
+                {
+                    var text = selector.Trim();
+                    if (text.Contains("unity-base-text-field__input") || text.Contains("mf-keyboard-focus"))
+                        continue;
+                    if (text == ".road-window:focus" || text.StartsWith(".road-section:focus", StringComparison.Ordinal) || text.Contains("road-window-template-chosen"))
+                        continue;
+                    offenders.Add(text);
+                }
+            Assert.IsEmpty(offenders, ":focus rules outside .mf-keyboard-focus: " + string.Join(" | ", offenders));
+        }
+
+        private static string WithoutComments(string css)
+        {
+            return Regex.Replace(css, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
+        }
+
+        private static string RootBlock()
+        {
+            var rootStart = stylesheet.IndexOf(":root", StringComparison.Ordinal);
+            var rootEnd = stylesheet.IndexOf("\n}", rootStart, StringComparison.Ordinal);
+            return stylesheet.Substring(rootStart, rootEnd - rootStart);
         }
 
         [Test]

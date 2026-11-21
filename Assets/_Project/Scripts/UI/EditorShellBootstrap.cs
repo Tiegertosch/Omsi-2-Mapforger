@@ -758,6 +758,7 @@ namespace OmsiMapEditor.UI
             // Shortcuts work anywhere except inside a text field, which keeps its own text undo and Delete key.
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
             RegisterContextMenuNavigation(root);
+            EditorShellFocusRing.Attach(root);
 
             CreateBackgroundCamera();
             groundRenderer = new GameObject("Map Ground").AddComponent<MapGroundRenderer>();
