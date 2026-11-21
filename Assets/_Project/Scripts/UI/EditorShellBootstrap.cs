@@ -331,7 +331,7 @@ namespace OmsiMapEditor.UI
             var document = uiObject.AddComponent<UIDocument>();
             var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
             panelSettings.renderMode = PanelRenderMode.ScreenSpaceOverlay;
-            panelSettings.scale = LoadSettings().@interface.scale;
+            EditorShellScale.Apply(panelSettings, LoadSettings().@interface.scale, Environment.GetCommandLineArgs());
             panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("EditorRuntimeTheme");
             if (panelSettings.themeStyleSheet == null)
                 Debug.LogError("EditorRuntimeTheme.tss was not found in Resources.");
