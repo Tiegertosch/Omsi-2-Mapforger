@@ -77,5 +77,14 @@ namespace OmsiMapEditor.Tests
         {
             Assert.That(EditorShellBootstrap.PressClosesBarMenu(anyOpen, inside, onButton), Is.EqualTo(closes));
         }
+
+        [TestCase(7, 7, true)]   // the release of the pointer whose press closed a menu is swallowed too
+        [TestCase(7, 8, false)]  // another pointer's release passes
+        [TestCase(-1, 0, false)] // no swallowed press: nothing is swallowed
+        [TestCase(-1, -1, false)]
+        public void TheReleaseOfASwallowedPressIsSwallowedToo(int swallowed, int released, bool swallows)
+        {
+            Assert.That(EditorShellBootstrap.SwallowsRelease(swallowed, released), Is.EqualTo(swallows));
+        }
     }
 }

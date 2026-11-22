@@ -28,6 +28,27 @@ namespace OmsiMapEditor.UI
             return anyMenuOpen && !insideOpenMenu && !onMenuBarButton;
         }
 
+        /// <summary>
+        /// The release that belongs to a swallowed press is swallowed too (M8 step 6): the map acts on a release without a press (the
+        /// road tool ends its stroke there). Only the same pointer's release counts; every press that is not swallowed clears the memory,
+        /// so a release outside the window cannot eat the next, real release.
+        /// </summary>
+        internal static bool SwallowsRelease(int swallowedPointerId, int releasedPointerId)
+        {
+            return swallowedPointerId >= 0 && swallowedPointerId == releasedPointerId;
+        }
+
+        /// <summary>Pointer id of a press that closed a menu and whose release is still to be swallowed; -1 for none.</summary>
+        private int swallowedPressPointerId = -1;
+
+        private void OnReleaseAfterSwallowedPress(PointerUpEvent evt)
+        {
+            if (!SwallowsRelease(swallowedPressPointerId, evt.pointerId))
+                return;
+            swallowedPressPointerId = -1;
+            evt.StopPropagation();
+        }
+
         private static bool IsSelfOrInside(VisualElement container, VisualElement element)
         {
             return container != null && element != null && (ReferenceEquals(container, element) || container.Contains(element));
@@ -50,7 +71,11 @@ namespace OmsiMapEditor.UI
                 onButton |= IsSelfOrInside(root.Q<VisualElement>(buttonName), target);
             }
             if (!PressClosesBarMenu(anyOpen, inside, onButton))
+            {
+                swallowedPressPointerId = -1;
                 return;
+            }
+            swallowedPressPointerId = evt.pointerId;
             foreach (var (menuName, _, _) in MenuButtons)
                 HidePopup(root.Q<VisualElement>(menuName));
             evt.StopPropagation();
@@ -60,6 +85,7 @@ namespace OmsiMapEditor.UI
         private void SetUpMenuPlacement(VisualElement root)
         {
             root.RegisterCallback<PointerDownEvent>(evt => OnPressOutsideBarMenu(evt, root), TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerUpEvent>(OnReleaseAfterSwallowedPress, TrickleDown.TrickleDown);
             foreach (var (menuName, buttonName, _) in MenuButtons)
             {
                 var menu = root.Q<VisualElement>(menuName);

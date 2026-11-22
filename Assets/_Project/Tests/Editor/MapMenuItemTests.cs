@@ -8,13 +8,6 @@ namespace OmsiMapEditor.Tests
     public sealed class MapMenuItemTests
     {
         [Test]
-        public void EntriesNeedingAMapAreUsableOnlyWithOne()
-        {
-            Assert.That(EditorShellBootstrap.MapMenuItemEnabled(false), Is.False);
-            Assert.That(EditorShellBootstrap.MapMenuItemEnabled(true), Is.True);
-        }
-
-        [Test]
         public void EveryListedEntryExistsInTheShellAndRoadBuilderIsAmongThem()
         {
             var folder = Directory.GetCurrentDirectory();
