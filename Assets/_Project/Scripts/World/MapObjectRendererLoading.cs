@@ -226,8 +226,7 @@ namespace OmsiMapEditor.World
             }
             if (reading.Problems.Count > 0)
                 Debug.LogWarning("Object models: " + reading.Problems.Count + " problem(s)\n" + string.Join("\n", reading.Problems));
-            Loaded?.Invoke(Loc.T("world.objects.ready", ("kinds", reading.Kinds), ("textures", textures.Count), ("problems", reading.Problems.Count),
-                ("first", reading.Problems.Count > 0 ? reading.Problems[0] : string.Empty)));
+            Loaded?.Invoke(Loc.T("world.objects.ready", ("kinds", reading.Kinds), ("textures", textures.Count), ("problems", reading.Problems.Count))); // the first problem is in the log above
         }
 
         /// <summary>A texture the workers read, for uploading; null when it is not theirs or not read yet.</summary>

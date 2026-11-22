@@ -1,9 +1,9 @@
 {
   "readonly.reading": "El mapa se está leyendo para la verificación del mapa o una fecha chrono; {action} nuevamente en un momento.",
   "@readonly.reading": "{action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.variant": "La variante chrono {title} se está editando; toma objetos, sus tipos y etiquetas, las reglas de tránsito y el derecho de paso, los tipos de caminos, los caminos nuevos y la eliminación de splines, y las líneas que corta únicamente. Elija Mapa base en el navegador de proyectos para {action}.",
+  "readonly.variant": "La variante chrono {title} se está editando; toma objetos, sus tipos y etiquetas, las reglas de tránsito y el derecho de paso, los tipos de caminos, los caminos nuevos y la eliminación de splines, y las líneas que corta únicamente. Elija Mapa base en la lista Chrono de la barra inferior para {action}.",
   "@readonly.variant": "{title} is the name of the variant, shown unchanged; {action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.chrono": "El mapa muestra {date} con sus variantes chrono y es de solo lectura. Elija Mapa base en el navegador de proyectos para {action}.",
+  "readonly.chrono": "El mapa muestra {date} con sus variantes chrono y es de solo lectura. Elija Mapa base en la lista Chrono de la barra inferior para {action}.",
   "@readonly.chrono": "{date} is a date like 2026-11-07, shown unchanged",
   "readonly.map": "El mapa es de sólo lectura. Guarde un proyecto MapWorks (Archivo > Guardar proyecto de mapa como...) en {action}.",
   "readonly.action.load_heights": "cargar alturas del terreno",

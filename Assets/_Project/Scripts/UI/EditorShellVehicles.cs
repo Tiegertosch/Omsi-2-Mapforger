@@ -16,8 +16,9 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement vehiclesDialog;
-        private ScrollView vehiclesBody;
+        private ModalDialog vehiclesDialog;
+        private VisualElement vehiclesBody;
+        private ScrollView vehiclesScroll;
         private List<string> installedVehicles = new List<string>();
         private int vehicleGroup;
         private int vehicleNew;
@@ -29,33 +30,18 @@ namespace OmsiMapEditor.UI
 
         private void SetUpVehicles(VisualElement root)
         {
-            vehiclesDialog = new VisualElement { name = "vehicles-dialog" };
-            vehiclesDialog.AddToClassList("dialog-overlay");
-            vehiclesDialog.style.display = DisplayStyle.None;
-            var dialog = new VisualElement();
-            dialog.AddToClassList("dialog");
-            dialog.AddToClassList("content-folders");
-            dialog.style.minWidth = 620;
-            var title = LocBindings.NewLabel("vehicles.title");
-            title.AddToClassList("popup-title");
-            dialog.Add(title);
-            var description = LocBindings.NewLabel("vehicles.description");
-            description.AddToClassList("popup-description");
-            dialog.Add(description);
-            vehiclesBody = new ScrollView(ScrollViewMode.Vertical);
-            vehiclesBody.AddToClassList("content-folders-list");
-            vehiclesBody.style.maxHeight = 520;
-            vehiclesBody.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-            dialog.Add(vehiclesBody);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var close = LocBindings.NewButton("vehicles.close", () => HidePopup(vehiclesDialog));
-            close.AddToClassList("map-control-button");
-            close.AddToClassList("dialog-primary");
-            buttons.Add(close);
-            dialog.Add(buttons);
-            vehiclesDialog.Add(dialog);
-            root.Add(vehiclesDialog);
+            // Every change is saved as its own undo step, so the only button is Close; Enter would close it by accident while a field is edited.
+            vehiclesDialog = NewDialog(new DialogOptions
+            {
+                Name = "vehicles-dialog",
+                TitleKey = "vehicles.title",
+                DescriptionKey = "vehicles.description",
+                Width = DialogWidth.Wide,
+                EnterPressesPrimary = false,
+                Buttons = new[] { new DialogButton { TextKey = "vehicles.close", Role = DialogButtonRole.Primary } }
+            });
+            vehiclesBody = vehiclesDialog.Body;
+            vehiclesScroll = vehiclesBody.GetFirstAncestorOfType<ScrollView>();
         }
 
         /// <summary>The button in the Lines tab.</summary>
@@ -63,7 +49,7 @@ namespace OmsiMapEditor.UI
         {
             var button = new Button(OpenVehicles) { text = Loc.T("vehicles.open"), tooltip = Loc.T("vehicles.open.tooltip") };
             button.AddToClassList("map-control-button");
-            button.style.marginBottom = 6;
+            button.AddToClassList("form-button-bottom");
             return button;
         }
 
@@ -84,13 +70,13 @@ namespace OmsiMapEditor.UI
             vehicleFilter = string.Empty;
             vehicleChosenFile = null;
             RefreshVehicles();
-            vehiclesDialog.style.display = DisplayStyle.Flex;
+            vehiclesDialog.Show();
         }
 
         /// <summary>Draws the dialog again when it is open, such as after an undo.</summary>
         private void RefreshVehiclesIfOpen()
         {
-            if (vehiclesDialog != null && vehiclesDialog.resolvedStyle.display == DisplayStyle.Flex)
+            if (vehiclesDialog != null && vehiclesDialog.IsShown)
                 RefreshVehicles();
         }
 
@@ -119,12 +105,12 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        private TextField VehicleField(string value, Action<string> changed, string tooltip = null)
+        private TextField VehicleField(string value, Action<string> changed, string tooltip = null, bool grow = true)
         {
             var field = new TextField { value = value ?? string.Empty, isDelayed = true };
             field.AddToClassList("picker-field");
-            field.style.width = StyleKeyword.Auto;
-            field.style.flexGrow = 1;
+            if (grow)
+                field.AddToClassList("form-field-grow");
             if (tooltip != null)
                 field.tooltip = tooltip;
             field.RegisterValueChangedCallback(change => changed(change.newValue));
@@ -134,22 +120,20 @@ namespace OmsiMapEditor.UI
         private void AddVehicleRow(string labelKey, VisualElement control)
         {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 3;
+            row.AddToClassList("form-row");
+            row.AddToClassList("form-row-dense-3");
             var label = LocBindings.NewLabel(labelKey); // i18n:keys
             label.AddToClassList("popup-description");
-            label.style.width = 120;
-            label.style.flexShrink = 0;
+            label.AddToClassList("form-row-label");
             row.Add(label);
-            control.style.flexGrow = 1;
+            control.AddToClassList("form-row-field");
             row.Add(control);
             vehiclesBody.Add(row);
         }
 
         private void RefreshVehicles()
         {
-            var scroll = vehiclesBody.scrollOffset;
+            var scroll = vehiclesScroll.scrollOffset;
             vehiclesBody.Clear();
             OmsiAiListFile lists;
             List<OmsiAiGroup> groups;
@@ -167,8 +151,7 @@ namespace OmsiMapEditor.UI
             vehicleGroup = Mathf.Clamp(vehicleGroup, 0, Math.Max(0, groups.Count - 1));
 
             var top = new VisualElement();
-            top.style.flexDirection = FlexDirection.Row;
-            top.style.marginBottom = 6;
+            top.AddToClassList("form-toolbar");
             top.Add(SmallButton("vehicles.new_depot", "vehicles.new_depot.tooltip", () => { vehicleNew = vehicleNew == 1 ? 0 : 1; RefreshVehicles(); }));
             top.Add(SmallButton("vehicles.new_pool", "vehicles.new_pool.tooltip", () => { vehicleNew = vehicleNew == 2 ? 0 : 2; RefreshVehicles(); }));
             vehiclesBody.Add(top);
@@ -214,8 +197,7 @@ namespace OmsiMapEditor.UI
             usage.AddToClassList("panel-info");
             vehiclesBody.Add(usage);
             var delete = SmallButton("vehicles.delete", "vehicles.delete.tooltip", () => ChangeVehicles(() => session.RemoveAiGroup(index), true));
-            delete.style.marginLeft = 0;
-            delete.style.marginBottom = 6;
+            delete.AddToClassList("form-action-block");
             delete.SetEnabled(users.Count == 0);
             vehiclesBody.Add(delete);
 
@@ -223,14 +205,14 @@ namespace OmsiMapEditor.UI
                 AddDepotTypes(current, index);
             else
                 AddPoolVehicles(current, index);
-            vehiclesBody.schedule.Execute(() => vehiclesBody.scrollOffset = scroll);
+            vehiclesScroll.schedule.Execute(() => vehiclesScroll.scrollOffset = scroll);
         }
 
         private void AddVehicleFileRows(string heading)
         {
             var title = new Label(Loc.T(heading)); // i18n:keys
             title.AddToClassList("inspector-group-title");
-            title.style.marginTop = 8;
+            title.AddToClassList("form-group-heading");
             vehiclesBody.Add(title);
             AddVehicleRow("vehicles.filter", VehicleField(vehicleFilter, text =>
             {
@@ -309,8 +291,7 @@ namespace OmsiMapEditor.UI
                     RefreshVehicles();
                 }
             });
-            create.style.marginLeft = 0;
-            create.style.marginBottom = 6;
+            create.AddToClassList("form-action-block");
             vehiclesBody.Add(create);
         }
 
@@ -318,7 +299,7 @@ namespace OmsiMapEditor.UI
         {
             var heading = new Label(Loc.T("vehicles.types"));
             heading.AddToClassList("inspector-group-title");
-            heading.style.marginTop = 8;
+            heading.AddToClassList("form-group-heading");
             vehiclesBody.Add(heading);
             if (depot.TypeGroups.Count == 0)
             {
@@ -331,16 +312,13 @@ namespace OmsiMapEditor.UI
                 var type = depot.TypeGroups[typeIndex];
                 var typeNumber = typeIndex;
                 var head = new VisualElement();
-                head.style.flexDirection = FlexDirection.Row;
-                head.style.alignItems = Align.Center;
-                head.style.marginTop = 6;
+                head.AddToClassList("form-row");
+                head.AddToClassList("form-row-dense");
+                head.AddToClassList("form-type-head");
                 var title = new Label(Loc.T("vehicles.type.item", ("file", type.File), ("count", type.Vehicles.Count)));
                 title.AddToClassList("popup-description");
-                title.style.flexGrow = 1;
-                title.style.flexShrink = 1;
-                title.style.flexBasis = 0;
-                title.style.minWidth = 0;
-                title.style.whiteSpace = WhiteSpace.Normal;
+                title.AddToClassList("form-cell-flex");
+                title.AddToClassList("form-cell-wrap");
                 head.Add(title);
                 var addBus = SmallButton("vehicles.bus.add", "vehicles.bus.add.tooltip", () =>
                 {
@@ -366,7 +344,7 @@ namespace OmsiMapEditor.UI
                 }
                 ChangeVehicles(() => session.EditAiLists(file => file.AddTypeGroup(group, chosen)));
             });
-            add.style.marginLeft = 0;
+            add.AddToClassList("form-action-block");
             vehiclesBody.Add(add);
         }
 
@@ -382,17 +360,16 @@ namespace OmsiMapEditor.UI
         private static VisualElement BusHeader()
         {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
+            row.AddToClassList("form-header-row");
             foreach (var key in new[] { "vehicles.col.number", "vehicles.col.plate", "vehicles.col.paint", "vehicles.col.from", "vehicles.col.to" })
             {
                 var label = LocBindings.NewLabel(key); // i18n:keys
                 label.AddToClassList("popup-description");
-                label.style.flexGrow = 1;
-                label.style.flexBasis = 0;
+                label.AddToClassList("form-cell-flex");
                 row.Add(label);
             }
             var spacer = new VisualElement();
-            spacer.style.width = 28;
+            spacer.AddToClassList("form-bus-spacer");
             row.Add(spacer);
             return row;
         }
@@ -400,9 +377,8 @@ namespace OmsiMapEditor.UI
         private VisualElement BusRow(OmsiDepotVehicle bus, int group, int type, int index)
         {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 2;
+            row.AddToClassList("form-row");
+            row.AddToClassList("form-row-dense");
             void Edit(Action<OmsiDepotVehicle> set)
             {
                 var edited = new OmsiDepotVehicle { Number = bus.Number, Registration = bus.Registration, Paint = bus.Paint, From = bus.From, To = bus.To };
@@ -419,13 +395,12 @@ namespace OmsiMapEditor.UI
             };
             foreach (var field in fields)
             {
-                field.style.flexBasis = 0;
-                field.style.marginRight = 2;
+                field.AddToClassList("form-cell-field");
                 row.Add(field);
             }
             var remove = new Button(() => ChangeVehicles(() => session.EditAiLists(file => file.RemoveVehicle(group, type, index)))) { text = "×", tooltip = Loc.T("vehicles.bus.remove.tooltip") };
             remove.AddToClassList("map-control-button");
-            remove.style.width = 26;
+            remove.AddToClassList("form-small-button");
             row.Add(remove);
             return row;
         }
@@ -434,32 +409,27 @@ namespace OmsiMapEditor.UI
         {
             var heading = new Label(Loc.T("vehicles.pool.vehicles", ("count", pool.PoolVehicles.Count)));
             heading.AddToClassList("inspector-group-title");
-            heading.style.marginTop = 8;
+            heading.AddToClassList("form-group-heading");
             vehiclesBody.Add(heading);
             for (var index = 0; index < pool.PoolVehicles.Count; index++)
             {
                 var vehicle = pool.PoolVehicles[index];
                 var number = index;
                 var row = new VisualElement();
-                row.style.flexDirection = FlexDirection.Row;
-                row.style.alignItems = Align.Center;
-                row.style.marginBottom = 2;
+                row.AddToClassList("form-row");
+                row.AddToClassList("form-row-dense");
                 var file = new Label(vehicle.File);
                 file.AddToClassList("popup-description");
-                file.style.flexGrow = 1;
-                file.style.flexShrink = 1;
-                file.style.flexBasis = 0;
-                file.style.minWidth = 0;
-                file.style.whiteSpace = WhiteSpace.Normal;
+                file.AddToClassList("form-cell-flex");
+                file.AddToClassList("form-cell-wrap");
                 row.Add(file);
                 var weight = VehicleField(vehicle.Weight, text => ChangeVehicles(() => session.EditAiLists(lists => lists.SetPoolVehicle(group, number, vehicle.File, text))),
-                    Loc.T("vehicles.weight.tooltip"));
-                weight.style.flexGrow = 0;
-                weight.style.width = 60;
+                    Loc.T("vehicles.weight.tooltip"), false);
+                weight.AddToClassList("form-narrow-field");
                 row.Add(weight);
                 var remove = new Button(() => ChangeVehicles(() => session.EditAiLists(lists => lists.RemovePoolVehicle(group, number)))) { text = "×", tooltip = Loc.T("vehicles.bus.remove.tooltip") };
                 remove.AddToClassList("map-control-button");
-                remove.style.width = 26;
+                remove.AddToClassList("form-small-button");
                 row.Add(remove);
                 vehiclesBody.Add(row);
             }
@@ -476,7 +446,7 @@ namespace OmsiMapEditor.UI
                 var weight = vehicleWeight;
                 ChangeVehicles(() => session.EditAiLists(lists => lists.AddPoolVehicle(group, chosen, weight)));
             });
-            add.style.marginLeft = 0;
+            add.AddToClassList("form-action-block");
             vehiclesBody.Add(add);
         }
 

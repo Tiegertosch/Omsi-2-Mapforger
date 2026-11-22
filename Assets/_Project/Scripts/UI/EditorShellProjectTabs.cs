@@ -14,11 +14,10 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private enum ProjectTab
+        internal enum ProjectTab
         {
             Tiles,
             Map,
-            Entries,
             Chrono,
             Lines,
             Paths
@@ -43,36 +42,11 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>Shows a tab of the project browser; one that is not available (no lines, paths hidden) falls back to the tiles.</summary>
+        /// <summary>Opens the popup of the bar with one of the map's lists; one that is not available (no lines, paths hidden) falls back to the tiles.</summary>
         private void ShowProjectTab(ProjectTab tab)
         {
             projectTab = ProjectTabAvailable(tab) ? tab : ProjectTab.Tiles;
-            RenderProjectBrowser();
-        }
-
-        /// <summary>The strip of tabs; only the tabs that have something to show are drawn.</summary>
-        private VisualElement ProjectTabStrip(ProjectTab current)
-        {
-            var strip = new VisualElement();
-            strip.AddToClassList("panel-tabs");
-            strip.AddToClassList("project-tabs");
-            var tabs = new[]
-            {
-                (ProjectTab.Tiles, "project.tab.tiles"), (ProjectTab.Map, "project.tab.map"), (ProjectTab.Entries, "project.tab.entries"), (ProjectTab.Chrono, "project.tab.chrono"),
-                (ProjectTab.Lines, "project.tab.lines"), (ProjectTab.Paths, "project.tab.paths")
-            };
-            foreach (var (tab, key) in tabs)
-            {
-                if (!ProjectTabAvailable(tab))
-                    continue;
-                var captured = tab;
-                var button = new Button(() => ShowProjectTab(captured));
-                LocBindings.Text(button, key); // i18n:keys
-                button.AddToClassList("panel-tab");
-                button.EnableInClassList("panel-tab-active", tab == current);
-                strip.Add(button);
-            }
-            return strip;
+            ShowBarPopup(true);
         }
 
         /// <summary>A tab that is not the tile list: a scrolling page.</summary>
@@ -84,20 +58,45 @@ namespace OmsiMapEditor.UI
             return page;
         }
 
-        /// <summary>The map tab: the button for its settings and what its author wrote about it.</summary>
+        /// <summary>The map popup: the project's and the map's name, its counts and warnings, the buttons for its settings and what its author wrote about it.</summary>
         private VisualElement MapTab()
         {
             var content = new VisualElement();
+            if (!string.IsNullOrWhiteSpace(currentProjectName))
+            {
+                var projectLabel = new Label(Loc.T("project.name", ("name", currentProjectName)));
+                projectLabel.AddToClassList("browser-project-name");
+                content.Add(projectLabel);
+            }
+            var mapName = new Label(string.IsNullOrEmpty(currentSummary.FriendlyName) ? currentSummary.Name : currentSummary.FriendlyName);
+            mapName.AddToClassList("browser-map-name");
+            content.Add(mapName);
+            browserCountsLabel = new Label();
+            browserCountsLabel.AddToClassList("browser-map-counts");
+            content.Add(browserCountsLabel);
+            UpdateCounts();
+            var warnings = currentSummary.Warnings;
+            if (warnings.Count > 0)
+            {
+                var warningLabel = new Label(Loc.T("project.warnings", ("count", warnings.Count), ("first", warnings[0]), ("more", warnings.Count > 1 ? "yes" : "no")))
+                {
+                    tooltip = string.Join("\n", warnings.GetRange(0, Math.Min(warnings.Count, 40)))
+                };
+                warningLabel.AddToClassList("browser-map-warnings");
+                content.Add(warningLabel);
+            }
             if (session != null && session.CanEdit)
+            {
                 content.Add(MapSettingsButton());
                 content.Add(ParkListButton());
                 content.Add(TrafficCurvesButton());
+            }
             if (!string.IsNullOrWhiteSpace(currentSummary.Description))
             {
                 var heading = new Label(Loc.T("project.about"));
                 heading.AddToClassList("inspector-group-title");
-                heading.style.marginTop = 8;
-                heading.style.marginBottom = 4;
+                heading.AddToClassList("browser-section-title");
+                heading.AddToClassList("mf-mt-2");
                 content.Add(heading);
                 var description = new Label(currentSummary.Description.Trim());
                 description.AddToClassList("browser-map-description-text");
@@ -114,7 +113,7 @@ namespace OmsiMapEditor.UI
             var lineCount = routes?.Lines.Count ?? 0;
             var heading = new Label(Loc.T("project.lines", ("count", lineCount)));
             heading.AddToClassList("inspector-group-title");
-            heading.style.marginBottom = 4;
+            heading.AddToClassList("browser-section-title");
             section.Add(heading);
             if (session != null && session.CanEdit && !EditingVariant)
                 section.Add(TimetableButton());
@@ -206,7 +205,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// Command line: <c>-projectTab tiles|map|entries|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
+        /// Command line: <c>-projectTab tiles|map|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
         /// <c>-tileFilter Text</c> types a text into the filter of the tile tab.
         /// </summary>
         private void RunProjectTabArguments(string[] args)
@@ -224,7 +223,7 @@ namespace OmsiMapEditor.UI
             if (name == null || !Enum.TryParse(name, true, out ProjectTab tab))
             {
                 if (filter != null)
-                    RenderProjectBrowser();
+                    RenderBarPopup();
                 return;
             }
             ShowProjectTab(tab);

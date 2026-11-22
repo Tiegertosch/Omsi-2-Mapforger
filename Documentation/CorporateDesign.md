@@ -74,6 +74,11 @@ work, not compete with it.
     contextual settings, and object properties.
 3.  **Orange means active:** Use the accent color primarily for selected
     tools, active states, primary actions, and important feedback.
+    On the map, colour meanings are fixed (ADR 015 addendum, ADR 098,
+    M6 step 6): light `#F2F4F7` with a dark halo marks the selection,
+    orange the selected tile and active tools, violet `#B48EDB` rail
+    paths, red only deleting and errors, yellow only edited and
+    warnings.
 4.  **Consistent icons:** Use one coherent line-icon family and avoid
     mixing unrelated icon styles.
 5.  **Labels where needed:** Essential tools should have text labels or

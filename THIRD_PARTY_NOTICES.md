@@ -60,6 +60,12 @@ The user interface font in `Assets/_Project/UI/Resources/Fonts/` is Inter 4.1 (R
 - License: SIL Open Font License 1.1; the full text ships next to the fonts as `Inter-LICENSE.txt`
 - The setup and uninstaller (`Tools/Installer`) carry the same two font files unchanged as embedded resources.
 
+## Traffic sign graphics
+
+The traffic sign graphics in `Assets/_Project/UI/Resources/TrafficSigns/` (`priority-road`, `yield`, `overtaking-ban`, `speed-blank`) were provided by the project owner for OMSI MapWorks. The project owner confirmed on 15 November 2026 that he drew all of them himself after the German road traffic regulations (StVO) in CorelDRAW, including the two CorelDRAW files (`overtaking-ban` and `speed-blank`); they are his own work and are released with the project under its license. The comment "Creator: CorelDRAW (Keine kommerzielle Nutzung)" in those two files only reflects the trial version of the program used to export them and puts no restriction on the graphics.
+
+The digits on the speed signs (`digit-0` to `digit-9` there) are the outlines of the figures 0 to 9 of the font "Alte DIN 1451 Mittelschrift" by Ludwig Goller, converted to vector paths once with a script; the font file itself is not part of OMSI MapWorks. According to the project owner the font is in the public domain.
+
 ## OMSI
 
 OMSI and its content are not part of this project. Mapforge reads OMSI files from the user's own installation and does not ship them.

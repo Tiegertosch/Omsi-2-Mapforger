@@ -23,7 +23,6 @@ namespace OmsiMapEditor.UI
         /// <summary>A press that moves less than this many pixels is a click, not a paint.</summary>
         private const float PaintPixels = 4f;
 
-        private const float RowHeight = 22f;
 
         private static readonly Color Red = new Color(0.86f, 0.24f, 0.24f);
         private static readonly Color Yellow = new Color(0.96f, 0.76f, 0.20f);
@@ -102,6 +101,13 @@ namespace OmsiMapEditor.UI
             Rebuild();
         }
 
+        /// <summary>Draws the bars again after the program was changed in place (an edge dragged in another view of the same program).</summary>
+        public void Repaint()
+        {
+            foreach (var child in rows.Children())
+                child.Q<VisualElement>(className: "signal-timeline-bar")?.MarkDirtyRepaint();
+        }
+
         public void Select(int light, int segment)
         {
             SelectedLight = light;
@@ -164,7 +170,6 @@ namespace OmsiMapEditor.UI
                 this.owner = owner;
                 this.light = light;
                 AddToClassList("signal-timeline-bar");
-                style.height = RowHeight;
                 generateVisualContent += Draw;
                 RegisterCallback<PointerDownEvent>(OnDown);
                 RegisterCallback<PointerMoveEvent>(OnMove);

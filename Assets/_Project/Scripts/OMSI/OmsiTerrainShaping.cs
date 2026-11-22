@@ -202,7 +202,8 @@ namespace OmsiMapEditor.OMSI
     /// result depends only on the base terrain and the roads. Where a road ends on a connection point of an object, such as a
     /// junction, the object goes on with the carriageway at the height of the spline: the terrain beyond that end stays as it
     /// is, and under the road within a grid diagonal of it the terrain lies below the spline, so no grid triangle reaching
-    /// into the object rises above its carriageway. A junction object joined by such a road is fitted like a road whose
+    /// into the object rises above its carriageway. An open end, joined to nothing, is fitted the same way under the road
+    /// and the slopes beyond it start at the carriageway, not the kerbs. A junction object joined by such a road is fitted like a road whose
     /// carriageway is the object's footprint: below it the terrain lies just under the object's plane, beside it on a
     /// shoulder at its kerbs, with slopes beyond.
     /// </summary>
@@ -343,9 +344,13 @@ namespace OmsiMapEditor.OMSI
             if (outside > settings.MaximumReachMeters)
                 return false;
             var fromEnd = atStart ? along : road.Spline.LengthMeters - along;
+            // An open end has no face down to kerb-high ground: the terrain there meets the carriageway instead, under the road
+            // near the end and from the end on, so no gap opens between the end of the road surface and the ground.
+            var open = !atObject && (atStart ? road.Spline.PreviousId : road.Spline.NextId) == 0;
             place = new Place
             {
-                Outside = outside, RoadHeight = roadHeight, EdgeHeight = roadHeight + road.EdgeHeight, NearObject = atObject && fromEnd <= shoulder
+                Outside = outside, RoadHeight = roadHeight, EdgeHeight = roadHeight + (open && beyondEnd ? 0.0 : road.EdgeHeight),
+                NearObject = (atObject || open) && fromEnd <= shoulder
             };
             return true;
         }

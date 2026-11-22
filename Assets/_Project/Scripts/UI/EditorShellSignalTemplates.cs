@@ -19,7 +19,6 @@ namespace OmsiMapEditor.UI
     public sealed partial class EditorShellBootstrap
     {
         private VisualElement signalTemplatesPage;
-        private VisualElement signalTemplatesButtons;
         private VisualElement signalTemplateList;
         private VisualElement signalTemplateDetails;
         private Label signalTemplatesInfo;
@@ -44,64 +43,67 @@ namespace OmsiMapEditor.UI
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "OMSI MapWorks", "Signal templates");
         }
 
-        private Button SignalTemplatesButton()
-        {
-            var button = LocBindings.WithTooltip(LocBindings.NewButton("signals.templates.open", OpenSignalTemplates), "signals.templates.open.tooltip");
-            button.AddToClassList("map-control-button");
-            return button;
-        }
-
+        /// <summary>The templates page: the templates and the name to keep this crossing's program under on the left, the chosen template on the right.</summary>
         private VisualElement CreateSignalTemplatesPage()
         {
-            signalTemplatesPage = new ScrollView(ScrollViewMode.Vertical);
-            signalTemplatesPage.AddToClassList("signal-scroll-page");
-            var title = LocBindings.NewLabel("signals.templates.title");
-            title.AddToClassList("inspector-section-heading");
-            signalTemplatesPage.Add(title);
+            var wrapper = new VisualElement();
+            wrapper.AddToClassList("signal-wrapper-page");
+            wrapper.Add(BuildSignalTemplatesToolbar());
+            var page = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            page.AddToClassList("signal-wrapper-scroll");
+            page.contentContainer.AddToClassList("signal-columns");
+            wrapper.Add(page);
+            signalTemplatesPage = wrapper;
+            var left = new VisualElement();
+            left.AddToClassList("signal-column");
+            left.AddToClassList("signal-column-templates");
+            var right = new VisualElement();
+            right.AddToClassList("signal-column");
+            right.AddToClassList("signal-column-template-details");
+            page.Add(left);
+            page.Add(right);
             signalTemplatesInfo = new Label();
             signalTemplatesInfo.AddToClassList("panel-info");
-            signalTemplatesPage.Add(signalTemplatesInfo);
+            signalTemplatesInfo.AddToClassList("mf-mt-0");
+            left.Add(signalTemplatesInfo);
             signalTemplateList = new VisualElement();
-            signalTemplatesPage.Add(signalTemplateList);
+            left.Add(signalTemplateList);
             signalTemplateDetails = new VisualElement();
-            signalTemplatesPage.Add(signalTemplateDetails);
+            right.Add(signalTemplateDetails);
             signalTemplateTimeline = new SignalTimelineElement();
 
-            signalTemplateHeadsToggle = new Toggle { value = true };
-            LocBindings.Text(signalTemplateHeadsToggle, "signals.templates.heads");
-            LocBindings.Tooltip(signalTemplateHeadsToggle, "signals.templates.heads.tooltip");
-            signalTemplatesPage.Add(signalTemplateHeadsToggle);
+            wrapper.style.display = DisplayStyle.None;
+            return wrapper;
+        }
 
-            var saveTitle = LocBindings.NewLabel("signals.templates.save.title");
-            saveTitle.AddToClassList("inspector-section-heading");
-            signalTemplatesPage.Add(saveTitle);
+        /// <summary>The templates' bar: apply the chosen one (red for the second click that replaces), cancel, whether heads are placed, and keeping this program under a name.</summary>
+        private VisualElement BuildSignalTemplatesToolbar()
+        {
+            var bar = new VisualElement();
+            bar.AddToClassList("signal-toolbar");
+            signalTemplateApplyButton = SignalLabelButton("check", "signals.templates.apply", "signals.templates.apply.tooltip", () => ApplySignalTemplate(false));
+            signalTemplateApplyButton.AddToClassList("option-icon-primary");
+            bar.Add(signalTemplateApplyButton);
+            bar.Add(SignalLabelButton("arrow-left", "signals.templates.back", "signals.templates.back.tooltip", () => ShowSignalTab(SignalTab.Movements)));
+            var options = new VisualElement();
+            options.AddToClassList("signal-toolbar-switches");
+            signalTemplateHeadsToggle = OptionControls.Switch(options, "traffic-light", "signals.templates.heads", "signals.templates.heads.tooltip", true);
+            bar.Add(options);
+            // Keeping this crossing's program: the name, then the save button (red while a second click would replace a template of that name).
             signalTemplateName = new TextField { isDelayed = false };
-            LocBindings.Text(signalTemplateName, "signals.templates.save.name");
             LocBindings.Tooltip(signalTemplateName, "signals.templates.save.name.tooltip");
+            signalTemplateName.textEdition.placeholder = Loc.T("signals.templates.save.name"); // i18n:keys
             signalTemplateName.AddToClassList("picker-field");
+            signalTemplateName.AddToClassList("signal-save-name");
             signalTemplateName.RegisterValueChangedCallback(_ =>
             {
                 signalTemplateOverwriting = null;
                 UpdateSignalTemplateButtons();
             });
-            signalTemplatesPage.Add(signalTemplateName);
-            signalTemplateSaveButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.templates.save", SaveSignalTemplate), "signals.templates.save.tooltip");
-            signalTemplateSaveButton.AddToClassList("map-control-button");
-            signalTemplatesPage.Add(signalTemplateSaveButton);
-
-            var buttons = new VisualElement();
-            buttons.AddToClassList("signal-group-row");
-            var back = LocBindings.WithTooltip(LocBindings.NewButton("signals.templates.back", () => ShowSignalTab(SignalTab.Movements)), "signals.templates.back.tooltip");
-            back.AddToClassList("map-control-button");
-            buttons.Add(back);
-            signalTemplateApplyButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.templates.apply", () => ApplySignalTemplate(false)), "signals.templates.apply.tooltip");
-            signalTemplateApplyButton.AddToClassList("map-control-button");
-            signalTemplateApplyButton.AddToClassList("dialog-primary");
-            buttons.Add(signalTemplateApplyButton);
-            signalTemplatesButtons = buttons;
-            signalTemplatesButtons.style.display = DisplayStyle.None;
-            signalTemplatesPage.style.display = DisplayStyle.None;
-            return signalTemplatesPage;
+            bar.Add(signalTemplateName);
+            signalTemplateSaveButton = SignalLabelButton("save", "signals.templates.save", "signals.templates.save.tooltip", SaveSignalTemplate);
+            bar.Add(signalTemplateSaveButton);
+            return bar;
         }
 
         private void OpenSignalTemplates()
@@ -245,10 +247,12 @@ namespace OmsiMapEditor.UI
             {
                 var name = template.Name;
                 var confirming = signalTemplateDeleting == name;
-                var delete = new Button(() => DeleteSignalTemplate(name)) { text = Loc.T(confirming ? "signals.templates.delete.confirm" : "signals.templates.delete") }; // i18n:keys
-                LocBindings.Tooltip(delete, "signals.templates.delete.tooltip");
-                delete.AddToClassList("map-control-button");
-                delete.EnableInClassList("dialog-danger", confirming);
+                var delete = new Button(() => DeleteSignalTemplate(name));
+                delete.AddToClassList("option-icon");
+                delete.AddToClassList("option-icon-danger");
+                delete.Add(new IconElement("trash-2"));
+                delete.tooltip = LocBindings.CardTooltip(Loc.T("signals.templates.delete"), Loc.T(confirming ? "signals.templates.delete.confirm" : "signals.templates.delete.tooltip")); // i18n:keys
+                delete.EnableInClassList("option-icon-confirm", confirming);
                 row.Add(delete);
             }
             row.RegisterCallback<ClickEvent>(evt =>
@@ -347,22 +351,37 @@ namespace OmsiMapEditor.UI
             var usable = SignalsEditable && match != null && match.MovementLights.Any(light => light >= 0);
             signalTemplateApplyButton.SetEnabled(usable);
             var existing = signalProgram?.Lights.Count ?? 0;
+            // The button is an icon: the second click that replaces groups (or applies a template that leaves movements without a signal) shows red
+            // and says so in the tooltip and in the status bar.
             string key;
             if (signalTemplateConfirm)
                 key = existing > 0 ? "signals.templates.confirm.replace" : "signals.templates.confirm.unfitting";
             else
-                key = "signals.templates.apply";
-            signalTemplateApplyButton.text = Loc.T(key, ("count", existing), ("unlit", match?.Unlit.Count ?? 0)); // i18n:keys
+                key = "signals.templates.apply.tooltip";
+            signalTemplateApplyButton.tooltip = LocBindings.CardTooltip(Loc.T("signals.templates.apply"), Loc.T(key, ("count", existing), ("unlit", match?.Unlit.Count ?? 0))); // i18n:keys
+            signalTemplateApplyButton.EnableInClassList("option-icon-confirm", signalTemplateConfirm);
+            signalTemplateApplyButton.EnableInClassList("option-icon-primary", !signalTemplateConfirm);
+            signalConfirmText = signalTemplateConfirm ? Loc.T(key, ("count", existing), ("unlit", match?.Unlit.Count ?? 0)) : string.Empty; // i18n:keys
             var name = signalTemplateName.value.Trim();
             var hasProgram = signalCrossing != null && signalProgram != null && signalProgram.Lights.Count > 0;
             signalTemplateSaveButton.SetEnabled(hasProgram && OmsiSignalTemplates.FileNameOf(name) != null);
-            signalTemplateSaveButton.text = Loc.T(signalTemplateOverwriting != null ? "signals.templates.save.overwrite" : "signals.templates.save"); // i18n:keys
+            // Saving over a template of the same name asks once more: the icon turns red and the tooltip says what a second click does.
+            signalTemplateSaveButton.EnableInClassList("option-icon-confirm", signalTemplateOverwriting != null);
+            signalTemplateSaveButton.tooltip = LocBindings.CardTooltip(Loc.T("signals.templates.save"), // i18n:keys
+                Loc.T(signalTemplateOverwriting != null ? "signals.templates.save.overwrite" : "signals.templates.save.tooltip")); // i18n:keys
+            if (signalConfirmText.Length == 0 && signalTemplateOverwriting != null)
+                signalConfirmText = Loc.T("signals.templates.save.overwrite");
+            if (signalConfirmText.Length == 0 && signalTemplateDeleting != null)
+                signalConfirmText = Loc.T("signals.templates.delete.confirm");
+            RefreshSignalHint();
         }
 
         /// <summary>Writes the template's groups, program and bindings into the junction as one undo step.</summary>
         private void ApplySignalTemplate(bool confirmed)
         {
             if (!SignalsEditable || signalTemplateChosen == null || signalCrossing == null)
+                return;
+            if (!SignalGate(() => ApplySignalTemplate(confirmed)))
                 return;
             var match = SignalTemplateMatch();
             if (!match.MovementLights.Any(light => light >= 0))

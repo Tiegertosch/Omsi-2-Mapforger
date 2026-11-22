@@ -166,6 +166,7 @@ namespace OmsiMapEditor.UI
             };
             markingOptions.DeleteRequested += DeleteSelectedMarking;
             markingOptions.CloseRequested += () => SetTool(EditorTool.Drag);
+            markingOptions.HintChanged += (text, warning) => ShowToolHint(markingOptions, text, warning);
             objectsPanelHost.Add(markingOptions);
         }
 
@@ -186,6 +187,14 @@ namespace OmsiMapEditor.UI
             var item = selection.Count == 1 ? selection[0] : null;
             if (item?.Tile == null || !TargetMarkingJunction(item.Tile, item.Record))
                 SetStatusT("markings.status.start");
+            else
+                KeepMarkingJunctionClear();
+        }
+
+        /// <summary>Keeps the junction being marked clear of the markings window (ADR 098, M4); only when it was chosen, not on a refresh or undo.</summary>
+        private void KeepMarkingJunctionClear()
+        {
+            KeepClearOfToolWindow(markingOptions, () => activeTool == EditorTool.Markings, () => ObjectWorldPoint(markingTile, markingJunction));
         }
 
         private void EndMarkingTool()
@@ -868,7 +877,8 @@ namespace OmsiMapEditor.UI
             }
             if (MadeJunctionAt(point, out var tile, out var record) && !ReferenceEquals(record, markingJunction))
             {
-                TargetMarkingJunction(tile, record);
+                if (TargetMarkingJunction(tile, record))
+                    KeepMarkingJunctionClear();
                 return;
             }
             markingFrom = -1;

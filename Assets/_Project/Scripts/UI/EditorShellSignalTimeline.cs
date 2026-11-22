@@ -31,42 +31,23 @@ namespace OmsiMapEditor.UI
             { "yellow", OmsiSignalAspect.Yellow }, { "dark", OmsiSignalAspect.Dark }
         };
 
-        private Button signalMovementsTab;
-        private Button signalTimelineTab;
         private VisualElement signalMovementsPage;
         private VisualElement signalTimelinePage;
         private SignalTimelineElement signalTimeline;
         private TextField signalCycleField;
-        private Label signalSegmentLabel;
         private DropdownField signalStateDropdown;
         private TextField signalStartField;
         private TextField signalLengthField;
         private Button signalRemoveSegmentButton;
         private Button signalRepeatSegmentButton;
         private Button signalSplitSegmentButton;
-        private VisualElement signalBrushRow;
         private readonly Dictionary<OmsiSignalAspect, Button> signalBrushButtons = new Dictionary<OmsiSignalAspect, Button>();
         private OmsiSignalAspect signalBrush = OmsiSignalAspect.Green;
-        private Label signalTimelineHint;
         private Label signalIssuesLabel;
-        private Button signalApplyButton;
-        private Button signalDiscardButton;
+        private string signalSegmentText = string.Empty;
         private OmsiSignalProgram signalDraft;
         private bool signalDirty;
         private SignalTab signalTab = SignalTab.Movements;
-        private Button signalPhasesTab;
-        private VisualElement signalDraftRow;
-
-        /// <summary>The pages of the signals tool; the assistant has no tab of its own and is opened from the movements.</summary>
-        private enum SignalTab
-        {
-            Movements,
-            Phases,
-            Timeline,
-            Check,
-            Wizard,
-            Templates
-        }
 
         private bool signalTimelineShown => signalTab == SignalTab.Timeline;
         private List<OmsiSignalAspect> signalStateChoices = new List<OmsiSignalAspect>();
@@ -84,46 +65,77 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>The tabs Movements and Timeline above the two pages; called from <see cref="CreateSignalOptions"/>.</summary>
-        private VisualElement CreateSignalTabs()
-        {
-            var tabs = new VisualElement();
-            tabs.AddToClassList("panel-tabs");
-            signalMovementsTab = LocBindings.NewButton("signals.tab.movements", () => ShowSignalTab(SignalTab.Movements));
-            signalMovementsTab.AddToClassList("panel-tab");
-            tabs.Add(signalMovementsTab);
-            signalPhasesTab = LocBindings.NewButton("signals.tab.phases", () => ShowSignalTab(SignalTab.Phases));
-            signalPhasesTab.AddToClassList("panel-tab");
-            tabs.Add(signalPhasesTab);
-            signalTimelineTab = LocBindings.NewButton("signals.tab.timeline", () => ShowSignalTab(SignalTab.Timeline));
-            signalTimelineTab.AddToClassList("panel-tab");
-            tabs.Add(signalTimelineTab);
-            tabs.Add(CreateSignalCheckTab());
-            return tabs;
-        }
-
+        /// <summary>
+        /// The timeline page of the window's "Phases and times" area: the cycle and the brush above, the timeline over the whole width, the
+        /// details of the selected stretch in one row under it (its colour, start and length, split, repeat, remove) and the findings of the
+        /// timing check. It edits the same draft as the phases page; the preview and Apply stand in the window's frame.
+        /// </summary>
         private VisualElement CreateSignalTimelinePage()
         {
-            signalTimelinePage = new VisualElement();
-            var cycleRow = new VisualElement();
-            cycleRow.AddToClassList("signal-group-row");
-            var cycleText = LocBindings.NewLabel("signals.cycle");
-            cycleText.AddToClassList("signal-movement-text");
-            cycleRow.Add(cycleText);
-            signalCycleField = new TextField { isDelayed = true };
-            signalCycleField.AddToClassList("picker-field");
-            LocBindings.Tooltip(signalCycleField, "signals.cycle.tooltip");
-            signalCycleField.RegisterValueChangedCallback(evt => SetSignalCycle(evt.newValue));
-            cycleRow.Add(signalCycleField);
-            signalTimelinePage.Add(cycleRow);
-            signalTimelinePage.Add(CreateSignalPreviewBar());
+            var page = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            signalTimelinePage = page;
+            signalTimeline = new SignalTimelineElement();
+            signalTimeline.SelectionChanged += RenderSignalTimelineDetails;
+            signalTimeline.PaintRequested += PaintSignalStretch;
+            signalTimeline.Edited += () =>
+            {
+                signalDirty = true;
+                RenderSignalTimelineDetails();
+                // The preview shares the program: it draws the dragged edge too.
+                signalPreviewTrack?.Repaint();
+            };
+            // How to paint and drag is the timeline's tooltip, not text in the window.
+            LocBindings.Tooltip(signalTimeline, "signals.timeline.hint");
+            page.Add(CreateSignalTimelineToolbar());
+            page.Add(signalTimeline);
+            SetSignalBrush(signalBrush);
 
-            // The colour a drag along a row paints with.
-            signalBrushRow = new VisualElement();
-            signalBrushRow.AddToClassList("signal-group-row");
-            var brushText = LocBindings.NewLabel("signals.brush");
-            brushText.AddToClassList("signal-movement-text");
-            signalBrushRow.Add(brushText);
+            var details = new VisualElement();
+            details.AddToClassList("signal-details");
+            signalStateDropdown = new DropdownField();
+            signalStateDropdown.AddToClassList("signal-movement-group");
+            LocBindings.Tooltip(signalStateDropdown, "signals.state.tooltip");
+            signalStateDropdown.RegisterValueChangedCallback(_ => PaintSignalSegment());
+            details.Add(signalStateDropdown);
+            signalStartField = new TextField { isDelayed = true };
+            signalStartField.RegisterValueChangedCallback(evt => MoveSignalSegment(evt.newValue, true));
+            OptionControls.ValueBox(details, "arrow-right-to-line", signalStartField, "s", "signals.segment.start", "signals.segment.start.tooltip");
+            signalLengthField = new TextField { isDelayed = true };
+            signalLengthField.RegisterValueChangedCallback(evt => MoveSignalSegment(evt.newValue, false));
+            OptionControls.ValueBox(details, "ruler", signalLengthField, "s", "signals.segment.length", "signals.segment.length.tooltip");
+            var segmentButtons = OptionControls.Group(details);
+            signalSplitSegmentButton = OptionControls.Choice(segmentButtons, "scissors", "signals.segment.split", "signals.segment.split.tooltip", SplitSignalSegment);
+            signalRepeatSegmentButton = OptionControls.Choice(segmentButtons, "copy", "signals.segment.repeat", "signals.segment.repeat.tooltip", RepeatSignalSegment);
+            signalRemoveSegmentButton = OptionControls.Choice(segmentButtons, "trash-2", "signals.segment.remove", "signals.segment.remove.tooltip", RemoveSignalSegment);
+            signalRemoveSegmentButton.AddToClassList("option-icon-danger");
+            page.Add(details);
+
+            signalIssuesLabel = new Label();
+            signalIssuesLabel.AddToClassList("panel-info");
+            signalIssuesLabel.AddToClassList("signal-issues");
+            page.Add(signalIssuesLabel);
+            page.style.display = DisplayStyle.None;
+            return page;
+        }
+
+        /// <summary>
+        /// The brush row and the cycle of the timeline page: the length of the cycle, and the colour a drag along a row of the timeline paints with.
+        /// </summary>
+        private VisualElement CreateSignalTimelineToolbar()
+        {
+            var toolbar = new VisualElement();
+            toolbar.AddToClassList("signal-toolbar");
+            var cycleLabel = LocBindings.NewLabel("signals.cycle"); // i18n:keys
+            cycleLabel.AddToClassList("signal-toolbar-label");
+            toolbar.Add(cycleLabel);
+            signalCycleField = new TextField { isDelayed = true };
+            signalCycleField.AddToClassList("signal-cycle-field");
+            signalCycleField.RegisterValueChangedCallback(evt => SetSignalCycle(evt.newValue));
+            OptionControls.ValueBox(toolbar, "repeat", signalCycleField, "s", "signals.cycle", "signals.cycle.tooltip");
+            var brushLabel = LocBindings.NewLabel("signals.brush"); // i18n:keys
+            brushLabel.AddToClassList("signal-toolbar-label");
+            toolbar.Add(brushLabel);
+            var brushGroup = OptionControls.Group(toolbar);
             foreach (var aspect in VehicleAspects)
             {
                 var chosen = aspect;
@@ -141,99 +153,22 @@ namespace OmsiMapEditor.UI
                 }
                 swatch.tooltip = AspectName(aspect);
                 signalBrushButtons[aspect] = swatch;
-                signalBrushRow.Add(swatch);
+                brushGroup.Add(swatch);
             }
-            signalTimelinePage.Add(signalBrushRow);
-
-            signalTimeline = new SignalTimelineElement();
-            signalTimeline.SelectionChanged += RenderSignalTimelineDetails;
-            signalTimeline.PaintRequested += PaintSignalStretch;
-            signalTimeline.Edited += () =>
-            {
-                signalDirty = true;
-                RenderSignalTimelineDetails();
-            };
-            signalTimelinePage.Add(signalTimeline);
-            signalTimelineHint = LocBindings.NewLabel("signals.timeline.hint");
-            signalTimelineHint.AddToClassList("panel-info");
-            signalTimelinePage.Add(signalTimelineHint);
-            SetSignalBrush(signalBrush);
-
-            signalSegmentLabel = new Label();
-            signalSegmentLabel.AddToClassList("panel-info");
-            signalTimelinePage.Add(signalSegmentLabel);
-            var stateRow = new VisualElement();
-            stateRow.AddToClassList("signal-group-row");
-            signalStateDropdown = new DropdownField();
-            signalStateDropdown.AddToClassList("signal-movement-group");
-            LocBindings.Tooltip(signalStateDropdown, "signals.state.tooltip");
-            signalStateDropdown.RegisterValueChangedCallback(_ => PaintSignalSegment());
-            stateRow.Add(signalStateDropdown);
-            signalStartField = new TextField { isDelayed = true };
-            signalStartField.AddToClassList("picker-field");
-            LocBindings.Tooltip(signalStartField, "signals.segment.start.tooltip");
-            signalStartField.RegisterValueChangedCallback(evt => MoveSignalSegment(evt.newValue, true));
-            stateRow.Add(signalStartField);
-            signalLengthField = new TextField { isDelayed = true };
-            signalLengthField.AddToClassList("picker-field");
-            LocBindings.Tooltip(signalLengthField, "signals.segment.length.tooltip");
-            signalLengthField.RegisterValueChangedCallback(evt => MoveSignalSegment(evt.newValue, false));
-            stateRow.Add(signalLengthField);
-            signalTimelinePage.Add(stateRow);
-
-            var segmentButtons = new VisualElement();
-            segmentButtons.AddToClassList("signal-group-row");
-            signalSplitSegmentButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.segment.split", SplitSignalSegment), "signals.segment.split.tooltip");
-            signalSplitSegmentButton.AddToClassList("map-control-button");
-            segmentButtons.Add(signalSplitSegmentButton);
-            signalRemoveSegmentButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.segment.remove", RemoveSignalSegment), "signals.segment.remove.tooltip");
-            signalRemoveSegmentButton.AddToClassList("map-control-button");
-            segmentButtons.Add(signalRemoveSegmentButton);
-            signalRepeatSegmentButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.segment.repeat", RepeatSignalSegment), "signals.segment.repeat.tooltip");
-            signalRepeatSegmentButton.AddToClassList("map-control-button");
-            segmentButtons.Add(signalRepeatSegmentButton);
-            signalTimelinePage.Add(segmentButtons);
-
-            signalIssuesLabel = new Label();
-            signalIssuesLabel.AddToClassList("panel-info");
-            signalIssuesLabel.AddToClassList("signal-issues");
-            signalTimelinePage.Add(signalIssuesLabel);
-
-            // Apply and Discard serve the phases and the timeline alike; the panel puts them below both.
-            var applyRow = new VisualElement();
-            applyRow.AddToClassList("signal-group-row");
-            signalDraftRow = applyRow;
-            signalDiscardButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.discard", DiscardSignalDraft), "signals.discard.tooltip");
-            signalDiscardButton.AddToClassList("map-control-button");
-            applyRow.Add(signalDiscardButton);
-            signalApplyButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.apply", ApplySignalDraft), "signals.apply.tooltip");
-            signalApplyButton.AddToClassList("map-control-button");
-            signalApplyButton.AddToClassList("dialog-primary");
-            applyRow.Add(signalApplyButton);
-            signalTimelinePage.style.display = DisplayStyle.None;
-            return signalTimelinePage;
+            return toolbar;
         }
 
         private void ShowSignalTab(SignalTab tab)
         {
             signalTab = tab;
-            void Show(VisualElement page, SignalTab of)
-            {
-                if (page != null)
-                    page.style.display = tab == of ? DisplayStyle.Flex : DisplayStyle.None;
-            }
-            Show(signalMovementsPage, SignalTab.Movements);
-            Show(signalPhasesPage, SignalTab.Phases);
-            Show(signalTimelinePage, SignalTab.Timeline);
-            Show(signalCheckPage, SignalTab.Check);
-            Show(signalWizardPage, SignalTab.Wizard);
-            Show(signalWizardButtons, SignalTab.Wizard);
-            Show(signalTemplatesPage, SignalTab.Templates);
-            Show(signalTemplatesButtons, SignalTab.Templates);
-            signalMovementsTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Movements);
-            signalPhasesTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Phases);
-            signalTimelineTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Timeline);
-            signalCheckTab?.EnableInClassList("panel-tab-active", tab == SignalTab.Check);
+            DisarmSignalDelete();
+            signalConfirmText = string.Empty;
+            if (tab == SignalTab.Phases || tab == SignalTab.Timeline)
+                signalLastPhasePage = tab;
+            if (tab == SignalTab.Wizard || tab == SignalTab.Templates)
+                signalLastAssistantPage = tab;
+            ApplySignalPageVisibility();
+            signalWindow?.ShowArea(tab);
             if (tab != SignalTab.Wizard)
                 signalProposal = null;
             if (tab == SignalTab.Timeline)
@@ -246,21 +181,10 @@ namespace OmsiMapEditor.UI
                 RenderSignalTemplates();
             else
                 signalTemplateLights = null;
-            UpdateSignalDraftRow();
+            UpdateSignalRows();
+            RefreshSignalHint();
             UpdateSignalPreview();
             UpdateSignalMarkers();
-        }
-
-        /// <summary>Apply and Discard below the phases and the timeline of a junction made here.</summary>
-        private void UpdateSignalDraftRow()
-        {
-            if (signalDraftRow == null)
-                return;
-            var shown = SignalsEditable && (signalTab == SignalTab.Phases || signalTab == SignalTab.Timeline);
-            signalDraftRow.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
-            signalApplyButton.SetEnabled(shown && signalDirty);
-            signalDiscardButton.SetEnabled(shown && signalDirty);
-            signalApplyButton.EnableInClassList("signal-dirty", signalDirty);
         }
 
         /// <summary>Shows the draft again wherever it is shown, after a change.</summary>
@@ -272,7 +196,8 @@ namespace OmsiMapEditor.UI
                 RenderSignalPhases();
             if (signalTab == SignalTab.Check)
                 RenderSignalCheck();
-            UpdateSignalDraftRow();
+            UpdateSignalRows();
+            RenderSignalPreviewTracks();
             // A preview follows the draft at once: the same program, changed in place.
             if (SignalPreviewActive)
             {
@@ -306,10 +231,12 @@ namespace OmsiMapEditor.UI
                 return;
             var shown = ShownSignalProgram;
             var editable = SignalsEditable && shown != null;
-            signalTimeline.Show(shown, SignalGroupColour, editable);
+            signalTimeline.Show(shown, SignalColourOf, editable);
             signalCycleField.SetValueWithoutNotify(shown != null ? shown.CycleLength.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty);
             signalCycleField.SetEnabled(editable);
-            RenderSignalPreviewRequests();
+            // The colours a drag paints with are for a crossing that can be changed.
+            foreach (var swatch in signalBrushButtons.Values)
+                swatch.SetEnabled(editable);
             RenderSignalTimelineDetails();
         }
 
@@ -338,7 +265,7 @@ namespace OmsiMapEditor.UI
             var pedestrian = PedestrianSignalLights();
             if (segment == null)
             {
-                signalSegmentLabel.text = Loc.T(shown == null || shown.Lights.Count == 0 ? "signals.timeline.empty" : "signals.timeline.pick"); // i18n:keys
+                signalSegmentText = Loc.T(shown == null || shown.Lights.Count == 0 ? "signals.timeline.empty" : "signals.timeline.pick"); // i18n:keys
                 signalStateDropdown.choices = new List<string>();
                 signalStateDropdown.SetValueWithoutNotify(string.Empty);
                 signalStartField.SetValueWithoutNotify(string.Empty);
@@ -346,7 +273,7 @@ namespace OmsiMapEditor.UI
             }
             else
             {
-                signalSegmentLabel.text = Loc.T("signals.segment", ("group", shown.Lights[light].Name), ("start", Seconds(segment.Start)), ("end", Seconds(segment.End)),
+                signalSegmentText = Loc.T("signals.segment", ("group", shown.Lights[light].Name), ("start", Seconds(segment.Start)), ("end", Seconds(segment.End)),
                     ("holds", segment.Holds ? "yes" : "no"));
                 signalStateChoices = (pedestrian.Contains(light) ? PedestrianAspects : VehicleAspects).ToList();
                 var aspect = OmsiSignalAspects.Of(segment.State);
@@ -364,9 +291,8 @@ namespace OmsiMapEditor.UI
             signalRemoveSegmentButton.SetEnabled(canEditSegment && segments.Count > 1);
             signalRepeatSegmentButton.SetEnabled(canEditSegment);
             signalSplitSegmentButton.SetEnabled(canEditSegment);
-            signalBrushRow.style.display = editable ? DisplayStyle.Flex : DisplayStyle.None;
-            signalTimelineHint.style.display = editable ? DisplayStyle.Flex : DisplayStyle.None;
-            UpdateSignalDraftRow();
+            UpdateSignalRows();
+            RefreshSignalHint();
             signalIssuesLabel.text = shown == null ? string.Empty : DescribeSignalIssues(OmsiSignalTimeline.CheckTiming(shown, pedestrian), shown);
         }
 
@@ -564,6 +490,21 @@ namespace OmsiMapEditor.UI
             ApplySignals(CurrentSignals(), null, Loc.T("signals.done.timing", ("id", signalJunction.Id), ("cycle", Seconds(signalDraft.CycleLength))));
         }
 
+        /// <summary>The page by the name the command line uses: groups, phases, timeline, check, assistant (the proposal) or templates.</summary>
+        private void ShowSignalPageByName(string name)
+        {
+            switch ((name ?? string.Empty).ToLowerInvariant())
+            {
+                case "timeline": ShowSignalTab(SignalTab.Timeline); break;
+                case "phases": ShowSignalTab(SignalTab.Phases); break;
+                case "check": ShowSignalTab(SignalTab.Check); break;
+                case "assistant":
+                case "wizard": ChooseSignalPage(SignalTab.Wizard); break;
+                case "templates": ChooseSignalPage(SignalTab.Templates); break;
+                default: ShowSignalTab(SignalTab.Movements); break;
+            }
+        }
+
         /// <summary>
         /// Command line, after <c>-signals</c>: <c>-signalTab timeline</c>, <c>-signalCycle s</c>, <c>-signalPaint g from to
         /// red|redyellow|green|yellow|dark</c> (group from 1, may repeat), <c>-signalPick g s</c> (selects the stretch of group
@@ -575,9 +516,7 @@ namespace OmsiMapEditor.UI
         {
             var tab = Array.IndexOf(args, "-signalTab");
             if (tab >= 0 && tab + 1 < args.Length)
-                ShowSignalTab(string.Equals(args[tab + 1], "timeline", StringComparison.OrdinalIgnoreCase) ? SignalTab.Timeline
-                    : string.Equals(args[tab + 1], "phases", StringComparison.OrdinalIgnoreCase) ? SignalTab.Phases
-                    : string.Equals(args[tab + 1], "check", StringComparison.OrdinalIgnoreCase) ? SignalTab.Check : SignalTab.Movements);
+                ShowSignalPageByName(args[tab + 1]);
             var cycle = Array.IndexOf(args, "-signalCycle");
             if (cycle >= 0 && cycle + 1 < args.Length)
                 SetSignalCycle(args[cycle + 1]);

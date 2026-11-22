@@ -19,5 +19,6 @@
   "timetable.stopping.1": "A richiesta",
   "timetable.stopping.2": "Senza sosta",
   "timetable.stopping.3": "Se in anticipo",
-  "timetable.stopping.4": "A richiesta (4)"
+  "timetable.stopping.4": "A richiesta (4)",
+  "line.edit.title": "Corsa {trip}"
 }

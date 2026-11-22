@@ -36,6 +36,9 @@ namespace OmsiMapEditor.UI
             }
             if (PickingElementType)
                 EndElementTypePick(null);
+            // The terrain and markings tools have a window of their own in the same place; it would stand beside the road panel.
+            if (activeTool == EditorTool.Terrain || activeTool == EditorTool.Markings)
+                SetTool(EditorTool.Drag);
             StopPlacement();
             StartInstallationScan();
             UpdateRoadProfiles();
@@ -247,6 +250,66 @@ namespace OmsiMapEditor.UI
                 {
                     StepHistory(redoSteps, undoSteps, false);
                     Debug.Log("Redo: " + statusLabel?.text);
+                }
+        }
+
+        /// <summary>
+        /// Command line for the view from above and in 3D alike (ADR 098, M5 step 2), after <c>-selectSpline</c>: <c>-alsoSpline id,id</c> joins
+        /// splines to the chosen one as Ctrl+click does, <c>-deleteSpline</c> deletes them as Delete does, <c>-deleteSplineUndo [n]</c> and
+        /// <c>-deleteSplineRedo [n]</c> step through the history. The status goes to the log as "Delete spline:", "Delete spline undo:" and
+        /// "Delete spline redo:".
+        /// </summary>
+        private void RunSplineDeleteArguments(string[] args)
+        {
+            string Value(string name)
+            {
+                var index = Array.IndexOf(args, name);
+                return index >= 0 && index + 1 < args.Length && !args[index + 1].StartsWith("-", StringComparison.Ordinal) ? args[index + 1] : null;
+            }
+
+            // -boxSelect x0 y0 x1 y1 (panel pixels) does what a Ctrl+drag box does: objects inside, else the splines it touches.
+            // -boxSelect x0 y0 x1 y1 shift does what a Shift+drag box does: only the splines it touches, whatever lies inside.
+            var boxIndex = Array.IndexOf(args, "-boxSelect");
+            if (boxIndex >= 0 && boxIndex + 4 < args.Length && mapCanvas != null)
+            {
+                var corners = new float[4];
+                var ok = true;
+                for (var part = 0; part < 4; part++)
+                    ok &= float.TryParse(args[boxIndex + 1 + part], NumberStyles.Float, CultureInfo.InvariantCulture, out corners[part]);
+                if (ok)
+                {
+                    var splinesOnly = boxIndex + 5 < args.Length && string.Equals(args[boxIndex + 5], "shift", StringComparison.OrdinalIgnoreCase);
+                    mapCanvas.SelectBoxAtPanel(new Vector2(corners[0], corners[1]), new Vector2(corners[2], corners[3]), splinesOnly);
+                    Debug.Log("Box select: " + statusLabel?.text + " (splines " + (selectedSpline != null ? selectedSpline.Id + " + " + moreSplines.Count : "none") +
+                              ", objects " + selection.Count + ")");
+                }
+            }
+
+            var also = Value("-alsoSpline");
+            if (also != null && selectedSpline != null)
+                foreach (var part in also.Split(','))
+                    if (int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+                    {
+                        var tile = currentSummary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+                        if (tile != null)
+                            ToggleSpline(tile, tile.Splines.Find(spline => spline.Id == id));
+                    }
+            if (Array.IndexOf(args, "-deleteSpline") >= 0)
+            {
+                DeleteSelectedSpline();
+                Debug.Log("Delete spline: " + statusLabel?.text);
+            }
+            if (Array.IndexOf(args, "-deleteSplineUndo") >= 0)
+                for (var undo = int.TryParse(Value("-deleteSplineUndo"), out var undoCount) ? undoCount : 1; undo > 0; undo--)
+                {
+                    StepHistory(undoSteps, redoSteps, true);
+                    Debug.Log("Delete spline undo: " + statusLabel?.text);
+                }
+            if (Array.IndexOf(args, "-deleteSplineRedo") >= 0)
+                for (var redo = int.TryParse(Value("-deleteSplineRedo"), out var redoCount) ? redoCount : 1; redo > 0; redo--)
+                {
+                    StepHistory(redoSteps, undoSteps, false);
+                    Debug.Log("Delete spline redo: " + statusLabel?.text);
                 }
         }
     }

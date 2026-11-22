@@ -15,7 +15,7 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement parkListDialog;
+        private ModalDialog parkListDialog;
         private ScrollView parkListList;
         private List<string> parkListCurrent = new List<string>();
         private IntegerField parkListNumber;
@@ -24,25 +24,29 @@ namespace OmsiMapEditor.UI
 
         private void SetUpParkList(VisualElement root)
         {
-            parkListDialog = new VisualElement { name = "park-list-dialog" };
-            parkListDialog.AddToClassList("dialog-overlay");
-            parkListDialog.style.display = DisplayStyle.None;
-            var dialog = new VisualElement();
-            dialog.AddToClassList("dialog");
-            dialog.AddToClassList("content-folders");
-            var title = LocBindings.NewLabel("parklist.title");
-            title.AddToClassList("popup-title");
-            dialog.Add(title);
-            var description = LocBindings.NewLabel("parklist.description");
-            description.AddToClassList("popup-description");
-            dialog.Add(description);
+            parkListDialog = NewDialog(new DialogOptions
+            {
+                Name = "park-list-dialog",
+                TitleKey = "parklist.title",
+                DescriptionKey = "parklist.description",
+                Width = DialogWidth.Standard,
+                BodyScrolls = false,
+                EnterPressesPrimary = false,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "parklist.cancel", Role = DialogButtonRole.Cancel },
+                    new DialogButton { TextKey = "parklist.apply", Role = DialogButtonRole.Primary, Clicked = ApplyParkList, Closes = false }
+                }
+            });
+            // The list scrolls by itself and shrinks with the window; the body only holds the number row and the list.
+            parkListDialog.Body.AddToClassList("dialog-body-fill");
+            var dialog = parkListDialog.Body;
             // The list a car park draws from is named by the first label of its object: 0 is parklist_p.txt, n is parklist_p_n.txt.
             var numberRow = new VisualElement();
-            numberRow.style.flexDirection = FlexDirection.Row;
-            numberRow.style.alignItems = Align.Center;
+            numberRow.AddToClassList("form-row");
             var numberLabel = LocBindings.NewLabel("parklist.number");
             numberLabel.AddToClassList("popup-description");
-            numberLabel.style.marginRight = 8;
+            numberLabel.AddToClassList("form-inline-label");
             numberRow.Add(numberLabel);
             parkListNumber = new IntegerField { value = 0 };
             parkListNumber.AddToClassList("picker-field");
@@ -60,18 +64,6 @@ namespace OmsiMapEditor.UI
             parkListList = new ScrollView(ScrollViewMode.Vertical);
             parkListList.AddToClassList("content-folders-list");
             dialog.Add(parkListList);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("parklist.cancel", () => HidePopup(parkListDialog));
-            cancel.AddToClassList("map-control-button");
-            buttons.Add(cancel);
-            var apply = LocBindings.NewButton("parklist.apply", ApplyParkList);
-            apply.AddToClassList("map-control-button");
-            apply.AddToClassList("dialog-primary");
-            buttons.Add(apply);
-            dialog.Add(buttons);
-            parkListDialog.Add(dialog);
-            root.Add(parkListDialog);
         }
 
         /// <summary>The button under the map settings button in the Map tab.</summary>
@@ -79,7 +71,7 @@ namespace OmsiMapEditor.UI
         {
             var button = new Button(OpenParkList) { text = Loc.T("parklist.open"), tooltip = Loc.T("parklist.open.tooltip") };
             button.AddToClassList("map-control-button");
-            button.style.marginTop = 4;
+            button.AddToClassList("form-button-top");
             return button;
         }
 
@@ -89,7 +81,7 @@ namespace OmsiMapEditor.UI
                 return;
             parkListNumber.SetValueWithoutNotify(0);
             ShowParkList(0);
-            parkListDialog.style.display = DisplayStyle.Flex;
+            parkListDialog.Show();
         }
 
         /// <summary>Fills the dialog with the cars of one list; a list that does not exist yet starts with no car ticked (list 0 with all).</summary>
@@ -146,7 +138,7 @@ namespace OmsiMapEditor.UI
                 SetStatusT("parklist.status.failed", ("reason", exception.Message));
                 return;
             }
-            HidePopup(parkListDialog);
+            parkListDialog.Hide();
             UpdateMapStateLabel();
             SetStatusT(changed ? "parklist.status.changed" : "parklist.status.unchanged", ("count", chosen.Count)); // i18n:keys
         }

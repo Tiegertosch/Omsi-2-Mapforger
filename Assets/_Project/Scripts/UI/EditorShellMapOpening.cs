@@ -40,10 +40,12 @@ namespace OmsiMapEditor.UI
             var session = string.IsNullOrEmpty(projectFilePath)
                 ? OmsiMapSession.OpenReadOnly(globalConfigPath)
                 : OmsiMapSession.OpenProject(globalConfigPath, projectFilePath);
+            var summary = session.Read();
+            session.WarmUpIdBoundary();
             return new MapReading
             {
                 Session = session,
-                Summary = session.Read(),
+                Summary = summary,
                 ChronoVariants = ReadChronoVariants(session.Source),
                 ImageryKey = globalConfigPath + "|" + projectFilePath
             };
@@ -56,10 +58,18 @@ namespace OmsiMapEditor.UI
         /// <param name="projectFilePath">The project whose workspace is used; null opens the map read-only.</param>
         private void OpenMapInBackground(string globalConfigPath, string projectName, string projectFilePath, string failure, Action opened)
         {
+            // Another map replaces the one the signals window works on: asked before the map is read, so Keep editing leaves everything as it is.
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => OpenMapInBackground(globalConfigPath, projectName, projectFilePath, failure, opened)))
+                return;
+            // Label lines typed in the open map are written before the new map is read (the same workspace may be opened again).
+            FlushLabelEdits();
             var generation = ++mapOpeningGeneration;
             var task = Task.Run(() => ReadMap(globalConfigPath, projectFilePath));
             mapOpening = task;
             welcomeScreen?.SetEnabled(false);
+            // The fields of the open map lock (CanEditObjects): text typed now would be lost when the new map shows.
+            RenderInspector();
+            UpdateToolbar();
             var name = string.IsNullOrWhiteSpace(projectName)
                 ? Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(globalConfigPath)))
                 : projectName;
@@ -72,13 +82,16 @@ namespace OmsiMapEditor.UI
             while (!task.IsCompleted)
                 yield return null;
             if (generation != mapOpeningGeneration)
-                yield break;
+                yield break; // a newer opening keeps the fields locked and draws them anew itself
             mapOpening = null;
             welcomeScreen?.SetEnabled(true);
             if (task.IsFaulted)
             {
                 var exception = task.Exception?.GetBaseException();
                 Debug.LogException(exception);
+                // The map that stays is editable again.
+                RenderInspector();
+                UpdateToolbar();
                 SetStatus(failure + exception?.Message);
                 yield break;
             }
@@ -90,6 +103,8 @@ namespace OmsiMapEditor.UI
             catch (Exception exception)
             {
                 Debug.LogException(exception);
+                RenderInspector();
+                UpdateToolbar();
                 SetStatus(failure + exception.Message);
             }
         }

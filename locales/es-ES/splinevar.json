@@ -25,6 +25,7 @@
   "splinevar.spline": "spline #{id}",
   "splinevar.status.delete_failed": "No se pudo eliminar spline #{id}: {reason}",
   "@splinevar.status.delete_failed": "{reason} is a message from the system, in English",
+  "splinevar.status.gone_in_map": "#{id}: ya no está en el mapa",
   "splinevar.step.delete": "la eliminación de spline #{id} en la variante",
   "splinevar.rest.rows": "{count, plural, one {# fila de objetos a lo largo va con él} other {# filas de objetos a lo largo van con él}}",
   "splinevar.rest.named": "todavía lleva el nombre de {names}",

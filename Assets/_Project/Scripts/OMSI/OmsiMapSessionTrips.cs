@@ -122,8 +122,26 @@ namespace OmsiMapEditor.OMSI
             var index = summary.Tiles.IndexOf(tile);
             if (index < 0)
                 return null;
-            var stop = OmsiTimetable.Read(Source).BusStops.Find(each => each.TileIndex == index && each.ObjectId == record.Id);
+            var stop = ReadTimetableCached().BusStops.Find(each => each.TileIndex == index && each.ObjectId == record.Id);
             return stop?.Name;
+        }
+
+        private OmsiTimetable timetableCache;
+        private int timetableCacheStamp = -1;
+
+        /// <summary>
+        /// The timetable files as they are now, read again only after a write through the workspace: the context menu of an object asks whether
+        /// it is a bus stop at every right-click, and parsing the timetable of a large map took about 100 ms each time. Read-only use.
+        /// </summary>
+        private OmsiTimetable ReadTimetableCached()
+        {
+            var stamp = Workspace != null ? Workspace.WriteCount : 0;
+            if (timetableCache == null || timetableCacheStamp != stamp)
+            {
+                timetableCache = OmsiTimetable.Read(Source);
+                timetableCacheStamp = stamp;
+            }
+            return timetableCache;
         }
 
         /// <summary>Gives the stop of an object its name in Busstops.cfg (making it a stop of the timetable if it is none); one undoable step, or null when nothing changes.</summary>
@@ -200,7 +218,7 @@ namespace OmsiMapEditor.OMSI
             foreach (var trip in trips)
             {
                 if (trip.Plan == null || !trip.Plan.IsValid)
-                    throw new InvalidOperationException("The trip " + trip.Name + " has problems: " + string.Join(" ", trip.Plan?.Problems ?? new List<string>()));
+                    throw new OmsiTripPlanException(trip.Name, trip.Plan?.Problems);
                 var tripPath = TimetablePath(trip.Name, ".ttp");
                 if (!names.Add(trip.Name) || workspace.FileExists(tripPath))
                     throw new InvalidOperationException("The map has a trip named " + trip.Name + " already.");

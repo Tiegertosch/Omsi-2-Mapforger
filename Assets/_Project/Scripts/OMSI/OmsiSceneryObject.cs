@@ -156,6 +156,24 @@ namespace OmsiMapEditor.OMSI
         /// <summary>[new_attachment] points in file order; [attachObj] names them by index.</summary>
         public List<OmsiAttachPoint> AttachPoints { get; } = new List<OmsiAttachPoint>();
 
+        /// <summary>
+        /// The special kind OMSI gives the object ([busstop], [carpark_p], [tree] …); the last such keyword wins, as in
+        /// Omsi.exe, which keeps one kind byte per object type. It decides the object's fixed label fields (<see cref="OmsiLabelSchema"/>).
+        /// </summary>
+        public OmsiSceneryObjectKind Kind { get; internal set; }
+
+        /// <summary>[stringvarnamelist]: the files naming the script's string variables, as written, relative to the .sco's folder.</summary>
+        public List<string> StringVariableLists { get; } = new List<string>();
+
+        /// <summary>
+        /// The first line of each [texttexture] and [texttexture_enh] in file order: a label index (0 = first label) or the
+        /// name of a script string variable whose text the texture shows.
+        /// </summary>
+        public List<string> TextTextureSources { get; } = new List<string>();
+
+        /// <summary>[passengercabin]: the file with the places of people waiting at the object, or null.</summary>
+        public string PassengerCabin { get; internal set; }
+
         public static OmsiSceneryObject Parse(byte[] bytes)
         {
             var file = OmsiRecordFile.Parse(bytes, null);
@@ -232,6 +250,7 @@ namespace OmsiMapEditor.OMSI
                             result.BoundingBox = box;
                         break;
                     case "tree":
+                        result.Kind = OmsiSceneryObjectKind.Tree;
                         if (values.Count >= 5 && TryNumbers(values.GetRange(1, 4), 4, out var tree))
                             result.Tree = new OmsiTreeShape
                             {
@@ -254,9 +273,38 @@ namespace OmsiMapEditor.OMSI
                         break;
                     case "trafficlight":
                         result.IsTrafficLight = true;
+                        result.Kind = OmsiSceneryObjectKind.TrafficLight;
                         break;
                     case "entrypoint":
                         result.IsEntryPoint = true;
+                        result.Kind = OmsiSceneryObjectKind.EntryPoint;
+                        break;
+                    case "busstop":
+                        result.Kind = OmsiSceneryObjectKind.BusStop;
+                        break;
+                    case "carpark_p":
+                        result.Kind = OmsiSceneryObjectKind.CarPark;
+                        break;
+                    case "signal":
+                        result.Kind = OmsiSceneryObjectKind.Signal;
+                        break;
+                    case "switch":
+                        result.Kind = OmsiSceneryObjectKind.Switch;
+                        break;
+                    case "helparrow":
+                        result.Kind = OmsiSceneryObjectKind.HelpArrow;
+                        break;
+                    case "passengercabin":
+                        if (values.Count > 0 && values[0].Length > 0)
+                            result.PassengerCabin = values[0];
+                        break;
+                    case "stringvarnamelist":
+                        ReadCountedList(values, result.StringVariableLists);
+                        break;
+                    case "texttexture":
+                    case "texttexture_enh":
+                        if (values.Count > 0)
+                            result.TextTextureSources.Add(values[0]);
                         break;
                     case "splinehelper":
                         if (values.Count >= 5 && TryNumbers(values.GetRange(1, 4), 4, out var helper))
@@ -285,6 +333,16 @@ namespace OmsiMapEditor.OMSI
                 point.Steps.Add(new OmsiAttachStep { Kind = kind, X = numbers[0], Y = count == 3 ? numbers[1] : 0, Z = count == 3 ? numbers[2] : 0 });
                 index += count;
             }
+        }
+
+        /// <summary>A count followed by that many file names; names missing at the end are left out.</summary>
+        private static void ReadCountedList(List<string> values, List<string> into)
+        {
+            if (values.Count == 0 || !int.TryParse(values[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) || count <= 0)
+                return;
+            for (var index = 1; index <= count && index < values.Count; index++)
+                if (values[index].Length > 0)
+                    into.Add(values[index]);
         }
 
         private static bool TryNumbers(List<string> values, int count, out double[] numbers)

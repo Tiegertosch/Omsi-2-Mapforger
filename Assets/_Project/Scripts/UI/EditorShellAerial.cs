@@ -58,7 +58,7 @@ namespace OmsiMapEditor.UI
         // Tiles added while "New tiles get pictures by themselves" is ticked, by position, waiting for the load running now.
         private readonly List<KeyValuePair<int, int>> autoTiles = new List<KeyValuePair<int, int>>();
 
-        private void InitializeSatellite(VisualElement root, VisualElement viewMenu)
+        private void InitializeSatellite(VisualElement root, VisualElement toolsMenu)
         {
             ReadImageryPreferences();
             tileFetcher.Keys = name => imageryPreferences.Key(name);
@@ -78,6 +78,12 @@ namespace OmsiMapEditor.UI
             satelliteWindow = new SatelliteWindow();
             satelliteWindow.style.display = DisplayStyle.None;
             workspaceElement?.Add(satelliteWindow);
+            // Not modal: the window floats beside the map while the map is edited.
+            RegisterOverlay(satelliteWindow, false, () =>
+            {
+                EndPlacementPick();
+                UpdatePlacementMarks();
+            });
             satelliteWindow.Closed += () =>
             {
                 HidePopup(satelliteWindow);
@@ -239,12 +245,13 @@ namespace OmsiMapEditor.UI
             imageryAttribution.AddToClassList("imagery-attribution");
             imageryAttribution.style.display = DisplayStyle.None;
             workspaceElement?.Add(imageryAttribution);
+            ApplyBottomBarHeight(bottomBarHeight);
 
             var menuItem = root.Q<Button>("satellite-menu-item");
             if (menuItem != null)
                 menuItem.clicked += () =>
                 {
-                    HidePopup(viewMenu);
+                    HidePopup(toolsMenu);
                     OpenSatelliteWindow();
                 };
         }
@@ -789,8 +796,7 @@ namespace OmsiMapEditor.UI
             var show = new Toggle { value = factor > 0f };
             LocBindings.Text(show, "aerial.tile.show");
             LocBindings.Tooltip(show, "aerial.tile.show.tooltip");
-            show.AddToClassList("picker-option-toggle");
-            show.AddToClassList("panel-toggle");
+            OptionControls.AsCheck(show);
             row.Add(show);
             var slider = new Slider(0f, 1f) { value = factor > 0f ? factor : 1f };
             LocBindings.Tooltip(slider, "aerial.tile.opacity.tooltip");

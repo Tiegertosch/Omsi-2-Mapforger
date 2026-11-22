@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The choice of folders (ADR 084): File, "Object and spline folders..." and the folder button of the object menu and the
+    /// The choice of folders (ADR 084): Settings, Content, "Object and spline folders..." and the folder button of the object menu and the
     /// road menu open a dialog with a tick box for each folder right below Sceneryobjects and Splines of the map's OMSI
     /// installation. Folders left out are not read when the installation is listed, so the menus leave them out. The choice is
     /// kept on this computer for each installation (<see cref="OmsiContentFolders"/>).
@@ -17,7 +17,8 @@ namespace OmsiMapEditor.UI
     public sealed partial class EditorShellBootstrap
     {
         private OmsiContentFolders contentFolders;
-        private VisualElement contentFoldersDialog;
+        private ModalDialog contentFoldersDialog;
+        private Button contentFoldersButton;
         private Label contentFoldersInstallation;
         private ScrollView contentFoldersList;
         private string contentFoldersRoot;
@@ -29,29 +30,36 @@ namespace OmsiMapEditor.UI
 
         private void SetUpContentFolders(VisualElement root)
         {
-            var menuItem = root.Q<Button>("content-folders-menu-item");
-            var fileMenu = root.Q<VisualElement>("file-menu");
-            if (menuItem != null)
-                menuItem.clicked += () =>
+            contentFoldersButton = root.Q<Button>("content-folders-button");
+            if (contentFoldersButton != null)
+                contentFoldersButton.clicked += () =>
                 {
-                    HidePopup(fileMenu);
+                    if (currentSummary == null)
+                        return;
+                    // The settings window gives way to the choice (and keeps the focus out of the hidden button); Esc then closes the choice.
+                    contentFoldersButton.Blur();
+                    settingsDialog.Hide();
                     OpenContentFolders();
                 };
-            LocBindings.Text(menuItem, "menu.file.content_folders");
-            LocBindings.Tooltip(menuItem, "menu.file.content_folders.tooltip");
+            LocBindings.Text(contentFoldersButton, "menu.file.content_folders");
+            LocBindings.Tooltip(contentFoldersButton, "menu.file.content_folders.tooltip");
 
-            contentFoldersDialog = new VisualElement { name = "content-folders-dialog" };
-            contentFoldersDialog.AddToClassList("dialog-overlay");
-            contentFoldersDialog.style.display = DisplayStyle.None;
-            var dialog = new VisualElement();
-            dialog.AddToClassList("dialog");
-            dialog.AddToClassList("content-folders");
-            var title = LocBindings.NewLabel("contentfolders.title");
-            title.AddToClassList("popup-title");
-            dialog.Add(title);
-            var description = LocBindings.NewLabel("contentfolders.description");
-            description.AddToClassList("popup-description");
-            dialog.Add(description);
+            contentFoldersDialog = NewDialog(new DialogOptions
+            {
+                Name = "content-folders-dialog",
+                TitleKey = "contentfolders.title",
+                DescriptionKey = "contentfolders.description",
+                Width = DialogWidth.Standard,
+                BodyScrolls = false,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "contentfolders.cancel", Role = DialogButtonRole.Cancel },
+                    new DialogButton { TextKey = "contentfolders.apply", Role = DialogButtonRole.Primary, Clicked = ApplyContentFolders, Closes = false }
+                }
+            });
+            // The list scrolls by itself and shrinks with the window; the body holds the installation line, the list and the note.
+            contentFoldersDialog.Body.AddToClassList("dialog-body-fill");
+            var dialog = contentFoldersDialog.Body;
             contentFoldersInstallation = new Label();
             contentFoldersInstallation.AddToClassList("popup-description");
             contentFoldersInstallation.AddToClassList("content-folders-installation");
@@ -63,18 +71,6 @@ namespace OmsiMapEditor.UI
             own.AddToClassList("popup-description");
             own.AddToClassList("content-folders-note");
             dialog.Add(own);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("contentfolders.cancel", () => HidePopup(contentFoldersDialog));
-            cancel.AddToClassList("map-control-button");
-            buttons.Add(cancel);
-            var apply = LocBindings.NewButton("contentfolders.apply", ApplyContentFolders);
-            apply.AddToClassList("map-control-button");
-            apply.AddToClassList("dialog-primary");
-            buttons.Add(apply);
-            dialog.Add(buttons);
-            contentFoldersDialog.Add(dialog);
-            root.Add(contentFoldersDialog);
         }
 
         /// <summary>
@@ -121,7 +117,7 @@ namespace OmsiMapEditor.UI
             return contentFolders.ExcludedFor(installationRoot);
         }
 
-        /// <summary>Shows on the folder buttons of the object and road menus how many folders the listing left out.</summary>
+        /// <summary>Tells the object and road menus how many folders the listing left out; their empty notes say so.</summary>
         private void ShowFoldersLeftOut(OmsiInstallationCatalog catalog)
         {
             var objects = 0;
@@ -132,8 +128,10 @@ namespace OmsiMapEditor.UI
                         splines++;
                     else
                         objects++;
-            objectsPanel?.SetFoldersLeftOut(objects);
-            roadPanel?.SetFoldersLeftOut(splines);
+            if (objectsPanel != null)
+                objectsPanel.FoldersLeftOut = objects;
+            if (roadPanel != null)
+                roadPanel.FoldersLeftOut = splines;
         }
 
         /// <summary>Lists the folders of the map's installation with a tick for each that is read.</summary>
@@ -163,7 +161,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             contentFoldersList.scrollOffset = Vector2.zero;
-            contentFoldersDialog.style.display = DisplayStyle.Flex;
+            contentFoldersDialog.Show();
         }
 
         private void AddFolderSection(string top, string headingKey, HashSet<string> excluded)
@@ -238,7 +236,7 @@ namespace OmsiMapEditor.UI
             var wasCommandLine = commandLineExcludedFolders != null;
             commandLineExcludedFolders = null;
             var after = ExcludedContentFolders(installationRoot);
-            HidePopup(contentFoldersDialog);
+            contentFoldersDialog.Hide();
             if (after.SetEquals(before) && !wasCommandLine)
             {
                 SetStatusT("contentfolders.status.unchanged");

@@ -116,11 +116,11 @@ namespace OmsiMapEditor.UI
 
         /// <summary>
         /// A group with a title that folds and unfolds. How it was left is remembered by its id, also between runs; <paramref name="defaultOpen"/>
-        /// is only how it starts. A group the fill left empty is not shown at all.
+        /// is only how it starts. A group the fill left empty is not shown at all, unless <paramref name="addToHeader"/> added buttons to its header.
         /// </summary>
-        private VisualElement AddInspectorGroup(VisualElement parent, string id, string title, bool defaultOpen, Action<VisualElement> fill)
+        private VisualElement AddInspectorGroup(VisualElement parent, string id, string title, bool defaultOpen, Action<VisualElement> fill, Action<VisualElement> addToHeader = null)
         {
-            var root = new VisualElement();
+            var root = new VisualElement { name = "group-" + id };
             root.AddToClassList("inspector-group");
             var header = new VisualElement();
             header.AddToClassList("inspector-group-header");
@@ -130,6 +130,10 @@ namespace OmsiMapEditor.UI
             var label = new Label(title);
             label.AddToClassList("inspector-group-title");
             header.Add(label);
+            // Icon buttons at the right of the title; a group with one is shown although its body stays empty.
+            var headerChildren = header.childCount;
+            addToHeader?.Invoke(header);
+            var hasHeaderTools = header.childCount > headerChildren;
             root.Add(header);
             var body = new VisualElement();
             body.AddToClassList("inspector-group-body");
@@ -141,16 +145,16 @@ namespace OmsiMapEditor.UI
                 chevron.SetIcon(open ? "chevron-down" : "chevron-right");
             }
 
-            Show(!IsFolded(id, defaultOpen));
+            Show(InspectorGroupStartsOpen(id, defaultOpen));
             header.userData = (Action<bool>)Show;
             header.RegisterCallback<ClickEvent>(_ =>
             {
                 var open = body.resolvedStyle.display == DisplayStyle.None;
                 Show(open);
-                RememberFold(id, open);
+                RememberInspectorGroup(id, open);
             });
             fill(body);
-            if (body.childCount > 0)
+            if (body.childCount > 0 || hasHeaderTools)
                 parent.Add(root);
             return body;
         }

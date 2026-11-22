@@ -171,15 +171,28 @@ namespace OmsiMapEditor.OMSI
 
         private static List<OmsiReference> TimetableReferences(IOmsiFileSource source, string relative)
         {
-            var references = new List<OmsiReference>();
+            return IsTimetableFile(relative) ? TimetableReferences(relative, source.ReadAllBytes(relative)) : new List<OmsiReference>();
+        }
+
+        private static bool IsTimetableFile(string relative)
+        {
             var name = Path.GetFileName(relative);
             var extension = Path.GetExtension(relative).ToLowerInvariant();
+            return string.Equals(name, "Busstops.cfg", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "StnLinks.cfg", StringComparison.OrdinalIgnoreCase) ||
+                   extension == ".ttr" || extension == ".ttp";
+        }
+
+        /// <summary>The references a timetable file's content makes, as the index would list them; for checking content before it is written.</summary>
+        internal static List<OmsiReference> TimetableReferences(string relative, byte[] bytes)
+        {
+            var references = new List<OmsiReference>();
+            var name = Path.GetFileName(relative);
             var isBusStops = string.Equals(name, "Busstops.cfg", StringComparison.OrdinalIgnoreCase);
             var isStationLinks = string.Equals(name, "StnLinks.cfg", StringComparison.OrdinalIgnoreCase);
-            if (!isBusStops && !isStationLinks && extension != ".ttr" && extension != ".ttp")
+            if (bytes == null || !IsTimetableFile(relative))
                 return references;
 
-            var file = OmsiRecordFile.Parse(source.ReadAllBytes(relative), null);
+            var file = OmsiRecordFile.Parse(bytes, null);
             foreach (var record in file.Records)
             {
                 var values = record.AllValues();

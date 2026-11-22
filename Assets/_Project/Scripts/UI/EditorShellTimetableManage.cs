@@ -21,6 +21,28 @@ namespace OmsiMapEditor.UI
         private string manageTrip;
         private string manageTripName = string.Empty;
 
+        /// <summary>After an object step that wrote timetable files (deleting an unused bus stop takes its entries along): the routes are read again.</summary>
+        private bool RefreshRoutesIfTimetableChanged(OmsiObjectChange change)
+        {
+            if (change == null || !change.ChangesTimetable)
+                return false;
+            StartRoutesBuild(currentSummary);
+            RefreshVehiclesIfOpen();
+            return true;
+        }
+
+        /// <summary>Set while undo or redo applies a step whose parts wrote timetable files; the routes are read once at its end.</summary>
+        private bool timetableStepPending;
+
+        private void RefreshRoutesAfterTimetableStep()
+        {
+            if (!timetableStepPending)
+                return;
+            timetableStepPending = false;
+            StartRoutesBuild(currentSummary);
+            RefreshVehiclesIfOpen();
+        }
+
         private void AddManageRows()
         {
             var fold = new Foldout { text = Loc.T("timetable.manage"), value = timetableManageOpen };
@@ -29,17 +51,16 @@ namespace OmsiMapEditor.UI
                 if (change.target == fold)
                     timetableManageOpen = change.newValue;
             });
-            fold.style.marginBottom = 6;
+            fold.AddToClassList("form-button-bottom");
             if (timetableLine != null)
             {
                 var line = timetableLine;
                 var name = new TextField { value = manageLineName.Length > 0 ? manageLineName : line, isDelayed = false };
                 name.AddToClassList("picker-field");
-                name.style.width = StyleKeyword.Auto;
+                name.AddToClassList("form-field-grow");
                 name.RegisterValueChangedCallback(change => manageLineName = change.newValue);
                 var row = new VisualElement();
-                row.style.flexDirection = FlexDirection.Row;
-                name.style.flexGrow = 1;
+                row.AddToClassList("form-inline-row");
                 row.Add(name);
                 row.Add(SmallButton("timetable.manage.rename", "timetable.manage.rename.tooltip", () =>
                 {
@@ -47,7 +68,7 @@ namespace OmsiMapEditor.UI
                     ManageTimetable(() => session.RenameLine(line, target), target, "timetable.status.line_renamed", ("old", line), ("name", target));
                 }));
                 row.Add(SmallButton("timetable.manage.delete", "timetable.manage.delete.line.tooltip", () =>
-                    ManageTimetable(() => session.DeleteLine(line), null, "timetable.status.line_deleted", ("name", line))));
+                    ManageTimetable(() => session.DeleteLine(line), null, "timetable.status.line_deleted", change => LineDeletedArguments(line, change))));
                 AddManageRow(fold, "timetable.manage.line", row);
             }
             if (timetableTripNames.Count > 0)
@@ -69,11 +90,10 @@ namespace OmsiMapEditor.UI
                 var trip = manageTrip;
                 var tripName = new TextField { value = manageTripName, isDelayed = false };
                 tripName.AddToClassList("picker-field");
-                tripName.style.width = StyleKeyword.Auto;
-                tripName.style.flexGrow = 1;
+                tripName.AddToClassList("form-field-grow");
                 tripName.RegisterValueChangedCallback(change => manageTripName = change.newValue);
                 var tripRow = new VisualElement();
-                tripRow.style.flexDirection = FlexDirection.Row;
+                tripRow.AddToClassList("form-inline-row");
                 tripRow.Add(tripName);
                 tripRow.Add(SmallButton("timetable.manage.rename", "timetable.manage.rename.trip.tooltip", () =>
                 {
@@ -90,7 +110,7 @@ namespace OmsiMapEditor.UI
                     CloseTimetable();
                     BeginEditTripStops(trip);
                 });
-                stopsButton.style.marginLeft = 0;
+                stopsButton.AddToClassList("form-button-flush");
                 AddManageRow(fold, "timetable.manage.stops", stopsButton);
             }
             timetableBody.Add(fold);
@@ -125,22 +145,18 @@ namespace OmsiMapEditor.UI
                 });
                 var hint = new Label(Loc.T("timetable.stoptimes.hint"));
                 hint.AddToClassList("panel-info");
-                hint.style.whiteSpace = WhiteSpace.Normal;
                 fold.Add(hint);
                 var settings = tripFile.GetStopSettings(profile);
                 var header = new VisualElement();
-                header.style.flexDirection = FlexDirection.Row;
+                header.AddToClassList("form-header-row");
                 var spacer = new VisualElement();
-                spacer.style.flexGrow = 1;
-                spacer.style.flexBasis = 0;
-                spacer.style.flexShrink = 1;
+                spacer.AddToClassList("form-cell-flex");
                 header.Add(spacer);
                 foreach (var labelKey in new[] { "timetable.stoptimes.arrival", "timetable.stoptimes.departure", "timetable.stoptimes.stopping" })
                 {
                     var label = LocBindings.NewLabel(labelKey); // i18n:keys
                     label.AddToClassList("popup-description");
-                    label.style.width = 84;
-                    label.style.marginLeft = 4;
+                    label.AddToClassList("form-stop-col");
                     header.Add(label);
                 }
                 fold.Add(header);
@@ -152,23 +168,17 @@ namespace OmsiMapEditor.UI
                 {
                     var stop = stopIndex;
                     var row = new VisualElement();
-                    row.style.flexDirection = FlexDirection.Row;
-                    row.style.alignItems = Align.Center;
-                    row.style.marginBottom = 2;
+                    row.AddToClassList("form-trip-row");
                     var name = timetableStopNames.TryGetValue(ids[stop], out var known) ? known : ids[stop].ToString(CultureInfo.InvariantCulture);
                     var label = new Label(Loc.T("timetable.stoptimes.stop", ("number", stop + 1), ("name", name)));
                     label.AddToClassList("popup-description");
-                    label.style.flexGrow = 1;
-                    label.style.flexBasis = 0;
-                    label.style.flexShrink = 1;
-                    label.style.minWidth = 0;
+                    label.AddToClassList("form-cell-flex");
                     row.Add(label);
                     row.Add(StopTimeField(settings.Arrivals, stop, minutes => tripFile.SetArrival(profile, stop, minutes), tripName));
                     row.Add(StopTimeField(settings.Departures, stop, minutes => tripFile.SetDeparture(profile, stop, minutes), tripName));
                     var kind = new DropdownField(kinds, settings.Stopping.TryGetValue(stop, out var current) ? Mathf.Clamp(current, 0, 4) : 0);
                     kind.AddToClassList("new-map-dropdown");
-                    kind.style.width = 84;
-                    kind.style.marginLeft = 4;
+                    kind.AddToClassList("form-stop-col");
                     kind.RegisterValueChangedCallback(change =>
                     {
                         var chosen = kinds.IndexOf(change.newValue);
@@ -187,8 +197,7 @@ namespace OmsiMapEditor.UI
         {
             var field = new TextField { value = values.TryGetValue(stop, out var minutes) ? minutes.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty, isDelayed = true };
             field.AddToClassList("picker-field");
-            field.style.width = 84;
-            field.style.marginLeft = 4;
+            field.AddToClassList("form-stop-col");
             field.RegisterValueChangedCallback(change =>
             {
                 var text = change.newValue.Trim().Replace(',', '.');
@@ -206,16 +215,19 @@ namespace OmsiMapEditor.UI
 
         private static void AddManageRow(VisualElement parent, string labelKey, VisualElement control)
         {
+            AddFormRow(parent, labelKey, control);
+        }
+
+        /// <summary>A label and its control in one row, in the timetable body and in the fold of the manage rows.</summary>
+        internal static void AddFormRow(VisualElement parent, string labelKey, VisualElement control)
+        {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 3;
+            row.AddToClassList("form-trip-row");
             var label = LocBindings.NewLabel(labelKey); // i18n:keys
             label.AddToClassList("popup-description");
-            label.style.width = 120;
-            label.style.flexShrink = 0;
+            label.AddToClassList("form-row-label");
             row.Add(label);
-            control.style.flexGrow = 1;
+            control.AddToClassList("form-row-grow");
             row.Add(control);
             parent.Add(row);
         }
@@ -243,7 +255,32 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>Most file names the status names after a line deletion; the log has them all.</summary>
+        private const int LineDeletedShownFiles = 5;
+
+        /// <summary>The status arguments of a line deletion: how many trips and tracks went with it and the first of their file names.</summary>
+        private static (string Name, object Value)[] LineDeletedArguments(string line, OmsiTerrainChange change)
+        {
+            var summary = new OmsiLineDeletedSummary(change.RemovedFiles);
+            var files = string.Empty;
+            if (summary.FileNames.Count > 0)
+            {
+                Debug.Log("Timetable: deleting line " + line + " took " + string.Join(", ", summary.FileNames));
+                var list = string.Join(", ", summary.FirstFileNames(LineDeletedShownFiles));
+                if (summary.MoreFileCount(LineDeletedShownFiles) > 0)
+                    list = Loc.T("timetable.status.files_more", ("list", list), ("count", summary.MoreFileCount(LineDeletedShownFiles)));
+                files = Loc.T("timetable.status.line_deleted.files", ("list", list));
+            }
+            return new (string Name, object Value)[] { ("name", line), ("trips", summary.TripCount), ("tracks", summary.TrackCount), ("files", files) };
+        }
+
         private void ManageTimetable(Func<OmsiTerrainChange> operation, string showLine, string statusKey, params (string Name, object Value)[] arguments)
+        {
+            ManageTimetable(operation, showLine, statusKey, change => arguments);
+        }
+
+        /// <summary>As above, with status arguments taken from the change, such as the files it removed.</summary>
+        private void ManageTimetable(Func<OmsiTerrainChange> operation, string showLine, string statusKey, Func<OmsiTerrainChange, (string Name, object Value)[]> argumentsOf)
         {
             if (session == null || !session.CanEdit || !FlushTimetableEdits())
                 return;
@@ -264,7 +301,7 @@ namespace OmsiMapEditor.UI
                 PushHistory(new ObjectEditStep { TerrainChange = change, Description = Loc.T("timetable.manage.step") });
                 if (currentSummary != null)
                     StartRoutesBuild(currentSummary);
-                SetStatusT(statusKey, arguments); // i18n:keys
+                SetStatusT(statusKey, argumentsOf(change)); // i18n:keys
                 Debug.Log("Timetable: " + statusLabel?.text);
             }
             manageLineName = string.Empty;
@@ -272,7 +309,7 @@ namespace OmsiMapEditor.UI
             OpenTimetable(showLine);
         }
 
-        /// <summary>The "Remove from timetable" button of the bus stop group in the inspector.</summary>
+        /// <summary>The "Remove from stop list" button of the bus stop group in the inspector.</summary>
         private void RemoveBusStopFromInspector(OmsiTileSummary tile, OmsiObjectRecord record)
         {
             if (!CanEdit || session == null)

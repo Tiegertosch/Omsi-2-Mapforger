@@ -9,8 +9,8 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The menu of the markings tool (ADR 044), laid out like the road menu (ADR 029): on the left "Options" with the
-    /// junction, "Auto markings" and the settings of the selected line, area or arrow, or of the next one; on the right a
+    /// The menu of the markings tool (ADR 044), laid out like the road menu (ADR 029) and built from OptionControls (ADR 098, M4): on the
+    /// left the junction with "Auto markings" and the settings of the selected line, area or arrow, or of the next one; on the right a
     /// library of all markings in tabs, each drawn as it is laid, with favourites kept per user. One marking is chosen at a
     /// time and says what clicks on the junction make. The shell picks the anchors, draws the markings and makes the
     /// junction again; the menu only holds the settings.
@@ -82,23 +82,22 @@ namespace OmsiMapEditor.UI
         private readonly List<Item> items = new List<Item>();
         private readonly HashSet<string> favorites = new HashSet<string>();
 
-        private readonly Label optionsTitle;
-        private readonly Label junctionLabel;
+        private readonly Label junctionRowLabel;
         private readonly Label contextTitle;
         private readonly VisualElement scopeRow;
         private readonly Button wholeLineButton;
         private readonly Button pieceButton;
-        private readonly Button hideButton;
+        private readonly Toggle hideSwitch;
         private readonly VisualElement curvatureRow;
         private readonly TextField curvatureField;
         private readonly VisualElement angleRow;
         private readonly TextField angleField;
         private readonly VisualElement distanceRow;
         private readonly TextField distanceField;
+        private readonly VisualElement deleteRow;
         private readonly Button deleteButton;
 
-        private readonly Label choiceLabel;
-        private readonly Label planLabel;
+        private readonly ToolCatalog catalog;
         private readonly Dictionary<Button, Tab> tabButtons = new Dictionary<Button, Tab>();
         private readonly ScrollView tiles;
         private readonly Label emptyLabel;
@@ -109,6 +108,11 @@ namespace OmsiMapEditor.UI
         // What is selected on the junction: nothing, a line (and a piece of it), an area or an arrow.
         private Kind? selected;
         private bool pieceSelected;
+
+        // What the junction row says about the junction and the last plan; the status hint shows the junction's line while there is no plan.
+        private string junctionText = string.Empty;
+        private string planText = string.Empty;
+        private bool planProblem;
 
         public MarkingToolOptions()
         {
@@ -123,110 +127,56 @@ namespace OmsiMapEditor.UI
                 items.Add(new Item { Kind = Kind.Arrow, Arrow = info.Kind });
             LoadFavorites();
 
-            // The options on the left.
-            var options = new VisualElement();
-            options.AddToClassList("tool-panel");
-            options.AddToClassList("picker-options");
-            optionsTitle = LocBindings.NewLabel("markings.options");
-            optionsTitle.AddToClassList("picker-options-title");
-            options.Add(optionsTitle);
-            junctionLabel = new Label(Loc.T("markings.click_junction"));
-            junctionLabel.AddToClassList("panel-info");
-            junctionLabel.style.marginTop = 0f;
-            options.Add(junctionLabel);
-            var auto = LocBindings.WithTooltip(LocBindings.NewButton("markings.auto", () => AutoRequested?.Invoke()), "markings.auto.tooltip");
-            auto.AddToClassList("map-control-button");
-            options.Add(auto);
+            // The options on the left, as rows of OptionControls (ADR 098, M4). What the column used to say as text goes to the hint of the
+            // status bar (the plan, and the junction's line while there is none) and to tooltips.
+            var options = ToolCatalog.Options(scrolling: true, icons: true);
+            var junctionRow = OptionControls.Row(options, "markings.row.junction");
+            junctionRowLabel = junctionRow.Q<Label>();
+            OptionControls.Choice(OptionControls.Group(junctionRow), "wand-sparkles", "markings.auto", "markings.auto.tooltip", () => AutoRequested?.Invoke());
 
             contextTitle = new Label();
-            contextTitle.AddToClassList("picker-options-title");
-            contextTitle.style.marginTop = 10f;
+            contextTitle.AddToClassList("option-heading");
+            // The keys that work on the marking are the tooltip of the heading.
+            LocBindings.Tooltip(contextTitle, "markings.keys");
             options.Add(contextTitle);
 
-            var scope = new VisualElement();
-            scope.AddToClassList("panel-tabs");
-            scope.AddToClassList("picker-segmented");
-            wholeLineButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.whole_line", () => SetPieceScope(false)), "markings.whole_line.tooltip");
-            pieceButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.this_piece", () => SetPieceScope(true)), "markings.this_piece.tooltip");
-            foreach (var button in new[] { wholeLineButton, pieceButton })
+            scopeRow = OptionControls.Row(options, "markings.apply_to");
+            var scope = OptionControls.Group(scopeRow);
+            wholeLineButton = OptionControls.Choice(scope, "minus", "markings.whole_line", "markings.whole_line.tooltip", () => SetPieceScope(false));
+            pieceButton = OptionControls.Choice(scope, "scissors", "markings.this_piece", "markings.this_piece.tooltip", () => SetPieceScope(true));
+            // The state is the piece's: the shell flips it and shows the line again, which sets the switch.
+            hideSwitch = OptionControls.Switch(scopeRow, "eye-off", "markings.piece.hide", "markings.piece.tooltip", false);
+            hideSwitch.RegisterValueChangedCallback(evt =>
             {
-                button.AddToClassList("panel-tab");
-                scope.Add(button);
-            }
-            scopeRow = Row(options, "markings.apply_to");
-            scopeRow.Add(scope);
+                hideSwitch.SetValueWithoutNotify(evt.previousValue);
+                PieceVisibilityToggled?.Invoke();
+            });
 
-            hideButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.piece.hide", () => PieceVisibilityToggled?.Invoke()), "markings.piece.tooltip");
-            hideButton.AddToClassList("map-control-button");
-            options.Add(hideButton);
+            curvatureRow = OptionControls.Row(options, "markings.curvature");
+            curvatureField = Field(OptionControls.Value(curvatureRow, "spline", string.Empty, "%", "markings.curvature", "markings.curvature.tooltip"), () => CurvatureCommitted?.Invoke());
+            angleRow = OptionControls.Row(options, "markings.angle");
+            angleField = Field(OptionControls.Value(angleRow, "triangle-right", OmsiMarkingArea.DefaultAngle.ToString(CultureInfo.InvariantCulture), "°", "markings.angle", "markings.angle.tooltip"),
+                () => AngleCommitted?.Invoke());
+            distanceRow = OptionControls.Row(options, "markings.distance");
+            distanceField = Field(OptionControls.Value(distanceRow, "ruler", OmsiMarkingArrow.DefaultDistance.ToString(CultureInfo.InvariantCulture), "m", "markings.distance", "markings.distance.tooltip"),
+                () => DistanceCommitted?.Invoke());
 
-            curvatureRow = Row(options, "markings.curvature");
-            curvatureField = Field(curvatureRow, string.Empty, "markings.curvature.tooltip", () => CurvatureCommitted?.Invoke());
-            angleRow = Row(options, "markings.angle");
-            angleField = Field(angleRow, OmsiMarkingArea.DefaultAngle.ToString(CultureInfo.InvariantCulture), "markings.angle.tooltip", () => AngleCommitted?.Invoke());
-            distanceRow = Row(options, "markings.distance");
-            distanceField = Field(distanceRow, OmsiMarkingArrow.DefaultDistance.ToString(CultureInfo.InvariantCulture), "markings.distance.tooltip", () => DistanceCommitted?.Invoke());
-
-            deleteButton = LocBindings.WithTooltip(LocBindings.NewButton("markings.delete.line", () => DeleteRequested?.Invoke()), "markings.delete.tooltip");
-            deleteButton.AddToClassList("map-control-button");
-            deleteButton.AddToClassList("inspector-edit-delete");
-            options.Add(deleteButton);
-
-            var hint = LocBindings.NewLabel("markings.keys");
-            hint.AddToClassList("panel-info");
-            options.Add(hint);
+            deleteRow = OptionControls.Row(options, "markings.delete");
+            deleteButton = OptionControls.Choice(OptionControls.Group(deleteRow), "trash-2", "markings.delete.line", "markings.delete.tooltip", () => DeleteRequested?.Invoke());
+            deleteButton.AddToClassList("option-icon-danger");
+            // Its name says what goes (line, area or arrow), so ShowContext binds the tooltip.
             Add(options);
 
             // The library beside them.
-            var picker = new VisualElement();
-            picker.AddToClassList("tool-panel");
-            picker.AddToClassList("picker-panel");
-            // Lower and narrower than the road library, so the junction above stays in view.
-            picker.style.width = picker.style.minWidth = picker.style.maxWidth = 560f;
-            picker.style.height = 300f;
-            var header = new VisualElement();
-            header.AddToClassList("tool-panel-header");
-            header.AddToClassList("picker-header");
-            var badge = new VisualElement();
-            badge.AddToClassList("tool-panel-badge");
-            badge.Add(new IconElement("brush"));
-            header.Add(badge);
-            var titles = new VisualElement();
-            titles.AddToClassList("tool-panel-titles");
-            choiceLabel = new Label();
-            choiceLabel.AddToClassList("tool-panel-title");
-            choiceLabel.AddToClassList("picker-title");
-            titles.Add(choiceLabel);
-            planLabel = new Label();
-            planLabel.AddToClassList("tool-panel-subtitle");
-            planLabel.AddToClassList("picker-subtitle");
-            titles.Add(planLabel);
-            header.Add(titles);
-            var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "markings.close.tooltip");
-            close.AddToClassList("panel-icon-button");
-            close.Add(new IconElement("x"));
-            header.Add(close);
-            picker.Add(header);
-
-            var tabRow = new VisualElement();
-            tabRow.AddToClassList("panel-tabs");
-            tabRow.AddToClassList("picker-tabs");
-            AddTab(tabRow, Tab.Lines, "markings.tab.lines", "markings.tab.lines.tooltip");
-            AddTab(tabRow, Tab.Areas, "markings.tab.areas", "markings.tab.areas.tooltip");
-            AddTab(tabRow, Tab.Arrows, "markings.tab.arrows", "markings.tab.arrows.tooltip");
-            AddTab(tabRow, Tab.Favorites, "markings.tab.favorites", "markings.tab.favorites.tooltip");
-            picker.Add(tabRow);
-
-            tiles = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
-            tiles.AddToClassList("picker-tiles");
-            tiles.contentContainer.AddToClassList("picker-tiles-content");
-            picker.Add(tiles);
-            emptyLabel = LocBindings.NewLabel("markings.favorites_empty");
-            emptyLabel.AddToClassList("panel-info");
-            emptyLabel.AddToClassList("picker-empty");
-            emptyLabel.style.top = 110f;
-            picker.Add(emptyLabel);
-            Add(picker);
+            catalog = new ToolCatalog("markings.close.tooltip", () => CloseRequested?.Invoke());
+            AddTab(Tab.Lines, "equal", "markings.tab.lines", "markings.tab.lines.tooltip");
+            AddTab(Tab.Areas, "square-dashed", "markings.tab.areas", "markings.tab.areas.tooltip");
+            AddTab(Tab.Arrows, "arrow-up", "markings.tab.arrows", "markings.tab.arrows.tooltip");
+            AddTab(Tab.Favorites, "star", "markings.tab.favorites", "markings.tab.favorites.tooltip");
+            tiles = catalog.Tiles;
+            emptyLabel = catalog.Empty;
+            LocBindings.Text(emptyLabel, "markings.favorites_empty");
+            Add(catalog.Panel);
 
             SetPieceScope(false);
             ShowChoice(choice);
@@ -256,6 +206,13 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The menu wants to close the markings tool.</summary>
         public event Action CloseRequested;
+
+        /// <summary>What the next click does with the chosen marking; the shell shows it in the status bar.</summary>
+        public event Action<string, bool> HintChanged
+        {
+            add => catalog.HintChanged += value;
+            remove => catalog.HintChanged -= value;
+        }
 
         /// <summary>The style of the next line, or the last one chosen while an area or arrow is.</summary>
         public OmsiMarkingStyle Style { get; private set; } = OmsiMarkingStyle.LaneLine;
@@ -349,8 +306,8 @@ namespace OmsiMapEditor.UI
         {
             selected = line != null ? Kind.Line : (Kind?)null;
             pieceSelected = piece != null;
-            hideButton.SetEnabled(piece != null);
-            LocBindings.Text(hideButton, piece != null && piece.Hidden ? "markings.piece.show" : "markings.piece.hide"); // i18n:keys
+            hideSwitch.SetEnabled(piece != null);
+            hideSwitch.SetValueWithoutNotify(piece != null && piece.Hidden);
             pieceButton.SetEnabled(piece != null);
             if (line != null)
             {
@@ -385,17 +342,25 @@ namespace OmsiMapEditor.UI
             ShowChoice(choice);
         }
 
+        /// <summary>The junction's line is the tooltip of the junction row, and the status hint while there is no plan.</summary>
         public void ShowJunction(string text)
         {
-            junctionLabel.text = text;
+            junctionText = text ?? string.Empty;
+            junctionRowLabel.tooltip = junctionText;
+            ShowHint();
         }
 
-        /// <summary>Shows what the next click does, under the name of the chosen marking.</summary>
+        /// <summary>Shows what the next click does in the hint of the status bar.</summary>
         public void ShowPlan(string text, bool problem)
         {
-            planLabel.text = text;
-            planLabel.tooltip = text;
-            planLabel.EnableInClassList("panel-info-warning", problem);
+            planText = text ?? string.Empty;
+            planProblem = problem;
+            ShowHint();
+        }
+
+        private void ShowHint()
+        {
+            catalog.ShowHint(planText.Length > 0 ? planText : junctionText, planText.Length > 0 && planProblem);
         }
 
         private void Choose(Item item)
@@ -415,8 +380,6 @@ namespace OmsiMapEditor.UI
             choice = item;
             if (item.Kind == Kind.Line)
                 Style = item.Style;
-            choiceLabel.text = item.Name;
-            choiceLabel.tooltip = item.Description;
             // The tab of its kind opens, unless it stands among the favourites shown.
             var own = item.Kind == Kind.Line ? Tab.Lines : item.Kind == Kind.Area ? Tab.Areas : Tab.Arrows;
             if (tab != own && !(tab == Tab.Favorites && favorites.Contains(item.Key)))
@@ -437,13 +400,14 @@ namespace OmsiMapEditor.UI
                 contextTitle.text = Loc.T(pieceNoun ? "markings.context.next.piece" : kind == Kind.Line ? "markings.context.next.line" // i18n:keys
                     : kind == Kind.Area ? "markings.context.next.area" : "markings.context.next.arrow"); // i18n:keys
             DisplayStyle Shown(bool shown) => shown ? DisplayStyle.Flex : DisplayStyle.None;
-            scopeRow.style.display = hideButton.style.display = Shown(selected == Kind.Line);
+            scopeRow.style.display = Shown(selected == Kind.Line);
             curvatureRow.style.display = Shown(kind == Kind.Line);
             angleRow.style.display = Shown(kind == Kind.Area);
             // A new arrow lies where its lane is clicked; only a selected one has a distance to change.
             distanceRow.style.display = Shown(selected == Kind.Arrow);
-            deleteButton.style.display = Shown(selected.HasValue);
-            LocBindings.Text(deleteButton, kind == Kind.Line ? "markings.delete.line" : kind == Kind.Area ? "markings.delete.area" : "markings.delete.arrow"); // i18n:keys
+            deleteRow.style.display = Shown(selected.HasValue);
+            LocBindings.TitledTooltip(deleteButton, kind == Kind.Line ? "markings.delete.line" : kind == Kind.Area ? "markings.delete.area" : "markings.delete.arrow", // i18n:keys
+                "markings.delete.tooltip");
         }
 
         private void SetPieceScope(bool piece)
@@ -451,21 +415,18 @@ namespace OmsiMapEditor.UI
             PieceScope = piece;
             wholeLineButton.EnableInClassList("panel-tab-active", !piece);
             pieceButton.EnableInClassList("panel-tab-active", piece);
-            if (contextTitle != null)
+            if (deleteButton != null)
                 ShowContext();
         }
 
-        private void AddTab(VisualElement row, Tab kind, string textKey, string tooltipKey)
+        private void AddTab(Tab kind, string icon, string textKey, string tooltipKey)
         {
-            var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => // i18n:keys
+            var button = catalog.AddTab(icon, textKey, tooltipKey, () =>
             {
                 tab = kind;
                 Refresh();
-            }), tooltipKey); // i18n:keys
-            button.AddToClassList("panel-tab");
-            button.AddToClassList("picker-tab");
+            });
             tabButtons.Add(button, kind);
-            row.Add(button);
         }
 
         /// <summary>Builds the tiles of the open tab, favourites first in each.</summary>
@@ -490,16 +451,11 @@ namespace OmsiMapEditor.UI
 
         private VisualElement MakeTile(Item item)
         {
-            var tile = new VisualElement { tooltip = item.Description };
+            var tile = new VisualElement { tooltip = LocBindings.CardTooltip(item.Name, item.Description) };
             tile.AddToClassList("picker-tile");
-            // Smaller than road tiles: a marking needs no more to be told apart.
-            tile.style.width = 96f;
-            tile.style.height = 76f;
             tile.EnableInClassList("picker-tile-selected", item.Equals(choice));
             var preview = new MarkingPreview(item);
             preview.AddToClassList("picker-tile-preview");
-            preview.style.width = 84f;
-            preview.style.height = 44f;
             tile.Add(preview);
             var name = new Label(item.TileName);
             name.AddToClassList("picker-tile-name");
@@ -527,31 +483,15 @@ namespace OmsiMapEditor.UI
             return tile;
         }
 
-        private static VisualElement Row(VisualElement parent, string labelKey)
+        /// <summary>Makes a number field report Enter and leaving it.</summary>
+        private static TextField Field(TextField field, Action committed)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            row.Add(text);
-            parent.Add(row);
-            return row;
-        }
-
-        /// <summary>A number field in a row that reports Enter and leaving it.</summary>
-        private static TextField Field(VisualElement row, string value, string tooltipKey, Action committed)
-        {
-            var field = new TextField { value = value };
-            LocBindings.Tooltip(field, tooltipKey); // i18n:keys
-            field.AddToClassList("picker-field");
             field.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
                     committed();
             }, TrickleDown.TrickleDown);
             field.RegisterCallback<FocusOutEvent>(_ => committed());
-            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
-            row.Add(field);
             return field;
         }
 

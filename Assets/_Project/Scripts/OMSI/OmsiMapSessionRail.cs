@@ -112,7 +112,7 @@ namespace OmsiMapEditor.OMSI
             foreach (var trip in trips)
             {
                 if (trip.Plan == null || !trip.Plan.IsValid)
-                    throw new InvalidOperationException("The trip " + trip.Name + " has problems: " + string.Join(" ", trip.Plan?.Problems ?? new List<string>()));
+                    throw new OmsiTripPlanException(trip.Name, trip.Plan?.Problems);
                 var name = TimetableName(trip.Name, "A trip");
                 var tripPath = TimetablePath(name, ".ttp");
                 var trackPath = TimetablePath(name, ".ttr");

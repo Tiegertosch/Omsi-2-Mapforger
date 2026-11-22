@@ -71,12 +71,11 @@ namespace OmsiMapEditor.UI
                 }
                 items.Add(stop);
             }
-            lineOut.Clear();
-            lineBack.Clear();
             lineRing = false;
             lineBackMode = false;
+            ResetLineDraft();
             lineOut.AddRange(items);
-            lineOptions.SetEditing(Loc.T("line.edit.banner", ("trip", lineEditTrip)));
+            lineOptions.SetEditing(lineEditTrip);
         }
 
         /// <summary>The tool was left: a trip being edited is let go, with its draft.</summary>
@@ -85,8 +84,7 @@ namespace OmsiMapEditor.UI
             if (lineEditTrip == null)
                 return;
             lineEditTrip = null;
-            lineOut.Clear();
-            lineBack.Clear();
+            ResetLineDraft();
             lineOptions?.SetEditing(null);
         }
 
@@ -113,7 +111,7 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatusT("line.status.failed", ("reason", exception.Message));
+                SetStatusT("line.status.failed", ("reason", LinePlanProblems.Reason(exception)));
                 return;
             }
             if (change != null)
@@ -123,7 +121,7 @@ namespace OmsiMapEditor.UI
             }
             SetStatusT("line.status.trip_saved", ("name", trip));
             Debug.Log("Line: " + statusLabel?.text);
-            lineOut.Clear();
+            ResetLineDraft();
             lineEditTrip = null;
             lineOptions.SetEditing(null);
             lineTimetable = OmsiTimetable.Read(session.Workspace);
@@ -170,7 +168,7 @@ namespace OmsiMapEditor.UI
                                               exception is UnauthorizedAccessException)
             {
                 Debug.LogException(exception);
-                SetStatusT("line.status.failed", ("reason", exception.Message));
+                SetStatusT("line.status.failed", ("reason", LinePlanProblems.Reason(exception)));
                 return;
             }
             if (change == null)
@@ -179,8 +177,7 @@ namespace OmsiMapEditor.UI
             StartRoutesBuild(currentSummary);
             SetStatusT("line.status.saved", ("name", line), ("count", specs.Count));
             Debug.Log("Line: " + statusLabel?.text);
-            lineOut.Clear();
-            lineBack.Clear();
+            ResetLineDraft();
             lineRing = false;
             lineBackMode = false;
             lineName = string.Empty;

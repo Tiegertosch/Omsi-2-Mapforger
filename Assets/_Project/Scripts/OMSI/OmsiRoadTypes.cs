@@ -663,9 +663,23 @@ namespace OmsiMapEditor.OMSI
         /// <returns>The lanes, or null when the profile has no carriageway or footpath to take apart.</returns>
         public static OmsiRoadType FromProfile(OmsiSplineProfile profile, List<string> notes)
         {
+            var found = new List<OmsiRoadTypeNote>();
+            var type = TakeApart(profile, found);
+            if (notes != null)
+                foreach (var note in found)
+                    notes.Add(note.ToString());
+            return type;
+        }
+
+        /// <summary>
+        /// <see cref="FromProfile"/> with the remarks as structured notes (code and values), so a window can translate them; their
+        /// <see cref="object.ToString"/> is the English sentence <see cref="FromProfile"/> gives.
+        /// </summary>
+        public static OmsiRoadType TakeApart(OmsiSplineProfile profile, List<OmsiRoadTypeNote> notes)
+        {
             if (profile == null)
                 throw new ArgumentNullException(nameof(profile));
-            notes = notes ?? new List<string>();
+            notes = notes ?? new List<OmsiRoadTypeNote>();
             var type = new OmsiRoadType();
             var sections = OmsiProfileSections.Of(profile);
             var roadLeft = -sections.RoadLeft;
@@ -694,11 +708,11 @@ namespace OmsiMapEditor.OMSI
                 type.AddFitted(OmsiRoadLaneKind.Sidewalk, sections.OuterRight - roadRight, OmsiRoadLaneDirection.Forward, notes);
             if (type.Lanes.Count > MaximumLanes)
             {
-                notes.Add("Only the first " + MaximumLanes + " lanes are taken.");
+                notes.Add(OmsiRoadTypeNote.LanesLimited(MaximumLanes));
                 type.Lanes.RemoveRange(MaximumLanes, type.Lanes.Count - MaximumLanes);
             }
             if (profile.Lanes.Exists(lane => lane.Kind == OmsiSplineCategories.RailLane && (lane.X <= roadLeft || lane.X >= roadRight)))
-                notes.Add("Tracks outside the carriageway are left out.");
+                notes.Add(OmsiRoadTypeNote.TracksLeftOut());
             return type.Lanes.Exists(lane => lane.Kind == OmsiRoadLaneKind.Driving || lane.Kind == OmsiRoadLaneKind.Tram) ? type : null;
         }
 
@@ -707,7 +721,7 @@ namespace OmsiMapEditor.OMSI
         /// spline: neighbours share the room between them as their [path]s are wide; at the edges a lane keeps the width of its [path], and the rest is a shoulder.
         /// A track becomes a tram lane, shared with cars where a [path] for them runs along it.
         /// </summary>
-        private void AddCarriageway(OmsiSplineProfile profile, double from, double to, List<string> notes)
+        private void AddCarriageway(OmsiSplineProfile profile, double from, double to, List<OmsiRoadTypeNote> notes)
         {
             const double sameTrack = 0.5;
             var rails = profile.Lanes.FindAll(lane => lane.Kind == OmsiSplineCategories.RailLane && lane.X > from && lane.X < to);
@@ -758,14 +772,84 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>Adds a lane, its width rounded to centimetres and kept within what its kind allows.</summary>
-        private void AddFitted(OmsiRoadLaneKind kind, double width, OmsiRoadLaneDirection direction, List<string> notes)
+        private void AddFitted(OmsiRoadLaneKind kind, double width, OmsiRoadLaneDirection direction, List<OmsiRoadTypeNote> notes)
         {
             var rounded = Math.Round(width, 2);
             var fitted = Math.Max(OmsiRoadLane.MinimumWidth(kind), Math.Min(OmsiRoadLane.MaximumWidth(kind), rounded));
             if (Math.Abs(fitted - rounded) > 0.005)
-                notes.Add(OmsiRoadLane.Name(kind) + " " + (Lanes.Count + 1) + " is " + fitted.ToString("0.00", CultureInfo.InvariantCulture) + " m wide instead of " +
-                          rounded.ToString("0.00", CultureInfo.InvariantCulture) + " m, as its kind allows.");
+                notes.Add(OmsiRoadTypeNote.WidthFitted(kind, Lanes.Count + 1, fitted, rounded));
             Lanes.Add(new OmsiRoadLane { Kind = kind, Width = fitted, Direction = direction });
+        }
+    }
+
+    /// <summary>What a road type is made of, as a remark of taking a profile apart (<see cref="OmsiRoadType.TakeApart"/>).</summary>
+    public enum OmsiRoadTypeNoteCode
+    {
+        /// <summary>A lane was made as wide as its kind allows instead of as wide as the profile.</summary>
+        WidthFitted,
+
+        /// <summary>Only the first lanes were taken, as a road type has a limit.</summary>
+        LanesLimited,
+
+        /// <summary>Tracks outside the carriageway were left out.</summary>
+        TracksLeftOut
+    }
+
+    /// <summary>
+    /// A remark of taking a profile apart: a code and the values it names, so the window translates it. The English sentence
+    /// (<see cref="ToString"/>) stays for the command line and the log.
+    /// </summary>
+    public sealed class OmsiRoadTypeNote
+    {
+        private OmsiRoadTypeNote(OmsiRoadTypeNoteCode code)
+        {
+            Code = code;
+        }
+
+        public OmsiRoadTypeNoteCode Code { get; }
+
+        /// <summary>The kind of the lane a width note is about.</summary>
+        public OmsiRoadLaneKind Kind { get; private set; }
+
+        /// <summary>The lane's number from the left, from 1, for a width note.</summary>
+        public int LaneNumber { get; private set; }
+
+        /// <summary>The width the lane got, in metres, for a width note.</summary>
+        public double Fitted { get; private set; }
+
+        /// <summary>The width the profile had, in metres, for a width note.</summary>
+        public double Original { get; private set; }
+
+        /// <summary>The number of lanes a road type may have, for the limit note.</summary>
+        public int Limit { get; private set; }
+
+        public static OmsiRoadTypeNote WidthFitted(OmsiRoadLaneKind kind, int laneNumber, double fitted, double original)
+        {
+            return new OmsiRoadTypeNote(OmsiRoadTypeNoteCode.WidthFitted) { Kind = kind, LaneNumber = laneNumber, Fitted = fitted, Original = original };
+        }
+
+        public static OmsiRoadTypeNote LanesLimited(int limit)
+        {
+            return new OmsiRoadTypeNote(OmsiRoadTypeNoteCode.LanesLimited) { Limit = limit };
+        }
+
+        public static OmsiRoadTypeNote TracksLeftOut()
+        {
+            return new OmsiRoadTypeNote(OmsiRoadTypeNoteCode.TracksLeftOut);
+        }
+
+        public override string ToString()
+        {
+            switch (Code)
+            {
+                case OmsiRoadTypeNoteCode.WidthFitted:
+                    return OmsiRoadLane.Name(Kind) + " " + LaneNumber + " is " + Fitted.ToString("0.00", CultureInfo.InvariantCulture) + " m wide instead of " +
+                           Original.ToString("0.00", CultureInfo.InvariantCulture) + " m, as its kind allows.";
+                case OmsiRoadTypeNoteCode.LanesLimited:
+                    return "Only the first " + Limit + " lanes are taken.";
+                default:
+                    return "Tracks outside the carriageway are left out.";
+            }
         }
     }
 
@@ -1232,11 +1316,30 @@ namespace OmsiMapEditor.OMSI
                 return;
             }
             var temporary = FullPath + ".tmp";
-            File.WriteAllBytes(temporary, bytes);
-            if (File.Exists(FullPath))
-                File.Replace(temporary, FullPath, null);
-            else
-                File.Move(temporary, FullPath);
+            try
+            {
+                File.WriteAllBytes(temporary, bytes);
+                if (File.Exists(FullPath))
+                    File.Replace(temporary, FullPath, null);
+                else
+                    File.Move(temporary, FullPath);
+            }
+            catch
+            {
+                // A file that cannot be replaced (read-only, in use) must not leave its copy behind.
+                try
+                {
+                    if (File.Exists(temporary))
+                        File.Delete(temporary);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                throw;
+            }
         }
     }
 

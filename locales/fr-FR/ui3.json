@@ -10,7 +10,6 @@
   "inspector.attach_hint_row": "Placez un objet sur un point libre du premier objet de la rangée pour l'y accrocher ; la suppression de la ligne les emporte avec elle.",
   "inspector.attached_objects": "Objets attachés",
   "inspector.attached_item": "Point {n} : #{id} {name}",
-  "inspector.type_short": "Tapez...",
   "inspector.detach": "Supprimer",
   "inspector.detach.tooltip": "Enlève cet objet, avec ce qui y est accroché",
   "inspector.selected_object": "Objet sélectionné",
@@ -55,5 +54,11 @@
   "@export.created_open_prefix": "The text ends with a colon and a space: a reason follows",
   "map.status.opening": "Ouverture de {name} : lecture de la carte...",
   "map.status.own_project_failed": "Le projet de cette carte n'a pas pu être réalisé en {folder} : {reason}",
-  "@map.status.own_project_failed": "{reason} is a message from the system, in English"
+  "@map.status.own_project_failed": "{reason} is a message from the system, in English",
+  "inspector.selected_splines": "Splines sélectionnés",
+  "inspector.count_objects": "{count, plural, one {# objet} other {# objets}}",
+  "inspector.count_splines": "{count, plural, one {# spline} other {# splines}}",
+  "inspector.delete_splines": "Supprimer {count, plural, one {# spline} other {# splines}}",
+  "inspector.view.full": "Afficher l'inspecteur complet",
+  "inspector.view.compact": "Afficher l'inspecteur compact"
 }

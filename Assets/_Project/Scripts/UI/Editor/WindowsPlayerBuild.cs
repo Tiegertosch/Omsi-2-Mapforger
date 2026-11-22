@@ -131,6 +131,7 @@ namespace OmsiMapEditor.Editor
             }
 
             CopyLanguageFiles();
+            CheckNoHiddenFolders();
             Debug.Log((release ? "Windows release player built: " : "Windows player built: ") + Path.GetFullPath(OutputPath));
             if (release)
                 PackRelease();
@@ -167,12 +168,33 @@ namespace OmsiMapEditor.Editor
             var target = Path.Combine(playerFolder, Path.GetFileNameWithoutExtension(OutputPath) + "_Data", "StreamingAssets", LanguageSourceFolder);
             if (Directory.Exists(target))
                 Directory.Delete(target, true);
-            foreach (var file in Directory.GetFiles(LanguageSourceFolder, "*.json", SearchOption.AllDirectories))
+            foreach (var file in Directory.GetFiles(LanguageSourceFolder, "*", SearchOption.AllDirectories))
             {
-                var destination = Path.Combine(target, Path.GetRelativePath(LanguageSourceFolder, file));
+                var relative = Path.GetRelativePath(LanguageSourceFolder, file);
+                // Only language files: hidden folders such as .omc hold state files of developer tools and must not ship (M8 step 6).
+                if (!LocaleShippingFilter.ShouldShip(relative))
+                    continue;
+                var destination = Path.Combine(target, relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination));
                 File.Copy(file, destination, true);
             }
+        }
+
+        /// <summary>
+        /// Stops the build when StreamingAssets holds a hidden (dot) folder: such a folder is a state folder of a developer tool, not
+        /// part of the program, and a file in it that vanishes while the release is zipped breaks the build.
+        /// </summary>
+        private static void CheckNoHiddenFolders()
+        {
+            var streaming = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(OutputPath)),
+                Path.GetFileNameWithoutExtension(OutputPath) + "_Data", "StreamingAssets");
+            if (!Directory.Exists(streaming))
+                return;
+            var hidden = Directory.GetDirectories(streaming, ".*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(streaming, path)).ToList();
+            if (hidden.Count > 0)
+                throw new InvalidOperationException("Player build blocked: StreamingAssets contains hidden folders that must not ship: " +
+                                                    string.Join(", ", hidden) + ". Delete them in the source folder (for example locales/.omc) and build again.");
         }
 
         /// <summary>

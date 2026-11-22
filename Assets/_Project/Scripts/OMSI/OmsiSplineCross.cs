@@ -162,9 +162,12 @@ namespace OmsiMapEditor.OMSI
                 return null;
             files.Collect(change.Files);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            // The ground follows a road's cant, so the roads built here fit it again.
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                // The ground follows a road's cant, so the roads built here fit it again.
+                ReshapeTerrain(summary, change);
+            });
             return change;
         }
     }

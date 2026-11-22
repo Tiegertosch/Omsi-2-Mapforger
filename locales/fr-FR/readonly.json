@@ -1,9 +1,9 @@
 {
   "readonly.reading": "La carte est en cours de lecture pour le contrôle cartographique ou une date chrono ; {action} à nouveau dans un instant.",
   "@readonly.reading": "{action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.variant": "La variante chrono {title} est en cours d'édition ; il prend les objets, leurs types et étiquettes, les règles de circulation et la priorité, les types de routes, les nouvelles routes et la suppression de splines, ainsi que les lignes qu'il désactive uniquement. Choisissez Carte de base dans le navigateur du projet sur {action}.",
+  "readonly.variant": "La variante chrono {title} est en cours d'édition ; il prend les objets, leurs types et étiquettes, les règles de circulation et la priorité, les types de routes, les nouvelles routes et la suppression de splines, ainsi que les lignes qu'il désactive uniquement. Choisissez Carte de base dans la liste Chrono de la barre du bas sur {action}.",
   "@readonly.variant": "{title} is the name of the variant, shown unchanged; {action} is a short phrase that completes \"to ...\" (see readonly.action.*)",
-  "readonly.chrono": "La carte montre {date} avec ses variantes chrono et est en lecture seule. Choisissez Carte de base dans le navigateur du projet sur {action}.",
+  "readonly.chrono": "La carte montre {date} avec ses variantes chrono et est en lecture seule. Choisissez Carte de base dans la liste Chrono de la barre du bas sur {action}.",
   "@readonly.chrono": "{date} is a date like 2026-11-07, shown unchanged",
   "readonly.map": "La carte est en lecture seule. Enregistrez un projet MapWorks (Fichier > Enregistrer le projet de carte sous...) dans {action}.",
   "readonly.action.load_heights": "hauteurs de terrain de charge",

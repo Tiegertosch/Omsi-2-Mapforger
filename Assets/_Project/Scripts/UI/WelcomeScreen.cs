@@ -11,7 +11,7 @@ namespace OmsiMapEditor.UI
     /// </summary>
     internal sealed class WelcomeScreen : VisualElement
     {
-        private readonly VisualElement recentList;
+        private readonly ScrollView recentList;
 
         public WelcomeScreen()
         {
@@ -37,7 +37,8 @@ namespace OmsiMapEditor.UI
             var recentHeading = LocBindings.NewLabel("welcome.recent");
             recentHeading.AddToClassList("welcome-section");
             Add(recentHeading);
-            recentList = new VisualElement();
+            // The list scrolls inside the box when the window is too short for all of it (M6 step 4).
+            recentList = new ScrollView(ScrollViewMode.Vertical);
             recentList.AddToClassList("welcome-recent");
             Add(recentList);
             Refresh();

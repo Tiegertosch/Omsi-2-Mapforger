@@ -5,7 +5,14 @@
   "settings.language.label": "Langue",
   "@settings.language.label": "Label of the drop-down list of interface languages; the list itself shows each language in its own language",
   "settings.language.hint": "La langue de l'interface du programme. Elle n'affecte ni les cartes, ni les projets, ni les exports ; ce choix est conservé au prochain démarrage.",
+  "settings.section.content": "Contenu",
+  "settings.hide_dlc": "Masquer le contenu DLC",
+  "settings.hide_dlc.hint": "Masque les objets et types de routes d'un DLC dans toutes les listes sauf celle de la carte, pour que la carte ne demande que le jeu de base et des freewares. {origin} Les dossiers d'extensions achetées hors de Steam peuvent être marqués comme DLC avec le bouton d'étiquette de la bibliothèque d'objets.",
   "settings.language.changed": "La langue de l'interface est désormais {language}.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
-  "settings.close": "Fermer"
+  "settings.close": "Fermer",
+  "settings.inspector_at_edge": "Garder l'inspecteur au bord droit plutôt qu'à côté de l'élément sélectionné",
+  "settings.interface_size.label": "Taille de l'interface (%)",
+  "settings.interface_size.hint": "Met toute l'interface à l'échelle en plus de l'échelle d'affichage de Windows. Une fenêtre trop petite pour la taille choisie l'affiche plus petite.",
+  "settings.interface_size.tooltip": "Agrandit ou réduit l'interface. 100 % suit l'échelle d'affichage de Windows."
 }

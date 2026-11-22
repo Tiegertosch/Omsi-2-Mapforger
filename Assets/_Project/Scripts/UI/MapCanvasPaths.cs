@@ -41,8 +41,8 @@ namespace OmsiMapEditor.UI
 
         private readonly List<PathLine> pathLines = new List<PathLine>();
 
-        // The signs of the arms of the junction the priority tool works on (ADR 047): where they stand, their levels
-        // (0 normal, 1 main road, 2 give way) and the one under the pointer, -1 for none.
+        // The signs of the arms of the junction the traffic rules tool works on (ADR 047, 098): where they stand, their signs
+        // (an OmsiRightOfWaySign) and the one under the pointer, -1 for none.
         private readonly List<Vector2> priorityHandles = new List<Vector2>();
         private readonly List<float> priorityHeights = new List<float>();
         private readonly List<int> priorityLevels = new List<int>();
@@ -134,8 +134,8 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
-        /// <summary>The signs of a junction's arms for the priority tool, as world points with their levels; null clears them.</summary>
-        /// <param name="levels">0 normal, 1 main road, 2 give way, by sign.</param>
+        /// <summary>The signs of a junction's arms for the traffic rules tool, as world points with what each shows; null clears them.</summary>
+        /// <param name="levels">The <see cref="OmsiRightOfWaySign"/> of each arm as a number.</param>
         /// <param name="heights">Where the signs stand in the 3D view, by sign; null for the ground.</param>
         public void SetPriorityHandles(IList<OmsiMapPoint> points, IList<int> levels, int hovered, IList<double> heights = null)
         {
@@ -167,58 +167,18 @@ namespace OmsiMapEditor.UI
             return camera.Value.TryProject(new Vector3(map.x, (float.IsNaN(height) ? GroundAt(map) : height) + 0.3f, map.y), out screen);
         }
 
-        /// <summary>A round sign per arm: a yellow diamond for a main road, a red-edged triangle for give way, a grey ring for normal.</summary>
+        /// <summary>The sign of each arm as the traffic rules tool draws it, one picture with the tiles and the sign dragged to the map; larger under the pointer.</summary>
         private void DrawPriorityHandles(Painter2D painter, MapOrbitCamera? camera = null)
         {
             for (var index = 0; index < priorityHandles.Count; index++)
             {
                 if (!HandleScreen(priorityHandles[index], priorityHeights[index], camera, out var at))
                     continue;
-                var radius = index == priorityHovered ? 16f : 13f;
-                painter.fillColor = handleFillColor;
-                painter.strokeColor = index == priorityHovered ? splineColor : tileBorderColor;
-                painter.lineWidth = 2f;
-                painter.lineJoin = LineJoin.Round;
-                painter.BeginPath();
-                painter.Arc(at, radius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
-                painter.Fill();
-                painter.Stroke();
-                var size = radius * 0.62f;
-                if (priorityLevels[index] == 1)
-                {
-                    painter.fillColor = selectedTileColor;
-                    painter.strokeColor = routeColor;
-                    painter.lineWidth = 1.5f;
-                    painter.BeginPath();
-                    painter.MoveTo(at + new Vector2(0f, -size));
-                    painter.LineTo(at + new Vector2(size, 0f));
-                    painter.LineTo(at + new Vector2(0f, size));
-                    painter.LineTo(at + new Vector2(-size, 0f));
-                    painter.ClosePath();
-                    painter.Fill();
-                    painter.Stroke();
-                }
-                else if (priorityLevels[index] == 2)
-                {
-                    painter.fillColor = routeColor;
-                    painter.strokeColor = selectedObjectColor;
-                    painter.lineWidth = 2.5f;
-                    painter.BeginPath();
-                    painter.MoveTo(at + new Vector2(-size, -size * 0.7f));
-                    painter.LineTo(at + new Vector2(size, -size * 0.7f));
-                    painter.LineTo(at + new Vector2(0f, size));
-                    painter.ClosePath();
-                    painter.Fill();
-                    painter.Stroke();
-                }
-                else
-                {
-                    painter.strokeColor = wireColor;
-                    painter.lineWidth = 2f;
-                    painter.BeginPath();
-                    painter.Arc(at, size * 0.55f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
-                    painter.Stroke();
-                }
+                var hovered = index == priorityHovered;
+                var radius = hovered ? 17f : 14f;
+                TrafficSignPainter.Draw(painter, TrafficSignPainter.Of((OmsiRightOfWaySign)priorityLevels[index]), 0, at, radius, true);
+                if (hovered)
+                    TrafficSignPainter.Ring(painter, at, radius * 1.3f, splineColor, 2.5f);
             }
         }
 
@@ -299,21 +259,101 @@ namespace OmsiMapEditor.UI
             }
         }
 
-        /// <summary>Centres the view from above on a point in world metres, close enough to see the paths there.</summary>
-        public void CenterOnWorld(OmsiMapPoint point)
+        /// <summary>Centres the view from above on a point in world metres, close enough to see the paths there unless <paramref name="closeUp"/> is false (the zoom stays).</summary>
+        public void CenterOnWorld(OmsiMapPoint point, bool closeUp = true)
         {
             center = WorldToMap(point);
-            if (metersPerPixel > 0.25f)
+            if (closeUp && metersPerPixel > 0.25f)
                 metersPerPixel = 0.25f;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>True while the pointer holds something on the map: an object, a handle, a rotation ring being dragged, or one pressed to be.</summary>
+        public bool IsDragging => dragMode != DragMode.None;
+
+        /// <summary>The view's place and zoom as one value, to tell whether it was moved by someone else in between.</summary>
+        public Vector3 ViewState => new Vector3(center.x, center.y, metersPerPixel);
+
+        /// <summary>Where a point in world metres stands on the screen in the view from above, in panel coordinates; false in 3D or before the first view.</summary>
+        public bool TryScreenPosition(OmsiMapPoint world, out Vector2 screen)
+        {
+            screen = default;
+            if (summary == null || !hasView || ThreeDimensional)
+                return false;
+            screen = this.LocalToWorld(MapToScreen(WorldToMap(world)));
+            return true;
+        }
+
+        /// <summary>
+        /// Moves the view up or down, keeping the zoom, so a point stands in the free part of the map above the tool windows (their places, in
+        /// panel coordinates) when it stands under one or too close to it; the point is put in the middle of the free part then. Nothing moves
+        /// when it is clear already, in 3D, or before the first view. True when the view moved.
+        /// </summary>
+        public bool PanIntoFreeArea(OmsiMapPoint world, IReadOnlyList<Rect> windows, float margin)
+        {
+            if (!TryScreenPosition(world, out var screen))
+                return false;
+            // On a low area (a high interface scale) the free part above the windows is shorter than three margins; the margin then shrinks
+            // with it, so the point still moves up instead of staying under the window (M6 step 4).
+            var freeHeight = FreeAreaPan.FreeBottom(windows) - worldBound.yMin;
+            if (!float.IsNaN(freeHeight) && freeHeight < margin * 3.5f)
+                margin = Mathf.Max(0f, freeHeight * 0.28f);
+            var shift = FreeAreaPan.ShiftFor(screen.x, screen.y, windows, worldBound.yMin, margin);
+            if (shift == 0f)
+                return false;
+            center.y += shift * metersPerPixel;
+            isFitted = false;
+            MarkDirtyRepaint();
+            return true;
+        }
+
+        /// <summary>
+        /// Moves the view, keeping the zoom, so a point that stands under a floating window (its place and the visible area of the map, in
+        /// panel coordinates) or within the margin of it stands in the largest free part beside it (<see cref="SignalWindowRules.ShiftAroundWindow"/>).
+        /// Nothing moves when it is clear already, in 3D, or before the first view. True when the view moved.
+        /// </summary>
+        public bool PanAroundWindow(OmsiMapPoint world, Rect window, Rect visibleMap, float margin)
+        {
+            if (!TryScreenPosition(world, out var screen))
+                return false;
+            var shift = SignalWindowRules.ShiftAroundWindow(screen, window, visibleMap, margin);
+            if (shift == Vector2.zero)
+                return false;
+            // The screen's y grows downwards, the map's upwards.
+            center.x -= shift.x * metersPerPixel;
+            center.y += shift.y * metersPerPixel;
+            isFitted = false;
+            MarkDirtyRepaint();
+            return true;
+        }
+
+        /// <summary>
+        /// Centres a point from above in the free part of the map: horizontally in the map, vertically between its top and the highest tool
+        /// window, keeping the zoom. Like <see cref="CenterOnWorld"/> (the whole map) while no window has its place yet; nothing in 3D.
+        /// </summary>
+        public void CenterOnWorldInFreeArea(OmsiMapPoint world, IReadOnlyList<Rect> windows)
+        {
+            var bottom = FreeAreaPan.FreeBottom(windows);
+            if (float.IsNaN(bottom) || bottom - worldBound.yMin < 1f)
+            {
+                CenterOnWorld(world, false);
+                return;
+            }
+            if (!TryScreenPosition(world, out var screen))
+                return;
+            var shiftX = worldBound.center.x - screen.x;
+            var shiftY = (worldBound.yMin + bottom) * 0.5f - screen.y;
+            center.x -= shiftX * metersPerPixel;
+            center.y += shiftY * metersPerPixel;
+            isFitted = false;
             MarkDirtyRepaint();
         }
 
         private Color PathColor(int kind)
         {
-            return kind == 0 ? (Color)objectColor : kind == 1 ? treeStrokeColor : selectedTileColor;
+            return kind == 0 ? (Color)objectColor : kind == 1 ? treeStrokeColor : pathRailColor;
         }
 
         private void DrawPaths(Painter2D painter, Rect visible)
@@ -418,7 +458,7 @@ namespace OmsiMapEditor.UI
                     painter.Stroke();
             }
 
-            painter.strokeColor = selectedObjectColor;
+            painter.strokeColor = errorColor;
             painter.lineWidth = 2f;
             foreach (var pair in shown)
             {

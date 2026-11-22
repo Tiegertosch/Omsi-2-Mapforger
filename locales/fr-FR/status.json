@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Pliage du spline annulé.",
   "spline.cancel_move": "Déplacement de l'extrémité spline annulé.",
   "junction.turn_cancelled": "Rotation du bras annulée.",
-  "view.status.3d_edit": "Vue 3D : faites glisser avec le bouton droit pour tourner la vue, avec le bouton central pour la déplacer, et utilisez la molette pour zoomer. Cliquez sur un objet pour le sélectionner et faites-le glisser pour le déplacer ; l'outil Déplacer (W) le déplace le long des flèches, y compris vers le haut, et l'outil Pivoter (E) le tourne avec les anneaux : vert pour l'orientation, rouge pour le tangage, bleu pour le roulis.",
-  "view.status.3d": "Vue 3D : faites glisser avec le bouton droit pour tourner la vue, avec le bouton central pour la déplacer, et utilisez la molette pour zoomer. Cliquez sur un objet pour le sélectionner.",
+  "view.status.3d": "Vue 3D : souris et touches sous Aide > Wiki.",
   "view.status.top": "Retour à la carte ci-dessus.",
   "view.status.ground_shown": "Textures de sol affichées.",
   "view.status.ground_hidden": "Textures de sol cachées ; tiles sont dessinés en clair.",
@@ -52,6 +51,8 @@
   "@spline.status.selected": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "spline.status.refs": "Spline #{id} reste : {count, plural, one {# référence en a encore besoin} other {# références en ont encore besoin}}, tel que {reasons}.",
   "spline.status.deleted": "spline #{id} supprimé ; Ctrl+Z le ramène.",
+  "spline.status.deleted_many": "{count} splines supprimés ; Ctrl+Z les ramène.",
+  "spline.status.deleted_some": "{count} splines sur {total} supprimés ; les autres restent, car des références en ont encore besoin, tel que {reasons}. Ctrl+Z ramène les supprimés.",
   "spline.drag.bend": "{alt, select, yes {Lissage spline #{id}} other {Pliage spline #{id} ; Alt va droit au but}}",
   "spline.drag.move": "Déplacement du {which, select, end {fin} other {commencer}} de spline #{id}{joined, select, yes { et le spline y a rejoint} other {}}{alt, select, yes { sans plis} other {; Le Alt maintient la route sans plis}}",
   "spline.status.stays": "Spline #{id} reste : {reason}",
@@ -85,5 +86,6 @@
   "terrain.all.fits": "Le terrain s'adapte déjà à toutes les routes construites ici.",
   "terrain.all.fitted": "Terrain réaménagé sur {count, plural, one {# tile} other {# tiles}}.",
   "status.ready": "Prêt",
+  "status.hint.more": "+{count} de plus",
   "status.no_map": "Aucune carte chargée"
 }

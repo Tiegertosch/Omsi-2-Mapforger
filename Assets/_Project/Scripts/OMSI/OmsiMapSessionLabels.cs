@@ -31,15 +31,14 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// Replaces all labels of an object or attached object, such as the line number on a bus stop's plate. One undo step;
-        /// null when they are the same.
+        /// Replaces all labels of an object or attached object, such as the line number on a bus stop's plate. An empty list
+        /// clears them to a count of 0, which OMSI writes for an object without labels. One undo step; null when they are the same.
+        /// <see cref="OmsiLabelSchema.LabelsToWrite"/> turns edited rows into the list to pass without dropping labels.
         /// </summary>
         public OmsiObjectChange SetElementLabels(OmsiTileSummary tile, object element, IReadOnlyList<string> labels)
         {
             if (labels == null)
                 throw new ArgumentNullException(nameof(labels));
-            if (labels.Count == 0)
-                throw new ArgumentException("An object keeps at least the labels it has; give them all.", nameof(labels));
             foreach (var text in labels)
                 if (text == null || text.IndexOf('\r') >= 0 || text.IndexOf('\n') >= 0)
                     throw new ArgumentException("A label must be one line.", nameof(labels));

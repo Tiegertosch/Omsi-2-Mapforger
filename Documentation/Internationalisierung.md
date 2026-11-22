@@ -34,9 +34,13 @@ Menüleiste, Statusleiste und Kartenhinweise, Willkommensbild, Werkzeugleiste, P
 - Unity-EditMode: 455 Tests grün (davon 29 in `LocalizationTests`, 16 neue in `LocalizationLanguageListTests` für die Sprachliste und die Pluralregeln als Daten, 5 in `LocalizationKeyUsageTests`, 5 in `LocalizationInterfaceTests`), Windows-Player-Build erfolgreich; der Player startet mit `languages.json` auf Deutsch (`-language de-DE -i18nSelfTest`).
 - Schneller Lauf ohne Unity (Core, OMSI, Tests): 437 grün.
 - `LocaleCheck`: 0 Fehler, 4 Warnungen (die leeren Entwurfssprachen).
-- `LocalizationKeyUsageTests` liest den Quelltext und prüft jeden Schlüssel (`Loc.T`, `SetStatusT`, `LocBindings.*`, `UpperLabel`) gegen `locales/en-US`, samt Argumentnamen; Schlüssel müssen als ganzer Text geschrieben sein.
+- `LocalizationKeyUsageTests` liest den Quelltext und prüft jeden Schlüssel (`Loc.T`, `SetStatusT`, `LocBindings.*`, `UpperLabel`) gegen `locales/en-US`, samt Argumentnamen; Schlüssel müssen als ganzer Text geschrieben sein. Ein zweiter Test (`NoTextIsLeftThatNoCodeAsksFor`, M8 Schritt 3) meldet jeden Text in `locales/en-US`, den kein Code verlangt, als Fehler, ohne Obergrenze und ohne Ausnahmeliste; aus Teilen gebaute Schlüssel erkennt er an `// i18n:keys` in der Zeile (Text mit Punkt am Ende = Präfix, mit Punkt am Anfang = Endung). Wer eine Oberfläche entfernt, löscht ihre Texte samt `@`-Hinweisen in allen acht Sprachen.
 - Player-Prüfung an Grundorf auf Deutsch und im Live-Wechsel Englisch nach Deutsch (Hauptfenster, Straßenwerkzeug, Straßenbauer, Objekte, Satellit, Gelände, Einstellungen, Neue Karte, Fehlerbericht).
 - Nicht ausführbar auf diesem Rechner: der GitHub-Workflow (nur das .NET SDK 2.1 vorhanden); seine Quellen sind mit `csc` geprüft.
+
+## Meldungen der OMSI-Ebene (Muster am Beispiel der Linienplaner)
+
+Die Ebene `Editor.OMSI` kennt keine Sprachdateien. Wo sie dem Nutzer etwas sagen muss (zuerst die Probleme von `OmsiTripPlanner` und `OmsiTrackPlanner`), gibt sie **Code und Argumente** zurück (`OmsiPlanProblem` mit `OmsiPlanProblemCode`, Haltestelle, von, nach, Meter, Wegpunkt-Kennzeichen), nicht einen Text. Die Oberfläche bildet den Code auf einen Schlüssel ab (`LinePlanProblems.Key`, `line.problem.*`) und setzt die Argumente mit `Loc.T` ein (`LinePlanProblems.Text`). `ToString()` des Problems bleibt der englische Text für das Log und für Tests der OMSI-Ebene. Ein Test (`LinePlanProblemsTests`) stellt die Vollständigkeit sicher: jeder Code hat einen eigenen Schlüssel in jeder Sprache, nur mit den Platzhaltern des Problems, und der englische Text jedes Codes gleicht `ToString()`. Zahlen werden vorher gerundet (`WholeMetres`, Hälften von Null weg wie `ToString("0")`) und ohne Tausendertrennung gezeigt. Wer einen neuen Code anlegt, ergänzt Schlüssel in allen Sprachen und die Probe in diesem Test; sonst schlägt er fehl.
 
 ## Bekannte Einschränkungen
 

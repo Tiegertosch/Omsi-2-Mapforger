@@ -123,7 +123,7 @@ namespace OmsiMapEditor.UI
             var editIndex = chronoVariants.FindIndex(variant => string.Equals(variant.Name, editedVariant.Name, StringComparison.OrdinalIgnoreCase));
             var active = chronoVariants.FindAll(variant => chronoVariants.IndexOf(variant) <= editIndex && variant.IsActiveOn(chronoDate.Value));
             StartRoutesBuild(currentSummary, active);
-            RenderProjectBrowser();
+            RenderBarPopup();
             SetStatus(done);
         }
 

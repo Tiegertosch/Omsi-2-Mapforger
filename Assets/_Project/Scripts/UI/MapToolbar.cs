@@ -25,22 +25,21 @@ namespace OmsiMapEditor.UI
             AddToClassList("tool-bar");
 
             var selection = AddGroup();
-            AddTool(selection, EditorTool.Drag, "mouse-pointer-2", "toolbar.drag", "Q", "toolbar.drag.tooltip");
-            AddTool(selection, EditorTool.Move, "move", "toolbar.move", "W", "toolbar.move.tooltip");
-            AddTool(selection, EditorTool.Rotate, "rotate-cw", "toolbar.rotate", "E", "toolbar.rotate.tooltip");
-            deleteButton = AddButton(selection, "trash-2", "toolbar.delete", "Del", "toolbar.delete.tooltip", () => DeleteRequested?.Invoke());
+            AddTool(selection, EditorTool.Drag, "mouse-pointer-2", "toolbar.drag.tooltip");
+            AddTool(selection, EditorTool.Move, "move", "toolbar.move.tooltip");
+            AddTool(selection, EditorTool.Rotate, "rotate-cw", "toolbar.rotate.tooltip");
+            deleteButton = AddButton(selection, "trash-2", "toolbar.delete.tooltip", () => DeleteRequested?.Invoke());
 
             AddSeparator();
             var world = AddGroup();
-            AddTool(world, EditorTool.Road, "spline", "toolbar.road", "R", "toolbar.road.tooltip");
-            AddTool(world, EditorTool.Rows, "fence", "toolbar.rows", "T", "toolbar.rows.tooltip");
-            AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain", "G", "toolbar.terrain.tooltip");
-            AddTool(world, EditorTool.Markings, "brush", "toolbar.markings", "M", "toolbar.markings.tooltip");
-            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.priority", "V", "toolbar.priority.tooltip");
-            AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes", "L", "toolbar.lanes.tooltip");
-            AddTool(world, EditorTool.Signals, "traffic-light", "toolbar.signals", "A", "toolbar.signals.tooltip");
-            AddTool(world, EditorTool.Line, "route", "toolbar.line", "B", "toolbar.line.tooltip");
-            objectsButton = AddButton(world, "box", "toolbar.objects", "3", "toolbar.objects.tooltip", () => ObjectsRequested?.Invoke());
+            AddTool(world, EditorTool.Road, "spline", "toolbar.road.tooltip");
+            AddTool(world, EditorTool.Terrain, "mountain", "toolbar.terrain.tooltip");
+            AddTool(world, EditorTool.Markings, "brush", "toolbar.markings.tooltip");
+            AddTool(world, EditorTool.Priorities, "diamond", "toolbar.traffic.tooltip");
+            AddTool(world, EditorTool.Lanes, "split", "toolbar.lanes.tooltip");
+            AddTool(world, EditorTool.Signals, "traffic-light", "toolbar.signals.tooltip");
+            AddTool(world, EditorTool.Line, "route", "toolbar.line.tooltip");
+            objectsButton = AddButton(world, "box", "toolbar.objects.tooltip", () => ObjectsRequested?.Invoke());
         }
 
         public event Action<EditorTool> ToolChosen;
@@ -78,12 +77,13 @@ namespace OmsiMapEditor.UI
             Add(separator);
         }
 
-        private void AddTool(VisualElement group, EditorTool tool, string icon, string name, string key, string description)
+        /// <summary>A tool's button; its tooltip names the tool and the key that chooses it.</summary>
+        private void AddTool(VisualElement group, EditorTool tool, string icon, string description)
         {
-            toolButtons[tool] = AddButton(group, icon, name, key, description, () => ToolChosen?.Invoke(tool));
+            toolButtons[tool] = AddButton(group, icon, description, () => ToolChosen?.Invoke(tool));
         }
 
-        private static Button AddButton(VisualElement group, string icon, string nameKey, string key, string tooltipKey, Action clicked)
+        private static Button AddButton(VisualElement group, string icon, string tooltipKey, Action clicked)
         {
             var button = new Button(clicked);
             LocBindings.Tooltip(button, tooltipKey); // i18n:keys
@@ -91,12 +91,6 @@ namespace OmsiMapEditor.UI
             var iconElement = new IconElement(icon);
             iconElement.AddToClassList("tool-icon");
             button.Add(iconElement);
-            var label = LocBindings.NewLabel(nameKey); // i18n:keys
-            label.AddToClassList("tool-label");
-            button.Add(label);
-            var keycap = new Label(key);
-            keycap.AddToClassList("tool-keycap");
-            button.Add(keycap);
             group.Add(button);
             return button;
         }

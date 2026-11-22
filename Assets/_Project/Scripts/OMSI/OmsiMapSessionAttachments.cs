@@ -186,10 +186,11 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The change has already been undone.");
+                throw new OmsiStepRefusedException("The change has already been undone.");
             ApplyFiles(change.Files, true);
-            ApplyAttachedObjects(summary, change, false);
+            // The flag follows the files, so a failure below shows that the files were written.
             change.IsApplied = false;
+            ApplyAttachedObjects(summary, change, false);
         }
 
         /// <summary>Applies an undone change of attached objects again.</summary>
@@ -198,10 +199,10 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The change is already applied.");
+                throw new OmsiStepRefusedException("The change is already applied.");
             ApplyFiles(change.Files, false);
-            ApplyAttachedObjects(summary, change, true);
             change.IsApplied = true;
+            ApplyAttachedObjects(summary, change, true);
         }
 
         /// <summary>Adds and removes the attached objects of a change in the summary, or the other way round when taking it back.</summary>
@@ -457,11 +458,12 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The change has already been undone.");
+                throw new OmsiStepRefusedException("The change has already been undone.");
             ApplyFiles(change.Files, true);
+            // The flag follows the files, so a failed read below shows that the files were written.
+            change.IsApplied = false;
             ApplyRows(summary, change, false);
             ReadAttachedObjectsAgain(change);
-            change.IsApplied = false;
         }
 
         /// <summary>Applies an undone change of rows again.</summary>
@@ -470,11 +472,11 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The change is already applied.");
+                throw new OmsiStepRefusedException("The change is already applied.");
             ApplyFiles(change.Files, false);
+            change.IsApplied = true;
             ApplyRows(summary, change, true);
             ReadAttachedObjectsAgain(change);
-            change.IsApplied = true;
         }
 
         /// <summary>

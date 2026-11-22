@@ -5,7 +5,17 @@
   "settings.language.label": "Language",
   "@settings.language.label": "Label of the drop-down list of interface languages; the list itself shows each language in its own language",
   "settings.language.hint": "The language of the program's interface. Maps, projects and exports do not depend on it; the choice is kept for the next start.",
+  "settings.section.content": "Content",
+  "settings.hide_dlc": "Hide DLC content",
+  "settings.hide_dlc.hint": "Hides objects and road types that belong to a DLC in every list but the map's own, so the map needs only the base game and freeware. {origin} Folders of add-ons bought outside Steam can be marked as DLC with the tag button in the object library.",
   "settings.language.changed": "The interface language is {language} now.",
   "@settings.language.changed": "Status message after choosing a language; {language} is the language's name in its own language, for example Deutsch",
-  "settings.close": "Close"
+  "settings.close": "Close",
+  "settings.inspector_at_edge": "Keep the inspector at the right edge instead of at the selected element",
+  "settings.interface_size.label": "Interface size (%)",
+  "@settings.interface_size.label": "Label of the drop-down list of interface sizes (90 to 200 %) in the settings dialog",
+  "settings.interface_size.hint": "Scales the whole interface on top of the Windows display scale. A window too small for the chosen size shows it smaller.",
+  "@settings.interface_size.hint": "Explains the interface size under the list; 'smaller' because a small window limits the scale",
+  "settings.interface_size.tooltip": "Makes the interface larger or smaller. 100 % follows the Windows display scale.",
+  "@settings.interface_size.tooltip": "Tooltip of the interface size list"
 }

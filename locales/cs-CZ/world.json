@@ -5,6 +5,6 @@
   "@world.ground.ready": "{first} is a message of MapWorks in English",
   "world.objects.failed": "Objekty nelze přečíst: {reason}",
   "@world.objects.failed": "{reason} is a message from the system, in English",
-  "world.objects.ready": "Připravené modely objektů: {kinds, plural, one {# druh} few {# druhy} many {# druhu} other {# druhů}}, {textures, plural, one {# textura} few {# textury} many {# textury} other {# textur}}{problems, plural, one {; # problém, první: {first}} few {; # problémy, první: {first}} many {; # problémy, první: {first}} other {; # problémů, první: {first}} =0 {}}.",
+  "world.objects.ready": "Připravené modely objektů: {kinds, plural, one {# druh} few {# druhy} many {# druhu} other {# druhů}}, {textures, plural, one {# textura} few {# textury} many {# textury} other {# textur}}{problems, plural, =0 {} one {; problémy: #, viz protokol} few {; problémy: #, viz protokol} many {; problémy: #, viz protokol} other {; problémy: #, viz protokol}}.",
   "@world.objects.ready": "{first} is a message of MapWorks in English"
 }

@@ -16,26 +16,28 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement trafficCurvesDialog;
+        private ModalDialog trafficCurvesDialog;
         private TrafficCurveElement carCurve;
         private TrafficCurveElement passengerCurve;
         private Label trafficCurveReadout;
 
         private void SetUpTrafficCurves(VisualElement root)
         {
-            trafficCurvesDialog = new VisualElement { name = "traffic-curves-dialog" };
-            trafficCurvesDialog.AddToClassList("dialog-overlay");
-            trafficCurvesDialog.style.display = DisplayStyle.None;
-            var dialog = new VisualElement();
-            dialog.AddToClassList("dialog");
-            dialog.AddToClassList("content-folders");
-            dialog.style.width = 640;
-            var title = LocBindings.NewLabel("trafficcurves.title");
-            title.AddToClassList("popup-title");
-            dialog.Add(title);
-            var description = LocBindings.NewLabel("trafficcurves.description");
-            description.AddToClassList("popup-description");
-            dialog.Add(description);
+            // No text field, so Enter does nothing; Esc and Cancel leave without writing; a click beside the dialog closes nothing.
+            trafficCurvesDialog = NewDialog(new DialogOptions
+            {
+                Name = "traffic-curves-dialog",
+                TitleKey = "trafficcurves.title",
+                DescriptionKey = "trafficcurves.description",
+                Width = DialogWidth.Wide,
+                EnterPressesPrimary = false,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "trafficcurves.cancel", Role = DialogButtonRole.Cancel },
+                    new DialogButton { TextKey = "trafficcurves.apply", Role = DialogButtonRole.Primary, Clicked = ApplyTrafficCurves, Closes = false }
+                }
+            });
+            var dialog = trafficCurvesDialog.Body;
 
             carCurve = new TrafficCurveElement();
             passengerCurve = new TrafficCurveElement();
@@ -44,33 +46,18 @@ namespace OmsiMapEditor.UI
             dialog.Add(CurveSection("trafficcurves.cars", carCurve, "trafficcurves.cars.tooltip"));
             dialog.Add(CurveSection("trafficcurves.passengers", passengerCurve, "trafficcurves.passengers.tooltip"));
             dialog.Add(trafficCurveReadout);
-
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("trafficcurves.cancel", () => HidePopup(trafficCurvesDialog));
-            cancel.AddToClassList("map-control-button");
-            buttons.Add(cancel);
-            var apply = LocBindings.NewButton("trafficcurves.apply", ApplyTrafficCurves);
-            apply.AddToClassList("map-control-button");
-            apply.AddToClassList("dialog-primary");
-            buttons.Add(apply);
-            dialog.Add(buttons);
-            trafficCurvesDialog.Add(dialog);
-            root.Add(trafficCurvesDialog);
         }
 
         /// <summary>A heading with a reset button, the graph and the hours under it.</summary>
         private VisualElement CurveSection(string headingKey, TrafficCurveElement curve, string tooltipKey)
         {
             var section = new VisualElement();
-            section.style.marginTop = 8;
+            section.AddToClassList("form-curve-section");
             var header = new VisualElement();
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.alignItems = Align.Center;
+            header.AddToClassList("form-curve-header");
             var heading = LocBindings.NewLabel(headingKey); // i18n:keys
             heading.AddToClassList("inspector-section-heading");
-            heading.style.flexGrow = 1;
-            heading.style.marginBottom = 0;
+            heading.AddToClassList("form-curve-heading");
             LocBindings.Tooltip(heading, tooltipKey); // i18n:keys
             header.Add(heading);
             var reset = LocBindings.NewButton("trafficcurves.reset", () => curve.Reset());
@@ -80,15 +67,12 @@ namespace OmsiMapEditor.UI
             section.Add(header);
             section.Add(curve);
             var hours = new VisualElement();
-            hours.style.flexDirection = FlexDirection.Row;
-            hours.style.justifyContent = Justify.SpaceBetween;
+            hours.AddToClassList("form-curve-hours");
             foreach (var hour in new[] { 0, 6, 12, 18, 24 })
             {
                 var tick = new Label(hour.ToString(CultureInfo.InvariantCulture) + ":00");
                 tick.AddToClassList("popup-description");
-                tick.style.fontSize = 10;
-                tick.style.marginTop = 0;
-                tick.style.marginBottom = 0;
+                tick.AddToClassList("form-hour-tick");
                 hours.Add(tick);
             }
             section.Add(hours);
@@ -108,7 +92,7 @@ namespace OmsiMapEditor.UI
             carCurve.SetCurve(OmsiTrafficCurve.Hourly(session.ReadTrafficCurve(false)));
             passengerCurve.SetCurve(OmsiTrafficCurve.Hourly(session.ReadTrafficCurve(true)));
             trafficCurveReadout.text = string.Empty;
-            trafficCurvesDialog.style.display = DisplayStyle.Flex;
+            trafficCurvesDialog.Show();
         }
 
         private void ApplyTrafficCurves()
@@ -129,7 +113,7 @@ namespace OmsiMapEditor.UI
                 SetStatusT("trafficcurves.status.failed", ("reason", exception.Message));
                 return;
             }
-            HidePopup(trafficCurvesDialog);
+            trafficCurvesDialog.Hide();
             SetStatusT(changed ? "trafficcurves.status.changed" : "trafficcurves.status.unchanged"); // i18n:keys
         }
 
@@ -163,7 +147,7 @@ namespace OmsiMapEditor.UI
         {
             var button = new Button(OpenTrafficCurves) { text = Loc.T("trafficcurves.open"), tooltip = Loc.T("trafficcurves.open.tooltip") };
             button.AddToClassList("map-control-button");
-            button.style.marginTop = 4;
+            button.AddToClassList("form-button-top");
             return button;
         }
     }

@@ -81,8 +81,6 @@ namespace OmsiMapEditor.UI
         }
         private Button signalWizardUseButton;
 
-        /// <summary>Back and Use, below the assistant's scrolling page so they stay in sight.</summary>
-        private VisualElement signalWizardButtons;
         private OmsiSignalProposal signalProposal;
         private readonly OmsiSignalWizardOptions signalWizardOptions = new OmsiSignalWizardOptions();
         private bool signalWizardConfirm;
@@ -94,101 +92,104 @@ namespace OmsiMapEditor.UI
         /// <summary>Heads that could not be placed in the last placing, which the status names.</summary>
         private int signalHeadFailures;
 
-        /// <summary>The button that opens the assistant, offered on the movements and the empty phases page.</summary>
-        private Button SignalWizardButton()
-        {
-            var button = LocBindings.WithTooltip(LocBindings.NewButton("signals.wizard.open", OpenSignalWizard), "signals.wizard.open.tooltip");
-            button.AddToClassList("map-control-button");
-            button.AddToClassList("dialog-primary");
-            return button;
-        }
-
         private VisualElement CreateSignalWizardPage()
         {
-            signalWizardPage = new ScrollView(ScrollViewMode.Vertical);
-            signalWizardPage.AddToClassList("signal-scroll-page");
+            var wrapper = new VisualElement();
+            wrapper.AddToClassList("signal-wrapper-page");
+            wrapper.Add(BuildSignalWizardToolbar());
+            var page = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
+            page.AddToClassList("signal-wrapper-scroll");
+            page.contentContainer.AddToClassList("signal-columns");
+            wrapper.Add(page);
+            signalWizardPage = wrapper;
+            // The settings on the left, what they propose on the right.
+            var colA = new VisualElement();
+            colA.AddToClassList("signal-column");
+            colA.AddToClassList("signal-column-settings");
+            var colB = new VisualElement();
+            colB.AddToClassList("signal-column");
+            colB.AddToClassList("signal-column-proposal");
+            page.Add(colA);
+            page.Add(colB);
             var title = LocBindings.NewLabel("signals.wizard.title");
             title.AddToClassList("inspector-section-heading");
-            signalWizardPage.Add(title);
+            colA.Add(title);
             signalWizardInfo = new Label();
             signalWizardInfo.AddToClassList("panel-info");
-            signalWizardPage.Add(signalWizardInfo);
+            colA.Add(signalWizardInfo);
 
-            signalWizardLeftToggle = new Toggle();
-            LocBindings.Text(signalWizardLeftToggle, "signals.wizard.separate_left");
-            LocBindings.Tooltip(signalWizardLeftToggle, "signals.wizard.separate_left.tooltip");
-            signalWizardLeftToggle.value = signalWizardOptions.SeparateLeftTurns;
+            signalWizardTimes = new VisualElement();
+            signalWizardTimes.AddToClassList("signal-phase-groups");
+            colA.Add(signalWizardTimes);
+
+            var groupsTitle = LocBindings.NewLabel("signals.wizard.groups");
+            groupsTitle.AddToClassList("inspector-section-heading");
+            colB.Add(groupsTitle);
+            signalWizardGroups = new VisualElement();
+            colB.Add(signalWizardGroups);
+            signalWizardTimeline = new SignalTimelineElement();
+            colB.Add(signalWizardTimeline);
+            signalWizardCheck = new Label();
+            signalWizardCheck.AddToClassList("panel-info");
+            signalWizardCheck.AddToClassList("signal-issues");
+            colB.Add(signalWizardCheck);
+
+            signalWizardHeadType = SignalHeadTypeField("signals.heads.type");
+            colA.Add(signalWizardHeadType);
+            signalWizardLeftHeadType = SignalHeadTypeField("signals.heads.left_type");
+            colA.Add(signalWizardLeftHeadType);
+            signalWizardHeadHeight = new TextField { isDelayed = true, value = Seconds(DefaultHeadHeight) };
+            LocBindings.Text(signalWizardHeadHeight, "signals.heads.height");
+            LocBindings.Tooltip(signalWizardHeadHeight, "signals.heads.height.tooltip");
+            signalWizardHeadHeight.AddToClassList("picker-field");
+            signalWizardHeadHeight.AddToClassList("signal-labelled-field");
+            colA.Add(signalWizardHeadHeight);
+            signalWizardMastType = SignalHeadTypeField("signals.heads.mast");
+            LocBindings.Tooltip(signalWizardMastType, "signals.heads.mast.tooltip");
+            colA.Add(signalWizardMastType);
+            signalWizardMastSearch = new TextField { isDelayed = true };
+            LocBindings.Text(signalWizardMastSearch, "signals.heads.mast_search");
+            LocBindings.Tooltip(signalWizardMastSearch, "signals.heads.mast_search.tooltip");
+            signalWizardMastSearch.AddToClassList("picker-field");
+            signalWizardMastSearch.AddToClassList("signal-labelled-field");
+            signalWizardMastSearch.RegisterValueChangedCallback(_ => FillSignalMastTypes(true));
+            colA.Add(signalWizardMastSearch);
+
+            signalWizardPage.style.display = DisplayStyle.None;
+            return signalWizardPage;
+        }
+
+        /// <summary>
+        /// The assistant's bar: use the proposal (the second click that replaces groups says so in red), cancel, and what it proposes on or off.
+        /// What is replaced stands in the text of the proposal below.
+        /// </summary>
+        private VisualElement BuildSignalWizardToolbar()
+        {
+            var bar = new VisualElement();
+            bar.AddToClassList("signal-toolbar");
+            signalWizardUseButton = SignalLabelButton("check", "signals.wizard.use", "signals.wizard.use.tooltip", UseSignalProposal);
+            signalWizardUseButton.AddToClassList("option-icon-primary");
+            bar.Add(signalWizardUseButton);
+            bar.Add(SignalLabelButton("arrow-left", "signals.wizard.back", "signals.wizard.back.tooltip", () => ShowSignalTab(SignalTab.Movements)));
+            var options = new VisualElement();
+            options.AddToClassList("signal-toolbar-switches");
+            signalWizardLeftToggle = OptionControls.Switch(options, "corner-up-left", "signals.wizard.separate_left", "signals.wizard.separate_left.tooltip",
+                signalWizardOptions.SeparateLeftTurns);
             signalWizardLeftToggle.RegisterValueChangedCallback(evt =>
             {
                 signalWizardOptions.SeparateLeftTurns = evt.newValue;
                 RenderSignalWizard();
             });
-            signalWizardPage.Add(signalWizardLeftToggle);
-
-            signalWizardFootToggle = new Toggle();
-            LocBindings.Text(signalWizardFootToggle, "signals.wizard.foot");
-            LocBindings.Tooltip(signalWizardFootToggle, "signals.wizard.foot.tooltip");
-            signalWizardFootToggle.value = signalWizardOptions.PedestrianLights;
+            signalWizardFootToggle = OptionControls.Switch(options, "footprints", "signals.wizard.foot", "signals.wizard.foot.tooltip", signalWizardOptions.PedestrianLights);
             signalWizardFootToggle.RegisterValueChangedCallback(evt =>
             {
                 signalWizardOptions.PedestrianLights = evt.newValue;
                 RenderSignalWizard();
             });
-            signalWizardPage.Add(signalWizardFootToggle);
-
-            signalWizardTimes = new VisualElement();
-            signalWizardTimes.AddToClassList("signal-phase-groups");
-            signalWizardPage.Add(signalWizardTimes);
-
-            var groupsTitle = LocBindings.NewLabel("signals.wizard.groups");
-            groupsTitle.AddToClassList("inspector-section-heading");
-            signalWizardPage.Add(groupsTitle);
-            signalWizardGroups = new VisualElement();
-            signalWizardPage.Add(signalWizardGroups);
-            signalWizardTimeline = new SignalTimelineElement();
-            signalWizardPage.Add(signalWizardTimeline);
-            signalWizardCheck = new Label();
-            signalWizardCheck.AddToClassList("panel-info");
-            signalWizardCheck.AddToClassList("signal-issues");
-            signalWizardPage.Add(signalWizardCheck);
-
-            signalWizardHeadsToggle = new Toggle { value = true };
-            LocBindings.Text(signalWizardHeadsToggle, "signals.wizard.heads");
-            LocBindings.Tooltip(signalWizardHeadsToggle, "signals.wizard.heads.tooltip");
+            signalWizardHeadsToggle = OptionControls.Switch(options, "traffic-light", "signals.wizard.heads", "signals.wizard.heads.tooltip", true);
             signalWizardHeadsToggle.RegisterValueChangedCallback(_ => RenderSignalWizard());
-            signalWizardPage.Add(signalWizardHeadsToggle);
-            signalWizardHeadType = SignalHeadTypeField("signals.heads.type");
-            signalWizardPage.Add(signalWizardHeadType);
-            signalWizardLeftHeadType = SignalHeadTypeField("signals.heads.left_type");
-            signalWizardPage.Add(signalWizardLeftHeadType);
-            signalWizardHeadHeight = new TextField { isDelayed = true, value = Seconds(DefaultHeadHeight) };
-            LocBindings.Text(signalWizardHeadHeight, "signals.heads.height");
-            LocBindings.Tooltip(signalWizardHeadHeight, "signals.heads.height.tooltip");
-            signalWizardHeadHeight.AddToClassList("picker-field");
-            signalWizardPage.Add(signalWizardHeadHeight);
-            signalWizardMastType = SignalHeadTypeField("signals.heads.mast");
-            LocBindings.Tooltip(signalWizardMastType, "signals.heads.mast.tooltip");
-            signalWizardPage.Add(signalWizardMastType);
-            signalWizardMastSearch = new TextField { isDelayed = true };
-            LocBindings.Text(signalWizardMastSearch, "signals.heads.mast_search");
-            LocBindings.Tooltip(signalWizardMastSearch, "signals.heads.mast_search.tooltip");
-            signalWizardMastSearch.AddToClassList("picker-field");
-            signalWizardMastSearch.RegisterValueChangedCallback(_ => FillSignalMastTypes(true));
-            signalWizardPage.Add(signalWizardMastSearch);
-
-            var buttons = new VisualElement();
-            buttons.AddToClassList("signal-group-row");
-            var back = LocBindings.WithTooltip(LocBindings.NewButton("signals.wizard.back", () => ShowSignalTab(SignalTab.Movements)), "signals.wizard.back.tooltip");
-            back.AddToClassList("map-control-button");
-            buttons.Add(back);
-            signalWizardUseButton = LocBindings.WithTooltip(LocBindings.NewButton("signals.wizard.use", UseSignalProposal), "signals.wizard.use.tooltip");
-            signalWizardUseButton.AddToClassList("map-control-button");
-            signalWizardUseButton.AddToClassList("dialog-primary");
-            buttons.Add(signalWizardUseButton);
-            signalWizardButtons = buttons;
-            signalWizardButtons.style.display = DisplayStyle.None;
-            signalWizardPage.style.display = DisplayStyle.None;
-            return signalWizardPage;
+            bar.Add(options);
+            return bar;
         }
 
         private DropdownField SignalHeadTypeField(string key)
@@ -230,6 +231,7 @@ namespace OmsiMapEditor.UI
             if (signalWizardPage == null || signalCrossing == null || !SignalsEditable)
                 return;
             var crossing = signalCrossing;
+            var focusKey = SignalFocus.Capture(signalWizardPage);
             // The footpaths over the arms of a junction made here can follow a light: those with a way to bind them by.
             var bindableFootpaths = crossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && WayOf(movement) != null).Select(movement => movement.Index).ToList();
             var proposal = OmsiSignalWizard.Propose(crossing, SignalConflicts(), signalWizardOptions, OmsiSignalWizard.TurnLaneMovements(crossing, signalLayout), bindableFootpaths);
@@ -310,9 +312,17 @@ namespace OmsiMapEditor.UI
             signalWizardMastType.style.display = placing ? DisplayStyle.Flex : DisplayStyle.None;
             signalWizardMastSearch.style.display = placing ? DisplayStyle.Flex : DisplayStyle.None;
 
-            signalWizardUseButton.text = Loc.T(signalWizardConfirm ? "signals.wizard.confirm" : "signals.wizard.use", ("count", signalProgram.Lights.Count)); // i18n:keys
+            // The button is an icon: the second click that replaces groups shows red and says so in the tooltip and in the status bar.
+            signalWizardUseButton.tooltip = LocBindings.CardTooltip(Loc.T("signals.wizard.use"), Loc.T(signalWizardConfirm ? "signals.wizard.confirm" : "signals.wizard.use.tooltip", // i18n:keys
+                ("count", signalProgram.Lights.Count)));
+            signalWizardUseButton.EnableInClassList("option-icon-confirm", signalWizardConfirm);
+            signalWizardUseButton.EnableInClassList("option-icon-primary", !signalWizardConfirm);
+            LocBindings.Text(signalWizardUseButton.Q<Label>(), signalWizardConfirm ? "signals.wizard.use_replace" : "signals.wizard.use"); // i18n:keys
+            signalConfirmText = signalWizardConfirm ? Loc.T("signals.wizard.confirm", ("count", signalProgram.Lights.Count)) : string.Empty;
+            RefreshSignalHint();
             signalWizardUseButton.SetEnabled(proposal.Groups.Count > 0);
             UpdateSignalPreview();
+            SignalFocus.Restore(signalWizardPage, focusKey);
         }
 
         private VisualElement SignalWizardField(string key, double value, bool zeroAllowed, Action<double> changed)
@@ -323,13 +333,15 @@ namespace OmsiMapEditor.UI
                     return;
                 changed(seconds);
                 RenderSignalWizard();
-            }, zeroAllowed);
+            }, zeroAllowed, "focus:wizard:" + key);
         }
 
         /// <summary>Writes the proposal: groups, program and bindings anew, with heads when chosen, as one undo step.</summary>
         private void UseSignalProposal()
         {
             if (!SignalsEditable || signalProposal == null || signalProposal.Groups.Count == 0)
+                return;
+            if (!SignalGate(UseSignalProposal))
                 return;
             if (signalProgram.Lights.Count > 0 && !signalWizardConfirm)
             {
@@ -951,7 +963,7 @@ namespace OmsiMapEditor.UI
                 var chip = new VisualElement();
                 chip.AddToClassList("signal-group-chip");
                 var light = head.LightIndex ?? 0;
-                chip.style.backgroundColor = light < program.Lights.Count ? SignalGroupColour(light) : new Color(0.5f, 0.5f, 0.5f);
+                chip.style.backgroundColor = light < program.Lights.Count ? SignalColourOf(light) : new Color(0.5f, 0.5f, 0.5f);
                 row.Add(chip);
                 var text = new Label(Loc.T("signals.heads.row", ("id", head.Id), ("type", Path.GetFileNameWithoutExtension(head.AssetPath))));
                 text.AddToClassList("signal-movement-text");
@@ -972,9 +984,8 @@ namespace OmsiMapEditor.UI
                     signalCrossing.Movements.Any(movement => movement.Light == light && movement.Approach >= 0)).ToList();
                 if (missing.Count > 0)
                 {
-                    var button = LocBindings.WithTooltip(LocBindings.NewButton("signals.heads.place", () => PlaceMissingSignalHeads(missing)), "signals.heads.place.tooltip");
-                    button.AddToClassList("map-control-button");
-                    signalHeadsBox.Add(button);
+                    var placeGroup = OptionControls.Group(signalHeadsBox);
+                    OptionControls.Choice(placeGroup, "traffic-light", "signals.heads.place", "signals.heads.place.tooltip", () => PlaceMissingSignalHeads(missing));
                     // What the button places with: the head, mast and height last set in the assistant.
                     FillSignalHeadTypes(signalWizardHeadType, false);
                     FillSignalMastTypes(false);
@@ -1020,8 +1031,8 @@ namespace OmsiMapEditor.UI
             if (change == null)
                 return;
             var program = SignalsEditable && signalDraft != null ? signalDraft : signalProgram;
-            PushSteps(new List<object> { change }, Loc.T("signals.heads.step", ("id", head.Id)));
-            RefreshSignalTarget();
+            KeepingSignalDraft(() => PushSteps(new List<object> { change }, Loc.T("signals.heads.step", ("id", head.Id))));
+            RefreshSignalTarget(true);
             SetStatus(Loc.T("signals.heads.done", ("id", head.Id), ("name", light >= 0 && light < program.Lights.Count ? program.Lights[light].Name : "-")));
         }
 
@@ -1049,11 +1060,11 @@ namespace OmsiMapEditor.UI
             if (steps.Count == 0)
             {
                 SetStatusT("signals.heads.status.place_failed", ("count", signalHeadFailures));
-                RefreshAfterChange(null);
+                KeepingSignalDraft(() => RefreshAfterChange(null));
                 return;
             }
-            PushSteps(steps, Loc.T("signals.heads.step_place", ("id", signalJunction.Id)));
-            RefreshSignalTarget();
+            KeepingSignalDraft(() => PushSteps(steps, Loc.T("signals.heads.step_place", ("id", signalJunction.Id))));
+            RefreshSignalTarget(true);
             SetStatus(Loc.T("signals.heads.done_place", ("count", steps.Count(step => step is OmsiObjectChange change && change.Kind == OmsiObjectChangeKind.Placement)),
                 ("id", signalJunction.Id)));
             if (signalHeadFailures > 0)

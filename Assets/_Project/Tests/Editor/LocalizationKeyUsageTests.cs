@@ -70,9 +70,41 @@ namespace OmsiMapEditor.Tests
             }
 
             Assert.IsEmpty(problems, "\n" + string.Join("\n", problems));
-            var unused = english.Messages.Keys.Where(key => !used.Contains(key)).OrderBy(key => key, StringComparer.Ordinal).ToList();
-            if (unused.Count > 0)
-                Console.WriteLine("Texts in locales/en-US that no code asks for yet: " + string.Join(", ", unused));
+        }
+
+        /// <summary>
+        /// A text in locales/en-US that no code asks for is a failure, without a list of exceptions (owner's decision 5A of 22 November 2026;
+        /// M8 step 3 deleted the last 70 from all eight languages). Delete the text and its translator note from every language, or use it.
+        /// </summary>
+        [Test]
+        public void NoTextIsLeftThatNoCodeAsksFor()
+        {
+            var english = LocaleLoader.Load(English());
+            var areas = new HashSet<string>(english.Messages.Keys.Select(key => key.Substring(0, key.IndexOf('.'))), StringComparer.Ordinal);
+            var used = new HashSet<string>(FindUses(areas).Where(use => use.Literal).Select(use => use.Key), StringComparer.Ordinal);
+            var composed = ComposedParts();
+            var unused = english.Messages.Keys.Where(key => !used.Contains(key) && !IsBuiltFromParts(key, used, composed)).OrderBy(key => key, StringComparer.Ordinal).ToList();
+
+            Assert.IsEmpty(unused, unused.Count + " texts in locales/en-US are asked for by no code: " + string.Join(", ", unused)
+                + ". Delete them (and their @notes) from all eight languages, or use them.");
+        }
+
+        [Test]
+        public void ATextBuiltFromPiecesOnALineMarkedI18nKeysCountsAsUsed()
+        {
+            var text = "Loc.T(\"mapcheck.parking.\" + fault, (\"id\", 1)); // i18n:keys\n" +
+                       "var a = Loc.T(pair.Key + \".problem\"); // i18n:keys\n" +
+                       "var b = Loc.T(\"other.thing.\" + x);\n";
+            var parts = new Parts();
+            Collect(parts, text);
+
+            CollectionAssert.AreEquivalent(new[] { "mapcheck.parking." }, parts.Prefixes);
+            CollectionAssert.AreEquivalent(new[] { ".problem" }, parts.Suffixes);
+            var used = new HashSet<string> { "line.result.ring" };
+            Assert.IsTrue(IsBuiltFromParts("mapcheck.parking.side", used, parts));
+            Assert.IsTrue(IsBuiltFromParts("line.result.ring.problem", used, parts));
+            Assert.IsFalse(IsBuiltFromParts("line.result.out.problem", used, parts), "the text that is the stem must be asked for itself");
+            Assert.IsFalse(IsBuiltFromParts("other.thing.x", used, parts), "a line without i18n:keys declares nothing");
         }
 
         [Test]
@@ -190,6 +222,56 @@ namespace OmsiMapEditor.Tests
                     return folder;
             Assert.Fail("The repository root was not found from " + Directory.GetCurrentDirectory());
             return null;
+        }
+
+        private sealed class Parts
+        {
+            /// <summary>Texts ending in a dot on lines marked i18n:keys: the start of a key whose end the code adds ("mapcheck.parking." + fault).</summary>
+            public readonly HashSet<string> Prefixes = new HashSet<string>(StringComparer.Ordinal);
+
+            /// <summary>Texts starting with a dot on lines marked i18n:keys: the end the code adds to a key it has ("line.result.ring" + ".problem").</summary>
+            public readonly HashSet<string> Suffixes = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        private static readonly Regex PrefixLiteral = new Regex("\"([a-z][a-z0-9]*(?:\\.[a-z0-9_]+)*\\.)\"", RegexOptions.CultureInvariant);
+        private static readonly Regex SuffixLiteral = new Regex("\"(\\.[a-z0-9_]+(?:\\.[a-z0-9_]+)*)\"", RegexOptions.CultureInvariant);
+
+        private static Parts ComposedParts()
+        {
+            var parts = new Parts();
+            var scripts = Path.Combine(RepositoryRoot(), "Assets", "_Project", "Scripts");
+            foreach (var file in Directory.GetFiles(scripts, "*.cs", SearchOption.AllDirectories))
+                Collect(parts, File.ReadAllText(file));
+            return parts;
+        }
+
+        private static void Collect(Parts parts, string text)
+        {
+            foreach (var line in text.Split('\n'))
+            {
+                if (!line.Contains("i18n:keys"))
+                    continue;
+                foreach (Match match in PrefixLiteral.Matches(line))
+                    parts.Prefixes.Add(match.Groups[1].Value);
+                foreach (Match match in SuffixLiteral.Matches(line))
+                    parts.Suffixes.Add(match.Groups[1].Value);
+            }
+        }
+
+        /// <summary>
+        /// A key the code builds from pieces: it starts with a prefix a marked line names, or it is a key the code asks for plus a suffix a
+        /// marked line names. The scanner cannot see which of the keys with that start the code really reaches; a truly orphaned key that
+        /// shares such a start stays unseen (the price of keys built from an enum name or a table).
+        /// </summary>
+        private static bool IsBuiltFromParts(string key, HashSet<string> used, Parts parts)
+        {
+            foreach (var prefix in parts.Prefixes)
+                if (key.StartsWith(prefix, StringComparison.Ordinal))
+                    return true;
+            foreach (var suffix in parts.Suffixes)
+                if (key.EndsWith(suffix, StringComparison.Ordinal) && used.Contains(key.Substring(0, key.Length - suffix.Length)))
+                    return true;
+            return false;
         }
 
         private static List<Use> FindUses(HashSet<string> areas)

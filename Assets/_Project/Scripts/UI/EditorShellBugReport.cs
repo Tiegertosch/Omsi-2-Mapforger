@@ -23,7 +23,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The longest stretch of a log read for a report, from its end.</summary>
         private const int BugReportLogBytes = 8 * 1024 * 1024;
 
-        private VisualElement bugReportDialog;
+        private ModalDialog bugReportDialog;
         private BugReportDialog bugReportForm;
         private string sessionMarker;
         private DateTime crashedSessionStart;
@@ -31,14 +31,22 @@ namespace OmsiMapEditor.UI
 
         private void InitializeBugReport(VisualElement root, VisualElement helpMenu)
         {
-            bugReportDialog = root.Q<VisualElement>("bug-report-dialog");
-            if (bugReportDialog != null)
+            // One line and three text areas: Enter does nothing here, the form cannot be sent by accident (rule 2B). Send stays open
+            // until the report was written.
+            bugReportDialog = NewDialog(new DialogOptions
             {
-                bugReportForm = new BugReportDialog();
-                bugReportForm.Cancelled += () => HidePopup(bugReportDialog);
-                bugReportForm.SendRequested += SendBugReport;
-                bugReportDialog.Add(bugReportForm);
-            }
+                Name = "bug-report-dialog",
+                TitleKey = "bugreport.title",
+                DescriptionKey = "bugreport.intro",
+                Width = DialogWidth.Standard,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "bugreport.cancel", Role = DialogButtonRole.Cancel },
+                    new DialogButton { TextKey = "bugreport.send", Role = DialogButtonRole.Primary, Clicked = SendBugReport, Closes = false }
+                }
+            });
+            bugReportForm = new BugReportDialog(bugReportDialog);
+            bugReportDialog.Body.Add(bugReportForm);
             var menuItem = root.Q<Button>("report-bug-menu-item");
             if (menuItem != null)
                 menuItem.clicked += () =>
@@ -117,7 +125,7 @@ namespace OmsiMapEditor.UI
             if (bugReportDialog == null || bugReportForm == null)
                 return;
             bugReportForm.Open(crashed);
-            bugReportDialog.style.display = DisplayStyle.Flex;
+            bugReportDialog.Show();
         }
 
         /// <summary>
@@ -171,7 +179,7 @@ namespace OmsiMapEditor.UI
             var url = report.IssueUrl(out var complete);
             if (!complete)
                 GUIUtility.systemCopyBuffer = report.Body();
-            HidePopup(bugReportDialog);
+            bugReportDialog.Hide();
             SetStatusT("bugreport.status", ("clipboard", complete ? "yes" : "no"), ("hasfile", logFile != null ? "yes" : "no"),
                 ("file", logFile != null ? Path.GetFileName(logFile) : string.Empty));
             Debug.Log("Bug report: " + statusLabel?.text + " Address " + url.Length + " characters" + (folder != null ? ", files in " + folder : string.Empty) + ".");

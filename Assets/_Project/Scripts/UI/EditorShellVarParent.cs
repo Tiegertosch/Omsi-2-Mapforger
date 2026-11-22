@@ -34,7 +34,7 @@ namespace OmsiMapEditor.UI
             var canEdit = CanEdit;
             var container = new VisualElement();
             if (nested)
-                container.style.marginLeft = 12;
+                container.AddToClassList("mf-indent");
             if (nested)
             {
                 var heading = LocBindings.NewLabel("varparent.group");
@@ -162,9 +162,13 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.var_parent"));
                 return;
             }
+            if (!SignalToolMayYield(SignalExitKind.Action, () => StartVarParentPick(tile, element)))
+                return;
             StopPlacement();
             if (activeTool != EditorTool.Drag)
                 SetTool(EditorTool.Drag);
+            if (activeTool == EditorTool.Signals)
+                return;
             varParentPickTile = tile;
             varParentPickElement = element;
             SetStatus(Loc.T("varparent.status.pick", ("element", DescribeElement(element))));

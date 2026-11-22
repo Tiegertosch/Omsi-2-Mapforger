@@ -9,3 +9,5 @@
 *.asset text eol=lf
 *.meta text eol=lf
 *.md text eol=lf
+*.svg.txt text eol=lf
+Assets/_Project/Settings/PlayerAssetReview.txt text eol=lf

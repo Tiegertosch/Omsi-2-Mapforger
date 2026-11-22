@@ -19,5 +19,6 @@
   "timetable.stopping.1": "If wanted",
   "timetable.stopping.2": "Passed",
   "timetable.stopping.3": "If early",
-  "timetable.stopping.4": "If wanted (4)"
+  "timetable.stopping.4": "If wanted (4)",
+  "line.edit.title": "Trip {trip}"
 }

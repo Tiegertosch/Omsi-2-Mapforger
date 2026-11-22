@@ -13,7 +13,8 @@ namespace OmsiMapEditor.UI
     /// <summary>
     /// The dialog for a new map (ADR 032): names and description, the template, size, ground height and texture, which
     /// side traffic keeps to, how busy cars and passengers are, rail, years, money, tickets and seasons. Every setting
-    /// starts with the template's value. The shell creates the map when <see cref="CreateRequested"/> fires.
+    /// starts with the template's value. The shell creates the map when <see cref="CreateRequested"/> fires. The form is the body of
+    /// a <see cref="ModalDialog"/> (M7 step 5), which owns the title, the intro and the buttons; the form changes them for the settings of the open map.
     /// </summary>
     internal sealed class NewMapDialog : VisualElement
     {
@@ -33,7 +34,7 @@ namespace OmsiMapEditor.UI
         private readonly Slider passengerSlider = new Slider(0f, 2f);
         private readonly Label carLabel = new Label();
         private readonly Label passengerLabel = new Label();
-        private readonly Toggle railToggle = new Toggle();
+        private Toggle railToggle;
         private readonly TextField firstYearField = new TextField();
         private readonly TextField lastYearField = new TextField();
         private readonly TextField offsetField = new TextField();
@@ -43,9 +44,7 @@ namespace OmsiMapEditor.UI
         private readonly ScrollView swatches = new ScrollView(ScrollViewMode.Horizontal);
         private readonly Label groundLabel = new Label();
         private readonly Label targetLabel = new Label();
-        private readonly Button createButton;
-        private readonly Label titleLabel;
-        private readonly Label introLabel;
+        private readonly ModalDialog host;
         private readonly List<VisualElement> creationOnly = new List<VisualElement>();
         private readonly List<VisualElement> trafficRows = new List<VisualElement>();
         private Button seasonKeepButton;
@@ -66,20 +65,11 @@ namespace OmsiMapEditor.UI
         /// <summary>True while the dialog changes the settings of the open map instead of making a new one (ADR 076).</summary>
         private bool editing;
 
-        public NewMapDialog()
+        public NewMapDialog(ModalDialog host)
         {
-            AddToClassList("dialog");
-            AddToClassList("new-map-dialog");
-            titleLabel = LocBindings.NewLabel("newmap.title");
-            titleLabel.AddToClassList("popup-title");
-            Add(titleLabel);
-            introLabel = LocBindings.NewLabel("newmap.intro");
-            introLabel.AddToClassList("popup-description");
-            Add(introLabel);
-
-            var body = new ScrollView(ScrollViewMode.Vertical);
-            body.AddToClassList("new-map-body");
-            Add(body);
+            this.host = host ?? throw new ArgumentNullException(nameof(host));
+            // The form is added to the body of the dialog, which scrolls when the window is small.
+            VisualElement body = this;
             var columns = new VisualElement();
             columns.AddToClassList("new-map-columns");
             body.Add(columns);
@@ -125,7 +115,7 @@ namespace OmsiMapEditor.UI
             {
                 var captured = size;
                 var button = new Button(() => SetSize(captured)) { text = size + "×" + size };
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 sizes.Add(button);
                 sizeButtons[size] = button;
             }
@@ -148,18 +138,16 @@ namespace OmsiMapEditor.UI
             LocBindings.Tooltip(leftButton, "newmap.traffic.left.tooltip");
             foreach (var button in new[] { rightButton, leftButton })
             {
-                button.AddToClassList("panel-tab");
+                OptionControls.AsTextChoice(button);
                 sides.Add(button);
             }
             var carRow = Row(right, "newmap.cars");
             var passengerRow = Row(right, "newmap.passengers");
             trafficRows.Add(carRow);
             trafficRows.Add(passengerRow);
-            AddSlider(carRow, carSlider, carLabel, "newmap.cars.tooltip");
-            AddSlider(passengerRow, passengerSlider, passengerLabel, "newmap.passengers.tooltip");
-            railToggle.AddToClassList("picker-option-toggle");
-            LocBindings.Tooltip(railToggle, "newmap.real_rail.tooltip");
-            Row(right, "newmap.real_rail").Add(railToggle);
+            AddSlider(carRow, "car", carSlider, carLabel, "newmap.cars", "newmap.cars.tooltip");
+            AddSlider(passengerRow, "user", passengerSlider, passengerLabel, "newmap.passengers", "newmap.passengers.tooltip");
+            railToggle = OptionControls.Switch(Row(right, "newmap.real_rail"), "train-front", "newmap.real_rail", "newmap.real_rail.tooltip", false);
 
             // Era and money.
             Section(right, "newmap.section.era");
@@ -183,6 +171,7 @@ namespace OmsiMapEditor.UI
             Section(right, "newmap.section.seasons");
             var seasons = Segmented(right);
             seasons.AddToClassList("new-map-seasons");
+            seasons.AddToClassList("option-icons-wrap");
             AddSeason(seasons, OmsiSeasonPreset.Template, "newmap.season.template", "newmap.season.template.tooltip");
             seasonKeepButton = seasonButtons[OmsiSeasonPreset.Template];
             AddSeason(seasons, OmsiSeasonPreset.FourWithSnow, "newmap.season.snow", "newmap.season.snow.tooltip");
@@ -195,21 +184,13 @@ namespace OmsiMapEditor.UI
             swatches.contentContainer.AddToClassList("new-map-swatches-content");
             body.Add(swatches);
             groundLabel.AddToClassList("new-map-hint");
+            groundLabel.AddToClassList("new-map-hint-flush");
             body.Add(groundLabel);
 
+            // The line about the target stays in view above the buttons, outside the scrolling body.
             targetLabel.AddToClassList("popup-description");
             targetLabel.AddToClassList("export-target");
-            Add(targetLabel);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("common.cancel", () => Cancelled?.Invoke());
-            cancel.AddToClassList("map-control-button");
-            createButton = LocBindings.NewButton("newmap.create", Create);
-            createButton.AddToClassList("map-control-button");
-            createButton.AddToClassList("dialog-primary");
-            buttons.Add(cancel);
-            buttons.Add(createButton);
-            Add(buttons);
+            host.Dialog.Insert(host.Dialog.childCount - 1, targetLabel);
 
             RegisterCallback<AttachToPanelEvent>(_ => schedule.Execute(TakeSwatches).Every(100));
         }
@@ -219,8 +200,6 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The settings of the open map are to be changed: display name and options (ADR 076).</summary>
         public event Action<string, OmsiNewMapOptions> SettingsRequested;
-
-        public event Action Cancelled;
 
         /// <summary>The texts that are computed from the dialog's state are written again, after a language change.</summary>
         public void RefreshTexts()
@@ -249,7 +228,6 @@ namespace OmsiMapEditor.UI
             nameField.SetValueWithoutNotify(name);
             folderField.SetValueWithoutNotify(FolderNameFor(name));
             UpdateTarget();
-            nameField.schedule.Execute(() => nameField.Focus());
         }
 
         /// <summary>
@@ -263,16 +241,15 @@ namespace OmsiMapEditor.UI
             nameField.SetValueWithoutNotify(friendlyName ?? string.Empty);
             descriptionField.SetValueWithoutNotify(description ?? string.Empty);
             UpdateTarget();
-            nameField.schedule.Execute(() => nameField.Focus());
         }
 
         /// <summary>Switches the texts and the fields between making a map and changing the settings of the open one.</summary>
         private void SetMode(bool edit)
         {
             editing = edit;
-            LocBindings.Text(titleLabel, edit ? "mapsettings.title" : "newmap.title"); // i18n:keys
-            LocBindings.Text(introLabel, edit ? "mapsettings.intro" : "newmap.intro"); // i18n:keys
-            LocBindings.Text(createButton, edit ? "mapsettings.apply" : "newmap.create"); // i18n:keys
+            LocBindings.Text(host.Title, edit ? "mapsettings.title" : "newmap.title"); // i18n:keys
+            LocBindings.Text(host.Description, edit ? "mapsettings.intro" : "newmap.intro"); // i18n:keys
+            LocBindings.Text(host.Primary, edit ? "mapsettings.apply" : "newmap.create"); // i18n:keys
             foreach (var element in creationOnly)
             {
                 if (edit)
@@ -382,7 +359,7 @@ namespace OmsiMapEditor.UI
         private void AddSeason(VisualElement parent, OmsiSeasonPreset preset, string textKey, string tooltipKey)
         {
             var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => SetSeasons(preset)), tooltipKey); // i18n:keys
-            button.AddToClassList("panel-tab");
+            OptionControls.AsTextChoice(button);
             parent.Add(button);
             seasonButtons[preset] = button;
         }
@@ -596,10 +573,11 @@ namespace OmsiMapEditor.UI
             var problem = Problem(out var target);
             targetLabel.text = problem ?? (editing ? Loc.T("mapsettings.note") : Loc.T("newmap.target", ("target", target)));
             targetLabel.EnableInClassList("export-problem", problem != null);
-            createButton.SetEnabled(problem == null);
+            host.Primary.SetEnabled(problem == null);
         }
 
-        private void Create()
+        /// <summary>The primary button: checks the fields and asks the shell to create the map or change the settings.</summary>
+        public void Submit()
         {
             var problem = Problem(out _);
             var result = problem == null ? ReadOptions(out problem) : null;
@@ -639,24 +617,12 @@ namespace OmsiMapEditor.UI
 
         private static VisualElement Row(VisualElement parent, string labelKey)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            row.AddToClassList("new-map-row");
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            text.AddToClassList("new-map-label");
-            row.Add(text);
-            parent.Add(row);
-            return row;
+            return OptionControls.Row(parent, labelKey, true, true);
         }
 
         private static VisualElement Segmented(VisualElement parent)
         {
-            var group = new VisualElement();
-            group.AddToClassList("panel-tabs");
-            group.AddToClassList("picker-segmented");
-            parent.Add(group);
-            return group;
+            return OptionControls.Group(parent);
         }
 
         private static void AddField(VisualElement row, TextField field, string tooltipKey)
@@ -668,15 +634,10 @@ namespace OmsiMapEditor.UI
             row.Add(field);
         }
 
-        private void AddSlider(VisualElement row, Slider slider, Label value, string tooltipKey)
+        private void AddSlider(VisualElement row, string icon, Slider slider, Label value, string nameKey, string tooltipKey)
         {
-            slider.AddToClassList("new-map-slider");
-            LocBindings.Tooltip(slider, tooltipKey); // i18n:keys
-            LocBindings.Tooltip(row, tooltipKey); // i18n:keys
             slider.RegisterValueChangedCallback(evt => ShowFactor(value, evt.newValue));
-            row.Add(slider);
-            value.AddToClassList("new-map-factor");
-            row.Add(value);
+            OptionControls.SliderBox(row, icon, slider, value, nameKey, tooltipKey);
         }
 
         private static void AddDropdown(VisualElement row, DropdownField field, string tooltipKey)

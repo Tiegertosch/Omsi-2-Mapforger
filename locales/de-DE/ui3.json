@@ -10,7 +10,6 @@
   "inspector.attach_hint_row": "Platziere ein Objekt auf einem freien Punkt des ersten Objekts der Reihe, um es dort anzuhängen; das Löschen der Reihe nimmt diese mit.",
   "inspector.attached_objects": "Angehängte Objekte",
   "inspector.attached_item": "Punkt {n}: #{id}  {name}",
-  "inspector.type_short": "Typ...",
   "inspector.detach": "Löschen",
   "inspector.detach.tooltip": "Nimmt dieses Objekt ab, samt dem, was daran hängt",
   "inspector.selected_object": "Gewähltes Objekt",
@@ -52,5 +51,11 @@
   "spline.step.heights": "Höhen von Spline #{id}",
   "export.created_open_prefix": "Die Karte wurde in {folder} angelegt, konnte aber nicht geöffnet werden: ",
   "map.status.opening": "{name} wird geöffnet: Die Karte wird gelesen...",
-  "map.status.own_project_failed": "Das Projekt dieser Karte konnte nicht in {folder} angelegt werden: {reason}"
+  "map.status.own_project_failed": "Das Projekt dieser Karte konnte nicht in {folder} angelegt werden: {reason}",
+  "inspector.selected_splines": "Gewählte Splines",
+  "inspector.count_objects": "{count, plural, one {# Objekt} other {# Objekte}}",
+  "inspector.count_splines": "{count, plural, one {# Spline} other {# Splines}}",
+  "inspector.delete_splines": "{count, plural, one {# Spline} other {# Splines}} löschen",
+  "inspector.view.full": "Vollständigen Inspector zeigen",
+  "inspector.view.compact": "Kompakten Inspector zeigen"
 }

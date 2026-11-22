@@ -55,6 +55,23 @@ namespace OmsiMapEditor.UI
         public bool Snapped;
     }
 
+    /// <summary>
+    /// A right-click in the map (ADR 098): what lies under the pointer, the object first, else the spline, else the tile, with the
+    /// tile-local position and where on the screen the pointer was, in panel coordinates.
+    /// </summary>
+    internal sealed class MapContextHit
+    {
+        public OmsiTileSummary Tile;
+        public OmsiObjectRecord Object;
+        public OmsiSplineRecord Spline;
+
+        /// <summary>A row of objects along a road under the pointer; not found by the map but by the shell, which knows the rows (M5).</summary>
+        public KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord>? Row;
+        public double LocalX;
+        public double LocalY;
+        public Vector2 ScreenPosition;
+    }
+
     /// <summary>Where a placement snaps to: the object's origin in world metres, its heading and absolute height.</summary>
     internal sealed class PlacementSnap
     {
@@ -106,6 +123,10 @@ namespace OmsiMapEditor.UI
         private static readonly CustomStyleProperty<Color> ObjectProperty = new CustomStyleProperty<Color>("--map-object");
         private static readonly CustomStyleProperty<Color> TreeProperty = new CustomStyleProperty<Color>("--map-tree");
         private static readonly CustomStyleProperty<Color> SelectionProperty = new CustomStyleProperty<Color>("--map-selection");
+        private static readonly CustomStyleProperty<Color> SelectionHaloProperty = new CustomStyleProperty<Color>("--map-selection-halo");
+        private static readonly CustomStyleProperty<Color> ErrorProperty = new CustomStyleProperty<Color>("--map-error");
+        private static readonly CustomStyleProperty<Color> WarningProperty = new CustomStyleProperty<Color>("--map-warning");
+        private static readonly CustomStyleProperty<Color> PathRailProperty = new CustomStyleProperty<Color>("--map-path-rail");
         private static readonly CustomStyleProperty<Color> PlacementProperty = new CustomStyleProperty<Color>("--map-placement");
         private static readonly CustomStyleProperty<Color> HandleProperty = new CustomStyleProperty<Color>("--map-handle");
         private static readonly CustomStyleProperty<Color> WireProperty = new CustomStyleProperty<Color>("--map-wire");
@@ -114,14 +135,18 @@ namespace OmsiMapEditor.UI
         private static readonly CustomStyleProperty<Color> QuietRouteProperty = new CustomStyleProperty<Color>("--map-route-quiet");
 
         private Color tileColor = Hex(0x202630);
-        private Color missingTileColor = Mix(Hex(0x202630), Hex(0xE06464), 0.3f);
+        private Color missingTileColor = Mix(Hex(0x202630), Hex(0xEA7676), 0.3f);
         private Color tileBorderColor = Hex(0x414B59);
-        private Color selectedTileColor = Hex(0xE6B450);
+        private Color selectedTileColor = Hex(0xF08A32);
+        private Color warningColor = Hex(0xE6B450);
+        private Color errorColor = Hex(0xEA7676);
+        private Color pathRailColor = Hex(0xB48EDB);
+        private Color selectionHaloColor = Hex(0x171C23, 0.85f);
         private Color splineColor = Hex(0xF08A32, 0.95f);
         private Color quietSplineColor = Hex(0xF08A32, 0.5f);
         private Color32 objectColor = Hex(0x65A9D9, 0.95f);
         private Color headingColor = Hex(0x65A9D9, 0.55f);
-        private Color selectedObjectColor = Hex(0xE06464);
+        private Color selectedObjectColor = Hex(0xF2F4F7);
         private Color outlineFillColor = Hex(0x65A9D9, 0.3f);
         private Color outlineStrokeColor = Hex(0x65A9D9, 0.85f);
         private Color treeFillColor = Hex(0x55B887, 0.3f);
@@ -129,7 +154,7 @@ namespace OmsiMapEditor.UI
         private Color placementColor = Hex(0x55B887);
         private Color placementPointColor = Hex(0xF08A32);
         private Color placementFillColor = Hex(0x55B887, 0.25f);
-        private Color boxFillColor = Hex(0xE06464, 0.12f);
+        private Color boxFillColor = Hex(0xF2F4F7, 0.12f);
         private Color handleFillColor = Hex(0x29313D);
         private Color wireColor = Hex(0xAEB8C5, 0.9f);
         private Color fenceColor = Hex(0x7E8A99, 0.95f);
@@ -220,11 +245,19 @@ namespace OmsiMapEditor.UI
 
             /// <summary>Overhead lines and fences are drawn as thin lines instead of road lines.</summary>
             public OmsiSplineLineKind LineKind;
+
+            /// <summary>What the 3D pick takes the spline for; built on demand, null without a surface.</summary>
+            public OmsiSplineRibbon Ribbon;
+
+            public bool RibbonBuilt;
         }
 
         private IReadOnlyDictionary<string, OmsiSplineLineKind> splineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
 
         private readonly List<SplinePath> splines = new List<SplinePath>();
+
+        /// <summary>The path of each spline record, found by reference: a selection of thousands must not search the list for each.</summary>
+        private readonly Dictionary<OmsiSplineRecord, SplinePath> splineByRecord = new Dictionary<OmsiSplineRecord, SplinePath>();
 
         /// <summary>A lane that timetable lines drive, once however many lines share it.</summary>
         private sealed class RouteLane
@@ -258,6 +291,7 @@ namespace OmsiMapEditor.UI
 
         // Heights of the preview points, for the 3D view; null where none were given.
         private readonly List<float[]> roadPreviewHeights = new List<float[]>();
+        private readonly List<Vector2[]> roadAccent = new List<Vector2[]>();
         private bool roadPreviewValid;
         private readonly List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>> roadIssues = new List<KeyValuePair<Vector2, OmsiRoadIssueSeverity>>();
         private Vector2? roadSnap;
@@ -321,6 +355,14 @@ namespace OmsiMapEditor.UI
         private DragMode dragMode;
         private int dragPointerId = -1;
         private Vector2 dragStartPointer;
+
+        /// <summary>True while the selection box in progress was started with Shift: it takes only splines, even over objects.</summary>
+        private bool boxSplinesOnly;
+
+        // A right button press that may end as a right-click: it opens the context menu if the pointer barely moves until release.
+        private bool rightClickCandidate;
+        private Vector2 rightDownPosition;
+        private const float RightClickSlack = 4f;
         private Vector2 dragLastPointer;
         private double dragStartLocalX;
         private double dragStartLocalY;
@@ -372,12 +414,15 @@ namespace OmsiMapEditor.UI
             generateVisualContent += Draw;
             RegisterCallback<PointerDownEvent>(OnPointerDown);
             RegisterCallback<PointerMoveEvent>(OnPointerMove);
+            RegisterCallback<PointerLeaveEvent>(_ => hoverPosition = null);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
             RegisterCallback<PointerCaptureOutEvent>(_ => CancelDrag());
             RegisterCallback<PointerLeaveEvent>(_ =>
             {
                 SetPlacementPointer(null);
                 ClearHoveredAdder();
+                if (pointerBadge != null)
+                    pointerBadge.style.display = DisplayStyle.None;
             });
             RegisterCallback<WheelEvent>(OnWheel);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
@@ -388,6 +433,51 @@ namespace OmsiMapEditor.UI
             angleLabel.AddToClassList("map-angle-label");
             angleLabel.style.display = DisplayStyle.None;
             Add(angleLabel);
+        }
+
+        // A tool icon that follows the pointer, for modes where a click acts on what is under it (a paint bucket for covering a tile).
+        // The round badge holds the icon as a child that fills its padded content, so the icon sits in the middle of the circle.
+        private VisualElement pointerBadge;
+        private IconElement pointerBadgeImage;
+        private string pointerBadgeIcon;
+
+        /// <summary>Shows the named icon beside the pointer while it is over the map, or none with null.</summary>
+        public void SetPointerBadge(string icon)
+        {
+            pointerBadgeIcon = icon;
+            if (icon == null)
+            {
+                if (pointerBadge != null)
+                    pointerBadge.style.display = DisplayStyle.None;
+                return;
+            }
+            if (pointerBadge == null)
+            {
+                pointerBadge = new VisualElement();
+                pointerBadge.AddToClassList("map-pointer-badge");
+                pointerBadge.pickingMode = PickingMode.Ignore;
+                pointerBadge.style.display = DisplayStyle.None;
+                pointerBadgeImage = new IconElement(icon);
+                pointerBadgeImage.pickingMode = PickingMode.Ignore;
+                pointerBadge.Add(pointerBadgeImage);
+                Add(pointerBadge);
+            }
+            else
+                pointerBadgeImage.SetIcon(icon);
+        }
+
+        /// <summary>Puts the badge at a world point instead of where the pointer is; for command-line checks, which have no pointer.</summary>
+        public void PlacePointerBadgeAtWorld(OmsiMapPoint point)
+        {
+            if (pointerBadge != null && pointerBadgeIcon != null)
+                MovePointerBadge(MapToScreen(WorldToMap(point)));
+        }
+
+        private void MovePointerBadge(Vector2 local)
+        {
+            pointerBadge.style.left = local.x + 12f;
+            pointerBadge.style.top = local.y + 10f;
+            pointerBadge.style.display = DisplayStyle.Flex;
         }
 
         private void OnCustomStyleResolved(CustomStyleResolvedEvent evt)
@@ -423,6 +513,14 @@ namespace OmsiMapEditor.UI
                 selectedObjectColor = selected;
                 boxFillColor = WithAlpha(selected, 0.12f);
             }
+            if (style.TryGetValue(SelectionHaloProperty, out var halo))
+                selectionHaloColor = WithAlpha(halo, 0.85f);
+            if (style.TryGetValue(ErrorProperty, out var error))
+                errorColor = error;
+            if (style.TryGetValue(WarningProperty, out var warning))
+                warningColor = warning;
+            if (style.TryGetValue(PathRailProperty, out var rail))
+                pathRailColor = rail;
             if (style.TryGetValue(PlacementProperty, out var placement))
             {
                 placementColor = placement;
@@ -470,11 +568,17 @@ namespace OmsiMapEditor.UI
         /// <summary>A box was dragged with Ctrl; the objects inside it, to add to the selection.</summary>
         public event Action<List<MapSelectionItem>> ObjectsBoxSelected;
 
+        /// <summary>A box was dragged with Ctrl that holds no object but touches splines; they are to be added to the selection.</summary>
+        public event Action<List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>> SplinesBoxSelected;
+
         /// <summary>Empty space inside a tile was clicked.</summary>
         public event Action<OmsiTileSummary> TileClicked;
 
         /// <summary>A spline was clicked where no object is.</summary>
         public event Action<OmsiTileSummary, OmsiSplineRecord> SplineClicked;
+
+        /// <summary>The right button was pressed and released without dragging: the shell shows a context menu for what is there.</summary>
+        public event Action<MapContextHit> ContextRequested;
 
         /// <summary>While building roads: the pointer moved to a world position, east and north in metres.</summary>
         public event Action<double, double> RoadPointerMoved;
@@ -548,8 +652,32 @@ namespace OmsiMapEditor.UI
         /// </summary>
         public Func<double, double, PlacementSnap> PlacementSnapper { get; set; }
 
-        /// <summary>Describes the position under the pointer and the scale, for an overlay label.</summary>
-        public event Action<string> PointerInfoChanged;
+        /// <summary>The view changed its scale, centre or 3D camera, so labels showing the scale can follow.</summary>
+        public event Action ViewChanged;
+
+        private int notifiedViewStamp;
+        private bool viewCheckScheduled;
+
+        /// <summary>
+        /// The one place that raises <see cref="ViewChanged"/>: every view change, whichever way it came (wheel, pan, buttons, command line,
+        /// 3D camera), repaints the element, and the draw compares the camera with the one last announced. The announcement is
+        /// deferred out of the draw, so listeners may change other elements.
+        /// </summary>
+        private void CheckViewChanged()
+        {
+            if (viewCheckScheduled || summary == null || !hasView || CameraStamp == notifiedViewStamp)
+                return;
+            viewCheckScheduled = true;
+            schedule.Execute(() =>
+            {
+                viewCheckScheduled = false;
+                var stamp = CameraStamp;
+                if (summary == null || stamp == notifiedViewStamp)
+                    return;
+                notifiedViewStamp = stamp;
+                ViewChanged?.Invoke();
+            });
+        }
 
         /// <summary>When false, objects can be selected but not dragged.</summary>
         public bool AllowEditing { get; set; }
@@ -629,6 +757,27 @@ namespace OmsiMapEditor.UI
         /// <summary>Ground height at a map position, for the point the 3D camera looks at.</summary>
         public Func<Vector2, float> GroundHeight { get; set; }
 
+        /// <summary>
+        /// How far the cross-section of a spline type reaches, for pointing at splines in 3D: x the left edge (negative), y the right edge,
+        /// z how high its surface lies above the spline; null for a type that has no surface. Null leaves splines out of 3D picking.
+        /// </summary>
+        public Func<string, Vector3?> SplineExtent
+        {
+            get => splineExtent;
+            set
+            {
+                splineExtent = value;
+                splineRibbons = null;
+                foreach (var path in splines)
+                    path.RibbonBuilt = false;
+            }
+        }
+
+        private Func<string, Vector3?> splineExtent;
+
+        /// <summary>The ribbons of all splines for the 3D pick, built on the first pick after the splines changed.</summary>
+        private List<OmsiSplineRibbon> splineRibbons;
+
         /// <summary>Changes whenever the heights <see cref="GroundHeight"/> gives change, so heights kept for drawing are taken anew.</summary>
         public Func<int> GroundVersion { get; set; }
 
@@ -652,7 +801,6 @@ namespace OmsiMapEditor.UI
             OrbitDistance = Mathf.Clamp(layout.height * metersPerPixel, 20f, 15000f);
             OrbitPitch = 40f;
             OrbitYaw = 0f;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -662,7 +810,6 @@ namespace OmsiMapEditor.UI
             OrbitYaw = (yawDegrees % 360f + 360f) % 360f;
             OrbitPitch = Mathf.Clamp(pitchDegrees, 5f, 89f);
             OrbitDistance = Mathf.Clamp(distance, 5f, 15000f);
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -674,7 +821,6 @@ namespace OmsiMapEditor.UI
             center = OrbitTarget;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -736,6 +882,25 @@ namespace OmsiMapEditor.UI
         }
 
         public bool IsPlacing => placementAsset != null;
+
+        /// <summary>The pointer is held down and has begun to move something (not a mere press on an object): an object, a handle, the view (pan, orbit) or a selection box. The inspector dims while it is.</summary>
+        public bool IsMovingWithPointer
+        {
+            get
+            {
+                if (dragMode == DragMode.None || dragMode == DragMode.MovePending)
+                    return false;
+                // A camera drag counts once the pointer has really moved (latched, so it cannot switch back and forth); a mere right or middle press does not.
+                if (dragMode == DragMode.Pan || dragMode == DragMode.Orbit || dragMode == DragMode.OrbitPan)
+                    return cameraDragMoved;
+                return true;
+            }
+        }
+
+        private bool cameraDragMoved;
+
+        /// <summary>The camera as one value (2D centre and zoom, 3D target, angles and distance); it changes whenever the view moves, however it was moved.</summary>
+        public int CameraStamp => HashCode.Combine(center.x, center.y, metersPerPixel, OrbitTarget.x, OrbitTarget.y, OrbitYaw, OrbitPitch, OrbitDistance);
 
         /// <summary>Several objects are being placed together, as pasted from the clipboard; the pointer holds their middle.</summary>
         public bool IsPlacingGroup => placementGroup != null;
@@ -924,6 +1089,7 @@ namespace OmsiMapEditor.UI
         {
             roadPreview.Clear();
             roadPreviewHeights.Clear();
+            roadAccent.Clear();
             roadIssues.Clear();
             if (pieces != null)
             {
@@ -1017,8 +1183,24 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>Pieces of the road preview to draw in the accent colour instead of the preview colour (such as the selected stop of the line tool); null for none. Call after <see cref="SetRoadPreview"/>, which clears them.</summary>
+        public void SetRoadPreviewAccent(IEnumerable<OmsiMapPoint[]> pieces)
+        {
+            roadAccent.Clear();
+            if (pieces != null)
+                foreach (var piece in pieces)
+                {
+                    var points = new Vector2[piece.Length];
+                    for (var index = 0; index < piece.Length; index++)
+                        points[index] = WorldToMap(piece[index]);
+                    roadAccent.Add(points);
+                }
+            MarkDirtyRepaint();
+        }
+
         public void ClearRoadPreview()
         {
+            roadAccent.Clear();
             roadGuides.Clear();
             roadGuideHeights.Clear();
             markingAnchors.Clear();
@@ -1057,6 +1239,8 @@ namespace OmsiMapEditor.UI
         public void RefreshSplines()
         {
             splines.Clear();
+            splineByRecord.Clear();
+            splineRibbons = null;
             if (summary != null)
                 foreach (var tile in summary.Tiles)
                     foreach (var spline in tile.Splines)
@@ -1315,7 +1499,6 @@ namespace OmsiMapEditor.UI
             center = mapBounds.center + new Vector2((FitInsets.z - FitInsets.x) * 0.5f, (FitInsets.y - FitInsets.w) * 0.5f) * metersPerPixel;
             hasView = true;
             isFitted = true;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -1340,7 +1523,6 @@ namespace OmsiMapEditor.UI
             metersPerPixel = viewMetersPerPixel;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -1362,13 +1544,14 @@ namespace OmsiMapEditor.UI
                 metersPerPixel = 0.5f;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
         private void BuildCaches()
         {
             splines.Clear();
+            splineByRecord.Clear();
+            splineRibbons = null;
             mapBounds = Rect.zero;
             if (summary == null || summary.Tiles.Count == 0)
                 return;
@@ -1411,11 +1594,13 @@ namespace OmsiMapEditor.UI
                 bounds.yMax = Mathf.Max(bounds.yMax, points[index].y);
             }
             splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
-            splines.Add(new SplinePath
+            var path = new SplinePath
             {
                 Tile = tile, Record = spline, AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind,
                 StartHeight = (float)spline.Height, EndHeight = (float)spline.EndHeight
-            });
+            };
+            splines.Add(path);
+            splineByRecord[spline] = path;
         }
 
         private Vector2 ToMap(OmsiTileSummary tile, double localX, double localY)
@@ -1455,6 +1640,7 @@ namespace OmsiMapEditor.UI
         {
             if (summary == null || !hasView)
                 return;
+            CheckViewChanged();
             if (ThreeDimensional)
             {
                 Draw3D(context.painter2D);
@@ -1474,11 +1660,14 @@ namespace OmsiMapEditor.UI
             DrawPaths(painter, visible);
             DrawHighlightedPaths(painter);
             DrawSignalMovements(painter);
+            DrawTrafficHighlight(painter);
             DrawPriorityHandles(painter);
             DrawLaneEnds(painter);
             DrawRoutes(context, painter, visible);
             DrawSelectedSpline(painter);
             DrawRoad(painter, visible);
+            // The signs of the road pieces lie over the selection and the road cursor, which would cross them.
+            DrawTrafficLabels(painter, visible);
             DrawPlacementPoints(painter);
             DrawJunctionMarkers(painter, visible);
             DrawArmHandles(painter);
@@ -1712,28 +1901,42 @@ namespace OmsiMapEditor.UI
 
         private void DrawSelectedSpline(Painter2D painter)
         {
-            foreach (var more in moreSelectedSplines)
+            if (moreSelectedSplines.Count > 0)
             {
-                var line = splines.Find(candidate => ReferenceEquals(candidate.Record, more));
-                if (line == null)
-                    continue;
+                // All further selected splines go into few strokes, each with one halo, instead of two strokes each.
                 painter.strokeColor = selectedObjectColor;
                 painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
                 painter.lineCap = LineCap.Round;
                 painter.lineJoin = LineJoin.Round;
-                StrokePolyline(painter, line.Points);
+                painter.BeginPath();
+                var segments = 0;
+                foreach (var more in moreSelectedSplines)
+                {
+                    if (!splineByRecord.TryGetValue(more, out var line))
+                        continue;
+                    segments += AddPolyline(painter, line.Points);
+                    if (segments >= StrokeSegments)
+                    {
+                        StrokeHaloed(painter, true);
+                        painter.BeginPath();
+                        segments = 0;
+                    }
+                }
+                if (segments > 0)
+                    StrokeHaloed(painter, true);
             }
-            if (selectedSpline == null)
-                return;
-            var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
-            if (path == null)
+            if (selectedSpline == null || !splineByRecord.TryGetValue(selectedSpline, out var path))
                 return;
             painter.strokeColor = selectedObjectColor;
             painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
+            painter.strokeColor = selectedObjectColor;
+            painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
             if (dragMode != DragMode.SplineEnd)
-                StrokePolyline(painter, path.Points);
+                StrokePolyline(painter, path.Points, true);
             if (!SplineHandlesShown)
                 return;
             // A round handle in the middle bends the spline.
@@ -1770,8 +1973,7 @@ namespace OmsiMapEditor.UI
         {
             if (!SplineHandlesShown)
                 return null;
-            var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
-            if (path == null)
+            if (!splineByRecord.TryGetValue(selectedSpline, out var path))
                 return null;
             if (Vector2.Distance(screen, MapToScreen(path.Points[path.Points.Length - 1])) <= HandleRadius + 3f)
                 return SplineHandleKind.End;
@@ -1819,7 +2021,7 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void DrawRoad(Painter2D painter, Rect visible)
         {
-            if (!roadMode && roadPreview.Count == 0)
+            if (!roadMode && roadPreview.Count == 0 && roadAccent.Count == 0)
                 return;
             if (roadMode && ShowSplineEnds && metersPerPixel <= FreeEndMetersPerPixel)
             {
@@ -1855,18 +2057,31 @@ namespace OmsiMapEditor.UI
                 painter.lineJoin = LineJoin.Round;
                 foreach (var piece in roadPreview)
                     StrokePolyline(painter, piece);
-                painter.strokeColor = roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.strokeColor = roadPreviewValid ? placementColor : errorColor;
                 painter.lineWidth = 3f;
                 foreach (var piece in roadPreview)
                     StrokePolyline(painter, piece);
                 // Piece boundaries, where each spline of the road begins.
-                painter.fillColor = roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.fillColor = roadPreviewValid ? placementColor : errorColor;
                 foreach (var piece in roadPreview)
                 {
                     painter.BeginPath();
                     AddCircle(painter, MapToScreen(piece[0]), 2.5f);
                     painter.Fill();
                 }
+            }
+            if (roadAccent.Count > 0)
+            {
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                painter.strokeColor = handleFillColor;
+                painter.lineWidth = 6f;
+                foreach (var piece in roadAccent)
+                    StrokePolyline(painter, piece);
+                painter.strokeColor = splineColor;
+                painter.lineWidth = 3f;
+                foreach (var piece in roadAccent)
+                    StrokePolyline(painter, piece);
             }
             if (roadStart.HasValue)
             {
@@ -1877,8 +2092,8 @@ namespace OmsiMapEditor.UI
             }
             foreach (var issue in roadIssues)
             {
-                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? selectedObjectColor
-                    : issue.Value == OmsiRoadIssueSeverity.Warning ? selectedTileColor : wireColor;
+                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? errorColor
+                    : issue.Value == OmsiRoadIssueSeverity.Warning ? warningColor : wireColor;
                 painter.BeginPath();
                 AddCircle(painter, MapToScreen(issue.Key), 5f);
                 painter.Fill();
@@ -1896,7 +2111,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The road tool in 3D: free spline ends, the planned road at its heights, its issues and the snap ring.</summary>
         private void DrawRoad3D(Painter2D painter, MapOrbitCamera camera)
         {
-            if (!roadMode && roadPreview.Count == 0)
+            if (!roadMode && roadPreview.Count == 0 && roadAccent.Count == 0)
                 return;
             const float lift = 0.3f;
             if (roadMode)
@@ -1945,7 +2160,7 @@ namespace OmsiMapEditor.UI
 
             for (var pass = 0; pass < 2; pass++)
             {
-                painter.strokeColor = pass == 0 ? handleFillColor : roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.strokeColor = pass == 0 ? handleFillColor : roadPreviewValid ? placementColor : errorColor;
                 painter.lineWidth = pass == 0 ? 6f : 3f;
                 painter.lineCap = LineCap.Round;
                 painter.lineJoin = LineJoin.Round;
@@ -1959,12 +2174,26 @@ namespace OmsiMapEditor.UI
                     StrokeWorldLine(painter, camera, world);
                 }
             }
+            for (var pass = 0; pass < 2 && roadAccent.Count > 0; pass++)
+            {
+                painter.strokeColor = pass == 0 ? handleFillColor : splineColor;
+                painter.lineWidth = pass == 0 ? 6f : 3f;
+                painter.lineCap = LineCap.Round;
+                painter.lineJoin = LineJoin.Round;
+                foreach (var points in roadAccent)
+                {
+                    var world = new List<Vector3>(points.Length);
+                    foreach (var point in points)
+                        world.Add(new Vector3(point.x, GroundAt(point) + lift, point.y));
+                    StrokeWorldLine(painter, camera, world);
+                }
+            }
             foreach (var issue in roadIssues)
             {
                 if (!camera.TryProject(new Vector3(issue.Key.x, GroundAt(issue.Key) + lift, issue.Key.y), out var screen))
                     continue;
-                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? selectedObjectColor
-                    : issue.Value == OmsiRoadIssueSeverity.Warning ? selectedTileColor : wireColor;
+                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? errorColor
+                    : issue.Value == OmsiRoadIssueSeverity.Warning ? warningColor : wireColor;
                 painter.BeginPath();
                 AddCircle(painter, screen, 5f);
                 painter.Fill();
@@ -2010,8 +2239,8 @@ namespace OmsiMapEditor.UI
         private void DrawJunctionMarker(Painter2D painter, Vector2 screen, Vector2 tip, OmsiJunctionPortState state)
         {
             var color = state == OmsiJunctionPortState.Connected ? placementColor
-                : state == OmsiJunctionPortState.NeedsReview ? selectedTileColor
-                : state == OmsiJunctionPortState.Invalid ? selectedObjectColor
+                : state == OmsiJunctionPortState.NeedsReview ? warningColor
+                : state == OmsiJunctionPortState.Invalid ? errorColor
                 : wireColor;
             painter.strokeColor = color;
             painter.lineWidth = 2f;
@@ -2037,13 +2266,23 @@ namespace OmsiMapEditor.UI
             return GroundHeight != null ? GroundHeight(map) : 0f;
         }
 
-        private void StrokePolyline(Painter2D painter, Vector2[] points)
+        private void StrokePolyline(Painter2D painter, Vector2[] points, bool haloed = false)
         {
             if (points.Length < 2)
                 return;
             painter.BeginPath();
+            AddPolyline(painter, points);
+            StrokeHaloed(painter, haloed);
+        }
+
+        /// <summary>Adds a polyline to the current path, leaving out points less than a pixel from the last one; the segments added.</summary>
+        private int AddPolyline(Painter2D painter, Vector2[] points)
+        {
+            if (points.Length < 2)
+                return 0;
             var last = MapToScreen(points[0]);
             painter.MoveTo(last);
+            var segments = 0;
             for (var index = 1; index < points.Length; index++)
             {
                 var point = MapToScreen(points[index]);
@@ -2051,8 +2290,9 @@ namespace OmsiMapEditor.UI
                     continue;
                 painter.LineTo(point);
                 last = point;
+                segments++;
             }
-            painter.Stroke();
+            return segments;
         }
 
         private static void AddCircle(Painter2D painter, Vector2 center, float radius)
@@ -2365,7 +2605,7 @@ namespace OmsiMapEditor.UI
                 painter.MoveTo(screen + new Vector2(7f, 0f));
                 painter.Arc(screen, 7f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
             }
-            painter.Stroke();
+            StrokeHaloed(painter, true);
             // A group shows its handle only with the rotate tool: its line points at the turn, not at a heading.
             if (!HasRotationHandle() || (TurnsGroup && !CanRotate))
                 return;
@@ -2375,7 +2615,7 @@ namespace OmsiMapEditor.UI
             painter.BeginPath();
             painter.MoveTo(objectScreen);
             painter.LineTo(handle);
-            painter.Stroke();
+            StrokeHaloed(painter, true);
             if (TurnsGroup)
             {
                 painter.fillColor = selectedObjectColor;
@@ -2390,7 +2630,7 @@ namespace OmsiMapEditor.UI
                 painter.BeginPath();
                 painter.Arc(handle, HandleRadius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
                 painter.Fill();
-                painter.Stroke();
+                StrokeHaloed(painter, true);
             }
         }
 
@@ -2506,7 +2746,7 @@ namespace OmsiMapEditor.UI
             painter.LineTo(new Vector2(rect.xMin, rect.yMax));
             painter.ClosePath();
             painter.Fill();
-            painter.Stroke();
+            StrokeHaloed(painter, true);
         }
 
         /// <summary>Where an object is drawn: shifted by the drag while it belongs to the moved selection.</summary>
@@ -2658,7 +2898,10 @@ namespace OmsiMapEditor.UI
             {
                 // Right button turns the camera, the middle one moves it; the left one edits.
                 if (evt.button == 1 || evt.button == 2)
+                {
+                    NoteRightPress(evt.button, position);
                     BeginDrag(evt.button == 1 ? DragMode.Orbit : DragMode.OrbitPan, evt.pointerId, position);
+                }
                 else if (evt.button == 0 && pickingPoint)
                 {
                     var ground = GroundPoint(OrbitCamera().RayThrough(position));
@@ -2678,6 +2921,7 @@ namespace OmsiMapEditor.UI
             }
             if (evt.button == 1 || evt.button == 2)
             {
+                NoteRightPress(evt.button, position);
                 BeginDrag(DragMode.Pan, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
@@ -2765,8 +3009,10 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
-            if (toggle)
+            // Shift (alone, or with Ctrl) starts a box that takes only splines, where no object is under the pointer.
+            if (toggle || evt.shiftKey)
             {
+                boxSplinesOnly = evt.shiftKey;
                 BeginDrag(DragMode.Box, evt.pointerId, position);
                 evt.StopPropagation();
                 return;
@@ -2869,8 +3115,27 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            // Shift on empty space or a road starts a box that takes only splines (as from above).
+            if (keepPlacing && !toggle)
+            {
+                boxSplinesOnly = true;
+                BeginDrag(DragMode.Box, pointerId, position);
+                return;
+            }
+
+            // As from above, a spline is taken where no object is: Ctrl adds or removes it, else it becomes the selection.
+            if (TryPickSpline3D(camera, ray, ground, out var splineTile, out var spline, out _))
+            {
+                if (toggle)
+                    SplineToggled?.Invoke(splineTile, spline);
+                else
+                    SplineClicked?.Invoke(splineTile, spline);
+                return;
+            }
+
             if (toggle)
             {
+                boxSplinesOnly = keepPlacing;
                 BeginDrag(DragMode.Box, pointerId, position);
                 return;
             }
@@ -2910,6 +3175,116 @@ namespace OmsiMapEditor.UI
                 grabPoint = marker.World;
             }
             return item != null;
+        }
+
+        /// <summary>The spline pick of the 3D view counts a hit this far beyond the edge of the cross-section, plus the pick radius in pixels, halved.</summary>
+        private const float SplinePickMarginMeters = 0.3f;
+
+        /// <summary>
+        /// The spline under an element position in 3D, for clicks where no object is: the ray from the camera against the surface of each
+        /// spline (cross-section from its profile, height along the spline), the nearest first. <paramref name="ground"/> is where the
+        /// ray meets the terrain; surfaces further than that, in tunnels, are not taken. Null spline when none (ADR 098, M5).
+        /// </summary>
+        private bool TryPickSpline3D(MapOrbitCamera camera, Ray ray, Vector3? ground, out OmsiTileSummary pickedTile,
+            out OmsiSplineRecord pickedSpline, out Vector3 point)
+        {
+            pickedTile = null;
+            pickedSpline = null;
+            point = default;
+            if (splineExtent == null || summary == null)
+                return false;
+            var maxDistance = ground.HasValue ? Vector3.Distance(ray.origin, ground.Value) + 2f : 4000f;
+            var origin = ray.origin;
+            var direction = ray.direction;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var ribbons = SplineRibbons();
+            watch.Restart();
+            var hit = OmsiSplineRayPicker.Pick(ribbons, origin.x, origin.y, origin.z, direction.x, direction.y, direction.z, maxDistance,
+                SplinePickMarginMeters, PickRadius * 0.5f / camera.PixelsPerMeter(1f), out var distance);
+            LastSplinePickMilliseconds = watch.Elapsed.TotalMilliseconds;
+            if (!(hit?.Owner is SplinePath path))
+                return false;
+            pickedTile = path.Tile;
+            pickedSpline = path.Record;
+            point = ray.GetPoint((float)distance);
+            return true;
+        }
+
+        /// <summary>Milliseconds the last pointer ray took to find the ground, and the last object pick in 3D (diagnostics for the player log).</summary>
+        public double LastGroundMilliseconds { get; private set; }
+
+        public double LastObjectPickMilliseconds { get; private set; }
+
+        /// <summary>Milliseconds the last right-click took to find what is under the pointer, in total.</summary>
+        public double LastHitMilliseconds { get; private set; }
+
+        /// <summary>Milliseconds the last spline pick in 3D took, without building the ribbons (diagnostics for the player log).</summary>
+        public double LastSplinePickMilliseconds { get; private set; }
+
+        /// <summary>Milliseconds the last build of the ribbons took, once after the splines changed (diagnostics).</summary>
+        public double LastRibbonBuildMilliseconds { get; private set; }
+
+        /// <summary>The ribbons of the splines that have a surface; built once after the splines change, as the profiles are read from files.</summary>
+        private List<OmsiSplineRibbon> SplineRibbons()
+        {
+            if (splineRibbons != null)
+                return splineRibbons;
+            var buildWatch = System.Diagnostics.Stopwatch.StartNew();
+            var ribbons = new List<OmsiSplineRibbon>(splines.Count);
+            foreach (var path in splines)
+            {
+                if (!path.RibbonBuilt)
+                {
+                    path.RibbonBuilt = true;
+                    path.Ribbon = null;
+                    var extent = splineExtent(path.AssetPath ?? string.Empty);
+                    if (extent.HasValue)
+                    {
+                        var x = new double[path.Points.Length];
+                        var y = new double[path.Points.Length];
+                        for (var index = 0; index < x.Length; index++)
+                        {
+                            x[index] = path.Points[index].x;
+                            y[index] = path.Points[index].y;
+                        }
+                        // A mirrored spline shows its cross-section turned over.
+                        var mirrored = path.Record.IsMirrored;
+                        path.Ribbon = new OmsiSplineRibbon(path, x, y, path.StartHeight, path.EndHeight, mirrored ? -extent.Value.y : extent.Value.x,
+                            mirrored ? -extent.Value.x : extent.Value.y, extent.Value.z);
+                    }
+                }
+                if (path.Ribbon != null)
+                    ribbons.Add(path.Ribbon);
+            }
+            splineRibbons = ribbons;
+            LastRibbonBuildMilliseconds = buildWatch.Elapsed.TotalMilliseconds;
+            return ribbons;
+        }
+
+        /// <summary>The ground height under a world position of the map (0 without a ground).</summary>
+        public float GroundAtWorld(OmsiMapPoint world)
+        {
+            return GroundAt(WorldToMap(world));
+        }
+
+        /// <summary>What lies under a panel position, as a right-click there would find it (for the command line and timing).</summary>
+        internal MapContextHit ContextHitAtPanel(Vector2 panelPosition)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var hit = HitAt(this.WorldToLocal(panelPosition));
+            LastHitMilliseconds = watch.Elapsed.TotalMilliseconds;
+            return hit;
+        }
+
+        /// <summary>Where a point of the map lies on the screen in 3D, in panel coordinates, at the given absolute height; false in the view from above or behind the camera.</summary>
+        public bool TryScreenPosition3D(OmsiTileSummary tile, double localX, double localY, double height, out Vector2 screen)
+        {
+            screen = default;
+            if (summary == null || !hasView || !ThreeDimensional || tile == null || !OrbitCamera().TryProject(
+                    new Vector3(ToMap(tile, localX, localY).x, (float)height, ToMap(tile, localX, localY).y), out var local))
+                return false;
+            screen = this.LocalToWorld(local);
+            return true;
         }
 
         private struct Marker
@@ -3490,9 +3865,12 @@ namespace OmsiMapEditor.UI
             DrawPlacementPoints3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
             DrawSignalMovements(painter, camera);
+            DrawTrafficHighlight(painter, camera);
             DrawPriorityHandles(painter, camera);
+            DrawTrafficLabels3D(painter, camera);
             DrawLaneEnds(painter, camera);
             DrawBox(painter);
+            DrawSelectedSplines3D(painter, camera);
             painter.lineWidth = 1.5f;
             painter.strokeColor = selectedObjectColor;
             for (var index = 0; index < selection.Count && index < 200; index++)
@@ -3516,6 +3894,33 @@ namespace OmsiMapEditor.UI
             }
         }
 
+        /// <summary>The selected splines as a line along their centre, at their height just above the surface (ADR 098, M5).</summary>
+        private void DrawSelectedSplines3D(Painter2D painter, MapOrbitCamera camera)
+        {
+            if (selectedSpline == null && moreSelectedSplines.Count == 0)
+                return;
+            painter.strokeColor = selectedObjectColor;
+            painter.lineWidth = 4f;
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
+            var shown = new List<SplinePath>(moreSelectedSplines.Count + 1);
+            if (selectedSpline != null && splineByRecord.TryGetValue(selectedSpline, out var main))
+                shown.Add(main);
+            foreach (var more in moreSelectedSplines)
+                if (!ReferenceEquals(more, selectedSpline) && splineByRecord.TryGetValue(more, out var other))
+                    shown.Add(other);
+            foreach (var path in shown)
+            {
+                var lift = path.Ribbon != null ? (float)path.Ribbon.Lift : 0f;
+                var last = path.Points.Length - 1;
+                var heights = new List<Vector3>(path.Points.Length);
+                for (var index = 0; index <= last; index++)
+                    heights.Add(new Vector3(path.Points[index].x, Mathf.Lerp(path.StartHeight, path.EndHeight, (float)index / last) + lift + 0.15f,
+                        path.Points[index].y));
+                StrokeWorldLine(painter, camera, heights, true);
+            }
+        }
+
         /// <summary>A world point on the ground at a map position, lifted a little so it is not hidden in the terrain.</summary>
         private Vector3 OnGround(Vector2 map, float lift)
         {
@@ -3523,7 +3928,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Draws a line through world points, leaving gaps where points lie behind the camera.</summary>
-        private static void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points)
+        private void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points, bool haloed = false)
         {
             painter.BeginPath();
             var open = false;
@@ -3540,7 +3945,7 @@ namespace OmsiMapEditor.UI
                     painter.MoveTo(screen);
                 open = true;
             }
-            painter.Stroke();
+            StrokeHaloed(painter, haloed);
         }
 
         /// <summary>The selected tile's border, following the ground every few metres.</summary>
@@ -3561,7 +3966,7 @@ namespace OmsiMapEditor.UI
             StrokeWorldLine(painter, camera, points);
         }
 
-        /// <summary>Objects without a model: a dot and a short line in their heading, red when selected.</summary>
+        /// <summary>Objects without a model: a dot and a short line in their heading, light when selected.</summary>
         private void DrawMarkers3D(Painter2D painter, MapOrbitCamera camera)
         {
             painter.lineWidth = 1.5f;
@@ -3638,7 +4043,26 @@ namespace OmsiMapEditor.UI
 
         private static readonly int[] BoxEdges = { 0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7 };
 
-        private static void DrawBoundingBox(Painter2D painter, MapOrbitCamera camera, Matrix4x4 frame, Bounds bounds)
+        /// <summary>
+        /// Strokes the current path; with <paramref name="haloed"/> a dark, wider stroke goes under it first, so a light
+        /// selection stays visible over a bright aerial image as well as over the dark ground (ADR 098, M6 step 6).
+        /// </summary>
+        private void StrokeHaloed(Painter2D painter, bool haloed)
+        {
+            if (haloed)
+            {
+                var colour = painter.strokeColor;
+                var width = painter.lineWidth;
+                painter.strokeColor = selectionHaloColor;
+                painter.lineWidth = width + 3f;
+                painter.Stroke();
+                painter.strokeColor = colour;
+                painter.lineWidth = width;
+            }
+            painter.Stroke();
+        }
+
+        private void DrawBoundingBox(Painter2D painter, MapOrbitCamera camera, Matrix4x4 frame, Bounds bounds)
         {
             var corners = new Vector2[8];
             var visible = new bool[8];
@@ -3658,7 +4082,7 @@ namespace OmsiMapEditor.UI
                 painter.MoveTo(corners[a]);
                 painter.LineTo(corners[b]);
             }
-            painter.Stroke();
+            StrokeHaloed(painter, true);
         }
 
         /// <param name="anchor">The object under the pointer; the whole selection moves by its offset.</param>
@@ -3681,12 +4105,16 @@ namespace OmsiMapEditor.UI
             dragPointerId = pointerId;
             dragStartPointer = position;
             dragLastPointer = position;
+            cameraDragMoved = false;
             this.CapturePointer(pointerId);
         }
 
         private void OnPointerMove(PointerMoveEvent evt)
         {
             var position = (Vector2)evt.localPosition;
+            hoverPosition = position;
+            if (pointerBadge != null && pointerBadgeIcon != null)
+                MovePointerBadge(position);
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
                 if (roadMode && !ThreeDimensional)
@@ -3703,7 +4131,6 @@ namespace OmsiMapEditor.UI
                 SetPlacementPointer(position, evt.altKey);
                 UpdateHoveredHandles(position);
                 UpdateHoveredAdder(position);
-                NotifyPointerInfo(position);
                 return;
             }
 
@@ -3784,6 +4211,8 @@ namespace OmsiMapEditor.UI
             }
 
             dragLastPointer = position;
+            if (!cameraDragMoved && Vector2.Distance(position, dragStartPointer) >= DragThreshold)
+                cameraDragMoved = true;
             if (dragMode == DragMode.Move)
                 MovePreviewed?.Invoke(selection, previewLocalX - dragStartLocalX, previewLocalY - dragStartLocalY, previewHeightOffset);
             else if (IsTurningGroup)
@@ -3792,7 +4221,6 @@ namespace OmsiMapEditor.UI
                 HeadingPreviewed?.Invoke(selectedTile, selectedObject, previewHeading);
             else if (dragMode == DragMode.Turn)
                 OrientationPreviewed?.Invoke(PrimaryTile(), selectedObject, previewHeading, previewPitch, previewBank);
-            NotifyPointerInfo(position);
             MarkDirtyRepaint();
         }
 
@@ -3871,20 +4299,215 @@ namespace OmsiMapEditor.UI
                     }
                 };
             }
+            var splinesOnly = finished == DragMode.Box && boxSplinesOnly;
             var boxed = finished != DragMode.Box ? null
+                : splinesOnly ? new List<MapSelectionItem>()
                 : ThreeDimensional ? ObjectsInBox3D(dragStartPointer, dragLastPointer)
                 : ObjectsInBox(dragStartPointer, dragLastPointer);
+            // A box with no objects in it takes the splines it touches (objects come first: a box over a town would otherwise take every road);
+            // a Shift box skips the objects and takes the splines alone.
+            var boxedSplines = boxed != null && boxed.Count == 0
+                ? (ThreeDimensional ? SplinesInBox3D(dragStartPointer, dragLastPointer) : SplinesInBox(dragStartPointer, dragLastPointer))
+                : null;
             var member = finished == DragMode.MovePending ? clickedMember : null;
+            var position = (Vector2)evt.localPosition;
+            var rightClick = evt.button == 1 && rightClickCandidate && (finished == DragMode.Pan || finished == DragMode.Orbit) &&
+                             Vector2.Distance(position, rightDownPosition) <= RightClickSlack;
+            rightClickCandidate = false;
             EndDrag();
 
             if (edits != null)
                 ObjectsEdited?.Invoke(edits);
-            if (boxed != null)
+            if (boxedSplines != null && boxedSplines.Count > 0)
+                SplinesBoxSelected?.Invoke(boxedSplines);
+            else if (boxed != null)
                 ObjectsBoxSelected?.Invoke(boxed);
             if (member != null)
                 ObjectSelected?.Invoke(member.Tile, member.Record);
+            if (rightClick)
+                RequestContext(position);
             MarkDirtyRepaint();
             evt.StopPropagation();
+        }
+
+        /// <summary>Remembers a right button press as a possible right-click; tools that use the map's clicks (roads, placing, picking a point) get none.</summary>
+        private void NoteRightPress(int button, Vector2 position)
+        {
+            rightClickCandidate = button == 1 && !roadMode && placementAsset == null && !pickingPoint;
+            rightDownPosition = position;
+        }
+
+        /// <summary>Finds what lies under a right-click, from above or in 3D, and asks the shell for its context menu.</summary>
+        private void RequestContext(Vector2 position)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var hit = HitAt(position);
+            LastHitMilliseconds = watch.Elapsed.TotalMilliseconds;
+            if (hit != null)
+                ContextRequested?.Invoke(hit);
+        }
+
+        /// <summary>
+        /// What lies under the pointer if it is over the map (the hit a right-click there would give; its tile and tile-local position are set
+        /// even for empty ground), for keys that act on the element under the pointer. False when the pointer is elsewhere or off the tiles.
+        /// </summary>
+        public bool TryPointerHit(out MapContextHit hit)
+        {
+            hit = hoverPosition.HasValue ? HitAt(hoverPosition.Value) : null;
+            return hit != null;
+        }
+
+        /// <summary>The last place of the pointer over the map in the map's own coordinates; null while it is outside.</summary>
+        private Vector2? hoverPosition;
+
+        private MapContextHit HitAt(Vector2 position)
+        {
+            if (summary == null || !hasView)
+                return null;
+            var hit = new MapContextHit { ScreenPosition = this.LocalToWorld(position) };
+            Vector2 map;
+            if (ThreeDimensional)
+            {
+                var camera = OrbitCamera();
+                var phase = System.Diagnostics.Stopwatch.StartNew();
+                var ground = GroundPoint(camera.RayThrough(position));
+                LastGroundMilliseconds = phase.Elapsed.TotalMilliseconds;
+                phase.Restart();
+                var spot = ground;
+                var objectPicked = TryPick3D(camera, position, out var tile3D, out var item3D, out _);
+                LastObjectPickMilliseconds = phase.Elapsed.TotalMilliseconds;
+                LastSplinePickMilliseconds = 0.0;
+                if (objectPicked)
+                {
+                    hit.Tile = tile3D;
+                    hit.Object = item3D;
+                }
+                else if (TryPickSpline3D(camera, camera.RayThrough(position), ground, out var splineTile3D, out var spline3D, out var splinePoint))
+                {
+                    // The spot on the road surface, which differs from the ground under the pointer on a bridge.
+                    hit.Tile = splineTile3D;
+                    hit.Spline = spline3D;
+                    spot = splinePoint;
+                }
+                if (!spot.HasValue)
+                {
+                    if (hit.Object == null)
+                        return null;
+                    map = ToMap(hit.Tile, hit.Object.LocalX, hit.Object.LocalY);
+                }
+                else
+                    map = new Vector2(spot.Value.x, spot.Value.z);
+            }
+            else
+            {
+                map = ScreenToMap(position);
+                if (TryPickObject(position, out var tile, out var item))
+                {
+                    hit.Tile = tile;
+                    hit.Object = item;
+                }
+                else if (TryPickSpline(position, out var splineTile, out var spline))
+                {
+                    hit.Tile = splineTile;
+                    hit.Spline = spline;
+                }
+            }
+            if (hit.Tile == null)
+                hit.Tile = TileAt(map);
+            if (hit.Tile == null)
+                return null;
+            var rect = TileRect(hit.Tile);
+            hit.LocalX = Math.Round(map.x - rect.xMin, 2);
+            hit.LocalY = Math.Round(map.y - rect.yMin, 2);
+            return hit;
+        }
+
+        /// <summary>Where an object stands on the screen in the view from above, in panel coordinates; false in 3D or before the first view.</summary>
+        public bool TryScreenPosition(OmsiTileSummary tile, OmsiObjectRecord item, out Vector2 screen)
+        {
+            screen = default;
+            if (summary == null || !hasView || ThreeDimensional || tile == null || item == null)
+                return false;
+            screen = this.LocalToWorld(MapToScreen(ToMap(tile, item.LocalX, item.LocalY)));
+            return true;
+        }
+
+        /// <summary>
+        /// The selection box of a Ctrl+drag, or of a Shift+drag with <paramref name="splinesOnly"/>, between two panel positions, for the
+        /// command line (<c>-boxSelect</c>); same result as dragging.
+        /// </summary>
+        internal void SelectBoxAtPanel(Vector2 firstPanel, Vector2 secondPanel, bool splinesOnly = false)
+        {
+            if (summary == null || !hasView)
+                return;
+            var first = this.WorldToLocal(firstPanel);
+            var second = this.WorldToLocal(secondPanel);
+            var objects = splinesOnly ? new List<MapSelectionItem>() : ThreeDimensional ? ObjectsInBox3D(first, second) : ObjectsInBox(first, second);
+            if (objects.Count == 0)
+            {
+                var found = ThreeDimensional ? SplinesInBox3D(first, second) : SplinesInBox(first, second);
+                if (found.Count > 0)
+                {
+                    SplinesBoxSelected?.Invoke(found);
+                    return;
+                }
+            }
+            ObjectsBoxSelected?.Invoke(objects);
+        }
+
+        /// <summary>Splines whose line touches the box between two screen points, seen from above.</summary>
+        private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> SplinesInBox(Vector2 first, Vector2 second)
+        {
+            var a = ScreenToMap(first);
+            var b = ScreenToMap(second);
+            var box = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+            var result = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            foreach (var spline in splines)
+            {
+                if (!spline.Bounds.Overlaps(box))
+                    continue;
+                for (var index = 1; index < spline.Points.Length; index++)
+                {
+                    var from = spline.Points[index - 1];
+                    var to = spline.Points[index];
+                    if (OmsiSplineRayPicker.SegmentTouchesRectangle(box.xMin, box.yMin, box.xMax, box.yMax, from.x, from.y, to.x, to.y))
+                    {
+                        result.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(spline.Tile, spline.Record));
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Splines whose line, projected onto the screen, touches the box between two element positions in 3D.</summary>
+        private List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>> SplinesInBox3D(Vector2 first, Vector2 second)
+        {
+            var box = Rect.MinMaxRect(Mathf.Min(first.x, second.x), Mathf.Min(first.y, second.y), Mathf.Max(first.x, second.x),
+                Mathf.Max(first.y, second.y));
+            var camera = OrbitCamera();
+            var result = new List<KeyValuePair<OmsiTileSummary, OmsiSplineRecord>>();
+            foreach (var spline in splines)
+            {
+                var count = spline.Points.Length;
+                Vector2? previous = null;
+                for (var index = 0; index < count; index++)
+                {
+                    var height = Mathf.Lerp(spline.StartHeight, spline.EndHeight, count > 1 ? index / (float)(count - 1) : 0f);
+                    var point = spline.Points[index];
+                    Vector2? current = camera.TryProject(new Vector3(point.x, height, point.y), out var screen) ? screen : (Vector2?)null;
+                    var touches = current.HasValue && (previous.HasValue
+                        ? OmsiSplineRayPicker.SegmentTouchesRectangle(box.xMin, box.yMin, box.xMax, box.yMax, previous.Value.x, previous.Value.y, current.Value.x, current.Value.y)
+                        : box.Contains(current.Value));
+                    previous = current;
+                    if (touches)
+                    {
+                        result.Add(new KeyValuePair<OmsiTileSummary, OmsiSplineRecord>(spline.Tile, spline.Record));
+                        break;
+                    }
+                }
+            }
+            return result;
         }
 
         /// <summary>Objects whose position lies inside the box between two screen points.</summary>
@@ -3935,16 +4558,20 @@ namespace OmsiMapEditor.UI
 
         private void OnWheel(WheelEvent evt)
         {
-            if (summary == null || !hasView)
-                return;
-            if (ThreeDimensional)
-            {
-                SetOrbit(OrbitYaw, OrbitPitch, OrbitDistance * (evt.delta.y > 0f ? 1.15f : 1f / 1.15f));
+            if (WheelZoom((Vector2)evt.localMousePosition, evt.delta.y))
                 evt.StopPropagation();
-                return;
-            }
-            ZoomAround((Vector2)evt.localMousePosition, evt.delta.y > 0f ? 1f / 1.25f : 1.25f);
-            evt.StopPropagation();
+        }
+
+        /// <summary>One wheel step at a position of the element (positive delta zooms out); false when there is no view to zoom. Also used by the check run.</summary>
+        internal bool WheelZoom(Vector2 position, float deltaY)
+        {
+            if (summary == null || !hasView)
+                return false;
+            if (ThreeDimensional)
+                SetOrbit(OrbitYaw, OrbitPitch, OrbitDistance * (deltaY > 0f ? 1.15f : 1f / 1.15f));
+            else
+                ZoomAround(position, deltaY > 0f ? 1f / 1.25f : 1.25f);
+            return true;
         }
 
         private void OnKeyDown(KeyDownEvent evt)
@@ -3968,7 +4595,6 @@ namespace OmsiMapEditor.UI
             var after = ScreenToMap(screen);
             center += anchor - after;
             isFitted = false;
-            NotifyPointerInfo(screen);
             MarkDirtyRepaint();
         }
 
@@ -4064,63 +4690,6 @@ namespace OmsiMapEditor.UI
                 if (TileRect(tile).Contains(map))
                     return tile;
             return null;
-        }
-
-        /// <summary>The tile and tile-local position of a map position, or that it lies outside the map.</summary>
-        private string DescribeMapPosition(Vector2? map)
-        {
-            var tile = map.HasValue ? TileAt(map.Value) : null;
-            return tile == null
-                ? Loc.T("canvas.outside")
-                : Loc.T("canvas.position", ("tileX", tile.X), ("tileY", tile.Y), ("x", map.Value.x - TileRect(tile).xMin), ("y", map.Value.y - TileRect(tile).yMin));
-        }
-
-        private string TurnInfo()
-        {
-            return Loc.T("canvas.turned", ("count", selection.Count), ("degrees", groupTurn), ("pivot", DescribeMapPosition(GroupPivot())));
-        }
-
-        private void NotifyPointerInfo(Vector2? screen)
-        {
-            if (PointerInfoChanged == null || summary == null)
-                return;
-
-            if (ThreeDimensional)
-            {
-                var view = Loc.T("canvas.view3d", ("distance", OrbitDistance), ("heading", OrbitYaw), ("tilt", OrbitPitch));
-                if (IsTurningGroup)
-                    view = TurnInfo() + "      " + view;
-                else if (dragMode == DragMode.Turn)
-                    view = Loc.T("canvas.object_turn", ("id", selectedObject.Id), ("heading", previewHeading), ("pitch", previewPitch), ("bank", previewBank)) + "      " + view;
-                else if (dragMode == DragMode.Move)
-                    view = (selection.Count > 1
-                               ? Loc.T("canvas.moved_group_height", ("count", selection.Count), ("dx", previewLocalX - dragStartLocalX),
-                                   ("dy", previewLocalY - dragStartLocalY), ("dh", previewHeightOffset))
-                               : Loc.T("canvas.moved_one_height", ("id", selectedObject.Id), ("dx", previewLocalX - dragStartLocalX),
-                                   ("dy", previewLocalY - dragStartLocalY), ("dh", previewHeightOffset))) + "      " + view;
-                else if (screen.HasValue && hasView)
-                {
-                    var ground = GroundPoint(OrbitCamera().RayThrough(screen.Value));
-                    view = DescribeMapPosition(ground.HasValue ? new Vector2(ground.Value.x, ground.Value.z) : (Vector2?)null) + "      " + view;
-                }
-                PointerInfoChanged(view);
-                return;
-            }
-            var scale = Loc.T("canvas.scale", ("meters", metersPerPixel));
-            if (!screen.HasValue)
-            {
-                PointerInfoChanged(scale);
-                return;
-            }
-
-            var text = DescribeMapPosition(ScreenToMap(screen.Value));
-            if (IsTurningGroup)
-                text = TurnInfo();
-            else if (dragMode == DragMode.Move && selection.Count > 1)
-                text = Loc.T("canvas.moved_group", ("count", selection.Count), ("dx", previewLocalX - dragStartLocalX), ("dy", previewLocalY - dragStartLocalY));
-            else if (IsDraggingObject())
-                text = Loc.T("canvas.dragging_one", ("id", selectedObject.Id), ("x", previewLocalX), ("y", previewLocalY), ("heading", previewHeading));
-            PointerInfoChanged(text + "      " + scale);
         }
     }
 }

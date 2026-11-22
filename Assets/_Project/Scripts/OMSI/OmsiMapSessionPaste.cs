@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 
 namespace OmsiMapEditor.OMSI
 {
@@ -28,14 +27,15 @@ namespace OmsiMapEditor.OMSI
         /// <summary>
         /// Puts copied objects down at their targets, each with its labels, pitch and bank, its rules and the objects hung on it,
         /// all with new IDs. It happens all or not at all: every target is checked before anything is written, and when a write still
-        /// fails, what was done is taken back in reverse order before the exception goes on, so no file is left half pasted. In a chrono
+        /// fails, what was done is taken back in reverse order before the exception goes on, so no file is left half pasted; when taking
+        /// it back fails too, <see cref="OmsiRollBackFailedException"/> reports both and the map must be read again. In a chrono
         /// variant only the objects themselves are put down (with labels, pitch and bank), as attached objects and rules belong to the
         /// base map there.
         /// </summary>
         /// <param name="hasAbsoluteHeight">Whether an object file takes its height as written (junctions, [absheight]) instead of above the ground; may be null.</param>
         /// <param name="groundAt">The terrain height at a world position, or null where there is none; may be null.</param>
         public OmsiPasteResult PasteObjects(OmsiMapSummary summary, IReadOnlyList<OmsiPasteTarget> targets, Func<string, bool> hasAbsoluteHeight = null,
-            Func<double, double, double?> groundAt = null)
+            Func<double, double, double?> groundAt = null, Func<string, bool> isEntryPoint = null)
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
@@ -44,6 +44,21 @@ namespace OmsiMapEditor.OMSI
             var workspace = RequireWorkspace();
             var size = summary.TileSizeMeters;
             var inVariant = EditedVariant != null;
+            // An entry point object is only an entry point with its line in [entrypoints] (ADR 079): a copy gets its own line and a name no other
+            // entry point has, or the whole paste is refused where no line can be written. Without the predicate the entry point object of the editor counts.
+            isEntryPoint = isEntryPoint ?? (asset => string.Equals(asset, OmsiNewMap.EntryPointObject, StringComparison.OrdinalIgnoreCase));
+            var needsEntryList = false;
+            foreach (var target in targets)
+            {
+                needsEntryList |= isEntryPoint(target.Item.AssetPath);
+                // An object hung on another has no place of its own to write into the line, and a hung entry point object without a line is none (ADR 079):
+                // the whole paste is refused before anything is written rather than leaving a copy global.cfg does not list.
+                if (!inVariant && HasAttachedEntryPoint(target.Item.Attached, isEntryPoint))
+                    throw new InvalidOperationException("An entry point hung on another object cannot be copied: an entry point stands on the terrain, not on an object.");
+            }
+            if (needsEntryList && !CanRegisterEntryPoints(out var entryProblem))
+                throw new InvalidOperationException("An entry point cannot be copied here: " + entryProblem);
+            OmsiTerrainSampler sampler = null;
 
             // Check everything first.
             var tiles = new OmsiTileSummary[targets.Count];
@@ -86,9 +101,32 @@ namespace OmsiMapEditor.OMSI
                         if (ground.HasValue)
                             height = item.Height + (ground.Value - item.SourceGround.Value);
                     }
+                    var labels = new List<string>(item.Labels);
+                    var entryName = (string)null;
+                    if (isEntryPoint(item.AssetPath))
+                    {
+                        // On the terrain like any entry point object; the line holds the ground height.
+                        entryName = CheckEntryName(UniqueEntryName(summary, labels.Count > 0 ? labels[0] : null));
+                        if (labels.Count == 0)
+                            labels.Add(entryName);
+                        else
+                            labels[0] = entryName;
+                        height = 0.0;
+                    }
                     var change = PlaceObject(summary, tile, item.AssetPath, target.WorldX - tile.X * size, target.WorldY - tile.Y * size, height,
-                        target.HeadingDegrees, item.PitchDegrees, item.BankDegrees, new List<string>(item.Labels), inVariant ? null : item.Rules);
+                        target.HeadingDegrees, item.PitchDegrees, item.BankDegrees, labels, inVariant ? null : item.Rules);
                     undo.Add(() => Undo(summary, change));
+                    if (entryName != null)
+                    {
+                        // The ground under the copy: the caller's lookup first, then the map's own terrain; where there is none the copy's written height stands.
+                        var ground = groundAt?.Invoke(target.WorldX, target.WorldY);
+                        if (!ground.HasValue)
+                        {
+                            sampler = sampler ?? new OmsiTerrainSampler(summary, Source);
+                            ground = sampler.TryGetHeight(target.WorldX, target.WorldY, out var found) ? found : item.Height;
+                        }
+                        RegisterEntryPoint(change, tile, entryName, target.WorldX - tile.X * size, target.WorldY - tile.Y * size, ground.Value, target.HeadingDegrees);
+                    }
                     result.Changes.Add(change);
                     result.Placed.Add(change);
                     if (inVariant)
@@ -102,17 +140,15 @@ namespace OmsiMapEditor.OMSI
             }
             catch (Exception exception)
             {
-                for (var index = undo.Count - 1; index >= 0; index--)
+                // The failure is thrown as it was; when taking back what was pasted fails too, both are reported together.
+                RollBackAfter(exception, () =>
                 {
-                    try
+                    for (var index = undo.Count - 1; index >= 0; index--)
                     {
                         undo[index]();
+                        undo.RemoveAt(index);
                     }
-                    catch (Exception rollback) when (rollback is InvalidOperationException || rollback is IOException)
-                    {
-                        throw new InvalidOperationException("Pasting failed (" + exception.Message + ") and could not be taken back completely: " + rollback.Message, exception);
-                    }
-                }
+                });
                 throw;
             }
             return result;
@@ -130,6 +166,14 @@ namespace OmsiMapEditor.OMSI
                 var id = change.Added[0].Value.Id;
                 AttachAll(summary, tile, id, attached.Children, result, undo);
             }
+        }
+
+        private static bool HasAttachedEntryPoint(List<OmsiPasteAttached> list, Func<string, bool> isEntryPoint)
+        {
+            foreach (var item in list)
+                if (isEntryPoint(item.AssetPath) || HasAttachedEntryPoint(item.Children, isEntryPoint))
+                    return true;
+            return false;
         }
 
         private static int CountAttached(List<OmsiPasteAttached> list)

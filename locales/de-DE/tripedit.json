@@ -19,5 +19,6 @@
   "timetable.stopping.1": "Bei Bedarf",
   "timetable.stopping.2": "Durchfahren",
   "timetable.stopping.3": "Wenn früh",
-  "timetable.stopping.4": "Bei Bedarf (4)"
+  "timetable.stopping.4": "Bei Bedarf (4)",
+  "line.edit.title": "Fahrt {trip}"
 }

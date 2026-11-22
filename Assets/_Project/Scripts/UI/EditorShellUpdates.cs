@@ -29,7 +29,7 @@ namespace OmsiMapEditor.UI
         /// <summary>How long a check by itself at start counts.</summary>
         private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(20);
 
-        private VisualElement updateDialog;
+        private ModalDialog updateDialog;
         private UpdateDialog updateForm;
         private string updateSource = MapWorksUpdates.LatestReleaseUrl;
         private MapWorksRelease offeredRelease;
@@ -44,27 +44,39 @@ namespace OmsiMapEditor.UI
 
         private void InitializeUpdates(VisualElement root, VisualElement helpMenu)
         {
-            updateDialog = root.Q<VisualElement>("update-dialog");
-            if (updateDialog != null)
+            // Three buttons whose texts and visibility the form changes per state: Skip, Close (the cancel role: Esc and Close run
+            // CloseUpdates, which also stops a download) and the main action (Install or Open page, which keeps the dialog open).
+            updateDialog = NewDialog(new DialogOptions
             {
-                updateForm = new UpdateDialog();
-                updateForm.SetCheckAtStart(PlayerPrefs.GetInt(UpdatesAtStartKey, 1) != 0);
-                updateForm.CloseRequested += CloseUpdates;
-                updateForm.CheckAtStartChanged += value => PlayerPrefs.SetInt(UpdatesAtStartKey, value ? 1 : 0);
-                updateForm.SkipRequested += () =>
+                Name = "update-dialog",
+                TitleKey = "updates.title.check",
+                Width = DialogWidth.Standard,
+                BodyScrolls = false,
+                Closed = CloseUpdates,
+                Buttons = new[]
                 {
-                    if (offeredRelease != null)
-                        PlayerPrefs.SetString(UpdatesSkippedKey, offeredRelease.Tag);
-                    CloseUpdates();
-                };
-                updateForm.OpenPageRequested += () =>
-                {
-                    Application.OpenURL(offeredRelease?.PageUrl ?? "https://github.com/Tiegertosch/Omsi-2-Mapforger/releases");
-                    CloseUpdates();
-                };
-                updateForm.InstallRequested += InstallUpdate;
-                updateDialog.Add(updateForm);
-            }
+                    new DialogButton { TextKey = "updates.skip", Role = DialogButtonRole.Secondary, Name = "update-skip-button", Clicked = () => updateForm?.RunSkip() },
+                    new DialogButton { TextKey = "updates.button.close", Role = DialogButtonRole.Cancel, Name = "update-close-button" },
+                    new DialogButton { TextKey = "updates.button.install", Role = DialogButtonRole.Primary, Name = "update-primary-button", Clicked = () => updateForm?.RunPrimary(), Closes = false }
+                }
+            });
+            updateDialog.Body.AddToClassList("dialog-body-fill");
+            updateForm = new UpdateDialog(updateDialog);
+            updateForm.SetCheckAtStart(PlayerPrefs.GetInt(UpdatesAtStartKey, 1) != 0);
+            updateForm.CheckAtStartChanged += value => PlayerPrefs.SetInt(UpdatesAtStartKey, value ? 1 : 0);
+            updateForm.SkipRequested += () =>
+            {
+                if (offeredRelease != null)
+                    PlayerPrefs.SetString(UpdatesSkippedKey, offeredRelease.Tag);
+                CloseUpdates();
+            };
+            updateForm.OpenPageRequested += () =>
+            {
+                Application.OpenURL(offeredRelease?.PageUrl ?? "https://github.com/Tiegertosch/Omsi-2-Mapforger/releases");
+                CloseUpdates();
+            };
+            updateForm.InstallRequested += InstallUpdate;
+            updateDialog.Body.Add(updateForm);
             var menuItem = root.Q<Button>("check-updates-menu-item");
             if (menuItem != null)
                 menuItem.clicked += () =>
@@ -123,14 +135,15 @@ namespace OmsiMapEditor.UI
             if (manual)
             {
                 updateForm.ShowChecking();
-                updateDialog.style.display = DisplayStyle.Flex;
+                updateDialog.Show();
+                updateForm.FocusDefault();
             }
             var cancellation = new CancellationTokenSource();
             updateCancellation = cancellation;
             KeepRunning(true);
             var task = MapWorksUpdates.FetchLatestAsync(updateSource, UserAgent, cancellation.Token);
             IVisualElementScheduledItem poll = null;
-            poll = updateDialog.schedule.Execute(() =>
+            poll = updateDialog.Overlay.schedule.Execute(() =>
             {
                 if (!task.IsCompleted)
                     return;
@@ -173,13 +186,14 @@ namespace OmsiMapEditor.UI
                     return;
                 }
                 // At start the window waits for other dialogs, such as the crash report.
-                if (!manual && (IsShown(bugReportDialog) || IsShown(newMapDialog)))
+                if (!manual && ((bugReportDialog != null && bugReportDialog.IsShown) || (newMapDialog != null && newMapDialog.IsShown)))
                     return;
                 offeredRelease = release;
                 var problem = InstallProblem(release);
                 Debug.Log("Update: " + release.Tag + " is available" + (problem != null ? "; " + problem : "."));
                 updateForm.ShowAvailable(release, Application.version, problem);
-                updateDialog.style.display = DisplayStyle.Flex;
+                updateDialog.Show();
+                updateForm.FocusDefault();
                 if (updateInstallWhenFound && problem == null)
                     InstallUpdate();
             }).Every(100);
@@ -233,7 +247,7 @@ namespace OmsiMapEditor.UI
                 return MapWorksUpdates.Unpack(zip, Path.Combine(staging, "new"), ProgramExe);
             });
             IVisualElementScheduledItem poll = null;
-            poll = updateDialog.schedule.Execute(() =>
+            poll = updateDialog.Overlay.schedule.Execute(() =>
             {
                 if (!task.IsCompleted)
                 {
@@ -299,7 +313,7 @@ namespace OmsiMapEditor.UI
             Debug.Log("Update: installing " + release.Tag + " from " + newProgram + "; MapWorks quits.");
             // A frame for the window to show, then quit so the script can replace the files, in the background too.
             KeepRunning(true);
-            updateDialog.schedule.Execute(Application.Quit).StartingIn(300);
+            updateDialog.Overlay.schedule.Execute(Application.Quit).StartingIn(300);
         }
 
         /// <summary>
@@ -324,7 +338,7 @@ namespace OmsiMapEditor.UI
         {
             updateCancellation?.Cancel();
             updateCancellation = null;
-            HidePopup(updateDialog);
+            updateDialog.Hide();
         }
 
         private static bool UpdateCheckDue()

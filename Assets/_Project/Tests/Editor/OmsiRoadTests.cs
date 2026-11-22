@@ -440,6 +440,52 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void SeveralSplinesDeletedOneAfterAnotherLeaveOnlyTheBlockedOnesAndUndoInReverseOrder()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var first = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 100, EndY = 170, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2
+            }, null);
+            var roadA = session.CreateRoad(summary, first, @"Splines\road.sli", OmsiSplineEnd.FindFree(summary, 100, 150, 1.0), null);
+            var second = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 140, StartY = 150, StartHeadingDegrees = 0, StartHeight = 2, EndX = 140, EndY = 170, HeightMode = OmsiRoadHeightMode.Manual,
+                EndHeight = 2
+            }, null);
+            var roadB = session.CreateRoad(summary, second, @"Splines\road.sli", null, null);
+            var idA = roadA.SplineIds[0];
+            var idB = roadB.SplineIds[0];
+
+            // As the shell does: each spline is looked up by its ID again, as a deletion reads the tiles again; spline 11 is held by a row of lamps.
+            var steps = new List<OmsiSplineChange>();
+            var refused = 0;
+            foreach (var id in new[] { idA, 11, idB })
+            {
+                var tile = summary.Tiles.Find(candidate => candidate.Splines.Exists(spline => spline.Id == id));
+                var result = session.DeleteSpline(summary, tile, tile.Splines.Single(spline => spline.Id == id));
+                if (result.Succeeded)
+                    steps.Add(result.Change);
+                else
+                    refused++;
+            }
+            Assert.AreEqual(2, steps.Count);
+            Assert.AreEqual(1, refused);
+            Assert.IsFalse(summary.Tiles.SelectMany(tile => tile.Splines).Any(spline => spline.Id == idA || spline.Id == idB));
+            Assert.IsTrue(summary.Tiles.SelectMany(tile => tile.Splines).Any(spline => spline.Id == 11));
+
+            for (var index = steps.Count - 1; index >= 0; index--)
+                session.Undo(summary, steps[index]);
+            var present = summary.Tiles.SelectMany(tile => tile.Splines).Select(spline => spline.Id).ToList();
+            CollectionAssert.IsSupersetOf(present, new[] { idA, idB, 10, 11 });
+            foreach (var step in steps)
+                session.Redo(summary, step);
+            Assert.IsFalse(summary.Tiles.SelectMany(tile => tile.Splines).Any(spline => spline.Id == idA || spline.Id == idB));
+        }
+
+        [Test]
         public void RulesOfSplinePathsAreSetForSeveralSplinesAsOneUndoStep()
         {
             var session = OpenProject();
@@ -543,8 +589,9 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10, Height(flat, 32, 30), 1e-5);
             // 11 m outside: the slope of 1:1.5 from the shoulder would end below the ground, so the ground stays.
             Assert.AreEqual(0.0, Height(flat, 33, 30), 1e-5);
-            // Beyond the north end on its line the shoulder and slopes round off around the end: flat at 5 m, ground at 15 m.
-            Assert.AreEqual(2.10, Height(flat, 30, 41), 1e-5);
+            // Beyond the open north end on its line the shoulder and slopes round off around the end, from the carriageway rather
+            // than the kerbs, so no gap opens below the end of the road surface: flat at 5 m, ground at 15 m.
+            Assert.AreEqual(1.95, Height(flat, 30, 41), 1e-5);
             Assert.AreEqual(0.0, Height(flat, 30, 43), 1e-5);
             // Far away nothing changes.
             Assert.AreEqual(0.0, Height(flat, 0, 0), 0.0);
@@ -556,6 +603,31 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10, Height(hill, 32, 30), 1e-5);
             Assert.AreEqual(2.10 + (11.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, Height(hill, 33, 30), 1e-5);
             Assert.AreEqual(6.0, Height(hill, 36, 30), 1e-5);
+        }
+
+        [Test]
+        public void TerrainMeetsTheCarriagewayAtAnOpenEndAndTheKerbsAtAJoinedOne()
+        {
+            var profile = OmsiSplineProfile.Parse(Encoding.ASCII.GetBytes(
+                "[profile]\r\n0\r\n[profilepnt]\r\n-4\r\n0.15\r\n0\r\n1\r\n[profilepnt]\r\n4\r\n0.15\r\n1\r\n1\r\n"), @"Splines\road.sli");
+            var tile = new OmsiTileSummary();
+            // A road 2 m high running north from 150, 100 to 150, 200, open at its start and joined to a spline at its end.
+            var spline = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 150, StartY = 100, StartHeight = 2, EndX = 150, EndY = 200, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual,
+                MaximumPieceLength = 200
+            }, null).Pieces[0].AsRecord();
+            spline.NextId = 7;
+            var heights = new float[OmsiTerrain.Resolution * OmsiTerrain.Resolution];
+            OmsiTerrainShaping.Shape(heights, 0, 0, 300, new[] { new OmsiShapedRoad(tile, spline, profile, 300) }, new OmsiTerrainShapeSettings());
+            // Open start: under the road at the end and 5 m beyond it the terrain lies just below the carriageway, not the kerbs.
+            Assert.AreEqual(1.95, Height(heights, 30, 20), 1e-5);
+            Assert.AreEqual(1.95, Height(heights, 30, 19), 1e-5);
+            // Joined end: the next spline goes on, so the terrain keeps to the kerbs there.
+            Assert.AreEqual(2.10, Height(heights, 30, 40), 1e-5);
+            Assert.AreEqual(2.10, Height(heights, 30, 41), 1e-5);
+            // Halfway along nothing changes.
+            Assert.AreEqual(2.10, Height(heights, 30, 30), 1e-5);
         }
 
         [Test]
@@ -640,6 +712,101 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void RevertingATileFitsTheTerrainAroundAgainAndUndoPutsEveryTerrainFileBack()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A cutting 2 m high along the east edge of tile 0, 0, which the ground of tile 1, 0 beside it follows too.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 295, StartY = 100, StartHeight = 2, EndX = 295, EndY = 160, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var road = session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsTrue(session.Workspace.IsModified("tile_1_0.map.terrain"), "The cutting reaches into the tile beside.");
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var modified = session.ModifiedFiles().ToList();
+            var splines = summary.Tiles[0].Splines.ToList();
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            CollectionAssert.IsSupersetOf(revert.FilePaths(), new[] { "tile_0_0.map", "tile_0_0.map.terrain", "tile_1_0.map.terrain" });
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
+            CollectionAssert.AreEquivalent(summary.Tiles, revert.TerrainTiles);
+            CollectionAssert.AreEqual(new[] { 10, 11 }, summary.Tiles[0].Splines.Select(spline => spline.Id).ToArray());
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "Nothing is left to fit outside the step.");
+
+            session.Undo(summary, revert);
+
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            CollectionAssert.AreEquivalent(modified, session.ModifiedFiles());
+            CollectionAssert.AreEqual(splines, summary.Tiles[0].Splines, "The road's own records are back, which its step holds.");
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "The terrain put back is the one fitted to the road.");
+
+            // The road built before the revert is taken back as ever, with the terrain it fitted.
+            session.Undo(summary, road);
+            Assert.IsFalse(session.Workspace.IsModified("tile_0_0.map.terrain"));
+            Assert.IsFalse(session.Workspace.IsModified("tile_1_0.map.terrain"));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            // Undoing a road leaves the range of heights the summary tells for a tile as it was; the records follow the files.
+            CollectionAssert.AreEqual(new[] { 10, 11 }, summary.Tiles[0].Splines.Select(spline => spline.Id).ToArray());
+            Assert.AreEqual(session.Read().SplineCount, summary.SplineCount);
+        }
+
+        [Test]
+        public void UndoAndRedoOfARevertAreRefusedWithoutWritingWhenATerrainFileItWroteChangedSince()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 295, StartY = 100, StartHeight = 2, EndX = 295, EndY = 160, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            CollectionAssert.Contains(revert.FilePaths().ToArray(), "tile_1_0.map.terrain");
+            var reverted = session.Workspace.ReadAllBytes("tile_1_0.map.terrain");
+
+            // The terrain beside is saved by another way, such as a terrain brush outside the history.
+            session.Workspace.Save("tile_1_0.map.terrain", ChangedLastByte(reverted));
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var splines = summary.Tiles[0].Splines.ToList();
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, revert));
+
+            StringAssert.Contains("tile_1_0.map.terrain was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(revert.IsApplied);
+            CollectionAssert.AreEqual(splines, summary.Tiles[0].Splines);
+
+            // With the terrain as the revert left it, the undo goes through; the terrain changed after it refuses the redo.
+            session.Workspace.Save("tile_1_0.map.terrain", reverted);
+            session.Undo(summary, revert);
+            var undone = session.Workspace.ReadAllBytes("tile_1_0.map.terrain");
+            session.Workspace.Save("tile_1_0.map.terrain", ChangedLastByte(undone));
+            files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            splines = summary.Tiles[0].Splines.ToList();
+
+            refused = Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, revert));
+
+            StringAssert.Contains("tile_1_0.map.terrain was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsFalse(revert.IsApplied);
+            CollectionAssert.AreEqual(splines, summary.Tiles[0].Splines);
+        }
+
+        private static byte[] ChangedLastByte(byte[] bytes)
+        {
+            var changed = (byte[])bytes.Clone();
+            changed[changed.Length - 1] ^= 0x01;
+            return changed;
+        }
+
+        [Test]
         public void TerrainIsLeftAloneBeyondARoadEndOnAJunctionAndLiesBelowTheSplineBeforeIt()
         {
             // A junction whose one connection point lies at its origin, facing south.
@@ -666,8 +833,8 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10, terrain[21, 51], 1e-4);
             // 5 m beyond the end, inside the junction, the ground stays as it was.
             Assert.AreEqual(5.0, terrain[20, 53], 1e-4);
-            // The start is free, so slopes still round off around it.
-            Assert.AreEqual(2.10, terrain[20, 39], 1e-4);
+            // The start is free, so slopes still round off around it, from the carriageway at an open end.
+            Assert.AreEqual(1.95, terrain[20, 39], 1e-4);
         }
 
         [Test]
@@ -700,17 +867,318 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(2.10 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[24, 54], 1e-4);
 
             // Moved away from the road end, the junction is no longer joined: fitted again, the free road end rounds its
-            // shoulder and slopes off around itself there instead.
+            // shoulder and slopes off around itself there instead, from the carriageway.
             junction.LocalX = 150;
             Assert.AreEqual(1, session.RefitAllTerrain(summary).Count);
             terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
-            Assert.AreEqual(2.10 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[20, 54], 1e-4);
+            Assert.AreEqual(1.95 + (10.0 - 5.0 * Math.Sqrt(2.0)) / 1.5, terrain[20, 54], 1e-4);
             // A junction of the original map keeps its terrain even when a fitted road joins it.
             junction.LocalX = 100;
             junction.Id = 90;
             session.RefitAllTerrain(summary);
             terrain = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
             Assert.AreEqual(5.0, terrain[20, 54], 1e-4);
+        }
+
+        [Test]
+        public void FittingTheTerrainAroundMovedJunctionsGivesTheTerrainOfAFullFit()
+        {
+            // Four tiles in a row; a junction 20 m square whose one connection point lies 10 m behind its origin, facing back.
+            WriteUtf16("global.cfg", "[NextIDCode]", "100", "", "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "",
+                "[map]", "2", "0", "tile_2_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            WriteUtf16("tile_2_0.map", "[version]", "14", "");
+            WriteUtf16("tile_3_0.map", "[version]", "14", "");
+            WriteTerrain("tile_2_0.map.terrain", 2);
+            WriteTerrain("tile_3_0.map.terrain", 3);
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 270, Height = 2 };
+            summary.Tiles[0].Objects.Add(junction);
+            // A fitted road ending on the junction's point, and one far away in tile 3, 0, which no junction reaches.
+            foreach (var x in new[] { 100.0, 1000.0 })
+                session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+                {
+                    StartX = x, StartY = 200, StartHeight = 2, EndX = x, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+                }, null), @"Splines\road.sli", null, null, true);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "The terrain is fitted to the junction as it lies.");
+            var places = session.JunctionTerrainPlaces(summary);
+            Assert.AreEqual(session.JunctionTerrainState(summary), string.Concat(places.Select(place => place.State)));
+            var far = session.Workspace.Stamp("tile_3_0.map.terrain");
+
+            // Away from the road end, to the edge of its tile, out of its tile with coordinates outside, where the map has no tile, and back.
+            foreach (var place in new[] { new[] { 150.0, 270.0 }, new[] { 295.0, 150.0 }, new[] { 310.0, 280.0 }, new[] { -5.0, 100.0 }, new[] { 100.0, 270.0 } })
+            {
+                junction.LocalX = place[0];
+                junction.LocalY = place[1];
+                var now = session.JunctionTerrainPlaces(summary);
+                var fitted = session.RefitTerrainAtJunctions(summary, places, now);
+                places = now;
+
+                Assert.IsFalse(fitted.Exists(tile => tile.X == 3), "Tile 3, 0 lies beyond the junction's reach.");
+                CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "A full fit after the junction moved to " + place[0] + ", " + place[1] + " changes nothing.");
+            }
+            Assert.AreEqual(far, session.Workspace.Stamp("tile_3_0.map.terrain"));
+            // The junction away from the road and back: the terrain under it changed and came back.
+            junction.LocalX = 150;
+            var away = session.RefitTerrainAtJunctions(summary, places, session.JunctionTerrainPlaces(summary));
+            CollectionAssert.Contains(away, summary.Tiles[0]);
+
+            // Without the junctions the terrain was fitted to, the whole map is fitted.
+            junction.LocalX = 100;
+            CollectionAssert.Contains(session.RefitTerrainAtJunctions(summary, null, session.JunctionTerrainPlaces(summary)), summary.Tiles[0]);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary));
+        }
+
+        [Test]
+        public void FittingTheTerrainAroundAJunctionThatTakesARoadEndFromAnotherGivesTheTerrainOfAFullFit()
+        {
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            // Its point lies 60 m behind its origin, so it can take the road end while it lies well away from the other junction.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "long.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-60\r\n180\r\n\r\n[boundingbox]\r\n30\r\n30\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            // The long junction comes first in the tile, so a road end on both points is joined to it and the square one leaves the fit.
+            var taker = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\long.sco", Id = 501, LocalX = 200, LocalY = 150, Height = 2 };
+            var square = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 270, Height = 2 };
+            summary.Tiles[0].Objects.Add(taker);
+            summary.Tiles[0].Objects.Add(square);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 200, StartHeight = 2, EndX = 100, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            CollectionAssert.IsEmpty(session.RefitAllTerrain(summary));
+            var places = session.JunctionTerrainPlaces(summary);
+            var underSquare = OmsiTerrain.Parse(session.Workspace.ReadAllBytes("tile_0_0.map.terrain"))[20, 54];
+            Assert.AreEqual(1.95, underSquare, 1e-4, "The square junction is fitted.");
+
+            // On the road end, then away again.
+            foreach (var place in new[] { new[] { 100.0, 320.0 }, new[] { 200.0, 150.0 } })
+            {
+                taker.LocalX = place[0];
+                taker.LocalY = place[1];
+                var now = session.JunctionTerrainPlaces(summary);
+                AssertLocalFitIsFullFit(session, summary, places, now, "the junction moved to " + place[0] + ", " + place[1]);
+                places = now;
+                CollectionAssert.IsEmpty(session.RefitAllTerrain(summary), "A full fit after the junction moved to " + place[0] + ", " + place[1] + " changes nothing.");
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void FittingTheTerrainAroundJunctionsGivesEveryTileTheBytesOfAFullFitFromTheSameStart(bool worldCoordinates)
+        {
+            // A grid of three by two tiles and a tile apart; on a [worldcoordinates] map at Berlin's latitude tiles are 371.9 m wide.
+            var originX = worldCoordinates ? 2402 : 0;
+            var originY = worldCoordinates ? 11279 : 0;
+            var config = new List<string>();
+            if (worldCoordinates)
+                config.AddRange(new[] { "[worldcoordinates]", "" });
+            config.AddRange(new[] { "[NextIDCode]", "100", "" });
+            foreach (var place in new[] { new[] { 0, 0 }, new[] { 1, 0 }, new[] { 2, 0 }, new[] { 0, 1 }, new[] { 1, 1 }, new[] { 2, 1 }, new[] { 5, 0 } })
+            {
+                var name = "tile_" + (originX + place[0]) + "_" + (originY + place[1]) + ".map";
+                config.AddRange(new[] { "[map]", (originX + place[0]).ToString(CultureInfo.InvariantCulture), (originY + place[1]).ToString(CultureInfo.InvariantCulture), name, "" });
+                WriteUtf16(name, "[version]", "14", "");
+                WriteUnevenTerrain(name + ".terrain", place[0], place[1]);
+            }
+            WriteUtf16("global.cfg", config.ToArray());
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var size = summary.TileSizeMeters;
+            Assert.AreEqual(worldCoordinates ? 371.9 : 300.0, size, 0.1);
+            var home = summary.Tiles.Single(tile => tile.X == originX && tile.Y == originY);
+            // Near the north-east corner of its tile: its point lies 20 m from both edges, where a fitted road ends.
+            var junction = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = size - 20, LocalY = size - 10, Height = 2 };
+            home.Objects.Add(junction);
+            var westEdge = originX * size;
+            var southEdge = originY * size;
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = westEdge + size - 20, StartY = southEdge + size - 100, StartHeight = 2, EndX = westEdge + size - 20, EndY = southEdge + size - 20,
+                EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            // A fitted road in the tile apart, which no junction reaches.
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = westEdge + 5 * size + 100, StartY = southEdge + 100, StartHeight = 2, EndX = westEdge + 5 * size + 100, EndY = southEdge + 160,
+                EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            session.RefitAllTerrain(summary);
+            var places = session.JunctionTerrainPlaces(summary);
+            var changedSomewhere = false;
+
+            // Away across the corner with coordinates outside its tile, back onto the road end, from there straight into the tile two east
+            // where no full fit looks (so the tiles where it lay have to be fitted as well as those where it lies), outside to the north,
+            // back, outside to the west where the map has no tile, and back.
+            foreach (var place in new[]
+                     {
+                         new[] { size + 5, size + 5 }, new[] { size - 20, size - 10 }, new[] { 2 * size + 150, 150.0 }, new[] { size - 15, size + 8 },
+                         new[] { size - 20, size - 10 }, new[] { -5.0, size - 10 }, new[] { size - 20, size - 10 }
+                     })
+            {
+                junction.LocalX = place[0];
+                junction.LocalY = place[1];
+                var now = session.JunctionTerrainPlaces(summary);
+                var fitted = AssertLocalFitIsFullFit(session, summary, places, now, "the junction moved to " + place[0] + ", " + place[1]);
+                places = now;
+                changedSomewhere |= fitted.Count > 0;
+                Assert.IsFalse(fitted.Exists(tile => tile.X == originX + 5), "The tile apart lies beyond the junction's reach.");
+            }
+            Assert.IsTrue(changedSomewhere, "Joining and leaving the road end changes the terrain.");
+        }
+
+        [Test]
+        public void AJunctionLosingARoadEndToOneTwoTilesAwayGetsItsTerrainFittedToo()
+        {
+            // Four tiles in a row, tile 2, 0 listed first, so a road end on points of junctions in tiles 1 and 2 is joined to the one in tile 2.
+            WriteUtf16("global.cfg", "[NextIDCode]", "100", "", "[map]", "2", "0", "tile_2_0.map", "", "[map]", "0", "0", "tile_0_0.map", "",
+                "[map]", "1", "0", "tile_1_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            foreach (var column in new[] { 0, 1, 2, 3 })
+            {
+                WriteUtf16("tile_" + column + "_0.map", "[version]", "14", "");
+                WriteUnevenTerrain("tile_" + column + "_0.map.terrain", column, 0);
+            }
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            // 100 m wide, its point 10 m behind its origin: its slopes reach out of its tile to the west.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "wide.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n100\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            // Its point lies 246 m to the west and 10 m behind its origin, less than a tile away with what a road joined to it reaches.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "arm.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n-246\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile1 = summary.Tiles.Single(tile => tile.X == 1);
+            var tile2 = summary.Tiles.Single(tile => tile.X == 2);
+            // The wide junction at 355, 150 in the world, 10 m below the ground, with its point at 355, 140 where a fitted road ends.
+            tile1.Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\wide.sco", Id = 500, LocalX = 55, LocalY = 150, Height = -10 });
+            var arm = new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\arm.sco", Id = 501, LocalX = 150, LocalY = 250, Height = -10 };
+            tile2.Objects.Add(arm);
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 355, StartY = 60, StartHeight = -10, EndX = 355, EndY = 140, EndHeight = -10, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            session.RefitAllTerrain(summary);
+            var places = session.JunctionTerrainPlaces(summary);
+            var westBefore = session.Workspace.ReadAllBytes("tile_0_0.map.terrain");
+
+            // The arm's point onto the road end: the wide junction leaves the fit, and the terrain two tiles from the arm, in tile 0, 0, changes.
+            arm.LocalX = 1;
+            arm.LocalY = 150;
+            var now = session.JunctionTerrainPlaces(summary);
+            AssertLocalFitIsFullFit(session, summary, places, now, "the arm took the road end");
+            CollectionAssert.AreNotEqual(westBefore, session.Workspace.ReadAllBytes("tile_0_0.map.terrain"), "The wide junction's slopes left tile 0, 0.");
+            places = now;
+
+            // And back: the wide junction takes the road end again.
+            arm.LocalX = 150;
+            arm.LocalY = 250;
+            AssertLocalFitIsFullFit(session, summary, places, session.JunctionTerrainPlaces(summary), "the arm let go of the road end");
+            CollectionAssert.AreEqual(westBefore, session.Workspace.ReadAllBytes("tile_0_0.map.terrain"));
+        }
+
+        [Test]
+        public void AJunctionReachingATileOrFurtherFitsTheWholeMap()
+        {
+            // Four tiles in a row with a fitted road in the last one.
+            WriteUtf16("global.cfg", "[NextIDCode]", "100", "", "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "",
+                "[map]", "2", "0", "tile_2_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            WriteUtf16("tile_2_0.map", "[version]", "14", "");
+            WriteUtf16("tile_3_0.map", "[version]", "14", "");
+            WriteTerrain("tile_2_0.map.terrain", 2);
+            WriteTerrain("tile_3_0.map.terrain", 3);
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "square.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-10\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            // Its point lies 400 m behind its origin, further than a tile.
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "far.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n-400\r\n180\r\n\r\n[boundingbox]\r\n20\r\n20\r\n1\r\n0\r\n0\r\n0\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 1000, StartY = 200, StartHeight = 2, EndX = 1000, EndY = 260, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null, true);
+            session.RefitAllTerrain(summary);
+            var fittedFar = session.Workspace.ReadAllBytes("tile_3_0.map.terrain");
+            // The terrain of tile 3, 0 put back to the original's, as if it had not been fitted: only a full fit mends it.
+            session.Workspace.Revert("tile_3_0.map.terrain");
+            CollectionAssert.AreNotEqual(fittedFar, session.Workspace.ReadAllBytes("tile_3_0.map.terrain"));
+            var farTile = summary.Tiles.Single(tile => tile.X == 3);
+            var places = session.JunctionTerrainPlaces(summary);
+
+            // A junction reaching less than a tile is fitted around: tile 3, 0 stays as it is.
+            summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\square.sco", Id = 500, LocalX = 100, LocalY = 100, Height = 2 });
+            var now = session.JunctionTerrainPlaces(summary);
+            CollectionAssert.DoesNotContain(session.RefitTerrainAtJunctions(summary, places, now), farTile);
+            places = now;
+            CollectionAssert.AreNotEqual(fittedFar, session.Workspace.ReadAllBytes("tile_3_0.map.terrain"));
+
+            // One reaching a tile or further fits the whole map, tile 3, 0 as well.
+            summary.Tiles[0].Objects.Add(new OmsiObjectRecord { AssetPath = @"Sceneryobjects\Test\far.sco", Id = 501, LocalX = 150, LocalY = 150, Height = 2 });
+            CollectionAssert.Contains(session.RefitTerrainAtJunctions(summary, places, session.JunctionTerrainPlaces(summary)), farTile);
+            CollectionAssert.AreEqual(fittedFar, session.Workspace.ReadAllBytes("tile_3_0.map.terrain"));
+        }
+
+        /// <summary>
+        /// Fits the terrain around the junctions that changed from <paramref name="before"/> to <paramref name="now"/>, then puts every tile's
+        /// terrain back as it was and fits the whole map from there: every tile's terrain has to come out byte for byte the same, also in
+        /// tiles a full fit does not look at. Returns the tiles the local fit changed; the terrain is that of the full fit afterwards.
+        /// </summary>
+        private static List<OmsiTileSummary> AssertLocalFitIsFullFit(OmsiMapSession session, OmsiMapSummary summary,
+            IReadOnlyList<OmsiJunctionTerrainPlace> before, IReadOnlyList<OmsiJunctionTerrainPlace> now, string what)
+        {
+            var start = TerrainFiles(session, summary);
+            var fitted = session.RefitTerrainAtJunctions(summary, before, now);
+            var local = TerrainFiles(session, summary);
+            foreach (var file in start)
+                session.Workspace.Save(file.Key, file.Value);
+            session.RefitTerrainAtJunctions(summary, null, now);
+            var full = TerrainFiles(session, summary);
+            CollectionAssert.AreEquivalent(full.Keys, local.Keys);
+            foreach (var file in full)
+                Assert.IsTrue(file.Value.SequenceEqual(local[file.Key]), "After " + what + ", " + file.Key + " differs from a full fit from the same start.");
+            return fitted;
+        }
+
+        /// <summary>The terrain file of every tile with terrain, as the workspace holds it.</summary>
+        private static Dictionary<string, byte[]> TerrainFiles(OmsiMapSession session, OmsiMapSummary summary)
+        {
+            var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            foreach (var tile in summary.Tiles)
+                if (tile.IsAvailable && tile.HasTerrain)
+                {
+                    var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
+                    files[path] = session.Workspace.ReadAllBytes(path);
+                }
+            return files;
+        }
+
+        /// <summary>A terrain rising unevenly to the north-east, a little different in every tile, whatever the tile size.</summary>
+        private void WriteUnevenTerrain(string relative, int column, int row)
+        {
+            var bytes = new byte[4 + OmsiTerrain.Resolution * OmsiTerrain.Resolution * 4];
+            Buffer.BlockCopy(BitConverter.GetBytes(60), 0, bytes, 0, 4);
+            for (var y = 0; y < OmsiTerrain.Resolution; y++)
+                for (var x = 0; x < OmsiTerrain.Resolution; x++)
+                {
+                    var height = 3.0 + 0.02 * (column * 60 + x) + 0.03 * (row * 60 + y) + 0.4 * Math.Sin((column * 60 + x) / 5.0) * Math.Cos((row * 60 + y) / 7.0);
+                    Buffer.BlockCopy(BitConverter.GetBytes((float)height), 0, bytes, 4 + (y * OmsiTerrain.Resolution + x) * 4, 4);
+                }
+            File.WriteAllBytes(Path.Combine(mapFolder, relative), bytes);
         }
 
         [Test]
@@ -2595,6 +3063,79 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void UndoingARevertPutsTheVeryRecordsOfRowsAndAttachedObjectsBackAndRedoTheRevertedOnes()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 50, StartY = 100, StartHeight = 2, EndX = 250, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var tile = summary.Tiles[0];
+            var first = tile.Splines.Single(spline => spline.Id == road.SplineIds[0]);
+            var plan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), tile, first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(plan.Problem);
+            session.AddAttachmentRow(summary, plan);
+            var row = tile.SplineAttachments.Single(item => item.AssetPath == @"Sceneryobjects\lamp.sco");
+            Assert.IsNotNull(session.AttachObject(summary, tile, row.Id, 1, @"Sceneryobjects\head.sco", 0));
+            var attached = tile.AttachedObjects.Single(item => item.ParentId == row.Id);
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            CollectionAssert.DoesNotContain(tile.SplineAttachments, row);
+            CollectionAssert.DoesNotContain(tile.AttachedObjects, attached);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            var revertedRows = tile.SplineAttachments.ToList();
+            var revertedAttached = tile.AttachedObjects.ToList();
+
+            session.Undo(summary, revert);
+
+            // The row and the object hung on it are the records the steps before the revert hold, not ones read again.
+            Assert.AreSame(row, tile.SplineAttachments.Single(item => item.Id == row.Id));
+            Assert.AreSame(attached, tile.AttachedObjects.Single(item => item.Id == attached.Id));
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            Assert.AreEqual(revertedRows.Count, tile.SplineAttachments.Count);
+            for (var index = 0; index < revertedRows.Count; index++)
+                Assert.AreSame(revertedRows[index], tile.SplineAttachments[index]);
+            Assert.AreEqual(revertedAttached.Count, tile.AttachedObjects.Count);
+            for (var index = 0; index < revertedAttached.Count; index++)
+                Assert.AreSame(revertedAttached[index], tile.AttachedObjects[index]);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void RevertingATileWhoseEditsLaidWaterKeepsTheSummaryAsTheFilesSayThroughUndoAndRedo()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var tile = summary.Tiles[0];
+            Assert.IsNull(tile.Water);
+            Assert.IsNotNull(session.SetTileWater(summary, tile, 5.0));
+            StringAssert.Contains("[water]", OmsiTextFile.Decode(session.Workspace.ReadAllBytes("tile_0_0.map")));
+
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+
+            Assert.IsNull(tile.Water);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            // The water file is not one the revert writes: its copy stays, unread while the tile has no [water] entry.
+            Assert.IsTrue(session.Workspace.IsModified("tile_0_0.map.water"));
+
+            session.Undo(summary, revert);
+
+            CollectionAssert.AreEqual(new[] { 5f, 5f, 5f, 5f }, tile.Water);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+
+            session.Redo(summary, revert);
+
+            Assert.IsNull(tile.Water);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
         public void ARowOnlyLaysObjectsAlongItsOwnTileAndNotBeforeItsOwnSpline()
         {
             var session = OpenProject();
@@ -3468,6 +4009,523 @@ namespace OmsiMapEditor.Tests
         private static double Height(float[] heights, int column, int row)
         {
             return heights[row * OmsiTerrain.Resolution + column];
+        }
+
+        [Test]
+        public void AnUndoOfARoadWhoseFileWasChangedSinceIsRefusedAndWritesNothing()
+        {
+            var session = OpenProject();
+            var road = RoadAcrossTwoTiles(session, out var summary);
+            session.PlaceObject(summary, summary.Tiles[0], @"Sceneryobjects\tree.sco", 20, 20, 0, 0);
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, road));
+
+            StringAssert.Contains("was changed in the meantime", refused.Message);
+            Assert.IsEmpty(raised, "A refused step wrote nothing, so no failed roll-back is reported.");
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(road.IsApplied);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AnUndoOfARoadWhoseFileWasTakenAwayIsRefusedAndWritesNothing()
+        {
+            var session = OpenProject();
+            var road = RoadAcrossTwoTiles(session, out var summary);
+            // Before, the check read the missing file and failed with FileNotFoundException; now it is a refusal like any other change.
+            session.Workspace.Delete("tile_1_0.map");
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+
+            var refused = Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, road));
+
+            StringAssert.Contains("tile_1_0.map was changed in the meantime", refused.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            Assert.IsTrue(session.Workspace.IsDeleted("tile_1_0.map"));
+            Assert.IsTrue(road.IsApplied);
+        }
+
+        [Test]
+        public void AnUndoOfARoadWhoseWriteFailsHalfWayPutsTheFilesBackAndCanBeDoneLater()
+        {
+            var session = OpenProject();
+            var road = RoadAcrossTwoTiles(session, out var summary);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var paths = road.Files.Select(file => file.RelativePath).ToList();
+            var first = paths[0];
+            var firstStamp = session.Workspace.Stamp(first);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            Exception failed;
+            // The undo gives every file its original back, which takes the edited copy away; the last copy is held open, so that fails.
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, paths[paths.Count - 1], true))
+                failed = Assert.Catch(() => session.Undo(summary, road));
+
+            OmsiMapWorkspaceTests.AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
+            Assert.AreNotEqual(firstStamp, session.Workspace.Stamp(first), "The undo wrote " + first + " before it failed.");
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+            Assert.IsTrue(road.IsApplied);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+
+            // Without the obstacle the very step succeeds.
+            session.Undo(summary, road);
+
+            Assert.IsFalse(road.IsApplied);
+            foreach (var path in paths)
+                Assert.IsFalse(session.Workspace.IsModified(path), path);
+            Assert.AreEqual(0, summary.Tiles[1].Splines.Count);
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void AnUndoOfARoadWhoseRollBackFailsReportsBothFailuresTheStepsFirst()
+        {
+            var session = OpenProject();
+            var road = RoadAcrossTwoTiles(session, out var summary);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var paths = road.Files.Select(file => file.RelativePath).ToList();
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            OmsiRollBackFailedException failed;
+            // The first file's undo takes its copy away, which needs no save; putting the copy back does, and cannot.
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, paths[0], false))
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, paths[paths.Count - 1], true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.Undo(summary, road));
+
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
+
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreEqual(2, both.InnerExceptions.Count);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[0]);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[1]);
+            StringAssert.StartsWith(both.InnerExceptions[0].Message, failed.Message);
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+            // Part of the step stayed in the files: the first file is the original again, while the road still counts as built.
+            Assert.IsFalse(session.Workspace.IsModified(paths[0]));
+            Assert.IsTrue(road.IsApplied);
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+        }
+
+        [Test]
+        public void APasteThatFailsIsTakenBackAndKeepsItsFailure()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var calls = 0;
+            var failure = new IOException("The ground could not be read.");
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            var thrown = Assert.Throws<IOException>(() => session.PasteObjects(summary, TwoPasteTargets(), asset => true, (x, y) =>
+            {
+                // The first object is put down; reading the ground for the second fails.
+                if (++calls == 2)
+                    throw failure;
+                return 0.0;
+            }));
+
+            Assert.AreSame(failure, thrown);
+            Assert.IsEmpty(raised, "What was pasted was taken back, so no failed roll-back is reported.");
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void APasteWhoseRollBackFailsReportsBothFailuresThePastesFirst()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var calls = 0;
+            FileStream held = null;
+            var failure = new IOException("The ground could not be read.");
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+            OmsiRollBackFailedException failed;
+            try
+            {
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.PasteObjects(summary, TwoPasteTargets(), asset => true, (x, y) =>
+                {
+                    if (++calls < 2)
+                        return 0.0;
+                    // The first object is in the tile's copy now; holding the copy open keeps taking it back from taking the copy away.
+                    held = new FileStream(Path.Combine(session.Workspace.WorkspacePath, "tile_0_0.map"), FileMode.Open, FileAccess.Read, FileShare.Read);
+                    throw failure;
+                }));
+            }
+            finally
+            {
+                held?.Dispose();
+            }
+
+            // Taking back the first object fails on its own write, with nothing written to put back: the paste reports the failed roll-back, once.
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreEqual(2, both.InnerExceptions.Count);
+            Assert.AreSame(failure, both.InnerExceptions[0]);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[1]);
+            StringAssert.StartsWith(failure.Message, failed.Message);
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+        }
+
+        [Test]
+        public void APasteWhoseRollBackFailsInsideTheUndoOfAnObjectReportsTheFailedRollBackOnce()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var calls = 0;
+            var obstacles = new List<IDisposable>();
+            var failure = new IOException("The ground could not be read.");
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+            OmsiRollBackFailedException failed;
+            try
+            {
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.PasteObjects(summary, TwoPasteTargets(), asset => true, (x, y) =>
+                {
+                    if (++calls < 2)
+                        return 0.0;
+                    // Taking the first object back writes the tile, then global.cfg: the tile's copy goes, which needs no save; global.cfg's
+                    // copy is held open, so that fails; putting the tile's copy back needs a save, and cannot. The undo's own roll-back fails.
+                    obstacles.Add(OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_0_0.map", false));
+                    obstacles.Add(OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "global.cfg", true));
+                    throw failure;
+                }));
+            }
+            finally
+            {
+                for (var index = obstacles.Count - 1; index >= 0; index--)
+                    obstacles[index].Dispose();
+            }
+
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreSame(failure, both.InnerExceptions[0]);
+            Assert.IsInstanceOf<OmsiRollBackFailedException>(both.InnerExceptions[1]);
+            // The undo of the object reported its failed roll-back; the paste that holds it does not report it again.
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(both.InnerExceptions[1], raised[0]);
+        }
+
+        [Test]
+        public void ARoadWhoseChainOffsetsCannotBeWrittenIsTakenBackAndKeepsItsFailure()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A road from tile 0, 0 into tile 1, 0; a piece built on at its start moves the chain offsets of both tiles.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 420, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var start = new OmsiSplineEnd(summary.Tiles[0], summary.Tiles[0].Splines.Single(spline => spline.Id == road.SplineIds[0]), false);
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 150, StartY = 100, StartHeight = 2, EndX = 200, EndY = 100, EndHeight = 2, EndJoinHeadingDegrees = 90, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            Exception failed;
+            // The piece itself writes tile 0, 0 and global.cfg; only the chain pass writes tile 1, 0, and cannot.
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map", false))
+                failed = Assert.Catch(() => session.CreateRoad(summary, plan, @"Splines\road.sli", null, start));
+
+            OmsiMapWorkspaceTests.AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+            // The road's start, read again from the files, is free again.
+            var freeStart = OmsiSplineEnd.FindFree(summary, 200, 100, 0.05);
+            Assert.IsNotNull(freeStart);
+            Assert.AreEqual(road.SplineIds[0], freeStart.Spline.Id);
+
+            // Without the obstacle the very piece is built.
+            var piece = session.CreateRoad(summary, plan, @"Splines\road.sli", null, freeStart);
+            Assert.AreEqual(50.0, session.Read().Tiles.SelectMany(tile => tile.Splines).Single(spline => spline.Id == road.SplineIds[0]).ChainOffset.Value, 1e-3);
+            Assert.IsTrue(piece.Files.Exists(file => file.RelativePath == "tile_1_0.map"), "The chain pass joins the piece's step.");
+        }
+
+        [Test]
+        public void ARoadWhoseTerrainCannotBeFittedIsTakenBackAndKeepsItsFailure()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A cutting along the east edge of tile 0, 0, whose terrain fit reaches into tile 1, 0 beside it.
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 295, StartY = 100, StartHeight = 2, EndX = 295, EndY = 160, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            Exception failed;
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", false))
+                failed = Assert.Catch(() => session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true));
+
+            OmsiMapWorkspaceTests.AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
+            // The terrain of tile 0, 0 was fitted first and went back with the rest; the tiles and global.cfg are the original's again.
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            // The splines are read again from the files, as after an undo.
+            CollectionAssert.AreEqual(new[] { 10, 11 }, summary.Tiles[0].Splines.Select(spline => spline.Id).ToArray());
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void ARoadWhoseTerrainCannotBeFittedNorPutBackReportsTheFailedRollBackOnce()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            // A copy of the terrain beside, saved by another way; with no road near it, fitting it again gives the original back,
+            // which takes the copy away. Held open, the copy cannot go, neither when the road is built nor when it is taken back.
+            session.Workspace.Save("tile_1_0.map.terrain", ChangedLastByte(session.Workspace.ReadAllBytes("tile_1_0.map.terrain")));
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 180, StartHeight = 2, EndX = 100, EndY = 280, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            OmsiRollBackFailedException failed;
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.CreateRoad(summary, plan, @"Splines\road.sli", null, null, true));
+
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreEqual(2, both.InnerExceptions.Count);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[0]);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[1]);
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+        }
+
+        [Test]
+        public void AJunctionInsertionWhoseRollBackFailsReportsTheFailedRollBackOnce()
+        {
+            var installation = Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName;
+            Directory.CreateDirectory(Path.Combine(installation, "Sceneryobjects", "Test"));
+            File.WriteAllText(Path.Combine(installation, "Sceneryobjects", "Test", "tee.sco"),
+                "[splinehelper]\r\nSplines\\road.sli\r\n0\r\n0\r\n7\r\n0\r\n\r\n" +
+                "[splinehelper]\r\nSplines\\road.sli\r\n7\r\n0\r\n0\r\n90\r\n\r\n" +
+                "[splinehelper]\r\nSplines\\road.sli\r\n-7\r\n0\r\n0\r\n-90\r\n");
+            var session = OpenProject();
+            var summary = session.Read();
+            // A road without terrain alignment far from tile 1, 0: cutting it fits no terrain, while building a piece, or taking a step
+            // back, fits the terrain of both tiles again.
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 100, StartY = 180, StartHeight = 2, EndX = 100, EndY = 280, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var spline = summary.Tiles[0].Splines.Single(candidate => candidate.Id == road.SplineIds[1]);
+            var plan = OmsiJunctionInsertion.Plan(summary, new OmsiJunctionCatalog(installation), @"Sceneryobjects\Test\tee.sco", summary.Tiles[0], spline, 25.0, 110, 230);
+            Assert.IsNull(plan.Problem);
+            // As above: a copy of the terrain beside that fitting gives back the original of, held open so it cannot go.
+            session.Workspace.Save("tile_1_0.map.terrain", ChangedLastByte(session.Workspace.ReadAllBytes("tile_1_0.map.terrain")));
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            OmsiRollBackFailedException failed;
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.InsertJunction(summary, plan));
+
+            // The first piece to a connection point fails to fit the terrain and to be taken back, which it reports; taking back the cuts
+            // and the object before it fails too, and the insertion that holds both does not report it again.
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreNotSame(failed, raised[0], "The insertion's own roll-back failed as well.");
+            Assert.IsTrue(HoldsException(failed, raised[0]), "The failure thrown holds the one reported.");
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+        }
+
+        [Test]
+        public void ATerrainStrokeWhoseGroundCannotBeFittedIsTakenBackAndKeepsItsFailure()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var stroke = session.BeginTerrainStroke(summary);
+            // A bump in each tile, shaped by hand; the ground shown follows it in both.
+            stroke.Shaped.Set(30, 30, 50f);
+            stroke.Shaped.Set(90, 30, 50f);
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+
+            Exception failed;
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", false))
+                failed = Assert.Catch(() => session.EndTerrainStroke(summary, stroke));
+
+            OmsiMapWorkspaceTests.AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
+            // The shaped ground and the ground of tile 0, 0 fitted first are gone again.
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        /// <summary>
+        /// A brush stroke over tile 1, 0 that draws its ground while it goes on; a bump shaped by hand beside it makes the fit write the
+        /// tile's ground once more when the stroke ends.
+        /// </summary>
+        /// <param name="water">Digs with the Water brush instead, so the tile gets water when the stroke is kept, as the shell starts it.</param>
+        private static OmsiTerrainStroke DragOverTileBeside(OmsiMapSession session, OmsiMapSummary summary, bool water = false)
+        {
+            var stroke = session.BeginTerrainStroke(summary);
+            stroke.WaterLevel = (stroke.HeightAt(450, 150) ?? 0.0) - 0.3;
+            var shownBefore = session.Workspace.ReadAllBytes("tile_1_0.map.terrain");
+            var touched = session.ApplyTerrainBrush(summary, stroke, water ? OmsiTerrainBrushMode.Water : OmsiTerrainBrushMode.Raise, 450, 150, 20, 0.5, 1.0);
+            if (water)
+                CollectionAssert.AreEqual(new[] { "tile_1_0.map" }, stroke.WaterTiles.Select(tile => tile.FileName).ToArray(), "The tile gets water with the stroke.");
+            CollectionAssert.AreEqual(new[] { "tile_1_0.map" }, touched.Select(tile => tile.FileName).ToArray());
+            CollectionAssert.AreNotEqual(shownBefore, session.Workspace.ReadAllBytes("tile_1_0.map.terrain"), "The drag draws the ground at once.");
+            CollectionAssert.AreEqual(new[] { "tile_1_0.map" }, stroke.WrittenTiles.Select(tile => tile.FileName).ToArray());
+            stroke.Shaped.Set(90, 10, 50f);
+            return stroke;
+        }
+
+        [Test]
+        public void ADraggedTerrainStrokeWhoseGroundCannotBeFittedPutsBackTheGroundItDrewAndItsWater()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var heights = summary.Tiles.Select(tile => tile.TerrainMinHeight + " " + tile.TerrainMaxHeight).ToArray();
+            var water = summary.Tiles.Select(tile => tile.Water).ToArray();
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+            var stroke = DragOverTileBeside(session, summary, true);
+
+            Exception failed;
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", false))
+                failed = Assert.Catch(() => session.EndTerrainStroke(summary, stroke));
+
+            OmsiMapWorkspaceTests.AssertWriteFailure(failed);
+            Assert.IsEmpty(raised, "The files were put back, so no failed roll-back is reported.");
+            // The ground the drag drew, the shaped ground, the water and the ground fitted are as before the stroke: no stroke is kept that no step holds.
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+            CollectionAssert.IsEmpty(session.ModifiedFiles());
+            CollectionAssert.AreEqual(heights, summary.Tiles.Select(tile => tile.TerrainMinHeight + " " + tile.TerrainMaxHeight).ToArray());
+            CollectionAssert.AreEqual(water, summary.Tiles.Select(tile => tile.Water).ToArray());
+            OmsiMapWorkspaceTests.AssertSummaryMatchesFiles(session, summary);
+        }
+
+        [Test]
+        public void ADraggedTerrainStrokeWhoseGroundCanNeitherBeFittedNorPutBackReportsTheFailedRollBackOnce()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var originalFolder = OmsiMapWorkspaceTests.FolderFiles(mapFolder);
+            var raised = OmsiMapWorkspaceTests.WatchRollBackFailures(session);
+            var stroke = DragOverTileBeside(session, summary);
+
+            OmsiRollBackFailedException failed;
+            // Held open, the ground the drag drew can neither be fitted nor go back to the original's.
+            using (OmsiMapWorkspaceTests.BlockWrites(session.Workspace, "tile_1_0.map.terrain", true))
+                failed = Assert.Throws<OmsiRollBackFailedException>(() => session.EndTerrainStroke(summary, stroke));
+
+            Assert.AreEqual(1, raised.Count, "The failed roll-back is reported once.");
+            Assert.AreSame(failed, raised[0]);
+            var both = (AggregateException)failed.InnerException;
+            Assert.AreEqual(2, both.InnerExceptions.Count);
+            OmsiMapWorkspaceTests.AssertWriteFailure(both.InnerExceptions[0]);
+            StringAssert.Contains("Putting the files back as they were failed as well", failed.Message);
+            OmsiMapWorkspaceTests.AssertSameFiles(originalFolder, OmsiMapWorkspaceTests.FolderFiles(mapFolder));
+        }
+
+        [Test]
+        public void UndoingAStepAlreadyUndoneOrRedoingOneAlreadyDoneIsRefused()
+        {
+            var session = OpenProject();
+            var summary = session.Read();
+            var placed = session.PlaceObject(summary, summary.Tiles[0], @"Sceneryobjects\tree.sco", 20, 20, 0, 0);
+            var road = session.CreateRoad(summary, OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = 200, StartY = 100, StartHeight = 2, EndX = 280, EndY = 100, EndHeight = 2, HeightMode = OmsiRoadHeightMode.Manual
+            }, null), @"Splines\road.sli", null, null);
+            var stroke = session.BeginTerrainStroke(summary);
+            stroke.Shaped.Set(30, 30, 50f);
+            var terrain = session.EndTerrainStroke(summary, stroke);
+            var tile = session.AddTile(summary, 2, 0);
+            var revert = session.RevertTile(summary, "tile_0_0.map");
+            var first = summary.Tiles[0].Splines.Single(spline => spline.Id == 10);
+            var rowPlan = OmsiAttachmentRows.Plan(summary, new OmsiSplineAttachmentLayout(summary), summary.Tiles[0], first,
+                new OmsiAttachmentRowRequest { AssetPath = @"Sceneryobjects\lamp.sco", LateralOffset = 6, Interval = 20 });
+            Assert.IsNull(rowPlan.Problem);
+            var row = session.AddAttachmentRow(summary, rowPlan);
+            Assert.IsNotNull(terrain);
+            Assert.IsNotNull(revert);
+
+            // Each is in effect: redoing it is refused, without writing.
+            var files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, row));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, revert));
+            Assert.Throws<OmsiStepRefusedException>(() => session.ApplyTileChange(tile, false));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, terrain));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, road));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Redo(summary, placed));
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+
+            // Undone, the last first: undoing it again is refused, without writing.
+            session.Undo(summary, row);
+            session.Undo(summary, revert);
+            session.ApplyTileChange(tile, true);
+            session.Undo(summary, terrain);
+            session.Undo(summary, road);
+            session.Undo(summary, placed);
+            files = OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace);
+            Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, row));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, revert));
+            Assert.Throws<OmsiStepRefusedException>(() => session.ApplyTileChange(tile, true));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, terrain));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, road));
+            Assert.Throws<OmsiStepRefusedException>(() => session.Undo(summary, placed));
+            OmsiMapWorkspaceTests.AssertSameFiles(files, OmsiMapWorkspaceTests.WorkspaceFiles(session.Workspace));
+        }
+
+        /// <summary>True when <paramref name="inner"/> is the exception or among its inner exceptions, however deep.</summary>
+        private static bool HoldsException(Exception exception, Exception inner)
+        {
+            if (exception == null)
+                return false;
+            if (ReferenceEquals(exception, inner))
+                return true;
+            if (exception is AggregateException aggregate)
+                return aggregate.InnerExceptions.Any(candidate => HoldsException(candidate, inner));
+            return HoldsException(exception.InnerException, inner);
+        }
+
+        /// <summary>Two copies of an object of absolute height to put down in tile 0, 0, so the ground under each is read before it is placed.</summary>
+        private static List<OmsiPasteTarget> TwoPasteTargets()
+        {
+            var item = new OmsiPasteItem { AssetPath = @"Sceneryobjects\stop.sco", WorldX = 20, WorldY = 20, Height = 0, SourceGround = 0 };
+            return new List<OmsiPasteTarget>
+            {
+                new OmsiPasteTarget { Item = item, WorldX = 20, WorldY = 20 },
+                new OmsiPasteTarget { Item = item, WorldX = 40, WorldY = 20 }
+            };
+        }
+
+        /// <summary>A road built from the end of spline 10 east across the tile border, with the step that built it: it writes both tiles and global.cfg.</summary>
+        private OmsiSplineChange RoadAcrossTwoTiles(OmsiMapSession session, out OmsiMapSummary summary)
+        {
+            summary = session.Read();
+            var end = OmsiSplineEnd.FindFree(summary, 100, 151, 2.0);
+            var start = end.Position(summary.TileSizeMeters);
+            var plan = OmsiRoadPlanner.Plan(new OmsiRoadRequest
+            {
+                StartX = start.X, StartY = start.Y, StartHeadingDegrees = end.OutwardHeadingDegrees, StartHeight = end.Height, EndX = 340, EndY = 150,
+                HeightMode = OmsiRoadHeightMode.Manual, EndHeight = 2
+            }, new OmsiTerrainSampler(summary, session.Source));
+            var road = session.CreateRoad(summary, plan, @"Splines\road.sli", end, null);
+            CollectionAssert.AreEquivalent(new[] { "tile_0_0.map", "tile_1_0.map", "global.cfg" }, road.Files.Select(file => file.RelativePath).ToArray());
+            return road;
         }
 
         private OmsiMapSession OpenProject()

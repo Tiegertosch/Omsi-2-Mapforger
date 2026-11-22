@@ -1,9 +1,5 @@
 {
-  "rows.title": "Rangées le long des routes",
   "rows.selected": "Ligne sélectionnée",
-  "rows.choose": "Choisissez un objet dans la bibliothèque.",
-  "rows.object": "Objet : {name}",
-  "@rows.object": "{name} is a file name without extension, shown unchanged",
   "rows.interval": "Chaque (m)",
   "rows.interval.tooltip": "Distance entre les objets d'une rangée le long de la route",
   "rows.offset": "Du centre (m)",
@@ -16,5 +12,8 @@
   "rows.both.tooltip": "Pose une rangée des deux côtés de la route à la fois",
   "rows.whole": "Route entière",
   "rows.whole.tooltip": "Un clic permet de disposer la rangée tout au long de la route, d'un carrefour ou d'une extrémité libre à un carrefour ou à une extrémité libre, uniformément espacés. Désactivez-la pour cliquer là où la ligne commence et où elle se termine.",
-  "rows.hint": "Pointez sur une route : la ligne se trouve du côté du pointeur. Cliquez pour le poser ; R retourne les objets de 15°, Shift+R en arrière. Cliquez sur un objet d'une ligne pour sélectionner la ligne : modifiez ses valeurs et appuyez sur Enter, ou choisissez un autre objet dans la bibliothèque ; Del le supprime. Esc termine l'outil."
+  "rows.hint": "Pointez sur une route : la ligne se trouve du côté du pointeur. Cliquez pour le poser ; R retourne les objets de 15°, Shift+R en arrière. Cliquez sur un objet d'une ligne pour sélectionner la ligne : modifiez ses valeurs et appuyez sur Enter, ou choisissez un autre objet dans la bibliothèque ; Del le supprime. Esc termine l'outil.",
+  "rows.row.spacing": "Espacement",
+  "rows.row.position": "Position",
+  "rows.row.layout": "Disposition"
 }

@@ -134,7 +134,7 @@ namespace OmsiMapEditor.Tests
 
             var broken = OmsiTripPlanner.Plan(new[] { stops[1], stops[2] }, new OmsiTimetable(), network, (x, y) => 0);
             Assert.IsFalse(broken.IsValid);
-            StringAssert.Contains("Far", broken.Problems[0]);
+            StringAssert.Contains("Far", broken.Problems[0].ToString());
             Assert.IsFalse(OmsiTripPlanner.Plan(stops.Take(1).ToList(), timetable, network, (x, y) => 0).IsValid);
         }
 

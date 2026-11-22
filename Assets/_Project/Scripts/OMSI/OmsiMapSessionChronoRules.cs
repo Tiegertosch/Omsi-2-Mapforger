@@ -112,7 +112,7 @@ namespace OmsiMapEditor.OMSI
                             view = candidate;
                     if (view == null)
                         throw new InvalidOperationException("Spline " + spline.Id + " was not found in " + path + ".");
-                    ReplaceRules(file, view.Record, edit.Paths, edit.Names, edit.Rules);
+                    ReplaceRules(file, view.Record, edit.Paths, edit.Names, edit.Rules, edit.KeepKillRules);
                 }
                 else
                     WriteRuleCommands(file, "selspline", spline.Id, spline.Rules, after);

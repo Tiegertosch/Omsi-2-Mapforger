@@ -28,7 +28,6 @@ namespace OmsiMapEditor.UI
         private const int SearchDelayMilliseconds = 150;
 
         private const string FavoritesKey = "Mapforge.ObjectFavorites";
-        private const string HideDlcKey = "Mapforge.HideDlcObjects";
         private const string RandomHeadingKey = "Mapforge.RandomHeading";
         private const string DlcFoldersKey = "Mapforge.DlcFolders";
         private const string RootFolder = "Sceneryobjects";
@@ -58,11 +57,19 @@ namespace OmsiMapEditor.UI
         private readonly Label folderLabel;
         private readonly ScrollView tiles;
         private readonly Label emptyLabel;
-        private readonly Label titleLabel;
-        private readonly Label info;
-        private readonly Toggle hideDlc;
+        private string hint;
+        private bool hintWarning;
+        private readonly ToolCatalog catalog;
+        private bool hideDlc;
         private readonly TextField headingField;
         private readonly Toggle randomHeading;
+        private readonly VisualElement headingRow;
+        private readonly Label placeLabel;
+        private readonly Button singleButton;
+        private readonly Button rowButton;
+        private bool rowMode;
+        private string rowPlan;
+        private bool rowPlanWarning;
         private readonly Dictionary<string, VisualElement> tileByPath = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
         private IVisualElementScheduledItem searchRefresh;
 
@@ -92,110 +99,61 @@ namespace OmsiMapEditor.UI
             LoadDlcFolders();
 
             // The options on the left.
-            var options = new VisualElement();
-            options.AddToClassList("tool-panel");
-            options.AddToClassList("picker-options");
-            var optionsTitle = LocBindings.NewLabel("objects.options");
-            optionsTitle.AddToClassList("picker-options-title");
-            options.Add(optionsTitle);
-            hideDlc = new Toggle { value = PlayerPrefs.GetInt(HideDlcKey, 0) != 0 };
-            hideDlc.AddToClassList("picker-option-toggle");
-            hideDlc.RegisterValueChangedCallback(evt =>
-            {
-                PlayerPrefs.SetInt(HideDlcKey, evt.newValue ? 1 : 0);
-                PlayerPrefs.Save();
-                Refresh();
-            });
-            Row(options, "objects.hide_dlc").Add(hideDlc);
-            var headingRow = Row(options, "objects.heading");
-            headingField = new TextField { value = "0" };
-            LocBindings.Tooltip(headingField, "objects.heading.tooltip");
-            headingField.AddToClassList("picker-field");
+            // The options scroll once they are taller than the panels of the bar may be (ADR 098, 210 px).
+            var options = ToolCatalog.Options(scrolling: true, icons: true);
+            // What to do with a chosen object: put it down singly, or lay a row of it along a road (ADR 098, M4).
+            var placeRow = OptionControls.Row(options, "objects.place");
+            placeLabel = placeRow.Q<Label>();
+            placeLabel.tooltip = Loc.T("objects.hint");
+            var places = OptionControls.Group(placeRow);
+            singleButton = OptionControls.Choice(places, "box", "objects.place.single", "objects.place.single.tooltip", () => PlaceModeChosen?.Invoke(false));
+            rowButton = OptionControls.Choice(places, "fence", "objects.place.row", "objects.place.row.tooltip", () => PlaceModeChosen?.Invoke(true));
+            singleButton.AddToClassList("panel-tab-active");
+
+            headingRow = OptionControls.Row(options, "objects.heading");
+            headingField = OptionControls.Value(headingRow, "compass", "0", "°", "objects.heading", "objects.heading.tooltip");
             headingField.RegisterValueChangedCallback(evt =>
             {
                 if (double.TryParse(evt.newValue.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var heading) && !double.IsInfinity(heading))
                     HeadingChanged?.Invoke(heading);
             });
-            LocBindings.Tooltip(headingRow, "objects.heading.tooltip");
-            headingRow.Add(headingField);
-            randomHeading = new Toggle { value = PlayerPrefs.GetInt(RandomHeadingKey, 0) != 0 };
-            randomHeading.AddToClassList("picker-option-toggle");
+            randomHeading = OptionControls.Switch(headingRow, "shuffle", "objects.random_heading", "objects.random_heading.tooltip", PlayerPrefs.GetInt(RandomHeadingKey, 0) != 0);
             randomHeading.RegisterValueChangedCallback(evt =>
             {
                 PlayerPrefs.SetInt(RandomHeadingKey, evt.newValue ? 1 : 0);
                 PlayerPrefs.Save();
                 RandomHeadingChanged?.Invoke(evt.newValue);
             });
-            var randomRow = Row(options, "objects.random_heading");
-            LocBindings.Tooltip(randomRow, "objects.random_heading.tooltip");
-            LocBindings.Tooltip(randomHeading, "objects.random_heading.tooltip");
-            randomRow.Add(randomHeading);
-            var hint = LocBindings.NewLabel("objects.hint");
-            hint.AddToClassList("panel-info");
-            options.Add(hint);
+            RowOptions = new RowToolOptions();
+            RowOptions.style.display = DisplayStyle.None;
+            RowOptions.PlanChanged += (text, problem) =>
+            {
+                rowPlan = text;
+                rowPlanWarning = problem;
+                if (rowMode)
+                    UpdateInfo();
+            };
+            options.Add(RowOptions);
             Add(options);
             placingOptions = options;
             shownOptions = options;
 
-            // The picker beside them.
-            var picker = new VisualElement();
-            picker.AddToClassList("tool-panel");
-            picker.AddToClassList("picker-panel");
-            var header = new VisualElement();
-            header.AddToClassList("tool-panel-header");
-            header.AddToClassList("picker-header");
-            var badge = new VisualElement();
-            badge.AddToClassList("tool-panel-badge");
-            badge.Add(new IconElement("box"));
-            header.Add(badge);
-            var titles = new VisualElement();
-            titles.AddToClassList("tool-panel-titles");
-            titleLabel = new Label(Loc.T("objects.title"));
-            titleLabel.AddToClassList("tool-panel-title");
-            titleLabel.AddToClassList("picker-title");
-            titles.Add(titleLabel);
-            info = new Label();
-            info.AddToClassList("tool-panel-subtitle");
-            info.AddToClassList("picker-subtitle");
-            titles.Add(info);
-            header.Add(titles);
-            var searchRow = new VisualElement();
-            searchRow.AddToClassList("panel-search");
-            searchRow.AddToClassList("picker-search");
-            search = new TextField();
-            search.AddToClassList("panel-search-field");
-            search.textEdition.placeholder = Loc.T("objects.search");
+            // The catalog beside them.
+            catalog = new ToolCatalog("objects.close.tooltip", () => CloseRequested?.Invoke(), "objects.search");
+            AddTab(Tab.InMap, OmsiObjectCategory.Other, "map-pin", "objects.tab.in_map", "objects.tab.in_map.tooltip");
+            AddTab(Tab.Favorites, OmsiObjectCategory.Other, "star", "objects.tab.favorites", "objects.tab.favorites.tooltip");
+            AddTab(Tab.Library, OmsiObjectCategory.Other, "library", "objects.tab.library", "objects.tab.library.tooltip");
+            foreach (OmsiObjectCategory each in Enum.GetValues(typeof(OmsiObjectCategory)))
+                AddTab(Tab.Category, each, CategoryIcon(each), CategoryTexts.ObjectNameKey(each), CategoryTexts.ObjectTooltipKey(each));
+            search = catalog.Search;
             search.RegisterValueChangedCallback(_ =>
             {
                 shownPages = 1;
                 searchRefresh?.Pause();
                 searchRefresh = schedule.Execute(Refresh).StartingIn(SearchDelayMilliseconds);
             });
-            searchRow.Add(search);
-            var searchIcon = new IconElement("search");
-            searchIcon.AddToClassList("panel-search-icon");
-            searchRow.Add(searchIcon);
-            header.Add(searchRow);
-            foldersButton = new Button(() => FoldersRequested?.Invoke());
-            foldersButton.AddToClassList("panel-icon-button");
-            foldersButton.Add(new IconElement("folder"));
-            header.Add(foldersButton);
-            SetFoldersLeftOut(0);
-            var close = LocBindings.WithTooltip(new Button(() => CloseRequested?.Invoke()), "objects.close.tooltip");
-            close.AddToClassList("panel-icon-button");
-            close.Add(new IconElement("x"));
-            header.Add(close);
-            picker.Add(header);
-
-            var tabRow = new VisualElement();
-            tabRow.AddToClassList("panel-tabs");
-            tabRow.AddToClassList("picker-tabs");
-            AddTab(tabRow, Tab.InMap, OmsiObjectCategory.Other, "objects.tab.in_map", "objects.tab.in_map.tooltip");
-            AddTab(tabRow, Tab.Favorites, OmsiObjectCategory.Other, "objects.tab.favorites", "objects.tab.favorites.tooltip");
-            AddTab(tabRow, Tab.Library, OmsiObjectCategory.Other, "objects.tab.library", "objects.tab.library.tooltip");
-            foreach (OmsiObjectCategory each in Enum.GetValues(typeof(OmsiObjectCategory)))
-                AddTab(tabRow, Tab.Category, each, CategoryTexts.ObjectNameKey(each), CategoryTexts.ObjectTooltipKey(each));
-            picker.Add(tabRow);
+            tiles = catalog.Tiles;
+            emptyLabel = catalog.Empty;
 
             folderBar = new VisualElement();
             folderBar.AddToClassList("panel-folder-bar");
@@ -206,21 +164,9 @@ namespace OmsiMapEditor.UI
             folderLabel = new Label();
             folderLabel.AddToClassList("panel-folder-label");
             folderBar.Add(folderLabel);
-            picker.Add(folderBar);
-
-            // The scroll bar always shows, so the tiles keep their places whatever the tab holds.
-            tiles = new ScrollView(ScrollViewMode.Vertical)
-            {
-                verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible, horizontalScrollerVisibility = ScrollerVisibility.Hidden
-            };
-            tiles.AddToClassList("picker-tiles");
-            tiles.contentContainer.AddToClassList("picker-tiles-content");
-            picker.Add(tiles);
-            emptyLabel = new Label();
-            emptyLabel.AddToClassList("panel-info");
-            emptyLabel.AddToClassList("picker-empty");
-            picker.Add(emptyLabel);
-            Add(picker);
+            // Between the header and the tiles.
+            catalog.Panel.Insert(1, folderBar);
+            Add(catalog.Panel);
 
             ShowTab(Tab.InMap, OmsiObjectCategory.Buildings);
         }
@@ -249,18 +195,54 @@ namespace OmsiMapEditor.UI
 
         public event Action CloseRequested;
 
-        /// <summary>The folder button was pressed: the shell opens the choice of folders (ADR 084).</summary>
-        public event Action FoldersRequested;
+        /// <summary>The user chose what to do with an object: true to lay rows along a road, false to place single objects.</summary>
+        public event Action<bool> PlaceModeChosen;
 
-        private readonly Button foldersButton;
-        private int foldersLeftOut;
+        /// <summary>The options of the rows, shown in place of the heading while the window is in Row mode.</summary>
+        public RowToolOptions RowOptions { get; }
 
-        /// <summary>Shows on the folder button how many folders of Sceneryobjects are left out; the button is marked while any are.</summary>
-        public void SetFoldersLeftOut(int count)
+        /// <summary>True while the window is in Row mode.</summary>
+        public bool IsRowMode => rowMode;
+
+        /// <summary>
+        /// Switches between placing single objects and laying rows: the option column shows the one's options, and the line of the status
+        /// bar follows the plan of the next row while it is on.
+        /// </summary>
+        public void ShowMode(bool row)
         {
-            foldersLeftOut = count;
-            foldersButton.tooltip = Loc.T("objects.folders.tooltip", ("count", count));
-            foldersButton.EnableInClassList("folders-left-out", count > 0);
+            rowMode = row;
+            singleButton.EnableInClassList("panel-tab-active", !row);
+            rowButton.EnableInClassList("panel-tab-active", row);
+            headingRow.style.display = row ? DisplayStyle.None : DisplayStyle.Flex;
+            RowOptions.style.display = row ? DisplayStyle.Flex : DisplayStyle.None;
+            placeLabel.tooltip = Loc.T(row ? "rows.hint" : "objects.hint"); // i18n:keys
+            if (!row)
+                rowPlan = null;
+            UpdateInfo();
+        }
+
+        /// <summary>Rows need the whole map; where only objects can be edited the choice is dimmed, and a click says why in the status bar.</summary>
+        public void SetRowAllowed(bool allowed)
+        {
+            rowButton.EnableInClassList("option-icon-locked", !allowed);
+        }
+
+        /// <summary>Highlights the tile of an object as chosen without reporting it, such as the object that was being placed when rows were chosen.</summary>
+        public void MarkChosen(string path)
+        {
+            if (chosen != null && tileByPath.TryGetValue(chosen, out var previous))
+                previous.RemoveFromClassList("picker-tile-selected");
+            chosen = path;
+            if (path != null && tileByPath.TryGetValue(path, out var tile))
+                tile.AddToClassList("picker-tile-selected");
+            UpdateInfo();
+        }
+
+        /// <summary>The line about the list or the chosen object changed; the shell shows it in the status bar, a warning in its colour.</summary>
+        public event Action<string, bool> HintChanged
+        {
+            add => catalog.HintChanged += value;
+            remove => catalog.HintChanged -= value;
         }
 
         /// <summary>A tile shows an object whose preview is not drawn yet; the shell has the object renderer draw it.</summary>
@@ -294,25 +276,30 @@ namespace OmsiMapEditor.UI
             origins?.SetMarkedFolders(dlcFolders);
             objectGroups = catalog?.Groups ?? new Dictionary<string, List<string>>();
             categories = catalog?.Categories ?? new Dictionary<string, OmsiObjectCategory>();
-            UpdateHideDlcTooltip();
             Refresh();
         }
 
-        private void UpdateHideDlcTooltip()
+        /// <summary>
+        /// Whether objects of a DLC leave every list but the map's own (File › Settings, ADR 098 stage 2); the setting holds for
+        /// roads as well.
+        /// </summary>
+        public bool HideDlc
         {
-            var origin = origins == null ? Loc.T("objects.origin.reading")
-                : origins.FromSteam ? origins.Description
-                : Loc.T("objects.origin.no_steam", ("description", origins.Description));
-            hideDlc.tooltip = Loc.T("objects.hide_dlc.tooltip", ("origin", origin));
-            hideDlc.parent.tooltip = hideDlc.tooltip;
+            get => hideDlc;
+            set
+            {
+                if (hideDlc == value)
+                    return;
+                hideDlc = value;
+                Refresh();
+            }
         }
 
         /// <summary>The language changed: what the panel wrote from the language files is written again.</summary>
         public void RefreshTexts()
         {
             search.textEdition.placeholder = Loc.T("objects.search");
-            UpdateHideDlcTooltip();
-            SetFoldersLeftOut(foldersLeftOut);
+            placeLabel.tooltip = Loc.T(rowMode ? "rows.hint" : "objects.hint"); // i18n:keys
             Refresh();
         }
 
@@ -347,9 +334,11 @@ namespace OmsiMapEditor.UI
             UpdateInfo();
         }
 
+        /// <summary>Puts the cursor in the search while it is unfolded; a folded search takes no keys, so the map's shortcuts keep working.</summary>
         public void FocusSearch()
         {
-            search.Focus();
+            if (catalog.SearchOpen)
+                search.Focus();
         }
 
         /// <summary>
@@ -374,32 +363,36 @@ namespace OmsiMapEditor.UI
             if (!string.IsNullOrEmpty(location))
                 folder = location.Replace('/', Path.DirectorySeparatorChar);
             if (searchText != null)
+            {
                 search.SetValueWithoutNotify(searchText);
+                catalog.ShowSearch(searchText.Length > 0);
+            }
             ShowTab(kind, each);
         }
 
-        private static VisualElement Row(VisualElement parent, string labelKey)
+        private void AddTab(Tab kind, OmsiObjectCategory each, string icon, string textKey, string tooltipKey)
         {
-            var row = new VisualElement();
-            row.AddToClassList("picker-option");
-            var text = LocBindings.NewLabel(labelKey); // i18n:keys
-            text.AddToClassList("picker-option-label");
-            row.Add(text);
-            parent.Add(row);
-            return row;
-        }
-
-        private void AddTab(VisualElement row, Tab kind, OmsiObjectCategory each, string textKey, string tooltipKey)
-        {
-            var button = LocBindings.WithTooltip(LocBindings.NewButton(textKey, () => // i18n:keys
+            var button = catalog.AddTab(icon, textKey, tooltipKey, () =>
             {
                 search.SetValueWithoutNotify(string.Empty);
                 ShowTab(kind, each);
-            }), tooltipKey); // i18n:keys
-            button.AddToClassList("panel-tab");
-            button.AddToClassList("picker-tab");
+            });
             tabButtons.Add(button, new KeyValuePair<Tab, OmsiObjectCategory>(kind, each));
-            row.Add(button);
+        }
+
+        private static string CategoryIcon(OmsiObjectCategory category)
+        {
+            switch (category)
+            {
+                case OmsiObjectCategory.Buildings: return "building-2";
+                case OmsiObjectCategory.Trees: return "tree-deciduous";
+                case OmsiObjectCategory.Junctions: return "cross";
+                case OmsiObjectCategory.Signs: return "signpost";
+                case OmsiObjectCategory.Stops: return "bus-front";
+                case OmsiObjectCategory.Lights: return "lightbulb";
+                case OmsiObjectCategory.Rail: return "train-track";
+                default: return "ellipsis";
+            }
         }
 
         private void ShowTab(Tab kind, OmsiObjectCategory each)
@@ -431,7 +424,7 @@ namespace OmsiMapEditor.UI
         /// <summary>DLC objects leave every tab but the map's own list while the toggle is on.</summary>
         private bool Hidden(string path)
         {
-            return hideDlc.value && tab != Tab.InMap && IsDlc(path);
+            return hideDlc && tab != Tab.InMap && IsDlc(path);
         }
 
         /// <summary>Rebuilds the tiles for the tab, folder and search terms.</summary>
@@ -605,7 +598,8 @@ namespace OmsiMapEditor.UI
             var path = entry.Path;
             var tile = new VisualElement
             {
-                tooltip = objectGroups.TryGetValue(path, out var names) ? Loc.T("objects.tile.groups", ("path", path), ("groups", string.Join(", ", names))) : path
+                tooltip = LocBindings.CardTooltip(entry.Name,
+                    objectGroups.TryGetValue(path, out var names) ? Loc.T("objects.tile.groups", ("path", path), ("groups", string.Join(", ", names))) : path)
             };
             tile.AddToClassList("picker-tile");
             tile.AddToClassList("object-tile");
@@ -771,20 +765,46 @@ namespace OmsiMapEditor.UI
             var objectCount = entries.Count - folderCount;
             var usesDlc = DlcUse(out var kinds, out var placements);
             var dlcWarning = chosen == null && tab == Tab.InMap && usesDlc;
-            titleLabel.text = chosen != null ? Path.GetFileNameWithoutExtension(chosen) : Loc.T("objects.title");
-            titleLabel.tooltip = chosen;
-            info.EnableInClassList("panel-info-warning", dlcWarning);
-            if (chosen != null)
-                info.text = otherChosenHint ?? Loc.T("objects.hint.chosen");
-            else if (dlcWarning)
-                info.text = Loc.T("objects.dlc_warning", ("kinds", kinds), ("placements", placements));
-            else
-                info.text = Loc.T("objects.info", ("folders", folderCount), ("objects", objectCount), ("hasHint", otherIdleHint != null ? "yes" : "no"), ("hint", otherIdleHint ?? string.Empty));
-            info.tooltip = info.text;
+            var planned = rowMode && rowPlan != null;
+            var text = planned ? rowPlan : chosen != null ? Path.GetFileNameWithoutExtension(chosen) + ": " + (otherChosenHint ?? Loc.T("objects.hint.chosen"))
+                : dlcWarning ? Loc.T("objects.dlc_warning", ("kinds", kinds), ("placements", placements))
+                : Loc.T("objects.info", ("folders", folderCount), ("objects", objectCount), ("hasHint", otherIdleHint != null ? "yes" : "no"), ("hint", otherIdleHint ?? string.Empty));
+            var warning = planned ? rowPlanWarning : dlcWarning;
+            if (text != hint || warning != hintWarning)
+            {
+                hint = text;
+                hintWarning = warning;
+                catalog.ShowHint(text, warning);
+            }
             emptyLabel.text = Loc.T(library == null && tab != Tab.InMap ? "objects.empty.listing" // i18n:keys
                 : tab == Tab.Favorites && favorites.Count == 0 ? "objects.empty.favorites"
                 : tab == Tab.InMap && used.Count == 0 ? "objects.empty.in_map"
                 : "objects.empty.none"); // i18n:keys
+            // Only where a folder left out can be why the list is empty: a search and the lists of the installation, not the map's own
+            // objects and the favourites.
+            if (foldersLeftOut > 0 && library != null && (!string.IsNullOrWhiteSpace(search.value) || tab != Tab.InMap && tab != Tab.Favorites))
+                emptyLabel.text += "\n" + Loc.T("contentfolders.left_out", ("count", foldersLeftOut));
+        }
+
+        private int foldersLeftOut;
+
+        /// <summary>How many object folders the listing leaves out; the empty note says so, as an empty list could be just that.</summary>
+        public int FoldersLeftOut
+        {
+            get => foldersLeftOut;
+            set
+            {
+                if (foldersLeftOut == value)
+                    return;
+                foldersLeftOut = value;
+                UpdateInfo();
+            }
+        }
+
+        /// <summary>True when the element is the unfolded search field or a part of it.</summary>
+        public bool SearchHolds(VisualElement element)
+        {
+            return catalog.SearchOpen && element != null && (element == search || search.Contains(element));
         }
 
         private static void ShowFavorite(Button star, bool favorite)

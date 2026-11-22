@@ -1,7 +1,7 @@
 {
   "readonly.reading": "Die Karte wird gerade für die Kartenprüfung oder ein Chrono-Datum gelesen; versuche es in einem Moment noch einmal, um {action}.",
-  "readonly.variant": "Die Chrono-Variante {title} wird bearbeitet; sie nimmt nur Objekte, ihre Typen und Beschriftungen, Verkehrsregeln und Vorfahrt, die Straßentypen, neue Straßen, das Löschen von Splines und die Linien, die sie abschaltet. Wähle im Projektbrowser „Basiskarte“, um {action}.",
-  "readonly.chrono": "Die Karte zeigt {date} mit ihren Chrono-Varianten und ist schreibgeschützt. Wähle im Projektbrowser „Basiskarte“, um {action}.",
+  "readonly.variant": "Die Chrono-Variante {title} wird bearbeitet; sie nimmt nur Objekte, ihre Typen und Beschriftungen, Verkehrsregeln und Vorfahrt, die Straßentypen, neue Straßen, das Löschen von Splines und die Linien, die sie abschaltet. Wähle in der Chrono-Liste der unteren Leiste „Basiskarte“, um {action}.",
+  "readonly.chrono": "Die Karte zeigt {date} mit ihren Chrono-Varianten und ist schreibgeschützt. Wähle in der Chrono-Liste der unteren Leiste „Basiskarte“, um {action}.",
   "readonly.map": "Die Karte ist schreibgeschützt. Speichere ein MapWorks-Projekt (Datei > Kartenprojekt speichern unter...), um {action}.",
   "readonly.action.load_heights": "Geländehöhen zu laden",
   "readonly.action.fit_edges": "Kachelränder anzupassen",

@@ -179,6 +179,30 @@ namespace OmsiMapEditor.OMSI
         public bool Succeeded => Change != null;
     }
 
+    /// <summary>An editor-placed junction that the terrain is fitted to, and where it lies (<see cref="OmsiMapSession.JunctionTerrainPlaces"/>).</summary>
+    public sealed class OmsiJunctionTerrainPlace
+    {
+        internal OmsiJunctionTerrainPlace(int id, string assetPath, double worldX, double worldY, string state)
+        {
+            Id = id;
+            AssetPath = assetPath;
+            WorldX = worldX;
+            WorldY = worldY;
+            State = state;
+        }
+
+        public int Id { get; }
+        public string AssetPath { get; }
+
+        /// <summary>Where its origin lies, in map metres east and north.</summary>
+        public double WorldX { get; }
+
+        public double WorldY { get; }
+
+        /// <summary>Its file, tile, place and orientation as text; a change of it calls for fitting the terrain again.</summary>
+        public string State { get; }
+    }
+
     public sealed partial class OmsiMapSession
     {
         /// <summary>The kind of reference a spline's neighbours hold to it; deleting the spline opens those ends instead.</summary>
@@ -278,9 +302,12 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                ReshapeTerrain(summary, change);
+            });
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, pieceIds[pieceIds.Count - 1]);
             summary.NextIdCode = ids.NextFreeId;
             return change;
@@ -357,10 +384,13 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            if (shaped)
-                ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                if (shaped)
+                    ReshapeTerrain(summary, change);
+            });
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
         }
 
@@ -505,10 +535,13 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            if (shaped)
-                ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                if (shaped)
+                    ReshapeTerrain(summary, change);
+            });
             summary.HighestBaseTileId = Math.Max(summary.HighestBaseTileId, newId);
             summary.NextIdCode = ids.NextFreeId;
             return new OmsiSplineChangeResult(change, new OmsiReference[0]);
@@ -590,9 +623,12 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                ReshapeTerrain(summary, change);
+            });
             return change;
         }
 
@@ -650,18 +686,41 @@ namespace OmsiMapEditor.OMSI
                     changes.Add(update);
                 return changes;
             }
-            catch
+            catch (Exception failure)
             {
-                UndoAll(summary, changes);
+                // The failure is thrown as it was; when taking back the earlier changes fails too, both are reported together.
+                RollBackAfter(failure, () => UndoAll(summary, changes));
                 throw;
             }
         }
 
+        /// <summary>
+        /// Brings the summary, the chains and the terrain up to date after the files of a new spline step were written. When that fails,
+        /// the step is taken back (<see cref="Undo(OmsiMapSummary, OmsiSplineChange)"/>): <paramref name="change"/> holds every file
+        /// written so far, as the chain and terrain passes write all or nothing. The failure is thrown as it was; when taking the step back
+        /// fails too, <see cref="OmsiRollBackFailedException"/> reports both.
+        /// </summary>
+        private void FinishSplineStep(OmsiMapSummary summary, OmsiSplineChange change, Action finish)
+        {
+            try
+            {
+                finish();
+            }
+            catch (Exception failure)
+            {
+                RollBackAfter(failure, () => Undo(summary, change));
+                throw;
+            }
+        }
+
+        /// <summary>Undoes the changes, the last first; each leaves the list once undone, so a second call goes on where a failed one stopped.</summary>
         private void UndoAll(OmsiMapSummary summary, List<OmsiSplineChange> changes)
         {
             for (var index = changes.Count - 1; index >= 0; index--)
+            {
                 Undo(summary, changes[index]);
-            changes.Clear();
+                changes.RemoveAt(index);
+            }
         }
 
         /// <summary>
@@ -711,9 +770,12 @@ namespace OmsiMapEditor.OMSI
             files.Collect(change.Files);
             var chains = Chains(summary);
             WriteFiles(change.Files, false);
-            RefreshSplines(summary, change);
-            KeepChains(summary, change, chains);
-            ReshapeTerrain(summary, change);
+            FinishSplineStep(summary, change, () =>
+            {
+                RefreshSplines(summary, change);
+                KeepChains(summary, change, chains);
+                ReshapeTerrain(summary, change);
+            });
             return change;
         }
 
@@ -794,7 +856,7 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (!change.IsApplied)
-                throw new InvalidOperationException("The change has already been undone.");
+                throw new OmsiStepRefusedException("The change has already been undone.");
             if (change.InVariant)
             {
                 ApplyFiles(change.Files, true);
@@ -815,7 +877,7 @@ namespace OmsiMapEditor.OMSI
             if (change == null)
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
-                throw new InvalidOperationException("The change is already applied.");
+                throw new OmsiStepRefusedException("The change is already applied.");
             if (change.InVariant)
             {
                 ApplyFiles(change.Files, false);
@@ -844,10 +906,44 @@ namespace OmsiMapEditor.OMSI
         {
             if (!firstNewId.HasValue)
             {
-                var original = new OmsiFolderSource(RequireWorkspace().RootPath);
-                firstNewId = OmsiNewMap.IsMadeHere(RequireWorkspace().RootPath) ? OmsiNewMap.FirstBuiltId : OmsiIdAllocator.ForMap(original, GlobalConfigFileName).NextFreeId;
+                var task = firstNewIdTask;
+                if (task != null && task.IsFaulted)
+                {
+                    // The early read failed: report it once, drop it and read again here, so the next call does not throw the same error forever.
+                    Console.Error.WriteLine("Reading the first new ID in the background failed: " + task.Exception?.GetBaseException());
+                    firstNewIdTask = task = null;
+                }
+                firstNewId = task != null ? task.GetAwaiter().GetResult() : ReadFirstNewId(RequireWorkspace().RootPath, GlobalConfigFileName);
             }
             return firstNewId.Value;
+        }
+
+        private static int ReadFirstNewId(string rootPath, string globalConfigFileName)
+        {
+            return OmsiNewMap.IsMadeHere(rootPath) ? OmsiNewMap.FirstBuiltId : OmsiIdAllocator.ForMap(new OmsiFolderSource(rootPath), globalConfigFileName).NextFreeId;
+        }
+
+        private System.Threading.Tasks.Task<int> firstNewIdTask;
+
+        /// <summary>For tests: replaces the early read of the ID boundary.</summary>
+        internal void SetIdBoundaryTask(System.Threading.Tasks.Task<int> task)
+        {
+            firstNewId = null;
+            firstNewIdTask = task;
+        }
+
+        /// <summary>
+        /// Starts reading the first ID the original map does not use on a worker thread. Without it the first spline selected in a session
+        /// read every tile of the original map (about half a second on Berlin-Spandau) to tell built-here splines from original ones; the
+        /// original map never changes, so the answer can be had early. Nothing happens without a workspace or when it is known already.
+        /// </summary>
+        public void WarmUpIdBoundary()
+        {
+            if (firstNewId.HasValue || firstNewIdTask != null || Workspace == null)
+                return;
+            var root = Workspace.RootPath;
+            var name = GlobalConfigFileName;
+            firstNewIdTask = System.Threading.Tasks.Task.Run(() => ReadFirstNewId(root, name));
         }
 
         /// <summary>
@@ -863,12 +959,25 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>
         /// Fits the ground of tiles and their neighbours to the roads anew, from the ground shaped by hand or else the
-        /// original map's (ADR 022, ADR 040); the tiles whose ground changed are added to <paramref name="reshaped"/>.
+        /// original map's (ADR 022, ADR 040); the tiles whose ground changed are added to <paramref name="reshaped"/>. Writes all or
+        /// nothing (<see cref="ApplyFiles"/>), and returns the files written, before and after.
         /// </summary>
-        private void ReshapeTerrainOf(OmsiMapSummary summary, IEnumerable<OmsiTileSummary> changedTiles, List<OmsiTileSummary> reshaped)
+        private List<OmsiObjectChange.FileState> ReshapeTerrainOf(OmsiMapSummary summary, IEnumerable<OmsiTileSummary> changedTiles, List<OmsiTileSummary> reshaped)
         {
+            var centres = new List<KeyValuePair<int, int>>();
+            foreach (var changed in changedTiles)
+                centres.Add(new KeyValuePair<int, int>(changed.X, changed.Y));
+            return ReshapeTerrainAround(summary, centres, reshaped);
+        }
+
+        /// <summary>
+        /// Like <see cref="ReshapeTerrainOf"/> for the tiles at and around tile coordinates, east and north, whether a tile lies there or not.
+        /// </summary>
+        private List<OmsiObjectChange.FileState> ReshapeTerrainAround(OmsiMapSummary summary, IEnumerable<KeyValuePair<int, int>> centres, List<OmsiTileSummary> reshaped)
+        {
+            var written = new List<OmsiObjectChange.FileState>();
             if (summary == null)
-                return;
+                return written;
             var workspace = RequireWorkspace();
             var size = summary.TileSizeMeters;
             var reach = TerrainShape.MaximumReachMeters + TerrainShape.ShoulderMeters + 30.0;
@@ -897,11 +1006,13 @@ namespace OmsiMapEditor.OMSI
             junctions.Sort((left, right) => left.Object.Id.CompareTo(right.Object.Id));
 
             var targets = new List<OmsiTileSummary>();
-            foreach (var changed in changedTiles)
+            foreach (var centre in centres)
                 foreach (var tile in summary.Tiles)
-                    if (Math.Abs(tile.X - changed.X) <= 1 && Math.Abs(tile.Y - changed.Y) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
+                    if (Math.Abs(tile.X - centre.Key) <= 1 && Math.Abs(tile.Y - centre.Value) <= 1 && tile.IsAvailable && tile.HasTerrain && !targets.Contains(tile))
                         targets.Add(tile);
 
+            var shapedTiles = new List<OmsiTileSummary>();
+            var fitted = new List<KeyValuePair<OmsiTileSummary, byte[]>>();
             foreach (var tile in targets)
             {
                 var path = OmsiRelativePath.Normalize(tile.FileName) + ".terrain";
@@ -917,11 +1028,23 @@ namespace OmsiMapEditor.OMSI
                                                                     junction.OriginY + junction.Reach + reach >= south && junction.OriginY - junction.Reach - reach <= south + size);
                 OmsiTerrainShaping.Shape(heights, tile.X, tile.Y, size, nearby, TerrainShape, nearbyJunctions);
                 var bytes = OmsiTerrain.Encode(heights);
-                if (SameBytes(bytes, workspace.ReadAllBytes(path)))
+                fitted.Add(new KeyValuePair<OmsiTileSummary, byte[]>(tile, bytes));
+                var current = workspace.ReadAllBytes(path);
+                if (SameBytes(bytes, current))
                     continue;
-                workspace.Save(path, bytes);
-                reshaped.Add(tile);
+                written.Add(new OmsiObjectChange.FileState { RelativePath = path, Before = current, After = bytes });
+                shapedTiles.Add(tile);
             }
+            ApplyFiles(written, false);
+            // The lowest and highest point the inspector shows follow the ground fitted, also of a tile whose file an undo just wrote back.
+            foreach (var pair in fitted)
+                if (OmsiMapReader.TryReadTerrainRange(pair.Value, out var minHeight, out var maxHeight))
+                {
+                    pair.Key.TerrainMinHeight = minHeight;
+                    pair.Key.TerrainMaxHeight = maxHeight;
+                }
+            reshaped.AddRange(shapedTiles);
+            return written;
         }
 
         /// <summary>The spline profiles of the installation, with the connection points and outlines of its objects alongside.</summary>
@@ -968,11 +1091,24 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public string JunctionTerrainState(OmsiMapSummary summary)
         {
+            var text = new System.Text.StringBuilder();
+            foreach (var place in JunctionTerrainPlaces(summary))
+                text.Append(place.State);
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// The editor-placed junction objects of <see cref="JunctionTerrainState"/>, one by one, with where they lie, to compare with an
+        /// earlier list in <see cref="RefitTerrainAtJunctions"/>.
+        /// </summary>
+        public IReadOnlyList<OmsiJunctionTerrainPlace> JunctionTerrainPlaces(OmsiMapSummary summary)
+        {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
+            var places = new List<OmsiJunctionTerrainPlace>();
             if (Workspace == null)
-                return string.Empty;
-            var text = new System.Text.StringBuilder();
+                return places;
+            var size = summary.TileSizeMeters;
             foreach (var tile in summary.Tiles)
                 foreach (var item in tile.Objects)
                 {
@@ -982,12 +1118,154 @@ namespace OmsiMapEditor.OMSI
                     if (shapeJunctions.Helpers(item.AssetPath).Count == 0)
                         continue;
                     // The file as well: a junction made again changes its shape in place.
+                    var text = new System.Text.StringBuilder();
                     text.Append(item.Id).Append(' ').Append(item.AssetPath).Append(' ').Append(tile.X).Append(' ').Append(tile.Y).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.LocalX)).Append(' ').Append(OmsiNumberFormat.Format(item.LocalY)).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.Height)).Append(' ').Append(OmsiNumberFormat.Format(item.HeadingDegrees)).Append(' ')
                         .Append(OmsiNumberFormat.Format(item.PitchDegrees)).Append(' ').Append(OmsiNumberFormat.Format(item.BankDegrees)).Append(';');
+                    var world = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, item.LocalX, item.LocalY, size);
+                    places.Add(new OmsiJunctionTerrainPlace(item.Id, item.AssetPath, world.X, world.Y, text.ToString()));
                 }
-            return text.ToString();
+            return places;
+        }
+
+        /// <summary>
+        /// Fits the terrain anew where editor-placed junctions moved, appeared or went between two lists of
+        /// <see cref="JunctionTerrainPlaces"/>: around where each such junction lay and lies now, and around junctions that may share a
+        /// connection point with it. Each tile is fitted from the whole map's roads and junctions, as <see cref="RefitAllTerrain"/> fits it,
+        /// and a junction reaches less than a tile from where it lies, so the tiles left alone would come out as they are: the result is
+        /// that of a full fit, as long as the terrain was fitted to <paramref name="before"/>. Without <paramref name="before"/>, with an
+        /// ID listed twice, or with a junction or road reaching a tile or further, the whole map is fitted instead.
+        /// </summary>
+        /// <returns>The tiles whose terrain changed.</returns>
+        public List<OmsiTileSummary> RefitTerrainAtJunctions(OmsiMapSummary summary, IReadOnlyList<OmsiJunctionTerrainPlace> before,
+            IReadOnlyList<OmsiJunctionTerrainPlace> after)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (after == null)
+                throw new ArgumentNullException(nameof(after));
+            var centres = before == null ? null : JunctionRefitCentres(summary, before, after);
+            if (centres == null)
+                return RefitAllTerrain(summary);
+            var reshaped = new List<OmsiTileSummary>();
+            if (centres.Count > 0)
+                ReshapeTerrainAround(summary, centres, reshaped);
+            return reshaped;
+        }
+
+        /// <summary>
+        /// The tile coordinates to fit the terrain around for <see cref="RefitTerrainAtJunctions"/>, or null when only a full fit is sure
+        /// to give the same terrain.
+        /// </summary>
+        private List<KeyValuePair<int, int>> JunctionRefitCentres(OmsiMapSummary summary, IReadOnlyList<OmsiJunctionTerrainPlace> before,
+            IReadOnlyList<OmsiJunctionTerrainPlace> after)
+        {
+            var earlier = new Dictionary<int, OmsiJunctionTerrainPlace>();
+            foreach (var place in before)
+                if (!earlier.ContainsKey(place.Id))
+                    earlier.Add(place.Id, place);
+                else
+                    return null;
+            var now = new Dictionary<int, OmsiJunctionTerrainPlace>();
+            foreach (var place in after)
+                if (!now.ContainsKey(place.Id))
+                    now.Add(place.Id, place);
+                else
+                    return null;
+            var changed = new List<OmsiJunctionTerrainPlace>();
+            foreach (var place in before)
+                if (!now.TryGetValue(place.Id, out var current) || current.State != place.State)
+                    changed.Add(place);
+            foreach (var place in after)
+                if (!earlier.TryGetValue(place.Id, out var previous) || previous.State != place.State)
+                    changed.Add(place);
+            var centres = new List<KeyValuePair<int, int>>();
+            if (changed.Count == 0)
+                return centres;
+
+            ShapeCatalogs();
+            var size = summary.TileSizeMeters;
+            var tolerance = new OmsiJunctionTolerances().PositionMeters;
+            // A road joined to a junction changes the terrain near its end when the junction comes or goes: beyond the end, and under and
+            // beside the road a shoulder before it (OmsiTerrainShaping.Locate).
+            var shoulder = Math.Max(TerrainShape.ShoulderMeters, size / (OmsiTerrain.Resolution - 1) * Math.Sqrt(2.0));
+            var widest = 0.0;
+            foreach (var tile in summary.Tiles)
+                foreach (var spline in tile.Splines)
+                {
+                    if (!ShapesTerrain(spline))
+                        continue;
+                    var profile = ShapeCatalogs().Get(spline.AssetPath);
+                    if (profile != null)
+                        widest = Math.Max(widest, Math.Max(-profile.LeftEdge, profile.RightEdge));
+                }
+            var roadEnd = widest + TerrainShape.MaximumReachMeters + shoulder;
+
+            // Junctions whose connection points may meet one that changed: a road end on both is joined to the first one found, so the
+            // other may come into the fit or leave it. Each point may lie a tolerance off the road end.
+            // Each file is looked up once: the catalogue compares paths ignoring case, which is slow on Mono for every pair of places.
+            var portReaches = new Dictionary<string, double>(StringComparer.Ordinal);
+            double PortReachOf(OmsiJunctionTerrainPlace place)
+            {
+                var path = place.AssetPath ?? string.Empty;
+                if (!portReaches.TryGetValue(path, out var known))
+                {
+                    known = PortReach(path);
+                    portReaches.Add(path, known);
+                }
+                return known;
+            }
+
+            // The list keeps the order the places were found in, which the tiles are fitted in; the set answers whether one is in it.
+            var affected = new List<OmsiJunctionTerrainPlace>(changed);
+            var inAffected = new HashSet<OmsiJunctionTerrainPlace>(changed);
+            var everyPlace = new List<OmsiJunctionTerrainPlace>(before);
+            everyPlace.AddRange(after);
+            foreach (var place in changed)
+            {
+                var reachOfPlace = PortReachOf(place);
+                foreach (var other in everyPlace)
+                {
+                    if (inAffected.Contains(other))
+                        continue;
+                    var dx = other.WorldX - place.WorldX;
+                    var dy = other.WorldY - place.WorldY;
+                    var meet = reachOfPlace + PortReachOf(other) + 2.0 * tolerance;
+                    if (dx * dx + dy * dy <= meet * meet)
+                    {
+                        affected.Add(other);
+                        inAffected.Add(other);
+                    }
+                }
+            }
+
+            foreach (var place in affected)
+            {
+                // The footprint reaches its corners and slopes beyond them; roads joined at its points reach from there.
+                var footprint = 0.0;
+                foreach (var contour in shapeOutlines.Get(place.AssetPath).Contours)
+                    foreach (var point in contour)
+                        footprint = Math.Max(footprint, Math.Sqrt(point.X * point.X + point.Y * point.Y));
+                var reach = Math.Max(footprint + TerrainShape.MaximumReachMeters, PortReachOf(place) + tolerance + roadEnd);
+                // Within a tile of the junction, every place lies in the tiles at and around its own.
+                if (!(reach < size))
+                    return null;
+                var centre = new KeyValuePair<int, int>((int)Math.Floor(place.WorldX / size), (int)Math.Floor(place.WorldY / size));
+                if (!centres.Contains(centre))
+                    centres.Add(centre);
+            }
+            return centres;
+        }
+
+        /// <summary>How far from its origin the furthest connection point of an object lies, in any turn of it.</summary>
+        private double PortReach(string assetPath)
+        {
+            ShapeCatalogs();
+            var reach = 0.0;
+            foreach (var helper in shapeJunctions.Helpers(assetPath))
+                reach = Math.Max(reach, Math.Sqrt(helper.X * helper.X + helper.Y * helper.Y + helper.Height * helper.Height));
+            return reach;
         }
 
         /// <summary>The connection point of a placed object, such as a junction, that a spline end lies on (ADR 024); or null.</summary>
@@ -1169,15 +1447,18 @@ namespace OmsiMapEditor.OMSI
 
             if (edited.Count == 0)
                 return;
+            // All or nothing, and the step's files learn of it only once written, so on a failure they still say what the files hold.
+            var states = new List<OmsiObjectChange.FileState>();
             foreach (var pair in edited)
+                states.Add(new OmsiObjectChange.FileState { RelativePath = pair.Key, Before = workspace.ReadAllBytes(pair.Key), After = pair.Value.ToBytes() });
+            ApplyFiles(states, false);
+            foreach (var applied in states)
             {
-                var bytes = pair.Value.ToBytes();
-                var state = change.Files.Find(file => string.Equals(file.RelativePath, pair.Key, StringComparison.OrdinalIgnoreCase));
+                var state = change.Files.Find(file => string.Equals(file.RelativePath, applied.RelativePath, StringComparison.OrdinalIgnoreCase));
                 if (state != null)
-                    state.After = bytes;
+                    state.After = applied.After;
                 else
-                    change.Files.Add(new OmsiObjectChange.FileState { RelativePath = pair.Key, Before = workspace.ReadAllBytes(pair.Key), After = bytes });
-                workspace.Save(pair.Key, bytes);
+                    change.Files.Add(applied);
             }
             foreach (var tile in tiles)
                 if (!change.Tiles.Contains(tile))
@@ -1206,15 +1487,14 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
+        /// <summary>
+        /// Writes the files of a road step all or none, as every other step does (<see cref="ApplyFiles"/>): refused with
+        /// <see cref="OmsiStepRefusedException"/> before anything is written when a file is no longer as the step left it, a missing or
+        /// deleted file included; a failed write puts back what was written, and <see cref="OmsiRollBackFailedException"/> says when that failed too.
+        /// </summary>
         private void WriteFiles(List<OmsiObjectChange.FileState> files, bool undo)
         {
-            var workspace = RequireWorkspace();
-            foreach (var file in files)
-                if (!SameBytes(workspace.ReadAllBytes(file.RelativePath), undo ? file.After : file.Before))
-                    throw new InvalidOperationException(file.RelativePath + " was changed in the meantime; the step cannot be " +
-                                                        (undo ? "undone." : "applied."));
-            foreach (var file in files)
-                workspace.Save(file.RelativePath, undo ? file.Before : file.After);
+            ApplyFiles(files, undo);
         }
 
         /// <summary>Tile files and global.cfg read once for an edit, with their bytes before it.</summary>

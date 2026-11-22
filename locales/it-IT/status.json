@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Piegatura dell'spline annullata.",
   "spline.cancel_move": "Spostamento dell'estremità spline annullato.",
   "junction.turn_cancelled": "Rotazione del braccio annullata.",
-  "view.status.3d_edit": "Vista 3D: trascina con il pulsante destro per ruotare la vista, con quello centrale per spostarla e usa la rotellina per ingrandire o ridurre. Fai clic su un oggetto per selezionarlo e trascinalo per spostarlo; lo strumento Sposta (W) lo muove lungo le frecce, anche verso l'alto, e Ruota (E) lo ruota con gli anelli: verde per l'orientamento, rosso per l'inclinazione longitudinale, blu per quella trasversale.",
-  "view.status.3d": "Vista 3D: trascina con il pulsante destro per ruotare la vista, con quello centrale per spostarla e usa la rotellina per ingrandire o ridurre. Fai clic su un oggetto per selezionarlo.",
+  "view.status.3d": "Vista 3D: mouse e tasti in Aiuto > Wiki.",
   "view.status.top": "Torniamo alla mappa dall'alto.",
   "view.status.ground_shown": "Strutture del terreno mostrate.",
   "view.status.ground_hidden": "Trame del terreno nascoste; tiles sono disegnati in tinta unita.",
@@ -52,6 +51,8 @@
   "@spline.status.selected": "{mode} is edit, chrono or readonly and chooses the ending: keep it in English",
   "spline.status.refs": "Spline #{id} resta: {count, plural, one {# riferimento ne ha ancora bisogno} other {Ne hanno ancora bisogno # referenze}}, come {reasons}.",
   "spline.status.deleted": "Cancellato spline #{id}; Ctrl+Z lo riporta indietro.",
+  "spline.status.deleted_many": "Cancellati {count} spline; Ctrl+Z li riporta indietro.",
+  "spline.status.deleted_some": "Cancellati {count} spline su {total}; gli altri restano perché dei riferimenti ne hanno ancora bisogno, come {reasons}. Ctrl+Z riporta indietro quelli cancellati.",
   "spline.drag.bend": "{alt, select, yes {Raddrizzatura spline #{id}} other {Piegatura spline #{id}; Alt lo esegue direttamente}}",
   "spline.drag.move": "Spostare {which, select, end {fine} other {iniziare}} di spline #{id}{joined, select, yes { e lì si sono uniti gli spline} other {}}{alt, select, yes { senza nodi} other {; Alt mantiene la strada libera da intoppi}}",
   "spline.status.stays": "Spline #{id} resta: {reason}",
@@ -85,5 +86,6 @@
   "terrain.all.fits": "Il terreno si adatta già a tutte le strade costruite qui.",
   "terrain.all.fitted": "Terreno rimontato su {count, plural, one {# tile} other {# tiles}}.",
   "status.ready": "Pronto",
+  "status.hint.more": "+{count} altri",
   "status.no_map": "Nessuna mappa caricata"
 }

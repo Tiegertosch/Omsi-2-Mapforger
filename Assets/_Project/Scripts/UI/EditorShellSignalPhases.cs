@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using OmsiMapEditor.Core.Localization;
 using OmsiMapEditor.OMSI;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace OmsiMapEditor.UI
@@ -22,16 +23,27 @@ namespace OmsiMapEditor.UI
 
         private VisualElement signalPhasesPage;
         private Label signalPhasesInfo;
+        private VisualElement signalPhasesFlag;
         private VisualElement signalPhasesBox;
 
         private VisualElement CreateSignalPhasesPage()
         {
-            signalPhasesPage = new ScrollView(ScrollViewMode.Vertical);
-            signalPhasesPage.AddToClassList("signal-scroll-page");
+            signalPhasesPage = new ScrollView(ScrollViewMode.Vertical) { horizontalScrollerVisibility = ScrollerVisibility.Hidden };
             signalPhasesInfo = new Label();
             signalPhasesInfo.AddToClassList("panel-info");
             signalPhasesPage.Add(signalPhasesInfo);
+            // A program that is no phase plan is flagged here, with the way to the timeline where it is edited; it is never converted.
+            signalPhasesFlag = new VisualElement();
+            signalPhasesFlag.AddToClassList("signal-flag");
+            var flagText = LocBindings.NewLabel("signals.phases.flag");
+            flagText.AddToClassList("signal-flag-text");
+            signalPhasesFlag.Add(flagText);
+            signalPhasesFlag.Add(SignalLabelButton("chart-gantt", "signals.phases.to_timeline", "signals.phases.to_timeline.tooltip", () => ShowSignalTab(SignalTab.Timeline)));
+            signalPhasesFlag.style.display = DisplayStyle.None;
+            signalPhasesPage.Add(signalPhasesFlag);
+            // The phases stand one under the other: a vertical list in the order of the cycle.
             signalPhasesBox = new VisualElement();
+            signalPhasesBox.AddToClassList("signal-phases-list");
             signalPhasesPage.Add(signalPhasesBox);
             signalPhasesPage.style.display = DisplayStyle.None;
             return signalPhasesPage;
@@ -41,24 +53,24 @@ namespace OmsiMapEditor.UI
         {
             if (signalPhasesBox == null)
                 return;
+            var scroll = signalPhasesPage as ScrollView;
+            var offset = scroll != null ? scroll.scrollOffset : default;
+            var focusKey = SignalFocus.Capture(signalPhasesPage);
             signalPhasesBox.Clear();
             var shown = ShownSignalProgram;
             var editable = SignalsEditable && shown != null;
-            if (shown == null || shown.Lights.Count == 0)
+            var view = SignalWindowRules.PhaseViewOf(shown);
+            signalPhasesFlag.style.display = view == SignalPhaseView.NotRepresentable ? DisplayStyle.Flex : DisplayStyle.None;
+            if (view == SignalPhaseView.Empty)
             {
                 signalPhasesInfo.text = Loc.T(editable ? "signals.phases.empty" : "signals.timeline.empty"); // i18n:keys
-                if (editable)
-                {
-                    signalPhasesBox.Add(SignalWizardButton());
-                    signalPhasesBox.Add(SignalTemplatesButton());
-                }
                 return;
             }
             var plan = OmsiSignalPhasePlan.Detect(shown);
             if (plan == null)
             {
-                // A simplified, read-only view: when which groups may go.
-                signalPhasesInfo.text = Loc.T("signals.phases.none");
+                // Not a phase plan: shown, not converted. When which groups may go; the program is edited on the timeline.
+                signalPhasesInfo.text = Loc.T("signals.phases.windows");
                 var windows = OmsiSignalPhasePlan.Windows(shown);
                 foreach (var window in windows.Take(MostSignalWindows))
                 {
@@ -83,22 +95,38 @@ namespace OmsiMapEditor.UI
             for (var index = 0; index < plan.Phases.Count; index++)
                 signalPhasesBox.Add(SignalPhaseRow(plan, index, shown, editable));
 
-            var times = new VisualElement();
-            times.AddToClassList("signal-group-row");
-            times.Add(SignalPlanField("signals.phases.red_yellow", plan.RedYellowSeconds, editable, value => EditSignalPlan(plan, changed => changed.RedYellowSeconds = value), true));
-            times.Add(SignalPlanField("signals.phases.yellow", plan.YellowSeconds, editable, value => EditSignalPlan(plan, changed => changed.YellowSeconds = value), true));
-            times.Add(SignalPlanField("signals.phases.clearance", plan.ClearanceSeconds, editable, value => EditSignalPlan(plan, changed => changed.ClearanceSeconds = value), true));
-            signalPhasesBox.Add(times);
-
             if (editable)
             {
-                var add = LocBindings.WithTooltip(LocBindings.NewButton("signals.phases.add", () => AddSignalPhase(plan, shown)), "signals.phases.add.tooltip");
-                add.AddToClassList("map-control-button");
-                signalPhasesBox.Add(add);
+                var addRow = new VisualElement();
+                addRow.AddToClassList("signal-toolbar");
+                addRow.Add(SignalLabelButton("plus", "signals.phases.add", "signals.phases.add.tooltip", () => AddSignalPhase(plan, shown)));
+                signalPhasesBox.Add(addRow);
             }
+
+            // The times every phase change shares: red-yellow before green, yellow after it, and all red between the phases. A program with
+            // other times for single groups is no phase plan (it is flagged above and edited on the timeline), so these are the real times.
+            var times = new VisualElement();
+            times.AddToClassList("signal-phase");
+            times.AddToClassList("signal-phase-times");
+            var timesTitle = LocBindings.NewLabel("signals.phases.times");
+            timesTitle.AddToClassList("inspector-section-heading");
+            times.Add(timesTitle);
+            var timeFields = new VisualElement();
+            timeFields.AddToClassList("signal-details");
+            timeFields.Add(SignalPlanField("signals.phases.red_yellow", plan.RedYellowSeconds, editable, value => EditSignalPlan(plan, changed => changed.RedYellowSeconds = value), true, "focus:times:redyellow"));
+            timeFields.Add(SignalPlanField("signals.phases.yellow", plan.YellowSeconds, editable, value => EditSignalPlan(plan, changed => changed.YellowSeconds = value), true, "focus:times:yellow"));
+            timeFields.Add(SignalPlanField("signals.phases.clearance", plan.ClearanceSeconds, editable, value => EditSignalPlan(plan, changed => changed.ClearanceSeconds = value), true, "focus:times:clearance"));
+            times.Add(timeFields);
+            var timesNote = LocBindings.NewLabel("signals.phases.times_note");
+            timesNote.AddToClassList("panel-info");
+            times.Add(timesNote);
+            signalPhasesBox.Add(times);
+            if (scroll != null)
+                scroll.schedule.Execute(() => scroll.scrollOffset = offset);
+            SignalFocus.Restore(signalPhasesPage, focusKey);
         }
 
-        /// <summary>One phase: its number, green time and buttons, then a chip for every group, lit when it goes in this phase.</summary>
+        /// <summary>One phase: its number with the time it starts, its green time and buttons, then a chip for every group, lit when it goes in this phase.</summary>
         private VisualElement SignalPhaseRow(OmsiSignalPhasePlan plan, int index, OmsiSignalProgram shown, bool editable)
         {
             var box = new VisualElement();
@@ -109,24 +137,27 @@ namespace OmsiMapEditor.UI
             title.AddToClassList("signal-phase-title");
             head.Add(title);
             head.Add(SignalPlanField("signals.phases.green", plan.Phases[index].GreenSeconds, editable,
-                value => EditSignalPlan(plan, changed => changed.Phases[index].GreenSeconds = value), false));
-            if (editable && index > 0)
+                value => EditSignalPlan(plan, changed => changed.Phases[index].GreenSeconds = value), false, "focus:phase:" + index.ToString(CultureInfo.InvariantCulture)));
+            if (editable)
             {
-                var up = LocBindings.WithTooltip(new Button(() => EditSignalPlan(plan, changed =>
-                {
-                    var phase = changed.Phases[index];
-                    changed.Phases.RemoveAt(index);
-                    changed.Phases.Insert(index - 1, phase);
-                })) { text = "↑" }, "signals.phases.up.tooltip");
-                up.AddToClassList("panel-icon-button");
-                head.Add(up);
-            }
-            if (editable && plan.Phases.Count > 1)
-            {
-                var remove = LocBindings.WithTooltip(new Button(() => EditSignalPlan(plan, changed => changed.Phases.RemoveAt(index))) { text = "×" },
-                    "signals.phases.remove.tooltip");
-                remove.AddToClassList("panel-icon-button");
-                head.Add(remove);
+                var buttons = OptionControls.Group(head);
+                if (index > 0)
+                    OptionControls.Choice(buttons, "arrow-up", "signals.phases.up", "signals.phases.up.tooltip", () => EditSignalPlan(plan, changed =>
+                    {
+                        var phase = changed.Phases[index];
+                        changed.Phases.RemoveAt(index);
+                        changed.Phases.Insert(index - 1, phase);
+                    }));
+                if (index < plan.Phases.Count - 1)
+                    OptionControls.Choice(buttons, "arrow-down", "signals.phases.down", "signals.phases.down.tooltip", () => EditSignalPlan(plan, changed =>
+                    {
+                        var phase = changed.Phases[index];
+                        changed.Phases.RemoveAt(index);
+                        changed.Phases.Insert(index + 1, phase);
+                    }));
+                if (plan.Phases.Count > 1)
+                    OptionControls.Choice(buttons, "trash-2", "signals.phases.remove", "signals.phases.remove.tooltip", () => EditSignalPlan(plan, changed => changed.Phases.RemoveAt(index)))
+                        .AddToClassList("option-icon-danger");
             }
             box.Add(head);
 
@@ -140,7 +171,7 @@ namespace OmsiMapEditor.UI
                 chip.AddToClassList("signal-phase-chip");
                 chip.EnableInClassList("signal-phase-chip-on", going);
                 if (going)
-                    chip.style.borderLeftColor = SignalGroupColour(light);
+                    chip.style.borderLeftColor = SignalColourOf(light);
                 chip.tooltip = Loc.T(going ? "signals.phases.chip.on" : "signals.phases.chip.off", ("group", shown.Lights[light].Name)); // i18n:keys
                 chip.SetEnabled(editable);
                 groups.Add(chip);
@@ -149,7 +180,8 @@ namespace OmsiMapEditor.UI
             return box;
         }
 
-        private VisualElement SignalPlanField(string key, double value, bool editable, Action<double> changed, bool zeroAllowed)
+        /// <summary>A time as a labelled field with its name before it and "(s)" in the name; its key keeps the focus when the page is rebuilt.</summary>
+        private VisualElement SignalPlanField(string key, double value, bool editable, Action<double> changed, bool zeroAllowed, string focusKey = null)
         {
             var row = new VisualElement();
             row.AddToClassList("signal-plan-field");
@@ -158,6 +190,7 @@ namespace OmsiMapEditor.UI
             row.Add(text);
             var field = new TextField { isDelayed = true, value = Seconds(value) };
             field.AddToClassList("picker-field");
+            field.userData = focusKey;
             field.SetEnabled(editable);
             field.RegisterValueChangedCallback(evt =>
             {
