@@ -41,7 +41,7 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void ColorTokensAreParsed()
         {
-            foreach (var name in new[] { "bg", "panel", "panel-raised", "panel-hover", "field", "text-primary", "text-secondary", "text-muted", "text-disabled", "accent", "accent-hover", "success", "warning", "error", "info", "bar-glass", "tool-glass", "panel-glass", "panel-pressed", "accent-pressed", "clear", "on-fill" })
+            foreach (var name in new[] { "bg", "panel", "panel-raised", "panel-hover", "field", "text-primary", "text-secondary", "text-muted", "text-disabled", "accent", "accent-hover", "success", "warning", "error", "info", "bar-glass", "tool-glass", "panel-glass", "panel-pressed", "accent-pressed", "clear", "on-fill", "map-selection", "map-selection-halo", "path-rail" })
                 Assert.IsTrue(tokens.ContainsKey(name), "Missing token --mf-color-" + name);
         }
 
@@ -128,6 +128,32 @@ namespace OmsiMapEditor.Tests
                     Check(failures, token, surface, SymbolRatio, selector);
             }
             Assert.AreEqual(string.Empty, failures.ToString(), failures.ToString());
+        }
+
+        [Test]
+        public void MapSelectionAndRailPathsReachThreeToOneOnTheDarkGround()
+        {
+            var failures = new StringBuilder();
+            foreach (var surface in new[] { "bg", "panel", "panel-raised" })
+            {
+                Check(failures, "map-selection", surface, SymbolRatio, "map selection");
+                Check(failures, "path-rail", surface, SymbolRatio, "rail path");
+                Check(failures, "accent", surface, SymbolRatio, "selected tile");
+            }
+            // The halo is what keeps the light selection visible over bright ground: it must stand out from the selection itself.
+            Check(failures, "map-selection", "map-selection-halo", TextRatio, "selection against its halo");
+            Assert.AreEqual(string.Empty, failures.ToString(), failures.ToString());
+        }
+
+        [Test]
+        public void MapCanvasMapsSelectionTileAndRailToTheirMeaningTokens()
+        {
+            var canvas = Regex.Match(stylesheet, @"\.map-canvas\s*\{[^}]*\}").Value;
+            StringAssert.Contains("--map-selection: var(--mf-color-map-selection)", canvas);
+            StringAssert.Contains("--map-tile-selected: var(--mf-color-accent)", canvas);
+            StringAssert.Contains("--map-path-rail: var(--mf-color-path-rail)", canvas);
+            StringAssert.DoesNotContain("--map-selection: var(--mf-color-error)", canvas);
+            StringAssert.DoesNotContain("--map-tile-selected: var(--mf-color-warning)", canvas);
         }
 
         [Test]

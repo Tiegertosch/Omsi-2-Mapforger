@@ -123,6 +123,10 @@ namespace OmsiMapEditor.UI
         private static readonly CustomStyleProperty<Color> ObjectProperty = new CustomStyleProperty<Color>("--map-object");
         private static readonly CustomStyleProperty<Color> TreeProperty = new CustomStyleProperty<Color>("--map-tree");
         private static readonly CustomStyleProperty<Color> SelectionProperty = new CustomStyleProperty<Color>("--map-selection");
+        private static readonly CustomStyleProperty<Color> SelectionHaloProperty = new CustomStyleProperty<Color>("--map-selection-halo");
+        private static readonly CustomStyleProperty<Color> ErrorProperty = new CustomStyleProperty<Color>("--map-error");
+        private static readonly CustomStyleProperty<Color> WarningProperty = new CustomStyleProperty<Color>("--map-warning");
+        private static readonly CustomStyleProperty<Color> PathRailProperty = new CustomStyleProperty<Color>("--map-path-rail");
         private static readonly CustomStyleProperty<Color> PlacementProperty = new CustomStyleProperty<Color>("--map-placement");
         private static readonly CustomStyleProperty<Color> HandleProperty = new CustomStyleProperty<Color>("--map-handle");
         private static readonly CustomStyleProperty<Color> WireProperty = new CustomStyleProperty<Color>("--map-wire");
@@ -133,12 +137,16 @@ namespace OmsiMapEditor.UI
         private Color tileColor = Hex(0x202630);
         private Color missingTileColor = Mix(Hex(0x202630), Hex(0xE06464), 0.3f);
         private Color tileBorderColor = Hex(0x414B59);
-        private Color selectedTileColor = Hex(0xE6B450);
+        private Color selectedTileColor = Hex(0xF08A32);
+        private Color warningColor = Hex(0xE6B450);
+        private Color errorColor = Hex(0xEA7676);
+        private Color pathRailColor = Hex(0xB48EDB);
+        private static Color selectionHaloColor = Hex(0x171C23, 0.85f);
         private Color splineColor = Hex(0xF08A32, 0.95f);
         private Color quietSplineColor = Hex(0xF08A32, 0.5f);
         private Color32 objectColor = Hex(0x65A9D9, 0.95f);
         private Color headingColor = Hex(0x65A9D9, 0.55f);
-        private Color selectedObjectColor = Hex(0xE06464);
+        private Color selectedObjectColor = Hex(0xF2F4F7);
         private Color outlineFillColor = Hex(0x65A9D9, 0.3f);
         private Color outlineStrokeColor = Hex(0x65A9D9, 0.85f);
         private Color treeFillColor = Hex(0x55B887, 0.3f);
@@ -146,7 +154,7 @@ namespace OmsiMapEditor.UI
         private Color placementColor = Hex(0x55B887);
         private Color placementPointColor = Hex(0xF08A32);
         private Color placementFillColor = Hex(0x55B887, 0.25f);
-        private Color boxFillColor = Hex(0xE06464, 0.12f);
+        private Color boxFillColor = Hex(0xF2F4F7, 0.12f);
         private Color handleFillColor = Hex(0x29313D);
         private Color wireColor = Hex(0xAEB8C5, 0.9f);
         private Color fenceColor = Hex(0x7E8A99, 0.95f);
@@ -502,6 +510,14 @@ namespace OmsiMapEditor.UI
                 selectedObjectColor = selected;
                 boxFillColor = WithAlpha(selected, 0.12f);
             }
+            if (style.TryGetValue(SelectionHaloProperty, out var halo))
+                selectionHaloColor = WithAlpha(halo, 0.85f);
+            if (style.TryGetValue(ErrorProperty, out var error))
+                errorColor = error;
+            if (style.TryGetValue(WarningProperty, out var warning))
+                warningColor = warning;
+            if (style.TryGetValue(PathRailProperty, out var rail))
+                pathRailColor = rail;
             if (style.TryGetValue(PlacementProperty, out var placement))
             {
                 placementColor = placement;
@@ -1868,7 +1884,7 @@ namespace OmsiMapEditor.UI
                 painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
                 painter.lineCap = LineCap.Round;
                 painter.lineJoin = LineJoin.Round;
-                StrokePolyline(painter, line.Points);
+                StrokePolyline(painter, line.Points, true);
             }
             if (selectedSpline == null)
                 return;
@@ -1880,7 +1896,7 @@ namespace OmsiMapEditor.UI
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
             if (dragMode != DragMode.SplineEnd)
-                StrokePolyline(painter, path.Points);
+                StrokePolyline(painter, path.Points, true);
             if (!SplineHandlesShown)
                 return;
             // A round handle in the middle bends the spline.
@@ -2002,12 +2018,12 @@ namespace OmsiMapEditor.UI
                 painter.lineJoin = LineJoin.Round;
                 foreach (var piece in roadPreview)
                     StrokePolyline(painter, piece);
-                painter.strokeColor = roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.strokeColor = roadPreviewValid ? placementColor : errorColor;
                 painter.lineWidth = 3f;
                 foreach (var piece in roadPreview)
                     StrokePolyline(painter, piece);
                 // Piece boundaries, where each spline of the road begins.
-                painter.fillColor = roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.fillColor = roadPreviewValid ? placementColor : errorColor;
                 foreach (var piece in roadPreview)
                 {
                     painter.BeginPath();
@@ -2037,8 +2053,8 @@ namespace OmsiMapEditor.UI
             }
             foreach (var issue in roadIssues)
             {
-                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? selectedObjectColor
-                    : issue.Value == OmsiRoadIssueSeverity.Warning ? selectedTileColor : wireColor;
+                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? errorColor
+                    : issue.Value == OmsiRoadIssueSeverity.Warning ? warningColor : wireColor;
                 painter.BeginPath();
                 AddCircle(painter, MapToScreen(issue.Key), 5f);
                 painter.Fill();
@@ -2105,7 +2121,7 @@ namespace OmsiMapEditor.UI
 
             for (var pass = 0; pass < 2; pass++)
             {
-                painter.strokeColor = pass == 0 ? handleFillColor : roadPreviewValid ? placementColor : selectedObjectColor;
+                painter.strokeColor = pass == 0 ? handleFillColor : roadPreviewValid ? placementColor : errorColor;
                 painter.lineWidth = pass == 0 ? 6f : 3f;
                 painter.lineCap = LineCap.Round;
                 painter.lineJoin = LineJoin.Round;
@@ -2137,8 +2153,8 @@ namespace OmsiMapEditor.UI
             {
                 if (!camera.TryProject(new Vector3(issue.Key.x, GroundAt(issue.Key) + lift, issue.Key.y), out var screen))
                     continue;
-                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? selectedObjectColor
-                    : issue.Value == OmsiRoadIssueSeverity.Warning ? selectedTileColor : wireColor;
+                painter.fillColor = issue.Value == OmsiRoadIssueSeverity.Error ? errorColor
+                    : issue.Value == OmsiRoadIssueSeverity.Warning ? warningColor : wireColor;
                 painter.BeginPath();
                 AddCircle(painter, screen, 5f);
                 painter.Fill();
@@ -2184,8 +2200,8 @@ namespace OmsiMapEditor.UI
         private void DrawJunctionMarker(Painter2D painter, Vector2 screen, Vector2 tip, OmsiJunctionPortState state)
         {
             var color = state == OmsiJunctionPortState.Connected ? placementColor
-                : state == OmsiJunctionPortState.NeedsReview ? selectedTileColor
-                : state == OmsiJunctionPortState.Invalid ? selectedObjectColor
+                : state == OmsiJunctionPortState.NeedsReview ? warningColor
+                : state == OmsiJunctionPortState.Invalid ? errorColor
                 : wireColor;
             painter.strokeColor = color;
             painter.lineWidth = 2f;
@@ -2211,7 +2227,7 @@ namespace OmsiMapEditor.UI
             return GroundHeight != null ? GroundHeight(map) : 0f;
         }
 
-        private void StrokePolyline(Painter2D painter, Vector2[] points)
+        private void StrokePolyline(Painter2D painter, Vector2[] points, bool haloed = false)
         {
             if (points.Length < 2)
                 return;
@@ -2226,7 +2242,7 @@ namespace OmsiMapEditor.UI
                 painter.LineTo(point);
                 last = point;
             }
-            painter.Stroke();
+            StrokeHaloed(painter, haloed);
         }
 
         private static void AddCircle(Painter2D painter, Vector2 center, float radius)
@@ -2539,7 +2555,7 @@ namespace OmsiMapEditor.UI
                 painter.MoveTo(screen + new Vector2(7f, 0f));
                 painter.Arc(screen, 7f, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
             }
-            painter.Stroke();
+            StrokeHaloed(painter, true);
             // A group shows its handle only with the rotate tool: its line points at the turn, not at a heading.
             if (!HasRotationHandle() || (TurnsGroup && !CanRotate))
                 return;
@@ -2549,7 +2565,7 @@ namespace OmsiMapEditor.UI
             painter.BeginPath();
             painter.MoveTo(objectScreen);
             painter.LineTo(handle);
-            painter.Stroke();
+            StrokeHaloed(painter, true);
             if (TurnsGroup)
             {
                 painter.fillColor = selectedObjectColor;
@@ -2564,7 +2580,7 @@ namespace OmsiMapEditor.UI
                 painter.BeginPath();
                 painter.Arc(handle, HandleRadius, Angle.Degrees(0f), Angle.Degrees(360f), ArcDirection.Clockwise);
                 painter.Fill();
-                painter.Stroke();
+                StrokeHaloed(painter, true);
             }
         }
 
@@ -2680,7 +2696,7 @@ namespace OmsiMapEditor.UI
             painter.LineTo(new Vector2(rect.xMin, rect.yMax));
             painter.ClosePath();
             painter.Fill();
-            painter.Stroke();
+            StrokeHaloed(painter, true);
         }
 
         /// <summary>Where an object is drawn: shifted by the drag while it belongs to the moved selection.</summary>
@@ -3847,7 +3863,7 @@ namespace OmsiMapEditor.UI
                 for (var index = 0; index <= last; index++)
                     heights.Add(new Vector3(path.Points[index].x, Mathf.Lerp(path.StartHeight, path.EndHeight, (float)index / last) + lift + 0.15f,
                         path.Points[index].y));
-                StrokeWorldLine(painter, camera, heights);
+                StrokeWorldLine(painter, camera, heights, true);
             }
         }
 
@@ -3858,7 +3874,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Draws a line through world points, leaving gaps where points lie behind the camera.</summary>
-        private static void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points)
+        private static void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points, bool haloed = false)
         {
             painter.BeginPath();
             var open = false;
@@ -3875,7 +3891,7 @@ namespace OmsiMapEditor.UI
                     painter.MoveTo(screen);
                 open = true;
             }
-            painter.Stroke();
+            StrokeHaloed(painter, haloed);
         }
 
         /// <summary>The selected tile's border, following the ground every few metres.</summary>
@@ -3896,7 +3912,7 @@ namespace OmsiMapEditor.UI
             StrokeWorldLine(painter, camera, points);
         }
 
-        /// <summary>Objects without a model: a dot and a short line in their heading, red when selected.</summary>
+        /// <summary>Objects without a model: a dot and a short line in their heading, light when selected.</summary>
         private void DrawMarkers3D(Painter2D painter, MapOrbitCamera camera)
         {
             painter.lineWidth = 1.5f;
@@ -3973,6 +3989,25 @@ namespace OmsiMapEditor.UI
 
         private static readonly int[] BoxEdges = { 0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7 };
 
+        /// <summary>
+        /// Strokes the current path; with <paramref name="haloed"/> a dark, wider stroke goes under it first, so a light
+        /// selection stays visible over a bright aerial image as well as over the dark ground (ADR 098, M6 step 6).
+        /// </summary>
+        private static void StrokeHaloed(Painter2D painter, bool haloed)
+        {
+            if (haloed)
+            {
+                var colour = painter.strokeColor;
+                var width = painter.lineWidth;
+                painter.strokeColor = selectionHaloColor;
+                painter.lineWidth = width + 3f;
+                painter.Stroke();
+                painter.strokeColor = colour;
+                painter.lineWidth = width;
+            }
+            painter.Stroke();
+        }
+
         private static void DrawBoundingBox(Painter2D painter, MapOrbitCamera camera, Matrix4x4 frame, Bounds bounds)
         {
             var corners = new Vector2[8];
@@ -3993,7 +4028,7 @@ namespace OmsiMapEditor.UI
                 painter.MoveTo(corners[a]);
                 painter.LineTo(corners[b]);
             }
-            painter.Stroke();
+            StrokeHaloed(painter, true);
         }
 
         /// <param name="anchor">The object under the pointer; the whole selection moves by its offset.</param>

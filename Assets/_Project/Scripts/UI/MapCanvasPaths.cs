@@ -357,7 +357,7 @@ namespace OmsiMapEditor.UI
 
         private Color PathColor(int kind)
         {
-            return kind == 0 ? (Color)objectColor : kind == 1 ? treeStrokeColor : selectedTileColor;
+            return kind == 0 ? (Color)objectColor : kind == 1 ? treeStrokeColor : pathRailColor;
         }
 
         private void DrawPaths(Painter2D painter, Rect visible)
@@ -462,7 +462,7 @@ namespace OmsiMapEditor.UI
                     painter.Stroke();
             }
 
-            painter.strokeColor = selectedObjectColor;
+            painter.strokeColor = errorColor;
             painter.lineWidth = 2f;
             foreach (var pair in shown)
             {

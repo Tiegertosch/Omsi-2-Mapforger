@@ -47,6 +47,10 @@
     --mf-color-warning: #E6B450;
     --mf-color-error: #EA7676;
     --mf-color-info: #65A9D9;
+    /* Colour meanings of the map (ADR 098, M6 step 6): selection light with a dark halo, rail paths violet */
+    --mf-color-map-selection: #F2F4F7;
+    --mf-color-map-selection-halo: #171C23;
+    --mf-color-path-rail: #B48EDB;
 
     /* Surfaces of the road builder's lane bar (ADR 049) */
     --mf-color-lane-asphalt: #3B4048;
@@ -106,7 +110,7 @@
 /* Workspace: the map fills it, panels and controls float above it */
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: var(--mf-color-clear); }
 .map-view { position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: hidden; background-color: var(--mf-color-clear); }
-.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-warning); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-error); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); --map-wire: var(--mf-color-text-secondary); --map-fence: var(--mf-color-text-muted); --map-route: var(--mf-color-text-primary); --map-route-quiet: var(--mf-color-text-secondary); }
+.map-canvas { position: absolute; left: 0; top: 0; right: 0; bottom: 0; --map-tile: var(--mf-color-panel); --map-tile-border: var(--mf-color-border); --map-tile-missing: var(--mf-color-error); --map-tile-selected: var(--mf-color-accent); --map-spline: var(--mf-color-accent); --map-object: var(--mf-color-info); --map-tree: var(--mf-color-success); --map-selection: var(--mf-color-map-selection); --map-selection-halo: var(--mf-color-map-selection-halo); --map-error: var(--mf-color-error); --map-warning: var(--mf-color-warning); --map-path-rail: var(--mf-color-path-rail); --map-placement: var(--mf-color-success); --map-handle: var(--mf-color-panel-raised); --map-wire: var(--mf-color-text-secondary); --map-fence: var(--mf-color-text-muted); --map-route: var(--mf-color-text-primary); --map-route-quiet: var(--mf-color-text-secondary); }
 .map-pointer-badge { position: absolute; width: 30px; height: 30px; padding: 3px; color: var(--mf-color-accent); background-color: var(--mf-color-panel-glass); border-radius: 15px; }
 .map-pointer-badge > .icon { flex-grow: 1; }
 .map-angle-label { position: absolute; padding: 2px 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
