@@ -1,6 +1,6 @@
 # Objekt-Popup in der unteren Leiste: Bestandsaufnahme und Plan
 
-Stand 22. November 2026, Zweig `feature/objects-popup` (von `main` c486e93). Die Entscheidungen des Projektinhabers stehen in Abschnitt 0, die Befunde von Schritt 0 und der Stand von Schritt 1 in Abschnitt 5; Schritt 1 (`OmsiPlacedObjectIndex`) sowie Schritt 2 (Knopf, Popup-Gerüst) und Schritt 3 (Liste, Suche, Gruppen, Klick; Abschnitt 5.5) sind gebaut und getestet, unkommittiert; offen sind Schritt 4 (Feinschliff der Aktualisierung, Messung am echten Bearbeiten), Prüfungen, Doku und ADR 102. Auftrag des Projektinhabers: „Neben dem Kacheln-Popup soll noch ein Objekt-Popup dazukommen, damit weiterhin eine Liste existiert, wo man alle auf der Karte platzierten Objekte einsehen kann.“ Die Funktion gehört zu Release 1.2.0 (Roadmap, Abschnitt „UI-Rework: nach dem Rework und Release 1.2.0“, ADR 098 Abschlussvermerk, Entscheidung 3B).
+Stand 22. November 2026, Zweig `feature/objects-popup` (von `main` c486e93). **Status: umgesetzt, getestet.** Die Schritte 0 bis 3 sind committet als `3e2de32` (Objekt-Liste), der Projektinhaber hat sie getestet (Öffnen und Scrollen in Berlin-Spandau flüssig). Der Merge nach `main` steht aus. Die Entscheidung steht in ADR 102 (`Decisions.md`). Die Entscheidungen des Projektinhabers stehen in Abschnitt 0, die Befunde von Schritt 0 und der Stand von Schritt 1 in Abschnitt 5; Schritt 1 (`OmsiPlacedObjectIndex`) sowie Schritt 2 (Knopf, Popup-Gerüst) und Schritt 3 (Liste, Suche, Gruppen, Klick; Abschnitt 5.5) sind gebaut und getestet. Offen sind die Nachschritte (angehängte Objekte und Reihen laut 2.5 und Entscheidung 8, „Alle dieser Art wählen“ laut Entscheidung 6, Zählung „In map“ laut 3.5; Roadmap). Auftrag des Projektinhabers: „Neben dem Kacheln-Popup soll noch ein Objekt-Popup dazukommen, damit weiterhin eine Liste existiert, wo man alle auf der Karte platzierten Objekte einsehen kann.“ Die Funktion gehört zu Release 1.2.0 (Roadmap, Abschnitt „UI-Rework: nach dem Rework und Release 1.2.0“, ADR 098 Abschlussvermerk, Entscheidung 3B).
 
 ## 0. Entscheidungen des Projektinhabers (22. November 2026)
 
@@ -14,6 +14,7 @@ Stand 22. November 2026, Zweig `feature/objects-popup` (von `main` c486e93). Die
 | 6 „Alle dieser Art wählen“ | **B** | Nicht in Stufe 1 (später nach Messung) |
 | 7 Reiter „In map“ | **A** | Bleibt im Objekte-Fenster |
 | 8 Angehängte Objekte und Reihenobjekte | **A** | Nur `[object]`-Datensätze; Anhänge (`[attachObj]`) und Reihenobjekte stehen nicht in der Liste (ein späterer Nachschritt B bleibt möglich) |
+| Entf (Zusatz 22. November 2026) | **Entf bleibt** wie überall | Entf mit Fokus in der Objektliste löscht die gewählten Objekte wie auf der Karte (globaler Kurzbefehl, einheitlich, per Strg+Z rücknehmbar); die Liste hat keinen eigenen Löschweg |
 
 Alle Fragen sind entschieden.
 
@@ -147,7 +148,7 @@ Jeder Schritt in kleinem Commit, wenn der Projektinhaber es verlangt; Docs wande
 - Berlin-Spandau `-view 2402 11279 200 200 0.4 -projectTab objects` (Gruppen zu, Anzahl, Abzeichen „29k“) und ein Filterbild.
 - Testprojekt im Scratchpad (`.omproj`, Arbeitskopie neben der Datei, Original bleibt unberührt): ein Objekt platzieren und löschen, das Popup bleibt offen; Bild vorher/nachher (per `-place` und `-deleteSelection`, falls vorhanden; sonst im Handtest).
 - Kartenansicht 3D (`-orbit`) mit Klick auf ein Objekt.
-- Nicht per Standbild prüfbar, Handtest des Projektinhabers: echtes Scrollen mit dem Mausrad bei 30.000 Zeilen, Tastenbedienung, Strg+Klick, Verhalten beim Rückgängig mit offenem Popup.
+- Nicht per Standbild prüfbar, Handtest des Projektinhabers: alle sieben Handtest-Punkte vom Projektinhaber am 22. November 2026 bestätigt (Öffnen und Scrollen in Spandau, Klick, Strg+Klick, Tastatur inkl. Esc, Suche/Herkunft/Gliederung, Karte zur Liste, Änderungen bei offener Liste).
 
 ### 3.3 Messung Spandau (Player-Log, Zeilen „Object list: …“, Stoppuhr wie bei „Inspector placement:“)
 
@@ -261,4 +262,4 @@ Neue Datei `Assets/_Project/Scripts/OMSI/OmsiPlacedObjectIndex.cs` (Namespace `O
 - **Prüfargumente** (`CommandLine.md`): `-projectTab objects`, `-objectFilter`, `-objectGroup type|tile|flat`, `-objectOpenGroup`, `-objectClick`, dazu `-objectType` (Buchstabe für Buchstabe tippen) und `-objectOrigins`.
 - **Messung** (Player, Mono, Berlin-Spandau, 1600 × 900, Log „Object list: …“): Öffnen kalt 67–85 ms insgesamt (Index 26–38 ms, Zeilen 16–19 ms, der Rest sind das erste Erzeugen von Feld, Tabs und `ListView`); ein zweites Zeichnen im selben Lauf (warm) 28 ms (Index 17–21 ms, Zeilen 6–9 ms). Grundorf 26 ms kalt, 1 ms warm. Jeder Buchstabe im Suchfeld („baum“, „shrubbery“): 3–8 ms einschließlich der Neuzuweisung an die `ListView`. Gruppe aufklappen 2 ms (Zeilen) plus Neuaufbau der `ListView`. Das erste Öffnen liegt damit über dem Ziel von 50 ms (ein Bild mit rund 70–85 ms, vor allem der Index); der Aufbau in Scheiben (2.4) ist als Nachbesserung offen, falls der Handtest es als Ruckeln meldet. Die Vektorebene meldete bei diesen Läufen keine Neuzeichnung über 50 ms.
 - **Prüfung:** EditMode 1456 von 1456 grün (1448 + 8: 7 `TheObjectBadgeShortensFromTenThousand`, 1 `ObjectListRowHeightMatchesTheRowRuleAndTheRowsAreSetInTokens`; `UnusedStyleClassTests`, `LocalizationKeyUsageTests`, `ElementNameLookupTests`, `DialogCodeRulesTests` grün); Player-Build ok; Bilder `.omc/handoffs/objects-popup/step3/`.
-- **Noch nicht geprüft** (Handtest): Mausrad bei 30.000 Zeilen, Tastenbedienung, Strg+Klick, Esc, Tooltip der Zeilen, Verhalten bei Rückgängig/Platzieren/Löschen mit offener Liste (`ScheduleObjectListRebuild` ist nur durch Lesen belegt), Fokusring. Entf mit dem Fokus in der Liste löscht wie bei jedem Element des Popups die gewählten Objekte (globaler Kurzbefehl).
+- **Handtest:** alle sieben Handtest-Punkte vom Projektinhaber am 22. November 2026 bestätigt (Öffnen und Scrollen in Spandau ohne Ruckeln, Klick, Strg+Klick, Tastatur inkl. Esc, Suche/Herkunft/Gliederung, Karte zur Liste, Änderungen bei offener Liste). Entf mit dem Fokus in der Liste löscht wie bei jedem Element des Popups die gewählten Objekte (globaler Kurzbefehl).

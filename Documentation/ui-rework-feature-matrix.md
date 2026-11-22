@@ -58,6 +58,7 @@ Neu belegt am 22. November 2026 (M8 Schritt 5, Zweig `feature/ui-rework`, HEAD `
 | Fahrplan-Editor, Fahrzeuge | Popup „Linien“ › Knöpfe (`EditorShellProjectTabs.cs`, Vorfassung `:120–122`) | voll | ja | `timetable-dialog` (M7 Schritt 4) und `vehicles-dialog` (M7 Schritt 3) aus der Fabrik, Wide 720; Inline-Größen: 0 unmarkiert (M7 Schritt 6, vorher 105) |
 | **Objekte** | | | | |
 | Objektbibliothek, Platzieren | Leiste „Objects“ 3; Edit › Place object (`ObjectLibraryPanel.cs`, `EditorShell.uxml:79`) | voll | ja | Katalog neu; Optionen über `OptionControls` (`ObjectLibraryPanel.cs`, 7 Aufrufe). Esc im Suchfeld: behoben in M2 (Audit 5.7) |
+| Liste aller platzierten Objekte | Knopf „Objects“ links neben dem Kachelknopf, Popup der Leiste (`EditorShellObjectList.cs`, Index `OmsiPlacedObjectIndex.cs` in `Editor.OMSI`; ADR 102) | voll | ja (Handtest 22. November 2026) | Gruppen nach Art, Kachel oder flach; Suche und Herkunftsschalter; Klick wählt und zentriert. Offen: angehängte Objekte und Reihen fehlen (ADR 102, 8B/8C); „In map“ veraltet nach Löschen und Rückgängig |
 | Auswählen, Ziehen, Verschieben, Drehen | Q, W, E (`MapToolbar.cs`) | voll | ja | |
 | Löschen | Entf, Leiste, Kontextmenü, Edit-Menü (`EditorShell.uxml:80`) | voll | ja | |
 | Kopieren, Duplizieren | Strg+C/D, Kontextmenü (`EditorShellClipboard.cs`) | voll | ja | |

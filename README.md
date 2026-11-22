@@ -50,6 +50,7 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 - **Clearer text and controls:** Text and panel contrast were raised, and the keyboard focus ring shows only when you navigate with the keyboard.
 - **Consistent colours on the map:** Orange marks the active tile, light with a dark rim the selection, violet rail paths; red means only errors, yellow only warnings.
 - **Consistent dialogs:** All dialogs share one layout, with Cancel on the left and the main button on the right. Esc closes only the top dialog, Enter confirms only in a dialog with a single text field, and a click beside a dialog does not close it. The map stays still behind open dialogs. The object and spline folders are in Settings under Content.
+- **Objects list in the bottom bar:** A button beside the tile button lists every object placed on the map, grouped by object type, by tile or flat, with a search and a filter for base game, DLC and other content. A click selects the object and centres the map on it.
 - **Simpler Help menu:** It offers Check for updates, Report a bug and the wiki.
 
 ## Current limitations
