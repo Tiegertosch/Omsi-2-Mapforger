@@ -43,6 +43,13 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 
 - **Translations:** The interface is multilingual, with a language choice in Settings: English and German are written by hand; Czech, French, Italian, Polish, Portuguese and Spanish are machine translations that native speakers are welcome to correct. The map check report is translated too; error messages from the OMSI file layer are still English. The texts and the list of languages live in plain JSON files under [locales](locales/README.md), so anyone can add or improve a language with a pull request, without changing code; a built-in check validates every file.
 
+## Current status
+
+- **Readable at any size:** The interface follows the Windows display scale and has an **Interface size** setting (90 to 200 %) in Settings. Dialogs, menus and toolbars keep to the window at 100, 150 and 200 %.
+- **Clearer text and controls:** Text and panel contrast were raised, and the keyboard focus ring shows only when you navigate with the keyboard.
+- **Consistent colours on the map:** Orange marks the active tile, light with a dark rim the selection, violet rail paths; red means only errors, yellow only warnings.
+- **Simpler Help menu:** It offers Check for updates, Report a bug and the wiki.
+
 ## Current limitations
 
 Mapforge is still in development. Timetable data can be inspected but not edited. Chrono variants take objects, their object files and their labels so far; roads, rules and timetables of a variant cannot be edited yet. Some advanced OMSI records and tile-bound references also limit which structural edits are possible. See the [roadmap](Documentation/Roadmap.md) for project details.
