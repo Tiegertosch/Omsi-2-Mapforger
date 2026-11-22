@@ -124,8 +124,6 @@
   "export.status.create_failed": "Nie można utworzyć mapy: {reason}",
   "@export.status.create_failed": "{reason} is a message from the system, in English",
   "export.status.created": "Utworzono {folder} z plikami pomocniczymi {count} z szablonu; edytuj to od razu. Eksportuj do OMSI... zapisuje Twoje zmiany w tym folderze; następnie wybierz „{name}” w OMSI, aby wypróbować.",
-  "export.created_open_failed": "Mapa została utworzona w {folder}, ale nie można jej było otworzyć: {reason}",
-  "@export.created_open_failed": "{reason} is a message from the system, in English",
   "export.target": "{kind, select, inplace {Zapisuje twoje zmiany we własnym folderze mapy, tak jak zostały wprowadzone za pomocą MapWorks:} replace {Zastępuje wcześniejszy eksport MapWorks w:} other {Tworzy folder mapy:}}\n{target}\nZawiera edytowane pliki: {count}",
   "export.problem.folder": "Wprowadź nazwę folderu bez separatorów ścieżki ani znaków specjalnych.",
   "export.problem.name": "Wprowadź nazwę, którą OMSI wyświetli dla wyeksportowanej mapy.",

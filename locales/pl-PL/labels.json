@@ -4,7 +4,6 @@
   "labels.change_type": "Zmień typ...",
   "labels.change_type.tooltip": "Wybierz dla niego inny plik obiektowy w bibliotece; jego miejsce i etykiety pozostają",
   "labels.heading": "Etykiety",
-  "labels.line": "Linia {n}",
   "labels.note.own": "Dodane przez {variant}: zmiany własnych rekordów.",
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "Nowy typ lub nowe etykiety są zapisywane w {variant} ([selobject] z [typ] lub [relabel]); {origin, select, variant {wariant, który go dodaje} other {mapa bazowa}} ma swój własny.",

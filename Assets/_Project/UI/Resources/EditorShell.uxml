@@ -6,7 +6,7 @@
             <ui:VisualElement class="menu-container">
                 <ui:Button name="file-menu-button" text="File" class="toolbar-menu-button" />
                 <ui:Button name="edit-menu-button" text="Edit" class="toolbar-menu-button" />
-                <ui:Button name="view-menu-button" text="Tools" class="toolbar-menu-button" />
+                <ui:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" />
                 <ui:Button name="help-menu-button" text="Help" class="toolbar-menu-button" />
             </ui:VisualElement>
             <ui:Label name="map-title" class="menu-bar-map" />
@@ -27,7 +27,7 @@
             <ui:VisualElement name="bar-popup" class="floating-panel bar-popup" style="display: none;">
                 <ui:VisualElement class="floating-panel-header">
                     <ui:Label name="project-title" text="Project" class="floating-panel-title" />
-                    <ui:Button name="project-collapse-button" class="panel-collapse-button" tooltip="Close" />
+                    <ui:Button name="bar-popup-close-button" class="panel-collapse-button" tooltip="Close" />
                 </ui:VisualElement>
                 <ui:VisualElement name="project-panel" class="floating-panel-content">
                     <ui:Label name="project-empty" text="No map loaded" class="muted" />
@@ -86,7 +86,7 @@
             <ui:Button name="undo-menu-item" text="Undo    Ctrl+Z" class="menu-popup-item" />
             <ui:Button name="redo-menu-item" text="Redo    Ctrl+Y" class="menu-popup-item" />
         </ui:VisualElement>
-        <ui:VisualElement name="view-menu" class="menu-popup view-menu">
+        <ui:VisualElement name="tools-menu" class="menu-popup tools-menu">
             <ui:Button name="inspector-menu-item" text="Inspector" class="menu-popup-item" />
             <ui:Button name="satellite-menu-item" text="Satellite and terrain..." class="menu-popup-item" tooltip="Place the map on the Earth and load pictures from the air and terrain heights for its tiles, without any key, as openMapper does." />
             <ui:Button name="road-builder-menu-item" text="Road builder..." class="menu-popup-item" />

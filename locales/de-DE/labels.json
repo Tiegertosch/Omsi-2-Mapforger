@@ -3,7 +3,6 @@
   "labels.change_type": "Typ ändern...",
   "labels.change_type.tooltip": "Wähle in der Bibliothek eine andere Objektdatei dafür; Platz und Beschriftungen bleiben",
   "labels.heading": "Beschriftungen",
-  "labels.line": "Zeile {n}",
   "labels.note.own": "Von {variant} hinzugefügt: Sein eigener Eintrag ändert sich.",
   "labels.note.other": "Ein neuer Typ oder neue Beschriftungen werden in {variant} geschrieben ([selobject] mit [typ] oder [relabel]); {origin, select, variant {die Variante, die es hinzufügt,} other {die Basiskarte}} behält ihre eigenen.",
   "labels.pick.cancel": "Abbrechen",

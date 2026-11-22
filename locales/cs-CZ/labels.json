@@ -4,7 +4,6 @@
   "labels.change_type": "Změnit typ...",
   "labels.change_type.tooltip": "Vyberte pro něj jiný objektový soubor v knihovně; jeho místo a štítky zůstávají",
   "labels.heading": "Štítky",
-  "labels.line": "Řádek {n}",
   "labels.note.own": "Přidáno {variant}: vlastní změny záznamu.",
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "Do {variant} se zapíše nový typ nebo nové štítky ([selobject] s [typ] nebo [relabel]); {origin, select, variant {varianta, která to přidává} other {základní mapa}} si zachovává svou vlastní.",

@@ -1,5 +1,4 @@
 {
-  "toolbar.signals": "Ampeln",
   "toolbar.signals.tooltip": "Ampeln (A): Eine Kreuzung anklicken, um ihre Zufahrten, Fahrstreifen und Fahrbewegungen in den Farben ihrer Signalgruppen zu sehen. Bei einer in diesem Projekt erzeugten Kreuzung Signalgruppen hinzufügen, umbenennen und entfernen und jeder Fahrbewegung ihre Gruppe geben.",
   "readonly.action.edit_signals": "Ampeln zu bearbeiten",
   "signals.click_junction": "Eine Kreuzung in der Karte anklicken.",

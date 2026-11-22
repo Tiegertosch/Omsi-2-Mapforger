@@ -96,7 +96,7 @@
 /* The left values are only the first frame before layout; EditorShellMenuPlacement then sets each menu under its button. */
 .file-menu { left: 168px; }
 .edit-menu { left: 222px; }
-.view-menu { left: 276px; }
+.tools-menu { left: 276px; }
 .help-menu { left: 384px; width: 360px; max-width: 94%; }
 .menu-popup-item { height: 32px; -unity-text-align: middle-left; padding-left: 10px; background-color: var(--mf-color-clear); border-width: 0; border-radius: var(--mf-radius-sm); color: var(--mf-color-text-primary); }
 .menu-popup-item:hover { background-color: var(--mf-color-panel-hover); }

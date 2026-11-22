@@ -1,6 +1,4 @@
 {
-  "terrain.title": "Terrain",
-  "terrain.brush": "Brush",
   "terrain.mode.raise": "Raise",
   "terrain.mode.lower": "Lower",
   "terrain.mode.smooth": "Smooth",

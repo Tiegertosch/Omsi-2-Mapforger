@@ -265,7 +265,7 @@ namespace OmsiMapEditor.UI
             RefreshAfterChange(new[] { new MapSelectionItem { Tile = placement.Tile, Record = change.Record } });
             if (objectsPanelOpen)
                 UpdateObjectsCatalog();
-            RenderProjectBrowser();
+            RenderBarPopup();
             SetStatusT("entry.status.added", ("name", name), ("x", placement.Tile.X), ("y", placement.Tile.Y));
         }
 
@@ -320,7 +320,7 @@ namespace OmsiMapEditor.UI
             }
             PushHistory(new ObjectEditStep { TileX = entry.Tile.X, TileY = entry.Tile.Y, ObjectId = entry.ObjectId, Change = change, Description = Loc.T("entry.step.rename") });
             RefreshAfterChange(new[] { new MapSelectionItem { Tile = entry.Tile, Record = change.CurrentRecord ?? entry.Object } });
-            RenderProjectBrowser();
+            RenderBarPopup();
             SetStatusT("entry.status.renamed", ("name", name.Trim()));
         }
 
@@ -349,7 +349,7 @@ namespace OmsiMapEditor.UI
             }
             PushHistory(new ObjectEditStep { TileX = entry.Tile.X, TileY = entry.Tile.Y, ObjectId = entry.ObjectId, Change = result.Change, Description = Loc.T("entry.step.delete") });
             RefreshAfterChange(null);
-            RenderProjectBrowser();
+            RenderBarPopup();
             SetStatusT("entry.status.deleted", ("name", entry.Name));
         }
 

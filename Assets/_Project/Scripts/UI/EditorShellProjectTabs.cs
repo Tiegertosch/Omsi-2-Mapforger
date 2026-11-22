@@ -223,7 +223,7 @@ namespace OmsiMapEditor.UI
             if (name == null || !Enum.TryParse(name, true, out ProjectTab tab))
             {
                 if (filter != null)
-                    RenderProjectBrowser();
+                    RenderBarPopup();
                 return;
             }
             ShowProjectTab(tab);

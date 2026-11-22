@@ -1,5 +1,4 @@
 {
-  "toolbar.line": "Linea",
   "toolbar.line.tooltip": "Linea (B): Clicca le fermate di una linea nell'ordine in cui l'autobus le serve; il percorso sulle strade della mappa appare subito. Fai il ritorno da altre fermate, chiudi un anello, porta il percorso su un'altra strada con i punti di passaggio e salva la linea.",
   "readonly.action.make_lines": "creare linee",
   "line.hint": "Clicca la fermata successiva nell'ordine del servizio.",

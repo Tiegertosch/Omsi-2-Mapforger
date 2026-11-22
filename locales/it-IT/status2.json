@@ -124,8 +124,6 @@
   "export.status.create_failed": "Impossibile creare la mappa: {reason}",
   "@export.status.create_failed": "{reason} is a message from the system, in English",
   "export.status.created": "Creato {folder} con i file helper {count} dal modello; modificalo subito. Esporta in OMSI... scrive le modifiche in questa cartella; quindi seleziona \"{name}\" in OMSI per provarlo.",
-  "export.created_open_failed": "La mappa è stata creata in {folder}, ma non è stato possibile aprirla: {reason}",
-  "@export.created_open_failed": "{reason} is a message from the system, in English",
   "export.target": "{kind, select, inplace {Scrive le modifiche nella cartella della mappa, come è stato fatto con MapWorks:} replace {Sostituisce la precedente esportazione MapWorks in:} other {Crea la cartella della mappa:}}\n{target}\nFile modificati inclusi: {count}",
   "export.problem.folder": "Inserisci un nome di cartella senza separatori di percorso o caratteri speciali.",
   "export.problem.name": "Inserisci il nome della mappa esportata da visualizzare in OMSI.",

@@ -108,7 +108,7 @@ Seit „Hinweise in die Statuszeile“ teilen sich drei Dinge ein Label: Meldung
 - **Versteckt und weiter gebaut:** siehe Audit, Abschnitt 2.
 - **Verwaiste Textschlüssel:** `terrain.title`, `project.empty` (Reviewer; nur `en-US` geprüft).
 - **Wirkungslos:** `ShowFoldersLeftOut`.
-- **Irreführende Namen:** `view-menu-button` (= Tools), `project-collapse-button` (= X des Popups), `RenderProjectBrowser`.
+- **Irreführende Namen:** `view-menu-button` (= Tools), `project-collapse-button` (= X des Popups), `RenderProjectBrowser`. *(M8 Schritt 4, 22. November 2026: umbenannt in `tools-menu-button`, `bar-popup-close-button`, `RenderBarPopup`.)*
 
 ## 9. Testbarkeit
 

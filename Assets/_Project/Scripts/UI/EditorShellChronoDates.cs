@@ -92,7 +92,7 @@ namespace OmsiMapEditor.UI
                 var editIndex = chronoVariants.FindIndex(variant => string.Equals(variant.Name, name, StringComparison.OrdinalIgnoreCase));
                 var active = chronoVariants.FindAll(variant => chronoVariants.IndexOf(variant) <= editIndex && variant.IsActiveOn(chronoDate.Value));
                 StartRoutesBuild(currentSummary, active);
-                RenderProjectBrowser();
+                RenderBarPopup();
                 SetStatusT("chrono.dates.changed", ("title", title), ("first", FormatDay(first)), ("last", FormatDay(last)), ("hasLast", last.HasValue ? "yes" : "no"));
                 return;
             }

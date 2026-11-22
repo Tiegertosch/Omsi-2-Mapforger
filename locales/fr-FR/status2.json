@@ -124,8 +124,6 @@
   "export.status.create_failed": "Impossible de créer la carte : {reason}",
   "@export.status.create_failed": "{reason} is a message from the system, in English",
   "export.status.created": "Création de {folder} avec les fichiers d'assistance {count} à partir du modèle ; modifiez-le tout de suite. Exporter vers OMSI... écrit vos modifications dans ce dossier ; puis sélectionnez « {name} » dans OMSI pour l'essayer.",
-  "export.created_open_failed": "La carte a été créée dans {folder}, mais elle n'a pas pu être ouverte : {reason}",
-  "@export.created_open_failed": "{reason} is a message from the system, in English",
   "export.target": "{kind, select, inplace {Écrit vos modifications dans le propre dossier de la carte, comme elles ont été effectuées avec MapWorks :} replace {Remplace l'exportation MapWorks précédente dans :} other {Crée le dossier de carte :}}\n{target}\nFichiers édités inclus : {count}",
   "export.problem.folder": "Saisissez un nom de dossier sans séparateurs de chemin ni caractères spéciaux.",
   "export.problem.name": "Saisissez le nom de la carte exportée affiché dans OMSI.",

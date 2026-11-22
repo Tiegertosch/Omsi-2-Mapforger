@@ -55,7 +55,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             newMapDialog.Hide();
-            RenderProjectBrowser();
+            RenderBarPopup();
             UpdateMapStateLabel();
             SetStatusT(changed ? "mapsettings.status.changed" : "mapsettings.status.unchanged", ("name", friendlyName)); // i18n:keys
         }

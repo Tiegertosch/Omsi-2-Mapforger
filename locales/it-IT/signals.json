@@ -1,5 +1,4 @@
 {
-  "toolbar.signals": "Semafori",
   "toolbar.signals.tooltip": "Semafori (A): clicca un incrocio per vedere accessi, corsie e manovre nei colori dei loro gruppi di segnali. Su un incrocio creato in questo progetto aggiungi, rinomina e rimuovi gruppi e assegna a ogni manovra il suo gruppo.",
   "readonly.action.edit_signals": "modificare i semafori",
   "signals.click_junction": "Clicca un incrocio nella mappa.",

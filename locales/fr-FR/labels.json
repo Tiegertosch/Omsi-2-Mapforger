@@ -4,7 +4,6 @@
   "labels.change_type": "Changer de type...",
   "labels.change_type.tooltip": "Choisissez un autre fichier objet dans la bibliothèque ; sa place et ses étiquettes restent",
   "labels.heading": "Étiquettes",
-  "labels.line": "Ligne {n}",
   "labels.note.own": "Ajouté par {variant} : son propre enregistrement change.",
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "Un nouveau type ou de nouvelles étiquettes sont écrits dans {variant} ([selobject] avec [typ] ou [relabel]) ; le {origin, select, variant {variante qui l'ajoute} other {carte de base}} garde le sien.",

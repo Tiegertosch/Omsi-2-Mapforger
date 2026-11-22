@@ -229,6 +229,7 @@ namespace OmsiMapEditor.UI
                 chain += (chain.Length == 0 ? string.Empty : " < ") + element.GetType().Name + (string.IsNullOrEmpty(element.name) ? string.Empty : "#" + element.name);
             var dialogBefore = AnyModalDialogShown();
             var selectionBefore = selection.Count;
+            var menusBefore = OpenBarMenus();
             if (picked != null)
             {
                 using (var press = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, mousePosition = position, button = 0 }))
@@ -236,11 +237,31 @@ namespace OmsiMapEditor.UI
                     press.target = picked;
                     picked.SendEvent(press);
                 }
+                // -clickRelease also lets the button go, so a button of the menu bar acts as after a whole click.
+                if (System.Array.IndexOf(args, "-clickRelease") >= 0)
+                {
+                    using (var release = PointerUpEvent.GetPooled(new Event { type = EventType.MouseUp, mousePosition = position, button = 0 }))
+                    {
+                        release.target = picked;
+                        picked.SendEvent(release);
+                    }
+                }
             }
             var focused = panel.focusController?.focusedElement as VisualElement;
             Debug.Log("Click check: picked " + (chain.Length == 0 ? "nothing" : chain) + "; focus on " +
                       (focused == null ? "nothing" : focused.GetType().Name + " '" + focused.name + "'") + (focused == mapCanvas ? " (the map)" : string.Empty) +
-                      "; dialog shown before " + dialogBefore + ", after " + AnyModalDialogShown() + "; selection " + selectionBefore + " -> " + selection.Count);
+                      "; dialog shown before " + dialogBefore + ", after " + AnyModalDialogShown() + "; selection " + selectionBefore + " -> " + selection.Count +
+                      "; menu bar menus open before [" + menusBefore + "], after [" + OpenBarMenus() + "]");
+        }
+
+        /// <summary>The names of the menus of the menu bar that are shown (for the click check).</summary>
+        private string OpenBarMenus()
+        {
+            var names = new System.Collections.Generic.List<string>();
+            foreach (var (menuName, _, _) in MenuButtons)
+                if (IsShown(rootElement.Q<VisualElement>(menuName)))
+                    names.Add(menuName);
+            return string.Join(", ", names);
         }
     }
 }

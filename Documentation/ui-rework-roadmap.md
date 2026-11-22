@@ -154,7 +154,7 @@ M2 und M3 berühren verschiedene Stellen (Statuszeile und Pille gegen `SetTool`,
 ## M8 – Aufräumen und Abschluss (P3, S)
 
 - **Ziel:** Keine Reste; Rework dokumentiert und freigabefähig.
-- **Aufgaben:** tote USS-Klassen und versteckte Labels entfernen (`MapToolbar` baut dann keine Labels und Tastenkappen mehr); verwaiste Textschlüssel; UXML-Namen (`view-menu-button`, `project-collapse-button`) und `RenderProjectBrowser` umbenennen; verwaiste Schlüssel als Testfehler; Architecture.md, CommandLine.md, DevelopmentSetup.md, CLAUDE.md nachziehen; ADR 098 abschließen; „Record Reviewed Player Assets“; Zusammenführen nach `main`; Wiki nach dem Release.
+- **Aufgaben:** tote USS-Klassen und versteckte Labels entfernen (`MapToolbar` baut dann keine Labels und Tastenkappen mehr); verwaiste Textschlüssel; UXML-Namen (`view-menu-button`, `project-collapse-button`) und `RenderProjectBrowser` umbenennen; verwaiste Schlüssel als Testfehler; Architecture.md, CommandLine.md, DevelopmentSetup.md, CLAUDE.md nachziehen; ADR 098 abschließen; „Record Reviewed Player Assets“; Zusammenführen nach `main`; Wiki nach dem Release. *(Umbenennungen erledigt in M8 Schritt 4.)*
 - **Abhängigkeiten:** alle.
 - **Zuständig:** reviewer (Befunde), frontend (Änderungen), testing (voller Lauf).
 - **Risiken:** Umbenennungen brechen Prüfargumente; deshalb zuletzt.

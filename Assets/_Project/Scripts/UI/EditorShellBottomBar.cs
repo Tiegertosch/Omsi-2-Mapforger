@@ -78,7 +78,7 @@ namespace OmsiMapEditor.UI
                 ApplyBottomBarHeight(evt.newRect.height);
             });
 
-            var close = root.Q<Button>("project-collapse-button");
+            var close = root.Q<Button>("bar-popup-close-button");
             if (close != null)
             {
                 DecorateButton(close, "x", null);
@@ -181,7 +181,7 @@ namespace OmsiMapEditor.UI
             barPopupOpen = show && currentSummary != null;
             if (barPopup != null)
                 barPopup.style.display = barPopupOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            RenderProjectBrowser();
+            RenderBarPopup();
         }
 
         /// <summary>The number of tiles on the tile button, the name on the pill, and which buttons work and which is open.</summary>

@@ -104,7 +104,6 @@
   "export.status.chrono_note": "Der Export enthält die Basiskarte mit deinen Änderungen; Chrono-Varianten bleiben wie im Original in ihren eigenen Ordnern.",
   "export.status.create_failed": "Die Karte konnte nicht angelegt werden: {reason}",
   "export.status.created": "{folder} mit {count} Hilfsdateien aus der Vorlage angelegt; du kannst sie sofort bearbeiten. „Nach OMSI exportieren...“ schreibt deine Änderungen in diesen Ordner; wähle dann in OMSI „{name}“, um sie auszuprobieren.",
-  "export.created_open_failed": "Die Karte wurde in {folder} angelegt, konnte aber nicht geöffnet werden: {reason}",
   "export.target": "{kind, select, inplace {Schreibt deine Änderungen in den eigenen Ordner der Karte, wie sie mit MapWorks erstellt wurde:} replace {Ersetzt den früheren MapWorks-Export in:} other {Legt den Kartenordner an:}}\n{target}\nEnthaltene geänderte Dateien: {count}",
   "export.problem.folder": "Gib einen Ordnernamen ohne Pfadtrenner oder Sonderzeichen ein.",
   "export.problem.name": "Gib den Namen ein, den OMSI für die exportierte Karte zeigt.",

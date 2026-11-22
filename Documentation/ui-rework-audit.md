@@ -22,7 +22,7 @@
   - *Eigenschaften* zeigt der Inspector rechts, nur auf Abruf (`EditorShellInspector.cs`, Gruppen `group-<id>`).
   - *Kontextmenü* per Rechtsklick für Objekt, Mehrfachauswahl, Spline und Kachel (`EditorShellContextMenu.cs:149–241`).
   - *Tasten* in einer Kette in `OnShortcut` (`EditorShellBootstrap.cs:6019–6280`).
-- **Zustand und Datenbindung:** kein Bindungssystem. Nach jeder Auswahl und jeder Änderung zeichnen `RenderInspector` und `RenderProjectBrowser` neu (zusammen rund 48 Aufrufstellen); das Popup zeichnet nur, wenn es offen ist (`:7952`), der Inspector immer.
+- **Zustand und Datenbindung:** kein Bindungssystem. Nach jeder Auswahl und jeder Änderung zeichnen `RenderInspector` und `RenderProjectBrowser` (seit M8 Schritt 4 `RenderBarPopup`) neu (zusammen rund 48 Aufrufstellen); das Popup zeichnet nur, wenn es offen ist (`:7952`), der Inspector immer.
 - **Gespeichert** wird von der Oberfläche wenig: PlayerPrefs für Inspector-Gruppen, Favoriten, Sprache, DLC-Schalter, zuletzt geöffnete Dateien, Updates. Offen/zu von Inspector und Popup wird nicht gespeichert (war es auch vorher nicht).
 
 ## 2. Stand des Reworks (A2)
@@ -32,7 +32,7 @@ Statusangaben nur mit Grundlage; „vom Nutzer getestet“ steht getrennt, weil 
 | Bereich | Status | Grundlage | Nutzertest |
 |---|---|---|---|
 | Untere Leiste (Ansichten, Kachelknopf, Projektpille, Werkzeuge, runde Knöpfe, Statusstreifen) | Completed | `EditorShellBottomBar.cs`, `EditorShell.uxml:36–66`, Commit `cb3a032` | bestätigt (ADR 098, Nachtrag 3) |
-| Popups statt Project-Fenster | Completed | `EditorShellProjectTabs.cs`, `RenderProjectBrowser` `:7941` | bestätigt |
+| Popups statt Project-Fenster | Completed | `EditorShellProjectTabs.cs`, `RenderProjectBrowser` (seit M8 Schritt 4 `RenderBarPopup`) `:7941` | bestätigt |
 | Inspector auf Abruf | Completed | `OpenInspector`, `EditorShell.uxml:17` | bestätigt |
 | Kontextmenü Objekt/Spline/Kachel in der Draufsicht | Completed, mit Fehlern (Abschnitt 5) | `EditorShellContextMenu.cs` | bestätigt, aber Fehler 1, 2, 5 dort nicht aufgefallen |
 | Esc schließt Dialoge und Popup | Completed, mit Nebenwirkung (Abschnitt 5, Punkt 4) | `CloseTopOverlay` `:5994` | bestätigt |
@@ -54,7 +54,7 @@ Statusangaben nur mit Grundlage; „vom Nutzer getestet“ steht getrennt, weil 
 - Versteckt, aber weiter gebaut und beschrieben: `.tool-label`, `.tool-keycap` (`EditorShell.uss:204–205`, `MapToolbar.cs:94–99`), `.status-pointer`, `.status-map-state` (`:549`, `:552`).
 - Vier gekoppelte Abstände zur Leiste: `bottom: 106px` (`EditorShell.uss:115`, `:117`) und `104px` (`:218`, `:649`) gegen `height: 94px` (`:142`).
 - `ShowFoldersLeftOut` zählt und verwirft das Ergebnis (`EditorShellContentFolders.cs:125–135`).
-- UXML-Namen der alten Oberfläche leben weiter: `view-menu-button` heißt *Tools*, `project-collapse-button` ist das X des Popups, `floating-panel*` trägt Inspector, Popup und Luftbild-Fenster.
+- UXML-Namen der alten Oberfläche leben weiter: `view-menu-button` heißt *Tools*, `project-collapse-button` ist das X des Popups, `floating-panel*` trägt Inspector, Popup und Luftbild-Fenster. *(M8 Schritt 4: `view-menu-button` heißt jetzt `tools-menu-button`, `project-collapse-button` heißt `bar-popup-close-button`.)*
 
 **Abweichung vom Gedächtnis früherer Sitzungen:** Dort gilt Etappe 1 als uncommittet und ungetestet. Das Repository zeigt sie committet (`cb3a032`) und ADR 098 als vom Nutzer getestet; maßgeblich ist das Repository.
 

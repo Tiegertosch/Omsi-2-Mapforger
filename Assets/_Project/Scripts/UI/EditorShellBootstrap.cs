@@ -425,7 +425,7 @@ namespace OmsiMapEditor.UI
             newMapDialog.Body.Add(newMapForm);
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
-            var viewMenu = root.Q<VisualElement>("view-menu");
+            var toolsMenu = root.Q<VisualElement>("tools-menu");
             editMenu = root.Q<VisualElement>("edit-menu");
             var inspectorMenuItem = root.Q<Button>("inspector-menu-item");
             var placeObjectMenuItem = root.Q<Button>("place-object-menu-item");
@@ -545,7 +545,7 @@ namespace OmsiMapEditor.UI
             projectPanel = root.Q<VisualElement>("project-panel");
             inspectorPanel = root.Q<VisualElement>("inspector-panel");
             var editButton = root.Q<Button>("edit-menu-button");
-            var viewButton = root.Q<Button>("view-menu-button");
+            var toolsButton = root.Q<Button>("tools-menu-button");
             checkMapMenuItem = root.Q<Button>("check-map-menu-item");
             var roadBuilderMenuItem = root.Q<Button>("road-builder-menu-item");
             var helpButton = root.Q<Button>("help-menu-button");
@@ -638,13 +638,13 @@ namespace OmsiMapEditor.UI
             if (inspectorMenuItem != null)
                 inspectorMenuItem.clicked += () =>
                 {
-                    HidePopup(viewMenu);
+                    HidePopup(toolsMenu);
                     ShowInspector(!inspectorShown);
                 };
-            InitializeSatellite(root, viewMenu);
+            InitializeSatellite(root, toolsMenu);
 
             if (fileButton != null)
-                fileButton.clicked += () => TogglePopup(fileMenu, helpMenu, editMenu, viewMenu);
+                fileButton.clicked += () => TogglePopup(fileMenu, helpMenu, editMenu, toolsMenu);
             if (openMapMenuItem != null)
                 openMapMenuItem.clicked += () =>
                 {
@@ -695,10 +695,10 @@ namespace OmsiMapEditor.UI
                 routesToggleButton.clicked += () => ShowRoutes(mapCanvas != null && !mapCanvas.ShowRoutes);
             }
 
-            if (viewButton != null)
-                viewButton.clicked += () => TogglePopup(viewMenu, fileMenu, helpMenu, editMenu);
+            if (toolsButton != null)
+                toolsButton.clicked += () => TogglePopup(toolsMenu, fileMenu, helpMenu, editMenu);
             if (editButton != null)
-                editButton.clicked += () => TogglePopup(editMenu, fileMenu, helpMenu, viewMenu);
+                editButton.clicked += () => TogglePopup(editMenu, fileMenu, helpMenu, toolsMenu);
             if (placeObjectMenuItem != null)
                 placeObjectMenuItem.clicked += () =>
                 {
@@ -752,19 +752,19 @@ namespace OmsiMapEditor.UI
                 checkMapMenuItem.SetEnabled(false);
                 checkMapMenuItem.clicked += () =>
                 {
-                    HidePopup(viewMenu);
+                    HidePopup(toolsMenu);
                     ValidateLoadedMap();
                 };
             }
             if (roadBuilderMenuItem != null)
                 roadBuilderMenuItem.clicked += () =>
                 {
-                    HidePopup(viewMenu);
+                    HidePopup(toolsMenu);
                     if (currentSummary != null)
                         ShowRoadBuilder(true);
                 };
             if (helpButton != null)
-                helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu, viewMenu);
+                helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu, toolsMenu);
             var wikiMenuItem = root.Q<Button>("wiki-menu-item");
             if (wikiMenuItem != null)
                 wikiMenuItem.clicked += () =>
@@ -2242,7 +2242,7 @@ namespace OmsiMapEditor.UI
             StartRoutesBuild(summary);
             ResetPaths(summary);
             UpdateMapHeader();
-            RenderProjectBrowser();
+            RenderBarPopup();
             RenderInspector();
             UpdateMapStateLabel();
             SetStatusT("map.loaded", ("name", currentSummary.Name), ("tiles", currentSummary.Tiles.Count), ("mode", session.CanEdit ? "project" : "readonly"));
@@ -2407,7 +2407,7 @@ namespace OmsiMapEditor.UI
             if (!ReferenceEquals(variantToDelete, variant))
             {
                 variantToDelete = variant;
-                RenderProjectBrowser();
+                RenderBarPopup();
                 SetStatusT("chrono.status.confirm_delete", ("title", variant.Title));
                 return;
             }
@@ -2425,7 +2425,7 @@ namespace OmsiMapEditor.UI
             if (chronoDate != null)
                 ShowChronoDate(chronoDate);
             else
-                RenderProjectBrowser();
+                RenderBarPopup();
             SetStatusT("chrono.status.deleted", ("title", variant.Title));
         }
 
@@ -2463,7 +2463,7 @@ namespace OmsiMapEditor.UI
             if (session == null || baseSummary == null)
                 return;
             // Another view replaces the one the signals window works on: asked before anything of the new view is begun.
-            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderProjectBrowser))
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderBarPopup))
                 return;
             var generation = ++chronoGeneration;
             projectTab = ProjectTab.Chrono;
@@ -2522,7 +2522,7 @@ namespace OmsiMapEditor.UI
                     return;
                 }
                 // Changes of the signals window made while the view was laid are asked about before the view replaces the crossing.
-                if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderProjectBrowser))
+                if (!SignalToolMayYield(SignalExitKind.ViewChange, () => ShowChrono(date, edit), RenderBarPopup))
                 {
                     RenderInspector();
                     return;
@@ -2554,7 +2554,7 @@ namespace OmsiMapEditor.UI
             StartRoutesBuild(summary, variants);
             ResetPaths(summary);
             UpdateMapHeader();
-            RenderProjectBrowser();
+            RenderBarPopup();
             RenderInspector();
             UpdateMapStateLabel();
         }
@@ -2685,7 +2685,7 @@ namespace OmsiMapEditor.UI
                 if (routes == null)
                     ShowRoutes(false);
                 if (linesChanged)
-                    RenderProjectBrowser();
+                    RenderBarPopup();
             }).Every(150);
         }
 
@@ -8935,7 +8935,7 @@ namespace OmsiMapEditor.UI
         /// Draws the popup of the bottom bar (ADR 098) for the list chosen,<see cref="projectTab"/>; with the popup closed only the
         /// buttons of the bar are brought up to date. Drawing never opens the popup: that is <see cref="ShowProjectTab"/>'s job.
         /// </summary>
-        private void RenderProjectBrowser()
+        private void RenderBarPopup()
         {
             UpdateBarButtons();
             if (projectPanel == null)
@@ -9082,7 +9082,7 @@ namespace OmsiMapEditor.UI
                 var open = new Button(() =>
                 {
                     newVariantFormOpen = true;
-                    RenderProjectBrowser();
+                    RenderBarPopup();
                 }) { text = Loc.T("chrono.new"), tooltip = Loc.T("chrono.new.tooltip")};
                 open.AddToClassList("map-control-button");
                 box.Add(open);
@@ -9123,7 +9123,7 @@ namespace OmsiMapEditor.UI
             var cancel = new Button(() =>
             {
                 newVariantFormOpen = false;
-                RenderProjectBrowser();
+                RenderBarPopup();
             }) { text = Loc.T("chrono.cancel")};
             cancel.AddToClassList("map-control-button");
             cancel.AddToClassList("browser-chrono-row-last");

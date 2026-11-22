@@ -124,8 +124,6 @@
   "export.status.create_failed": "No se pudo crear el mapa: {reason}",
   "@export.status.create_failed": "{reason} is a message from the system, in English",
   "export.status.created": "Creó {folder} con archivos auxiliares {count} de la plantilla; edítelo de inmediato. Exportar a OMSI... escribe sus ediciones en esta carpeta; luego seleccione “{name}” en OMSI para probarlo.",
-  "export.created_open_failed": "El mapa fue creado en {folder}, pero no se pudo abrir: {reason}",
-  "@export.created_open_failed": "{reason} is a message from the system, in English",
   "export.target": "{kind, select, inplace {Escribe tus ediciones en la propia carpeta del mapa, tal como se hizo con MapWorks:} replace {Reemplaza la exportación MapWorks anterior en:} other {Crea la carpeta del mapa:}}\n{target}\nArchivos editados incluidos: {count}",
   "export.problem.folder": "Introduce un nombre de carpeta sin separadores de ruta ni caracteres especiales.",
   "export.problem.name": "Introduce el nombre que mostrará OMSI para el mapa exportado.",

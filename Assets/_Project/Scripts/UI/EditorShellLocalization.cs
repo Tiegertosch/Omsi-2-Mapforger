@@ -20,7 +20,7 @@ namespace OmsiMapEditor.UI
             ("project-empty", "text", "panel.project.empty"),
             ("inspector-title", "text", "panel.inspector.title"),
             ("inspector-empty", "text", "panel.inspector.empty"),
-            ("project-collapse-button", "tooltip", "bar.popup.close"),
+            ("bar-popup-close-button", "tooltip", "bar.popup.close"),
             ("inspector-collapse-button", "tooltip", "panel.inspector.close"),
             ("fit-map-button", "tooltip", "view.fit.tooltip"),
             ("zoom-out-button", "tooltip", "view.zoom_out.tooltip"),
@@ -65,7 +65,7 @@ namespace OmsiMapEditor.UI
         {
             LocBindings.Text(root.Q<Button>("file-menu-button"), "menu.file");
             LocBindings.Text(root.Q<Button>("edit-menu-button"), "menu.edit");
-            LocBindings.Text(root.Q<Button>("view-menu-button"), "menu.tools");
+            LocBindings.Text(root.Q<Button>("tools-menu-button"), "menu.tools");
             LocBindings.Text(root.Q<Button>("help-menu-button"), "menu.help");
             foreach (var (name, attribute, key) in UxmlTexts)
             {
@@ -130,7 +130,7 @@ namespace OmsiMapEditor.UI
             satelliteWindow?.RefreshTexts();
             if (currentSummary != null)
             {
-                RenderProjectBrowser();
+                RenderBarPopup();
                 RenderInspector();
             }
         }

@@ -15,11 +15,51 @@ namespace OmsiMapEditor.UI
         private static readonly (string Menu, string Button, string Argument)[] MenuButtons =
         {
             ("file-menu", "file-menu-button", "file"), ("edit-menu", "edit-menu-button", "edit"),
-            ("view-menu", "view-menu-button", "tools"), ("help-menu", "help-menu-button", "help")
+            ("tools-menu", "tools-menu-button", "tools"), ("help-menu", "help-menu-button", "help")
         };
+
+        /// <summary>
+        /// A press outside the open menu closes it and goes no further, as in Windows (M8 step 4, after the owner's hand test): the map
+        /// selects nothing, no tool acts. Not closed by it: a press inside the menu and one on a button of the menu bar, which toggles
+        /// (its own menu closes, another one replaces the open one). Any mouse button counts. The rule is separate for the test.
+        /// </summary>
+        internal static bool PressClosesBarMenu(bool anyMenuOpen, bool insideOpenMenu, bool onMenuBarButton)
+        {
+            return anyMenuOpen && !insideOpenMenu && !onMenuBarButton;
+        }
+
+        private static bool IsSelfOrInside(VisualElement container, VisualElement element)
+        {
+            return container != null && element != null && (ReferenceEquals(container, element) || container.Contains(element));
+        }
+
+        private void OnPressOutsideBarMenu(PointerDownEvent evt, VisualElement root)
+        {
+            var target = evt.target as VisualElement;
+            var anyOpen = false;
+            var inside = false;
+            var onButton = false;
+            foreach (var (menuName, buttonName, _) in MenuButtons)
+            {
+                var menu = root.Q<VisualElement>(menuName);
+                if (IsShown(menu))
+                {
+                    anyOpen = true;
+                    inside |= IsSelfOrInside(menu, target);
+                }
+                onButton |= IsSelfOrInside(root.Q<VisualElement>(buttonName), target);
+            }
+            if (!PressClosesBarMenu(anyOpen, inside, onButton))
+                return;
+            foreach (var (menuName, _, _) in MenuButtons)
+                HidePopup(root.Q<VisualElement>(menuName));
+            evt.StopPropagation();
+            evt.PreventDefault();
+        }
 
         private void SetUpMenuPlacement(VisualElement root)
         {
+            root.RegisterCallback<PointerDownEvent>(evt => OnPressOutsideBarMenu(evt, root), TrickleDown.TrickleDown);
             foreach (var (menuName, buttonName, _) in MenuButtons)
             {
                 var menu = root.Q<VisualElement>(menuName);

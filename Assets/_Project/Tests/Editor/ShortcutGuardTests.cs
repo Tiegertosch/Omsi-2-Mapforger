@@ -67,5 +67,15 @@ namespace OmsiMapEditor.Tests
         {
             Assert.That(EditorShellBootstrap.KeepsContextMenu(key), Is.False);
         }
+
+        [TestCase(true, false, false, true)]  // map, bar or other surface outside the open menu: close and consume
+        [TestCase(true, true, false, false)]  // inside the menu: as before
+        [TestCase(true, false, true, false)]  // a menu bar button: it toggles (closes its own menu, replaces another)
+        [TestCase(false, false, false, false)] // no menu open: nothing to close
+        [TestCase(false, false, true, false)]
+        public void APressClosesTheOpenBarMenuOnlyOutsideItAndOffTheMenuButtons(bool anyOpen, bool inside, bool onButton, bool closes)
+        {
+            Assert.That(EditorShellBootstrap.PressClosesBarMenu(anyOpen, inside, onButton), Is.EqualTo(closes));
+        }
     }
 }

@@ -58,7 +58,7 @@ namespace OmsiMapEditor.UI
                 StartPathsBuild(currentSummary);
             if (pathsShown)
                 SetStatus(DescribePaths());
-            RenderProjectBrowser();
+            RenderBarPopup();
             RenderInspector();
         }
 
@@ -120,7 +120,7 @@ namespace OmsiMapEditor.UI
                 {
                     if (announce)
                         SetStatus(DescribePaths());
-                    RenderProjectBrowser();
+                    RenderBarPopup();
                     RenderInspector();
                     if (openPathsGroupWhenRead)
                     {
@@ -205,7 +205,7 @@ namespace OmsiMapEditor.UI
                 return;
             PushHistory(new ObjectEditStep { SplineChange = change });
             RefreshSplineViews(change);
-            RenderProjectBrowser();
+            RenderBarPopup();
             SetStatusT("paths.release.done", ("count", change.SplineIds.Count));
         }
 
@@ -232,7 +232,7 @@ namespace OmsiMapEditor.UI
                     shownPathKinds[captured] = !shownPathKinds[captured];
                     mapCanvas?.SetPathKinds(shownPathKinds[0], shownPathKinds[1], shownPathKinds[2]);
                     openEndCursor = -1;
-                    RenderProjectBrowser();
+                    RenderBarPopup();
                 })
                 {
                     text = Loc.T("paths.entry", ("kind", Loc.T(PathKindNames[kind])), ("count", ofKind.Count), ("open", open)), // i18n:keys
@@ -298,7 +298,7 @@ namespace OmsiMapEditor.UI
             else if (tile != null && tile.Objects.Find(item => item.Id == path.ElementId) is OmsiObjectRecord item)
                 SelectObject(tile, item, false);
             mapCanvas.CenterOnWorld(point);
-            RenderProjectBrowser();
+            RenderBarPopup();
             SetStatus(Loc.T("paths.status.open_end", ("n", openEndCursor + 1), ("total", ends.Count), ("which", ends[openEndCursor].Value ? "start" : "end"),
                 ("path", path.PathIndex), ("kind", path.OnSpline ? "spline" : "object"), ("id", path.ElementId), ("tileX", path.TileX), ("tileY", path.TileY),
                 ("noun", PathKindNoun(path.Kind))));

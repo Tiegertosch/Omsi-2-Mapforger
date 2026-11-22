@@ -4,7 +4,6 @@
   "labels.change_type": "Change type...",
   "labels.change_type.tooltip": "Choose another object file for it in the library; its place and labels stay",
   "labels.heading": "Labels",
-  "labels.line": "Line {n}",
   "labels.note.own": "Added by {variant}: its own record changes.",
   "@labels.note.own": "{variant} is the name of the chrono variant, shown unchanged",
   "labels.note.other": "A new type or new labels are written into {variant} ([selobject] with [typ] or [relabel]); the {origin, select, variant {variant that adds it} other {base map}} keeps its own.",

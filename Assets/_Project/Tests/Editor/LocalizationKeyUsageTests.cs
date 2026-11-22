@@ -73,16 +73,11 @@ namespace OmsiMapEditor.Tests
         }
 
         /// <summary>
-        /// Texts in locales/en-US that no code asks for. M8 step 0 made them a ceiling that may only fall; M8 step 3 deletes them in all
-        /// eight languages and sets this to 0 (owner's decision 5A of 22 November 2026: an orphan is a failure, no list of exceptions).
-        /// M8 steps 1 and 2 freed 10 <c>canvas.*</c> texts (the hidden pointer label is gone) and 12 <c>toolbar.*</c> names (no labels on the tool buttons).
-        /// Today: the 37 texts of the "New trip" dialog that is gone since 11 November 2026 (bbc8304), and 10 others of removed panels. The scanner
-        /// does not see a 48th, <c>context.properties.tooltip</c> (it looks like the suffix ".tooltip" of a key the code asks for); M8 step 3 deletes it too.
+        /// A text in locales/en-US that no code asks for is a failure, without a list of exceptions (owner's decision 5A of 22 November 2026;
+        /// M8 step 3 deleted the last 70 from all eight languages). Delete the text and its translator note from every language, or use it.
         /// </summary>
-        private const int UnusedKeyCeiling = 69;
-
         [Test]
-        public void TextsNoCodeAsksForDoNotGrow()
+        public void NoTextIsLeftThatNoCodeAsksFor()
         {
             var english = LocaleLoader.Load(English());
             var areas = new HashSet<string>(english.Messages.Keys.Select(key => key.Substring(0, key.IndexOf('.'))), StringComparer.Ordinal);
@@ -90,10 +85,8 @@ namespace OmsiMapEditor.Tests
             var composed = ComposedParts();
             var unused = english.Messages.Keys.Where(key => !used.Contains(key) && !IsBuiltFromParts(key, used, composed)).OrderBy(key => key, StringComparer.Ordinal).ToList();
 
-            Assert.LessOrEqual(unused.Count, UnusedKeyCeiling,
-                unused.Count + " texts in locales/en-US are asked for by no code (ceiling " + UnusedKeyCeiling + "): " + string.Join(", ", unused)
-                + ". Delete them from all eight languages, or use them. If you removed some, lower UnusedKeyCeiling to " + unused.Count + ".");
-            TestContext.WriteLine("keys: " + english.Messages.Count + "; unused: " + unused.Count + " (" + string.Join(", ", unused) + ")");
+            Assert.IsEmpty(unused, unused.Count + " texts in locales/en-US are asked for by no code: " + string.Join(", ", unused)
+                + ". Delete them (and their @notes) from all eight languages, or use them.");
         }
 
         [Test]

@@ -1,5 +1,4 @@
 {
-  "toolbar.line": "Linia",
   "toolbar.line.tooltip": "Linia (B): Klikaj przystanki linii w kolejności, w jakiej obsługuje je autobus; droga po ulicach mapy pojawia się od razu. Kurs powrotny zrób z innych przystanków, zamknij pętlę, poprowadź drogę inną ulicą punktami przejazdu i zapisz linię.",
   "readonly.action.make_lines": "tworzyć linie",
   "line.hint": "Kliknij kolejny przystanek w kolejności kursu.",

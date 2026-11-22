@@ -1,5 +1,4 @@
 {
-  "toolbar.line": "Línea",
   "toolbar.line.tooltip": "Línea (B): Haz clic en las paradas de una línea en el orden en que el autobús las atiende; el camino por las calles del mapa aparece al instante. Haz la vuelta con otras paradas, cierra un anillo, lleva el camino por otra calle con puntos de paso y guarda la línea.",
   "readonly.action.make_lines": "crear líneas",
   "line.hint": "Haz clic en la siguiente parada en el orden del recorrido.",

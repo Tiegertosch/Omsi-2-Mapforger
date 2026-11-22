@@ -132,8 +132,6 @@
   "export.status.create_failed": "Could not create the map: {reason}",
   "@export.status.create_failed": "{reason} is a message from the system, in English",
   "export.status.created": "Created {folder} with {count} helper files from the template; edit it right away. Export to OMSI... writes your edits into this folder; then select “{name}” in OMSI to try it.",
-  "export.created_open_failed": "The map was created in {folder}, but it could not be opened: {reason}",
-  "@export.created_open_failed": "{reason} is a message from the system, in English",
   "export.target": "{kind, select, inplace {Writes your edits into the map's own folder, as it was made with MapWorks:} replace {Replaces the earlier MapWorks export in:} other {Creates the map folder:}}\n{target}\nEdited files included: {count}",
   "export.problem.folder": "Enter a folder name without path separators or special characters.",
   "export.problem.name": "Enter the name OMSI shows for the exported map.",

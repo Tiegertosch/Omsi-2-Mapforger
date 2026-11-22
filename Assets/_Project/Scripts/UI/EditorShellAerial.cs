@@ -58,7 +58,7 @@ namespace OmsiMapEditor.UI
         // Tiles added while "New tiles get pictures by themselves" is ticked, by position, waiting for the load running now.
         private readonly List<KeyValuePair<int, int>> autoTiles = new List<KeyValuePair<int, int>>();
 
-        private void InitializeSatellite(VisualElement root, VisualElement viewMenu)
+        private void InitializeSatellite(VisualElement root, VisualElement toolsMenu)
         {
             ReadImageryPreferences();
             tileFetcher.Keys = name => imageryPreferences.Key(name);
@@ -251,7 +251,7 @@ namespace OmsiMapEditor.UI
             if (menuItem != null)
                 menuItem.clicked += () =>
                 {
-                    HidePopup(viewMenu);
+                    HidePopup(toolsMenu);
                     OpenSatelliteWindow();
                 };
         }

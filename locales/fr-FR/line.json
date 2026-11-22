@@ -1,5 +1,4 @@
 {
-  "toolbar.line": "Ligne",
   "toolbar.line.tooltip": "Ligne (B) : Clique sur les arrêts d'une ligne dans l'ordre où le bus les dessert ; le chemin sur les routes de la carte s'affiche aussitôt. Fais le retour par d'autres arrêts, ferme une boucle, mène le chemin par une autre route avec des points de passage et enregistre la ligne.",
   "readonly.action.make_lines": "créer des lignes",
   "line.hint": "Cliquez sur l'arrêt suivant dans l'ordre de desserte.",

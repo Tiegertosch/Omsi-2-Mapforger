@@ -124,8 +124,6 @@
   "export.status.create_failed": "Nelze vytvořit mapu: {reason}",
   "@export.status.create_failed": "{reason} is a message from the system, in English",
   "export.status.created": "Vytvořeno {folder} s pomocnými soubory {count} ze šablony; hned upravit. Export do OMSI... zapíše vaše úpravy do této složky; poté vyberte „{name}“ v OMSI a vyzkoušejte to.",
-  "export.created_open_failed": "Mapa byla vytvořena v {folder}, ale nebylo možné ji otevřít: {reason}",
-  "@export.created_open_failed": "{reason} is a message from the system, in English",
   "export.target": "{kind, select, inplace {Zapíše vaše úpravy do vlastní složky mapy, jak to bylo vytvořeno pomocí MapWorks:} replace {Nahrazuje dřívější export MapWorks v:} other {Vytvoří složku mapy:}}\n{target}\nZahrnuty upravené soubory: {count}",
   "export.problem.folder": "Zadejte název složky bez oddělovačů cest a speciálních znaků.",
   "export.problem.name": "Zadejte název exportované mapy, který zobrazí OMSI.",
