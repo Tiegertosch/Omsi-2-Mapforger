@@ -1374,7 +1374,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 085: Ampelschaltungen – Datenmodell, Lesen und Schreiben (Meilenstein 1)
 
-**Status:** Angenommen für Meilenstein 1, 10. November 2026 (Entwicklungsauftrag „Visueller Ampelphasen-Editor“ des Nutzers). Exportstrategie vom Nutzer entschieden: zuerst nur von MapWorks erzeugte Kreuzungen bearbeiten (siehe unten). Formatbefund: `Documentation/TrafficSignalInventory.md`.
+**Status:** Angenommen für Meilenstein 1, 10. November 2026 (Entwicklungsauftrag „Visueller Ampelphasen-Editor“ des Nutzers). Exportstrategie vom Nutzer entschieden: zuerst nur von MapWorks erzeugte Kreuzungen bearbeiten (siehe unten). Formatbefund: `Documentation/TrafficSignalInventory.md`. Nachtrag 22. November 2026: Meilensteine 1 bis 6 vom Projektinhaber getestet und auf `main`; der Zweig `feature/traffic-signals` ist gelöscht.
 
 **Befund:** Eine Ampelschaltung steht im Kreuzungsobjekt (`.sco`) und gilt für jede Platzierung dieses Typs; die Köpfe sind Kachelobjekte mit `[trafficlight]`, `[varparent]` auf die Kreuzung und der Lichtnummer als erster Beschriftung; Fahrzeuge folgen über `[use_traffic_light]` an ihren Pfaden. openOMSI startet ein Programm nur, wenn ein Kopf die Kreuzung nennt. Der Zustand ist ein Rohwert, den jedes Kopfskript anders deutet.
 
@@ -1452,7 +1452,7 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 
 ## ADR 086: Fußgängerüberwege an erzeugten Kreuzungen (Schritt 1: nur Pfade)
 
-**Status:** Angenommen, 11. November 2026, Wunsch des Nutzers (Zweig `feature/pedestrian-crossings`). Bisher hatten erzeugte Kreuzungen Fußwege nur um die Ecken; über die Fahrbahn eines Arms führte kein Pfad, Menschen und KI konnten die Straßenseite nicht wechseln. Schritte 1 bis 5 sind vom Nutzer in openOMSI getestet (11. November 2026).
+**Status:** Angenommen, 11. November 2026, Wunsch des Nutzers (Zweig `feature/pedestrian-crossings`). Bisher hatten erzeugte Kreuzungen Fußwege nur um die Ecken; über die Fahrbahn eines Arms führte kein Pfad, Menschen und KI konnten die Straßenseite nicht wechseln. Schritte 1 bis 5 sind vom Nutzer in openOMSI getestet (11. November 2026). Nachtrag 22. November 2026: Der Projektinhaber hat den Stand bestätigt; der Zweig `feature/pedestrian-crossings` ist auf `main` und gelöscht.
 
 **Befund aus openOMSIs Quelltext** (`omsi-sim/src/people/pednet.rs`, `walk_path.rs`, `traffic/lights.rs`):
 - Fußgängerpfade (Art 1) bilden ein eigenes Netz: Pfadenden näher als 1,2 m sind **ein Knoten, gleich welche Richtung** (Fahrzeugpfade verbinden nur bei gleicher Richtung); ein Pfadende kann auch mitten in einen anderen Pfad münden (Abstand zu dessen Enden mindestens 0,3 m).
