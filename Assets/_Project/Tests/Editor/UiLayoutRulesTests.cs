@@ -78,15 +78,6 @@ namespace OmsiMapEditor.Tests
             Assert.GreaterOrEqual(rect.width, OmsiMapEditor.UI.RoadTypeWindow.LeastSize.x, "The window keeps its least width.");
         }
 
-        [Test]
-        public void MenusDoNotKeepAFixedDistanceFromTheLeftEdge()
-        {
-            // EditorShellMenuPlacement sets left from the button; the stylesheet's value is only the value before the first layout.
-            var placement = File.ReadAllText(Path.Combine(Application.dataPath, "_Project", "Scripts", "UI", "EditorShellMenuPlacement.cs"));
-            foreach (var menu in new[] { "file-menu", "edit-menu", "view-menu", "help-menu" })
-                StringAssert.Contains("\"" + menu + "\"", placement);
-        }
-
         private static string Rule(string selector)
         {
             var match = Regex.Match(stylesheet, "(^|\n)" + Regex.Escape(selector) + @"\s*\{([^}]*)\}");

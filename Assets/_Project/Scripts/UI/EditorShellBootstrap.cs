@@ -910,11 +910,50 @@ namespace OmsiMapEditor.UI
             UpdateZoomLabel();
             SetStatusT(mapCanvas.ThreeDimensional ? "view.status.3d" : "view.status.top") /* i18n:keys */;
             viewStatusUntil = Time.unscaledTime + ViewStatusSeconds;
+            // A report held back from an earlier switch now waits until this later end.
+            if (deferredLoadReport != null)
+                ScheduleDeferredReport();
         }
 
         private const float ViewStatusSeconds = 6f;
         private float viewStatusUntil;
         private string deferredLoadReport;
+        private IVisualElementScheduledItem deferredReportTimer;
+
+        /// <summary>The milliseconds until a held-back report may show: the rest of the view sentence's time plus a little.</summary>
+        internal static long DeferredReportDelayMs(float until, float now)
+        {
+            return (long)(Mathf.Max(0f, until - now) * 1000f) + 50;
+        }
+
+        /// <summary>Sets the one timer of the held-back report to the current end of the view sentence (starts it, or moves it).</summary>
+        private void ScheduleDeferredReport()
+        {
+            if (rootElement == null)
+            {
+                deferredLoadReport = null;
+                return;
+            }
+            var delay = DeferredReportDelayMs(viewStatusUntil, Time.unscaledTime);
+            if (deferredReportTimer == null)
+                deferredReportTimer = rootElement.schedule.Execute(ShowDeferredReport);
+            deferredReportTimer.ExecuteLater(delay);
+        }
+
+        private void ShowDeferredReport()
+        {
+            // A view switch since the timer was set may have moved the end: wait again instead of cutting the sentence short.
+            if (deferredLoadReport != null && Time.unscaledTime < viewStatusUntil)
+            {
+                ScheduleDeferredReport();
+                return;
+            }
+            // Whatever the status says by now wins over the held report; either way nothing stays held.
+            var pending = deferredLoadReport;
+            deferredLoadReport = null;
+            if (pending != null && (statusKey == "view.status.3d" || statusKey == "view.status.top"))
+                SetStatus(pending);
+        }
 
         /// <summary>
         /// A renderer says it has loaded. Right after a switch between the views the sentence of the view stays for a few seconds
@@ -927,16 +966,8 @@ namespace OmsiMapEditor.UI
                 SetStatus(report);
                 return;
             }
-            var first = deferredLoadReport == null;
             deferredLoadReport = report;
-            if (first)
-                rootElement?.schedule.Execute(() =>
-                {
-                    var pending = deferredLoadReport;
-                    deferredLoadReport = null;
-                    if (pending != null && (statusKey == "view.status.3d" || statusKey == "view.status.top"))
-                        SetStatus(pending);
-                }).StartingIn((long)(Mathf.Max(0f, viewStatusUntil - Time.unscaledTime) * 1000f) + 50);
+            ScheduleDeferredReport();
         }
 
         private void ToggleGround()

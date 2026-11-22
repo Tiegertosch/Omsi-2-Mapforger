@@ -135,13 +135,13 @@ namespace OmsiMapEditor.UI
         private static readonly CustomStyleProperty<Color> QuietRouteProperty = new CustomStyleProperty<Color>("--map-route-quiet");
 
         private Color tileColor = Hex(0x202630);
-        private Color missingTileColor = Mix(Hex(0x202630), Hex(0xE06464), 0.3f);
+        private Color missingTileColor = Mix(Hex(0x202630), Hex(0xEA7676), 0.3f);
         private Color tileBorderColor = Hex(0x414B59);
         private Color selectedTileColor = Hex(0xF08A32);
         private Color warningColor = Hex(0xE6B450);
         private Color errorColor = Hex(0xEA7676);
         private Color pathRailColor = Hex(0xB48EDB);
-        private static Color selectionHaloColor = Hex(0x171C23, 0.85f);
+        private Color selectionHaloColor = Hex(0x171C23, 0.85f);
         private Color splineColor = Hex(0xF08A32, 0.95f);
         private Color quietSplineColor = Hex(0xF08A32, 0.5f);
         private Color32 objectColor = Hex(0x65A9D9, 0.95f);
@@ -255,6 +255,9 @@ namespace OmsiMapEditor.UI
         private IReadOnlyDictionary<string, OmsiSplineLineKind> splineLineKinds = new Dictionary<string, OmsiSplineLineKind>();
 
         private readonly List<SplinePath> splines = new List<SplinePath>();
+
+        /// <summary>The path of each spline record, found by reference: a selection of thousands must not search the list for each.</summary>
+        private readonly Dictionary<OmsiSplineRecord, SplinePath> splineByRecord = new Dictionary<OmsiSplineRecord, SplinePath>();
 
         /// <summary>A lane that timetable lines drive, once however many lines share it.</summary>
         private sealed class RouteLane
@@ -1215,6 +1218,7 @@ namespace OmsiMapEditor.UI
         public void RefreshSplines()
         {
             splines.Clear();
+            splineByRecord.Clear();
             splineRibbons = null;
             if (summary != null)
                 foreach (var tile in summary.Tiles)
@@ -1528,6 +1532,7 @@ namespace OmsiMapEditor.UI
         private void BuildCaches()
         {
             splines.Clear();
+            splineByRecord.Clear();
             splineRibbons = null;
             mapBounds = Rect.zero;
             if (summary == null || summary.Tiles.Count == 0)
@@ -1571,11 +1576,13 @@ namespace OmsiMapEditor.UI
                 bounds.yMax = Mathf.Max(bounds.yMax, points[index].y);
             }
             splineLineKinds.TryGetValue(spline.AssetPath ?? string.Empty, out var lineKind);
-            splines.Add(new SplinePath
+            var path = new SplinePath
             {
                 Tile = tile, Record = spline, AssetPath = spline.AssetPath, Points = points, Bounds = bounds, LineKind = lineKind,
                 StartHeight = (float)spline.Height, EndHeight = (float)spline.EndHeight
-            });
+            };
+            splines.Add(path);
+            splineByRecord[spline] = path;
         }
 
         private Vector2 ToMap(OmsiTileSummary tile, double localX, double localY)
@@ -1875,22 +1882,36 @@ namespace OmsiMapEditor.UI
 
         private void DrawSelectedSpline(Painter2D painter)
         {
-            foreach (var more in moreSelectedSplines)
+            if (moreSelectedSplines.Count > 0)
             {
-                var line = splines.Find(candidate => ReferenceEquals(candidate.Record, more));
-                if (line == null)
-                    continue;
+                // All further selected splines go into few strokes, each with one halo, instead of two strokes each.
                 painter.strokeColor = selectedObjectColor;
                 painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
                 painter.lineCap = LineCap.Round;
                 painter.lineJoin = LineJoin.Round;
-                StrokePolyline(painter, line.Points, true);
+                painter.BeginPath();
+                var segments = 0;
+                foreach (var more in moreSelectedSplines)
+                {
+                    if (!splineByRecord.TryGetValue(more, out var line))
+                        continue;
+                    segments += AddPolyline(painter, line.Points);
+                    if (segments >= StrokeSegments)
+                    {
+                        StrokeHaloed(painter, true);
+                        painter.BeginPath();
+                        segments = 0;
+                    }
+                }
+                if (segments > 0)
+                    StrokeHaloed(painter, true);
             }
-            if (selectedSpline == null)
+            if (selectedSpline == null || !splineByRecord.TryGetValue(selectedSpline, out var path))
                 return;
-            var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
-            if (path == null)
-                return;
+            painter.strokeColor = selectedObjectColor;
+            painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
+            painter.lineCap = LineCap.Round;
+            painter.lineJoin = LineJoin.Round;
             painter.strokeColor = selectedObjectColor;
             painter.lineWidth = Mathf.Clamp(6f / metersPerPixel, 1.5f, 6f) + 3f;
             painter.lineCap = LineCap.Round;
@@ -1933,8 +1954,7 @@ namespace OmsiMapEditor.UI
         {
             if (!SplineHandlesShown)
                 return null;
-            var path = splines.Find(candidate => ReferenceEquals(candidate.Record, selectedSpline));
-            if (path == null)
+            if (!splineByRecord.TryGetValue(selectedSpline, out var path))
                 return null;
             if (Vector2.Distance(screen, MapToScreen(path.Points[path.Points.Length - 1])) <= HandleRadius + 3f)
                 return SplineHandleKind.End;
@@ -2232,8 +2252,18 @@ namespace OmsiMapEditor.UI
             if (points.Length < 2)
                 return;
             painter.BeginPath();
+            AddPolyline(painter, points);
+            StrokeHaloed(painter, haloed);
+        }
+
+        /// <summary>Adds a polyline to the current path, leaving out points less than a pixel from the last one; the segments added.</summary>
+        private int AddPolyline(Painter2D painter, Vector2[] points)
+        {
+            if (points.Length < 2)
+                return 0;
             var last = MapToScreen(points[0]);
             painter.MoveTo(last);
+            var segments = 0;
             for (var index = 1; index < points.Length; index++)
             {
                 var point = MapToScreen(points[index]);
@@ -2241,8 +2271,9 @@ namespace OmsiMapEditor.UI
                     continue;
                 painter.LineTo(point);
                 last = point;
+                segments++;
             }
-            StrokeHaloed(painter, haloed);
+            return segments;
         }
 
         private static void AddCircle(Painter2D painter, Vector2 center, float radius)
@@ -3853,10 +3884,14 @@ namespace OmsiMapEditor.UI
             painter.lineWidth = 4f;
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
-            foreach (var path in splines)
+            var shown = new List<SplinePath>(moreSelectedSplines.Count + 1);
+            if (selectedSpline != null && splineByRecord.TryGetValue(selectedSpline, out var main))
+                shown.Add(main);
+            foreach (var more in moreSelectedSplines)
+                if (!ReferenceEquals(more, selectedSpline) && splineByRecord.TryGetValue(more, out var other))
+                    shown.Add(other);
+            foreach (var path in shown)
             {
-                if (!ReferenceEquals(path.Record, selectedSpline) && !moreSelectedSplines.Contains(path.Record))
-                    continue;
                 var lift = path.Ribbon != null ? (float)path.Ribbon.Lift : 0f;
                 var last = path.Points.Length - 1;
                 var heights = new List<Vector3>(path.Points.Length);
@@ -3874,7 +3909,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Draws a line through world points, leaving gaps where points lie behind the camera.</summary>
-        private static void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points, bool haloed = false)
+        private void StrokeWorldLine(Painter2D painter, MapOrbitCamera camera, IEnumerable<Vector3> points, bool haloed = false)
         {
             painter.BeginPath();
             var open = false;
@@ -3993,7 +4028,7 @@ namespace OmsiMapEditor.UI
         /// Strokes the current path; with <paramref name="haloed"/> a dark, wider stroke goes under it first, so a light
         /// selection stays visible over a bright aerial image as well as over the dark ground (ADR 098, M6 step 6).
         /// </summary>
-        private static void StrokeHaloed(Painter2D painter, bool haloed)
+        private void StrokeHaloed(Painter2D painter, bool haloed)
         {
             if (haloed)
             {
@@ -4008,7 +4043,7 @@ namespace OmsiMapEditor.UI
             painter.Stroke();
         }
 
-        private static void DrawBoundingBox(Painter2D painter, MapOrbitCamera camera, Matrix4x4 frame, Bounds bounds)
+        private void DrawBoundingBox(Painter2D painter, MapOrbitCamera camera, Matrix4x4 frame, Bounds bounds)
         {
             var corners = new Vector2[8];
             var visible = new bool[8];

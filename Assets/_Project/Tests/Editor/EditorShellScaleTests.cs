@@ -99,5 +99,33 @@ namespace OmsiMapEditor.Tests
             StringAssert.Contains("scale=1.222", line);
             StringAssert.Contains("clamped from 2", line);
         }
+
+        [Test]
+        public void ScaleIsCalculatedAgainWhenWidthOrDpiChanges()
+        {
+            Assert.IsFalse(EditorShellScale.NeedsRecalculation(1600f, 96f, 1600f, 96f));
+            Assert.IsTrue(EditorShellScale.NeedsRecalculation(1600f, 96f, 1500f, 96f));
+            Assert.IsTrue(EditorShellScale.NeedsRecalculation(1600f, 96f, 1600f, 144f), "a window moved to a screen with another dpi");
+        }
+
+        [Test]
+        public void MenuWaitsForItsWidthAndStaysInsideTheWindow()
+        {
+            Assert.IsNull(EditorShellBootstrap.MenuLeft(100f, 1000f, float.NaN));
+            Assert.AreEqual(100f, EditorShellBootstrap.MenuLeft(100f, 1000f, 200f).Value, 0.001f);
+            Assert.AreEqual(796f, EditorShellBootstrap.MenuLeft(900f, 1000f, 200f).Value, 0.001f);
+            Assert.AreEqual(4f, EditorShellBootstrap.MenuLeft(-20f, 1000f, 200f).Value, 0.001f);
+            Assert.AreEqual(4f, EditorShellBootstrap.MenuLeft(300f, 150f, 200f).Value, 0.001f, "a menu wider than the window keeps its left margin");
+            Assert.AreEqual(796f, EditorShellBootstrap.MenuLeft(796f, 1000f, 200f).Value, 0.001f, "exactly at the right margin");
+            Assert.IsNull(EditorShellBootstrap.MenuLeft(float.NaN, 1000f, 200f));
+            Assert.IsNull(EditorShellBootstrap.MenuLeft(100f, float.NaN, 200f));
+        }
+
+        [Test]
+        public void HeldBackReportWaitsForTheRestOfTheViewSentence()
+        {
+            Assert.AreEqual(2050L, EditorShellBootstrap.DeferredReportDelayMs(10f, 8f));
+            Assert.AreEqual(50L, EditorShellBootstrap.DeferredReportDelayMs(10f, 12f), "an elapsed time does not give a negative delay");
+        }
     }
 }

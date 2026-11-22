@@ -137,5 +137,19 @@ namespace OmsiMapEditor.Tests
             lanes.ShowJunction("Junction #3: 4 arms, 2 of 6 ways through.");
             Assert.That(hint, Is.EqualTo("Junction #3: 4 arms, 2 of 6 ways through."));
         }
+
+        [Test]
+        public void LineSaysNothingWithoutAStopExceptForAnEditedTripAndTheResult()
+        {
+            Loc.Manager = Manager("en-US");
+            Assert.That(LineToolPanel.HintText(string.Empty, null, 0), Is.Empty, "no trip and no stop: the list says what to click");
+            var banner = LineToolPanel.HintText(string.Empty, "Line 7 / 06:00", 0);
+            Assert.That(banner, Is.Not.Empty);
+            StringAssert.Contains("Line 7 / 06:00", banner);
+            Assert.That(LineToolPanel.HintText(string.Empty, "Line 7 / 06:00", 2), Is.EqualTo(Loc.T("line.hint")), "from the first stop on, the hint");
+            Assert.That(LineToolPanel.HintText(string.Empty, null, 1), Is.EqualTo(Loc.T("line.hint")));
+            Assert.That(LineToolPanel.HintText(string.Empty, null, 1), Is.Not.Empty);
+            Assert.That(LineToolPanel.HintText("No way between the stops.", "Line 7", 3), Is.EqualTo("No way between the stops."), "a result wins");
+        }
     }
 }

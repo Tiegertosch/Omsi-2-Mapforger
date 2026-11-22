@@ -35,11 +35,12 @@ namespace OmsiMapEditor.UI
         {
             if (toolHintLabel == null)
                 return;
-            if (!toolHintFitRegistered)
+            // The parent may be missing at the first call; the flag is set only when both callbacks are in place.
+            if (!toolHintFitRegistered && toolHintLabel.parent != null)
             {
                 toolHintFitRegistered = true;
                 toolHintLabel.RegisterCallback<GeometryChangedEvent>(_ => FitToolHint());
-                toolHintLabel.parent?.RegisterCallback<GeometryChangedEvent>(_ => FitToolHint());
+                toolHintLabel.parent.RegisterCallback<GeometryChangedEvent>(_ => FitToolHint());
             }
             var text = string.Empty;
             var warning = false;
@@ -93,9 +94,10 @@ namespace OmsiMapEditor.UI
             if (float.IsNaN(wanted) || wanted <= 0f)
                 return;
             // The bar gives the hint at most this share; a percentage max-width in the style sheet came out at about 300 px here.
-            var bar = toolHintLabel.parent.layout.width;
-            if (bar > 0f)
-                wanted = UnityEngine.Mathf.Min(wanted, UnityEngine.Mathf.Floor(bar * MaxHintShare));
+            var bar = toolHintLabel.parent?.layout.width ?? 0f;
+            if (float.IsNaN(bar) || bar <= 0f)
+                return; // The bar has no width yet; its next GeometryChangedEvent calls this again.
+            wanted = UnityEngine.Mathf.Min(wanted, UnityEngine.Mathf.Floor(bar * MaxHintShare));
             var current = toolHintLabel.style.width;
             if (current.keyword == StyleKeyword.Undefined && UnityEngine.Mathf.Abs(current.value.value - wanted) < 0.5f)
                 return;

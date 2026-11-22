@@ -93,6 +93,7 @@
 
 /* Menus and popups */
 .menu-popup { position: absolute; top: 38px; min-width: 230px; max-height: 86%; padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); display: none; }
+/* The left values are only the first frame before layout; EditorShellMenuPlacement then sets each menu under its button. */
 .file-menu { left: 168px; }
 .edit-menu { left: 222px; }
 .view-menu { left: 276px; }

@@ -306,6 +306,21 @@ namespace OmsiMapEditor.UI
     /// <summary>What the signals window shows, decided from the state of the tool; pure rules without the window.</summary>
     internal static class SignalWindowRules
     {
+        /// <summary>
+        /// What the footer says: nothing without a crossing, else the question that waits for a second click, else why the crossing is
+        /// only read, else the state of the draft.
+        /// </summary>
+        public static string FooterText(bool hasCrossing, string confirmText, SignalChangeState state, string readOnlyReason, string unapplied, string applied)
+        {
+            if (!hasCrossing)
+                return string.Empty;
+            if (!string.IsNullOrEmpty(confirmText))
+                return confirmText;
+            if (state == SignalChangeState.ReadOnly)
+                return readOnlyReason ?? string.Empty;
+            return state == SignalChangeState.Unapplied ? unapplied : applied;
+        }
+
         /// <summary>The area a page belongs to.</summary>
         public static SignalArea AreaOf(SignalTab page)
         {

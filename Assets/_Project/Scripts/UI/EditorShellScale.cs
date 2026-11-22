@@ -108,13 +108,24 @@ namespace OmsiMapEditor.UI
         /// <summary>The user's "Interface size" in percent from the preferences (100 when never set).</summary>
         public static int LoadUserPercent()
         {
-            return NormalizePercent(PlayerPrefs.GetInt(UserPercentKey, DefaultUserPercent));
+            if (!cachedUserPercent.HasValue)
+                cachedUserPercent = NormalizePercent(PlayerPrefs.GetInt(UserPercentKey, DefaultUserPercent));
+            return cachedUserPercent.Value;
         }
 
         public static void SaveUserPercent(int percent)
         {
             PlayerPrefs.SetInt(UserPercentKey, NormalizePercent(percent));
             PlayerPrefs.Save();
+            cachedUserPercent = null;
+        }
+
+        private static int? cachedUserPercent;
+
+        /// <summary>Whether the scale has to be calculated again: the window width or the reported dpi changed since the last run.</summary>
+        public static bool NeedsRecalculation(float lastWidth, float lastDpi, float width, float dpi)
+        {
+            return Math.Abs(lastWidth - width) > 0.5f || Math.Abs(lastDpi - dpi) > 0.01f;
         }
 
         /// <summary>

@@ -39,13 +39,20 @@ namespace OmsiMapEditor.UI
             var buttonBound = button.worldBound;
             if (float.IsNaN(rootBound.width) || float.IsNaN(buttonBound.xMin) || menu.resolvedStyle.display == DisplayStyle.None)
                 return;
-            var width = menu.resolvedStyle.width;
-            if (float.IsNaN(width))
-                width = 0f;
-            var left = buttonBound.xMin - rootBound.xMin;
-            left = Mathf.Max(MenuEdgeMargin, Mathf.Min(left, rootBound.width - width - MenuEdgeMargin));
-            if (Mathf.Abs(menu.resolvedStyle.left - left) > 0.5f)
-                menu.style.left = left;
+            // Without a width the right edge cannot be kept inside: wait for the next GeometryChangedEvent instead of placing for one frame.
+            var left = MenuLeft(buttonBound.xMin - rootBound.xMin, rootBound.width, menu.resolvedStyle.width);
+            if (!left.HasValue)
+                return;
+            if (Mathf.Abs(menu.resolvedStyle.left - left.Value) > 0.5f)
+                menu.style.left = left.Value;
+        }
+
+        /// <summary>The left edge of a menu under its button, inside the window; null while the menu has no width yet.</summary>
+        internal static float? MenuLeft(float buttonLeft, float windowWidth, float menuWidth)
+        {
+            if (float.IsNaN(menuWidth) || float.IsNaN(buttonLeft) || float.IsNaN(windowWidth))
+                return null;
+            return Mathf.Max(MenuEdgeMargin, Mathf.Min(buttonLeft, windowWidth - menuWidth - MenuEdgeMargin));
         }
 
         /// <summary>For checks: <c>-openMenu file|edit|tools|help</c> opens that menu of the menu bar.</summary>

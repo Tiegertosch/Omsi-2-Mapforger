@@ -35,14 +35,19 @@ namespace OmsiMapEditor.UI
         {
             if (interfacePanelSettings == null)
                 return;
-            interfaceScaleResult = EditorShellScale.Apply(interfacePanelSettings, configuredInterfaceScale, Environment.GetCommandLineArgs(), interfaceScaleResult);
+            interfaceScaleArguments = interfaceScaleArguments ?? Environment.GetCommandLineArgs();
+            interfaceScaleResult = EditorShellScale.Apply(interfacePanelSettings, configuredInterfaceScale, interfaceScaleArguments, interfaceScaleResult);
             interfaceScaleWindowWidth = Screen.width;
+            interfaceScaleDpi = Screen.dpi;
         }
 
-        /// <summary>The window limit depends on the width: calculate again when the window changed its size.</summary>
+        private string[] interfaceScaleArguments;
+        private float interfaceScaleDpi;
+
+        /// <summary>The window limit depends on the width and the factor on the dpi: calculate again when either changed (the window moved to another screen).</summary>
         private void KeepInterfaceScaleForWindow()
         {
-            if (interfacePanelSettings != null && interfaceScaleWindowWidth != Screen.width)
+            if (interfacePanelSettings != null && EditorShellScale.NeedsRecalculation(interfaceScaleWindowWidth, interfaceScaleDpi, Screen.width, Screen.dpi))
                 ApplyInterfaceScale();
         }
 

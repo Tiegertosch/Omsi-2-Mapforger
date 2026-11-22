@@ -627,5 +627,16 @@ namespace OmsiMapEditor.Tests
             window.SetCrossingText(null);
             Assert.AreEqual(DisplayStyle.None, detail.style.display.value);
         }
+
+        [Test]
+        public void FooterShowsTheQuestionThenTheReasonThenTheState()
+        {
+            Assert.AreEqual("Sure?", SignalWindowRules.FooterText(true, "Sure?", SignalChangeState.Unapplied, null, "open", "ok"));
+            Assert.AreEqual("Sure?", SignalWindowRules.FooterText(true, "Sure?", SignalChangeState.ReadOnly, "why", "open", "ok"), "the question beats the reason");
+            Assert.AreEqual("why", SignalWindowRules.FooterText(true, string.Empty, SignalChangeState.ReadOnly, "why", "open", "ok"));
+            Assert.AreEqual("open", SignalWindowRules.FooterText(true, string.Empty, SignalChangeState.Unapplied, null, "open", "ok"));
+            Assert.AreEqual("ok", SignalWindowRules.FooterText(true, null, SignalChangeState.Applied, null, "open", "ok"));
+            Assert.AreEqual(string.Empty, SignalWindowRules.FooterText(false, "Sure?", SignalChangeState.ReadOnly, "why", "open", "ok"));
+        }
     }
 }

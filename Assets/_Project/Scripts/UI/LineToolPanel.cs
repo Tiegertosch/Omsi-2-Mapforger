@@ -614,14 +614,17 @@ namespace OmsiMapEditor.UI
         /// </summary>
         private void UpdateHint()
         {
-            if (resultText.Length > 0)
-                HintChanged?.Invoke(resultText, resultProblem);
-            else if (editTrip != null && stopCount == 0)
-                HintChanged?.Invoke(Loc.T("line.edit.banner", ("trip", editTrip)), false);
-            else if (stopCount > 0)
-                HintChanged?.Invoke(Loc.T("line.hint"), false);
-            else
-                HintChanged?.Invoke(string.Empty, false);
+            HintChanged?.Invoke(HintText(resultText, editTrip, stopCount), resultText.Length > 0 && resultProblem);
+        }
+
+        /// <summary>The status bar text of the panel: the result, else the banner of an edited trip without a stop, else the hint once a stop is chosen, else nothing.</summary>
+        internal static string HintText(string result, string editTrip, int stops)
+        {
+            if (!string.IsNullOrEmpty(result))
+                return result;
+            if (editTrip != null && stops == 0)
+                return Loc.T("line.edit.banner", ("trip", editTrip));
+            return stops > 0 ? Loc.T("line.hint") : string.Empty;
         }
     }
 }

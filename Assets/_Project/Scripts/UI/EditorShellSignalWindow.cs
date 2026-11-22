@@ -267,11 +267,8 @@ namespace OmsiMapEditor.UI
         {
             if (signalCrossing == null)
                 return string.Empty;
-            if (signalConfirmText.Length > 0)
-                return signalConfirmText;
-            if (state == SignalChangeState.ReadOnly)
-                return SignalReadOnlyReason();
-            return Loc.T(state == SignalChangeState.Unapplied ? "signals.footer.unapplied" : "signals.footer.applied"); // i18n:keys
+            return SignalWindowRules.FooterText(true, signalConfirmText, state,
+                state == SignalChangeState.ReadOnly ? SignalReadOnlyReason() : null, Loc.T("signals.footer.unapplied"), Loc.T("signals.footer.applied"));
         }
 
         private bool SignalFooterWarning(SignalChangeState state)
