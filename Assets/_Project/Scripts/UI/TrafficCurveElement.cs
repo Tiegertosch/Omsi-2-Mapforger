@@ -25,10 +25,6 @@ namespace OmsiMapEditor.UI
 
         public TrafficCurveElement()
         {
-            style.height = 150;
-            style.minHeight = 150;
-            style.marginTop = 4;
-            style.marginBottom = 2;
             AddToClassList("traffic-curve");
             generateVisualContent += Draw;
             RegisterCallback<PointerDownEvent>(OnDown);

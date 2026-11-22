@@ -11,14 +11,14 @@ namespace OmsiMapEditor.Tests
     /// </summary>
     public sealed class DialogCodeRulesTests
     {
-        /// <summary>Constructions of <c>dialog-overlay</c> in Scripts/UI (*.cs) and EditorShell.uxml; today 3 in code and 6 in the UXML.</summary>
-        private const int DialogOverlayCeiling = 9;
+        /// <summary>Constructions of <c>dialog-overlay</c> in Scripts/UI (*.cs) and EditorShell.uxml; today 1 in code and 6 in the UXML.</summary>
+        private const int DialogOverlayCeiling = 7;
 
         /// <summary>
         /// Inline size, spacing and flex assignments (<c>style.width/height/min/max, margin*, padding*, flexBasis/Grow/Shrink</c>) in
-        /// Scripts/UI. Wide count of the owner's decision 5A; today 170 in 29 files.
+        /// Scripts/UI. Wide count of the owner's decision 5A; today 120 in 27 files.
         /// </summary>
-        private const int InlineSizeCeiling = 170;
+        private const int InlineSizeCeiling = 120;
 
         private static readonly Regex InlineSize = new Regex(
             @"style\.(width|height|minWidth|minHeight|maxWidth|maxHeight|margin[A-Za-z]*|padding[A-Za-z]*|flexBasis|flexGrow|flexShrink)\b",

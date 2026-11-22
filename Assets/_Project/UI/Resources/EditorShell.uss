@@ -896,7 +896,7 @@
 .dialog-field > Label { min-width: 110px; width: 110px; color: var(--mf-color-text-secondary); }
 .export-target { margin-top: 8px; color: var(--mf-color-info); }
 .export-problem { color: var(--mf-color-error); }
-.dialog-buttons { flex-direction: row; justify-content: flex-end; margin-top: var(--mf-space-3); }
+.dialog-buttons { flex-direction: row; justify-content: flex-end; flex-shrink: 0; margin-top: var(--mf-space-3); }
 .dialog-primary { background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .dialog-primary:hover { background-color: var(--mf-color-accent-hover); }
 .dialog-danger { background-color: var(--mf-color-error); border-color: var(--mf-color-error); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
@@ -915,6 +915,9 @@
 .form-inline-label { margin-right: 8px; }
 .form-button-top { margin-top: 4px; }
 .dialog-modal .popup-title { color: var(--mf-color-text-primary); }
+/* USS gives every element flex-shrink 1: without these, a clamped dialog squeezed the button row to no height and the buttons stood over the edge. Only the body gives way. */
+.dialog-modal .popup-title, .dialog-modal .popup-description { flex-shrink: 0; }
+.dialog-buttons > Button { flex-shrink: 0; }
 
 /* Form rows for dialog content (M7): replace the inline sizes of the dialog files as the dialogs move to the factory. */
 .form-row { flex-direction: row; align-items: center; margin: var(--mf-space-1) 0; }
@@ -926,6 +929,26 @@
 .settings-folders-button { align-self: flex-start; margin-top: var(--mf-space-2); }
 .form-section-title { margin: var(--mf-space-3) 0 var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .form-footnote { margin-top: var(--mf-space-2); color: var(--mf-color-text-muted); white-space: normal; }
+
+/* Vehicles and traffic curves (M7 step 3). The body of the factory dialog scrolls, so nothing in it may shrink: that squeezed the
+   graphs and put the Reset buttons and the Cars/Passengers headings on top of them at a large display scale. */
+.picker-field.form-field-grow { width: auto; flex-grow: 1; }
+.picker-field.form-cell-field { flex-basis: 0; margin-right: 2px; }
+.form-button-bottom { margin-bottom: 6px; }
+.form-toolbar { flex-direction: row; flex-shrink: 0; margin-bottom: 6px; }
+.form-action-block { margin-left: 0; margin-bottom: 6px; }
+.form-group-heading { margin-top: var(--mf-space-2); }
+.form-type-head { margin-top: 6px; }
+.form-header-row { flex-direction: row; flex-shrink: 0; }
+.form-cell-wrap { white-space: normal; }
+.form-bus-spacer { width: 28px; flex-shrink: 0; }
+.dialog-body .form-row { flex-shrink: 0; }
+.form-curve-section { flex-shrink: 0; margin-top: var(--mf-space-2); }
+.form-curve-header { flex-direction: row; align-items: center; flex-shrink: 0; }
+.form-curve-heading { flex-grow: 1; margin-bottom: 0; }
+.form-curve-hours { flex-direction: row; justify-content: space-between; flex-shrink: 0; }
+.form-hour-tick { font-size: var(--mf-font-mark); margin-top: 0; margin-bottom: 0; }
+.traffic-curve { height: 150px; min-height: 150px; flex-shrink: 0; margin-top: var(--mf-space-1); margin-bottom: 2px; }
 
 /* Status bar */
 /* The status line is a dark strip in the lower row of the bottom bar */

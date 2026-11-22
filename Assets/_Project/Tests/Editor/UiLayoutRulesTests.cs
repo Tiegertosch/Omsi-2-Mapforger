@@ -47,6 +47,29 @@ namespace OmsiMapEditor.Tests
             Assert.IsTrue(Regex.IsMatch(body, @"(^|[;\s])max-height:\s*\d+(\.\d+)?%"), selector + " needs max-height in percent: " + body);
         }
 
+        // M7 step 3 fix: USS gives every element flex-shrink 1, so a clamped dialog squeezed its button row (and title) to nothing and the
+        // buttons stood over the dialog's edge. Only the body may give way.
+        [TestCase(".dialog-buttons")]
+        public void ButtonRowOfADialogDoesNotShrink(string selector)
+        {
+            Assert.IsTrue(Regex.IsMatch(Rule(selector), @"flex-shrink:\s*0"), selector + " must not shrink: " + Rule(selector));
+            Assert.IsTrue(Regex.IsMatch(stylesheet, @"\.dialog-buttons\s*>\s*Button\s*\{[^}]*flex-shrink:\s*0"), "The buttons of the row must not shrink.");
+        }
+
+        [Test]
+        public void TitleOfAFactoryDialogDoesNotShrink()
+        {
+            Assert.IsTrue(Regex.IsMatch(stylesheet, @"\.dialog-modal \.popup-title,\s*\.dialog-modal \.popup-description\s*\{[^}]*flex-shrink:\s*0"));
+        }
+
+        [Test]
+        public void BodyOfAFactoryDialogMayShrinkAndStartsAtZero()
+        {
+            var body = Rule(".dialog-body");
+            Assert.IsTrue(Regex.IsMatch(body, @"flex-shrink:\s*[1-9]") && Regex.IsMatch(body, @"min-height:\s*0"), ".dialog-body must give way: " + body);
+            Assert.IsTrue(Regex.IsMatch(Rule(".dialog-body-fill"), @"flex-shrink:\s*[1-9]"));
+        }
+
         [Test]
         public void ToolWindowCatalogGivesUpWidthBeforeTheOptionColumn()
         {
