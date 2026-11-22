@@ -87,7 +87,7 @@ namespace OmsiMapEditor.UI
         private VisualElement toolbarHost;
         private MapToolbar toolbar;
         private EditorTool activeTool = EditorTool.Drag;
-        private Label mapHintLabel;
+        private const string WikiUrl = "https://github.com/Tiegertosch/Omsi-2-Mapforger/wiki";
         private Label zoomLabel;
         private Button checkMapMenuItem;
         private VisualElement projectPanel;
@@ -502,7 +502,6 @@ namespace OmsiMapEditor.UI
             if (mapStateLabel != null)
                 mapStateLabel.text = Loc.T("status.no_map");
             mapTitleLabel = root.Q<Label>("map-title");
-            mapHintLabel = root.Q<Label>("map-hint");
             pointerInfoLabel = root.Q<Label>("pointer-info");
             selectionInfoLabel = root.Q<Label>("selection-info");
             emptyState = root.Q<VisualElement>("empty-state");
@@ -526,7 +525,6 @@ namespace OmsiMapEditor.UI
             checkMapMenuItem = root.Q<Button>("check-map-menu-item");
             var roadBuilderMenuItem = root.Q<Button>("road-builder-menu-item");
             var helpButton = root.Q<Button>("help-menu-button");
-            var helpCloseButton = root.Q<Button>("help-menu-close-button");
             var fitMapButton = root.Q<Button>("fit-map-button");
             var zoomOutButton = root.Q<Button>("zoom-out-button");
             var zoomInButton = root.Q<Button>("zoom-in-button");
@@ -753,8 +751,13 @@ namespace OmsiMapEditor.UI
                 };
             if (helpButton != null)
                 helpButton.clicked += () => TogglePopup(helpMenu, fileMenu, editMenu, viewMenu);
-            if (helpCloseButton != null)
-                helpCloseButton.clicked += () => HidePopup(helpMenu);
+            var wikiMenuItem = root.Q<Button>("wiki-menu-item");
+            if (wikiMenuItem != null)
+                wikiMenuItem.clicked += () =>
+                {
+                    HidePopup(helpMenu);
+                    Application.OpenURL(WikiUrl);
+                };
             InitializeBugReport(root, helpMenu);
             InitializeUpdates(root, helpMenu);
 
@@ -767,13 +770,13 @@ namespace OmsiMapEditor.UI
             groundRenderer = new GameObject("Map Ground").AddComponent<MapGroundRenderer>();
             groundRenderer.Loaded += report =>
             {
-                SetStatus(report);
+                ReportLoaded(report);
                 mapCanvas?.SetSplineLineKinds(groundRenderer.SplineLineKinds);
             };
             objectRenderer = groundRenderer.gameObject.AddComponent<MapObjectRenderer>();
             objectRenderer.SetCamera(groundRenderer.ViewCamera);
             objectRenderer.SetGround(groundRenderer);
-            objectRenderer.Loaded += SetStatus;
+            objectRenderer.Loaded += ReportLoaded;
             objectRenderer.ModelsChanged += () => mapCanvas?.UpdateModelFlags();
             if (mapCanvas != null)
             {
@@ -905,7 +908,35 @@ namespace OmsiMapEditor.UI
             view3DButton?.EnableInClassList("view-control-active", mapCanvas.ThreeDimensional);
             UpdateMapHeader();
             UpdateZoomLabel();
-            SetStatusT(mapCanvas.ThreeDimensional ? (CanEdit ? "view.status.3d_edit" : "view.status.3d") : "view.status.top") /* i18n:keys */;
+            SetStatusT(mapCanvas.ThreeDimensional ? "view.status.3d" : "view.status.top") /* i18n:keys */;
+            viewStatusUntil = Time.unscaledTime + ViewStatusSeconds;
+        }
+
+        private const float ViewStatusSeconds = 6f;
+        private float viewStatusUntil;
+        private string deferredLoadReport;
+
+        /// <summary>
+        /// A renderer says it has loaded. Right after a switch between the views the sentence of the view stays for a few seconds
+        /// (the objects load on the first switch to 3D and used to replace it at once); the report follows if nothing else was said.
+        /// </summary>
+        private void ReportLoaded(string report)
+        {
+            if (Time.unscaledTime >= viewStatusUntil || (statusKey != "view.status.3d" && statusKey != "view.status.top"))
+            {
+                SetStatus(report);
+                return;
+            }
+            var first = deferredLoadReport == null;
+            deferredLoadReport = report;
+            if (first)
+                rootElement?.schedule.Execute(() =>
+                {
+                    var pending = deferredLoadReport;
+                    deferredLoadReport = null;
+                    if (pending != null && (statusKey == "view.status.3d" || statusKey == "view.status.top"))
+                        SetStatus(pending);
+                }).StartingIn((long)(Mathf.Max(0f, viewStatusUntil - Time.unscaledTime) * 1000f) + 50);
         }
 
         private void ToggleGround()
@@ -1838,6 +1869,17 @@ namespace OmsiMapEditor.UI
                     yield return null;
                 for (var frame = 0; frame < 10; frame++)
                     yield return null;
+                // -orbitAfterLoad yaw pitch distance switches to 3D only now, like a click on the 3D button after loading; the status shows its sentence.
+                if (Argument("-orbitAfterLoad", 3) != null &&
+                    float.TryParse(Argument("-orbitAfterLoad", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var lateYaw) &&
+                    float.TryParse(Argument("-orbitAfterLoad", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var latePitch) &&
+                    float.TryParse(Argument("-orbitAfterLoad", 3), NumberStyles.Float, CultureInfo.InvariantCulture, out var lateDistance))
+                {
+                    ToggleThreeDimensional();
+                    mapCanvas?.SetOrbit(lateYaw, latePitch, lateDistance);
+                    for (var frame = 0; frame < 10; frame++)
+                        yield return null;
+                }
                 RunPickArguments(args);
                 // -trafficGhost and -trafficDrop <tile> px py hold or drop a sign at a pixel, as dragging it from the window would.
                 RunTrafficPointerArguments(args);
@@ -4046,7 +4088,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             ContinueRoadFrom(change);
-            SetStatus(message + " " + Loc.T("roadbuild.status.go_on"));
+            SetStatus(message);
         }
 
         /// <summary>
@@ -4088,7 +4130,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             ContinueRoadFrom(parts[parts.Count - 1]);
-            SetStatus(message + " " + Loc.T("roadbuild.status.go_on"));
+            SetStatus(message);
         }
 
         /// <summary>
@@ -4445,7 +4487,7 @@ namespace OmsiMapEditor.UI
                 var control = ControlPointAt(roadPointer.Value);
                 mapCanvas.SetRoadPreview(null, true, null, null, roadStart);
                 ShowRoadGuides(roadStartHeading.HasValue ? (OmsiMapPoint?)null : control, new[] { roadStart, control });
-                roadPanel.ShowPlan(Loc.T("roadbuild.plan.control", ("along", roadStartHeading.HasValue ? "yes" : "no")), false);
+                roadPanel.ShowPlan(Loc.T("roadbuild.plan.control"), false);
                 return;
             }
             var plan = PlanRoad(roadPointer.Value, out var endJoin, out var endPort, out var planEnd);
@@ -4498,18 +4540,23 @@ namespace OmsiMapEditor.UI
             for (var index = plan.Issues.Count; index < issues.Count; index++)
                 if (issues[index].Severity != OmsiRoadIssueSeverity.Note && besides.IndexOf(issues[index].Message, StringComparison.Ordinal) < 0)
                     besides += Loc.T("roadbuild.besides", ("severity", issues[index].Severity == OmsiRoadIssueSeverity.Error ? "error" : "warning"), ("message", issues[index].Message));
-            roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort) + meets + besides,
+            // The first line says the road; what a click does and the findings follow in lines of their own, so the status bar can show the road and count the rest.
+            roadPanel.ShowPlan(DescribePlan(plan, endJoin, endPort, meets) + besides,
                 plan.HasErrors || issues.Exists(issue => issue.Severity != OmsiRoadIssueSeverity.Note));
         }
 
-        private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin, OmsiJunctionPort endPort)
+        private static string DescribePlan(OmsiRoadPlan plan, OmsiSplineEnd endJoin, OmsiJunctionPort endPort, string meets)
         {
             var text = plan.Pieces.Count == 0
                 ? Loc.T("roadbuild.describe.none")
                 : Loc.T("roadbuild.describe.main", ("length", plan.LengthMeters), ("pieces", plan.Pieces.Count), ("straight", plan.Pieces[0].RadiusMeters == 0 ? "yes" : "no"),
-                    ("radius", Math.Abs(plan.Pieces[0].RadiusMeters)), ("corner", plan.StartTrimMeters > 0.0 ? "yes" : "no"), ("cornerRadius", plan.CornerRadiusMeters),
-                    ("trim", plan.StartTrimMeters), ("gradient", plan.MaximumGradientPercent), ("height", plan.EndHeight),
+                    ("radius", Math.Abs(plan.Pieces[0].RadiusMeters)),
+                    ("gradient", plan.MaximumGradientPercent), ("height", plan.EndHeight),
                     ("join", endJoin != null ? "spline" : endPort != null ? "port" : "none"), ("id", endJoin?.Spline.Id ?? 0), ("port", endPort != null ? DescribePort(endPort) : string.Empty));
+            if (meets.Length > 0)
+                text += "\n" + meets.TrimStart();
+            if (plan.Pieces.Count > 0 && plan.StartTrimMeters > 0.0)
+                text += "\n" + Loc.T("roadbuild.describe.corner", ("cornerRadius", plan.CornerRadiusMeters), ("trim", plan.StartTrimMeters));
             foreach (var issue in plan.Issues)
                 text += Loc.T("roadbuild.issue", ("severity", issue.Severity.ToString()), ("message", issue.Message));
             return text;
@@ -4565,10 +4612,10 @@ namespace OmsiMapEditor.UI
                 roadReferenceHeading = roadStartHeading ?? OmsiRoadSnapping.NearbyRoadHeading(currentSummary, roadStart.X, roadStart.Y, RoadReferenceReach) ?? 0.0;
                 roadStarted = true;
                 UpdateRoadPreview();
-                var next = Loc.T(roadPanel.Shape == OmsiRoadShape.Curved ? "roadbuild.next.curved" : "roadbuild.next.free"); // i18n:keys
-                SetStatus(join != null ? Loc.T("roadbuild.started.continue", ("id", join.Spline.Id), ("next", next))
-                    : port != null ? Loc.T("roadbuild.started.port", ("port", DescribePort(port)), ("next", next))
-                    : Loc.T("roadbuild.started", ("next", next)));
+                // Only the state: what to click next is the hint of the road tool (roadbuild.plan.*), not a second line in the status bar.
+                SetStatus(join != null ? Loc.T("roadbuild.started.continue", ("id", join.Spline.Id))
+                    : port != null ? Loc.T("roadbuild.started.port", ("port", DescribePort(port)))
+                    : Loc.T("roadbuild.started"));
                 return;
             }
 
@@ -8717,14 +8764,6 @@ namespace OmsiMapEditor.UI
             if (mapTitleLabel != null)
                 mapTitleLabel.text = displayName;
             UpdateCounts();
-            if (mapHintLabel != null)
-            {
-                var view = mapCanvas != null && mapCanvas.ThreeDimensional
-                    ? Loc.T("map.hint.view3d")
-                    : Loc.T("map.hint.top");
-                mapHintLabel.text = view + Loc.T(CanEdit ? "map.hint.edit" : EditingVariant ? "map.hint.variant" : chronoDate != null ? "map.hint.chrono" : "map.hint.readonly", ("title", EditingVariant ? editedVariant.Title : string.Empty)) /* i18n:keys */;
-                mapHintLabel.style.display = DisplayStyle.Flex;
-            }
             SetBarContentVisible(true);
             UpdateBarButtons();
             UpdateToolbar();

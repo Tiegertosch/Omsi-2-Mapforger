@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Das Biegen des Splines wurde abgebrochen.",
   "spline.cancel_move": "Das Verschieben des Spline-Endes wurde abgebrochen.",
   "junction.turn_cancelled": "Das Drehen des Arms wurde abgebrochen.",
-  "view.status.3d_edit": "3D-Ansicht: Rechtsziehen dreht, Mittelziehen verschiebt, das Rad zoomt. Klicke ein Objekt an, um es zu wählen, und ziehe es; das Verschieben-Werkzeug (W) bewegt es entlang der Pfeile, auch nach oben, das Drehen-Werkzeug (E) dreht es an Ringen: grün Richtung, rot Neigung, blau Querneigung.",
-  "view.status.3d": "3D-Ansicht: Rechtsziehen dreht, Mittelziehen verschiebt, das Rad zoomt. Klicke ein Objekt an, um es zu wählen.",
+  "view.status.3d": "3D-Ansicht: Maus und Tasten stehen unter Hilfe > Wiki.",
   "view.status.top": "Zurück zur Karte von oben.",
   "view.status.ground_shown": "Bodentexturen gezeigt.",
   "view.status.ground_hidden": "Bodentexturen verborgen; Kacheln werden schlicht gezeichnet.",
@@ -64,5 +63,6 @@
   "terrain.all.fits": "Das Gelände passt schon zu allen hier gebauten Straßen.",
   "terrain.all.fitted": "Gelände auf {count, plural, one {# Kachel} other {# Kacheln}} neu angepasst.",
   "status.ready": "Bereit",
+  "status.hint.more": "+{count} weitere",
   "status.no_map": "Keine Karte geladen"
 }

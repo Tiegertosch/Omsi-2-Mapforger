@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Gięcie spline anulowane.",
   "spline.cancel_move": "Przenoszenie końca spline zostało anulowane.",
   "junction.turn_cancelled": "Obracanie ramieniem anulowane.",
-  "view.status.3d_edit": "Widok 3D: przeciąganie prawym przyciskiem myszy obraca widok, środkowym przesuwa go, a kółko przybliża i oddala. Kliknij obiekt, aby go zaznaczyć, i przeciągnij, aby go przesunąć; narzędzie Przesuń (W) przesuwa wzdłuż strzałek, również w górę, a Obróć (E) obraca za pomocą pierścieni: zielony zmienia kierunek, czerwony nachylenie wzdłużne, niebieski przechył.",
-  "view.status.3d": "Widok 3D: przeciąganie prawym przyciskiem myszy obraca widok, środkowym przesuwa go, a kółko przybliża i oddala. Kliknij obiekt, aby go zaznaczyć.",
+  "view.status.3d": "Widok 3D: mysz i klawisze w Pomoc > Wiki.",
   "view.status.top": "Powrót do mapy z góry.",
   "view.status.ground_shown": "Pokazano tekstury podłoża.",
   "view.status.ground_hidden": "Ukryte tekstury podłoża; tiles są rysowane jako gładkie.",
@@ -87,5 +86,6 @@
   "terrain.all.fits": "Teren pasuje już do wszystkich budowanych tu dróg.",
   "terrain.all.fitted": "Teren zamontowany ponownie w {count, plural, one {# tile} few {# tiles} many {# tiles} other {# tiles}}.",
   "status.ready": "Gotowe",
+  "status.hint.more": "+{count} więcej",
   "status.no_map": "Nie wczytano mapy"
 }

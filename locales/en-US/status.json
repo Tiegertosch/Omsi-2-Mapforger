@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Bending the spline cancelled.",
   "spline.cancel_move": "Moving the spline end cancelled.",
   "junction.turn_cancelled": "Turning the arm cancelled.",
-  "view.status.3d_edit": "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it and drag it; the move tool (W) moves it along arrows, also up, the rotate tool (E) turns it on rings: green heading, red pitch, blue bank.",
-  "view.status.3d": "3D view: right drag turns, middle drag moves, the wheel zooms. Click an object to select it.",
+  "view.status.3d": "3D view: mouse and keys are in Help > Wiki.",
   "view.status.top": "Back to the map from above.",
   "view.status.ground_shown": "Ground textures shown.",
   "view.status.ground_hidden": "Ground textures hidden; tiles are drawn plain.",
@@ -87,5 +86,6 @@
   "terrain.all.fits": "The terrain already fits all roads built here.",
   "terrain.all.fitted": "Terrain fitted again on {count, plural, one {# tile} other {# tiles}}.",
   "status.ready": "Ready",
+  "status.hint.more": "+{count} more",
   "status.no_map": "No map loaded"
 }

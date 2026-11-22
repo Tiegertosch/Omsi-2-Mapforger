@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Dobragem do spline cancelada.",
   "spline.cancel_move": "A movimentação do final spline foi cancelada.",
   "junction.turn_cancelled": "Virar o braço foi cancelado.",
-  "view.status.3d_edit": "Vista 3D: arraste com o botão direito para rodar a vista, com o botão do meio para a deslocar e use a roda para ampliar ou reduzir. Clique num objeto para o selecionar e arraste-o para o mover; a ferramenta Mover (W) desloca-o ao longo das setas, também para cima, e Rodar (E) roda-o com os anéis: verde para a orientação, vermelho para a inclinação longitudinal e azul para a transversal.",
-  "view.status.3d": "Vista 3D: arraste com o botão direito para rodar a vista, com o botão do meio para a deslocar e use a roda para ampliar ou reduzir. Clique num objeto para o selecionar.",
+  "view.status.3d": "Vista 3D: rato e teclas em Ajuda > Wiki.",
   "view.status.top": "De volta ao mapa visto de cima.",
   "view.status.ground_shown": "Texturas de solo apresentadas.",
   "view.status.ground_hidden": "Texturas de solo ocultas; tiles são desenhados de forma simples.",
@@ -87,5 +86,6 @@
   "terrain.all.fits": "O terreno já cabe em todas as estradas aqui construídas.",
   "terrain.all.fitted": "Terreno montado novamente no {count, plural, one {# tile} other {# tiles}}.",
   "status.ready": "Pronto",
+  "status.hint.more": "+{count} mais",
   "status.no_map": "Nenhum mapa carregado"
 }

@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Volver al constructor de carreteras",
   "roadbuilder.row.back.tooltip": "Volver sin elegir objeto (Esc)",
   "roadbuilder.row.panel": "Haga clic en el objeto del carril {lane}; Esc vuelve al constructor de carreteras.",
-  "roadbuilder.status.pick_row": "Constructor de carreteras: haga clic en el objeto del carril {lane} en la biblioteca, como un árbol o, en Luces, una farola.",
+  "roadbuilder.status.pick_row": "Constructor de carreteras: objeto de fila para el carril {lane}.",
   "roadbuilder.status.row_set": "Constructor de carreteras: una fila de {name} se ubica a lo largo del carril {lane} siempre que se construye el tipo de carretera {turned, select, yes {, girado por {degrees, number, 0}° para seguir la carretera} other {}}; establezca qué tan separados y en qué punto del carril.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Constructor de carreteras: ningún objeto elegido.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} con sus filas de objetos",
   "roadbuilder.step.with_bus": "{step} con sus carriles bus",
-  "roadbuilder.status.start": "Constructor de carreteras: haz clic en un elemento de la sección para cambiarlo, añade elementos o empieza con una plantilla y guarda después el tipo de carretera.",
+  "roadbuilder.status.start": "Constructor de carreteras: cambia un tipo de carretera o crea uno nuevo.",
   "roadbuilder.status.make_failed": "Constructor de carreteras: no se pudo crear el tipo de carretera: {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Constructor de carreteras: hizo {name} ({width, number, 0.00} m) como {path} en su instalación OMSI; se elige en la herramienta de carretera, haga clic en el mapa para construirlo.",
   "roadbuilder.status.unreadable": "Constructor de carreteras: {name} no se puede leer: {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Constructor de carreteras: {name} no contiene carriles que el constructor de carreteras pueda leer; no fue hecho con eso.",
-  "roadbuilder.status.edit": "Constructor de carreteras: cambie {name} y guárdelo; {uses, plural, =0 {ningún spline de este mapa lo usa todavía.} one {el spline en este mapa cambia con él.} other {los # splines en este mapa cambian con él.}}",
+  "roadbuilder.status.edit": "Constructor de carreteras: editando {name}; {uses, plural, =0 {ningún spline de este mapa lo usa todavía.} one {splines de este mapa que lo usan: #, cambian con él.} other {splines de este mapa que lo usan: #, cambian con él.}}",
   "roadbuilder.status.change_failed": "Constructor de carreteras: {name} no se pudo cambiar: {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "el cambio de tipo de carretera {name}",
@@ -252,5 +252,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} mide {fitted, number, 0.00} m de ancho en lugar de {original, number, 0.00} m, como permite su tipo.",
   "roadbuilder.window.note.lanes": "Solo se toman los primeros {limit} carriles.",
   "roadbuilder.window.note.tracks": "Las vías fuera de la calzada se omiten.",
-  "roadbuilder.status.edit_foreign": "Constructor de carreteras: {name} no está en la carpeta de este proyecto, así que no se puede cambiar aquí. Cámbialo y guárdalo como tipo de carretera nuevo."
+  "roadbuilder.status.edit_foreign": "Constructor de carreteras: {name} no está en la carpeta de este proyecto; guárdalo como tipo nuevo."
 }

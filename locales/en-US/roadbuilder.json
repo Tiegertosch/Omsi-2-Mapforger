@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Back to the road builder",
   "roadbuilder.row.back.tooltip": "Back without choosing an object (Esc)",
   "roadbuilder.row.panel": "Click the object for lane {lane}; Esc goes back to the road builder.",
-  "roadbuilder.status.pick_row": "Road builder: click the object for lane {lane} in the library, such as a tree or, under Lights, a street light.",
+  "roadbuilder.status.pick_row": "Road builder: row object for lane {lane}.",
   "roadbuilder.status.row_set": "Road builder: a row of {name} stands along lane {lane} whenever the road type is built{turned, select, yes {, turned by {degrees, number, 0}° so it runs along the road} other {}}; set how far apart and where across the lane.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Road builder: no object chosen.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} with its rows of objects",
   "roadbuilder.step.with_bus": "{step} with its bus lanes",
-  "roadbuilder.status.start": "Road builder: click an element in the cross-section to change it, add elements or start from a template, then save the road type.",
+  "roadbuilder.status.start": "Road builder: change a road type or make a new one.",
   "roadbuilder.status.make_failed": "Road builder: the road type could not be made: {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Road builder: made {name} ({width, number, 0.00} m) as {path} in your OMSI installation; it is chosen in the road tool, click on the map to build it.",
   "roadbuilder.status.unreadable": "Road builder: {name} cannot be read: {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Road builder: {name} holds no lanes the road builder can read; it was not made with it.",
-  "roadbuilder.status.edit": "Road builder: change {name} and save it; {uses, plural, =0 {no spline of this map uses it yet.} one {the spline of it in this map changes with it.} other {all # splines of it in this map change with it.}}",
+  "roadbuilder.status.edit": "Road builder: editing {name}; {uses, plural, =0 {no spline of this map uses it yet.} one {splines of this map using it: #, they change with it.} other {splines of this map using it: #, they change with it.}}",
   "roadbuilder.status.change_failed": "Road builder: {name} could not be changed: {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "the change of road type {name}",
@@ -270,5 +270,5 @@
   "@roadbuilder.window.note.width": "{kind} is the name of the lane kind, {lane} its number from the left; {fitted} and {original} are widths in metres",
   "roadbuilder.window.note.lanes": "Only the first {limit} lanes are taken.",
   "roadbuilder.window.note.tracks": "Tracks outside the carriageway are left out.",
-  "roadbuilder.status.edit_foreign": "Road builder: {name} is not in this project's folder, so it cannot be changed here. Change it and save it as a new road type."
+  "roadbuilder.status.edit_foreign": "Road builder: {name} is not in this project's folder; save it as a new type."
 }

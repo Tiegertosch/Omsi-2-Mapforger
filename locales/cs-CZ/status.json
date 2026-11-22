@@ -3,8 +3,7 @@
   "spline.cancel_bend": "Ohýbání spline zrušeno.",
   "spline.cancel_move": "Posunutí konce spline zrušeno.",
   "junction.turn_cancelled": "Otočení ramene zrušeno.",
-  "view.status.3d_edit": "3D pohled: tažením pravým tlačítkem myši otáčíte pohled, prostředním jej posouváte a kolečkem přibližujete či oddalujete. Kliknutím na objekt jej vyberete a přetažením přesunete; nástroj Přesunout (W) jej posouvá podél šipek, také nahoru, a nástroj Otočit (E) jej otáčí pomocí prstenců: zelený mění směr, červený podélný sklon a modrý příčný sklon.",
-  "view.status.3d": "3D pohled: tažením pravým tlačítkem myši otáčíte pohled, prostředním jej posouváte a kolečkem přibližujete či oddalujete. Kliknutím na objekt jej vyberete.",
+  "view.status.3d": "3D pohled: myš a klávesy jsou v Nápověda > Wiki.",
   "view.status.top": "Zpět na mapu shora.",
   "view.status.ground_shown": "Jsou zobrazeny pozemní textury.",
   "view.status.ground_hidden": "Pozemní textury skryté; tiles jsou kresleny jako hladké.",
@@ -87,5 +86,6 @@
   "terrain.all.fits": "Terén už pasuje na všechny zde vybudované silnice.",
   "terrain.all.fitted": "Terén opět osazen na {count, plural, one {# tile} few {# tiles} many {# tiles} other {# tiles}}.",
   "status.ready": "Připraveno",
+  "status.hint.more": "ještě +{count}",
   "status.no_map": "Není načtena žádná mapa"
 }

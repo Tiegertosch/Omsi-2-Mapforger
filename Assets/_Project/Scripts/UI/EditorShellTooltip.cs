@@ -25,6 +25,8 @@ namespace OmsiMapEditor.UI
         private VisualElement tooltipTarget;
         private IVisualElementScheduledItem tooltipTimer;
         private bool tooltipSuppressed;
+        private Vector2 tooltipPointer; // panel pixels of the last pointer position
+        private const float WideElementFactor = 1.5f;
 
         private void SetUpTooltips(VisualElement root)
         {
@@ -46,7 +48,12 @@ namespace OmsiMapEditor.UI
             tooltipCard.RegisterCallback<GeometryChangedEvent>(_ => PlaceTooltip());
             root.Add(tooltipCard);
 
-            root.RegisterCallback<PointerOverEvent>(evt => PointTooltipAt(evt.target as VisualElement), TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerMoveEvent>(evt => tooltipPointer = evt.position, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerOverEvent>(evt =>
+            {
+                tooltipPointer = evt.position;
+                PointTooltipAt(evt.target as VisualElement);
+            }, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip(false));
             // A click or the wheel puts the card away until the pointer reaches another element.
             root.RegisterCallback<PointerDownEvent>(_ => HideTooltip(true), TrickleDown.TrickleDown);
@@ -158,7 +165,16 @@ namespace OmsiMapEditor.UI
             var target = root.WorldToLocal(tooltipTarget.worldBound);
             var bounds = root.layout;
             const float gap = 6f;
-            var x = Mathf.Clamp(target.xMin, 4f, Mathf.Max(4f, bounds.width - size.x - 4f));
+            // A wide element (the message and hint of the status bar) is no anchor for a narrow card: it would sit at the element's
+            // left edge, far from the pointer. The card then follows the pointer's x position, centred on it.
+            var left = target.xMin;
+            if (target.width > size.x * WideElementFactor)
+            {
+                var pointer = root.WorldToLocal(tooltipPointer);
+                if (pointer.x >= target.xMin && pointer.x <= target.xMax)
+                    left = pointer.x - size.x * 0.5f;
+            }
+            var x = Mathf.Clamp(left, 4f, Mathf.Max(4f, bounds.width - size.x - 4f));
             var y = TooltipTopEdge(target.yMin, root) - size.y - gap;
             if (y < 4f)
                 y = Mathf.Min(target.yMax + gap, bounds.height - size.y - 4f);
@@ -210,6 +226,7 @@ namespace OmsiMapEditor.UI
             if (!float.TryParse(args[index + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
                 !float.TryParse(args[index + 2], NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
                 return;
+            tooltipPointer = new Vector2(x, y);
             var owner = TooltipOwner(rootElement.panel.Pick(new Vector2(x, y)));
             Debug.Log("Tooltip: " + (owner == null ? "none" : owner.tooltip.Replace(LocBindings.TooltipSeparator.ToString(), " | ")));
             if (owner != null)

@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "De volta ao construtor de estradas",
   "roadbuilder.row.back.tooltip": "Voltar sem escolher um objeto (Esc)",
   "roadbuilder.row.panel": "Clique no objeto da via {lane}; Esc volta ao construtor de estradas.",
-  "roadbuilder.status.pick_row": "Construtor de estradas: clique no objeto da via {lane} na biblioteca, como uma árvore ou, em Luzes, um poste de iluminação.",
+  "roadbuilder.status.pick_row": "Construtor de estradas: objeto de linha para a via {lane}.",
   "roadbuilder.status.row_set": "Construtor de estradas: uma fila de {name} encontra-se ao longo da via {lane} sempre que o tipo de estrada é construído{turned, select, yes {, virou {degrees, number, 0}° para correr ao longo da estrada} other {}}; definir a que distância e onde na via.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Construtor de estradas: nenhum objeto escolhido.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} com as suas linhas de objectos",
   "roadbuilder.step.with_bus": "{step} com as suas vias de bus",
-  "roadbuilder.status.start": "Construtor de estradas: clique num elemento da secção para o alterar, adicione elementos ou comece por um modelo e depois guarde o tipo de estrada.",
+  "roadbuilder.status.start": "Construtor de estradas: altere um tipo de estrada ou crie um novo.",
   "roadbuilder.status.make_failed": "Construtor de estradas: o tipo de estrada não pôde ser feito: {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Construtor de estradas: fez {name} ({width, number, 0.00} m) como {path} na sua instalação OMSI; é escolhido na ferramenta estrada, clique no mapa para o construir.",
   "roadbuilder.status.unreadable": "Construtor de estradas: {name} não pode ser lido: {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Construtor de estradas: {name} não tem vias que o construtor de estradas possa ler; não foi feito com isso.",
-  "roadbuilder.status.edit": "Construtor de estradas: altere o {name} e guarde-o; {uses, plural, =0 {nenhum spline deste mapa o utiliza ainda.} one {o spline dele neste mapa muda com ele.} other {todos os # splines neste mapa mudam com ele.}}",
+  "roadbuilder.status.edit": "Construtor de estradas: a editar {name}; {uses, plural, =0 {nenhum spline deste mapa o utiliza ainda.} one {splines deste mapa que o utilizam: #, mudam com ele.} other {splines deste mapa que o utilizam: #, mudam com ele.}}",
   "roadbuilder.status.change_failed": "Construtor de estradas: {name} não pôde ser alterado: {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "a mudança do tipo de estrada {name}",
@@ -252,5 +252,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} tem {fitted, number, 0.00} m de largura em vez de {original, number, 0.00} m, como o seu tipo permite.",
   "roadbuilder.window.note.lanes": "Só são tomadas as primeiras {limit} vias.",
   "roadbuilder.window.note.tracks": "As linhas fora da faixa de rodagem são omitidas.",
-  "roadbuilder.status.edit_foreign": "Construtor de estradas: {name} não está na pasta deste projeto, por isso não pode ser alterado aqui. Altere-o e guarde-o como novo tipo de estrada."
+  "roadbuilder.status.edit_foreign": "Construtor de estradas: {name} não está na pasta deste projeto; guarde-o como novo tipo."
 }

@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Torniamo al costruttore di strade",
   "roadbuilder.row.back.tooltip": "Indietro senza scegliere un oggetto (Esc)",
   "roadbuilder.row.panel": "Fare clic sull'oggetto per la corsia {lane}; Esc risale al costruttore di strade.",
-  "roadbuilder.status.pick_row": "Costruttore di strade: clicca sull'oggetto per la corsia {lane} nella libreria, come un albero o, sotto Luci, un lampione.",
+  "roadbuilder.status.pick_row": "Costruttore di strade: oggetto di riga per la corsia {lane}.",
   "roadbuilder.status.row_set": "Costruttore di strade: una fila di {name} si trova lungo la corsia {lane} ogni volta che viene costruito il tipo di strada{turned, select, yes {, girato di {degrees, number, 0}° quindi corre lungo la strada} other {}}; impostare la distanza e il punto della corsia.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Costruttore di strade: nessun oggetto scelto.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} con le sue file di oggetti",
   "roadbuilder.step.with_bus": "{step} con le sue corsie preferenziali",
-  "roadbuilder.status.start": "Costruttore di strade: fai clic su un elemento della sezione per modificarlo, aggiungi elementi o parti da un modello, poi salva il tipo di strada.",
+  "roadbuilder.status.start": "Costruttore di strade: modifica un tipo di strada o creane uno nuovo.",
   "roadbuilder.status.make_failed": "Costruttore di strade: impossibile realizzare il tipo di strada: {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Costruttore di strade: hai creato {name} ({width, number, 0.00} m) come {path} nella tua installazione OMSI; viene scelto nello strumento strada, clicca sulla mappa per costruirlo.",
   "roadbuilder.status.unreadable": "Costruttore di strade: {name} non può essere letto: {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Costruttore di strade: {name} non contiene corsie che il costruttore di strade possa leggere; non è stato realizzato con esso.",
-  "roadbuilder.status.edit": "Costruttore di strade: modifica {name} e salvalo; {uses, plural, =0 {nessun spline di questa mappa lo utilizza ancora.} one {il suo spline in questa mappa cambia con esso.} other {tutti e # i splines in questa mappa cambiano con esso.}}",
+  "roadbuilder.status.edit": "Costruttore di strade: modifica di {name}; {uses, plural, =0 {nessuno spline di questa mappa lo usa ancora.} one {spline di questa mappa che lo usano: #, cambiano con esso.} other {spline di questa mappa che lo usano: #, cambiano con esso.}}",
   "roadbuilder.status.change_failed": "Costruttore di strade: {name} non può essere modificato: {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "il cambio di tipologia stradale {name}",
@@ -252,5 +252,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} è largo {fitted, number, 0.00} m invece di {original, number, 0.00} m, come consente il suo tipo.",
   "roadbuilder.window.note.lanes": "Vengono prese solo le prime {limit} corsie.",
   "roadbuilder.window.note.tracks": "I binari fuori dalla carreggiata vengono tralasciati.",
-  "roadbuilder.status.edit_foreign": "Costruttore di strade: {name} non è nella cartella di questo progetto, quindi non può essere modificato qui. Modificalo e salvalo come nuovo tipo di strada."
+  "roadbuilder.status.edit_foreign": "Costruttore di strade: {name} non è nella cartella di questo progetto; salvalo come nuovo tipo."
 }

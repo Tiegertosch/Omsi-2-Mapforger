@@ -292,28 +292,22 @@ namespace OmsiMapEditor.UI
         {
             if (signalWindow == null)
                 return;
-            string crossing = null, reason = null, next = null;
-            var warning = false;
+            // The window's footer already says why nothing can be changed and asks its questions (ADR 098, M6 step 5: an instruction
+            // has one place), so the status bar only says what the next click does and which crossing this is.
+            string crossing = null, next = null;
             if (signalCrossing != null && signalProgram != null && signalJunction != null)
             {
                 crossing = Loc.T("signals.junction", ("id", signalJunction.Id), ("approaches", signalCrossing.Approaches.Count),
                     ("movements", signalCrossing.Movements.Count), ("groups", signalProgram.Lights.Count));
-                if (!SignalsEditable)
+                if (signalConfirmText.Length == 0 && SignalsEditable)
                 {
-                    reason = SignalReadOnlyReason();
-                    warning = signalMade != null && CanEdit;
+                    if (signalTab == SignalTab.Movements)
+                        next = signalPlanText;
+                    else if (signalTab == SignalTab.Timeline)
+                        next = signalSegmentText;
                 }
-                if (signalConfirmText.Length > 0)
-                {
-                    next = signalConfirmText;
-                    warning = true;
-                }
-                else if (signalTab == SignalTab.Movements)
-                    next = signalPlanText;
-                else if (signalTab == SignalTab.Timeline && SignalsEditable)
-                    next = signalSegmentText;
             }
-            ShowToolHint(signalWindow, SignalWindowRules.Hint(crossing, reason, next), warning);
+            ShowToolHint(signalWindow, SignalWindowRules.Hint(crossing, null, next), false);
             UpdateSignalFooterOnly();
         }
 

@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Zpět ke staviteli silnic",
   "roadbuilder.row.back.tooltip": "Zpět bez výběru objektu (Esc)",
   "roadbuilder.row.panel": "Klikněte na objekt pro pruh {lane}; Esc se vrací ke staviteli silnic.",
-  "roadbuilder.status.pick_row": "Stavitel silnice: klikněte na objekt pro pruh {lane} v knihovně, například na strom nebo v části Světla na pouliční osvětlení.",
+  "roadbuilder.status.pick_row": "Stavitel silnic: objekt řádku pro pruh {lane}.",
   "roadbuilder.status.row_set": "Stavitel silnice: řada {name} stojí podél pruhu {lane}, kdykoli je postaven typ silnice{turned, select, yes {, otočený o {degrees, number, 0}°, takže běží podél silnice} other {}}; nastavte, jak daleko od sebe a kde přes jízdní pruh.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Stavitel silnice: nebyl vybrán žádný objekt.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} se svými řadami objektů",
   "roadbuilder.step.with_bus": "{step} se svými pruhy pro autobusy",
-  "roadbuilder.status.start": "Stavitel silnic: Kliknutím na prvek v příčném řezu jej změníte, přidejte prvky nebo začněte šablonou a pak typ silnice uložte.",
+  "roadbuilder.status.start": "Stavitel silnic: změňte typ silnice nebo vytvořte nový.",
   "roadbuilder.status.make_failed": "Stavitel silnice: typ silnice nelze vyrobit: {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Silniční stavitel: vyrobený {name} ({width, number, 0.00} m) jako {path} ve vaší instalaci OMSI; je vybrána v nástroji silnice, kliknutím na mapu ji postavte.",
   "roadbuilder.status.unreadable": "Stavitel silnice: {name} nelze přečíst: {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Stavitel silnice: {name} nemá žádné jízdní pruhy, které by mohl stavitel silnice přečíst; nebylo s tím vyrobeno.",
-  "roadbuilder.status.edit": "Stavitel silnic: změňte {name} a uložte jej; {uses, plural, one {jeho spline na této mapě se mění s tím.} few {všechny # splines na této mapě se mění s tím.} many {všech # splines na této mapě se mění s tím.} other {všech # splines na této mapě se mění s tím.} =0 {žádná spline této mapy ji zatím nepoužívá.}}",
+  "roadbuilder.status.edit": "Stavitel silnic: úprava {name}; {uses, plural, =0 {žádný spline této mapy jej zatím nepoužívá.} one {splines této mapy, které jej používají: #, mění se s ním.} few {splines této mapy, které jej používají: #, mění se s ním.} many {splines této mapy, které jej používají: #, mění se s ním.} other {splines této mapy, které jej používají: #, mění se s ním.}}",
   "roadbuilder.status.change_failed": "Stavitel silnice: {name} nelze změnit: {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "změna typu silnice {name}",
@@ -252,5 +252,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} je široký {fitted, number, 0.00} m místo {original, number, 0.00} m, jak to jeho druh dovoluje.",
   "roadbuilder.window.note.lanes": "Přebírá se jen prvních {limit} pruhů.",
   "roadbuilder.window.note.tracks": "Koleje mimo vozovku se vynechávají.",
-  "roadbuilder.status.edit_foreign": "Stavitel silnic: {name} není ve složce tohoto projektu, proto jej zde nelze změnit. Upravte jej a uložte jako nový typ silnice."
+  "roadbuilder.status.edit_foreign": "Stavitel silnic: {name} není ve složce tohoto projektu; uložte jej jako nový typ."
 }

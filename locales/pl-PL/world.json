@@ -5,6 +5,6 @@
   "@world.ground.ready": "{first} is a message of MapWorks in English",
   "world.objects.failed": "Nie można odczytać obiektów: {reason}",
   "@world.objects.failed": "{reason} is a message from the system, in English",
-  "world.objects.ready": "Gotowe modele obiektów: {kinds, plural, one {# rodzaj} few {# rodzaje} many {# rodzajów} other {# rodzaju}}, {textures, plural, one {# tekstura} few {# tekstury} many {# tekstur} other {# tekstury}}{problems, plural, one {; # problem, pierwszy: {first}} few {; # problemy, pierwszy: {first}} many {; # problemów, pierwszy: {first}} other {; # problemów, po pierwsze: {first}} =0 {}}.",
+  "world.objects.ready": "Gotowe modele obiektów: {kinds, plural, one {# rodzaj} few {# rodzaje} many {# rodzajów} other {# rodzaju}}, {textures, plural, one {# tekstura} few {# tekstury} many {# tekstur} other {# tekstury}}{problems, plural, =0 {} one {; problemy: #, patrz dziennik} few {; problemy: #, patrz dziennik} many {; problemy: #, patrz dziennik} other {; problemy: #, patrz dziennik}}.",
   "@world.objects.ready": "{first} is a message of MapWorks in English"
 }

@@ -245,7 +245,8 @@ namespace OmsiMapEditor.UI
             laneTabJunction = null;
             if (laneOptions != null)
             {
-                laneOptions.ShowJunction(Loc.T("lanes.click_junction"));
+                // No hint without a junction: the empty note of the panel already says to click one (M6 step 5, no second line in the status bar).
+                laneOptions.ShowJunction(string.Empty);
                 laneOptions.ShowPlan(string.Empty, false);
                 RefreshLaneArms(null);
             }

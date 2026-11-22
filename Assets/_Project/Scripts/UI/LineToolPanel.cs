@@ -608,13 +608,18 @@ namespace OmsiMapEditor.UI
             content.RegisterCallback(restore);
         }
 
-        /// <summary>The result of the way when there is one, else what to click.</summary>
+        /// <summary>
+        /// The result of the way when there is one, else what to click next. Without a stop the list of the panel says to click one, so
+        /// the status bar stays silent then (M6 step 5), except for the trip being edited.
+        /// </summary>
         private void UpdateHint()
         {
             if (resultText.Length > 0)
                 HintChanged?.Invoke(resultText, resultProblem);
-            else if (stopCount == 0)
-                HintChanged?.Invoke(editTrip != null ? Loc.T("line.edit.banner", ("trip", editTrip)) : Loc.T("line.hint"), false);
+            else if (editTrip != null && stopCount == 0)
+                HintChanged?.Invoke(Loc.T("line.edit.banner", ("trip", editTrip)), false);
+            else if (stopCount > 0)
+                HintChanged?.Invoke(Loc.T("line.hint"), false);
             else
                 HintChanged?.Invoke(string.Empty, false);
         }

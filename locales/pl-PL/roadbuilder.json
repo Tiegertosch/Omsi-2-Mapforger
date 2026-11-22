@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Wracając do budowniczego dróg",
   "roadbuilder.row.back.tooltip": "Powrót bez wybierania obiektu (Esc)",
   "roadbuilder.row.panel": "Kliknij obiekt pasa {lane}; Esc wraca do budowniczego dróg.",
-  "roadbuilder.status.pick_row": "Budowniczy dróg: kliknij obiekt pasa {lane} w bibliotece, na przykład drzewo lub w obszarze Światła latarnię uliczną.",
+  "roadbuilder.status.pick_row": "Kreator dróg: obiekt wiersza dla pasa {lane}.",
   "roadbuilder.status.row_set": "Budowniczy dróg: rząd {name} stoi wzdłuż pasa {lane}, ilekroć budowana jest droga typu {turned, select, yes {, obrócona o {degrees, number, 0}°, tak aby biegła wzdłuż drogi} other {}}; ustaw odległość od siebie i miejsce w poprzek pasa.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Budowniczy dróg: nie wybrano obiektu.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} z rzędami obiektów",
   "roadbuilder.step.with_bus": "{step} z pasami autobusowymi",
-  "roadbuilder.status.start": "Kreator dróg: kliknij element w przekroju, aby go zmienić, dodaj elementy lub zacznij od szablonu, a potem zapisz typ drogi.",
+  "roadbuilder.status.start": "Kreator dróg: zmień typ drogi lub utwórz nowy.",
   "roadbuilder.status.make_failed": "Budowniczy dróg: nie można utworzyć typu drogi: {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Budowniczy dróg: wykonano {name} ({width, number, 0.00} m) jako {path} w instalacji OMSI; jest on wybrany w narzędziu drogowym, kliknij mapę, aby go zbudować.",
   "roadbuilder.status.unreadable": "Budowniczy dróg: {name} nie można odczytać: {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Konstruktor dróg: {name} nie posiada pasów, które budowniczy dróg mógłby odczytać; nie zostało z nim zrobione.",
-  "roadbuilder.status.edit": "Budowniczy dróg: zmień {name} i zapisz go; {uses, plural, one {spline tego na tej mapie zmienia się wraz z nim.} few {wszystkie # splines na tej mapie zmieniają się wraz z nią.} many {wszystkie # splines na tej mapie zmieniają się wraz z nią.} other {wszystkie # splines na tej mapie zmieniają się wraz z nią.} =0 {żaden spline z tej mapy jeszcze jej nie używa.}}",
+  "roadbuilder.status.edit": "Kreator dróg: edycja {name}; {uses, plural, =0 {żaden spline z tej mapy jeszcze go nie używa.} one {splines tej mapy, które go używają: #, zmieniają się razem z nim.} few {splines tej mapy, które go używają: #, zmieniają się razem z nim.} many {splines tej mapy, które go używają: #, zmieniają się razem z nim.} other {splines tej mapy, które go używają: #, zmieniają się razem z nim.}}",
   "roadbuilder.status.change_failed": "Producent dróg: {name} nie można zmienić: {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "zmiana typu drogi {name}",
@@ -252,5 +252,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} ma szerokość {fitted, number, 0.00} m zamiast {original, number, 0.00} m, na jaką pozwala jego rodzaj.",
   "roadbuilder.window.note.lanes": "Brane jest tylko pierwszych {limit} pasów.",
   "roadbuilder.window.note.tracks": "Tory poza jezdnią są pomijane.",
-  "roadbuilder.status.edit_foreign": "Budowniczy dróg: {name} nie znajduje się w folderze tego projektu, więc nie można go tu zmienić. Zmień go i zapisz jako nowy typ drogi."
+  "roadbuilder.status.edit_foreign": "Kreator dróg: {name} nie leży w folderze tego projektu; zapisz go jako nowy typ."
 }

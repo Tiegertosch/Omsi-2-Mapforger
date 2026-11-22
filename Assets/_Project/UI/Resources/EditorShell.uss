@@ -93,7 +93,6 @@
 .edit-menu { left: 222px; }
 .view-menu { left: 276px; }
 .help-menu { left: 384px; width: 360px; max-width: 94%; }
-.help-menu-scroll { flex-shrink: 1; min-height: 0; }
 .menu-popup-item { height: 32px; -unity-text-align: middle-left; padding-left: 10px; background-color: var(--mf-color-clear); border-width: 0; border-radius: var(--mf-radius-sm); color: var(--mf-color-text-primary); }
 .menu-popup-item:hover { background-color: var(--mf-color-panel-hover); }
 .menu-popup-item:disabled { color: var(--mf-color-text-disabled); }
@@ -102,7 +101,6 @@
 .menu-section-label { margin: 4px 10px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .popup-title { margin: 4px 8px 8px; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .popup-description { margin: 4px 8px; color: var(--mf-color-text-secondary); white-space: normal; }
-.help-controls { margin-bottom: var(--mf-space-2); padding: var(--mf-space-2); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-sm); }
 .popup-close { align-self: flex-end; min-width: 68px; -unity-text-align: middle-center; }
 
 /* Workspace: the map fills it, panels and controls float above it */
@@ -904,9 +902,9 @@
 .status-bar > Label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-pointer { display: none; }
 .status-selection { flex-shrink: 0; margin-right: var(--mf-space-3); color: var(--mf-color-accent); }
-.status-message { flex-grow: 1; flex-shrink: 1; -unity-text-align: middle-center; color: var(--mf-color-text-primary); }
-/* The hint of the open tool has its own place at the right, so it never replaces a message; it gives way first when both are long. */
-.status-hint { display: none; flex-grow: 0; flex-shrink: 3; max-width: 60%; margin-left: var(--mf-space-3); padding-left: var(--mf-space-3); border-left-width: 1px; border-left-color: var(--mf-color-border); -unity-text-align: middle-right; color: var(--mf-color-text-secondary); }
+.status-message { flex-grow: 1; flex-shrink: 1; flex-basis: 0; -unity-text-align: middle-center; color: var(--mf-color-text-primary); }
+/* The hint of the open tool has its own place at the right, so it never replaces a message. Its width is set from its text in EditorShellToolHints.FitToolHint (up to 65 % of the bar); the message gives way first. */
+.status-hint { display: none; flex-grow: 0; flex-shrink: 0; margin-left: var(--mf-space-3); padding-left: var(--mf-space-3); border-left-width: 1px; border-left-color: var(--mf-color-border); -unity-text-align: middle-right; color: var(--mf-color-text-secondary); }
 .status-hint.status-hint-shown { display: flex; }
 .status-map-state { display: none; }
 

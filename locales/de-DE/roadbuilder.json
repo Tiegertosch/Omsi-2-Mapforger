@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Zurück zum Straßenbauer",
   "roadbuilder.row.back.tooltip": "Zurück, ohne ein Objekt zu wählen (Esc)",
   "roadbuilder.row.panel": "Klicke das Objekt für Fahrstreifen {lane} an; Esc geht zurück zum Straßenbauer.",
-  "roadbuilder.status.pick_row": "Straßenbauer: Klicke in der Bibliothek das Objekt für Fahrstreifen {lane} an, etwa einen Baum oder, unter „Lichter“, eine Straßenlaterne.",
+  "roadbuilder.status.pick_row": "Straßenbauer: Reihenobjekt für Fahrstreifen {lane}.",
   "roadbuilder.status.row_set": "Straßenbauer: Eine Reihe aus {name} steht entlang von Fahrstreifen {lane}, wenn der Straßentyp gebaut wird{turned, select, yes {, um {degrees, number, 0}° gedreht, damit sie entlang der Straße läuft} other {}}; lege fest, wie weit auseinander und wo quer zum Fahrstreifen.",
   "roadbuilder.status.no_object": "Straßenbauer: Kein Objekt gewählt.",
   "roadbuilder.rows_laid": "{count, plural, one {# Objekt steht} other {# Objekte stehen}} in Reihen daran.",
@@ -12,12 +12,12 @@
   "roadbuilder.bus_failed": "Die Busspuren konnten nicht für Busse erhalten werden: {reason}",
   "roadbuilder.step.with_rows": "{step} mit ihren Objektreihen",
   "roadbuilder.step.with_bus": "{step} mit ihren Busspuren",
-  "roadbuilder.status.start": "Straßenbauer: Klicke ein Element im Straßenaufbau an, um es zu ändern, füge Elemente hinzu oder beginne mit einer Vorlage, dann speichere den Straßentyp.",
+  "roadbuilder.status.start": "Straßenbauer: Straßentyp ändern oder einen neuen anlegen.",
   "roadbuilder.status.make_failed": "Straßenbauer: Der Straßentyp konnte nicht angelegt werden: {reason}",
   "roadbuilder.status.made": "Straßenbauer: {name} ({width, number, 0.00} m) als {path} in deiner OMSI-Installation angelegt; er ist im Straßenwerkzeug gewählt, klicke in die Karte, um ihn zu bauen.",
   "roadbuilder.status.unreadable": "Straßenbauer: {name} kann nicht gelesen werden: {reason}",
   "roadbuilder.status.no_lanes": "Straßenbauer: {name} enthält keine Fahrstreifen, die der Straßenbauer lesen kann; er wurde nicht damit angelegt.",
-  "roadbuilder.status.edit": "Straßenbauer: Ändere {name} und speichere ihn; {uses, plural, =0 {kein Spline dieser Karte nutzt ihn bisher.} one {der Spline dieser Karte, der ihn nutzt, ändert sich mit.} other {alle # Splines dieser Karte, die ihn nutzen, ändern sich mit.}}",
+  "roadbuilder.status.edit": "Straßenbauer: {name} wird bearbeitet; {uses, plural, =0 {kein Spline dieser Karte nutzt ihn bisher.} one {Splines dieser Karte, die ihn nutzen: #, sie ändern sich mit.} other {Splines dieser Karte, die ihn nutzen: #, sie ändern sich mit.}}",
   "roadbuilder.status.change_failed": "Straßenbauer: {name} konnte nicht geändert werden: {reason}",
   "roadbuilder.step.change": "Änderung des Straßentyps {name}",
   "roadbuilder.status.changed": "Straßenbauer: {name} geändert ({width, number, 0.00} m){uses, plural, =0 {} one {; # Spline davon änderte sich mit} other {; # Splines davon änderten sich mit}}{remade, plural, =0 {} one {, # Kreuzung wurde neu erzeugt{every, select, yes { mit jedem Weg hindurch, da sich die Fahrstreifen änderten} other {}}} other {, # Kreuzungen wurden neu erzeugt{every, select, yes { mit jedem Weg hindurch, da sich die Fahrstreifen änderten} other {}}}}{hasStayed, select, yes {; diese Kreuzungen bleiben, wie sie waren: {stayed}} other {}}{rows, plural, =0 {} one {; # Objekt steht in seinen Reihen} other {; # Objekte stehen in seinen Reihen}}{hasFailed, select, yes {; nicht gelegt: {failed}} other {}}. Strg+Z macht es rückgängig.",
@@ -241,5 +241,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} ist {fitted, number, 0.00} m breit statt {original, number, 0.00} m, wie es seine Art erlaubt.",
   "roadbuilder.window.note.lanes": "Nur die ersten {limit} Spuren werden übernommen.",
   "roadbuilder.window.note.tracks": "Gleise außerhalb der Fahrbahn werden weggelassen.",
-  "roadbuilder.status.edit_foreign": "Straßenbauer: {name} liegt nicht im Ordner dieses Projekts und lässt sich hier nicht ändern. Ändere ihn und speichere ihn als neuen Straßentyp."
+  "roadbuilder.status.edit_foreign": "Straßenbauer: {name} liegt nicht im Ordner dieses Projekts; als neuen Typ speichern."
 }

@@ -3,7 +3,7 @@
   "roadbuilder.row.back": "Retour au constructeur de route",
   "roadbuilder.row.back.tooltip": "Retour sans choisir d'objet (Esc)",
   "roadbuilder.row.panel": "Cliquez sur l'objet pour la voie {lane} ; Esc revient au constructeur de routes.",
-  "roadbuilder.status.pick_row": "Constructeur de routes : cliquez sur l'objet de la voie {lane} dans la bibliothèque, comme un arbre ou, sous Lumières, un lampadaire.",
+  "roadbuilder.status.pick_row": "Constructeur de routes : objet de ligne pour la voie {lane}.",
   "roadbuilder.status.row_set": "Constructeur de route : une rangée de {name} se trouve le long de la voie {lane} chaque fois que le type de route est construit {turned, select, yes {, tourné de {degrees, number, 0}° pour longer la route} other {}} ; définir à quelle distance les uns des autres et où à travers la voie.",
   "@roadbuilder.status.row_set": "{turned} is yes or no and chooses a part: keep it in English",
   "roadbuilder.status.no_object": "Constructeur de route : aucun objet choisi.",
@@ -15,14 +15,14 @@
   "@roadbuilder.bus_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.with_rows": "{step} avec ses lignes d'objets",
   "roadbuilder.step.with_bus": "{step} avec ses couloirs de bus",
-  "roadbuilder.status.start": "Constructeur de routes : cliquez sur un élément de la coupe pour le modifier, ajoutez des éléments ou partez d'un modèle, puis enregistrez le type de route.",
+  "roadbuilder.status.start": "Constructeur de routes : modifiez un type de route ou créez-en un.",
   "roadbuilder.status.make_failed": "Constructeur de route : le type de route n'a pas pu être créé : {reason}",
   "@roadbuilder.status.make_failed": "{reason} is a message from the system, in English",
   "roadbuilder.status.made": "Constructeur de routes : faites {name} ({width, number, 0.00} m) en tant que {path} dans votre installation OMSI ; il est choisi dans l'outil route, cliquez sur la carte pour le construire.",
   "roadbuilder.status.unreadable": "Constructeur de route : {name} ne peut pas être lu : {reason}",
   "@roadbuilder.status.unreadable": "{reason} is a message from the system, in English",
   "roadbuilder.status.no_lanes": "Constructeur de route : {name} ne contient aucune voie que le constructeur de route peut lire ; cela n'a pas été fait avec.",
-  "roadbuilder.status.edit": "Constructeur de routes : modifiez {name} et enregistrez-le ; {uses, plural, =0 {aucun spline de cette carte ne l'utilise encore.} one {le spline de celui-ci dans cette carte change avec lui.} other {les # splines de cette carte changent avec.}}",
+  "roadbuilder.status.edit": "Constructeur de routes : modification de {name} ; {uses, plural, =0 {aucun spline de cette carte ne l'utilise encore.} one {splines de cette carte qui l'utilisent : #, ils changent avec lui.} other {splines de cette carte qui l'utilisent : #, ils changent avec lui.}}",
   "roadbuilder.status.change_failed": "Constructeur de route : {name} n'a pas pu être modifié : {reason}",
   "@roadbuilder.status.change_failed": "{reason} is a message from the system, in English",
   "roadbuilder.step.change": "le changement de type de route {name}",
@@ -252,5 +252,5 @@
   "roadbuilder.window.note.width": "{kind} {lane} fait {fitted, number, 0.00} m de large au lieu de {original, number, 0.00} m, comme son type le permet.",
   "roadbuilder.window.note.lanes": "Seules les {limit} premières voies sont prises.",
   "roadbuilder.window.note.tracks": "Les rails hors de la chaussée sont laissés de côté.",
-  "roadbuilder.status.edit_foreign": "Constructeur de routes : {name} n'est pas dans le dossier de ce projet et ne peut pas être modifié ici. Modifiez-le et enregistrez-le comme nouveau type de route."
+  "roadbuilder.status.edit_foreign": "Constructeur de routes : {name} n'est pas dans le dossier de ce projet ; enregistrez-le comme nouveau type."
 }
