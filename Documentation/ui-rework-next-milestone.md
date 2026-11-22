@@ -1,5 +1,7 @@
 # UI-Rework: nächster Schritt – M0 und M1 (12. November 2026)
 
+**Status (22. November 2026): M8 Schritt 0 in Arbeit.** Der Projektinhaber hat am 22. November 2026 alle fünf Fragen der Entscheidungsvorlage beantwortet (Tabelle im Abschnitt „M8 – Plan“ am Ende dieser Datei, Spalte „Entscheidung“); die Prüfgrundlage (Tests, Befunde, Vorher-Bilder) steht im Abschnitt „M8 Schritt 0 – Befunde“ ganz am Ende. Nichts committet.
+
 Empfehlung aus [ui-rework-roadmap.md](ui-rework-roadmap.md). **Stand 12. November 2026: M0 und M1 sind abgeschlossen, vom Nutzer getestet und committet (ADR 098, „M1“). Dieses Dokument bleibt als Plan und Nachweis; M2 ist umgesetzt und committet; M3 ist abgeschlossen, vom Nutzer getestet (13. November 2026) und committet; der nächste Meilenstein war M4; M4 und M5 sind inzwischen abgeschlossen, Bestandsaufnahme und Plan für M6 stehen unten (Abschnitt „M6“, 21. November 2026), Stand in [ui-rework-roadmap.md](ui-rework-roadmap.md). **M6 ist abgeschlossen (22. November 2026):** Schritte 0 bis 7 vom Projektinhaber getestet und gepusht (`26d0c1c` bis `41aeba5`). Der Abschnitt „M6“ unten bleibt als Plan und Nachweis. **M7 „Dialoge vereinheitlichen“ ist abgeschlossen (22. November 2026):** Schritte 0 bis 7 vom Projektinhaber getestet und gepusht (`98038b6` bis `311aeb8`); die Abschnitte „M7“ unten bleiben als Plan und Nachweis. **Nächster Meilenstein ist M8 „Aufräumen und Abschluss“** (Roadmap, `ui-rework-roadmap.md`); er ist nicht geplant und wartet auf die Freigabe des Projektinhabers. Eingangsliste für M8: die ungenutzten USS-Klassen aus ADR 098, Nachtrag „M7 Schritt 6“.
 
 ## Empfehlung
@@ -401,3 +403,199 @@ Nicht gefragt (steht fest): Dialoge bleiben modal mit gesperrten Tastenkürzeln 
 - **Esc gegen Abbrechen (Fahrplan, Fahrzeuge):** Dasselbe. Fahrplan: „Cancel“ ruft `CloseTimetable` = `HidePopup`; Esc ruft `OverlayRegistry.CloseAllShown` = `Hide` je Überlagerung. Der Fahrplan-Entwurf (`timetableLines`, `timetableTrips`, `timetableDirty*`) wird beim nächsten `OpenTimetable` geleert; geschrieben wird nur über „Apply“. Fahrzeuge: Änderungen wirken sofort als Undo-Schritte (`ChangeVehicles`), „Close“ ruft `HidePopup`, Esc dasselbe; es gibt nichts zu verwerfen. Keiner der beiden meldet eine `Closed`-Aktion an. Auch beim Einstiegsnamen (Antwort verwerfen, Fokus an die Karte) und bei Updates (`CloseUpdates` bricht die Prüfung ab) tun Esc (über `Closed`) und Knopf dasselbe. Folge für die Fabrik (Schritt 1): Esc muss den Abbrechen-Knopf nicht eigens auslösen, solange jede Aufräumarbeit als `Closed` angemeldet ist; ein Test soll das für alle 13 Dialoge festhalten.
 - **Prüfargumente:** `-exportDialog`, `-entryNameDialog` (mit Projekt), `-signalNotice` sind umgesetzt (`EditorShellBootstrap.cs`, `CommandLine.md`).
 - **Test `DialogCodeRulesTests`:** zwei Obergrenzen (13 `dialog-overlay`-Konstruktionen, 172 Inline-Größen in `Scripts/UI`); Zeilen mit `// computed` sind ausgenommen.
+
+# M8 – Plan (22. November 2026)
+
+**Status: Entscheidungen eingetragen (22. November 2026), Schritt 0 in Arbeit.** Gemessen am Stand `827309a` (Zweig `feature/ui-rework`, sauber bis auf `.claude/`). Nichts geändert, nichts committet, nichts gebaut; die Zahlen stammen aus Skripten über den Quelltext (im Scratchpad, nicht im Repo) und aus `git`. Ziel laut Roadmap: keine Reste, Rework dokumentiert und freigabefähig.
+
+## Kernzahlen
+
+| Messgröße | Wert |
+|---|---|
+| USS-Klassen in `EditorShell.uss` (ohne Kommentare) | 710 |
+| ohne jede Verwendung (Scripts, UXML, Tests, Tools) | 48: **24 eigene tote Klassen** und 24 Überschreibungen von Unity-Klassen (`unity-*`, bleiben) |
+| nur über Präfix-Bausteine in C# erreichbar (bleiben) | 24 (`junction-swatch-*`, `road-mini-lane-*`, `road-section-element-*`, `road-swatch-*`) |
+| nur von einem Test verwendet | `primary-button` (`UiTokenContrastTests.cs:209`) |
+| Textschlüssel in `locales/en-US` (ohne `@`-Notizen) | 2.892 |
+| davon ohne Verwendung in `Scripts/**/*.cs` | **62**; dazu 12 `toolbar.*`, die mit der Leistenbeschriftung frei werden = **74 Schlüssel in 8 Sprachen** |
+| Umzubenennen | 2 UXML-Namen (5 Fundstellen im Code, 2 im UXML), 1 Methode (`RenderProjectBrowser`: 1 Definition, 23 Verwendungen in 9 Dateien) |
+| Matrixzeilen nicht „voll“ | 28 (16 teilweise, 6 alt, 5 Lücke, 1 „voll (Menü), Dialog alt“) plus 2 Mischzeilen; **keine** trägt eine Entscheidung |
+| Commits `main..feature/ui-rework` | **65** |
+| Commits `feature/ui-rework..main` | **0** (`main` = `64e125a`, 12. November 2026, ist Vorfahre des Zweigs) |
+| Andere Zweige | keine (lokal und auf `origin` nur `main` und `feature/ui-rework`) |
+| Version / letztes Release | `bundleVersion` 1.1.5, Tag `v1.1.5` |
+
+## Bestandsaufnahme
+
+### (a) USS-Klassen ohne Verwendung
+
+Verfahren: alle `.klasse`-Selektoren aus `EditorShell.uss` (Kommentare entfernt); jedes Vorkommen als ganzes Wort in allen `.cs`, `.uxml`, `.json`, `.txt`, `.ps1` unter `Assets` und `Tools`. Klassen, die nur über ein Präfix in C# gebaut werden (`"road-swatch-" + …`), zählen als verwendet. Nachprüfung der 16 aus dem Review (`ui-rework-architecture-review.md:107`) und der Liste aus ADR 098 („M7 Schritt 6“, `Decisions.md:1972`):
+
+| Gruppe | Klassen | USS-Zeilen (`EditorShell.uss`) | Befund |
+|---|---|---|---|
+| Reste des Project-Fensters | `panel-list` (mit Regeln für `.unity-collection-view__item`), `panel-row`, `panel-row-icon`, `-thumbnail`, `-texts`, `-name`, `-detail`, `-tag`, `panel-heading`, `panel-search-icon`, `project-tabs` | `:300`–`:308`, `:325`–`:329`, `:688`, `:770`, `:773`, `:812`–`:813`, `:1119` | tot; `panel-search-icon` hängt auch an `.picker-search` (`:688`), `.panel-row-detail` an der Hover-Regel `:1119` |
+| Werkzeugkopf | `tool-panel-badge`, `-titles`, `-title`, `-subtitle` | `:284`–`:288` | tot (laut ADR 098 aus M7 offen gelassen) |
+| Auswahlkacheln | `picker-title`, `picker-subtitle` | `:655`–`:656` | tot |
+| Menüs, Leiste | `menu-popup-item-checked`, `menu-section-label`, `view-control-separator` | `:104`, `:106`, `:247` | tot |
+| Dialoge | `satellite-columns`, `satellite-column`, `road-picker-new` (mit `> .icon`, `> Label`) | `:1038`, `:1042`, `:1075`–`:1077` | tot |
+| **Neu gegenüber der ADR-Liste** | `browser-map-description` (mit `Label`) | `:778`–`:779` | tot; `browser-map-description-text` (`:817`) ist verwendet |
+| **In der Review-Liste, aber nicht tot** | `floating-panel-collapsed` | `:174`–`:177` | wird in C# gesetzt (`FloatingWindowFrame.cs:179`); der Review-Befund war falsch, bleibt |
+| **In der Review-Liste, nur Test** | `primary-button` | `:146`, `:147`, `:1137` | im Produkt nirgends gesetzt; nur `UiTokenContrastTests.cs:209` zählt sie. Entfernen und aus der Testliste streichen |
+| **In der Review-Liste, keine Klasse** | `folders-left-out` | – | gemeint war die Methode `ShowFoldersLeftOut` (`EditorShellContentFolders.cs:121`); sie wirkt heute (`Loc.T("contentfolders.left_out", …)` in `ObjectLibraryPanel.cs:786` und `RoadToolPanel.cs:719`); Matrixzeile 37 („Hinweis fehlt“) ist überholt |
+
+Ergebnis: Die „16 Klassen“ des Reviews sind heute 12 tote Selektornamen (`panel-row*` als einer gezählt), 1 nur im Test genutzte Klasse (`primary-button`), 1 Fehlbefund (`floating-panel-collapsed`) und 1 Nicht-Klasse; ADR 098 nennt dazu `tool-panel-*` und `picker-subtitle`, der Lauf findet zusätzlich `browser-map-description`. Die Akzeptanz „Suche nach den 16 Klassen ergibt nichts“ ist so zu lesen: Die Suche nach den 24 toten Klassen und `primary-button` in `Assets` und `Tools` ergibt nichts; `floating-panel-collapsed` bleibt bewusst. Die 24 Unity-Überschreibungen (`unity-button`, `unity-toggle__*`, `unity-scroller__*` …) bleiben, sie stylen Unitys eigene Elemente.
+
+### (b) Versteckte Labels und Tastenkappen
+
+- `MapToolbar.AddButton` (`MapToolbar.cs:86`–`:102`) baut für jeden der 13 Leistenknöpfe ein Label (`tool-label`, `:94`–`:96`) und eine Tastenkappe (`tool-keycap`, `:97`–`:99`); die USS blendet beide aus (`EditorShell.uss:261`, `:262`: `display: none`). Das sind 26 unsichtbare Elemente.
+- Die Parameter `key` und `nameKey` von `AddButton` und `EditorToolRules.KeyOf(tool).ToString()` im Aufruf `AddTool` (`:83`) dienen nur diesen Elementen. Der Tooltip trägt Namen und Taste („Drag (Q): …“); vor dem Entfernen prüfen, dass jeder der 13 Tooltips die Taste nennt (Entf, 3 und die Buchstaben).
+- Weitere `display: none`-Regeln sind **nicht tot**: `picker-tile-name` (an 9 Stellen gesetzt), `bar-mode-text` (`EditorShellBottomBar.cs:66`, kompakter Modus), `status-hint` (Zustand per `status-hint-shown`, `EditorShellToolHints.cs:67`), `line-stop-remove` (Hover), `new-map-slider … dragger-border`.
+- **Zu prüfen in Schritt 1:** `status-pointer` und `status-map-state` (`EditorShell.uss:977`, `:983`; Elemente `pointer-info` und `map-state` in `EditorShell.uxml:60`, `:64`) sind immer ausgeblendet. `map-state` wird befüllt und dient als Tooltip der Projektpille (`EditorShellBootstrap.cs:8248`, `:8252`), bleibt also; bei `pointer-info` (`:531`) ist offen, ob das Befüllen noch eine Wirkung hat.
+
+### (c) Textschlüssel ohne Verwendung
+
+- Der Test `LocalizationKeyUsageTests.EveryKeyTheCodeAsksForExistsInEnglishWithMatchingPlaceholders` (`LocalizationKeyUsageTests.cs:44`–`:73`) sammelt alle Schlüssel, die im Quelltext unter `Assets/_Project/Scripts/**/*.cs` als Zeichenkette stehen (ohne `Core/Localization/` und `UI/LocBindings.cs`), und **schreibt unbenutzte Schlüssel nur auf die Konsole** (`:70`–`:72`); er schlägt nicht fehl. Einen Test, der Waisen als Fehler meldet, gibt es nicht; `Tools/LocaleCheck` prüft nur Syntax und den Abgleich der Sprachen.
+- Gemessen (gleiche Zählweise, ohne `@`-Notizen): **62 Waisen** in `locales/en-US`:
+  - `newtrip.*` 37 Schlüssel (der Dialog „New trip“ ist weg; verwendet wird nur `timetable.newtrip`), darunter die zwei, die der Projektinhaber am 17. November 2026 umformuliert ließ (`Decisions.md:2048`)
+  - `inspector.connections/objects/splines/status` 4, `mapcheck.parking.heading/laneend/nolane/side` 4, `satellite.move.{north,east,south,west}.tooltip` 4, `line.result.{back,out,ring}.problem` 3, `roadbuild.parking.problem.{no_lane,short,wide}` 3, je 1 bis 2: `context.attached`, `context.properties.tooltip`, `terrain.brush`, `terrain.title`, `export.created_open_failed`, `labels.line`, `project.empty`
+  - Nur `terrain.title` und `project.empty` kannte der Review (`ui-rework-architecture-review.md:109`); die übrigen 60 sind seitdem entstanden (Werkzeugfenster, Dialog-Fabrik, Inspector am Element).
+- Dazu **12 Schlüssel `toolbar.*`** (`drag`, `move`, `rotate`, `delete`, `road`, `terrain`, `markings`, `traffic`, `lanes`, `signals`, `line`, `objects`), die nur `MapToolbar.cs:94` für die unsichtbaren Labels liest; sie werden mit Schritt 2 frei. Die `*.tooltip`-Schlüssel bleiben.
+- Löschen heißt in **allen 8 Sprachordnern** (`cs-CZ`, `de-DE`, `en-US`, `es-ES`, `fr-FR`, `it-IT`, `pl-PL`, `pt-PT`, je 60 Dateien), samt zugehöriger `@…`-Notiz; `LocaleCheck --strict` meldet Abweichungen zwischen den Sprachen.
+- Vorbehalt: Die Zählung sieht nur Schlüssel, die als Zeichenkette im Quelltext von `Scripts` stehen (der Test erlaubt keine aus Teilen gebauten Schlüssel, `i18n:keys`). Vor dem Löschen zusätzlich `Tools/` und Dev-Argumente (`-selftest`) durchsuchen.
+
+### (d) Fundstellen der umzubenennenden Namen
+
+| Name | Vorschlag | Fundstellen Code | Weitere |
+|---|---|---|---|
+| UXML-Name `view-menu-button` (Knopf „Tools“) | `tools-menu-button` | `EditorShellBootstrap.cs:550`, `EditorShellLocalization.cs:68`, `EditorShellMenuPlacement.cs:18` | `EditorShell.uxml:9`; Doku: Audit `:57`, Review `:111`, Roadmap `:157` |
+| Zugehöriges Menü `view-menu` (Name und Klasse) | `tools-menu` | `EditorShellBootstrap.cs:429`, `EditorShellMenuPlacement.cs:18` | `EditorShell.uxml:90`, `EditorShell.uss:99` (`.view-menu`); im Review nicht genannt, derselbe Fehlname |
+| UXML-Name `project-collapse-button` (X des Popups) | `bar-popup-close-button` | `EditorShellBottomBar.cs:81`, `EditorShellLocalization.cs:23` | `EditorShell.uxml:30` |
+| Methode `RenderProjectBrowser` | `RenderBarPopup` | Definition `EditorShellBootstrap.cs:8929`; Verwendungen: `EditorShellBootstrap.cs` (9), `EditorShellPaths.cs` (5), `EditorShellEntryPoints.cs` (3), je 1 in `EditorShellBottomBar.cs`, `EditorShellChronoDates.cs`, `EditorShellChronoLines.cs`, `EditorShellLocalization.cs`, `EditorShellMapSettings.cs`, `EditorShellProjectTabs.cs` | Doku: `Architecture.md:48`, `Decisions.md:1691`, `:1844`, `:1974`, `DevelopmentSetup.md:57`, `RefactoringAudit.md:34`, Audit `:25`, `:35` |
+
+- **Prüfargumente und Tests sind nicht betroffen:** `CommandLine.md`, alle Tests und alle Kommandozeilenargumente enthalten keinen der Namen (Suche über `*.cs`, `*.uxml`, `*.uss`, `*.md`). Es sind interne UXML- und Methodennamen.
+- `graphify-out/` (Wissensgraph) enthält die Namen im Cache; es ist ein Werkzeug-Artefakt und wird nicht von Hand angefasst.
+
+### (e) Funktionsmatrix
+
+`ui-rework-feature-matrix.md` trägt den Stand vom 12. November 2026; die Auswertung (25 voll, 17 teilweise, 7 alt, 7 Lücke = 56 Zeilen) ist nicht nachgeführt. Nicht „voll“ und ohne Entscheidung sind **28 Zeilen** (Zeilennummern der Matrixdatei):
+
+- **Lücke (5):** `:35` Karte ohne Projekt ansehen (M1, `64e125a`), `:37` Objekt- und Spline-Ordner (Hinweis wirkt heute, siehe (a)), `:49` Kachel zurücksetzen (M3: rückgängig machbar), `:62` Einfügen (M1), `:88` Luftbild-Fenster (sperrt Kürzel, M1). Vermutlich alle erledigt; die Zeile wird mit Beleg auf „voll“ gesetzt.
+- **teilweise (16):** `:36`, `:51`, `:52`, `:56`, `:58`, `:67`, `:73`, `:74`, `:76`, `:77`, `:79`, `:80`, `:81`, `:86`, `:91`, `:97`. Vieles ist durch M4 (Werkzeugfenster), M5 (Kontextmenü, Inspector) und M7 (13 Dialoge aus der Fabrik) erledigt; „Dialoge alt“ und „105 Inline-Größen“ sind überholt. Vermutlich offen bleiben: Reihen, Kreuzungen, Ampeln, Markierungen ohne Kontextmenü; Spline-Menü in 3D; Edit-Menü „Kreuzungen aus Profil“; kein Prüfargument für Settings-Dialog und Spline-/Kachelmenü (`:97`).
+- **alt (6):** `:34` Karte/Projekt öffnen (Startbildschirm), `:39` Updates und Fehlerbericht (M7 erledigt), `:72` Enden und Gelenke ziehen, `:75` Gelände neu anpassen, `:89` Eigene Bilder, `:92` Fahrten, Zeiten, Depots (M7 erledigt).
+- **Mischzeile in der Zählung (1):** `:38` „voll (Menü), Dialog alt“ (M7 erledigt). **Weitere Mischzeilen (2):** `:48` „voll / teilweise“ (Kachel hinzufügen/löschen, kein Kontextmenüeintrag), `:70` „voll in der Draufsicht“ (in 3D trifft das Menü keine Splines).
+- Die Auswertung (`:101`–`:106`) und die Kopfzeile müssen neu gezählt werden. Das Neubelegen ist Handarbeit gegen Code und Prüfargumente und braucht den Reviewer.
+
+### (f) `main` gegen `feature/ui-rework`
+
+- `git log --oneline main..feature/ui-rework | wc -l` = **65**; `git log --oneline feature/ui-rework..main` = **leer**; `git merge-base` = `64e125a` = Spitze von `main`. `main` ist Vorfahre des Zweigs: **Fast-forward ist möglich, Konflikte gibt es nicht.** Zeitraum der 65 Commits: 12. bis 22. November 2026; 626 Dateien, +44.851/−7.678 Zeilen (davon unter `Scripts`: 217 Dateien). `origin/feature/ui-rework` = `827309a` = Zweig; `origin/main` = `main`.
+- `main` enthält die Korrektur „Objektauswahl ohne Projekt“ bereits (`64e125a`).
+- `feature/traffic-signals` und `feature/pedestrian-crossings` existieren weder lokal noch auf `origin`; ihr Inhalt ist seit 11. November 2026 in `main` und im Rework aufgegangen (`ProjectStatus.md:82`). Nichts zu koordinieren.
+- Letztes Release 1.1.5 (Tag `v1.1.5`; `bundleVersion` 1.1.5, `ProjectSettings/ProjectSettings.asset:154`); seitdem 10 Tage UI-Rework ohne Versionsnummer.
+
+### (g) Liefe `BuildRelease` heute durch?
+
+Nur aus Code und Doku abgeleitet, nicht gebaut: **voraussichtlich ja.**
+
+- Die einzige harte Sperre im Quelltext ist die Freigabeliste: `BuildRelease` wirft bei neuen oder geänderten Player-Dateien (`WindowsPlayerBuild.cs:93`–`:100`). `PlayerAssetReview.txt` wurde zuletzt mit `311aeb8` geschrieben; die SHA-256-Summen von `EditorShell.uss` (`D06C93E1…`) und `EditorShell.uxml` (`46CC9C99…`) stimmen mit den Zeilen 16 und 17 der Liste überein. Der Arbeitsbaum ist sauber. Die übrigen Player-Dateien habe ich nicht einzeln nachgerechnet.
+- Der Lauf braucht die OMSI-Installation (Bytevergleich, `FindCopiedInstallFile`) und ein nicht gesperrtes Projekt: auf der Projektkopie im Scratchpad bauen (CLAUDE.md, „Bauen und Testen“).
+- **Jede Änderung in M8 an `EditorShell.uss`/`EditorShell.uxml` macht die Freigabeliste ungültig** (Schritte 1, 2, 4). Deshalb „Record Reviewed Player Assets“ erst am Ende (Schritt 6) und danach nur noch Änderungen ohne Player-Dateien.
+- Nicht aus dem Code ableitbar: Der letzte nachgewiesene Lauf mit Installer (Setup, Deinstaller) war am 1. November 2026 (`DevelopmentSetup.md:223`); ob er auf dem Stand des Zweigs baut, zeigt erst der Lauf in Schritt 6.
+
+## Arbeitsplan
+
+Zuständigkeit nach Roadmap: reviewer (Befunde), frontend (Änderungen), testing (voller Lauf), Hauptsitzung (Entscheidungen, Commits nach Freigabe). Kein Schritt ändert Verhalten; alles Sichtbare muss **pixelgleich** bleiben (bekanntes Rauschen der Vektorebene am Auswahlrand: einzelne Pixel, siehe ADR 098 „M7 Schritt 6“). Jeder Schritt ist ein eigener Commit nach Handtest des Projektinhabers und führt die Doku im selben Commit nach.
+
+| Schritt | Inhalt | Dateien | Prüfung | Risiko |
+|---|---|---|---|---|
+| **0 Basis** | Projektkopie im Scratchpad; EditMode-Lauf (Basis 1400 Tests) und `LocaleCheck --strict` auf `827309a`. Vorher-Bilder (Grundorf, `-language en-US`, 1920×1010, 100 % und 200 %): Hauptansicht, Inspector, Leiste mit 13 Knöpfen, Reiter Map/Lines/Paths/Chrono, Tools-Menü, Straßentyp-, Luftbild-, Ampel-Fenster, die 13 Dialoge. Tests zuerst, **rot**: `UnusedStyleClassTests` (jede Klasse der USS kommt in Scripts, UXML oder Tests vor; Ausnahmen `unity-*` und die vier Präfix-Gruppen als feste Liste) und die Verschärfung des Schlüsseltests (Schritt 3) | neue Tests in `Assets/_Project/Tests/Editor/` | Tests rot mit genau den 24 Klassen und 62 Schlüsseln, sonst grün | gering; die Präfix-Gruppen als Liste, nicht als Heuristik |
+| **1 Tote USS-Klassen** | 24 Klassen aus (a) und `primary-button` mit allen Regelzeilen entfernen; `primary-button` aus der Liste `UiTokenContrastTests.cs:209` streichen; `:1137` (Kommagruppe) bereinigen; Nachfahren-Selektoren `.picker-search .panel-search-icon` (`:688`) und `:1119` mit entfernen; `pointer-info` prüfen | `EditorShell.uss`, `UiTokenContrastTests.cs`, ggf. `EditorShell.uxml`, `EditorShellBootstrap.cs` | `UnusedStyleClassTests` grün; Suche nach den 25 Namen in `Assets`, `Tools` leer; Bilder aus Schritt 0 **pixelgleich** (Differenz-Skript, Zahl und Ort abweichender Pixel); keine USS-Warnung im Player-Log | gering; Kommagruppen einzeln lesen. Freigabeliste wird ungültig (Schritt 6) |
+| **2 Leiste ohne Labels und Kappen** | `MapToolbar.AddButton` baut nur Knopf und Symbol; Parameter `key`, `nameKey` und `EditorToolRules.KeyOf` im Aufruf entfallen; `.tool-label` und `.tool-keycap` (`:261`, `:262`) entfernen; Tooltips der 13 Knöpfe auf Taste und Namen prüfen | `MapToolbar.cs`, `EditorShell.uss` | Leistenbilder pixelgleich (1100 und 1600 px, 100 %/200 %, kompakt und voll); `LocalizationInterfaceTests` grün; Q/W/E/Entf per Hand | gering; `AddButton` ist privat |
+| **3 Schlüssel und Waisentest** | 74 Schlüssel (62 + 12 `toolbar.*`) samt `@`-Notizen in **allen 8 Sprachen** löschen; `LocalizationKeyUsageTests` meldet unbenutzte Schlüssel als Fehler (Datei und Schlüssel in der Meldung) | `locales/*/*.json`, `LocalizationKeyUsageTests.cs`, `Documentation/Internationalisierung.md` | `LocaleCheck --strict` 0/0 (en-US 2.892 → 2.818, in jeder Sprache gleich); Schlüsseltest grün; Player in en-US und de-DE ohne `[Schlüssel]` in allen Fenstern aus Schritt 0 | **mittel**: ein Schlüssel, den nur ein vom Test nicht gesehener Pfad nutzt (Tools, Dev-Argument), erschiene als `[key]`. Gegenmaßnahme: Vorab-Suche in `Tools/` und `-selftest`; Bildvergleich in de-DE |
+| **4 Umbenennungen** | `view-menu-button`→`tools-menu-button`, `view-menu`/`.view-menu`→`tools-menu`, `project-collapse-button`→`bar-popup-close-button`, `RenderProjectBrowser`→`RenderBarPopup` (Namen nach Entscheidung 4); UXML, USS, Lokalisierung und Menüplatzierung gemeinsam; Doku-Fundstellen nachziehen (alte ADR-Texte nicht umschreiben, sondern mit einem Vermerk versehen) | `EditorShell.uxml`, `EditorShell.uss`, `EditorShellBootstrap.cs` und 8 weitere `EditorShell*.cs`, `EditorShellLocalization.cs`, `EditorShellMenuPlacement.cs` | Compiler und Tests; Bilder pixelgleich (Tools-Menü offen, Popup offen und zu, Tooltips „Close“ und Tools); Suche nach den alten Namen in `Assets` und `Tools` leer | **mittel**: Namen in `root.Q<…>("name")` melden Fehler nicht beim Übersetzen (`null`, Folge: stumm fehlende Bindung oder `NullReferenceException`). Gegenmaßnahme: Test, der `EditorShell.uxml` lädt und jeden `Q`-Namen aus der Shell dagegen prüft; Prüfargumente sind nicht betroffen |
+| **5 Doku und Matrix** | Matrix zeilenweise neu belegen (28 + 2 Mischzeilen, mit Datei:Zeile und Prüflauf), Auswertung neu zählen, Entscheidungen eintragen; `Architecture.md`, `CommandLine.md` (alle `-`-Argumente aus `EditorShellBootstrap.cs` gegen die Datei abgleichen), `DevelopmentSetup.md` („Validierungsstand“ M8), `CLAUDE.md` (Zeilenzahlen: `EditorShellBootstrap.cs` jetzt 9.751, `MapCanvasElement.cs` 4.732; „ADR 001–101“), `Roadmap.md`, `ProjectStatus.md`, README („Current status“); **ADR 098 abschließen** (Status „abgeschlossen“, Zusammenfassung M0–M8); `ui-rework-roadmap.md` (M8-Abschluss) | `Documentation/*.md`, `CLAUDE.md`, `README.md` | Reviewer prüft jede Matrixzeile gegen den Code; Stichproben der Argumente im Player | gering; Umfang groß, reine Doku |
+| **6 Abschluss und Freigabe** | Reviewer-Durchgang über den ganzen M8-Diff; voller Lauf: EditMode, `LocaleCheck --strict`, Player-Build (im Hintergrund, vorher ansagen), Bilder wie in Schritt 0, Spandau-Leistung; **„Record Reviewed Player Assets“**; danach `BuildRelease` auf der Projektkopie mit Installer | `Assets/_Project/Settings/PlayerAssetReview.txt`, Doku | alle Läufe grün; `BuildRelease` ohne Sperre; Akzeptanz der Roadmap erfüllt | mittel: Installer seit 1. November nicht geprüft; Build dauert etwa 3 Minuten |
+| **7 Zusammenführen, Release, Wiki** | Nach Handtest und Entscheidungen 1 und 3: `main` aktualisieren, Push, ggf. Version und Release; Wiki (englisches Handbuch, auch 3D-Bedienung aus M6/M7) erst nach dem Release | Git, `ProjectSettings.asset` (nur bei Release) | `git log main..feature/ui-rework` leer; Release-Seite; Wiki | gering; nur auf ausdrücklichen Wunsch des Projektinhabers committen und pushen |
+
+Reihenfolge: 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7. Die Schritte 1 bis 3 sind voneinander unabhängig, Schritt 4 kommt danach (Umbenennungen zuletzt, laut Roadmap). Dateibesitz: `EditorShell.uss` wird in 1, 2 und 4 nacheinander bearbeitet, nie parallel; `EditorShellBootstrap.cs` in Schritt 4 von genau einem Bearbeiter.
+
+## Entscheidungsvorlage für den Projektinhaber
+
+| # | Frage | Optionen | Empfehlung | Entscheidung (22. November 2026) |
+|---|---|---|---|---|
+| 1 | **Wie kommt der Zweig nach `main`?** (65 Commits, `main` ist Vorfahre, kein Konflikt) | **A.** Fast-forward: lineare Geschichte, keine Sammelmarke. **B.** Merge-Commit (`--no-ff`): eine Marke „UI-Rework“, alle 65 Commits bleiben. **C.** Squash: ein Commit, Geschichte der Meilensteine geht aus `main` verloren. | **B.** Der Rework bleibt als Einheit sichtbar und in einem Schritt rückgängig zu machen, und die 65 Commits bleiben erhalten, deren Hashes ADR 098 und `ProjectStatus.md` zitieren. A ist ebenfalls verlustfrei, aber ohne Marke; C macht alle zitierten Hashes ungültig. | **B** (Merge-Commit `--no-ff` „UI-Rework“ nach `main`, alle 65 Commits bleiben) |
+| 2 | **Was geschieht mit Matrixzeilen, die nach der Neubelegung nicht „voll“ sind?** (vermutlich Kontextmenüs für Reihen, Kreuzungen, Ampeln, Markierungen; Spline-Menü in 3D; Edit-Menü „Kreuzungen aus Profil“; Prüfargumente für Settings und Spline-/Kachelmenü) | **A.** Jede Zeile bekommt die Entscheidung „bleibt so“ mit Begründung; kein Code. **B.** Kleine Reste (Prüfargumente, Beschriftungen) in M8 beheben; größere (Kontextmenüs für neue Elementarten, 3D-Splines) als Punkt mit Entscheidung „nach dem Rework“ in die Roadmap. **C.** Alle in M8 beheben. | **B.** M8 ist Aufräumen (Größe S); Kontextmenüs für neue Elementarten sind Funktionen und würden den Abschluss um einen Meilenstein verschieben. | **B** (kleine Matrixreste in M8 beheben, größere mit Entscheidung „nach dem Rework“ in die Roadmap) |
+| 3 | **Version und Release: jetzt oder später?** (Stand 1.1.5, Oberfläche komplett neu) | **A.** Release **1.2.0** nach dem Merge: `bundleVersion` anheben, `BuildRelease`, Entwurf auf GitHub, Wiki danach. **B.** Nur Merge, Release später mit weiteren Funktionen. **C.** Release als 1.1.6. | **A**, erst nach Handtest und Installer-Prüfung (Schritt 6): Eine so große sichtbare Änderung trägt 1.2.0; ein Entwurf (wie bei 1.1.5) gibt den letzten Test. Das Wiki (3D-Bedienung, neue Menüs) wartet auf das Release, deshalb nicht auf weitere Funktionen warten. | **B, abgewandelt:** Release als **1.2.0**, aber erst zusammen mit zwei weiteren Funktionen (welche, legt der Projektinhaber noch fest). In M8 also **nur Merge, kein Release**, keine Versionsanhebung, kein `BuildRelease`-Lauf für die Auslieferung; das Wiki folgt nach dem Release |
+| 4 | **Namen** für `view-menu-button`, `project-collapse-button`, `RenderProjectBrowser` und das zugehörige Menü `view-menu` | **A.** `tools-menu-button`/`tools-menu`, `bar-popup-close-button`, `RenderBarPopup`. **B.** Nur die drei Namen der Roadmap ändern, `view-menu` unverändert lassen. | **A.** `view-menu` ist derselbe Fehlname wie sein Knopf; zwei halbe Umbenennungen erhielten die Verwechslung. | **A** (`tools-menu-button`, `tools-menu`, `bar-popup-close-button`, `RenderBarPopup`) |
+| 5 | **Waisen-Schlüssel als Testfehler: ohne oder mit Ausnahmeliste?** | **A.** Fehler ohne Ausnahme: jeder Schlüssel in `locales` muss im Code vorkommen. **B.** Fehler mit kleiner Liste bewusst vorgehaltener Texte, je Eintrag mit Grund. | **A.** Die Roadmap verlangt „verwaiste Schlüssel als Testfehler“; eine Ausnahmeliste wächst erfahrungsgemäß. Taucht in Schritt 3 ein Fall auf, den der Test nicht sehen kann, kommt er einzeln zurück. | **A** (Waisen-Schlüssel sind Testfehler, ohne Ausnahmeliste) |
+
+**Hinweis zu Prüfargumenten und Aliassen:** In M8 wird kein Kommandozeilenargument umbenannt; die drei Namen sind interne UXML- und Methodennamen und stehen in keinem Argument, keinem Test und nicht in `CommandLine.md`. Die Aliasfrage entfällt damit. Findet der Reviewer in Schritt 5 ein irreführend benanntes Argument, kommt sie als eigene Frage zurück; Empfehlung dann: alten Namen für ein Release als Alias behalten und in `CommandLine.md` als „veraltet“ vermerken.
+
+## Risiken im Überblick
+
+- **Umbenennungen brechen Zeichenkettenbezüge still** (`Q<…>("name")` ohne Compilerprüfung): Test auf UXML-Namen in Schritt 4.
+- **Freigabeliste:** jede Änderung an `EditorShell.uss`/`.uxml` macht `PlayerAssetReview.txt` ungültig; erst in Schritt 6 neu aufzeichnen, nach Prüfung auf OMSI-Inhalt (harte Regel 3).
+- **Matrixaufwand:** 30 Zeilen Handarbeit, nicht automatisierbar.
+- **Installer:** seit 1. November nicht gebaut; erst Schritt 6 zeigt, ob er baut.
+- **Pixelvergleich:** das bekannte Rauschen am Auswahlrand darf nicht als Unterschied zählen; Zahl und Ort der Pixel melden.
+
+## Folgen der Entscheidungen vom 22. November 2026
+
+- **Zu 1B:** Schritt 7 führt `feature/ui-rework` mit `git merge --no-ff` und dem Betreff „UI-Rework“ nach `main` zusammen (kein Fast-forward, kein Squash); nur auf ausdrücklichen Wunsch des Projektinhabers committen und pushen.
+- **Zu 2B:** Schritt 5 behebt kleine Reste der Matrix (Prüfargumente, Beschriftungen) in M8; größere Punkte (Kontextmenüs für Reihen, Kreuzungen, Ampeln, Markierungen; Spline-Menü in 3D; „Kreuzungen aus Profil“ im Edit-Menü) kommen mit der Entscheidung „nach dem Rework“ in die Roadmap.
+- **Zu 3B (abgewandelt):** M8 endet mit dem Merge. Es gibt in M8 **kein Release**: `bundleVersion` bleibt 1.1.5, kein Tag, kein Entwurf auf GitHub. Das Release **1.2.0** folgt erst zusammen mit zwei weiteren Funktionen, die der Projektinhaber noch festlegt; das Wiki (englisches Handbuch, 3D-Bedienung) erst danach. Empfehlung für Schritt 6: `BuildRelease` trotzdem einmal als Probe auf der Projektkopie fahren (damit der Installer nicht erst beim Release überrascht), nichts ausliefern; das entscheidet die Hauptsitzung. In Schritt 7 entfallen Version und Release.
+- **Zu 4A:** Namen wie im Plan (siehe Schritt 4).
+- **Zu 5A:** Der Schlüsseltest hat keine Ausnahmeliste; nur das Schreiben eines Schlüssels aus Teilen wird über die vorhandene Auszeichnung `i18n:keys` zugelassen (siehe Schritt-0-Befund).
+
+# M8 Schritt 0 – Befunde (22. November 2026)
+
+**Stand:** Prüfgrundlage steht, nichts committet, Zweig `feature/ui-rework`, HEAD `827309a`. EditMode **1410 von 1410** grün (Basis 1406 + 4 neue); `LocaleCheck --strict` 8 Sprachen, 2.892 Schlüssel, 0 Fehler, 0 Warnungen. Player: Bau auf `827309a` per `WindowsPlayerBuild.Build` (Tundra „0 items updated“ für die Player-Assemblies, also derselbe Stand wie der Build von 16:43; nur Daten neu geschrieben), ohne `Record Reviewed Player Assets`.
+
+## Neue Tests
+
+- **`UnusedStyleClassTests.OwnStyleClassesWithoutAnyUseDoNotGrow`** (`Assets/_Project/Tests/Editor/UnusedStyleClassTests.cs`): liest alle Klassen aus den Selektoren von `EditorShell.uss` (Kommentare entfernt) und prüft, ob der Name als Wort in `Scripts/**/*.cs` oder `EditorShell.uxml` vorkommt. **Tests zählen nicht** (ein Test, der eine tote Klasse nennt, hielte sie am Leben); deshalb ist `primary-button` tot. Zwei Regeln statt einer Einzelliste: (1) `unity-*` stylt Unitys eigene Elemente; (2) eine Klasse aus Präfix und Variable (`AddToClassList("road-swatch-" + word)`) gilt als benutzt, wenn der Code ein Präfix mit Bindestrich in `AddToClassList`/`EnableInClassList`/`RemoveFromClassList`/`ToggleInClassList` mit `+` anhängt und die Klasse so beginnt. Obergrenze `UnusedClassCeiling = 25` (heute genau 25), Schritt 1 setzt sie auf 0. Meldung nennt alle Namen. Zweiter Test `TheRulesExemptOnlyUnityClassesAndPrefixBuiltClasses` prüft den Prüfer an einem kleinen Beispiel.
+- **Statt „rot“ eine Obergrenze (Vorgabe der Hauptsitzung):** Die Schritt-0-Zeile des Arbeitsplans sah rote Tests vor. Die Projektregel verbietet `Ignore`/`Skip` und rote Tests als Zwischenstand; deshalb prüfen beide neuen Tests gegen eine Obergrenze in Höhe des heutigen Werts (25 Klassen, 47 Schlüssel), die in Schritt 1 und Schritt 3 auf 0 fällt. Beide Tests sind heute grün.
+- **`LocalizationKeyUsageTests.TextsNoCodeAsksForDoNotGrow`**: sammelt wie der bestehende Test alle Schlüssel aus dem Quelltext und meldet Schlüssel aus `locales/en-US`, die kein Code verlangt, mit allen Namen. Obergrenze `UnusedKeyCeiling = 47`, Schritt 3 setzt sie auf 0. Die Konsolenausgabe des alten Tests (`Console.WriteLine`) entfällt. Zweiter Test `ATextBuiltFromPiecesOnALineMarkedI18nKeysCountsAsUsed` hält die Regel für zusammengesetzte Schlüssel fest.
+
+## Zahlen (gemessen, Abweichungen vom Plan fett)
+
+| Messgröße | Plan | gemessen |
+|---|---|---|
+| USS-Klassen mit eigenem Namen und `unity-*` | 710, davon 24 `unity-*` | **709**, davon **25** `unity-*` (Zählweise des Skripts: jeder `.name` in Selektoren, jeder nur einmal) |
+| tote eigene Klassen | 24 + `primary-button` | 24 + `primary-button` = **25** (Namen: siehe Test; stimmt mit Abschnitt (a) überein) |
+| nur über Präfix erreichbare Klassen | 24 | 24 (`junction-swatch-` 4, `road-mini-lane-` 7, `road-section-element-` 6, `road-swatch-` 7) |
+| Schlüssel ohne Literal im Quelltext (alter Zählweise) | 62 | 62 |
+| **davon in Wirklichkeit benutzt (aus Teilen gebaut)** | – | **14** |
+| **echte Waisen in `locales/en-US`** | 62 | **48** (der Test sieht 47, siehe unten) |
+| Schlüssel, die Schritt 3 löscht | 74 (62 + 12 `toolbar.*`) | **60** (48 + 12 `toolbar.*`), en-US 2.892 → **2.832** |
+
+## Befund: 14 der 62 „Waisen“ sind in Wirklichkeit in Gebrauch
+
+Der Plan (Abschnitt (c)) zählte Schlüssel, die nicht als ganze Zeichenkette im Quelltext stehen. **Aus Teilen gebaute Schlüssel entgehen dieser Zählung**; Schritt 3 hätte 14 benutzte Texte gelöscht (im Spiel als `[Schlüssel]` sichtbar). Die 14 und ihre Quellen:
+
+| Schlüssel | Wo gebaut |
+|---|---|
+| `mapcheck.parking.heading`, `.laneend`, `.nolane`, `.side` (4) | `OmsiMapCheck.cs:566`: `"mapcheck.parking." + verdict.Fault.ToString().ToLowerInvariant()` (Enum `OmsiParkingFault`: Heading, LaneEnd, NoLane, Side) |
+| `roadbuild.parking.problem.no_lane`, `.short`, `.wide` (3) | `EditorShellParking.cs:68`: `"roadbuild.parking.problem." + plan.Problem` (`OmsiParkingRow.cs:76`, `:87`, `:102` setzen `short`, `no_lane`, `wide`) |
+| `satellite.move.north/east/south/west.tooltip` (4) | `SatelliteWindow.cs:916`–`:924`: `move.Item1 + ".tooltip"` |
+| `line.result.back/out/ring.problem` (3) | `EditorShellLine.cs:387`–`:399`: `pair.Key + ".problem"` |
+
+**Folge im Test:** Die Zeilen stehen alle mit `// i18n:keys` (so verlangt es der bestehende Schlüsseltest für Aufrufe mit Variablenschlüssel). Der neue Test nutzt diese Auszeichnung: Auf einer so markierten Zeile gilt ein Text mit Punkt am Ende (`"mapcheck.parking."`) als **Präfix**, ein Text mit Punkt am Anfang (`".problem"`) als **Endung**; ein Schlüssel zählt als benutzt, wenn er mit einem Präfix beginnt oder wenn er ein sonst verlangter Schlüssel plus eine Endung ist. Das ist keine Ausnahmeliste (die Auszeichnung steht am Aufruf und ist Pflicht), aber eine Grenze: Ein wirklich verwaister Schlüssel, der mit einem solchen Präfix beginnt oder zu einem benutzten Schlüssel plus Endung passt, bleibt unsichtbar. Heute trifft das genau einen: **`context.properties.tooltip`** (zu `context.properties` plus `.tooltip`); er ist echt verwaist (nur im Commit `cb3a032` vom 12. November 2026 in `locales` angelegt, nie im Code) und wird in Schritt 3 von Hand mit gelöscht. Deshalb 48 echte Waisen, 47 vom Test gesehen, Obergrenze 47.
+
+## Befund: die 48 echten Waisen
+
+- **`newtrip.*` (37):** Belegt ungenutzt. Der Dialog „New trip“ (`EditorShellNewTrip.cs`, 433 Zeilen) kam mit `6c5c912` (11. November 2026) und wurde mit **`bbc8304` (11. November 2026, „Add a line tool to the toolbar …“) gelöscht**; derselbe Commit entfernt genau 37 Zeilen mit `newtrip.` aus `Scripts` (`git show bbc8304 -- Assets/_Project/Scripts`). Seitdem kommt `newtrip.` im Quelltext nur noch als `timetable.newtrip` (Fahrplan-Knopf, `EditorShellTimetable.cs:288`) vor. In `Tools/`, `Tests/` und der UXML kein Treffer. Die Umformulierung vom 17. November 2026 (`Decisions.md:2048`, `ProjectStatus.md:51`: `newtrip.stop.new.tooltip` und `newtrip.stop.object.tooltip`) betraf also schon tote Texte; wirksam ist nur `line.stop.new.double`. Löschen in allen 8 Sprachen ist sicher.
+- **Übrige 11:** `inspector.connections/objects/splines/status` (4; Inspector neu gebaut mit `feb6532`, 9. November 2026), `terrain.brush`, `terrain.title` (mit `75601d7`, 12. November 2026 entfallen), `project.empty` (`cb3a032`, 12. November 2026), `labels.line` (`2603ca0`, 17. November 2026), `context.attached`, `context.properties.tooltip` (seit `cb3a032` in `locales`, nie im Code), `export.created_open_failed` (seit der ersten Migration `5732f0b` vom 7. November 2026 ohne Aufrufer). Kein Treffer in `Tools/`, `Tests/`, UXML, `Settings/`; es gibt keine anderen `.cs` außerhalb `Scripts` und `Tests`.
+- **Ergebnis für Schritt 3:** 48 Waisen + 12 `toolbar.*` (frei mit Schritt 2) = 60 Schlüssel; das schreibt `Documentation/Internationalisierung.md` bei der Nachführung fest.
+
+## Offener Prüfpunkt `pointer-info` / `status-pointer`: geklärt
+
+- **Sichtbar: nein.** `.status-pointer { display: none; }` (`EditorShell.uss:977`) seit **`cb3a032` (12. November 2026)**, dem Umbau der unteren Leiste; im UXML (`:60`) steht das Label ohne Text.
+- **Wirksam: nein, aber nicht kostenlos.** `EditorShellBootstrap.cs:531` holt das Label, `:612`–`:615` schreibt jedes `MapCanvasElement.PointerInfoChanged` in `pointerInfoLabel.text`. Gelesen wird der Text nirgends (kein Tooltip, kein Test, kein Prüfargument). `MapCanvasElement.NotifyPointerInfo` (`:4689`) wird bei **jeder** Zeigerbewegung und jedem Ziehen gerufen und baut dafür jedes Mal Text mit `Loc.T` und `DescribeMapPosition`.
+- **Reichweite:** Nur diese Kette dient dem verborgenen Label: `NotifyPointerInfo`, `PointerInfoChanged`, `DescribeMapPosition`, `TurnInfo` und **10 Texte** `canvas.scale`, `canvas.view3d`, `canvas.object_turn`, `canvas.moved_group_height`, `canvas.moved_one_height`, `canvas.moved_group`, `canvas.dragging_one`, `canvas.turned`, `canvas.outside`, `canvas.position` (je genau eine Fundstelle in `MapCanvasElement.cs`).
+- **Vorschlag für Schritt 1 (zur Entscheidung der Hauptsitzung):** *Klein:* Label `pointer-info`, Feld, Abonnement und `.status-pointer` entfernen, die Kette im Canvas lassen. *Vollständig (Empfehlung, kein Verhaltensunterschied, spart Arbeit je Mausbewegung):* zusätzlich Kette und die 10 `canvas.*`-Texte entfernen (Schritt 3 hätte dann 70 Schlüssel, en-US 2.822). Die Kette fasst `MapCanvasElement.cs` (Mausbehandlung) an; Handtest „Auswahl, Ziehen, Drehen, 3D“ nötig. `map-state` bleibt (Tooltip der Projektpille, `EditorShellBootstrap.cs:8248`).
+
+## Vorher-Bilder für die Schritte 1 bis 2
+
+- Ablage: `.omc/handoffs/m8/step0/before/` (Grundorf-Testprojekt, `-language en-US`, 1920 x 1010, `-uiScale 1` und `2`, also 100 % und 200 %; der gleiche Player-Stand `827309a`). Skript (nicht im Repo): `shots8.sh <Player-Ordner> <Ausgabe>` im Scratchpad der Sitzung; es setzt nach dem Rezept von `shots6.sh` die Sitzungsmarken zurück und läuft je Ansicht einmal.
+- Ansichten (je `-100` und `-200`): `main`, `tooltip-drag` (Tooltip des Werkzeugs „Drag“ per `-tooltipAt`), `tooltip-tool2` (Tooltip eines zweiten Leistenknopfs), `tab-map`, `tab-lines`, `tab-chrono`, `tab-paths`, `tab-tiles` (alle Leisten-Popups), `inspector` (`-select 4229`), `settings`, `timetable`, `roadtype` (`-roadBuilder`), `satellite` (Luftbild-Fenster).
+- Vergleich nach den Schritten 1 und 2: dasselbe Skript auf den neuen Player, pixelweise gegen diese Bilder (bekanntes Rauschen am Auswahlrand des Inspectors: einzelne Pixel).

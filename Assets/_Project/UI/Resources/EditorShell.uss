@@ -101,9 +101,7 @@
 .menu-popup-item { height: 32px; -unity-text-align: middle-left; padding-left: 10px; background-color: var(--mf-color-clear); border-width: 0; border-radius: var(--mf-radius-sm); color: var(--mf-color-text-primary); }
 .menu-popup-item:hover { background-color: var(--mf-color-panel-hover); }
 .menu-popup-item:disabled { color: var(--mf-color-text-disabled); }
-.menu-popup-item-checked { color: var(--mf-color-accent); }
 .menu-divider { height: 1px; margin: 5px 4px; background-color: var(--mf-color-border); }
-.menu-section-label { margin: 4px 10px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .popup-title { margin: 4px 8px 8px; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .popup-description { margin: 4px 8px; color: var(--mf-color-text-secondary); white-space: normal; }
 
@@ -143,8 +141,6 @@
 .welcome-recent-name { -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .welcome-recent-path { font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); }
 .welcome-recent-kind { margin: 0 0 0 var(--mf-space-3); padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); flex-shrink: 0; }
-.primary-button { margin-top: 20px; height: 36px; padding-left: var(--mf-space-4); padding-right: var(--mf-space-4); background-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); border-width: 0; border-radius: var(--mf-radius-md); }
-.primary-button:hover { background-color: var(--mf-color-accent-hover); }
 
 /* Floating panels */
 .floating-panel { position: absolute; top: var(--mf-space-2); bottom: var(--mf-space-2); padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
@@ -244,7 +240,6 @@
 .view-control-icon-only > .icon { margin-right: 0; }
 .view-control-active, .view-control-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); }
 .view-control-active:disabled { color: var(--mf-color-bg); background-color: var(--mf-color-accent); opacity: 0.5; }
-.view-control-separator { width: 1px; height: 18px; margin: 0 var(--mf-space-1); background-color: var(--mf-color-border); }
 .zoom-label { min-width: 52px; -unity-text-align: middle-center; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 
 /* Tool bar in the middle of the bottom bar: the icons alone, as in the sketch; name and key stand in the tooltip */
@@ -258,8 +253,6 @@
 .tool-button:disabled { color: var(--mf-color-text-disabled); }
 .tool-button-active, .tool-button-active:hover { color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); }
 .tool-icon { width: 22px; height: 22px; flex-shrink: 0; }
-.tool-label { display: none; }
-.tool-keycap { display: none; }
 
 /* Context menu on a right-click in the map (ADR 098): an overlay catches the click outside, the menu stands at the pointer */
 .context-menu-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
@@ -281,11 +274,6 @@
 .picker-panel-compact .picker-icon-tab { width: 26px; height: 30px; margin: 0 1px 0 0; }
 .picker-panel-compact .picker-icon-tab > .icon { width: 16px; height: 16px; }
 .tool-panel { width: 420px; height: 470px; padding: var(--mf-space-3); background-color: var(--mf-color-panel-glass); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
-.tool-panel-badge { width: 40px; height: 40px; margin-right: var(--mf-space-3); align-items: center; justify-content: center; color: var(--mf-color-bg); background-color: var(--mf-color-accent); border-radius: var(--mf-radius-md); }
-.tool-panel-badge > .icon { width: 24px; height: 24px; }
-.tool-panel-titles { flex-grow: 1; }
-.tool-panel-title { font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
-.tool-panel-subtitle { font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .panel-icon-button { width: 28px; height: 28px; margin: 0; padding: 4px; color: var(--mf-color-text-secondary); background-color: var(--mf-color-clear); border-width: 0; border-radius: var(--mf-radius-sm); }
 .panel-icon-button:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
 .panel-icon-button > .icon { flex-grow: 1; }
@@ -297,15 +285,8 @@
 .panel-search-field { margin: 0; }
 .panel-search-field .unity-base-text-field__input { height: 32px; padding-left: var(--mf-space-2); padding-right: 30px; background-color: var(--mf-color-field); color: var(--mf-color-text-primary); border-color: var(--mf-color-border); border-radius: var(--mf-radius-sm); }
 .panel-search-field .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
-.panel-search-icon { position: absolute; right: 8px; top: 8px; width: 16px; height: 16px; color: var(--mf-color-text-secondary); }
 .panel-folder-bar { flex-direction: row; align-items: center; margin-bottom: var(--mf-space-1); }
 .panel-folder-label { flex-grow: 1; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.panel-list { flex-grow: 1; min-height: 0; }
-.panel-list .unity-collection-view__item { background-color: var(--mf-color-clear); border-radius: var(--mf-radius-sm); }
-.panel-list .unity-collection-view__item:hover { background-color: var(--mf-color-panel-hover); }
-.panel-list .unity-collection-view__item--selected { background-color: var(--mf-color-panel-hover); border-left-width: 3px; border-left-color: var(--mf-color-accent); }
-.panel-row { flex-grow: 1; flex-direction: row; align-items: center; padding-left: var(--mf-space-1); padding-right: var(--mf-space-1); }
-.panel-row-icon { width: 18px; height: 18px; margin-right: var(--mf-space-2); color: var(--mf-color-text-secondary); flex-shrink: 0; }
 .dialog-row { flex-direction: row; align-items: center; margin: 4px 0; }
 /* Every dialog may use at most 94 % of the window; this rule stands before the dialogs' own rules, so a dialog with its own maximum (below, by name) keeps it (M6 step 4). */
 .dialog { max-width: 94%; max-height: 94%; }
@@ -322,11 +303,6 @@
 .check-section-button { height: 24px; margin: 0 0 0 var(--mf-space-2); }
 .check-more-button { align-self: flex-start; height: 22px; margin: 2px 0 0 var(--mf-space-3); font-size: var(--mf-font-secondary); }
 .dialog-row-text { flex-grow: 1; flex-shrink: 1; margin: 0 8px; }
-.panel-row-thumbnail { width: 36px; height: 36px; margin-right: var(--mf-space-2); flex-shrink: 0; background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); -unity-background-scale-mode: scale-to-fit; }
-.panel-row-texts { flex-grow: 1; flex-shrink: 1; overflow: hidden; justify-content: center; }
-.panel-row-texts > Label { margin: 0; padding: 0; }
-.panel-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.panel-row-detail { font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .favorite-button { width: 26px; height: 26px; color: var(--mf-color-text-muted); }
 .favorite-on, .favorite-on:hover { color: var(--mf-color-accent); }
 /* The signals window (ADR 098): one window that floats beside the map like the one for pictures from the air; title bar, navigation, work area, preview and footer. */
@@ -652,8 +628,6 @@
 .picker-field .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
 .picker-panel { width: 780px; min-width: 380px; max-width: 780px; height: 210px; padding: 0; flex-shrink: 1000; flex-grow: 0; background-color: var(--mf-color-bar-glass); }
 .picker-header { height: 44px; flex-shrink: 0; margin: 0; padding: 0 var(--mf-space-2); background-color: var(--mf-color-panel); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
-.picker-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-search { width: 210px; margin: 0 var(--mf-space-2); flex-shrink: 0; }
 .picker-tabs { flex-shrink: 0; overflow: hidden; margin-bottom: 6px; padding: 2px; }
 .picker-tab { flex-basis: 0; min-width: 0; padding: 0 4px; font-size: 11px; }
@@ -685,7 +659,6 @@
 /* The menus of the bar are at most 210 px tall, as in the references (ADR 098, stage 2): a flat header, flat tabs, two rows of small
    tiles that scroll, and option columns that scroll once they are taller. */
 .picker-search .panel-search-field .unity-base-text-field__input { height: 26px; padding-top: 0; padding-bottom: 0; -unity-text-align: middle-left; }
-.picker-search .panel-search-icon { top: 5px; }
 .picker-header { flex-direction: row; align-items: center; }
 .picker-header > .picker-tabs { flex-grow: 1; margin: 0 var(--mf-space-2) 0 0; padding: 0; background-color: var(--mf-color-clear); border-radius: 0; }
 .picker-icon-tab { flex-grow: 0; flex-basis: auto; width: 36px; height: 36px; margin: 0 2px 0 0; padding: 0; align-items: center; justify-content: center; border-radius: var(--mf-radius-md); }
@@ -767,16 +740,12 @@
 .picker-empty { position: absolute; left: var(--mf-space-3); right: var(--mf-space-3); top: 80px; }
 .panel-toggle > Label { min-width: 0; color: var(--mf-color-text-secondary); font-size: var(--mf-font-secondary); }
 .panel-toggle .unity-toggle__checkmark { border-color: var(--mf-color-border); background-color: var(--mf-color-field); border-radius: var(--mf-radius-sm); }
-.panel-row-tag { margin: 0 var(--mf-space-1); padding: 0 5px; font-size: var(--mf-font-mark); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-bg); background-color: var(--mf-color-warning); border-radius: var(--mf-radius-sm); flex-shrink: 0; }
 
 /* Project popups (the former project browser) */
-.panel-heading { margin-bottom: var(--mf-space-3); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
 .browser-project-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-secondary); color: var(--mf-color-info); white-space: normal; }
 .browser-map-name { margin-bottom: var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); white-space: normal; }
 .browser-map-counts { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .browser-map-warnings { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-secondary); color: var(--mf-color-warning); white-space: normal; }
-.browser-map-description { margin-bottom: var(--mf-space-2); }
-.browser-map-description Label { font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); white-space: normal; }
 .browser-lines { margin-bottom: var(--mf-space-2); flex-shrink: 0; }
 .browser-line-list { max-height: 180px; }
 .browser-chrono { margin-bottom: var(--mf-space-2); flex-shrink: 0; }
@@ -809,8 +778,6 @@
 .compact-filter .unity-base-text-field__input { height: 30px; margin: 0; padding: 0 var(--mf-space-2); -unity-text-align: middle-left; }
 .compact-filter .unity-base-text-field__input .unity-text-element { padding: 0; margin: 0; }
 /* Tabs of the project browser (ADR 078) */
-.project-tabs { flex-shrink: 0; margin-bottom: var(--mf-space-2); }
-.project-tabs > .panel-tab { height: 26px; min-width: 0; padding-left: 2px; padding-right: 2px; font-size: var(--mf-font-secondary); }
 .browser-page { flex-grow: 1; min-height: 0; }
 .browser-tiles-tab { flex-grow: 1; min-height: 0; }
 .browser-filter { flex-shrink: 0; margin-bottom: var(--mf-space-2); }
@@ -974,7 +941,6 @@
 .status-bar { height: 28px; min-height: 28px; flex-shrink: 0; flex-direction: row; align-items: center; justify-content: center; margin: 0 var(--mf-space-3) 6px var(--mf-space-3); padding-left: var(--mf-space-3); padding-right: var(--mf-space-3); background-color: var(--mf-color-status-glass); border-width: 1px; border-color: var(--mf-color-border-glass); border-radius: 14px; color: var(--mf-color-text-secondary); font-size: 12px; }
 .bottom-bar-empty .status-bar { margin-bottom: 3px; height: 26px; }
 .status-bar > Label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status-pointer { display: none; }
 .status-selection { flex-shrink: 0; margin-right: var(--mf-space-3); color: var(--mf-color-accent); }
 .status-message { flex-grow: 1; flex-shrink: 1; flex-basis: 0; -unity-text-align: middle-center; color: var(--mf-color-text-primary); }
 /* The hint of the open tool has its own place at the right, so it never replaces a message. Its width is set from its text in EditorShellToolHints.FitToolHint (up to 65 % of the bar); the message gives way first. */
@@ -1035,11 +1001,9 @@
 .update-skip { margin-right: auto; }
 .satellite-frame { left: var(--mf-space-2); bottom: auto; width: 480px; max-width: 94%; max-height: 86%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }
-.satellite-columns { flex-direction: row; }
 .satellite-tab { margin: 0 var(--mf-space-2); }
 .satellite-tabs { flex-shrink: 0; margin: 0 var(--mf-space-2) var(--mf-space-2); }
 .satellite-footer { margin: 0 var(--mf-space-2) var(--mf-space-2); }
-.satellite-column { flex-grow: 1; flex-basis: 0; min-width: 0; margin: 0 var(--mf-space-2); }
 .satellite-row { flex-direction: row; align-items: center; min-height: 30px; margin-bottom: 2px; }
 .satellite-row > .satellite-button { margin-bottom: 0; }
 .satellite-tab .option-check { min-height: 30px; margin: 0 0 2px; align-items: center; }
@@ -1072,9 +1036,6 @@
 .imagery-attribution { position: absolute; right: var(--mf-space-2); padding: 2px 6px; font-size: var(--mf-font-caption); color: var(--mf-color-text-secondary); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-sm); }
 
 /* Road builder (ADR 049): a cross-section of lanes above the lane settings, in place of the road picker */
-.road-picker-new { flex-direction: row; align-items: center; flex-shrink: 0; margin: 0 0 0 var(--mf-space-2); }
-.road-picker-new > .icon { width: 16px; height: 16px; margin-right: 6px; }
-.road-picker-new > Label { margin: 0; padding: 0; }
 
 .inspector-rule-lanes { flex-wrap: wrap; margin-bottom: var(--mf-space-2); }
 .inspector-rule-whole { align-self: flex-start; margin: 0 0 var(--mf-space-2); }
@@ -1116,7 +1077,6 @@
 /* M6 step 1: muted text and the error red do not reach 4.5:1 on the hover and selected surface (panel-hover), so the texts that stand on it turn secondary or primary there (UiTokenContrastTests lists the pairs). */
 .menu-popup-item:hover .context-menu-key, .menu-popup-item.context-menu-item-focused .context-menu-key,
 .welcome-recent-row:hover .welcome-recent-path,
-.panel-list .unity-collection-view__item:hover .panel-row-detail, .panel-list .unity-collection-view__item--selected .panel-row-detail,
 .signal-group-item:hover .signal-group-count, .signal-group-selected .signal-group-count,
 .inspector-record-clickable:hover .muted, .inspector-record-selected .muted { color: var(--mf-color-text-secondary); }
 .browser-tile-entry-missing:hover, .browser-tile-entry-missing.browser-tile-entry-selected { color: var(--mf-color-text-primary); }
@@ -1134,7 +1094,7 @@
 .signal-phase-chip:active, .browser-tile-entry:active, .map-control-button:active, .picker-tile:active, .welcome-card:active, .road-prop-fold:active { background-color: var(--mf-color-panel-pressed); }
 .bar-tile-button:active, .bar-round-button:active, .tool-button:active { background-color: var(--mf-color-panel-pressed); border-color: var(--mf-color-border); }
 .new-map-swatch:active { border-color: var(--mf-color-accent-pressed); }
-.primary-button:active, .dialog-primary:active, .signal-label-button.option-icon-primary:active { background-color: var(--mf-color-accent-pressed); }
+.dialog-primary:active, .signal-label-button.option-icon-primary:active { background-color: var(--mf-color-accent-pressed); }
 .bar-tile-button.bar-button-active:active, .bar-round-button.bar-button-active:active, .tool-button-active:active, .view-control-active:active,
 .panel-tab-active:active, .signal-sub-button.panel-tab-active:active, .option-icon.panel-tab-active:active, .road-prop-style.panel-tab-active:active,
 .option-icon.option-icon-primary:active { color: var(--mf-color-bg); background-color: var(--mf-color-accent-pressed); border-color: var(--mf-color-accent-pressed); }

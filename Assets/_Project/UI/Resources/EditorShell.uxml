@@ -57,7 +57,6 @@
                         <ui:VisualElement name="bar-right" class="bar-group" />
                     </ui:VisualElement>
                     <ui:VisualElement class="status-bar">
-                        <ui:Label name="pointer-info" class="status-pointer" />
                         <ui:Label name="selection-info" class="status-selection" />
                         <ui:Label name="status-message" text="Ready" class="status-message" />
                         <ui:Label name="tool-hint" class="status-hint" />

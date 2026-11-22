@@ -206,7 +206,7 @@ namespace OmsiMapEditor.Tests
         {
             var css = WithoutComments(stylesheet);
             var offenders = new List<string>();
-            foreach (var cls in new[] { "toolbar-menu-button", "menu-popup-item", "welcome-card", "welcome-recent-row", "primary-button", "panel-collapse-button", "bar-tile-button", "bar-round-button", "view-control-button", "tool-button", "panel-icon-button", "panel-tab", "option-icon", "picker-tile", "map-control-button", "dialog-primary" })
+            foreach (var cls in new[] { "toolbar-menu-button", "menu-popup-item", "welcome-card", "welcome-recent-row", "panel-collapse-button", "bar-tile-button", "bar-round-button", "view-control-button", "tool-button", "panel-icon-button", "panel-tab", "option-icon", "picker-tile", "map-control-button", "dialog-primary" })
                 if (css.IndexOf("." + cls + ":active", StringComparison.Ordinal) < 0)
                     offenders.Add(cls);
             Assert.IsEmpty(offenders, "No :active rule for: " + string.Join(", ", offenders));

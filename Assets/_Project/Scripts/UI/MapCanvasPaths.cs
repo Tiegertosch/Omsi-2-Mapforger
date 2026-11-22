@@ -267,7 +267,6 @@ namespace OmsiMapEditor.UI
                 metersPerPixel = 0.25f;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -306,7 +305,6 @@ namespace OmsiMapEditor.UI
                 return false;
             center.y += shift * metersPerPixel;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
             return true;
         }
@@ -327,7 +325,6 @@ namespace OmsiMapEditor.UI
             center.x -= shift.x * metersPerPixel;
             center.y += shift.y * metersPerPixel;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
             return true;
         }
@@ -351,7 +348,6 @@ namespace OmsiMapEditor.UI
             center.x -= shiftX * metersPerPixel;
             center.y += shiftY * metersPerPixel;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 

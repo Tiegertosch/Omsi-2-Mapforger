@@ -78,7 +78,6 @@ namespace OmsiMapEditor.UI
         private (string Name, object Value)[] statusArguments;
         private Label mapStateLabel;
         private Label mapTitleLabel;
-        private Label pointerInfoLabel;
         private Label selectionInfoLabel;
         private VisualElement emptyState;
         private VisualElement workspaceElement;
@@ -528,7 +527,6 @@ namespace OmsiMapEditor.UI
             if (mapStateLabel != null)
                 mapStateLabel.text = Loc.T("status.no_map");
             mapTitleLabel = root.Q<Label>("map-title");
-            pointerInfoLabel = root.Q<Label>("pointer-info");
             selectionInfoLabel = root.Q<Label>("selection-info");
             emptyState = root.Q<VisualElement>("empty-state");
             if (emptyState != null)
@@ -608,12 +606,6 @@ namespace OmsiMapEditor.UI
                     armRebuild = null;
                     mapCanvas.ClearRoadPreview();
                     SetStatusT("junction.turn_cancelled");
-                };
-                mapCanvas.PointerInfoChanged += text =>
-                {
-                    if (pointerInfoLabel != null)
-                        pointerInfoLabel.text = text;
-                    UpdateZoomLabel();
                 };
                 mapView.Add(mapCanvas);
             }
@@ -849,6 +841,7 @@ namespace OmsiMapEditor.UI
                     });
                 };
                 mapCanvas.PreviewEnded += () => PreviewJunctionMarkers(null);
+                mapCanvas.ViewChanged += UpdateZoomLabel;
                 mapCanvas.ObjectRenderer = objectRenderer;
                 objectRenderer.PreviewReady += (path, image) => objectsPanel?.SetPreview(path, image);
                 objectRenderer.PreviewInUse = path => objectsPanel != null && objectsPanel.ShowsPreview(path);
@@ -1161,6 +1154,22 @@ namespace OmsiMapEditor.UI
                 var tile = currentSummary.Tiles.Find(candidate => candidate.X == tileX && candidate.Y == tileY);
                 mapCanvas?.ShowArea(tile, localX, localY, scale);
                 UpdateZoomLabel();
+            }
+
+            // Check run for the zoom field: wheel steps (+1 out, -1 in) like the mouse wheel, label text logged before and after.
+            if (Argument("-wheelZoom", 1) != null && mapCanvas != null)
+            {
+                Debug.Log("wheelZoom before: \"" + zoomLabel?.text + "\"");
+                foreach (var step in Argument("-wheelZoom", 1).Split(','))
+                {
+                    if (float.TryParse(step, NumberStyles.Float, CultureInfo.InvariantCulture, out var wheel))
+                    {
+                        mapCanvas.WheelZoom(new Vector2(mapCanvas.layout.width, mapCanvas.layout.height) * 0.5f, wheel);
+                        yield return null;
+                        yield return null;
+                        Debug.Log("wheelZoom step " + step + ": \"" + zoomLabel?.text + "\"");
+                    }
+                }
             }
 
             if (Argument("-orbit", 3) != null &&

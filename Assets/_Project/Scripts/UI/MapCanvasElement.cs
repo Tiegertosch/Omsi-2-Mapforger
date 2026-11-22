@@ -652,8 +652,32 @@ namespace OmsiMapEditor.UI
         /// </summary>
         public Func<double, double, PlacementSnap> PlacementSnapper { get; set; }
 
-        /// <summary>Describes the position under the pointer and the scale, for an overlay label.</summary>
-        public event Action<string> PointerInfoChanged;
+        /// <summary>The view changed its scale, centre or 3D camera, so labels showing the scale can follow.</summary>
+        public event Action ViewChanged;
+
+        private int notifiedViewStamp;
+        private bool viewCheckScheduled;
+
+        /// <summary>
+        /// The one place that raises <see cref="ViewChanged"/>: every view change, whichever way it came (wheel, pan, buttons, command line,
+        /// 3D camera), repaints the element, and the draw compares the camera with the one last announced. The announcement is
+        /// deferred out of the draw, so listeners may change other elements.
+        /// </summary>
+        private void CheckViewChanged()
+        {
+            if (viewCheckScheduled || summary == null || !hasView || CameraStamp == notifiedViewStamp)
+                return;
+            viewCheckScheduled = true;
+            schedule.Execute(() =>
+            {
+                viewCheckScheduled = false;
+                var stamp = CameraStamp;
+                if (summary == null || stamp == notifiedViewStamp)
+                    return;
+                notifiedViewStamp = stamp;
+                ViewChanged?.Invoke();
+            });
+        }
 
         /// <summary>When false, objects can be selected but not dragged.</summary>
         public bool AllowEditing { get; set; }
@@ -777,7 +801,6 @@ namespace OmsiMapEditor.UI
             OrbitDistance = Mathf.Clamp(layout.height * metersPerPixel, 20f, 15000f);
             OrbitPitch = 40f;
             OrbitYaw = 0f;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -787,7 +810,6 @@ namespace OmsiMapEditor.UI
             OrbitYaw = (yawDegrees % 360f + 360f) % 360f;
             OrbitPitch = Mathf.Clamp(pitchDegrees, 5f, 89f);
             OrbitDistance = Mathf.Clamp(distance, 5f, 15000f);
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -799,7 +821,6 @@ namespace OmsiMapEditor.UI
             center = OrbitTarget;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -1478,7 +1499,6 @@ namespace OmsiMapEditor.UI
             center = mapBounds.center + new Vector2((FitInsets.z - FitInsets.x) * 0.5f, (FitInsets.y - FitInsets.w) * 0.5f) * metersPerPixel;
             hasView = true;
             isFitted = true;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -1503,7 +1523,6 @@ namespace OmsiMapEditor.UI
             metersPerPixel = viewMetersPerPixel;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -1525,7 +1544,6 @@ namespace OmsiMapEditor.UI
                 metersPerPixel = 0.5f;
             hasView = true;
             isFitted = false;
-            NotifyPointerInfo(null);
             MarkDirtyRepaint();
         }
 
@@ -1622,6 +1640,7 @@ namespace OmsiMapEditor.UI
         {
             if (summary == null || !hasView)
                 return;
+            CheckViewChanged();
             if (ThreeDimensional)
             {
                 Draw3D(context.painter2D);
@@ -4112,7 +4131,6 @@ namespace OmsiMapEditor.UI
                 SetPlacementPointer(position, evt.altKey);
                 UpdateHoveredHandles(position);
                 UpdateHoveredAdder(position);
-                NotifyPointerInfo(position);
                 return;
             }
 
@@ -4203,7 +4221,6 @@ namespace OmsiMapEditor.UI
                 HeadingPreviewed?.Invoke(selectedTile, selectedObject, previewHeading);
             else if (dragMode == DragMode.Turn)
                 OrientationPreviewed?.Invoke(PrimaryTile(), selectedObject, previewHeading, previewPitch, previewBank);
-            NotifyPointerInfo(position);
             MarkDirtyRepaint();
         }
 
@@ -4541,16 +4558,20 @@ namespace OmsiMapEditor.UI
 
         private void OnWheel(WheelEvent evt)
         {
-            if (summary == null || !hasView)
-                return;
-            if (ThreeDimensional)
-            {
-                SetOrbit(OrbitYaw, OrbitPitch, OrbitDistance * (evt.delta.y > 0f ? 1.15f : 1f / 1.15f));
+            if (WheelZoom((Vector2)evt.localMousePosition, evt.delta.y))
                 evt.StopPropagation();
-                return;
-            }
-            ZoomAround((Vector2)evt.localMousePosition, evt.delta.y > 0f ? 1f / 1.25f : 1.25f);
-            evt.StopPropagation();
+        }
+
+        /// <summary>One wheel step at a position of the element (positive delta zooms out); false when there is no view to zoom. Also used by the check run.</summary>
+        internal bool WheelZoom(Vector2 position, float deltaY)
+        {
+            if (summary == null || !hasView)
+                return false;
+            if (ThreeDimensional)
+                SetOrbit(OrbitYaw, OrbitPitch, OrbitDistance * (deltaY > 0f ? 1.15f : 1f / 1.15f));
+            else
+                ZoomAround(position, deltaY > 0f ? 1f / 1.25f : 1.25f);
+            return true;
         }
 
         private void OnKeyDown(KeyDownEvent evt)
@@ -4574,7 +4595,6 @@ namespace OmsiMapEditor.UI
             var after = ScreenToMap(screen);
             center += anchor - after;
             isFitted = false;
-            NotifyPointerInfo(screen);
             MarkDirtyRepaint();
         }
 
@@ -4670,63 +4690,6 @@ namespace OmsiMapEditor.UI
                 if (TileRect(tile).Contains(map))
                     return tile;
             return null;
-        }
-
-        /// <summary>The tile and tile-local position of a map position, or that it lies outside the map.</summary>
-        private string DescribeMapPosition(Vector2? map)
-        {
-            var tile = map.HasValue ? TileAt(map.Value) : null;
-            return tile == null
-                ? Loc.T("canvas.outside")
-                : Loc.T("canvas.position", ("tileX", tile.X), ("tileY", tile.Y), ("x", map.Value.x - TileRect(tile).xMin), ("y", map.Value.y - TileRect(tile).yMin));
-        }
-
-        private string TurnInfo()
-        {
-            return Loc.T("canvas.turned", ("count", selection.Count), ("degrees", groupTurn), ("pivot", DescribeMapPosition(GroupPivot())));
-        }
-
-        private void NotifyPointerInfo(Vector2? screen)
-        {
-            if (PointerInfoChanged == null || summary == null)
-                return;
-
-            if (ThreeDimensional)
-            {
-                var view = Loc.T("canvas.view3d", ("distance", OrbitDistance), ("heading", OrbitYaw), ("tilt", OrbitPitch));
-                if (IsTurningGroup)
-                    view = TurnInfo() + "      " + view;
-                else if (dragMode == DragMode.Turn)
-                    view = Loc.T("canvas.object_turn", ("id", selectedObject.Id), ("heading", previewHeading), ("pitch", previewPitch), ("bank", previewBank)) + "      " + view;
-                else if (dragMode == DragMode.Move)
-                    view = (selection.Count > 1
-                               ? Loc.T("canvas.moved_group_height", ("count", selection.Count), ("dx", previewLocalX - dragStartLocalX),
-                                   ("dy", previewLocalY - dragStartLocalY), ("dh", previewHeightOffset))
-                               : Loc.T("canvas.moved_one_height", ("id", selectedObject.Id), ("dx", previewLocalX - dragStartLocalX),
-                                   ("dy", previewLocalY - dragStartLocalY), ("dh", previewHeightOffset))) + "      " + view;
-                else if (screen.HasValue && hasView)
-                {
-                    var ground = GroundPoint(OrbitCamera().RayThrough(screen.Value));
-                    view = DescribeMapPosition(ground.HasValue ? new Vector2(ground.Value.x, ground.Value.z) : (Vector2?)null) + "      " + view;
-                }
-                PointerInfoChanged(view);
-                return;
-            }
-            var scale = Loc.T("canvas.scale", ("meters", metersPerPixel));
-            if (!screen.HasValue)
-            {
-                PointerInfoChanged(scale);
-                return;
-            }
-
-            var text = DescribeMapPosition(ScreenToMap(screen.Value));
-            if (IsTurningGroup)
-                text = TurnInfo();
-            else if (dragMode == DragMode.Move && selection.Count > 1)
-                text = Loc.T("canvas.moved_group", ("count", selection.Count), ("dx", previewLocalX - dragStartLocalX), ("dy", previewLocalY - dragStartLocalY));
-            else if (IsDraggingObject())
-                text = Loc.T("canvas.dragging_one", ("id", selectedObject.Id), ("x", previewLocalX), ("y", previewLocalY), ("heading", previewHeading));
-            PointerInfoChanged(text + "      " + scale);
         }
     }
 }
