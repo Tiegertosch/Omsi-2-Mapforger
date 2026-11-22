@@ -277,3 +277,18 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Variable parent (`[varparent]`) von Objekten und angehängten Objekten im Inspector setzen, wählen, anzeigen und entfernen, ein Rückgängig-Schritt (ADR 082, 9. November 2026; vom Projektinhaber bestätigt (16. November 2026))
 - [x] Geländeanpassung folgt der Querneigung von Straßen, neu angepasst nach dem Ändern von Querneigung und Schräge (ADR 083, 9. November 2026; Befund des Nutzers aus openOMSI; vom Projektinhaber bestätigt (16. November 2026))
 - [ ] Text auf `[texttexture]`-Objekten in der Draufsicht und in 3D zeigen (zurückgestellt vom Projektinhaber bis nach dem UI-Umbau, 16. November 2026): Schilder zeigen in MapWorks heute leere Flächen, openOMSI zeigt den Text. Plan: Schriftdatei `.oft` lesen und den Text rastern nach openOMSI (`crates/omsi-content/src/font.rs`, `crates/omsi-sim/src/texttex.rs`); je Text eine eigene Variante in `MapObjectRenderer`; Neuzeichnen bei Änderung der Beschriftung. Aufwand M. Voraussetzung: Der eingerückte Dokumentationsblock `\t[texttexture]` in `Ruede\hst_alt.sco` zählt `OmsiSceneryObject` heute als echten Eintrag (OMSI und openOMSI nehmen Schlüsselwörter nur in Spalte 0); lokal dort beheben.
+
+## UI-Rework: nach dem Rework und Release 1.2.0
+
+Stand 22. November 2026 (ADR 098, M8-Entscheidungen 2B und 3B). M8 endet mit dem Merge, ohne Release. Release 1.2.0 folgt erst zusammen mit den zwei Funktionen unten; `bundleVersion` bleibt bis dahin 1.1.5, das Wiki folgt nach dem Release. Zeilen mit Fundstellen: `ui-rework-feature-matrix.md`.
+
+- [ ] Release 1.2.0 (Entscheidung 3B): erst mit diesen zwei Funktionen
+  - [ ] Objekt-Popup in der unteren Leiste neben dem Kachel-Popup: Liste aller auf der Karte platzierten Objekte
+  - [ ] Ansicht „Topologie“ am rechten Rand der Leiste: Höhenlinien über dem Gelände zum Planen von Straßen (ADR 098 als spätere eigene Funktion; in der Skizze heißt der Knopf „Topology View“, `Decisions.md` ADR 098)
+- [ ] Größere Reste der Funktionsmatrix nach dem Rework (Entscheidung 2B)
+  - [x] Dialoge und Fenster im neuen Stil: Karteneinstellungen, Parkliste, Verkehrskurven, Fahrplan- und Fahrzeug-Dialog, Kartenprüfung (alle 13 modalen Dialoge aus `DialogFactory.cs`, M7, vom Projektinhaber getestet); Luftbild-Fenster und eigene Bilder als Sonderform nach Entscheidung 6A (nicht modal, Optionszeilen seit M4). Die Zeile stand hier fälschlich offen (M8 Schritt 5, Rest 4, 22. November 2026)
+  - [x] Werkzeug-Optionen im neuen Stil: Geländepinsel, Markierungen, Vorfahrt, Spuren, Reihen, Linie, Zufallsdrehung, Überweg und Parkreihe über `OptionControls` (M3/M4, vom Projektinhaber getestet). Ebenfalls fälschlich offen geführt
+  - [ ] Zeilen in den Formular-Dialogen (Einstellungen, Parkliste, Verkehrskurven, Fahrplan, Fahrzeuge) im Optionsstil statt `form-*`: nur auf Wunsch des Projektinhabers (M4 hat sie bewusst nicht umgebaut); zu entscheiden
+  - [x] Menüeintrag Tools › „Road builder…“ ohne geladene Karte: ausgegraut (22. November 2026, `EditorShellMapMenuState.cs`); ebenso alle Einträge der Menüs Edit und Tools, die ohne Karte nichts tun
+  - [ ] Kontextmenü für Kreuzungen, Ampeln und Markierungen als eigene Elemente (heute nur Einträge am Kreuzungsobjekt, `EditorShellContextMenu.cs:297–330`)
+  - [ ] „Kreuzungen aus Profil“ im Edit-Menü im neuen Stil (`EditorShell.uxml:82–84`)

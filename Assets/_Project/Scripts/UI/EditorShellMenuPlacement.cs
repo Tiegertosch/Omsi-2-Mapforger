@@ -66,10 +66,14 @@ namespace OmsiMapEditor.UI
                 var button = root.Q<VisualElement>(buttonName);
                 if (menu == null || button == null)
                     continue;
+                // Entries that need a map follow the state of the map each time a menu is opened.
+                if (button is Button menuButton)
+                    menuButton.clicked += UpdateMapMenuItems;
                 EventCallback<GeometryChangedEvent> place = _ => PlaceMenuUnder(root, menu, button);
                 menu.RegisterCallback(place);
                 button.RegisterCallback(place);
             }
+            UpdateMapMenuItems();
         }
 
         /// <summary>Sets the menu's left edge to the button's, but keeps the menu inside the window; changes only when it differs, so it does not trigger itself.</summary>
@@ -108,6 +112,7 @@ namespace OmsiMapEditor.UI
                     foreach (var (otherName, _, _) in MenuButtons)
                         if (otherName != menuName)
                             HidePopup(rootElement.Q<VisualElement>(otherName));
+                    UpdateMapMenuItems();
                     if (menu != null)
                         menu.style.display = DisplayStyle.Flex;
                     Debug.Log("Open menu: " + argument);

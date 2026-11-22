@@ -11,7 +11,7 @@ using UnityEngine.UIElements;
 namespace OmsiMapEditor.UI
 {
     /// <summary>
-    /// The road builder in the road tool (ADR 049): New road type... in the road picker opens it in place of the picker;
+    /// The road builder in the road tool (ADR 049): Tools > Road builder... opens it (greyed out without a map; New road type... in the road tool is gone since M7);
     /// saving writes the road type under Splines\Mapforge in the installation, adds it to the picker's My roads and
     /// chooses it, ready to build. The pencil on a road type of My roads opens it again (stage 3): saving then writes the
     /// same file anew, so every spline of it changes, and makes the junctions made with it again, as one undo step.

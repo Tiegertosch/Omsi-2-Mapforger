@@ -117,5 +117,8 @@
   "status.mode.readonly": "schreibgeschützt",
   "tool.status.move": "Verschieben: Ziehe einen Pfeil, um die Auswahl nach Osten, Norden oder, in 3D, nach oben zu verschieben; Umschalt verschiebt in ganzen Metern.",
   "tool.status.rotate": "Drehen: Ziehe den runden Griff von oben oder einen Ring in 3D, um das gewählte Objekt zu drehen; Umschalt rastet auf 15° ein.",
-  "tool.status.drag": "Ziehen: Klicke Objekte an, um sie zu wählen, und ziehe sie, um sie frei zu verschieben; Strg+Klick und Strg+Ziehen wählen mehrere."
+  "tool.status.drag": "Ziehen: Klicke Objekte an, um sie zu wählen, und ziehe sie, um sie frei zu verschieben; Strg+Klick und Strg+Ziehen wählen mehrere.",
+  "tile.revert.title": "Änderungen der Kachel verwerfen?",
+  "tile.revert.text": "Die Kachel wird auf die Originalkarte zurückgesetzt, ihre Änderungen gehen verloren. Rückgängig holt sie zurück.",
+  "tile.revert.confirm": "Kachel zurücksetzen"
 }

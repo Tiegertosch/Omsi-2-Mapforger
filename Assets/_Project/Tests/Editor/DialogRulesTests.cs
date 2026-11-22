@@ -187,6 +187,35 @@ namespace OmsiMapEditor.Tests
             Assert.That(dialog.IsShown, Is.False, "the primary button closes after its action");
         }
 
+        // M8 step 5: the question before Revert tile edits is Cancel on the left and a red Danger button on the right; only that button acts.
+        [Test]
+        public void ADangerQuestionActsOnlyThroughItsDangerButtonAndFocusesCancelFirst()
+        {
+            var acted = 0;
+            var dialog = ModalDialog.Create(Options("revert-test", DialogWidth.Narrow,
+                new DialogButton { TextKey = "tile.revert.confirm", Role = D, Clicked = () => acted++ },
+                new DialogButton { TextKey = "common.cancel", Role = C }));
+
+            Assert.That(dialog.Buttons.Count, Is.EqualTo(2));
+            Assert.That(dialog.Buttons[0].ClassListContains("dialog-danger"), Is.False, "Cancel stands left");
+            Assert.That(dialog.Buttons[1].ClassListContains("dialog-danger"), "the danger button stands right and is red");
+            Assert.That(dialog.Primary, Is.Null, "no orange main button, so Enter cannot confirm");
+
+            dialog.Show();
+            dialog.Dismiss();
+            Assert.That(acted, Is.EqualTo(0), "Cancel does not act");
+            dialog.Show();
+            OverlayRegistry.Hide(dialog.Overlay);
+            dialog.OnEscaped();
+            Assert.That(acted, Is.EqualTo(0), "Esc does not act");
+            Assert.That(DialogRules.InitialFocus(false, false, false, true), Is.EqualTo(DialogInitialFocus.FirstButton), "the first button is Cancel");
+
+            dialog.Show();
+            dialog.Press(dialog.Buttons[1]);
+            Assert.That(acted, Is.EqualTo(1));
+            Assert.That(dialog.IsShown, Is.False);
+        }
+
         [Test]
         public void AnOverlayRegisteredByTheShellClosesWithEscThroughTheRegistry()
         {

@@ -749,7 +749,6 @@ namespace OmsiMapEditor.UI
                 };
             if (checkMapMenuItem != null)
             {
-                checkMapMenuItem.SetEnabled(false);
                 checkMapMenuItem.clicked += () =>
                 {
                     HidePopup(toolsMenu);
@@ -1319,7 +1318,7 @@ namespace OmsiMapEditor.UI
                     var groundStarted = Time.realtimeSinceStartup;
                     while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - groundStarted < 300f)
                         yield return null;
-                    RevertSelectedTile();
+                    RevertSelectedTileNow();
                     Debug.Log("Revert: " + statusLabel?.text);
                 }
             }
@@ -1403,6 +1402,9 @@ namespace OmsiMapEditor.UI
                 OpenEntryNameDialog("Entry", false, null);
             if (Array.IndexOf(args, "-signalNotice") >= 0)
                 ShowSignalDraftDroppedNotice();
+            // -revertTileDialog (after -selectTile x y) shows the question of the Revert tile edits command; nothing is reverted.
+            if (Array.IndexOf(args, "-revertTileDialog") >= 0)
+                RevertSelectedTile();
             // -pressEscape (after one of the dialog arguments): after 1.5 s sends Esc to the focused element, as the keyboard does, and logs
             // what had the focus and whether a dialog is still shown ("Esc check:"). The only way to see Esc with the focus in a dialog without a hand.
             // -clickMap [x y]: after 1 s presses the left button at that point (default: the middle of the window) as the pointer does:
@@ -2246,7 +2248,7 @@ namespace OmsiMapEditor.UI
             RenderInspector();
             UpdateMapStateLabel();
             SetStatusT("map.loaded", ("name", currentSummary.Name), ("tiles", currentSummary.Tiles.Count), ("mode", session.CanEdit ? "project" : "readonly"));
-            checkMapMenuItem?.SetEnabled(true);
+            UpdateMapMenuItems();
         }
 
         /// <summary>
@@ -8018,7 +8020,7 @@ namespace OmsiMapEditor.UI
             return false;
         }
 
-        private void RevertSelectedTile()
+        private void RevertSelectedTileNow()
         {
             if (selectedTile == null)
                 return;
@@ -8032,7 +8034,7 @@ namespace OmsiMapEditor.UI
                 SetStatusT("tile.status.added_here", ("file", selectedTile.FileName));
                 return;
             }
-            if (!SignalToolMayYield(SignalExitKind.ViewChange, RevertSelectedTile))
+            if (!SignalToolMayYield(SignalExitKind.ViewChange, RevertSelectedTileNow))
                 return;
             // Typed label lines become their own step before the tile's files go back.
             FlushLabelEdits();

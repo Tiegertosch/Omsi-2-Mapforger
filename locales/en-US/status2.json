@@ -146,5 +146,8 @@
   "status.mode.readonly": "read-only",
   "tool.status.move": "Move: drag an arrow to move the selection east, north or, in 3D, up; Shift moves in whole metres.",
   "tool.status.rotate": "Rotate: drag the round handle from above or a ring in 3D to turn the selected object; Shift snaps to 15°.",
-  "tool.status.drag": "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several."
+  "tool.status.drag": "Drag: click objects to select them and drag them to move them freely; Ctrl+click and Ctrl+drag select several.",
+  "tile.revert.title": "Revert tile edits?",
+  "tile.revert.text": "The tile goes back to the original map and its edits are discarded. Undo brings them back.",
+  "tile.revert.confirm": "Revert tile"
 }

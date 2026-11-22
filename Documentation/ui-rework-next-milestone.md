@@ -603,3 +603,36 @@ Der Plan (Abschnitt (c)) zählte Schlüssel, die nicht als ganze Zeichenkette im
 ## M8 Schritt 4 – Umbenennungen umgesetzt (22. November 2026)
 
 Entscheidung 4A ist umgesetzt: `view-menu-button` → `tools-menu-button`, `view-menu` (Name und Klasse) → `tools-menu`, `project-collapse-button` → `bar-popup-close-button`, `RenderProjectBrowser` → `RenderBarPopup`; Variablen `viewMenu`/`viewButton` → `toolsMenu`/`toolsButton`. 13 Dateien (11 Code, UXML, USS), zusammen 53 Zeilen. Prüfargument `-openMenu` kennt nur `file|edit|tools|help` (kein Wert „view“), daher kein Alias nötig. Neuer Test `ElementNameLookupTests` (siehe ADR 098, Nachtrag „M8 Schritt 4“). Die Abschnitte (d) und der Arbeitsplan oben bleiben als Planstand stehen.
+
+# M8 Schritt 5 – Doku und Matrix (22. November 2026)
+
+**Stand:** Nur Dokumentation, kein Code. Zweig `feature/ui-rework`, HEAD `ab5eaea`, nichts committet.
+
+**Matrix neu belegt** (`ui-rework-feature-matrix.md`): 56 Zeilen, **29 voll, 20 teilweise, 6 alt, 1 Lücke**. Die Vorfassung nannte 25/17/7/7; ihre Tabelle ergab nachgezählt 26/16/6/5 (dazu 2 „neu“, 1 Abzeichen-Zeile). Änderungen gegenüber der Tabelle: Karte ohne Projekt, Einfügen und Luftbild-Tastenkürzel sind seit M1 behoben; der Hinweis „N Ordner ausgelassen“ ist vorhanden; das Kontextmenü für Reihen und Splines in 3D besteht; die Prüfargumente für Einstellungen und Spline-/Kachel-Menü sind belegt.
+
+**Kleine Reste (Liste (a) für die Hauptsitzung, nicht im Code behoben):**
+
+| Rest | Fundstelle | Vorschlag | Größe |
+|---|---|---|---|
+| Kachel zurücksetzen ohne Rückfrage, leert die Undo-Historie (Audit 5.3) | `EditorShellContextMenu.cs:520`, `:528` (Eintrag), `EditorShellBootstrap.cs:8021` (`RevertSelectedTile`) | Rückfrage über `DialogFactory` (Gefahrknopf in Rot), Hinweis auf die geleerte Undo-Historie; Test wie bei den anderen Dialogen | klein |
+| Klärung: „New road type…“ | `EditorShellRoadBuilder.cs:14` (Kommentar) und `EditorShellLocalization.cs:52` (Tooltip des Tools-Eintrags) | Die Hauptsitzung soll bestätigen, ob der Eintrag im Straßenwerkzeug noch existiert; die Matrix führt ihn als offen | Klärung |
+| Wirkung von `-lineGroup` und `-lineBackMode` | `EditorShellLine.cs:583–588`, `:618` | Einmal im Player prüfen, dann die Beschreibung in `CommandLine.md` bestätigen | klein |
+
+**Eingetragen:**
+- Roadmap, neuer Abschnitt „UI-Rework: nach dem Rework und Release 1.2.0“: die zwei Funktionen für 1.2.0 (Objekt-Popup, Ansicht „Topologie“) und vier größere Restpunkte nach dem Rework (alte Dialoge und Fenster, Werkzeug-Optionen, Kontextmenüs für Kreuzungen/Ampeln/Markierungen als eigene Elemente, „Kreuzungen aus Profil“ im Edit-Menü).
+- `CommandLine.md`: 15 Argumente (`-openMap`, `-language`, `-localesFolder`, `-chooseLanguage`, `-switchLanguage`, `-i18nSelfTest`, `-inspectorRedraw`, `-lineBackMode`, `-lineGroup`, `-linesOff`, `-splineType`, `-splinePick`, `-splineDelete`, `-splineUndo`, `-splineRedo`) und 2 interne Neustart-Argumente (`-updatedFrom`, `-updateFailed`). Nicht aufgenommen: `-noconfig`, `-nologo`, `-nostdlib` (Unity-Flags des Player-Builds), `-prev` (Dateiendung der Fehlerberichte).
+- `CLAUDE.md`: Zeilenzahlen, ADR 001–101, Dialog-Baustein und ModalGuard.
+
+**Nicht erledigt, bewusst:** ADR 098 bleibt offen (Abschluss nach Review und Merge). README „Current status“ wurde in diesem Schritt nicht angefasst.
+
+## M8 Schritt 5, Reste umgesetzt (22. November 2026)
+
+Die drei kleinen Reste aus der Liste oben sind bearbeitet, dazu die Einstufung der Dialoge (Entscheidung 2B). Zweig `feature/ui-rework`, HEAD `ab5eaea`, nichts committet.
+
+| Rest | Ergebnis |
+|---|---|
+| Kachel zurücksetzen | Rückfrage `revert-tile-dialog` (`EditorShellTileRevert.cs`), Danger-Knopf „Revert tile“ rechts, Abbrechen links, Esc und Abbrechen ändern nichts. Die Undo-Historie wird **nicht** geleert: das Zurücksetzen ist seit M3 ein Schritt des Verlaufs; der Text sagt „Undo brings them back“. `-revertTile` bleibt ohne Frage, neu `-revertTileDialog`. |
+| „New road type…“ | Gibt es im Straßenwerkzeug nicht mehr (Kopfzeile des Katalogs, 12. November). Einstieg: Tools › „Road builder…“. Befund: ohne Karte wirkungslos und stumm; **behoben am 22. November 2026**: ausgegraut (`EditorShellMapMenuState.cs`, siehe ADR 098 Nachtrag). Kommentar `EditorShellRoadBuilder.cs:14` korrigiert. |
+| `-lineGroup`, `-lineBackMode` | Im Player geprüft, beide wirken; Beschreibung in `CommandLine.md` bestätigt. |
+| „Alt“ in Matrix und Roadmap | Meinte die Bauweise vor M7. Matrix 48 voll, 6 teilweise, 2 alt; Roadmap: Dialoge und Werkzeug-Optionen abgehakt. Siehe Matrix, Abschnitt „Dialoge: was „alt“ hieß“. |
+

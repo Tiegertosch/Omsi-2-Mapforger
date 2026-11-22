@@ -138,5 +138,8 @@
   "status.mode.readonly": "tylko do odczytu",
   "tool.status.move": "Przesuń: przeciągnij strzałkę, aby przesunąć zaznaczenie na wschód, północ lub w 3D w górę; Shift porusza się w pełnych metrach.",
   "tool.status.rotate": "Obróć: przeciągnij okrągły uchwyt z góry lub pierścień w 3D, aby obrócić wybrany obiekt; Shift zatrzaskuje się pod kątem 15°.",
-  "tool.status.drag": "Przeciągnij: kliknij obiekty, aby je zaznaczyć i przeciągnij, aby je swobodnie przesuwać; Ctrl+kliknij i Ctrl+przeciągnij wybierz kilka."
+  "tool.status.drag": "Przeciągnij: kliknij obiekty, aby je zaznaczyć i przeciągnij, aby je swobodnie przesuwać; Ctrl+kliknij i Ctrl+przeciągnij wybierz kilka.",
+  "tile.revert.title": "Odrzucić zmiany tile?",
+  "tile.revert.text": "Tile wraca do oryginalnej mapy, a jego zmiany zostaną odrzucone. Cofnij je przywraca.",
+  "tile.revert.confirm": "Cofnij zmiany tile"
 }
