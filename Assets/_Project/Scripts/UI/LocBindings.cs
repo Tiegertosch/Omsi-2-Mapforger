@@ -68,6 +68,17 @@ namespace OmsiMapEditor.UI
             return element;
         }
 
+        /// <summary>Takes the element's text binding away, so a text the code writes itself stays through a language change; the text stays as it is.</summary>
+        public static void ClearText(VisualElement element)
+        {
+            if (element == null)
+                return;
+            var binding = BindingOf(element);
+            binding.TextKey = null;
+            binding.TextArguments = null;
+            binding.Upper = false;
+        }
+
         /// <summary>Takes the element's tooltip binding away and clears the tooltip.</summary>
         public static void ClearTooltip(VisualElement element)
         {

@@ -58,15 +58,6 @@ namespace OmsiMapEditor.UI
             ("report-bug-menu-item", "tooltip", "menu.help.report_bug.tooltip"),
             ("wiki-menu-item", "text", "menu.help.wiki"),
             ("wiki-menu-item", "tooltip", "menu.help.wiki.tooltip"),
-            ("export-title", "text", "export.title"),
-            ("export-description", "text", "export.description"),
-            ("export-folder-field", "label", "export.folder_name"),
-            ("export-name-field", "label", "export.name_in_omsi"),
-            ("export-cancel-button", "text", "common.cancel"),
-            ("export-confirm-button", "text", "export.confirm"),
-            ("check-title", "text", "check.title"),
-            ("check-copy-button", "text", "check.copy_report"),
-            ("check-close-button", "text", "common.close"),
         };
 
         /// <summary>Binds the menu bar to keys; the UXML's own English texts stay as what shows before the language is known.</summary>
@@ -134,7 +125,7 @@ namespace OmsiMapEditor.UI
                     RefreshSignalTexts();
             }
             // An open map check report was written in the earlier language: the check runs again, as the report is made when it runs.
-            if (currentSummary != null && IsShown(checkDialog))
+            if (currentSummary != null && checkDialog != null && checkDialog.IsShown)
                 ValidateLoadedMap();
             satelliteWindow?.RefreshTexts();
             if (currentSummary != null)

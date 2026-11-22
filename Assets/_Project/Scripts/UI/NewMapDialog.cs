@@ -13,7 +13,8 @@ namespace OmsiMapEditor.UI
     /// <summary>
     /// The dialog for a new map (ADR 032): names and description, the template, size, ground height and texture, which
     /// side traffic keeps to, how busy cars and passengers are, rail, years, money, tickets and seasons. Every setting
-    /// starts with the template's value. The shell creates the map when <see cref="CreateRequested"/> fires.
+    /// starts with the template's value. The shell creates the map when <see cref="CreateRequested"/> fires. The form is the body of
+    /// a <see cref="ModalDialog"/> (M7 step 5), which owns the title, the intro and the buttons; the form changes them for the settings of the open map.
     /// </summary>
     internal sealed class NewMapDialog : VisualElement
     {
@@ -43,9 +44,7 @@ namespace OmsiMapEditor.UI
         private readonly ScrollView swatches = new ScrollView(ScrollViewMode.Horizontal);
         private readonly Label groundLabel = new Label();
         private readonly Label targetLabel = new Label();
-        private readonly Button createButton;
-        private readonly Label titleLabel;
-        private readonly Label introLabel;
+        private readonly ModalDialog host;
         private readonly List<VisualElement> creationOnly = new List<VisualElement>();
         private readonly List<VisualElement> trafficRows = new List<VisualElement>();
         private Button seasonKeepButton;
@@ -66,20 +65,11 @@ namespace OmsiMapEditor.UI
         /// <summary>True while the dialog changes the settings of the open map instead of making a new one (ADR 076).</summary>
         private bool editing;
 
-        public NewMapDialog()
+        public NewMapDialog(ModalDialog host)
         {
-            AddToClassList("dialog");
-            AddToClassList("new-map-dialog");
-            titleLabel = LocBindings.NewLabel("newmap.title");
-            titleLabel.AddToClassList("popup-title");
-            Add(titleLabel);
-            introLabel = LocBindings.NewLabel("newmap.intro");
-            introLabel.AddToClassList("popup-description");
-            Add(introLabel);
-
-            var body = new ScrollView(ScrollViewMode.Vertical);
-            body.AddToClassList("new-map-body");
-            Add(body);
+            this.host = host ?? throw new ArgumentNullException(nameof(host));
+            // The form is added to the body of the dialog, which scrolls when the window is small.
+            VisualElement body = this;
             var columns = new VisualElement();
             columns.AddToClassList("new-map-columns");
             body.Add(columns);
@@ -197,19 +187,10 @@ namespace OmsiMapEditor.UI
             groundLabel.AddToClassList("new-map-hint-flush");
             body.Add(groundLabel);
 
+            // The line about the target stays in view above the buttons, outside the scrolling body.
             targetLabel.AddToClassList("popup-description");
             targetLabel.AddToClassList("export-target");
-            Add(targetLabel);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("common.cancel", () => Cancelled?.Invoke());
-            cancel.AddToClassList("map-control-button");
-            createButton = LocBindings.NewButton("newmap.create", Create);
-            createButton.AddToClassList("map-control-button");
-            createButton.AddToClassList("dialog-primary");
-            buttons.Add(cancel);
-            buttons.Add(createButton);
-            Add(buttons);
+            host.Dialog.Insert(host.Dialog.childCount - 1, targetLabel);
 
             RegisterCallback<AttachToPanelEvent>(_ => schedule.Execute(TakeSwatches).Every(100));
         }
@@ -219,8 +200,6 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The settings of the open map are to be changed: display name and options (ADR 076).</summary>
         public event Action<string, OmsiNewMapOptions> SettingsRequested;
-
-        public event Action Cancelled;
 
         /// <summary>The texts that are computed from the dialog's state are written again, after a language change.</summary>
         public void RefreshTexts()
@@ -249,7 +228,6 @@ namespace OmsiMapEditor.UI
             nameField.SetValueWithoutNotify(name);
             folderField.SetValueWithoutNotify(FolderNameFor(name));
             UpdateTarget();
-            nameField.schedule.Execute(() => nameField.Focus());
         }
 
         /// <summary>
@@ -263,16 +241,15 @@ namespace OmsiMapEditor.UI
             nameField.SetValueWithoutNotify(friendlyName ?? string.Empty);
             descriptionField.SetValueWithoutNotify(description ?? string.Empty);
             UpdateTarget();
-            nameField.schedule.Execute(() => nameField.Focus());
         }
 
         /// <summary>Switches the texts and the fields between making a map and changing the settings of the open one.</summary>
         private void SetMode(bool edit)
         {
             editing = edit;
-            LocBindings.Text(titleLabel, edit ? "mapsettings.title" : "newmap.title"); // i18n:keys
-            LocBindings.Text(introLabel, edit ? "mapsettings.intro" : "newmap.intro"); // i18n:keys
-            LocBindings.Text(createButton, edit ? "mapsettings.apply" : "newmap.create"); // i18n:keys
+            LocBindings.Text(host.Title, edit ? "mapsettings.title" : "newmap.title"); // i18n:keys
+            LocBindings.Text(host.Description, edit ? "mapsettings.intro" : "newmap.intro"); // i18n:keys
+            LocBindings.Text(host.Primary, edit ? "mapsettings.apply" : "newmap.create"); // i18n:keys
             foreach (var element in creationOnly)
             {
                 if (edit)
@@ -596,10 +573,11 @@ namespace OmsiMapEditor.UI
             var problem = Problem(out var target);
             targetLabel.text = problem ?? (editing ? Loc.T("mapsettings.note") : Loc.T("newmap.target", ("target", target)));
             targetLabel.EnableInClassList("export-problem", problem != null);
-            createButton.SetEnabled(problem == null);
+            host.Primary.SetEnabled(problem == null);
         }
 
-        private void Create()
+        /// <summary>The primary button: checks the fields and asks the shell to create the map or change the settings.</summary>
+        public void Submit()
         {
             var problem = Problem(out _);
             var result = problem == null ? ReadOptions(out problem) : null;

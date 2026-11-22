@@ -208,6 +208,8 @@ Alle sechs Fragen sind entschieden; ADR 098, Nachtrag „M6 Entscheidungen“.
 
 **Stand: M7 Schritt 0 in Arbeit** (Entscheidungen des Projektinhabers vom 22. November 2026 stehen unten in „Entscheidungen des Projektinhabers“). Die Bestandsaufnahme darunter ist der Stand vor Schritt 0. Grundlage: HEAD `074ef75` auf `feature/ui-rework`, Roadmap M7 (`ui-rework-roadmap.md`, Abschnitt M7), ADR 098 (M3: Anmeldung der Überlagerungen; M6 Schritt 4: Klemmen), `CorporateDesign.md`. Alle Zahlen sind per Suche über `Assets/_Project/Scripts/UI`, `UI/Resources/EditorShell.uxml` und `EditorShell.uss` am 22. November 2026 gezählt. Nicht gemessen: das Aussehen im Player; die Vorher-Bilder entstehen in Schritt 0.
 
+**Stand Schritt 5 (22. November 2026):** Die sechs Formular-Dialoge (Export, Einstellungen, Kartenprüfung, Neue Karte/Karteneinstellungen, Fehlerbericht, Updates) kommen aus der Fabrik, `EditorShell.uxml` hat keinen Dialog mehr; Handtest offen, siehe ADR 098, Nachtrag „M7 Schritt 5“, und `.omc/handoffs/m7/HANDOFF.md`. Offen: Schritt 6 (Abschluss: Zähler auf die Endwerte, Reviewer-Durchgang, Wiki-Hinweis).
+
 ## Kernzahlen
 
 | Messgröße | Ist | Ziel (Roadmap) |

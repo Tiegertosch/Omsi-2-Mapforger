@@ -34,7 +34,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             newMapForm.OpenForSettings(currentSummary.GlobalConfigPath, currentSummary.FriendlyName, currentSummary.Description);
-            newMapDialog.style.display = DisplayStyle.Flex;
+            newMapDialog.Show();
         }
 
         /// <summary>Writes what the dialog collected into global.cfg of the project copy and shows the new name.</summary>
@@ -54,7 +54,7 @@ namespace OmsiMapEditor.UI
                 SetStatusT("mapsettings.status.failed", ("reason", exception.Message));
                 return;
             }
-            HidePopup(newMapDialog);
+            newMapDialog.Hide();
             RenderProjectBrowser();
             UpdateMapStateLabel();
             SetStatusT(changed ? "mapsettings.status.changed" : "mapsettings.status.unchanged", ("name", friendlyName)); // i18n:keys

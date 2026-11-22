@@ -310,7 +310,6 @@
 .dialog-row { flex-direction: row; align-items: center; margin: 4px 0; }
 /* Every dialog may use at most 94 % of the window; this rule stands before the dialogs' own rules, so a dialog with its own maximum (below, by name) keeps it (M6 step 4). */
 .dialog { max-width: 94%; max-height: 94%; }
-.check-dialog { width: 760px; max-width: 94%; max-height: 86%; }
 .check-sections { flex-shrink: 1; min-height: 120px; max-height: 560px; margin: 4px 0 8px; }
 .check-section { margin: 0 0 var(--mf-space-2); padding: var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-panel); border-radius: var(--mf-radius-md); }
 .check-section-header { flex-direction: row; align-items: center; }
@@ -889,8 +888,6 @@
 .dialog-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; background-color: var(--mf-color-overlay); }
 .dialog { width: 560px; padding: var(--mf-space-4); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-lg); }
 .dialog-field { margin: 4px 8px; }
-/* The middle of a dialog scrolls inside it when the window is too small; the title and the buttons stay (M6 step 4). */
-.dialog-scroll { flex-grow: 0; flex-shrink: 1; min-height: 0; }
 .entry-name-error { color: var(--mf-color-error); }
 .entry-name-taken { color: var(--mf-color-warning); }
 .dialog-field > Label { min-width: 110px; width: 110px; color: var(--mf-color-text-secondary); }
@@ -927,6 +924,11 @@
 .form-small-button { width: 26px; min-width: 26px; flex-shrink: 0; padding: 0; }
 .form-narrow-field { width: 60px; min-width: 60px; flex-shrink: 0; }
 .settings-folders-button { align-self: flex-start; margin-top: var(--mf-space-2); }
+/* M7 step 5: one look for the tick boxes of Settings, Updates and Bug report (they had three different margins and text colours);
+   the text beside the box follows the content folders list. Declared after .inspector-section-heading so the indent wins. */
+.form-toggle { margin: var(--mf-space-1) var(--mf-space-2); }
+.form-toggle .unity-toggle__text { margin-left: 6px; color: var(--mf-color-text-primary); }
+.form-indent { margin-left: var(--mf-space-2); margin-right: var(--mf-space-2); }
 .form-section-title { margin: var(--mf-space-3) 0 var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .form-footnote { margin-top: var(--mf-space-2); color: var(--mf-color-text-muted); white-space: normal; }
 
@@ -980,8 +982,6 @@
 .status-map-state { display: none; }
 
 /* New map dialog (ADR 032) */
-.new-map-dialog { width: 880px; max-width: 94%; max-height: 94%; }
-.new-map-body { flex-shrink: 1; min-height: 0; margin-top: var(--mf-space-1); }
 .new-map-columns { flex-direction: row; }
 .new-map-column { flex-grow: 1; flex-basis: 0; margin: 0 var(--mf-space-2); }
 .new-map-section { margin: var(--mf-space-3) var(--mf-space-2) var(--mf-space-1); }
@@ -1005,8 +1005,6 @@
 .new-map-dropdown .unity-base-popup-field__input:hover { border-color: var(--mf-color-accent); }
 .settings-language-slot { width: 220px; flex-grow: 0; flex-shrink: 0; margin: 0 8px; }
 .settings-dropdown { width: 100%; flex-grow: 0; }
-.settings-toggle { margin: var(--mf-space-1) var(--mf-space-2) 0; }
-.settings-toggle > .unity-label { min-width: 0; color: var(--mf-color-text-primary); }
 .new-map-seasons { margin: 0 var(--mf-space-2); }
 .new-map-swatches { height: 108px; flex-shrink: 0; margin: 0 var(--mf-space-2); }
 .new-map-swatches-content { flex-direction: row; }
@@ -1016,7 +1014,6 @@
 .new-map-swatch-image { width: 64px; height: 64px; align-items: center; justify-content: center; border-radius: var(--mf-radius-sm); -unity-background-scale-mode: scale-and-crop; }
 .new-map-swatch-image > .spinner { width: 20px; height: 20px; color: var(--mf-color-accent); }
 .new-map-swatch-name { max-width: 70px; margin-top: 2px; font-size: var(--mf-font-caption); color: var(--mf-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bug-report-dialog { width: 640px; max-width: 94%; max-height: 94%; }
 .bug-report-row { flex-direction: row; align-items: center; min-height: 30px; margin: 2px 8px; }
 .bug-report-row-tall { align-items: flex-start; }
 .bug-report-row-tall > .bug-report-label { margin-top: 6px; }
@@ -1024,9 +1021,7 @@
 .bug-report-field { flex-grow: 1; flex-shrink: 1; width: auto; margin: 0; }
 .bug-report-text { height: 72px; }
 .bug-report-text .unity-base-text-field__input { height: 72px; padding: 4px 6px; -unity-text-align: upper-left; white-space: normal; }
-.bug-report-toggle { margin: 0; color: var(--mf-color-text-primary); }
 .bug-report-hint { margin: 2px 8px 0 126px; font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); white-space: normal; }
-.update-dialog { width: 560px; max-width: 94%; max-height: 90%; }
 .update-message-row { flex-direction: row; align-items: center; }
 .update-spinner { width: 18px; height: 18px; margin-left: 8px; flex-shrink: 0; color: var(--mf-color-accent); }
 .update-message { flex-grow: 1; flex-shrink: 1; }
@@ -1036,7 +1031,6 @@
 .update-progress { height: 6px; margin: 8px 8px 4px; background-color: var(--mf-color-field); border-radius: 3px; overflow: hidden; }
 .update-progress-fill { height: 100%; width: 0; background-color: var(--mf-color-accent); border-radius: 3px; }
 .update-hint { margin: 4px 8px; font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); white-space: normal; }
-.update-toggle { margin: 8px 8px 0; color: var(--mf-color-text-secondary); }
 .update-skip { margin-right: auto; }
 .satellite-frame { left: var(--mf-space-2); bottom: auto; width: 480px; max-width: 94%; max-height: 86%; }
 .satellite-body { flex-grow: 0; flex-shrink: 1; }

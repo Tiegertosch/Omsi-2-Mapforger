@@ -86,6 +86,35 @@ namespace OmsiMapEditor.UI
             return false;
         }
 
+        /// <summary>Diagnostics only (-modalGuardStrict): switches the popup exemption off, to show the old behaviour in a check run.</summary>
+        internal static bool PopupExemptionOff;
+
+        /// <summary>The class prefix of Unity's dropdown menu (GenericDropdownMenu: "unity-base-dropdown", "...__container-outer", "...__item").</summary>
+        internal const string UnityDropdownClassPrefix = "unity-base-dropdown";
+
+        /// <summary>
+        /// Whether the element belongs to a popup that is not part of any dialog's own tree: the list of a DropdownField, an enum or
+        /// popup field, or a tooltip. Unity hangs these on the panel, outside the dialog that opened them, but they belong to it: the
+        /// modal guard neither stops the pointer on them nor pulls the focus back from them (M7 step 5, correction: the language and
+        /// interface size lists closed as soon as the pointer reached them). Two signs, either is enough: the element lies outside the
+        /// shell root altogether (the structural sign, independent of Unity's class names), or an ancestor carries one of Unity's
+        /// dropdown or tooltip classes (for a menu that Unity hangs below the shell root).
+        /// </summary>
+        public static bool IsPopupElement(VisualElement element, VisualElement shellRoot)
+        {
+            if (element == null || PopupExemptionOff)
+                return false;
+            if (shellRoot != null && element.panel != null && element != shellRoot && !shellRoot.Contains(element))
+                return true;
+            for (var current = element; current != null; current = current.parent)
+            {
+                foreach (var name in current.GetClasses())
+                    if (name.StartsWith(UnityDropdownClassPrefix, StringComparison.Ordinal) || name == "unity-tooltip" || name == "unity-base-tooltip")
+                        return true;
+            }
+            return false;
+        }
+
         /// <summary>The modal overlay that is shown and stands highest in its parent (the one on top), or null.</summary>
         public VisualElement TopShownModal()
         {

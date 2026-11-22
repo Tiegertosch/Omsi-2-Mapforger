@@ -38,7 +38,7 @@ namespace OmsiMapEditor.UI
                         return;
                     // The settings window gives way to the choice (and keeps the focus out of the hidden button); Esc then closes the choice.
                     contentFoldersButton.Blur();
-                    HidePopup(settingsDialog);
+                    settingsDialog.Hide();
                     OpenContentFolders();
                 };
             LocBindings.Text(contentFoldersButton, "menu.file.content_folders");

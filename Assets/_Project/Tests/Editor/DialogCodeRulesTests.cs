@@ -11,8 +11,8 @@ namespace OmsiMapEditor.Tests
     /// </summary>
     public sealed class DialogCodeRulesTests
     {
-        /// <summary>Constructions of <c>dialog-overlay</c> in Scripts/UI (*.cs) and EditorShell.uxml; today none in code and 6 in the UXML.</summary>
-        private const int DialogOverlayCeiling = 6;
+        /// <summary>Constructions of <c>dialog-overlay</c> in Scripts/UI (*.cs) and EditorShell.uxml; none outside the dialog factory since M7 step 5 (the UXML has none either).</summary>
+        private const int DialogOverlayCeiling = 0;
 
         /// <summary>
         /// Inline size, spacing and flex assignments (<c>style.width/height/min/max, margin*, padding*, flexBasis/Grow/Shrink</c>) in

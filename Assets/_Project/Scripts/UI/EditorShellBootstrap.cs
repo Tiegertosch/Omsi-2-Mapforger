@@ -271,10 +271,10 @@ namespace OmsiMapEditor.UI
         private readonly List<MapSelectionItem> selection = new List<MapSelectionItem>();
         private string currentProjectName = string.Empty;
         private OmsiMapSession session;
-        private VisualElement exportDialog;
+        private ModalDialog exportDialog;
         private TextField exportFolderField;
         private TextField exportNameField;
-        private VisualElement checkDialog;
+        private ModalDialog checkDialog;
         private Label checkSummaryLabel;
         private ScrollView checkSections;
         private Task<OmsiMapCheckReport> checkTask;
@@ -285,7 +285,7 @@ namespace OmsiMapEditor.UI
         private OmsiCheckSection madeObjectsSection;
         private List<OmsiChainOffsetFinding> staleChainOffsets;
         private OmsiCheckSection chainOffsetsSection;
-        private VisualElement newMapDialog;
+        private ModalDialog newMapDialog;
         private NewMapDialog newMapForm;
         private Label exportTargetLabel;
         private Button exportConfirmButton;
@@ -364,40 +364,66 @@ namespace OmsiMapEditor.UI
             var openProjectMenuItem = root.Q<Button>("open-project-menu-item");
             var saveProjectMenuItem = root.Q<Button>("save-project-menu-item");
             var exportMenuItem = root.Q<Button>("export-menu-item");
-            exportDialog = root.Q<VisualElement>("export-dialog");
-            RegisterOverlay(exportDialog, true);
-            exportFolderField = root.Q<TextField>("export-folder-field");
-            exportNameField = root.Q<TextField>("export-name-field");
-            exportTargetLabel = root.Q<Label>("export-target-label");
-            exportConfirmButton = root.Q<Button>("export-confirm-button");
-            var exportCancelButton = root.Q<Button>("export-cancel-button");
-            checkDialog = root.Q<VisualElement>("check-dialog");
-            RegisterOverlay(checkDialog, true);
-            checkSummaryLabel = root.Q<Label>("check-summary");
-            checkSections = root.Q<ScrollView>("check-sections");
-            var checkCopyButton = root.Q<Button>("check-copy-button");
-            var checkCloseButton = root.Q<Button>("check-close-button");
-            if (checkCopyButton != null)
-                checkCopyButton.clicked += () =>
-                {
-                    if (lastCheck == null || currentSummary == null)
-                        return;
-                    GUIUtility.systemCopyBuffer = lastCheck.ToText(currentSummary.Name);
-                    SetStatusT("mapcheck.copied");
-                };
-            if (checkCloseButton != null)
-                checkCloseButton.clicked += () => HidePopup(checkDialog);
-            var newMapMenuItem = root.Q<Button>("new-map-menu-item");
-            newMapDialog = root.Q<VisualElement>("new-map-dialog");
-            RegisterOverlay(newMapDialog, true);
-            if (newMapDialog != null)
+            // Export: two fields, so Enter does nothing (rule 2B); Esc and Cancel leave. The primary button stays open until the export worked.
+            exportDialog = NewDialog(new DialogOptions
             {
-                newMapForm = new NewMapDialog();
-                newMapForm.Cancelled += () => HidePopup(newMapDialog);
-                newMapForm.CreateRequested += CreateNewMap;
-                newMapForm.SettingsRequested += ApplyMapSettings;
-                newMapDialog.Add(newMapForm);
-            }
+                Name = "export-dialog",
+                TitleKey = "export.title",
+                DescriptionKey = "export.description",
+                Width = DialogWidth.Standard,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "common.cancel", Role = DialogButtonRole.Cancel, Name = "export-cancel-button" },
+                    new DialogButton { TextKey = "export.confirm", Role = DialogButtonRole.Primary, Name = "export-confirm-button", Clicked = ExportMap, Closes = false }
+                }
+            });
+            exportFolderField = NewExportField("export-folder-field", "export.folder_name");
+            exportNameField = NewExportField("export-name-field", "export.name_in_omsi");
+            exportTargetLabel = new Label { name = "export-target-label" };
+            exportTargetLabel.AddToClassList("popup-description");
+            exportTargetLabel.AddToClassList("export-target");
+            exportDialog.Body.Add(exportFolderField);
+            exportDialog.Body.Add(exportNameField);
+            exportDialog.Body.Add(exportTargetLabel);
+            exportConfirmButton = exportDialog.Primary;
+            // The report of the map check: the summary line above the sections, which scroll by themselves and give way in a small window.
+            checkDialog = NewDialog(new DialogOptions
+            {
+                Name = "check-dialog",
+                TitleKey = "check.title",
+                Width = DialogWidth.Wide,
+                BodyScrolls = false,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "check.copy_report", Role = DialogButtonRole.Secondary, Name = "check-copy-button", Clicked = CopyCheckReport, Closes = false },
+                    new DialogButton { TextKey = "common.close", Role = DialogButtonRole.Primary, Name = "check-close-button" }
+                }
+            });
+            checkDialog.Body.AddToClassList("dialog-body-fill");
+            checkSummaryLabel = new Label { name = "check-summary" };
+            checkSummaryLabel.AddToClassList("popup-description");
+            checkSections = new ScrollView(ScrollViewMode.Vertical) { name = "check-sections" };
+            checkSections.AddToClassList("check-sections");
+            checkDialog.Body.Add(checkSummaryLabel);
+            checkDialog.Body.Add(checkSections);
+            var newMapMenuItem = root.Q<Button>("new-map-menu-item");
+            // New map and map settings share one dialog (title, intro and the button change); many fields, so Enter does nothing.
+            newMapDialog = NewDialog(new DialogOptions
+            {
+                Name = "new-map-dialog",
+                TitleKey = "newmap.title",
+                DescriptionKey = "newmap.intro",
+                Width = DialogWidth.Form,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "common.cancel", Role = DialogButtonRole.Cancel },
+                    new DialogButton { TextKey = "newmap.create", Role = DialogButtonRole.Primary, Clicked = () => newMapForm?.Submit(), Closes = false }
+                }
+            });
+            newMapForm = new NewMapDialog(newMapDialog);
+            newMapForm.CreateRequested += CreateNewMap;
+            newMapForm.SettingsRequested += ApplyMapSettings;
+            newMapDialog.Body.Add(newMapForm);
             var fileMenu = root.Q<VisualElement>("file-menu");
             var helpMenu = root.Q<VisualElement>("help-menu");
             var viewMenu = root.Q<VisualElement>("view-menu");
@@ -659,10 +685,6 @@ namespace OmsiMapEditor.UI
                 };
             exportFolderField?.RegisterValueChangedCallback(_ => UpdateExportTarget());
             exportNameField?.RegisterValueChangedCallback(_ => UpdateExportTarget());
-            if (exportConfirmButton != null)
-                exportConfirmButton.clicked += ExportMap;
-            if (exportCancelButton != null)
-                exportCancelButton.clicked += () => HidePopup(exportDialog);
             if (fitMapButton != null)
                 fitMapButton.clicked += FitMap;
             if (zoomOutButton != null)
@@ -1379,6 +1401,10 @@ namespace OmsiMapEditor.UI
             // dialog took the focus and whether a dialog is still shown; a modal dialog must keep the click from the map (M7).
             if (Array.IndexOf(args, "-clickMap") >= 0 && rootElement != null)
                 rootElement.schedule.Execute(RunClickMapCheck).StartingIn(1000);
+            // -dropdownCheck [n] [-dropdownEscape]: after 1.5 s opens the n-th dropdown of the shown dialog and logs "Dropdown check:" (M7 step 5 correction).
+            OverlayRegistry.PopupExemptionOff = Array.IndexOf(args, "-modalGuardStrict") >= 0;
+            if (Array.IndexOf(args, "-dropdownCheck") >= 0 && rootElement != null)
+                rootElement.schedule.Execute(RunDropdownCheck).StartingIn(1500);
             if (Array.IndexOf(args, "-pressEscape") >= 0 && rootElement != null)
                 rootElement.schedule.Execute(() =>
                 {
@@ -6652,6 +6678,9 @@ namespace OmsiMapEditor.UI
         {
             if (evt.keyCode == KeyCode.Escape)
             {
+                // Esc in the open list of a dropdown closes that list first (it handles the key itself); the dialog stays for the next Esc.
+                if (AnyModalDialogShown() && OverlayRegistry.IsPopupElement(evt.target as VisualElement, rootElement))
+                    return;
                 if (ContextMenuOpen)
                     contextMenuKeyFrame = Time.frameCount;
                 OnEscape(evt);
@@ -8038,7 +8067,7 @@ namespace OmsiMapEditor.UI
             exportFolderField.SetValueWithoutNotify(Path.GetFileName(OmsiMapExporter.SuggestTargetFolder(session.Workspace)));
             exportNameField.SetValueWithoutNotify(ExportsInPlace() ? displayName : displayName + " (MapWorks)");
             UpdateExportTarget();
-            exportDialog.style.display = DisplayStyle.Flex;
+            exportDialog.Show();
             if (chronoDate != null)
                 SetStatusT("export.status.chrono_note");
         }
@@ -8061,7 +8090,7 @@ namespace OmsiMapEditor.UI
                     templatePath = null;
                 }
             newMapForm.Open(templatePath);
-            newMapDialog.style.display = DisplayStyle.Flex;
+            newMapDialog.Show();
         }
 
         /// <summary>The global.cfg a project file points to, or null when it cannot be read.</summary>
@@ -8094,7 +8123,7 @@ namespace OmsiMapEditor.UI
                 SetStatusT("export.status.create_failed", ("reason", exception.Message));
                 return;
             }
-            HidePopup(newMapDialog);
+            newMapDialog.Hide();
 
             var failure = Loc.T("export.created_open_prefix", ("folder", report.MapFolder));
             try
@@ -8107,6 +8136,22 @@ namespace OmsiMapEditor.UI
                 Debug.LogException(exception);
                 SetStatus(failure + exception.Message);
             }
+        }
+
+        private static TextField NewExportField(string name, string labelKey)
+        {
+            var field = new TextField { name = name };
+            field.AddToClassList("dialog-field");
+            LocBindings.Text(field, labelKey); // i18n:keys
+            return field;
+        }
+
+        private void CopyCheckReport()
+        {
+            if (lastCheck == null || currentSummary == null)
+                return;
+            GUIUtility.systemCopyBuffer = lastCheck.ToText(currentSummary.Name);
+            SetStatusT("mapcheck.copied");
         }
 
         private string ExportTargetFolder(out string problem)
@@ -8151,7 +8196,7 @@ namespace OmsiMapEditor.UI
             try
             {
                 var report = OmsiMapExporter.Export(session.Workspace, target, exportNameField.value);
-                HidePopup(exportDialog);
+                exportDialog.Hide();
                 if (report.InPlace)
                 {
                     // The map holds the edits now and the workspace is empty again; what the view shows stays the same.
@@ -8348,8 +8393,7 @@ namespace OmsiMapEditor.UI
             }
             if (checkTask != null)
             {
-                if (checkDialog != null)
-                    checkDialog.style.display = DisplayStyle.Flex;
+                checkDialog?.Show();
                 return;
             }
 
@@ -8361,8 +8405,7 @@ namespace OmsiMapEditor.UI
             checkSections?.Clear();
             if (checkSummaryLabel != null)
                 checkSummaryLabel.text = Loc.T("check.running", ("name", string.IsNullOrWhiteSpace(summary.FriendlyName) ? summary.Name : summary.FriendlyName), ("noChrono", chronoDate != null ? "yes" : "no"));
-            if (checkDialog != null)
-                checkDialog.style.display = DisplayStyle.Flex;
+            checkDialog?.Show();
             SetStatusT("check.status.checking");
             // The objects made for the project are looked for alongside, reading every map of the installation.
             OmsiMadeObjectScan made = null;
@@ -8395,7 +8438,7 @@ namespace OmsiMapEditor.UI
                         Debug.LogException(task.Exception);
                         SetStatusT("check.status.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     }
-                    HidePopup(checkDialog);
+                    checkDialog.Hide();
                     return;
                 }
                 var report = task.Result;
@@ -8439,7 +8482,7 @@ namespace OmsiMapEditor.UI
                     var tile = currentSummary.Tiles.Find(candidate => candidate.X == section.Tile.X && candidate.Y == section.Tile.Y);
                     var show = new Button(() =>
                     {
-                        HidePopup(checkDialog);
+                        checkDialog.Hide();
                         if (tile != null)
                             SelectTile(tile, true);
                     }) { text = Loc.T("check.show_tile", ("x", section.Tile.X), ("y", section.Tile.Y))};

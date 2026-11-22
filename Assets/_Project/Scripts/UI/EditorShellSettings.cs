@@ -13,7 +13,7 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement settingsDialog;
+        private ModalDialog settingsDialog;
         private VisualElement languageSlot;
         private DropdownField languageDropdown;
         private List<LocaleInfo> languageChoices = new List<LocaleInfo>();
@@ -86,10 +86,36 @@ namespace OmsiMapEditor.UI
 
         private void SetUpSettings(VisualElement root)
         {
-            settingsDialog = root.Q<VisualElement>("settings-dialog");
+            // Only a primary button: Close. Esc closes it all the same; the choices apply at once, so there is nothing to discard.
+            settingsDialog = NewDialog(new DialogOptions
+            {
+                Name = "settings-dialog",
+                TitleKey = "settings.title",
+                Width = DialogWidth.Standard,
+                Buttons = new[] { new DialogButton { TextKey = "settings.close", Role = DialogButtonRole.Primary, Name = "settings-close-button" } }
+            });
+            var body = settingsDialog.Body;
+            SettingsHeading(body, "settings-general-heading", "settings.section.general");
+            languageSlot = SettingsDropdownRow(body, "settings-language-label", "settings.language.label", "settings-language-list");
+            SettingsHint(body, "settings-language-hint", "settings.language.hint");
+            SettingsDropdownRow(body, "settings-interface-size-label", "settings.interface_size.label", "settings-interface-size-list");
+            SettingsHint(body, "settings-interface-size-hint", "settings.interface_size.hint");
+            var edgeToggle = new Toggle { name = "settings-inspector-edge" };
+            edgeToggle.AddToClassList("form-toggle");
+            body.Add(edgeToggle);
+            SettingsHeading(body, "settings-content-heading", "settings.section.content");
+            var dlcToggle = new Toggle { name = "settings-hide-dlc" };
+            dlcToggle.AddToClassList("form-toggle");
+            body.Add(dlcToggle);
+            var dlcHint = new Label { name = "settings-hide-dlc-hint" };
+            dlcHint.AddToClassList("popup-description");
+            body.Add(dlcHint);
+            var foldersButton = new Button { name = "content-folders-button" };
+            foldersButton.AddToClassList("map-control-button");
+            foldersButton.AddToClassList("settings-folders-button");
+            body.Add(foldersButton);
+
             languageDropdown = new DropdownField();
-            RegisterOverlay(settingsDialog, true);
-            languageSlot = root.Q<VisualElement>("settings-language-list");
             if (languageSlot != null)
             {
                 languageDropdown.AddToClassList("new-map-dropdown");
@@ -102,22 +128,18 @@ namespace OmsiMapEditor.UI
                 });
                 languageSlot.Add(languageDropdown);
             }
-            hideDlcToggle = root.Q<Toggle>("settings-hide-dlc");
-            hideDlcHint = root.Q<Label>("settings-hide-dlc-hint");
-            if (hideDlcToggle != null)
+            hideDlcToggle = dlcToggle;
+            hideDlcHint = dlcHint;
+            hideDlcToggle.SetValueWithoutNotify(HideDlcContent);
+            hideDlcToggle.RegisterValueChangedCallback(change =>
             {
-                hideDlcToggle.SetValueWithoutNotify(HideDlcContent);
-                hideDlcToggle.RegisterValueChangedCallback(change =>
-                {
-                    PlayerPrefs.SetInt(HideDlcKey, change.newValue ? 1 : 0);
-                    PlayerPrefs.Save();
-                    ApplyHideDlc();
-                });
-            }
+                PlayerPrefs.SetInt(HideDlcKey, change.newValue ? 1 : 0);
+                PlayerPrefs.Save();
+                ApplyHideDlc();
+            });
             SetUpInterfaceSizeSetting(root);
             SetUpInspectorEdgeSetting(root);
             var menuItem = root.Q<Button>("settings-menu-item");
-            var close = root.Q<Button>("settings-close-button");
             var fileMenu = root.Q<VisualElement>("file-menu");
             if (menuItem != null)
                 menuItem.clicked += () =>
@@ -125,17 +147,42 @@ namespace OmsiMapEditor.UI
                     HidePopup(fileMenu);
                     OpenSettings();
                 };
-            if (close != null)
-                close.clicked += () => HidePopup(settingsDialog);
 
             LocBindings.Text(menuItem, "menu.file.settings");
-            LocBindings.Text(root.Q<Label>("settings-title"), "settings.title");
-            LocBindings.Text(root.Q<Label>("settings-general-heading"), "settings.section.general");
-            LocBindings.Text(root.Q<Label>("settings-language-label"), "settings.language.label");
-            LocBindings.Text(root.Q<Label>("settings-language-hint"), "settings.language.hint");
-            LocBindings.Text(root.Q<Label>("settings-content-heading"), "settings.section.content");
             LocBindings.Text(hideDlcToggle, "settings.hide_dlc");
-            LocBindings.Text(close, "settings.close");
+        }
+
+        private static void SettingsHeading(VisualElement body, string name, string key)
+        {
+            var heading = LocBindings.NewLabel(key); // i18n:keys
+            heading.name = name;
+            heading.AddToClassList("inspector-section-heading");
+            heading.AddToClassList("form-indent");
+            body.Add(heading);
+        }
+
+        private static void SettingsHint(VisualElement body, string name, string key)
+        {
+            var hint = LocBindings.NewLabel(key); // i18n:keys
+            hint.name = name;
+            hint.AddToClassList("popup-description");
+            body.Add(hint);
+        }
+
+        /// <summary>A row with a label at the left and an empty slot for a drop-down at the right; returns the slot.</summary>
+        private static VisualElement SettingsDropdownRow(VisualElement body, string labelName, string labelKey, string slotName)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("dialog-row");
+            var label = LocBindings.NewLabel(labelKey); // i18n:keys
+            label.name = labelName;
+            label.AddToClassList("dialog-row-text");
+            row.Add(label);
+            var slot = new VisualElement { name = slotName };
+            slot.AddToClassList("settings-language-slot");
+            row.Add(slot);
+            body.Add(row);
+            return slot;
         }
 
         /// <summary>Shows the dialog with the languages that can be chosen, the one in use marked.</summary>
@@ -150,7 +197,7 @@ namespace OmsiMapEditor.UI
             MarkLanguage();
             ShowHideDlcHint();
             contentFoldersButton?.SetEnabled(currentSummary != null); // the folders are those of the open map's installation
-            settingsDialog.style.display = DisplayStyle.Flex;
+            settingsDialog.Show();
         }
 
         /// <summary>Gives the lists of objects and road types the setting and what the installation's files are known to come from.</summary>

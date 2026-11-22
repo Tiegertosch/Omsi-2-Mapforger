@@ -208,5 +208,54 @@ namespace OmsiMapEditor.Tests
             OverlayRegistry.Hide(dialog);
             Assert.That(registry.IsInsideShownModal(button), Is.False, "a hidden dialog covers nothing");
         }
+
+        [Test]
+        public void APopupOutsideTheShellRootOrWithUnityDropdownClassesBelongsToTheDialogThatOpenedIt()
+        {
+            var shell = new VisualElement();
+            var map = new VisualElement();
+            var dialog = new VisualElement();
+            shell.Add(map);
+            shell.Add(dialog);
+            var panelRoot = new VisualElement();
+            panelRoot.Add(shell);
+            var outside = new VisualElement();
+            panelRoot.Add(outside);
+            var outsideItem = new VisualElement();
+            outside.Add(outsideItem);
+            var menuBelowShell = new VisualElement();
+            menuBelowShell.AddToClassList("unity-base-dropdown__container-outer");
+            var menuItem = new VisualElement();
+            menuItem.AddToClassList("unity-base-dropdown__item");
+            menuBelowShell.Add(menuItem);
+            shell.Add(menuBelowShell);
+
+            Assert.That(OverlayRegistry.IsPopupElement(menuItem, shell), Is.True, "a Unity dropdown row below the shell root");
+            Assert.That(OverlayRegistry.IsPopupElement(menuBelowShell, shell), Is.True);
+            Assert.That(OverlayRegistry.IsPopupElement(map, shell), Is.False, "the map is not a popup");
+            Assert.That(OverlayRegistry.IsPopupElement(dialog, shell), Is.False, "a dialog is not a popup");
+            Assert.That(OverlayRegistry.IsPopupElement(shell, shell), Is.False);
+            Assert.That(OverlayRegistry.IsPopupElement(null, shell), Is.False);
+            // Outside the shell root counts only with a panel (a detached element is nobody's popup); the plain tree here has none.
+            Assert.That(OverlayRegistry.IsPopupElement(outsideItem, shell), Is.False, "detached elements have no panel");
+        }
+
+        [Test]
+        public void TheGuardStillBlocksAPressOnTheMapWhileADropdownListIsOpen()
+        {
+            var registry = new OverlayRegistry();
+            var shell = new VisualElement();
+            var map = new VisualElement();
+            var dialog = new VisualElement();
+            var menu = new VisualElement();
+            menu.AddToClassList("unity-base-dropdown__container-outer");
+            shell.Add(map);
+            shell.Add(dialog);
+            shell.Add(menu);
+            registry.Register(dialog, true);
+
+            Assert.That(registry.IsInsideShownModal(map) || OverlayRegistry.IsPopupElement(map, shell), Is.False, "the map stays blocked");
+            Assert.That(registry.IsInsideShownModal(menu) || OverlayRegistry.IsPopupElement(menu, shell), Is.True, "the list is let through");
+        }
     }
 }

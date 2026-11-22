@@ -7,28 +7,24 @@ namespace OmsiMapEditor.UI
 {
     /// <summary>
     /// The form of Help > Report a bug... (ADR 053): a title, what happened, how to get there and what was expected. After
-    /// a crash it opens by itself and says so. The shell sends it when <see cref="SendRequested"/> fires.
+    /// a crash it opens by itself and says so. The form is the body of a <see cref="ModalDialog"/> (M7 step 5), which owns the title,
+    /// the intro and the buttons; the shell sends the report when the primary button is pressed. One of its four fields is a line and three
+    /// are text areas, so Enter never presses Send (rule 2B).
     /// </summary>
     internal sealed class BugReportDialog : VisualElement
     {
-        private readonly Label titleLabel = new Label();
-        private readonly Label introLabel = new Label();
+        private readonly ModalDialog host;
         private readonly TextField titleField = new TextField();
         private readonly TextField whatField = new TextField { multiline = true };
         private readonly TextField stepsField = new TextField { multiline = true };
         private readonly TextField expectedField = new TextField { multiline = true };
         private readonly Toggle logToggle = new Toggle { value = true };
         private readonly Label includedLabel = new Label();
-        private readonly Button sendButton;
 
-        public BugReportDialog()
+        public BugReportDialog(ModalDialog host)
         {
-            AddToClassList("dialog");
-            AddToClassList("bug-report-dialog");
-            titleLabel.AddToClassList("popup-title");
-            Add(titleLabel);
-            introLabel.AddToClassList("popup-description");
-            Add(introLabel);
+            this.host = host ?? throw new ArgumentNullException(nameof(host));
+            LocBindings.Tooltip(host.Primary, "bugreport.send.tooltip");
 
             AddField("bugreport.field.title", titleField, "bugreport.field.title.tooltip", false);
             titleField.textSelection.selectAllOnFocus = false;
@@ -44,29 +40,13 @@ namespace OmsiMapEditor.UI
             logRow.Add(logLabel);
             LocBindings.Text(logToggle, "bugreport.log.attach");
             LocBindings.Tooltip(logToggle, "bugreport.log.attach.tooltip");
-            logToggle.AddToClassList("bug-report-toggle");
+            logToggle.AddToClassList("form-toggle");
             logToggle.RegisterValueChangedCallback(_ => UpdateIncluded());
             logRow.Add(logToggle);
             Add(logRow);
             includedLabel.AddToClassList("bug-report-hint");
             Add(includedLabel);
-
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("bugreport.cancel", () => Cancelled?.Invoke());
-            cancel.AddToClassList("map-control-button");
-            sendButton = LocBindings.WithTooltip(LocBindings.NewButton("bugreport.send", () => SendRequested?.Invoke()), "bugreport.send.tooltip");
-            sendButton.AddToClassList("map-control-button");
-            sendButton.AddToClassList("dialog-primary");
-            buttons.Add(cancel);
-            buttons.Add(sendButton);
-            Add(buttons);
         }
-
-        /// <summary>The report is to be opened on GitHub with the texts of <see cref="FillIn"/>.</summary>
-        public event Action SendRequested;
-
-        public event Action Cancelled;
 
         public bool IncludeLog => logToggle.value;
 
@@ -76,8 +56,8 @@ namespace OmsiMapEditor.UI
         public void Open(bool crashed)
         {
             Crashed = crashed;
-            LocBindings.Text(titleLabel, crashed ? "bugreport.title.crash" : "bugreport.title"); // i18n:keys
-            LocBindings.Text(introLabel, crashed ? "bugreport.intro.crash" : "bugreport.intro"); // i18n:keys
+            LocBindings.Text(host.Title, crashed ? "bugreport.title.crash" : "bugreport.title"); // i18n:keys
+            LocBindings.Text(host.Description, crashed ? "bugreport.intro.crash" : "bugreport.intro"); // i18n:keys
             titleField.SetValueWithoutNotify(crashed ? "Crash: " : string.Empty);
             whatField.SetValueWithoutNotify(string.Empty);
             stepsField.SetValueWithoutNotify(string.Empty);
@@ -137,7 +117,7 @@ namespace OmsiMapEditor.UI
         private void UpdateSend()
         {
             var title = titleField.value.Trim();
-            sendButton.SetEnabled(title.Length > 0 && title != "Crash:");
+            host.Primary.SetEnabled(title.Length > 0 && title != "Crash:");
         }
     }
 }

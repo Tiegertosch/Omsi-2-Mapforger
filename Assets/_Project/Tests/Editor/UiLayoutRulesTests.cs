@@ -22,10 +22,6 @@ namespace OmsiMapEditor.Tests
         }
 
         [TestCase(".dialog")]
-        [TestCase(".new-map-dialog")]
-        [TestCase(".check-dialog")]
-        [TestCase(".bug-report-dialog")]
-        [TestCase(".update-dialog")]
         [TestCase(".welcome")]
         [TestCase(".bar-popup")]
         [TestCase(".inspector-frame")]
@@ -38,7 +34,6 @@ namespace OmsiMapEditor.Tests
         }
 
         [TestCase(".dialog")]
-        [TestCase(".new-map-dialog")]
         [TestCase(".menu-popup")]
         [TestCase(".welcome")]
         public void DialogsAndMenusHaveAMaximumHeightInPercent(string selector)
