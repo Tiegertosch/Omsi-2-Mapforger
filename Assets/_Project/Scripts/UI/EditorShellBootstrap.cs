@@ -5178,6 +5178,7 @@ namespace OmsiMapEditor.UI
             var culture = System.Globalization.CultureInfo.InvariantCulture;
             lastSelectionTimings = "selection " + before.ToString("0.0", culture) + " ms, toolbar " + (toolbar - before).ToString("0.0", culture) + ", inspector " +
                                    (inspector - toolbar).ToString("0.0", culture) + ", arm handles " + (phase.Elapsed.TotalMilliseconds - inspector).ToString("0.0", culture);
+            RefreshObjectListSelection();
         }
 
         /// <summary>How long the parts of the last <see cref="ApplySelection"/> took, for the log line of the context menu.</summary>
@@ -5577,6 +5578,8 @@ namespace OmsiMapEditor.UI
             foreach (var tile in browserEntries.Keys)
                 UpdateBrowserEntry(tile);
             UpdateCounts();
+            UpdateObjectBadge();
+            ScheduleObjectListRebuild();
             UpdateMapStateLabel();
             // Undo may have put another file of the junction back; the markings tool reads it anew.
             if (activeTool == EditorTool.Markings)
@@ -7675,6 +7678,7 @@ namespace OmsiMapEditor.UI
                     Debug.Log("Object origins: " + contentOrigins.Description + " Groups in " + installationCatalog.Groups.Count + " of " +
                               installationCatalog.Objects.Count + " objects.");
                 }
+                OnObjectOriginsKnown();
                 objectsPanel.SetCatalog(installationCatalog, usedAssetCounts);
                 ApplyHideDlc();
                 ShowFoldersLeftOut(installationCatalog);
@@ -8927,10 +8931,10 @@ namespace OmsiMapEditor.UI
                 zoomLabel.text = text;
         }
 
-        /// <summary>Only the tile list (the tall one) opens at the left edge; every other popup of the bar opens at the right edge.</summary>
+        /// <summary>The tile list and the object list (the two tall ones, the buttons at the left of the bar) open at the left edge; every other popup of the bar opens at the right edge.</summary>
         internal static bool BarPopupOnLeft(ProjectTab tab)
         {
-            return tab == ProjectTab.Tiles;
+            return tab == ProjectTab.Tiles || tab == ProjectTab.Objects;
         }
 
         /// <summary>
@@ -8949,17 +8953,26 @@ namespace OmsiMapEditor.UI
             if (currentSummary == null && barPopupOpen)
                 ShowBarPopup(false);
             if (!barPopupOpen)
+            {
+                ReleaseObjectList();
                 return;
+            }
 
             // The list chosen stays through every redraw; one that has nothing to show now falls back to the tiles.
             if (!ProjectTabAvailable(projectTab))
                 projectTab = ProjectTab.Tiles;
+            if (projectTab != ProjectTab.Objects)
+                ReleaseObjectList();
             if (barPopupTitle != null)
                 LocBindings.Text(barPopupTitle, ProjectTabTitleKey(projectTab)); // i18n:keys
             barPopup?.EnableInClassList("bar-popup-right", !BarPopupOnLeft(projectTab));
-            barPopup?.EnableInClassList("bar-popup-tall", projectTab == ProjectTab.Tiles);
+            barPopup?.EnableInClassList("bar-popup-tall", projectTab == ProjectTab.Tiles || projectTab == ProjectTab.Objects);
+            barPopup?.EnableInClassList("bar-popup-wide", projectTab == ProjectTab.Objects);
             switch (projectTab)
             {
+                case ProjectTab.Objects:
+                    projectPanel.Add(ObjectsTab());
+                    break;
                 case ProjectTab.Map:
                     projectPanel.Add(MapTab());
                     break;

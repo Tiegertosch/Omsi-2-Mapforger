@@ -54,12 +54,39 @@ namespace OmsiMapEditor.Tests
         }
 
         // M7 step 6 fix: the Map popup opened at the left edge while Chrono, Lines and AI Paths opened at the right one.
+        // Objects popup: the two buttons at the left of the bar (tiles, objects) open their lists at the left edge, the others at the right one.
         [Test]
-        public void OnlyTheTilePopupOpensAtTheLeftEdge()
+        public void OnlyTheTileAndObjectPopupsOpenAtTheLeftEdge()
         {
             foreach (EditorShellBootstrap.ProjectTab tab in Enum.GetValues(typeof(EditorShellBootstrap.ProjectTab)))
-                Assert.AreEqual(tab == EditorShellBootstrap.ProjectTab.Tiles, EditorShellBootstrap.BarPopupOnLeft(tab), tab.ToString());
+            {
+                var atLeft = tab == EditorShellBootstrap.ProjectTab.Tiles || tab == EditorShellBootstrap.ProjectTab.Objects;
+                Assert.AreEqual(atLeft, EditorShellBootstrap.BarPopupOnLeft(tab), tab.ToString());
+            }
             Assert.IsTrue(Regex.IsMatch(Rule(".bar-popup-right"), @"left:\s*auto") && Regex.IsMatch(Rule(".bar-popup-right"), @"right:\s*var\(--mf-space-2\)"));
+        }
+
+        // The object list is a virtual list with a fixed row height: the code's constant is the 28 px item of the list, whose card has the margin above and below (1 px each).
+        [Test]
+        public void ObjectListRowHeightMatchesTheRowRuleAndTheRowsAreSetInTokens()
+        {
+            var row = Rule(".objlist-card");
+            Assert.IsTrue(Regex.IsMatch(row, @"margin:\s*1px 0"), ".objlist-card needs the 1 px margin of the 28 px row: " + row);
+            Assert.IsTrue(Regex.IsMatch(Rule(".bar-popup-wide"), @"width:\s*360px"));
+            foreach (Match color in Regex.Matches(Rule(".objlist-card") + Rule(".objlist-chip") + Rule(".objlist-dot-dlc"), @"(?<![\w-])(?:color|background-color|border-color):\s*([^;]+);"))
+                StringAssert.Contains("var(--mf-color-", color.Groups[1].Value, "Colours of the object list come from tokens: " + color.Value);
+        }
+
+        [TestCase(0, "0")]
+        [TestCase(1095, "1095")]
+        [TestCase(9999, "9999")]
+        [TestCase(10000, "10k")]
+        [TestCase(29450, "29k")]
+        [TestCase(29500, "30k")]
+        [TestCase(99999, "100k")]
+        public void TheObjectBadgeShortensFromTenThousand(int count, string expected)
+        {
+            Assert.AreEqual(expected, EditorShellBootstrap.ObjectBadgeText(count));
         }
 
         [Test]

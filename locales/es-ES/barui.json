@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Semáforos (solo lectura)...",
   "context.reason.foreign_junction": "Solo se pueden cambiar los cruces creados con MapWorks.",
   "context.reason.readonly_map": "No disponible en un mapa de solo lectura ni en una variante cronológica.",
-  "context.reason.few_arms": "Requiere un cruce con al menos dos accesos."
+  "context.reason.few_arms": "Requiere un cruce con al menos dos accesos.",
+  "bar.objects.tooltip": "Objetos: todos los objetos colocados en el mapa, con búsqueda; un clic selecciona uno y lo muestra."
 }

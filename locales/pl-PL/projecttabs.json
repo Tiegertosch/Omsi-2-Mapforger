@@ -6,5 +6,6 @@
   "project.tab.paths": "Ścieżki",
   "project.filter": "Znajdź tile",
   "project.filter.tooltip": "Wpisz współrzędne tile, na przykład 2,-1, lub fragment nazwy pliku.",
-  "project.no_match": "Żadna tile nie pasuje."
+  "project.no_match": "Żadna tile nie pasuje.",
+  "project.tab.objects": "Obiekty"
 }

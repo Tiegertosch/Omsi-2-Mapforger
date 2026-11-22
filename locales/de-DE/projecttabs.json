@@ -6,5 +6,6 @@
   "project.tab.paths": "Pfade",
   "project.filter": "Kachel suchen",
   "project.filter.tooltip": "Koordinaten einer Kachel wie 2,-1 oder einen Teil des Dateinamens eintippen.",
-  "project.no_match": "Keine Kachel passt."
+  "project.no_match": "Keine Kachel passt.",
+  "project.tab.objects": "Objekte"
 }

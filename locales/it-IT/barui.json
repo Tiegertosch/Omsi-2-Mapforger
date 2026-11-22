@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Semafori (sola lettura)...",
   "context.reason.foreign_junction": "Si possono modificare solo gli incroci creati con MapWorks.",
   "context.reason.readonly_map": "Non disponibile in una mappa di sola lettura o in una variante cronologica.",
-  "context.reason.few_arms": "Richiede un incrocio con almeno due accessi."
+  "context.reason.few_arms": "Richiede un incrocio con almeno due accessi.",
+  "bar.objects.tooltip": "Oggetti: tutti gli oggetti posizionati sulla mappa, con ricerca; un clic ne seleziona uno e lo mostra."
 }

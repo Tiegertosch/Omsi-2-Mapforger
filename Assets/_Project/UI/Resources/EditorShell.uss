@@ -159,6 +159,8 @@
 .bar-popup { top: auto; left: var(--mf-space-2); width: 320px; max-width: 94%; max-height: 70%; }
 .bar-popup-right { left: auto; right: var(--mf-space-2); }
 .bar-popup-tall { height: 480px; }
+/* The object list needs room for a name, a tile and an ID in one row. */
+.bar-popup-wide { width: 360px; }
 .bar-popup > .floating-panel-header { margin: -12px -12px var(--mf-space-2) -12px; padding: var(--mf-space-2) var(--mf-space-2) var(--mf-space-2) var(--mf-space-3); background-color: var(--mf-color-bg); border-bottom-width: 1px; border-bottom-color: var(--mf-color-border-subtle); border-top-left-radius: var(--mf-radius-lg); border-top-right-radius: var(--mf-radius-lg); }
 .floating-panel-header { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
 .floating-panel-title { flex-grow: 1; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
@@ -218,6 +220,7 @@
 .bar-compact .bar-mode { padding: 0 5px; }
 .bar-compact .bar-mode-dot { margin-right: 0; }
 .bar-compact .bar-mode-text { display: none; }
+.bar-compact .bar-tile-button { width: 36px; height: 36px; padding: 7px; border-radius: 18px; }
 .bar-compact .bar-round-button { width: 32px; height: 32px; margin: 0 3px; padding: 7px; border-radius: 16px; }
 .bar-compact .view-controls { width: 180px; padding: 4px 6px; }
 .bar-compact .view-controls-row > .view-control-button { padding-left: 4px; padding-right: 4px; }
@@ -765,6 +768,33 @@
 .browser-tile-entry-selected { border-color: var(--mf-color-accent); background-color: var(--mf-color-panel-hover); }
 .browser-tile-entry-missing { color: var(--mf-color-error); }
 .browser-tile-entry-edited { border-left-width: 3px; border-left-color: var(--mf-color-warning); }
+
+/* The object list of the bottom bar (objects popup): search, arrangement tabs (panel-tab), origin chips, a summary and a virtual list whose rows are 28 px
+   (EditorShellBootstrap.ObjectRowHeight): the row is the list's item, the card inside it has a 1 px margin above and below. Unity's blue selection of the list is replaced by tokens. */
+.objlist { flex-grow: 1; min-height: 0; }
+.objlist-chips { flex-direction: row; flex-shrink: 0; margin-bottom: var(--mf-space-2); }
+.objlist-chip { height: 24px; margin: 0 var(--mf-space-1) 0 0; padding: 0 var(--mf-space-3); font-size: var(--mf-font-secondary); color: var(--mf-color-text-muted); background-color: var(--mf-color-clear); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: 12px; }
+.objlist-chip:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); }
+.objlist-chip-on, .objlist-chip-on:hover { color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-hover); border-color: var(--mf-color-text-muted); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.objlist-summary { flex-shrink: 0; margin: 0 0 var(--mf-space-1); padding: 0; font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); }
+.objlist-list { flex-grow: 1; min-height: 0; background-color: var(--mf-color-clear); }
+.objlist-list .unity-collection-view__item, .objlist-list .unity-collection-view__item:hover, .objlist-list .unity-collection-view__item--selected,
+.objlist-list .unity-collection-view__item--selected:hover { margin: 0; padding: 0; color: var(--mf-color-text-primary); background-color: var(--mf-color-clear); border-width: 0; }
+.objlist-row { flex-direction: row; }
+.objlist-card { flex-grow: 1; flex-direction: row; align-items: center; margin: 1px 0; padding: 0 var(--mf-space-2) 0 var(--mf-space-1); font-size: var(--mf-font-secondary); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: var(--mf-radius-sm); }
+.objlist-row:hover > .objlist-card { background-color: var(--mf-color-panel-hover); }
+.objlist-row-group { -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.objlist-row-child { margin-left: var(--mf-space-4); padding-left: var(--mf-space-2); }
+.objlist-row-selected, .objlist-row:hover > .objlist-row-selected { border-color: var(--mf-color-accent); background-color: var(--mf-color-panel-hover); }
+.objlist-list .unity-collection-view__item--selected > .objlist-card { background-color: var(--mf-color-panel-hover); }
+.mf-keyboard-focus .objlist-list:focus .unity-collection-view__item--selected > .objlist-card { border-color: var(--mf-color-accent-hover); }
+.objlist-chevron { width: 16px; height: 16px; margin-right: var(--mf-space-1); flex-shrink: 0; color: var(--mf-color-text-secondary); }
+.objlist-name { flex-grow: 1; flex-shrink: 1; min-width: 0; margin: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -unity-text-align: middle-left; }
+.objlist-detail { flex-shrink: 0; margin: 0 0 0 var(--mf-space-2); padding: 0; color: var(--mf-color-text-secondary); white-space: nowrap; -unity-text-align: middle-right; }
+.objlist-dot { width: 8px; height: 8px; margin: 0 0 0 var(--mf-space-2); flex-shrink: 0; border-radius: 4px; }
+.objlist-dot-base { background-color: var(--mf-color-success); }
+.objlist-dot-dlc { background-color: var(--mf-color-warning); }
+.objlist-dot-other { background-color: var(--mf-color-info); }
 
 /* Inspector */
 .inspector-title { margin-bottom: var(--mf-space-2); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }

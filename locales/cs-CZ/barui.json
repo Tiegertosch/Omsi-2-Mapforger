@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Semafory (jen pro čtení)...",
   "context.reason.foreign_junction": "Změnit lze jen křižovatky vytvořené v MapWorks.",
   "context.reason.readonly_map": "V mapě jen pro čtení nebo ve variantě chrono není k dispozici.",
-  "context.reason.few_arms": "Vyžaduje křižovatku s alespoň dvěma rameny."
+  "context.reason.few_arms": "Vyžaduje křižovatku s alespoň dvěma rameny.",
+  "bar.objects.tooltip": "Objekty: všechny objekty umístěné na mapě, s vyhledáváním; kliknutí objekt vybere a zobrazí."
 }

@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Traffic lights (read only)...",
   "context.reason.foreign_junction": "Only junctions made with MapWorks can be changed.",
   "context.reason.readonly_map": "Not available in a read-only map or a chrono variant.",
-  "context.reason.few_arms": "Needs a junction with at least two approaches."
+  "context.reason.few_arms": "Needs a junction with at least two approaches.",
+  "bar.objects.tooltip": "Objects: every object placed on the map, with a search; click one to select it and show it."
 }

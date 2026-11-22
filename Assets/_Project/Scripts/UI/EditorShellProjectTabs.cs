@@ -20,7 +20,8 @@ namespace OmsiMapEditor.UI
             Map,
             Chrono,
             Lines,
-            Paths
+            Paths,
+            Objects
         }
 
         private ProjectTab projectTab = ProjectTab.Tiles;
@@ -205,8 +206,8 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>
-        /// Command line: <c>-projectTab tiles|map|chrono|lines|paths</c> opens that tab of the project browser (for screenshots), and
-        /// <c>-tileFilter Text</c> types a text into the filter of the tile tab.
+        /// Command line: <c>-projectTab tiles|map|chrono|lines|paths|objects</c> opens that tab of the project browser (for screenshots), and
+        /// <c>-tileFilter Text</c> types a text into the filter of the tile tab. The arguments of the object list are in <see cref="ReadObjectListArguments"/>.
         /// </summary>
         private void RunProjectTabArguments(string[] args)
         {
@@ -219,14 +220,19 @@ namespace OmsiMapEditor.UI
             var filter = Value("-tileFilter");
             if (filter != null)
                 tileBrowserFilter = filter;
+            var objectArguments = ReadObjectListArguments(args);
             var name = Value("-projectTab");
             if (name == null || !Enum.TryParse(name, true, out ProjectTab tab))
             {
-                if (filter != null)
+                // Any of the -object... arguments opens the object list by itself.
+                if (objectArguments)
+                    ShowProjectTab(ProjectTab.Objects);
+                else if (filter != null)
                     RenderBarPopup();
-                return;
             }
-            ShowProjectTab(tab);
+            else
+                ShowProjectTab(tab);
+            RunObjectListActions();
         }
     }
 }

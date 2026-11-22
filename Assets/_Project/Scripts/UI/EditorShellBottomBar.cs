@@ -15,6 +15,7 @@ namespace OmsiMapEditor.UI
         private VisualElement barPopup;
         private Label barPopupTitle;
         private Label tileCountBadge;
+        private Label objectCountBadge;
         private VisualElement projectPill;
         private Label projectPillLabel;
         private VisualElement projectModeBadge;
@@ -51,6 +52,15 @@ namespace OmsiMapEditor.UI
             tileCountBadge.AddToClassList("bar-badge");
             tiles.Add(tileCountBadge);
             left.Add(tiles);
+
+            // The objects button stands right of the tile button; its badge counts the objects placed on the map.
+            var objects = BarButton(ProjectTab.Objects, "boxes", "bar.objects.tooltip");
+            objects.RemoveFromClassList("bar-round-button");
+            objects.AddToClassList("bar-tile-button");
+            objectCountBadge = new Label { pickingMode = PickingMode.Ignore };
+            objectCountBadge.AddToClassList("bar-badge");
+            objects.Add(objectCountBadge);
+            left.Add(objects);
 
             // The pill only shows the name and the mode; the map's settings open from the Map button at the right.
             projectPill = new VisualElement();
@@ -192,6 +202,7 @@ namespace OmsiMapEditor.UI
             var loaded = currentSummary != null;
             if (tileCountBadge != null)
                 tileCountBadge.text = loaded ? currentSummary.Tiles.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
+            UpdateObjectBadge();
             if (projectPillLabel != null)
                 projectPillLabel.text = !loaded ? string.Empty
                     : !string.IsNullOrWhiteSpace(currentProjectName) ? currentProjectName
@@ -232,6 +243,7 @@ namespace OmsiMapEditor.UI
                 case ProjectTab.Chrono: return "project.tab.chrono";
                 case ProjectTab.Lines: return "project.tab.lines";
                 case ProjectTab.Paths: return "project.tab.paths";
+                case ProjectTab.Objects: return "project.tab.objects";
                 default: return "project.tab.tiles";
             }
         }

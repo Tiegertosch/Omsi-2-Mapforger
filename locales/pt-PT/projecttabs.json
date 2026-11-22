@@ -6,5 +6,6 @@
   "project.tab.paths": "Percursos",
   "project.filter": "Procurar tile",
   "project.filter.tooltip": "Escreva as coordenadas de uma tile, como 2,-1, ou parte do nome do ficheiro.",
-  "project.no_match": "Nenhuma tile corresponde."
+  "project.no_match": "Nenhuma tile corresponde.",
+  "project.tab.objects": "Objetos"
 }
