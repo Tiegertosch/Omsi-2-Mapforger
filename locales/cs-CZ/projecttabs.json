@@ -6,5 +6,6 @@
   "project.tab.paths": "Cesty",
   "project.filter": "Najít tile",
   "project.filter.tooltip": "Zadejte souřadnice tile, například 2,-1, nebo část názvu souboru.",
-  "project.no_match": "Žádná tile neodpovídá."
+  "project.no_match": "Žádná tile neodpovídá.",
+  "project.tab.objects": "Objekty"
 }

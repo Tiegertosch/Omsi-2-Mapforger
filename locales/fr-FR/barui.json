@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Feux (lecture seule)...",
   "context.reason.foreign_junction": "Seuls les carrefours créés avec MapWorks peuvent être modifiés.",
   "context.reason.readonly_map": "Indisponible dans une carte en lecture seule ou une variante chrono.",
-  "context.reason.few_arms": "Nécessite un carrefour avec au moins deux branches."
+  "context.reason.few_arms": "Nécessite un carrefour avec au moins deux branches.",
+  "bar.objects.tooltip": "Objets : tous les objets placés sur la carte, avec une recherche ; un clic en sélectionne un et l'affiche."
 }

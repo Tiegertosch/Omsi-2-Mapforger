@@ -6,5 +6,6 @@
   "project.tab.paths": "Paths",
   "project.filter": "Find a tile",
   "project.filter.tooltip": "Type the coordinates of a tile, such as 2,-1, or part of a file name.",
-  "project.no_match": "No tile matches."
+  "project.no_match": "No tile matches.",
+  "project.tab.objects": "Objects"
 }

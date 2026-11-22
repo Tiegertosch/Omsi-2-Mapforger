@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Ampeln (nur lesen)...",
   "context.reason.foreign_junction": "Nur mit MapWorks erstellte Kreuzungen lassen sich ändern.",
   "context.reason.readonly_map": "In einer schreibgeschützten Karte oder Chrono-Variante nicht verfügbar.",
-  "context.reason.few_arms": "Braucht eine Kreuzung mit mindestens zwei Zufahrten."
+  "context.reason.few_arms": "Braucht eine Kreuzung mit mindestens zwei Zufahrten.",
+  "bar.objects.tooltip": "Objekte: alle auf der Karte platzierten Objekte mit Suche; ein Klick wählt eines und zeigt es."
 }

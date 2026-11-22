@@ -42,5 +42,6 @@
   "context.traffic_lights_view": "Sygnalizacja (tylko do odczytu)...",
   "context.reason.foreign_junction": "Można zmieniać tylko skrzyżowania utworzone w MapWorks.",
   "context.reason.readonly_map": "Niedostępne w mapie tylko do odczytu ani w wariancie chrono.",
-  "context.reason.few_arms": "Wymaga skrzyżowania z co najmniej dwoma dojazdami."
+  "context.reason.few_arms": "Wymaga skrzyżowania z co najmniej dwoma dojazdami.",
+  "bar.objects.tooltip": "Obiekty: wszystkie obiekty umieszczone na mapie, z wyszukiwaniem; kliknięcie wybiera obiekt i pokazuje go."
 }

@@ -2122,3 +2122,39 @@ M7 abgeschlossen (22. November 2026): Schritte 0–7 vom Projektinhaber getestet
 **Nachtrag C9 (19. November 2026): altes Panel entfernt.** `RoadBuilderPanel.cs` (1.162 Zeilen) samt `.meta` ist gelöscht; kein anderer Code verwies noch darauf (nur Kommentare und Doku). Die Kommandozeile `-roadBuilder*` lief schon auf `RoadTypeWindow` und bleibt unverändert. In `EditorShell.uss` sind alle 39 Regeln `.road-builder*` weg (34 Klassen, keine mehr in C# oder UXML benutzt; der Menüeintrag `road-builder-menu-item` ist ein Elementname und bleibt); die Farb-Tokens `--mf-color-lane-*` bleiben, weil `.road-section-*` und `.road-swatch-*` sie nutzen. In `locales/*/roadbuilder.json` sind 50 nicht mehr referenzierte Schlüssel samt Übersetzerhinweis `@roadbuilder.panel.edit` entfernt (alle acht Sprachen; 2922 auf 2872 Schlüssel): 49 Schlüssel `roadbuilder.panel.*` (Kopf, Speichern, Löschen, Hinzufügen, Vorlagen, Breite, Objekte, Verschieben, Entfernen, Tooltips der Markierungen und Orte) und `roadbuilder.window.inspector.summary`; die Namen der Spuren, Markierungen, Orte und Vorlagen (`roadbuilder.panel.lane.*`, `.marking.<art>`, `.place.<ort>`, `.template.*`) bleiben. Die Hinweise `@…` der verbliebenen Schlüssel bleiben. Keine dynamisch zusammengesetzten Schlüssel gefunden; alle Zugriffe laufen über Schlüssellisten mit vollständigen Literalen. `PlayerAssetReview.txt` ist für die geänderte `EditorShell.uss` neu aufgezeichnet.
 
 **Nachtrag Handtest C9 (19. November 2026):** Bei der Wahl des Ausstattungsobjekts (`PickRowObject`) blieben die Straßen-Optionen und die Straßenliste (`roadPanel`) neben dem Objekt-Browser sichtbar und quetschten ihn; jetzt blendet `PickRowObject` sie aus und `EndRowObjectPick` (Wahl, Zurück, Esc) blendet sie wieder ein, `EndRoadTool` hatte sie schon geschlossen. Neuer Befehl `-roadBuilderDo pickobject` für die Prüfung. Die Rückfrage „Ungespeicherte Änderungen verwerfen?“ kommt über `Loc.T("roadbuilder.window.prompt")` und existiert in allen 8 Sprachen; C9 hat den Schlüssel nicht entfernt, im C9-Player erscheint sie auf Deutsch (Bild geprüft), der englische Text war nicht nachzustellen. Keine festen englischen Texte im Fenster gefunden.
+
+## ADR 102: Objekt-Liste in der unteren Leiste
+
+**Datum:** 22. November 2026 · **Status:** Umgesetzt (Commit `3e2de32` auf `feature/objects-popup`, vom Projektinhaber getestet; Merge nach `main` steht aus). Plan und Messwerte: `Documentation/objects-popup-plan.md`.
+
+**Anlass:** Der Projektinhaber wünscht für Release 1.2.0 eine Liste, in der man alle auf der Karte platzierten Objekte einsehen kann. Eine solche Liste gab es nie: Das Project-Fenster zeigte Objekte nur als Zahl je Kachel (`N obj`), der Reiter „In map“ des Objekte-Fensters zeigt Objektarten (.sco-Dateien) als Katalog zum Platzieren, nicht die einzelnen Objekte mit ID und Kachel. Die Liste ist ein Suchwerkzeug, kein Ersatz für den Katalog.
+
+**Entscheidungen des Projektinhabers (22. November 2026):**
+1. **Gliederung nach Objektart (A):** Gruppen nach Dateipfad mit Anzahl, aufklappbar zu den einzelnen Objekten; Umschalter „By type“, „By tile“ und „Flat“ (`OmsiPlacedObjectGrouping`).
+2. **Klick wählt und zentriert (A):** Ein Klick auf ein Objekt wählt es, zentriert die Karte (2D und 3D) und lässt das Popup offen. Strg+Klick ergänzt die Auswahl.
+3. **Nur Objekte, keine Straßen (A):** Splines stehen nicht in der Liste; eine Liste „Roads“ bleibt für später.
+4. **Suche und Herkunft (A):** Ein Suchfeld (Dateiname, Ordner, ID, Kachel „x,y“; mehrere Wörter müssen alle treffen) plus Schalter „Base game | DLC | Other“ nach `OmsiContentOrigins`.
+5. **Knopf links neben dem Kachelknopf (A):** Das Popup öffnet links wie das Kachel-Popup.
+6. **„Alle dieser Art wählen“ (B):** Nicht in dieser Stufe; erst nach einer Messung der Massenauswahl.
+7. **Reiter „In map“ bleibt (A):** Er dient dem Platzieren der benutzten Arten; das Popup dient dem Finden.
+8. **Angehängte Objekte und Reihen (A):** Nur `[object]`-Datensätze. Angehängte Objekte (`[attachObj]`) und Reihenobjekte stehen nicht in der Liste. Die Zahl stimmt damit mit `ObjectCount` und dem Kachel-Popup überein.
+- **Nachtrag Entf (22. November 2026):** Entf mit dem Fokus in der Objektliste löscht die gewählten Objekte wie überall: einheitlich über den globalen Kurzbefehl, rücknehmbar mit Strg+Z. Die Liste hat keinen eigenen Löschweg.
+
+**Umsetzung:**
+- Reine Logik in `Editor.OMSI` ohne Unity: `OmsiPlacedObjectIndex.cs` (Tests in `OmsiPlacedObjectIndexTests.cs`). Der Index liest `OmsiMapSummary` und legt je `[object]` einen Struct-Eintrag ab (`OmsiPlacedObjectEntry`, ohne Kopie der Records) sowie eine Typtabelle je Objektart. `BuildRows` liefert Zeilenverweise für Gruppierung, Suche und Herkunft; Schreibvarianten desselben Pfads werden zu einer Art zusammengeführt.
+- Oberfläche in `Editor.UI`: `EditorShellObjectList.cs` (Teil von `EditorShellBootstrap`, Knopf `ProjectTab.Objects`, Popup, Suchfeld, Schalter, Klick und Tastatur). Die Zeilen laufen in einer virtualisierten `ListView` mit fester Zeilenhöhe von 28 px. Zeilen enthalten keine Bilder und keine Modelle; Text entsteht erst beim Binden der sichtbaren Zeilen.
+- Aktualisierung: Der Index wird nur gebaut, wenn das Popup offen ist. Er entsteht beim Öffnen und 100 ms nach der letzten Änderung (`ScheduleObjectListRebuild` aus `RefreshAfterChange`, zusammengefasst). Beim Schließen oder Wechsel des Reiters wird er verworfen (`ReleaseObjectList`). Die Herkunft kommt nach dem Installations-Scan über `OnObjectOriginsKnown` ohne Neuaufbau. Die Auswahl markiert Zeilen neu, ohne die Liste neu zu bauen.
+- Kommandozeile: `-projectTab objects`, `-objectFilter`, `-objectGroup`, `-objectOpenGroup`, `-objectClick`, `-objectType`, `-objectOrigins` (`CommandLine.md`).
+
+**Messwerte (Player, Mono, Berlin-Spandau, 29.450 Objekte in 369 Kacheln, 1600 × 900):**
+- Öffnen kalt 67–85 ms (Index 26–38 ms, Zeilen 16–19 ms, der Rest ist das erste Erzeugen der Bedienelemente); warm 28 ms.
+- Jeder Buchstabe im Suchfeld 3–8 ms; Gruppe auf- und zuklappen 2 ms plus Neuaufbau der Liste.
+- Grundorf: 26 ms kalt, 1 ms warm. Die Vektorebene meldete keine Neuzeichnung über 50 ms.
+- Vergleich: Die alte Zählschleife (`UpdateObjectsCatalog`) braucht auf Mono allein 47–52 ms.
+- Das erste Öffnen liegt über dem Ziel von 50 ms; der Projektinhaber hat Öffnen und Scrollen in Spandau als flüssig bestätigt. Ein Aufbau in Scheiben (je etwa 4 ms) ist nur bei Bedarf vorgesehen.
+
+**Folgen und Offenes:**
+- Angehängte Objekte (8B, Spandau 1.447) und Reihen (8C, 1.073 Datensätze für 9.747 Objekte) können als späterer Nachschritt dazukommen. Angehängte Objekte brauchen einen eigenen Auswahl- und Zentrierweg; Reihenobjekte haben keine IDs.
+- „Alle dieser Art wählen“ (6B) bleibt offen, bis die Massenauswahl gemessen ist.
+- Randbefund: Der Reiter „In map“ zählt nach Löschen und Rückgängig veraltet, weil `UpdateObjectsCatalog` dort nicht aufgerufen wird. Der Index liefert die Zählung später mit; das ist ein eigener, kleiner Schritt.
+- Handtest: alle sieben Handtest-Punkte vom Projektinhaber am 22. November 2026 bestätigt (Öffnen und Scrollen in Spandau ohne Ruckeln, auch schnelles Scrollen; Klick wählt und zentriert; Strg+Klick; Tastatur inkl. Esc; Suche, Herkunft und Gliederung; Karte zur Liste rollt; Änderungen bei offener Liste).
