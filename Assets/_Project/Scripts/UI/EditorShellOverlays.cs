@@ -34,7 +34,9 @@ namespace OmsiMapEditor.UI
                 throw new InvalidOperationException("A dialog can only be built after the shell root exists.");
             if (options.ReturnFocus == null)
                 options.ReturnFocus = () => mapCanvas?.Focus();
-            var dialog = ModalDialog.Create(options);
+            ModalDialog dialog = null;
+            options.IsTopmost = () => dialog != null && ReferenceEquals(overlays.TopShownModal(), dialog.Overlay);
+            dialog = ModalDialog.Create(options);
             rootElement.Add(dialog.Overlay);
             RegisterOverlay(dialog.Overlay, true, dialog.OnEscaped);
             return dialog;

@@ -121,6 +121,7 @@ namespace OmsiMapEditor.UI
         {
             var row = new VisualElement();
             row.AddToClassList("form-row");
+            row.AddToClassList("form-row-dense-3");
             var label = LocBindings.NewLabel(labelKey); // i18n:keys
             label.AddToClassList("popup-description");
             label.AddToClassList("form-row-label");
@@ -312,6 +313,7 @@ namespace OmsiMapEditor.UI
                 var typeNumber = typeIndex;
                 var head = new VisualElement();
                 head.AddToClassList("form-row");
+                head.AddToClassList("form-row-dense");
                 head.AddToClassList("form-type-head");
                 var title = new Label(Loc.T("vehicles.type.item", ("file", type.File), ("count", type.Vehicles.Count)));
                 title.AddToClassList("popup-description");
@@ -376,6 +378,7 @@ namespace OmsiMapEditor.UI
         {
             var row = new VisualElement();
             row.AddToClassList("form-row");
+            row.AddToClassList("form-row-dense");
             void Edit(Action<OmsiDepotVehicle> set)
             {
                 var edited = new OmsiDepotVehicle { Number = bus.Number, Registration = bus.Registration, Paint = bus.Paint, From = bus.From, To = bus.To };
@@ -414,6 +417,7 @@ namespace OmsiMapEditor.UI
                 var number = index;
                 var row = new VisualElement();
                 row.AddToClassList("form-row");
+                row.AddToClassList("form-row-dense");
                 var file = new Label(vehicle.File);
                 file.AddToClassList("popup-description");
                 file.AddToClassList("form-cell-flex");

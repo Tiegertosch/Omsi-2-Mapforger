@@ -160,6 +160,22 @@ namespace OmsiMapEditor.UI
             return editableTextFields == 1 && multilineFields == 0 && !focusOnButton && primaryEnabled;
         }
 
+        /// <summary>Whether the focused element is the field or lies inside it (the input element inside a text field).</summary>
+        public static bool FocusInsideField(VisualElement field, VisualElement focused)
+        {
+            return field != null && focused != null && (field == focused || field.Contains(focused));
+        }
+
+        /// <summary>
+        /// Whether a navigation-cancel event closes the dialog it reaches. Unity makes one from the same Esc that the dialog's key
+        /// handler already dealt with; after the top dialog closed, the focus returns into the dialog below and the event would reach
+        /// that one too. It closes only when the dialog is the topmost modal one and no Esc was handled in this or the previous frame.
+        /// </summary>
+        public static bool NavigationCancelCloses(bool isTopmost, int frame, int lastEscapeFrame)
+        {
+            return isTopmost && frame - lastEscapeFrame > 1;
+        }
+
         /// <summary>What a dialog focuses when it opens: a marked element, else the first text field, else the primary button.</summary>
         public static DialogInitialFocus InitialFocus(bool hasMarked, bool hasTextField, bool hasPrimary, bool hasAnyButton)
         {
@@ -231,6 +247,8 @@ namespace OmsiMapEditor.UI
         public bool EnterPressesPrimary = true;
         /// <summary>Gives the focus back when the dialog closes and the element focused before it is gone; null for none.</summary>
         public Action ReturnFocus;
+        /// <summary>Whether this dialog is the topmost shown modal one; null counts as yes (a dialog built outside the shell).</summary>
+        public Func<bool> IsTopmost;
     }
 
     /// <summary>
@@ -241,17 +259,24 @@ namespace OmsiMapEditor.UI
     internal sealed class ModalDialog
     {
         public const string AutofocusClass = "dialog-autofocus";
+        public const string OverlayClass = "dialog-overlay";
 
         private readonly DialogOptions options;
         private readonly List<DialogButton> definitions = new List<DialogButton>();
         private readonly List<Button> buttons = new List<Button>();
         private VisualElement previousFocus;
 
+        /// <summary>Frame of the last Esc any dialog handled (shared: the event for the dialog below arrives after the top one closed).</summary>
+        private static int lastEscapeFrame = -10;
+
+        /// <summary>For -navigationGuardOff: every navigation cancel closes the dialog it reaches, as before M7 step 7 (shows finding A1).</summary>
+        internal static bool NavigationGuardOff;
+
         private ModalDialog(DialogOptions options)
         {
             this.options = options;
             Overlay = new VisualElement { name = options.Name };
-            Overlay.AddToClassList("dialog-overlay");
+            Overlay.AddToClassList(OverlayClass);
             Overlay.style.display = DisplayStyle.None;
             Overlay.focusable = true;
             Overlay.tabIndex = -1;
@@ -439,6 +464,7 @@ namespace OmsiMapEditor.UI
         /// </summary>
         public void OnEscaped()
         {
+            lastEscapeFrame = UnityEngine.Time.frameCount;
             AfterDismissed();
         }
 
@@ -487,7 +513,14 @@ namespace OmsiMapEditor.UI
         {
             var marked = Body.Q(className: AutofocusClass);
             var fields = EditableFields(out _);
-            var choice = DialogRules.InitialFocus(marked != null, fields.Count > 0, Primary != null, buttons.Count > 0);
+            // Only elements a user can reach: a form may hide or disable buttons per state (the update dialog), and focusing a hidden
+            // button would leave Enter and Space without effect.
+            if (marked != null && !IsUsable(marked))
+                marked = null;
+            fields.RemoveAll(field => !IsUsable(field));
+            var primary = Primary != null && IsUsable(Primary) ? Primary : null;
+            var firstButton = buttons.Find(IsUsable);
+            var choice = DialogRules.InitialFocus(marked != null, fields.Count > 0, primary != null, firstButton != null);
             switch (choice)
             {
                 case DialogInitialFocus.Marked:
@@ -497,19 +530,42 @@ namespace OmsiMapEditor.UI
                     fields[0].Focus();
                     break;
                 case DialogInitialFocus.Primary:
-                    Primary.Focus();
+                    primary.Focus();
                     break;
                 case DialogInitialFocus.FirstButton:
-                    buttons[0].Focus();
+                    firstButton.Focus();
                     break;
             }
+        }
+
+        /// <summary>
+        /// Whether the element can take the focus now: enabled, and not hidden by its own inline display (or an ancestor's up to the overlay).
+        /// The inline value is read because the resolved one lags behind until the next style pass.
+        /// </summary>
+        internal static bool IsUsable(VisualElement element)
+        {
+            for (var current = element; current != null; current = current.parent)
+                if (current.style.display == DisplayStyle.None)
+                    return false;
+            return element != null && element.enabledSelf;
         }
 
         private void OnNavigationCancel(NavigationCancelEvent evt)
         {
             if (!IsShown)
                 return;
-            Dismiss();
+            var isTopmost = options.IsTopmost == null || options.IsTopmost();
+            if (NavigationGuardOff)
+            {
+                Dismiss();
+                evt.StopPropagation();
+                return;
+            }
+            if (DialogRules.NavigationCancelCloses(isTopmost, UnityEngine.Time.frameCount, lastEscapeFrame))
+            {
+                lastEscapeFrame = UnityEngine.Time.frameCount;
+                Dismiss();
+            }
             evt.StopPropagation();
             evt.PreventDefault();
         }
@@ -520,6 +576,7 @@ namespace OmsiMapEditor.UI
                 return;
             if (evt.keyCode == UnityEngine.KeyCode.Escape)
             {
+                lastEscapeFrame = UnityEngine.Time.frameCount;
                 Dismiss();
                 evt.StopPropagation();
                 evt.PreventDefault();
@@ -553,6 +610,9 @@ namespace OmsiMapEditor.UI
                 if (element is Button)
                     onButton = true;
             var primaryEnabled = Primary != null && Primary.enabledInHierarchy;
+            // Enter belongs to the one field; with the focus on a dropdown, a toggle or nothing it does not press the primary button.
+            if (fields.Count == 1 && !DialogRules.FocusInsideField(fields[0], focused))
+                return false;
             if (!DialogRules.EnterActivatesPrimary(fields.Count, multiline, onButton, primaryEnabled))
                 return false;
             var index = buttons.IndexOf(Primary);

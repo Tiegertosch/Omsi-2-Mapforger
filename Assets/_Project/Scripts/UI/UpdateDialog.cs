@@ -88,7 +88,8 @@ namespace OmsiMapEditor.UI
         /// <summary>Focuses the main action, or Close when the state has none, so Tab and Enter start in the dialog.</summary>
         public void FocusDefault()
         {
-            schedule.Execute(() => (primaryButton.resolvedStyle.display != DisplayStyle.None ? primaryButton : closeButton).Focus());
+            // The inline display decides: ShowChecking hid the main action a moment ago and the resolved style still says Flex until the next pass.
+            schedule.Execute(() => (ModalDialog.IsUsable(primaryButton) ? primaryButton : closeButton).Focus());
         }
 
         public event Action<bool> CheckAtStartChanged;

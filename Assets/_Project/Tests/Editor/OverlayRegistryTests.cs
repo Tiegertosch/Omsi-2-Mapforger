@@ -254,8 +254,12 @@ namespace OmsiMapEditor.Tests
             shell.Add(menu);
             registry.Register(dialog, true);
 
-            Assert.That(registry.IsInsideShownModal(map) || OverlayRegistry.IsPopupElement(map, shell), Is.False, "the map stays blocked");
-            Assert.That(registry.IsInsideShownModal(menu) || OverlayRegistry.IsPopupElement(menu, shell), Is.True, "the list is let through");
+            // The shell's guard asks BlocksPointer, so this is the decision it makes, not a copy of it.
+            Assert.That(registry.BlocksPointer(map, shell), Is.True, "the map stays blocked");
+            Assert.That(registry.BlocksPointer(menu, shell), Is.False, "the list is let through");
+            Assert.That(registry.BlocksPointer(dialog, shell), Is.False, "the dialog itself is let through");
+            OverlayRegistry.Hide(dialog);
+            Assert.That(registry.BlocksPointer(map, shell), Is.False, "without a shown dialog nothing is blocked");
         }
     }
 }

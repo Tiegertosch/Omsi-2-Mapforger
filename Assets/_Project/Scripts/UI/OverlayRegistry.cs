@@ -115,6 +115,18 @@ namespace OmsiMapEditor.UI
             return false;
         }
 
+        /// <summary>Whether a press or wheel turn on <paramref name="element"/> reaches it although a modal dialog is shown: it lies inside a shown modal or is a dialog's own popup. The guard and its test use this one rule.</summary>
+        public bool LetsPointerThrough(VisualElement element, VisualElement shellRoot)
+        {
+            return IsInsideShownModal(element) || IsPopupElement(element, shellRoot);
+        }
+
+        /// <summary>Whether the pointer is stopped on <paramref name="element"/>: a modal dialog is shown and the element is neither in it nor one of its popups.</summary>
+        public bool BlocksPointer(VisualElement element, VisualElement shellRoot)
+        {
+            return AnyModalShown() && !LetsPointerThrough(element, shellRoot);
+        }
+
         /// <summary>The modal overlay that is shown and stands highest in its parent (the one on top), or null.</summary>
         public VisualElement TopShownModal()
         {

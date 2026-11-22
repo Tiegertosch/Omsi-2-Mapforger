@@ -1403,6 +1403,10 @@ namespace OmsiMapEditor.UI
                 rootElement.schedule.Execute(RunClickMapCheck).StartingIn(1000);
             // -dropdownCheck [n] [-dropdownEscape]: after 1.5 s opens the n-th dropdown of the shown dialog and logs "Dropdown check:" (M7 step 5 correction).
             OverlayRegistry.PopupExemptionOff = Array.IndexOf(args, "-modalGuardStrict") >= 0;
+            ModalDialog.NavigationGuardOff = Array.IndexOf(args, "-navigationGuardOff") >= 0;
+            // -stackBugReport: after 0.8 s opens the bug report over whatever dialog is open (the focus is inside that one by then), for -pressEscape with two dialogs.
+            if (Array.IndexOf(args, "-stackBugReport") >= 0 && rootElement != null)
+                rootElement.schedule.Execute(() => OpenBugReport(false)).StartingIn(800);
             if (Array.IndexOf(args, "-dropdownCheck") >= 0 && rootElement != null)
                 rootElement.schedule.Execute(RunDropdownCheck).StartingIn(1500);
             if (Array.IndexOf(args, "-pressEscape") >= 0 && rootElement != null)
@@ -1417,14 +1421,26 @@ namespace OmsiMapEditor.UI
                         focusedElement?.Blur();
                         focusedElement = null;
                     }
+                    Debug.Log("Esc check: shown before: " + ShownDialogNames());
                     var keyTarget = blurred ? rootElement.panel.visualTree : (focusedElement ?? rootElement);
                     using (var press = KeyDownEvent.GetPooled('\0', KeyCode.Escape, EventModifiers.None))
                     {
                         press.target = keyTarget;
                         keyTarget.SendEvent(press);
                     }
+                    // -escapeNavigation: also the navigation event Unity makes of the same key, sent to whatever has the focus after the
+                    // key was handled (in the same frame, as the event system does); two stacked dialogs must lose only the top one (M7 step 7).
+                    if (Array.IndexOf(args, "-escapeNavigation") >= 0)
+                    {
+                        var afterKey = rootElement.panel?.focusController?.focusedElement as VisualElement ?? keyTarget;
+                        using (var cancel = NavigationCancelEvent.GetPooled())
+                        {
+                            cancel.target = afterKey;
+                            afterKey.SendEvent(cancel);
+                        }
+                    }
                     Debug.Log("Esc check: focus on " + (focusedElement == null ? "nothing" : focusedElement.GetType().Name + " '" + focusedElement.name + "'") +
-                              ", dialog shown before " + before + ", after " + AnyModalDialogShown());
+                              ", dialog shown before " + before + ", after " + AnyModalDialogShown() + "; shown after: " + ShownDialogNames());
                 }).StartingIn(1500);
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
@@ -8901,7 +8917,7 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Only the tile list (the tall one) opens at the left edge; every other popup of the bar opens at the right edge.</summary>
-        private static bool BarPopupOnLeft(ProjectTab tab)
+        internal static bool BarPopupOnLeft(ProjectTab tab)
         {
             return tab == ProjectTab.Tiles;
         }

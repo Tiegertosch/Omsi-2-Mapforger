@@ -30,8 +30,17 @@ namespace OmsiMapEditor.UI
             if (root.panel != null)
                 root.panel.visualTree.RegisterCallback<KeyDownEvent>(OnPanelRootKey, TrickleDown.TrickleDown);
             else
-                root.RegisterCallback<AttachToPanelEvent>(evt => ((VisualElement)evt.currentTarget).panel.visualTree
-                    .RegisterCallback<KeyDownEvent>(OnPanelRootKey, TrickleDown.TrickleDown));
+                root.RegisterCallback<AttachToPanelEvent>(OnGuardAttached);
+        }
+
+        /// <summary>Hooks the panel-root key handler once, when the shell root first reaches a panel.</summary>
+        private void OnGuardAttached(AttachToPanelEvent evt)
+        {
+            var element = (VisualElement)evt.currentTarget;
+            element.UnregisterCallback<AttachToPanelEvent>(OnGuardAttached);
+            var visualTree = element.panel.visualTree;
+            visualTree.UnregisterCallback<KeyDownEvent>(OnPanelRootKey, TrickleDown.TrickleDown);
+            visualTree.RegisterCallback<KeyDownEvent>(OnPanelRootKey, TrickleDown.TrickleDown);
         }
 
         /// <summary>Whether the element is inside a modal dialog that is shown (its overlay is the element or an ancestor).</summary>
@@ -58,7 +67,7 @@ namespace OmsiMapEditor.UI
         /// <summary>A press or wheel turn outside every shown modal dialog while one is shown (the tooltip never takes input).</summary>
         private bool BlocksForModal(VisualElement target)
         {
-            return AnyModalDialogShown() && !InsideShownModal(target) && !OverlayRegistry.IsPopupElement(target, rootElement);
+            return overlays.BlocksPointer(target, rootElement);
         }
 
         /// <summary>The focus moves from inside a modal dialog to an element outside every one (the map, a bar button): it goes back in.</summary>
@@ -76,6 +85,12 @@ namespace OmsiMapEditor.UI
                 if (!InsideShownModal(focusedNow) && !OverlayRegistry.IsPopupElement(focusedNow, rootElement))
                     top.Focus();
             });
+        }
+
+        /// <summary>The names of the dialog overlays that are shown, bottom to top (for the Esc check).</summary>
+        private string ShownDialogNames()
+        {
+            return string.Join(", ", rootElement.Query<VisualElement>(className: ModalDialog.OverlayClass).ToList().Where(OverlayRegistry.IsShown).Select(e => e.name));
         }
 
         private static string Describe(VisualElement element)

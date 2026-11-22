@@ -14,7 +14,7 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private enum ProjectTab
+        internal enum ProjectTab
         {
             Tiles,
             Map,

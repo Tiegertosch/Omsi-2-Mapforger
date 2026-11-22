@@ -15,6 +15,24 @@ namespace OmsiMapEditor.Tests
         private static readonly DialogButtonRole D = DialogButtonRole.Danger;
 
         [Test]
+        public void AHiddenOrDisabledButtonCannotTakeTheInitialFocus()
+        {
+            var parent = new VisualElement();
+            var button = new Button();
+            parent.Add(button);
+            Assert.That(ModalDialog.IsUsable(button), Is.True);
+            button.style.display = DisplayStyle.None;
+            Assert.That(ModalDialog.IsUsable(button), Is.False, "hidden by its own inline display, before any style pass");
+            button.style.display = DisplayStyle.Flex;
+            parent.style.display = DisplayStyle.None;
+            Assert.That(ModalDialog.IsUsable(button), Is.False, "hidden through a parent");
+            parent.style.display = DisplayStyle.Flex;
+            button.SetEnabled(false);
+            Assert.That(ModalDialog.IsUsable(button), Is.False);
+            Assert.That(ModalDialog.IsUsable(null), Is.False);
+        }
+
+        [Test]
         public void WidthsAreTheFourClassesOfTheOwnersDecision()
         {
             Assert.That(DialogRules.WidthPixels(DialogWidth.Narrow), Is.EqualTo(420));
@@ -210,6 +228,65 @@ namespace OmsiMapEditor.Tests
             dialog.Body.Add(new TextField());
             Assert.That(dialog.TryEnter(first), Is.False, "two fields");
             Assert.That(presses, Is.EqualTo(1));
+        }
+
+        // M7 step 7, finding A2: Enter belongs to the single field; focus on a dropdown or a toggle does not press the primary button.
+        [Test]
+        public void EnterWithTheFocusOutsideTheOneFieldDoesNotPressThePrimaryButton()
+        {
+            var presses = 0;
+            var dialog = ModalDialog.Create(Options("enterfocus", DialogWidth.Standard,
+                new DialogButton { TextKey = "signals.notice.ok", Role = P, Clicked = () => presses++ }));
+            var field = new TextField();
+            var dropdown = new DropdownField();
+            var toggle = new Toggle();
+            dialog.Body.Add(field);
+            dialog.Body.Add(dropdown);
+            dialog.Body.Add(toggle);
+
+            Assert.That(dialog.TryEnter(dropdown), Is.False);
+            Assert.That(dialog.TryEnter(toggle), Is.False);
+            Assert.That(dialog.TryEnter(null), Is.False);
+            Assert.That(presses, Is.EqualTo(0));
+            Assert.That(dialog.TryEnter(field), Is.True, "the field itself");
+            Assert.That(dialog.TryEnter(field.Q<TextElement>()), Is.True, "the input inside the field");
+            Assert.That(presses, Is.EqualTo(2));
+            Assert.That(DialogRules.FocusInsideField(field, field), Is.True);
+            Assert.That(DialogRules.FocusInsideField(field, toggle), Is.False);
+            Assert.That(DialogRules.FocusInsideField(field, null), Is.False);
+        }
+
+        // M7 step 7, finding A1: one Esc closes one dialog. The navigation event Unity makes of the same key reaches the dialog below
+        // after the top one closed and the focus returned into it; it must not close that one.
+        [Test]
+        public void ANavigationCancelClosesOnlyTheTopDialogAndOnlyWithoutAnEscInTheSameFrame()
+        {
+            Assert.That(DialogRules.NavigationCancelCloses(true, 100, -10), Is.True, "a lone navigation cancel closes the top dialog");
+            Assert.That(DialogRules.NavigationCancelCloses(false, 100, -10), Is.False, "not the topmost dialog");
+            Assert.That(DialogRules.NavigationCancelCloses(true, 100, 100), Is.False, "Esc already handled in this frame");
+            Assert.That(DialogRules.NavigationCancelCloses(true, 101, 100), Is.False, "or in the frame before");
+            Assert.That(DialogRules.NavigationCancelCloses(true, 102, 100), Is.True, "a later Esc is a new one");
+        }
+
+        [Test]
+        public void ANavigationCancelDoesNotCloseADialogThatIsNotOnTop()
+        {
+            var closed = 0;
+            var top = false;
+            var options = Options("below", DialogWidth.Standard, new DialogButton { TextKey = "signals.notice.ok", Role = P });
+            options.Closed = () => closed++;
+            options.IsTopmost = () => top;
+            var dialog = ModalDialog.Create(options);
+            var host = new VisualElement();
+            host.Add(dialog.Overlay);
+            dialog.Overlay.style.display = DisplayStyle.Flex;
+
+            using (var cancel = NavigationCancelEvent.GetPooled())
+            {
+                cancel.target = dialog.Overlay;
+                dialog.Overlay.SendEvent(cancel);
+            }
+            Assert.That(closed, Is.EqualTo(0), "below another dialog");
         }
 
         [Test]

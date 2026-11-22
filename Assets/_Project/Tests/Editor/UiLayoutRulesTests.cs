@@ -1,6 +1,8 @@
 using System.IO;
 using System.Text.RegularExpressions;
+using System;
 using NUnit.Framework;
+using OmsiMapEditor.UI;
 using UnityEngine;
 
 namespace OmsiMapEditor.Tests
@@ -55,11 +57,8 @@ namespace OmsiMapEditor.Tests
         [Test]
         public void OnlyTheTilePopupOpensAtTheLeftEdge()
         {
-            var path = Path.Combine(Application.dataPath, "_Project", "Scripts", "UI", "EditorShellBootstrap.cs");
-            var source = File.ReadAllText(path);
-            var match = Regex.Match(source, @"static bool BarPopupOnLeft\(ProjectTab tab\)\s*\{\s*return ([^;]+);");
-            Assert.IsTrue(match.Success, "BarPopupOnLeft not found.");
-            Assert.AreEqual("tab == ProjectTab.Tiles", match.Groups[1].Value.Trim());
+            foreach (EditorShellBootstrap.ProjectTab tab in Enum.GetValues(typeof(EditorShellBootstrap.ProjectTab)))
+                Assert.AreEqual(tab == EditorShellBootstrap.ProjectTab.Tiles, EditorShellBootstrap.BarPopupOnLeft(tab), tab.ToString());
             Assert.IsTrue(Regex.IsMatch(Rule(".bar-popup-right"), @"left:\s*auto") && Regex.IsMatch(Rule(".bar-popup-right"), @"right:\s*var\(--mf-space-2\)"));
         }
 
@@ -106,6 +105,16 @@ namespace OmsiMapEditor.Tests
             Assert.LessOrEqual(rect.xMax, width - Margin + 0.01f, "The window ends inside the area.");
             Assert.LessOrEqual(rect.yMax, height - 120f + 0.01f, "The window ends above the bottom bar.");
             Assert.GreaterOrEqual(rect.width, OmsiMapEditor.UI.RoadTypeWindow.LeastSize.x, "The window keeps its least width.");
+        }
+
+        // M7 step 7, findings B1 and B2: the vehicle dialog keeps the old spacing (buttons flush left, dense list rows).
+        [Test]
+        public void TheVehicleDialogKeepsItsOldSpacing()
+        {
+            Assert.IsTrue(Regex.IsMatch(Rule(".map-control-button.form-action-block"), @"margin-left:\s*0"), "must beat .map-control-button.form-inline-button");
+            Assert.IsTrue(Regex.IsMatch(Rule(".form-row-dense"), @"margin:\s*0 0 2px 0"));
+            Assert.IsTrue(Regex.IsMatch(Rule(".form-row-dense-3"), @"margin:\s*0 0 3px 0"));
+            Assert.IsTrue(stylesheet.IndexOf(".form-row-dense {", StringComparison.Ordinal) > stylesheet.IndexOf(".form-row {", StringComparison.Ordinal), "the dense rule comes after .form-row");
         }
 
         private static string Rule(string selector)

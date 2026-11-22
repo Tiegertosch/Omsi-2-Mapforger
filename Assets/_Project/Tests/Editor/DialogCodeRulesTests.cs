@@ -20,6 +20,8 @@ namespace OmsiMapEditor.Tests
         /// </summary>
         private const int InlineSizeCeiling = 0;
 
+        // Not counted on purpose (decision 5A, wide count of size, spacing and flex): left/top/right/bottom and flexDirection place an element
+        // (a popup, a handle) and are not a size; counting them would force every positioned element into USS without gain.
         private static readonly Regex InlineSize = new Regex(
             @"style\.(width|height|minWidth|minHeight|maxWidth|maxHeight|margin[A-Za-z]*|padding[A-Za-z]*|flexBasis|flexGrow|flexShrink)\b",
             RegexOptions.Compiled);
@@ -41,11 +43,18 @@ namespace OmsiMapEditor.Tests
         {
             var root = ProjectRoot();
             var count = 0;
+            var factory = Path.GetFullPath(Path.Combine(root, "Assets", "_Project", "Scripts", "UI", "DialogFactory.cs"));
             foreach (var file in Directory.GetFiles(Path.Combine(root, "Assets", "_Project", "Scripts", "UI"), "*.cs", SearchOption.AllDirectories))
+            {
+                // The dialog factory (M7 step 1) is the one place that names the overlay class; bound to its full path, not to a file name.
+                if (string.Equals(Path.GetFullPath(file), factory, System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                // Every mention of the class name counts, however the element gets it (constructor, AddToClassList, EnableInClassList,
+                // a constant): the name is only meant to appear in the factory. "// computed" means nothing for an overlay.
                 foreach (var line in File.ReadAllLines(file))
-                    // The dialog factory (M7 step 1) is the one place that builds the overlay.
-                    if (line.Contains("\"dialog-overlay\"") && !line.Contains("// computed") && Path.GetFileName(file) != "DialogFactory.cs")
+                    if (line.Contains("dialog-overlay"))
                         count++;
+            }
             foreach (var line in File.ReadAllLines(Path.Combine(root, "Assets", "_Project", "UI", "Resources", "EditorShell.uxml")))
                 if (line.Contains("dialog-overlay"))
                     count++;
