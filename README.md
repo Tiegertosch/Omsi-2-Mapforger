@@ -48,6 +48,7 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 - **Readable at any size:** The interface follows the Windows display scale and has an **Interface size** setting (90 to 200 %) in Settings. Dialogs, menus and toolbars keep to the window at 100, 150 and 200 %.
 - **Clearer text and controls:** Text and panel contrast were raised, and the keyboard focus ring shows only when you navigate with the keyboard.
 - **Consistent colours on the map:** Orange marks the active tile, light with a dark rim the selection, violet rail paths; red means only errors, yellow only warnings.
+- **Consistent dialogs:** All dialogs share one layout, with Cancel on the left and the main button on the right. Esc closes only the top dialog, Enter confirms only in a dialog with a single text field, and a click beside a dialog does not close it. The map stays still behind open dialogs. The object and spline folders are in Settings under Content.
 - **Simpler Help menu:** It offers Check for updates, Report a bug and the wiki.
 
 ## Current limitations

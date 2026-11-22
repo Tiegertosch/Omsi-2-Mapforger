@@ -29,7 +29,7 @@ Vorschlag auf Grundlage von [ui-rework-audit.md](ui-rework-audit.md), [ui-rework
 | M4 | Werkzeug-Fenster fertig migrieren (**erledigt**, 19. November 2026) | P1 | L | M2 | frontend |
 | M5 | Kontextmenü, zweite Etappe (**erledigt**, 21. November 2026) | P1 | M | M3 | frontend + backend |
 | M6 | Lesbarkeit und Bedienbarkeit (Design-Review) (**erledigt**, 22. November 2026, Schritte 0 bis 7 vom Projektinhaber getestet und gepusht) | P1/P2 | M | M4 | frontend |
-| M7 | Dialoge vereinheitlichen | P2 | L | M3 | frontend |
+| M7 | Dialoge vereinheitlichen (**erledigt**, 22. November 2026, Schritte 0 bis 7 vom Projektinhaber getestet und gepusht) | P2 | L | M3 | frontend |
 | M8 | Aufräumen und Abschluss | P3 | S | alle | reviewer + testing |
 
 ```
@@ -149,6 +149,7 @@ M2 und M3 berühren verschiedene Stellen (Statuszeile und Pille gegen `SetTool`,
 - **Risiken:** viel Fläche, wenig sichtbarer Gewinn; Fahrplan-Dialog ist komplex.
 - **Tests:** Screenshots jedes Dialogs vor/nach (`-timetable`, `-vehicles`, `-parkList`, `-trafficCurves`, `-mapSettings`, `-contentFolders`, `-satellite`).
 - **Akzeptanz:** keine von Hand gebaute `dialog-overlay` außerhalb der Fabrik; unter 20 Inline-Größen in `Scripts/UI`.
+- **Abschluss (22. November 2026):** M7 ist abgeschlossen. Der Projektinhaber hat die Schritte 0 bis 7 getestet und gepusht (`98038b6`, `5ab8976`, `7c61f22`, `dfde4b4`, `21dc0e9`, `311aeb8`). Ergebnis: alle 13 modalen Dialoge kommen aus `DialogFactory.cs`, `dialog-overlay` nur noch dort (Test), Inline-Größen in `Scripts/UI`: 0 unmarkiert, 31 nach USS verschoben, 33 mit `// computed` (Akzeptanz „unter 20“ ist damit erfüllt). Esc schließt nur den obersten Dialog, Enter bestätigt nur bei genau einem Textfeld, Klick daneben schließt nicht, die Karte ist hinter offenen Dialogen gesperrt. Die Sonderform der Werkzeugfenster (Luftbild, Straßentyp, Ampel) steht in `Architecture.md` und ADR 098. Offene Punkte für M8: ungenutzte USS-Klassen aus früheren Meilensteinen (Liste in ADR 098, Nachtrag „M7 Schritt 6“).
 
 ## M8 – Aufräumen und Abschluss (P3, S)
 
