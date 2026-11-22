@@ -256,8 +256,8 @@ namespace OmsiMapEditor.UI
             element.style.position = Position.Absolute;
             element.style.left = Mathf.Floor(corner.x);
             element.style.top = Mathf.Floor(corner.y);
-            element.style.width = Mathf.Ceil(far.x) - Mathf.Floor(corner.x);
-            element.style.height = Mathf.Ceil(far.y) - Mathf.Floor(corner.y);
+            element.style.width = Mathf.Ceil(far.x) - Mathf.Floor(corner.x); // computed: map extent in pixels
+            element.style.height = Mathf.Ceil(far.y) - Mathf.Floor(corner.y); // computed: map extent in pixels
             element.style.backgroundImage = new StyleBackground(tiles[id].Texture);
             tileLayer.Add(element);
             shown.Add(element);

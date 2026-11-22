@@ -51,6 +51,18 @@ namespace OmsiMapEditor.Tests
             Assert.IsTrue(Regex.IsMatch(stylesheet, @"\.dialog-buttons\s*>\s*Button\s*\{[^}]*flex-shrink:\s*0"), "The buttons of the row must not shrink.");
         }
 
+        // M7 step 6 fix: the Map popup opened at the left edge while Chrono, Lines and AI Paths opened at the right one.
+        [Test]
+        public void OnlyTheTilePopupOpensAtTheLeftEdge()
+        {
+            var path = Path.Combine(Application.dataPath, "_Project", "Scripts", "UI", "EditorShellBootstrap.cs");
+            var source = File.ReadAllText(path);
+            var match = Regex.Match(source, @"static bool BarPopupOnLeft\(ProjectTab tab\)\s*\{\s*return ([^;]+);");
+            Assert.IsTrue(match.Success, "BarPopupOnLeft not found.");
+            Assert.AreEqual("tab == ProjectTab.Tiles", match.Groups[1].Value.Trim());
+            Assert.IsTrue(Regex.IsMatch(Rule(".bar-popup-right"), @"left:\s*auto") && Regex.IsMatch(Rule(".bar-popup-right"), @"right:\s*var\(--mf-space-2\)"));
+        }
+
         [Test]
         public void TitleOfAFactoryDialogDoesNotShrink()
         {

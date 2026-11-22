@@ -898,7 +898,7 @@ namespace OmsiMapEditor.UI
             var positionRow = Row(exact, "satellite.lies_at");
             Field(positionRow, positionField, "satellite.lies_at.tooltip");
             positionField.textEdition.placeholder = "52.5200, 13.4050";
-            positionField.style.width = 190;
+            positionField.AddToClassList("satellite-field-position");
             OnCommit(positionField, () => PositionEntered?.Invoke(positionField.value));
 
             var scaleRow = Row(exact, "satellite.scale");
@@ -912,7 +912,7 @@ namespace OmsiMapEditor.UI
 
             var moveRow = Row(exact, "satellite.move");
             Field(moveRow, stepField, "satellite.move.tooltip");
-            stepField.style.width = 44;
+            stepField.AddToClassList("satellite-field-step");
             foreach (var move in new[] { ("satellite.move.west", -1, 0), ("satellite.move.east", 1, 0), ("satellite.move.north", 0, 1), ("satellite.move.south", 0, -1) })
             {
                 var east = move.Item2;
@@ -948,7 +948,7 @@ namespace OmsiMapEditor.UI
                 var fieldRow = Row(fitFold, "satellite.lies_at");
                 Field(fieldRow, field, "satellite.fit.lies_at.tooltip");
                 field.textEdition.placeholder = "52.5200, 13.4050";
-                field.style.width = 190;
+                field.AddToClassList("satellite-field-position");
             }
             var fitRow = new VisualElement();
             fitRow.AddToClassList("satellite-row");

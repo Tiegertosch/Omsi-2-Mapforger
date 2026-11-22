@@ -122,7 +122,7 @@ namespace OmsiMapEditor.UI
                 inspectorFrame.style.left = StyleKeyword.Null;
                 inspectorFrame.style.top = StyleKeyword.Null;
                 inspectorFrame.style.right = StyleKeyword.Null;
-                inspectorFrame.style.maxHeight = StyleKeyword.Null;
+                inspectorFrame.style.maxHeight = StyleKeyword.Null; // computed: room below the pointer
                 SetInspectorBusy(false);
                 HideInspectorLink();
                 ApplyBottomBarHeight(bottomBarHeight);
@@ -240,7 +240,7 @@ namespace OmsiMapEditor.UI
                 return;
             var area = new Rect(0f, 0f, width, height - BottomBarLayout.DistanceAbove(bottomBarHeight, BottomBarLayout.PopupGap));
             var limit = Mathf.Max(120f, Mathf.Min(inspectorFull ? PointerInspectorFullHeight : PointerInspectorCompactHeight, area.height - 2f * InspectorPlacement.Margin));
-            inspectorFrame.style.maxHeight = limit;
+            inspectorFrame.style.maxHeight = limit; // computed: room below the pointer
             inspectorFrame.style.bottom = StyleKeyword.Auto;
 
             if (!TryInspectorAnchor(out var panelPoint, out var panelExtent))
@@ -295,7 +295,7 @@ namespace OmsiMapEditor.UI
             inspectorLink.style.display = DisplayStyle.Flex;
             inspectorLink.style.left = from.x;
             inspectorLink.style.top = from.y - 0.5f;
-            inspectorLink.style.width = length;
+            inspectorLink.style.width = length; // computed: measured link length
             inspectorLink.style.rotate = new Rotate(new Angle(degrees, AngleUnit.Degree));
             inspectorLinkDot.style.display = DisplayStyle.Flex;
             inspectorLinkDot.style.left = anchor.x - InspectorLinkDotSize / 2f;

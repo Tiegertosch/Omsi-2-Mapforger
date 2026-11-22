@@ -106,7 +106,6 @@
 .menu-section-label { margin: 4px 10px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 .popup-title { margin: 4px 8px 8px; font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .popup-description { margin: 4px 8px; color: var(--mf-color-text-secondary); white-space: normal; }
-.popup-close { align-self: flex-end; min-width: 68px; -unity-text-align: middle-center; }
 
 /* Workspace: the map fills it, panels and controls float above it */
 .workspace { flex-grow: 1; min-height: 0; position: relative; overflow: hidden; background-color: var(--mf-color-clear); }
@@ -330,7 +329,6 @@
 .panel-row-detail { font-size: var(--mf-font-caption); color: var(--mf-color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .favorite-button { width: 26px; height: 26px; color: var(--mf-color-text-muted); }
 .favorite-on, .favorite-on:hover { color: var(--mf-color-accent); }
-.folders-left-out, .folders-left-out:hover { color: var(--mf-color-warning); }
 /* The signals window (ADR 098): one window that floats beside the map like the one for pictures from the air; title bar, navigation, work area, preview and footer. */
 .signal-frame { left: var(--mf-space-2); right: auto; top: var(--mf-space-2); bottom: auto; width: 780px; height: 640px; max-width: 100%; max-height: 100%; padding: 0; background-color: var(--mf-color-panel); }
 .signal-frame.signal-dirty { border-width: 1px; border-color: var(--mf-color-warning); }
@@ -435,7 +433,7 @@
 .road-section { margin: 0; padding: 0; }
 .road-section:focus > .road-section-scroll { border-color: var(--mf-color-border); }
 .road-section-scroll { padding: var(--mf-space-1); background-color: var(--mf-color-field); border-radius: var(--mf-radius-md); border-width: 1px; border-color: var(--mf-color-border-subtle); }
-.road-section-track { position: relative; margin: 0; padding: 0; }
+.road-section-track { position: relative; flex-grow: 0; flex-shrink: 0; margin: 0; padding: 0; }
 .road-section-element { position: absolute; top: 0; bottom: 0; margin: 0; align-items: center; justify-content: center; overflow: hidden; background-color: var(--mf-color-lane-asphalt); border-width: 2px; border-color: var(--mf-color-clear); -unity-background-scale-mode: scale-and-crop; }
 .road-section-element-walk { background-color: var(--mf-color-lane-walk); }
 .road-section-element-median { background-color: var(--mf-color-lane-grass); }
@@ -627,10 +625,9 @@
 .signal-timeline-row { flex-direction: row; align-items: center; margin: 2px 0; }
 .signal-timeline-name { width: 74px; min-width: 74px; margin: 0 4px 0 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); overflow: hidden; }
 .signal-timeline-axis > .signal-timeline-name { width: 94px; min-width: 94px; }
-.signal-timeline-bar { flex-grow: 1; border-radius: 2px; background-color: var(--mf-color-field); }
+.signal-timeline-bar { flex-grow: 1; height: 22px; border-radius: 2px; background-color: var(--mf-color-field); }
 .signal-issues { white-space: normal; }
 .signal-shared-hint { margin: 0 0 4px 20px; color: var(--mf-color-text-muted); }
-.content-folders { color: var(--mf-color-text-primary); max-height: 92%; }
 .content-folders-toggle .unity-toggle__text { color: var(--mf-color-text-primary); margin-left: 6px; }
 .content-folders-list { max-height: 420px; min-height: 120px; flex-shrink: 1; margin: var(--mf-space-2) 0; border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: var(--mf-radius-sm); padding: var(--mf-space-2); }
 .content-folders-header { flex-direction: row; align-items: center; margin-top: var(--mf-space-2); }
@@ -790,7 +787,9 @@
 .browser-chrono-date .unity-base-text-field__input:focus { border-color: var(--mf-color-accent); }
 .browser-chrono-row > .map-control-button { flex-shrink: 0; padding-left: 8px; padding-right: 8px; }
 .browser-chrono-row > .map-control-button.browser-chrono-row-last { margin-right: 0; }
-.browser-chrono-variant { white-space: normal; padding-top: 4px; padding-bottom: 4px; }
+.browser-chrono-variant { flex-grow: 1; flex-shrink: 1; white-space: normal; padding-top: 4px; padding-bottom: 4px; }
+.browser-chrono-form { margin-top: 6px; }
+.browser-section-title { margin-bottom: var(--mf-space-1); }
 .browser-tile-list { flex-grow: 1; min-height: 0; }
 .browser-tile-entry { min-height: 28px; margin: 0 0 3px; padding-left: var(--mf-space-2); padding-right: var(--mf-space-1); -unity-text-align: middle-left; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border-subtle); border-radius: var(--mf-radius-sm); }
 .browser-tile-entry:hover { background-color: var(--mf-color-panel-hover); }
@@ -830,6 +829,8 @@
 .inspector-record-clickable:hover { background-color: var(--mf-color-panel-hover); }
 .inspector-record-selected { background-color: var(--mf-color-panel-hover); border-left-width: 3px; border-left-color: var(--mf-color-accent); }
 .inspector-edit { margin-top: var(--mf-space-2); padding: var(--mf-space-2); background-color: var(--mf-color-panel-raised); border-width: 1px; border-color: var(--mf-color-border); border-radius: var(--mf-radius-md); }
+.inspector-attached-row { flex-direction: row; align-items: center; }
+.inspector-attached-row > .inspector-edit-name { flex-grow: 1; flex-shrink: 1; }
 .inspector-edit-name { margin-bottom: 6px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); white-space: normal; }
 .inspector-edit-field { margin: 2px 0; }
 .inspector-edit-field > Label { min-width: 84px; width: 84px; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
@@ -929,8 +930,6 @@
 .form-toggle { margin: var(--mf-space-1) var(--mf-space-2); }
 .form-toggle .unity-toggle__text { margin-left: 6px; color: var(--mf-color-text-primary); }
 .form-indent { margin-left: var(--mf-space-2); margin-right: var(--mf-space-2); }
-.form-section-title { margin: var(--mf-space-3) 0 var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
-.form-footnote { margin-top: var(--mf-space-2); color: var(--mf-color-text-muted); white-space: normal; }
 
 /* Vehicles and traffic curves (M7 step 3). The body of the factory dialog scrolls, so nothing in it may shrink: that squeezed the
    graphs and put the Reset buttons and the Cars/Passengers headings on top of them at a large display scale. */
@@ -1094,9 +1093,18 @@
 .mf-keyboard-focus .traffic-tile:focus { border-color: var(--mf-color-text-secondary); }
 .mf-keyboard-focus .traffic-tile.picker-tile-selected:focus { border-color: var(--mf-color-accent); }
 .traffic-sign { flex-grow: 1; }
-.traffic-ghost { opacity: 0.92; }
+.traffic-ghost { width: 48px; height: 48px; opacity: 0.92; }
 .traffic-ghost-icon { align-items: center; justify-content: center; color: var(--mf-color-accent); background-color: var(--mf-color-panel-glass); border-radius: var(--mf-radius-md); }
 .traffic-ghost-icon > .icon { width: 28px; height: 28px; }
+/* M7 step 6: the few spacing and flex values the code used to set inline. Declared late so they outrank the single-class rules above; the indent is one step (--mf-space-3). */
+.mf-grow { flex-grow: 1; }
+.mf-mt-0 { margin-top: 0; }
+.mf-mt-1 { margin-top: var(--mf-space-1); }
+.mf-mt-2 { margin-top: var(--mf-space-2); }
+.mf-indent { margin-left: var(--mf-space-3); }
+.picker-field.form-field-auto { width: auto; }
+.picker-field.satellite-field-position { width: 190px; }
+.picker-field.satellite-field-step { width: 44px; }
 /* Every text input of the app, also Integer/Float/DoubleField (their input is a .unity-base-text-field__input as well): a light caret,
    a visible selection and an accent border while focused. The class is doubled to outrank the default theme. The border colour changes
    only, so nothing moves. Keep this at the end: it must come after the per-field rules above. Unity 6.6 has no caret blink for UI Toolkit. */

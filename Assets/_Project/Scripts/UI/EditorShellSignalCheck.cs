@@ -92,7 +92,7 @@ namespace OmsiMapEditor.UI
             right.Add(findingsTitle);
             signalCheckSummary = new Label();
             signalCheckSummary.AddToClassList("panel-info");
-            signalCheckSummary.style.marginTop = 0f;
+            signalCheckSummary.AddToClassList("mf-mt-0");
             right.Add(signalCheckSummary);
             signalFindingsBox = new VisualElement();
             right.Add(signalFindingsBox);

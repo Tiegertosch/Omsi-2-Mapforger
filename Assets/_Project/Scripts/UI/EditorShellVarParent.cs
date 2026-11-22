@@ -34,7 +34,7 @@ namespace OmsiMapEditor.UI
             var canEdit = CanEdit;
             var container = new VisualElement();
             if (nested)
-                container.style.marginLeft = 12;
+                container.AddToClassList("mf-indent");
             if (nested)
             {
                 var heading = LocBindings.NewLabel("varparent.group");

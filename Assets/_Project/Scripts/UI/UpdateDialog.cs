@@ -144,7 +144,7 @@ namespace OmsiMapEditor.UI
                 ? Loc.T("updates.downloading.progress", ("done", Megabytes(done)), ("total", Megabytes(total)))
                 : Loc.T("updates.downloading", ("done", Megabytes(done))), true);
             progressTrack.style.display = DisplayStyle.Flex;
-            progressFill.style.width = Length.Percent(total > 0 ? Math.Min(100f, 100f * done / total) : 0f);
+            progressFill.style.width = Length.Percent(total > 0 ? Math.Min(100f, 100f * done / total) : 0f); // computed: download progress
             Buttons(Loc.T("updates.button.cancel"), null, null, false, false);
         }
 

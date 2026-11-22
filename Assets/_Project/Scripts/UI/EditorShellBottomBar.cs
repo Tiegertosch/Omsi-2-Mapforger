@@ -138,7 +138,7 @@ namespace OmsiMapEditor.UI
             if (System.Math.Abs(room - satelliteMaxHeight) > 0.5f)
             {
                 satelliteMaxHeight = room;
-                satelliteWindow.style.maxHeight = room;
+                satelliteWindow.style.maxHeight = room; // computed: room above the bottom bar
             }
         }
 

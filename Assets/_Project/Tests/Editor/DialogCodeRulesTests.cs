@@ -5,9 +5,9 @@ using NUnit.Framework;
 namespace OmsiMapEditor.Tests
 {
     /// <summary>
-    /// M7 step 0: keeps the two numbers M7 brings down from rising again. Both are ceilings that may only fall; M7 step 6 sets them to the
-    /// acceptance (no hand-built <c>dialog-overlay</c> outside the dialog factory, under 20 inline sizes). Lines marked
-    /// <c>// computed</c> (values calculated at run time, such as progress in percent or window geometry) are exempt.
+    /// M7 step 0: keeps the two numbers M7 brings down from rising again. Both are ceilings that may only fall; since M7 step 6 they stand at
+    /// the acceptance (no hand-built <c>dialog-overlay</c> outside the dialog factory, no unmarked inline size). Lines marked
+    /// <c>// computed</c> (values calculated at run time, such as progress in percent or window geometry) are exempt; the comment names the reason.
     /// </summary>
     public sealed class DialogCodeRulesTests
     {
@@ -16,9 +16,9 @@ namespace OmsiMapEditor.Tests
 
         /// <summary>
         /// Inline size, spacing and flex assignments (<c>style.width/height/min/max, margin*, padding*, flexBasis/Grow/Shrink</c>) in
-        /// Scripts/UI. Wide count of the owner's decision 5A; today 64.
+        /// Scripts/UI. Wide count of the owner's decision 5A; since M7 step 6 none is left unmarked (33 are marked computed).
         /// </summary>
-        private const int InlineSizeCeiling = 64;
+        private const int InlineSizeCeiling = 0;
 
         private static readonly Regex InlineSize = new Regex(
             @"style\.(width|height|minWidth|minHeight|maxWidth|maxHeight|margin[A-Za-z]*|padding[A-Za-z]*|flexBasis|flexGrow|flexShrink)\b",

@@ -98,7 +98,7 @@ namespace OmsiMapEditor.UI
             nameRow.Add(nameField);
             BuildDeleteButton(nameRow);
             var spacer = new VisualElement();
-            spacer.style.flexGrow = 1f;
+            spacer.AddToClassList("mf-grow");
             nameRow.Add(spacer);
             undoButton = IconButton("undo-2", "roadbuilder.window.undo.tooltip", UndoDraft);
             redoButton = IconButton("redo-2", "roadbuilder.window.redo.tooltip", RedoDraft);

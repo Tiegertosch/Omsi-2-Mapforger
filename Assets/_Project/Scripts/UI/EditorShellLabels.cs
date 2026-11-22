@@ -174,12 +174,12 @@ namespace OmsiMapEditor.UI
                 var heading = new Label();
                 LocBindings.Text(heading, "labels.heading");
                 heading.AddToClassList("muted");
-                heading.style.marginLeft = 12;
+                heading.AddToClassList("mf-indent");
                 editor.Add(heading);
             }
             var box = new VisualElement();
             if (nested)
-                box.style.marginLeft = 12;
+                box.AddToClassList("mf-indent");
             var written = new string[rows.Count];
             for (var index = 0; index < written.Length; index++)
                 written[index] = index < labels.Count ? labels[index] ?? string.Empty : string.Empty;

@@ -19,7 +19,7 @@ namespace OmsiMapEditor.UI
         private VisualElement VariantDatesEditor()
         {
             var box = new VisualElement();
-            box.style.marginTop = 6;
+            box.AddToClassList("browser-chrono-form");
             var first = new TextField(Loc.T("chrono.field.first")) { value = FormatDay(editedVariant.Start), tooltip = Loc.T("chrono.dates.first.tooltip") };
             var last = new TextField(Loc.T("chrono.field.last")) { value = FormatDay(editedVariant.End), tooltip = Loc.T("chrono.field.last.tooltip") };
             foreach (var field in new[] { first, last })

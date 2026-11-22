@@ -184,10 +184,10 @@ namespace OmsiMapEditor.UI
                 if (value)
                 {
                     expandedHeight = layout.height;
-                    style.height = StyleKeyword.Auto;
+                    style.height = StyleKeyword.Auto; // computed: window geometry
                 }
                 else if (expandedHeight > 0f)
-                    style.height = expandedHeight;
+                    style.height = expandedHeight; // computed: window geometry
                 collapseButton.Clear();
                 collapseButton.Add(new IconElement(value ? "chevron-down" : "minus"));
                 LocBindings.Tooltip(collapseButton, value ? options.ExpandTooltipKey : options.CollapseTooltipKey); // i18n:keys
@@ -199,10 +199,10 @@ namespace OmsiMapEditor.UI
         {
             placed = true;
             if (width > 0f)
-                style.width = width;
+                style.width = width; // computed: window geometry
             if (height > 0f)
             {
-                style.height = height;
+                style.height = height; // computed: window geometry
                 expandedHeight = height;
             }
             style.left = x;
@@ -263,11 +263,11 @@ namespace OmsiMapEditor.UI
             placed = true;
             const float Margin = EdgeMargin;
             var size = FloatingWindowRules.ClampSize(options.DefaultSize, options.LeastSize, FloatingWindowRules.MaxSize(new Vector2(area.width, area.height), Margin, BottomInset));
-            style.width = size.x;
+            style.width = size.x; // computed: window geometry
             expandedHeight = size.y;
             // A window collapsed before it was first laid out stays as high as its title bar.
             if (!collapsed)
-                style.height = size.y;
+                style.height = size.y; // computed: window geometry
             var place = FloatingWindowRules.FirstPlace(size, new Vector2(area.width, area.height), Margin);
             style.left = place.x;
             style.top = place.y;

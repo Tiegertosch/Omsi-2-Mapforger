@@ -252,7 +252,7 @@ namespace OmsiMapEditor.UI
             docked = pickerWidth.HasValue;
             optionsColumn.style.display = docked || Picking ? DisplayStyle.None : DisplayStyle.Flex;
             catalog.Panel.EnableInClassList("picker-panel-compact", pickerWidth.HasValue && pickerWidth.Value < 520f);
-            catalog.Panel.style.width = pickerWidth.HasValue ? new StyleLength(pickerWidth.Value) : new StyleLength(StyleKeyword.Null);
+            catalog.Panel.style.width = pickerWidth.HasValue ? new StyleLength(pickerWidth.Value) : new StyleLength(StyleKeyword.Null); // computed: picker width from the window
         }
 
         // The controls only the base map has, with the tooltip they show again once the road tool builds there.

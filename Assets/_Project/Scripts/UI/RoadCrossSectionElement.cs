@@ -79,13 +79,11 @@ namespace OmsiMapEditor.UI
 
             scroll = new ScrollView(ScrollViewMode.Horizontal) { verticalScrollerVisibility = ScrollerVisibility.Hidden };
             scroll.AddToClassList("road-section-scroll");
-            scroll.style.height = StripHeight;
+            scroll.style.height = StripHeight; // computed: strip height from the zoom state
             Add(scroll);
             track = scroll.contentContainer;
             track.AddToClassList("road-section-track");
-            track.style.height = StripHeight;
-            track.style.flexShrink = 0f;
-            track.style.flexGrow = 0f;
+            track.style.height = StripHeight; // computed: strip height
 
             overlay = new MarkingsOverlay();
             track.Add(overlay);
@@ -113,7 +111,7 @@ namespace OmsiMapEditor.UI
         /// <summary>The pixels per metre the strip is drawn at; 0 before it was laid out. Zoomed in when it is more than the width fitted.</summary>
         public float Scale => scale;
 
-        public bool Zoomed => scroll.style.height.value.value > StripHeight + 1f;
+        public bool Zoomed => scroll.style.height.value.value > StripHeight + 1f; // computed: strip height from the zoom state
 
         public float TotalPixels => edges[edges.Length - 1];
 
@@ -174,8 +172,8 @@ namespace OmsiMapEditor.UI
             scale = RoadTypeWindowRules.StripScale(widths, viewport);
             edges = RoadTypeWindowRules.StripEdges(widths, scale);
             var zoomed = edges[count] > viewport + 0.5f;
-            scroll.style.height = StripHeight + (zoomed ? ScrollBarHeight : 0f);
-            track.style.width = Mathf.Max(viewport, edges[count]);
+            scroll.style.height = StripHeight + (zoomed ? ScrollBarHeight : 0f); // computed: strip height from the zoom state
+            track.style.width = Mathf.Max(viewport, edges[count]); // computed: track width from the lane edges
 
             var problems = new Dictionary<int, string>();
             for (var index = 0; index < count; index++)
@@ -185,7 +183,7 @@ namespace OmsiMapEditor.UI
                 view.Left = edges[index];
                 view.Pixels = edges[index + 1] - edges[index];
                 view.Root.style.left = view.Left;
-                view.Root.style.width = view.Pixels;
+                view.Root.style.width = view.Pixels; // computed: lane width in pixels
                 var problem = ProblemOf?.Invoke(id);
                 if (problem != null)
                     problems[id] = problem;
@@ -226,7 +224,7 @@ namespace OmsiMapEditor.UI
                 var handle = handles[index];
                 handleLeftIds[index] = ids[index];
                 handle.style.left = edges[index + 1] - BoundaryPixels - 0.5f;
-                handle.style.width = BoundaryPixels * 2f + 1f;
+                handle.style.width = BoundaryPixels * 2f + 1f; // computed: handle width from the boundary pixels
                 var selected = draft.SelectionKind == OmsiRoadDraftSelectionKind.Boundary && draft.SelectedId == ids[index];
                 handle.EnableInClassList("road-section-boundary-selected", selected);
                 var marking = draft.MarkingAfter(ids[index]);

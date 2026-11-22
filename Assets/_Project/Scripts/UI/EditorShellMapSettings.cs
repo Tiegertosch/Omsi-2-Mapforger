@@ -20,7 +20,7 @@ namespace OmsiMapEditor.UI
         {
             var button = new Button(OpenMapSettings) { text = Loc.T("mapsettings.open"), tooltip = Loc.T("mapsettings.open.tooltip") };
             button.AddToClassList("map-control-button");
-            button.style.marginTop = 4;
+            button.AddToClassList("mf-mt-1");
             return button;
         }
 

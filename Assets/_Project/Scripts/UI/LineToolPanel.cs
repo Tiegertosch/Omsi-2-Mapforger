@@ -80,15 +80,14 @@ namespace OmsiMapEditor.UI
 
             var nameRow = OptionControls.Row(options, "line.row.name");
             nameField.AddToClassList("picker-field");
-            nameField.style.width = StyleKeyword.Auto;
-            nameField.style.flexGrow = 1;
+            nameField.AddToClassList("form-field-grow");
             LocBindings.TitledTooltip(nameField, "line.name", "line.name.tooltip");
             nameField.RegisterValueChangedCallback(change => NameChanged?.Invoke(change.newValue));
             nameRow.Add(nameField);
             newLineOnly.Add(nameRow);
 
             var groupRow = OptionControls.Row(options, "line.row.group");
-            groupHost.style.flexGrow = 1;
+            groupHost.AddToClassList("mf-grow");
             groupRow.Add(groupHost);
             newLineOnly.Add(groupRow);
 
@@ -244,7 +243,7 @@ namespace OmsiMapEditor.UI
             {
                 groupText = new TextField { value = chosen ?? string.Empty, isDelayed = true };
                 groupText.AddToClassList("picker-field");
-                groupText.style.width = StyleKeyword.Auto;
+                groupText.AddToClassList("form-field-auto");
                 LocBindings.TitledTooltip(groupText, "line.group", "line.group.tooltip");
                 groupText.RegisterValueChangedCallback(change => GroupChanged?.Invoke(change.newValue));
                 groupHost.Add(groupText);

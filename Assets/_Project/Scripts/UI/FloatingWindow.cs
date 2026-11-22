@@ -122,11 +122,11 @@ namespace OmsiMapEditor.UI
             var fit = FloatingWindowRules.Fit(new Vector2(window.layout.x, window.layout.y), new Vector2(window.layout.width, height), collapsed ? window.layout.height : height,
                 limits.Least, new Vector2(area.width, area.height), limits.Margin, limits.BottomInset);
             if (Mathf.Abs(fit.Size.x - window.layout.width) > 0.5f)
-                window.style.width = fit.Size.x;
+                window.style.width = fit.Size.x; // computed: window size from fit and saved geometry
             if (Mathf.Abs(fit.Size.y - height) > 0.5f)
             {
                 if (!collapsed)
-                    window.style.height = fit.Size.y;
+                    window.style.height = fit.Size.y; // computed: window size from fit and saved geometry
                 limits.HeightFitted?.Invoke(fit.Size.y);
             }
         }
@@ -162,8 +162,8 @@ namespace OmsiMapEditor.UI
                     room = new Vector2(Mathf.Min(room.x, most.x), Mathf.Min(Mathf.Max(0f, room.y - limits.BottomInset), most.y));
                 }
                 var size = FloatingWindowRules.ClampSize(startSize + ((Vector2)evt.position - start.Value), least, room);
-                window.style.width = size.x;
-                window.style.height = size.y;
+                window.style.width = size.x; // computed: window size from fit and saved geometry
+                window.style.height = size.y; // computed: window size from fit and saved geometry
                 resized?.Invoke();
                 evt.StopPropagation();
             });

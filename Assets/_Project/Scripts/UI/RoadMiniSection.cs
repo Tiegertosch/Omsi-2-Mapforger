@@ -30,7 +30,7 @@ namespace OmsiMapEditor.UI
                 block.AddToClassList("road-mini-lane");
                 block.AddToClassList("road-mini-lane-" + OmsiRoadLane.Word(lane.Kind));
                 // Proportional: the share of the width, with no least width, so a narrow kerb stays as narrow as it is.
-                block.style.flexGrow = Mathf.Max(0.01f, (float)lane.Width);
+                block.style.flexGrow = Mathf.Max(0.01f, (float)lane.Width); // computed: lane width as the share
                 if (!first)
                     block.AddToClassList("road-mini-lane-gap");
                 first = false;

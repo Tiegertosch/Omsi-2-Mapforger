@@ -210,6 +210,8 @@ Alle sechs Fragen sind entschieden; ADR 098, Nachtrag „M6 Entscheidungen“.
 
 **Stand Schritt 5 (22. November 2026):** Die sechs Formular-Dialoge (Export, Einstellungen, Kartenprüfung, Neue Karte/Karteneinstellungen, Fehlerbericht, Updates) kommen aus der Fabrik, `EditorShell.uxml` hat keinen Dialog mehr; Handtest offen, siehe ADR 098, Nachtrag „M7 Schritt 5“, und `.omc/handoffs/m7/HANDOFF.md`. Offen: Schritt 6 (Abschluss: Zähler auf die Endwerte, Reviewer-Durchgang, Wiki-Hinweis).
 
+**Stand Schritt 6 (22. November 2026):** Zähler auf den Endwerten (Inline-Größen 0 unmarkiert, 31 verschoben, 33 `computed`), tote USS-Regeln entfernt, Sonderform der drei Werkzeugfenster dokumentiert (ADR 098, Nachtrag „M7 Schritt 6“). Offen: Reviewer-Durchgang, Handtest, Wiki-Hinweis nach der Veröffentlichung.
+
 ## Kernzahlen
 
 | Messgröße | Ist | Ziel (Roadmap) |

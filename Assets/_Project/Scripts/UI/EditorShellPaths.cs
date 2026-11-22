@@ -220,7 +220,7 @@ namespace OmsiMapEditor.UI
             }
             var pathsHeading = new Label(Loc.T("paths.foldout", ("count", mapPaths.Count)));
             pathsHeading.AddToClassList("inspector-group-title");
-            pathsHeading.style.marginBottom = 4;
+            pathsHeading.AddToClassList("browser-section-title");
             section.Add(pathsHeading);
             for (var kind = 0; kind < 3; kind++)
             {

@@ -356,9 +356,9 @@ namespace OmsiMapEditor.UI
             SetUpTimetable(root);
             SetUpVehicles(root);
             SetUpTrafficCurves(root);
-            root.style.flexGrow = 1f;
-            root.style.width = Length.Percent(100f);
-            root.style.height = Length.Percent(100f);
+            root.style.flexGrow = 1f; // computed: the panel root sits outside the UXML stylesheet, so no class reaches it
+            root.style.width = Length.Percent(100f); // computed: same
+            root.style.height = Length.Percent(100f); // computed: same
             var fileButton = root.Q<Button>("file-menu-button");
             var openMapMenuItem = root.Q<Button>("open-map-menu-item");
             var openProjectMenuItem = root.Q<Button>("open-project-menu-item");
@@ -8900,8 +8900,14 @@ namespace OmsiMapEditor.UI
                 zoomLabel.text = text;
         }
 
+        /// <summary>Only the tile list (the tall one) opens at the left edge; every other popup of the bar opens at the right edge.</summary>
+        private static bool BarPopupOnLeft(ProjectTab tab)
+        {
+            return tab == ProjectTab.Tiles;
+        }
+
         /// <summary>
-        /// Draws the popup of the bottom bar (ADR 098) for the list chosen, <see cref="projectTab"/>; with the popup closed only the
+        /// Draws the popup of the bottom bar (ADR 098) for the list chosen,<see cref="projectTab"/>; with the popup closed only the
         /// buttons of the bar are brought up to date. Drawing never opens the popup: that is <see cref="ShowProjectTab"/>'s job.
         /// </summary>
         private void RenderProjectBrowser()
@@ -8923,8 +8929,7 @@ namespace OmsiMapEditor.UI
                 projectTab = ProjectTab.Tiles;
             if (barPopupTitle != null)
                 LocBindings.Text(barPopupTitle, ProjectTabTitleKey(projectTab)); // i18n:keys
-            var leftSide = projectTab == ProjectTab.Tiles || projectTab == ProjectTab.Map;
-            barPopup?.EnableInClassList("bar-popup-right", !leftSide);
+            barPopup?.EnableInClassList("bar-popup-right", !BarPopupOnLeft(projectTab));
             barPopup?.EnableInClassList("bar-popup-tall", projectTab == ProjectTab.Tiles);
             switch (projectTab)
             {
@@ -8958,7 +8963,7 @@ namespace OmsiMapEditor.UI
             section.AddToClassList("browser-chrono");
             var chronoHeading = new Label(Loc.T("chrono.foldout", ("count", chronoVariants.Count)));
             chronoHeading.AddToClassList("inspector-group-title");
-            chronoHeading.style.marginBottom = 4;
+            chronoHeading.AddToClassList("browser-section-title");
             section.Add(chronoHeading);
             var state = new Label(EditingVariant
                 ? Loc.T("chrono.note.editing", ("title", editedVariant.Title), ("date", chronoDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
@@ -9005,8 +9010,6 @@ namespace OmsiMapEditor.UI
                     text = variant.ToString(), tooltip = Loc.T("chrono.variant.tooltip", ("folder", variant.Folder), ("hasLines", variant.DeactivatedLines.Count > 0 ? "yes" : "no"), ("lines", string.Join(", ", variant.DeactivatedLines)))};
                 entry.AddToClassList("browser-tile-entry");
                 entry.AddToClassList("browser-chrono-variant");
-                entry.style.flexGrow = 1f;
-                entry.style.flexShrink = 1f;
                 var edited = EditingVariant && string.Equals(editedVariant.Name, variant.Name, StringComparison.OrdinalIgnoreCase);
                 entry.EnableInClassList("browser-tile-entry-selected", edited || !EditingVariant && chronoDate != null && variant.IsActiveOn(chronoDate.Value));
                 line.Add(entry);
@@ -9048,7 +9051,7 @@ namespace OmsiMapEditor.UI
         private VisualElement NewVariantForm()
         {
             var box = new VisualElement();
-            box.style.marginTop = 6;
+            box.AddToClassList("browser-chrono-form");
             if (!newVariantFormOpen)
             {
                 var open = new Button(() =>
@@ -9390,13 +9393,9 @@ namespace OmsiMapEditor.UI
                     var attached = pair.Value;
                     var row = new VisualElement();
                     row.AddToClassList("inspector-attached-row");
-                    row.style.flexDirection = FlexDirection.Row;
-                    row.style.alignItems = Align.Center;
-                    row.style.marginLeft = 12 * pair.Key;
+                    row.style.marginLeft = 12 * pair.Key; // computed: indent by attachment depth
                     var label = new Label(Loc.T("inspector.attached_item", ("n", attached.AttachPointIndex + 1), ("id", attached.Id), ("name", Path.GetFileNameWithoutExtension(attached.AssetPath)))) { tooltip = attached.AssetPath };
                     label.AddToClassList("inspector-edit-name");
-                    label.style.flexGrow = 1f;
-                    label.style.flexShrink = 1f;
                     row.Add(label);
                     if (CanEditObjects)
                     {

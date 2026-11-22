@@ -95,8 +95,8 @@ namespace OmsiMapEditor.UI
             {
                 var heading = new Label(Loc.T("project.about"));
                 heading.AddToClassList("inspector-group-title");
-                heading.style.marginTop = 8;
-                heading.style.marginBottom = 4;
+                heading.AddToClassList("browser-section-title");
+                heading.AddToClassList("mf-mt-2");
                 content.Add(heading);
                 var description = new Label(currentSummary.Description.Trim());
                 description.AddToClassList("browser-map-description-text");
@@ -113,7 +113,7 @@ namespace OmsiMapEditor.UI
             var lineCount = routes?.Lines.Count ?? 0;
             var heading = new Label(Loc.T("project.lines", ("count", lineCount)));
             heading.AddToClassList("inspector-group-title");
-            heading.style.marginBottom = 4;
+            heading.AddToClassList("browser-section-title");
             section.Add(heading);
             if (session != null && session.CanEdit && !EditingVariant)
                 section.Add(TimetableButton());

@@ -238,8 +238,6 @@ namespace OmsiMapEditor.UI
             var ghost = new VisualElement { pickingMode = PickingMode.Ignore };
             ghost.AddToClassList("traffic-ghost");
             ghost.style.position = Position.Absolute;
-            ghost.style.width = 48f;
-            ghost.style.height = 48f;
             if (item.IsEraser)
             {
                 ghost.AddToClassList("traffic-ghost-icon");
@@ -251,7 +249,7 @@ namespace OmsiMapEditor.UI
                     : item.Kind == TrafficItemKind.OvertakingBan ? TrafficSignKind.OvertakingBan : TrafficSignKind.Speed;
                 var kmh = item.Kind == TrafficItemKind.Speed ? item.Kmh : item.Kind == TrafficItemKind.CustomSpeed && trafficOptions.CustomKmh.HasValue ? (int)Math.Round(trafficOptions.CustomKmh.Value) : 0;
                 var sign = new TrafficSignElement(kind, kmh);
-                sign.style.flexGrow = 1f;
+                sign.AddToClassList("traffic-sign");
                 ghost.Add(sign);
             }
             rootElement.Add(ghost);

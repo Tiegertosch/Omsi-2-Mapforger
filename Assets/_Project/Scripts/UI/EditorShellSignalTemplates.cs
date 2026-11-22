@@ -64,7 +64,7 @@ namespace OmsiMapEditor.UI
             page.Add(right);
             signalTemplatesInfo = new Label();
             signalTemplatesInfo.AddToClassList("panel-info");
-            signalTemplatesInfo.style.marginTop = 0f;
+            signalTemplatesInfo.AddToClassList("mf-mt-0");
             left.Add(signalTemplatesInfo);
             signalTemplateList = new VisualElement();
             left.Add(signalTemplateList);

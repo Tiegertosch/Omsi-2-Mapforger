@@ -62,7 +62,7 @@ namespace OmsiMapEditor.UI
             shownToolHint = text;
             shownToolHintWarning = warning;
             toolHintLabel.text = HintLine(text);
-            toolHintLabel.style.width = StyleKeyword.Auto;
+            toolHintLabel.style.width = StyleKeyword.Auto; // computed: measured text width
             toolHintLabel.tooltip = text;
             toolHintLabel.EnableInClassList("status-hint-shown", text.Length > 0);
             toolHintLabel.EnableInClassList("status-warning", warning);
@@ -98,10 +98,10 @@ namespace OmsiMapEditor.UI
             if (float.IsNaN(bar) || bar <= 0f)
                 return; // The bar has no width yet; its next GeometryChangedEvent calls this again.
             wanted = UnityEngine.Mathf.Min(wanted, UnityEngine.Mathf.Floor(bar * MaxHintShare));
-            var current = toolHintLabel.style.width;
+            var current = toolHintLabel.style.width; // computed: measured text width
             if (current.keyword == StyleKeyword.Undefined && UnityEngine.Mathf.Abs(current.value.value - wanted) < 0.5f)
                 return;
-            toolHintLabel.style.width = wanted;
+            toolHintLabel.style.width = wanted; // computed: measured text width
         }
 
         /// <summary>The longest text the status bar gets for a hint of several lines (the hint has at most 65 % of a window of 1100 px).</summary>
