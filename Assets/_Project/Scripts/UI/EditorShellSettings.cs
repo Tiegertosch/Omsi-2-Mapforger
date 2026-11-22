@@ -149,6 +149,7 @@ namespace OmsiMapEditor.UI
             languageDropdown.choices = languageChoices.Select(info => info.NativeName).ToList();
             MarkLanguage();
             ShowHideDlcHint();
+            contentFoldersButton?.SetEnabled(currentSummary != null); // the folders are those of the open map's installation
             settingsDialog.style.display = DisplayStyle.Flex;
         }
 

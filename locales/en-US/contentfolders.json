@@ -1,6 +1,6 @@
 {
   "menu.file.content_folders": "Object and spline folders...",
-  "@menu.file.content_folders": "Item of the File menu that opens the choice of folders the object menu and the road menu read (ADR 084)",
+  "@menu.file.content_folders": "Button in the Settings dialog (Content) that opens the choice of folders the object menu and the road menu read (ADR 084)",
   "menu.file.content_folders.tooltip": "Choose which folders of Sceneryobjects and Splines the object menu and the road menu read",
   "contentfolders.title": "Object and spline folders",
   "contentfolders.description": "Untick the folders the object menu and the road menu should leave out. MapWorks then does not read them at all, which keeps the menus quick with many add-ons and a lot of community content. What the map already uses is still drawn and stays in the In map tabs. The choice is kept on this computer, for this OMSI installation.",
@@ -23,5 +23,5 @@
   "contentfolders.this_project": "{name} (open project)",
   "contentfolders.this_project.tooltip": "The folder of the open project stays in: MapWorks puts the junctions and road types it makes for this project there.",
   "@contentfolders.left_out": "Added to the empty note of the object menu and the road menu when folders are left out of the listing.",
-  "contentfolders.left_out": "{count, plural, one {# folder is not read} other {# folders are not read}} (File › Object and spline folders...)."
+  "contentfolders.left_out": "{count, plural, one {# folder is not read} other {# folders are not read}} (Settings › Object and spline folders...)."
 }

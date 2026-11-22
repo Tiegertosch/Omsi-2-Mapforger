@@ -21,5 +21,5 @@
   "contentfolders.status.failed": "Nabídky se řídí novou volbou, ale nepodařilo se ji uložit pro příští spuštění: {reason}",
   "contentfolders.this_project": "{name} (otevřený projekt)",
   "contentfolders.this_project.tooltip": "Složka otevřeného projektu zůstává vždy zahrnuta: MapWorks do ní ukládá křižovatky a typy silnic, které pro tento projekt vytvoří.",
-  "contentfolders.left_out": "{count, plural, one {# složka se nečte} few {# složky se nečtou} many {# složky se nečte} other {# složek se nečte}} (Soubor › Složky objektů a splinů...)."
+  "contentfolders.left_out": "{count, plural, one {# složka se nečte} few {# složky se nečtou} many {# složky se nečte} other {# složek se nečte}} (Nastavení › Složky objektů a splinů...)."
 }

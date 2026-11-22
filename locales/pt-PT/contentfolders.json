@@ -21,5 +21,5 @@
   "contentfolders.status.failed": "Os menus seguem a nova escolha, mas não foi possível guardá-la para o próximo arranque: {reason}",
   "contentfolders.this_project": "{name} (projeto aberto)",
   "contentfolders.this_project.tooltip": "A pasta do projeto aberto fica sempre incluída: o MapWorks guarda lá os cruzamentos e tipos de estrada que cria para este projeto.",
-  "contentfolders.left_out": "{count, plural, one {# pasta não é lida} other {# pastas não são lidas}} (Ficheiro › Pastas de objetos e splines...)."
+  "contentfolders.left_out": "{count, plural, one {# pasta não é lida} other {# pastas não são lidas}} (Definições › Pastas de objetos e splines...)."
 }

@@ -140,5 +140,73 @@ namespace OmsiMapEditor.Tests
 
             Assert.That(shownWhenCleaningUp, Is.EqualTo(new[] { false }));
         }
+
+        [Test]
+        public void EscClosesOnlyTheTopModalDialogAndLeavesWindowsAndDialogsBelow()
+        {
+            var registry = new OverlayRegistry();
+            var root = new VisualElement();
+            var window = new VisualElement();
+            var lower = new VisualElement();
+            var upper = new VisualElement();
+            root.Add(window);
+            root.Add(lower);
+            root.Add(upper);
+            var closed = new List<string>();
+            registry.Register(window, false, () => closed.Add("window"));
+            registry.Register(lower, true, () => closed.Add("lower"));
+            registry.Register(upper, true, () => closed.Add("upper"));
+
+            Assert.That(registry.TopShownModal(), Is.SameAs(upper));
+            Assert.That(registry.CloseTopModal(), Is.True);
+            Assert.That(closed, Is.EqualTo(new[] { "upper" }));
+            Assert.That(OverlayRegistry.IsShown(lower), Is.True);
+            Assert.That(OverlayRegistry.IsShown(window), Is.True);
+            Assert.That(registry.CloseTopModal(), Is.True);
+            Assert.That(registry.CloseTopModal(), Is.False, "no modal dialog left: the window is not a dialog");
+            Assert.That(closed, Is.EqualTo(new[] { "upper", "lower" }));
+        }
+
+        [Test]
+        public void ADialogThatIsBroughtToTheFrontIsTheTopOne()
+        {
+            var registry = new OverlayRegistry();
+            var root = new VisualElement();
+            var first = new VisualElement();
+            var second = new VisualElement();
+            root.Add(first);
+            root.Add(second);
+            registry.Register(first, true);
+            registry.Register(second, true);
+
+            first.BringToFront();
+
+            Assert.That(registry.TopShownModal(), Is.SameAs(first));
+        }
+
+        [Test]
+        public void ElementsInsideAShownModalDialogAreInsideAndTheMapBesideItIsNot()
+        {
+            var registry = new OverlayRegistry();
+            var root = new VisualElement();
+            var map = new VisualElement();
+            var dialog = new VisualElement();
+            var button = new VisualElement();
+            root.Add(map);
+            root.Add(dialog);
+            dialog.Add(button);
+            var window = new VisualElement();
+            root.Add(window);
+            registry.Register(dialog, true);
+            registry.Register(window, false);
+
+            Assert.That(registry.IsInsideShownModal(button), Is.True);
+            Assert.That(registry.IsInsideShownModal(dialog), Is.True);
+            Assert.That(registry.IsInsideShownModal(map), Is.False, "a click on the map behind a dialog is not inside it");
+            Assert.That(registry.IsInsideShownModal(window), Is.False, "a window beside the map is not a modal dialog");
+            Assert.That(registry.IsInsideShownModal(null), Is.False);
+            OverlayRegistry.Hide(dialog);
+            Assert.That(registry.IsInsideShownModal(button), Is.False, "a hidden dialog covers nothing");
+        }
     }
 }

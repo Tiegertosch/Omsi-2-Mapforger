@@ -899,6 +899,33 @@
 .dialog-buttons { flex-direction: row; justify-content: flex-end; margin-top: var(--mf-space-3); }
 .dialog-primary { background-color: var(--mf-color-accent); border-color: var(--mf-color-accent); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
 .dialog-primary:hover { background-color: var(--mf-color-accent-hover); }
+.dialog-danger { background-color: var(--mf-color-error); border-color: var(--mf-color-error); color: var(--mf-color-bg); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+
+/* The dialog factory (DialogFactory.cs, M7): the width is a class, the text colour belongs to the dialog itself (not to .content-folders),
+   the body scrolls inside the clamp of .dialog (max-height 94 %) while title and buttons stay. Declared after .dialog so the width wins. */
+.dialog-modal { color: var(--mf-color-text-primary); }
+.dialog-narrow { width: 420px; max-width: 94%; }
+.dialog-standard { width: 560px; max-width: 94%; }
+.dialog-wide { width: 720px; max-width: 94%; }
+.dialog-form { width: 880px; max-width: 94%; }
+.dialog-body { flex-grow: 0; flex-shrink: 1; min-height: 0; }
+.dialog-body-plain { flex-shrink: 0; }
+/* A plain body whose list scrolls by itself (park list, folder choice): it shrinks with the window instead. */
+.dialog-body-fill { flex-shrink: 1; }
+.form-inline-label { margin-right: 8px; }
+.form-button-top { margin-top: 4px; }
+.dialog-modal .popup-title { color: var(--mf-color-text-primary); }
+
+/* Form rows for dialog content (M7): replace the inline sizes of the dialog files as the dialogs move to the factory. */
+.form-row { flex-direction: row; align-items: center; margin: var(--mf-space-1) 0; }
+.form-row-label { width: 120px; min-width: 120px; flex-shrink: 0; color: var(--mf-color-text-secondary); }
+.form-row-field { flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.form-cell-flex { flex-grow: 1; flex-shrink: 1; flex-basis: 0; min-width: 0; }
+.form-small-button { width: 26px; min-width: 26px; flex-shrink: 0; padding: 0; }
+.form-narrow-field { width: 60px; min-width: 60px; flex-shrink: 0; }
+.settings-folders-button { align-self: flex-start; margin-top: var(--mf-space-2); }
+.form-section-title { margin: var(--mf-space-3) 0 var(--mf-space-1); font-size: var(--mf-font-heading); -unity-font: url("Fonts/Inter-SemiBold.ttf"); }
+.form-footnote { margin-top: var(--mf-space-2); color: var(--mf-color-text-muted); white-space: normal; }
 
 /* Status bar */
 /* The status line is a dark strip in the lower row of the bottom bar */

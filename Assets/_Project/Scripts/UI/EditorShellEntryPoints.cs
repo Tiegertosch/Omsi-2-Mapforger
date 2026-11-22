@@ -19,7 +19,8 @@ namespace OmsiMapEditor.UI
         // True while the object chosen for placing is an [entrypoint] object: each click asks for a name first.
         private bool placementIsEntryPoint;
 
-        private VisualElement entryNameDialog;
+        private ModalDialog entryNameModal;
+        private VisualElement entryNameDialog; // the overlay of entryNameModal
         private TextField entryNameField;
         private Label entryNameError;
         private Label entryNameTaken;
@@ -110,7 +111,7 @@ namespace OmsiMapEditor.UI
             entryNamesInUse = new HashSet<string>(session.ReadEntryPoints(currentSummary).ConvertAll(entry => entry.Name), StringComparer.OrdinalIgnoreCase);
             entryNameField.SetValueWithoutNotify(session.UniqueEntryName(currentSummary, wanted));
             UpdateEntryNameHint();
-            entryNameDialog.style.display = DisplayStyle.Flex;
+            entryNameModal.Show();
             entryNameField.schedule.Execute(() =>
             {
                 entryNameField.Focus();
@@ -122,33 +123,29 @@ namespace OmsiMapEditor.UI
         {
             if (entryNameDialog != null)
                 return;
-            entryNameDialog = new VisualElement { name = "entry-name-dialog" };
-            entryNameDialog.AddToClassList("dialog-overlay");
-            entryNameDialog.style.display = DisplayStyle.None;
-            RegisterOverlay(entryNameDialog, true, () =>
+            // Enter in the one text field presses the primary button (the dialog factory, decision 2B); Esc and Cancel both end in Closed.
+            entryNameModal = NewDialog(new DialogOptions
             {
-                entryNameAnswer = null;
-                mapCanvas?.Focus();
+                Name = "entry-name-dialog",
+                TitleKey = "entry.name.title",
+                DescriptionKey = "entry.name.text",
+                Width = DialogWidth.Narrow,
+                BodyScrolls = false,
+                Closed = () => entryNameAnswer = null,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "entry.name.cancel", Role = DialogButtonRole.Cancel },
+                    // A bad name keeps the dialog open with the reason, so the button does not close it by itself.
+                    new DialogButton { TextKey = "entry.name.ok", Role = DialogButtonRole.Primary, Clicked = ConfirmEntryName, Closes = false }
+                }
             });
-            var dialog = new VisualElement();
-            dialog.AddToClassList("dialog");
-            dialog.AddToClassList("content-folders"); // the same text colour as the other dialogs
-            var title = LocBindings.NewLabel("entry.name.title");
-            title.AddToClassList("popup-title");
-            dialog.Add(title);
-            var description = LocBindings.NewLabel("entry.name.text");
-            description.AddToClassList("popup-description");
-            dialog.Add(description);
+            entryNameDialog = entryNameModal.Overlay;
+            entryNameOk = entryNameModal.Primary;
+            var dialog = entryNameModal.Body;
             entryNameField = new TextField();
             LocBindings.Text(entryNameField, "entry.field.name");
             entryNameField.AddToClassList("dialog-field");
-            entryNameField.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter)
-                    return;
-                evt.StopPropagation();
-                ConfirmEntryName();
-            });
+            entryNameField.AddToClassList(ModalDialog.AutofocusClass);
             entryNameField.RegisterValueChangedCallback(_ => UpdateEntryNameHint());
             dialog.Add(entryNameField);
             entryNameTaken = LocBindings.NewLabel("entry.name.taken");
@@ -161,18 +158,6 @@ namespace OmsiMapEditor.UI
             entryNameError.AddToClassList("entry-name-error");
             entryNameError.style.display = DisplayStyle.None;
             dialog.Add(entryNameError);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("entry.name.cancel", CancelEntryName);
-            cancel.AddToClassList("map-control-button");
-            buttons.Add(cancel);
-            entryNameOk = LocBindings.NewButton("entry.name.ok", ConfirmEntryName);
-            entryNameOk.AddToClassList("map-control-button");
-            entryNameOk.AddToClassList("dialog-primary");
-            buttons.Add(entryNameOk);
-            dialog.Add(buttons);
-            entryNameDialog.Add(dialog);
-            rootElement.Add(entryNameDialog);
         }
 
         /// <summary>Shows under the field that the name is already an entry point's; it only informs, the name can still be used.</summary>
@@ -182,13 +167,6 @@ namespace OmsiMapEditor.UI
                 return;
             var name = (entryNameField.value ?? string.Empty).Trim();
             entryNameTaken.style.display = name.Length > 0 && entryNamesInUse.Contains(name) ? DisplayStyle.Flex : DisplayStyle.None;
-        }
-
-        private void CancelEntryName()
-        {
-            entryNameAnswer = null;
-            HidePopup(entryNameDialog);
-            mapCanvas?.Focus();
         }
 
         /// <summary>The answer of the name dialog: a bad name keeps it open with the reason; a good one makes the entry point.</summary>
@@ -204,7 +182,7 @@ namespace OmsiMapEditor.UI
                 return;
             }
             entryNameAnswer = null;
-            HidePopup(entryNameDialog);
+            entryNameModal.Hide();
             mapCanvas?.Focus();
             answer(name);
         }

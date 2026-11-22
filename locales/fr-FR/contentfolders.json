@@ -21,5 +21,5 @@
   "contentfolders.status.failed": "Les menus suivent le nouveau choix, mais il n'a pas pu être gardé pour le prochain démarrage : {reason}",
   "contentfolders.this_project": "{name} (projet ouvert)",
   "contentfolders.this_project.tooltip": "Le dossier du projet ouvert reste inclus : MapWorks y range les carrefours et types de route qu'il crée pour ce projet.",
-  "contentfolders.left_out": "{count, plural, one {# dossier n'est pas lu} other {# dossiers ne sont pas lus}} (Fichier › Dossiers d'objets et de splines...)."
+  "contentfolders.left_out": "{count, plural, one {# dossier n'est pas lu} other {# dossiers ne sont pas lus}} (Paramètres › Dossiers d'objets et de splines...)."
 }

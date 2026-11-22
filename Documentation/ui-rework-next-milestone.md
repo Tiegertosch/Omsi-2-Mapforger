@@ -1,6 +1,6 @@
 # UI-Rework: nächster Schritt – M0 und M1 (12. November 2026)
 
-Empfehlung aus [ui-rework-roadmap.md](ui-rework-roadmap.md). **Stand 12. November 2026: M0 und M1 sind abgeschlossen, vom Nutzer getestet und committet (ADR 098, „M1“). Dieses Dokument bleibt als Plan und Nachweis; M2 ist umgesetzt und committet; M3 ist abgeschlossen, vom Nutzer getestet (13. November 2026) und committet; der nächste Meilenstein war M4; M4 und M5 sind inzwischen abgeschlossen, Bestandsaufnahme und Plan für M6 stehen unten (Abschnitt „M6“, 21. November 2026), Stand in [ui-rework-roadmap.md](ui-rework-roadmap.md). **M6 ist abgeschlossen (22. November 2026):** Schritte 0 bis 7 vom Projektinhaber getestet und gepusht (`26d0c1c` bis `41aeba5`). Der Abschnitt „M6“ unten bleibt als Plan und Nachweis. Nächster Meilenstein laut [Übersicht](ui-rework-roadmap.md): M7 „Dialoge vereinheitlichen“; Planung erst nach Freigabe des Projektinhabers.**
+Empfehlung aus [ui-rework-roadmap.md](ui-rework-roadmap.md). **Stand 12. November 2026: M0 und M1 sind abgeschlossen, vom Nutzer getestet und committet (ADR 098, „M1“). Dieses Dokument bleibt als Plan und Nachweis; M2 ist umgesetzt und committet; M3 ist abgeschlossen, vom Nutzer getestet (13. November 2026) und committet; der nächste Meilenstein war M4; M4 und M5 sind inzwischen abgeschlossen, Bestandsaufnahme und Plan für M6 stehen unten (Abschnitt „M6“, 21. November 2026), Stand in [ui-rework-roadmap.md](ui-rework-roadmap.md). **M6 ist abgeschlossen (22. November 2026):** Schritte 0 bis 7 vom Projektinhaber getestet und gepusht (`26d0c1c` bis `41aeba5`). Der Abschnitt „M6“ unten bleibt als Plan und Nachweis. **M7 „Dialoge vereinheitlichen“ ist in Planung (22. November 2026): Bestandsaufnahme, Plan und Entscheidungsfragen stehen unten im Abschnitt „M7 – Plan“; Umsetzung erst nach den Entscheidungen des Projektinhabers.**
 
 ## Empfehlung
 
@@ -159,7 +159,8 @@ Reihenfolge: erst die Mess- und Prüfgrundlage, dann die kleinen Token-Änderung
 | 0 | **Prüfgrundlage.** Argument `-uiScale <Faktor>` (setzt `panelSettings.scale` für den Lauf), Zeile im Player-Log `UI scale: dpi=… scale=…`; EditMode-Test `UiTokenContrastTests` (liest `EditorShell.uss`, rechnet WCAG für die Paare Text-Token × Flächen-Token, prüft: keine `font-size` unter der Mindestgröße, keine rohen `rgba`-Literale außerhalb `:root`). Der Test ist anfangs rot (Liste der Verstöße) und dient danach als Schranke | S | `EditorShellScale.cs` (neu), `EditorShellBootstrap.cs` (eine Zeile), `Tests/Editor/UiTokenContrastTests.cs`, `CommandLine.md` | `-uiScale 1.5` bei 1100 × 700 zeigt die Oberfläche 1,5-fach, Log-Zeile vorhanden; Test läuft in der Projektkopie und zeigt die Verstöße |
 | 1 | **Kontrast-Tokens (Befund 2, 5, 9).** `text-muted` auf `#909CAA`, neues `text-disabled #7E8A99` für alle `:disabled`-Regeln, `error` auf `#EA7676`, Sterne im Aus-Zustand `text-muted`, Symbole in Panelköpfen und letzten Dateien `text-secondary`. Prüfen, dass Text auf `panel-hover` primär bleibt | S | `EditorShell.uss` | Kontrasttest grün; Bilder 00, 02, 03, 08, 19 vorher/nachher; Sterne sichtbar |
 | 2 | **Fokus, Drücken, Tokens (Befund 6, Literale).** Sammelregeln `Button:focus` (2-px-Rand `accent-hover` oder Innenring ohne Layoutverschiebung), `:active` mit dunklerer Fläche; die 24 Alpha-Literale auf sechs Tokens; 10/9-px-Schrift auf `--mf-font-caption`, 26 px auf `--mf-font-display`. Tastaturreihenfolge in Dialogen und Panels prüfen (`focusable`/`tabIndex` kommen im Code bisher nicht vor) | M | `EditorShell.uss`, ggf. `EditorShellBootstrap.cs` (Fokus nur nach Tastatur, Entscheidung 6) | Tab durch Menü, Leiste, Werkzeugfenster, Dialog: Fokus auf jedem Knopf sichtbar (Handtest, dazu ein Screenshot je Klasse); keine rohen Alpha-Literale und keine Schrift unter der Mindestgröße (Test); Screenshots sonst unverändert bis auf Schriftgröße |
-| 3 | **Skalierung (Befund 1).** `scaleMode = ConstantPhysicalSize`, `referenceDpi = 96`, `fallbackDpi = 96` (nach Entscheidung 2); „Interface size“ im Settings-Dialog (90–200 %, in `PlayerPrefs`, wirkt sofort); der `editor-settings.json`-Wert bleibt Standardfaktor; Klemmen nach Entscheidung 4; Texte in acht Sprachen | M | `EditorShellScale.cs`, `EditorShellSettings.cs`, `EditorShell.uxml`, `locales/*`, ggf. `MapforgeEditorSettings.cs` | Läufe `-uiScale 1.0/1.5/2.0`; Log nennt dpi; **Nutzertest auf einem Rechner mit 125/150 %** (nur dort ist `Screen.dpi` echt prüfbar); LocaleCheck `--strict` grün; Neustart behält die Einstellung | **Umgesetzt am 21. November 2026, Handtest auf einem Rechner mit 125/150 % offen (ADR 098, Nachtrag „M6 Schritt 3“). Abweichung: `ConstantPixelSize` mit selbst gerechnetem Faktor (dpi/96 x Nutzer x Standard, geklemmt auf Fensterbreite/900, nie unter 1,0) statt `ConstantPhysicalSize`; Dropdown statt Slider.** |
+| 3 | **Skalierung (Befund 1).** `scaleMode = ConstantPhysicalSize`, `referenceDpi = 96`, `fallbackDpi = 96` (nach Entscheidung 2); „Interface size“ im Settings-Dialog (90–200 %, in `PlayerPrefs`, wirkt sofort); der `editor-settings.json`-Wert bleibt Standardfaktor; Klemmen nach Entscheidung 4; Texte in acht Sprachen | M | `EditorShellScale.cs`, `EditorShellSettings.cs`, `EditorShell.uxml`, `locales/*`, ggf. `MapforgeEditorSettings.cs` | Läufe `-uiScale 1.0/1.5/2.0`; Log nennt dpi; **Nutzertest auf einem Rechner mit 125/150 %** (nur dort ist `Screen.dpi` echt prüfbar); LocaleCheck `--strict` grün; Neustart behält die Einstellung |
+ **Umgesetzt am 21. November 2026, Handtest auf einem Rechner mit 125/150 % offen (ADR 098, Nachtrag „M6 Schritt 3“). Abweichung: `ConstantPixelSize` mit selbst gerechnetem Faktor (dpi/96 x Nutzer x Standard, geklemmt auf Fensterbreite/900, nie unter 1,0) statt `ConstantPhysicalSize`; Dropdown statt Slider.** |
 | 4 | **Layout bei 1100, 150, 200 % (Befund 3, feste Breiten).** `max-width`/`max-height` in Prozent für Dialoge, Willkommensfläche rollt, Werkzeugfenster und Katalog schrumpfen (Optionsspalte darf umbrechen), Menüs positionieren sich nach der Menüleiste statt mit festem `left`, Ampel-Fenster endet über der Leiste, `KeepClearOfToolWindow` für Spuren, Vorfahrt und Markierungen prüfen und anwenden | L | `EditorShell.uss`, `EditorShellBottomBar.cs`, Dateien der Werkzeugfenster und Kreuzungs-Werkzeuge | Bilderreihe 100/150/200 % × 1100×700 und 1600×900 aller Fenster und Dialoge: nichts überlappt, nichts liegt unter der Leiste oder außerhalb; Kreuzung #472 in `TestMap` bleibt in Lanes, Priority, Markings sichtbar | **Umgesetzt am 21. November 2026, Handtest offen (ADR 098, Nachtrag „M6 Schritt 4“): Dialoge und Menüs mit `max-width`/`max-height` in Prozent, innen rollend (Settings, Export, Hilfemenü, Recent-Liste), Werkzeugfenster schrumpfen (Katalog zuerst), Menüs unter ihrem Knopf (`EditorShellMenuPlacement.cs`), Satelliten-Fenster endet über der Leiste, Leiste mit 8 px rechts, `PanIntoFreeArea` mit schrumpfendem Rand bei niedriger Fläche (Spuren, Vorfahrt, Markierungen halten die Kreuzung frei, auch bei 900 x 506 logisch). Offen: das Ampel-Fenster (780 px) deckt bei 900 px logischer Breite die Kreuzung zu (es lässt sich verschieben), „Optionsspalte darf umbrechen“ nur als Mindestbreite.** |
 | 5 | **Statuszeile und Anleitungen (Befund 7, 8).** Meldungen auf einen Satz, voller Text als Tooltip, Dopplung zwischen Panel und Statuszeile entfernen (Panel: Legende plus eine Zeile; Statuszeile: nur Ergebnisse), 3D-Bedienhilfe ins Hilfemenü | M | Statuszeilen-Code in `EditorShellBootstrap.cs` bzw. den Werkzeugdateien, `locales/*` | Bilder 02, 03, 05, 06 vorher/nachher: nichts abgeschnitten, nichts doppelt; Tooltip zeigt den vollen Text; `TooltipTextTests` und Sprachtests grün | **Umgesetzt am 21. November 2026, Handtest der Tooltip-Anzeige offen (ADR 098, Nachtrag „M6 Schritt 5“): Regel „Statuszeile = Zustand oder Ergebnis in einem Satz, Anleitung = Hinweis des Werkzeugs oder Panel, Bedienung der 3D-Ansicht = Hilfemenü“; 30 Texte in acht Sprachen gekürzt, 4 Schlüssel entfernt, 1 neu; Doppelungen bei Spuren (Panel gegen Hinweis) und Linie (Liste gegen Hinweis) entfernt; Hinweis bekommt Vorrang vor der Meldung (`flex-basis: 0`); `StatusLineTextTests`.** |
 | 6 | **Erledigt 22. November 2026 (Handtest offen, unkommittiert).** **Farbbedeutungen (Befund 4)**, nur nach Entscheidung 1: Tokens `--mf-color-path-rail`, Auswahl, gewählte Kachel; Nachtrag zu ADR 015 | M | `EditorShell.uss`, `MapCanvasElement.cs`, `MapCanvasPaths.cs`, `CorporateDesign.md`, `Decisions.md` | Grundorf und Berlin-Spandau (Gleise, Auswahl, Kachelrahmen) über hellem und dunklem Grund; Auswahl bleibt über Luftbild erkennbar |
@@ -200,3 +201,199 @@ Alle sechs Fragen sind entschieden; ADR 098, Nachtrag „M6 Entscheidungen“.
 | 4 | Kleine Fenster | **A.** Fenster und Dialoge schrumpfen und rollen; die Skalierung wird so geklemmt, dass die logische Breite nie unter 900 px fällt (die Einstellung bleibt als Wunsch gespeichert). |
 | 5 | Deckkraft Glasflächen | **A.** Werkzeugknöpfe 0,62 auf 0,85, Leiste 0,5 auf 0,7, nach Bildvergleich über einem hellen Berlin-Spandau-Ausschnitt. |
 | 6 | Fokusanzeige | **B.** Fokusring nur bei Tastaturbedienung (Schritt 2). |
+
+
+
+# M7 – Dialoge vereinheitlichen: Bestandsaufnahme und Plan (22. November 2026)
+
+**Stand: M7 Schritt 0 in Arbeit** (Entscheidungen des Projektinhabers vom 22. November 2026 stehen unten in „Entscheidungen des Projektinhabers“). Die Bestandsaufnahme darunter ist der Stand vor Schritt 0. Grundlage: HEAD `074ef75` auf `feature/ui-rework`, Roadmap M7 (`ui-rework-roadmap.md`, Abschnitt M7), ADR 098 (M3: Anmeldung der Überlagerungen; M6 Schritt 4: Klemmen), `CorporateDesign.md`. Alle Zahlen sind per Suche über `Assets/_Project/Scripts/UI`, `UI/Resources/EditorShell.uxml` und `EditorShell.uss` am 22. November 2026 gezählt. Nicht gemessen: das Aussehen im Player; die Vorher-Bilder entstehen in Schritt 0.
+
+## Kernzahlen
+
+| Messgröße | Ist | Ziel (Roadmap) |
+|---|---|---|
+| Konstruktionen von `dialog-overlay` (Suche in `*.cs` und `*.uxml`) | **13**: 7 im Code, 6 in der UXML (dazu die USS-Regel `EditorShell.uss:889`) | 0 außerhalb der Fabrik |
+| Überlagerungen mit `RegisterOverlay` | 13 (12 modal, 1 nicht modal: Luftbild-Fenster) | alle modalen über die Fabrik |
+| Inline-Größen in `Scripts/UI`, enge Zählung (`style.width/height/minWidth/minHeight/maxWidth/maxHeight`) | **66** | |
+| dazu `style.margin*` und `style.padding*` | 63 | |
+| dazu `style.flexBasis/flexGrow/flexShrink` | 43 | |
+| Summe Größe, Abstand, Flex (Zählung, die M7 meint, siehe Frage 5) | **172** in 30 Dateien | unter 20 |
+| davon in Dialogdateien: Fahrzeuge 39, Fahrplan 32, Fahrplan verwalten 24, Verkehrskurven 7, Parkliste 2, Karteneinstellungen 1, Updates 1 | **106** | 0 (USS-Klassen) |
+| davon Rest (Karte, Kreuzungsschnitt, Fenstergeometrie, Leiste, Inspector, Luftbild, Werkzeugfenster) | 66 | höchstens 19 |
+| zusätzlich `style.left/top/right/bottom` (Platzierung, rechnerisch) | 55 | zählt nicht |
+| Bauweisen für Dialoge | 3 modale (A, B, C) plus 1 Sonderform (D) | 1 plus erklärte Sonderform |
+
+## Bestandsaufnahme: alle Dialoge und modalen Fenster
+
+Gemeinsam ist allen 13: das Gerüst `.dialog-overlay` (`EditorShell.uss:889`, vollflächig, `--mf-color-overlay`) mit einem `.dialog` darin (`:890`, **560 px** breit, `max-width`/`max-height` 94 % aus M6 Schritt 4 in `:312`) und einer `.dialog-buttons`-Zeile (`:899`, rechtsbündig). Titel ist immer ein Label mit `.popup-title` (`:107`), Beschreibung mit `.popup-description` (`:108`).
+
+| Nr. | Dialog | Bauweise | Fundstelle (Overlay, Inhalt, Anmeldung) | Breite | Knöpfe |
+|---|---|---|---|---|---|
+| 1 | Export | **A** UXML-statisch | `EditorShell.uxml:103`; `EditorShellBootstrap.cs:368` | 560 | Cancel, Export (primär) |
+| 2 | Einstellungen | **A** | `EditorShell.uxml:118`; `EditorShellSettings.cs:91` | 560 | nur Close (primär) |
+| 3 | Kartenprüfung | **A** | `EditorShell.uxml:143`; `EditorShellBootstrap.cs:375` | 560 | Copy report, Close |
+| 4 | Neue Karte / Karteneinstellungen (ein Dialog, zwei Modi) | **B** Formklasse in leerem UXML-Overlay | Overlay `EditorShell.uxml:154`; `NewMapDialog.cs:71`; `EditorShellBootstrap.cs:392` | 880 (`.new-map-dialog`, `EditorShell.uss:917`) | Cancel, Create/Apply |
+| 5 | Fehlerbericht | **B** | `EditorShell.uxml:155`; `BugReportDialog.cs:26`; `EditorShellBugReport.cs:35` | 560 | Cancel, Send |
+| 6 | Updates | **B** | `EditorShell.uxml:156`; `UpdateDialog.cs:32`; `EditorShellUpdates.cs:48` (mit Aktion `CloseUpdates`) | 560 | Skip, Close, Primär je Zustand |
+| 7 | Ordnerwahl | **C** handgebaut im Code | `EditorShellContentFolders.cs:44`, Anmeldung `:46` | 560 | Cancel, Apply |
+| 8 | Name des Einstiegspunkts | **C** | `EditorShellEntryPoints.cs:126`, Anmeldung `:128` (mit Aktion) | 560 | Cancel, OK |
+| 9 | Parkliste | **C** | `EditorShellParkList.cs:28`, `:30` | 560 | Cancel, Apply |
+| 10 | Hinweis „nicht übernommene Änderungen“ (Ampel) | **C** | `EditorShellSignalNotice.cs:21`, `:23` | 560 | OK |
+| 11 | Fahrplan (mit „verwalten“) | **C** | `EditorShellTimetable.cs:43`, `:45`; Inhalt in `EditorShellTimetableManage.cs` | 560 als `minWidth` inline (`:49`) | Cancel, Apply |
+| 12 | Tageskurven (Verkehr) | **C** | `EditorShellTrafficCurves.cs:27`, `:29` | **640 inline** (`:33`) | Cancel, Apply |
+| 13 | Fahrzeuge | **C** | `EditorShellVehicles.cs:33`, `:35` | **620 `minWidth` inline** (`:39`) | nur Close (primär) |
+| – | Luftbild-Fenster | **D** schwebendes Fenster, kein Dialog | `SatelliteWindow.cs:120` (`FloatingWindow.MakeMovable`); Anmeldung nicht modal `EditorShellAerial.cs:82` | eigene | eigene Fußzeile |
+| – | Straßentyp-Fenster, Ampel-Fenster (Assistent und Vorlagen sind Seiten darin) | **D** `FloatingWindowFrame` | `FloatingWindowFrame.cs:33`; `RoadTypeWindow.cs:18`, `SignalWindow.cs:16` | Fenstergröße gemerkt | Rückfrage im Fenster (`FloatingWindowFrame.cs:139`, `:154`) |
+
+Zu den Bauweisen: **A** und **B** liegen als `<VisualElement class="dialog-overlay">` in der UXML (6 Stück), **C** baut Overlay, `.dialog` und Knopfzeile je Dialog mit denselben Zeilen von Hand (7 Stück: `new VisualElement { name = … }`, `AddToClassList("dialog-overlay")`, `style.display = None`, `RegisterOverlay`, `rootElement.Add`). **D** sind keine modalen Dialoge. Der Ampel-Assistent und die Vorlagen (`EditorShellSignalWizard.cs`, `EditorShellSignalTemplates.cs`) sind Seiten des Ampel-Fensters, nicht eigene Dialoge; der einzige echte Dialog dieses Bereichs ist der Hinweis (Nr. 10).
+
+Befunde (aus dem Code gelesen, nicht im Player gemessen):
+
+1. **Breite:** 560 (Standard), 880 (Karte), dazu 640 und 620/560 als Inline-Wert in Verkehrskurven, Fahrzeugen und Fahrplan. Keine Breitenklassen.
+2. **Textfarbe über einen Umweg:** Die Klasse `.content-folders` (`EditorShell.uss:634`: nur `color` und `max-height: 92 %`) hängt an Ordnerwahl, Parkliste, Fahrplan, Verkehrskurven, Fahrzeugen und Einstiegsname („the same text colour as the other dialogs“, `EditorShellEntryPoints.cs:135`). Dialoge ohne sie (Hinweis, Export, Einstellungen) erben eine andere Textfarbe.
+3. **Rollen:** Jeder Dialog rollt anders: `.dialog-scroll` in Export und Einstellungen (`EditorShell.uxml:106`, `:121`), `.new-map-body`, `.content-folders-list` mit `max-height: 420px` (`EditorShell.uss:636`), Fahrplan und Fahrzeuge inline `maxHeight = 520` (`EditorShellTimetable.cs:58`, `EditorShellVehicles.cs:48`). Feste Pixel statt Prozent: bei kleinem Fenster greift nur die Klemme `.dialog { max-height: 94 % }`.
+4. **Knöpfe:** Überall Abbrechen links, primär rechts; die Beschriftung des primären Knopfes ist frei (Apply, Close, OK, Create, Send, Export). Ein-Knopf-Dialoge: Einstellungen und Fahrzeuge „Close“, Hinweis „OK“.
+5. **Esc und Anmeldung (M3):** Eine zentrale Stelle: `OnShortcut` (`EditorShellBootstrap.cs:6614`) führt über `EscapeAction.CloseTopOverlay` (`:6580`, `EscapeOrder.cs:133`) zu `OverlayRegistry.CloseAllShown`. Das versteckt **alle** angemeldeten Überlagerungen auf einmal (nicht nur die oberste) und führt danach die Aufräum-Aktionen derer aus, die offen waren. Aktionen haben nur Einstiegsname (Antwort verwerfen, `mapCanvas?.Focus()`), Updates (`CloseUpdates`) und Luftbild-Fenster. Alle anderen werden nur versteckt. Ob Esc und der Abbrechen-Knopf überall dasselbe tun (Fahrplan, Fahrzeuge mit Änderungen im Dialog), ist **nicht untersucht** und gehört in Schritt 0.
+6. **Tastenkürzel:** `AnyModalDialogShown` (`EditorShellOverlays.cs:27`) sperrt sie bei jeder modalen Überlagerung (`EditorShellBootstrap.cs:6635`); einheitlich.
+7. **Enter:** Nur der Einstiegsname bestätigt mit Enter (`EditorShellEntryPoints.cs:147`, im Textfeld). Kein Dialog kennt einen Standardknopf.
+8. **Fokus:** Beim Öffnen setzen nur Neue Karte (`NewMapDialog.cs:252`, `:266`), Fehlerbericht (`BugReportDialog.cs:91`) und Einstiegsname (`EditorShellEntryPoints.cs:110-113`) den Fokus; die anderen lassen ihn auf der Karte. Beim Schließen gibt nur der Einstiegsname ihn zurück. Keine Fokusfalle: Tab kann hinter den Dialog laufen (seit dem Fokusring aus M6 Schritt 2 sichtbar).
+9. **Klick neben den Dialog:** schließt keinen (keine Pointer-Registrierung am Overlay).
+10. **Skalierung (M6):** `.dialog` und `.new-map-dialog` haben `max-width`/`max-height` 94 %; die Skalierung ist auf logisch 900 px Breite geklemmt (`EditorShellScale.cs`). Dialoge ohne ScrollView (Hinweis, Einstiegsname, Parkliste-Kopf) wachsen mit dem Text.
+11. **Einstellungen:** Die Kästchen „Keep the inspector…“ und „Hide DLC content“ (`.settings-toggle`) hatten laut M6-Bild 15 nicht den Stil der übrigen Schalter; Kandidat für Schritt 5.
+
+Die Inline-Größen der Dialogdateien sind überwiegend Zeilen- und Spaltenbau: `flexDirection`, `marginBottom`, `width = 120` für Beschriftungen, `width = 26/28/60` für kleine Knöpfe und Gewichtsfelder (`EditorShellVehicles.cs:143`, `:396`, `:429`, `:459`), `flexGrow/flexShrink/flexBasis/minWidth = 0` für verkürzbare Zellen (`:340-343`, `:450-453`). Es sind wiederkehrende Muster, die in rund acht USS-Klassen aufgehen.
+
+## Vorschlag: Dialog-Fabrik
+
+**Ort:** neue Datei `Scripts/UI/DialogFactory.cs` (Klassen `ModalDialog`, `DialogOptions`, `DialogButton`) mit einer kleinen reinen Klasse `DialogRules` für die Tastenlogik (damit sie in EditMode-Tests ohne Panel läuft) und Anschluss im Gerüst `EditorShellOverlays.cs`. Kein neuer Namespace, keine neue Assembly. Skizze (nicht verbindlich):
+
+```csharp
+internal enum DialogWidth { Narrow /*420*/, Standard /*560*/, Wide /*720*/, Form /*880*/ }
+internal enum DialogButtonRole { Primary, Secondary, Danger }
+
+internal sealed class DialogButton
+{
+    public string TextKey;            // Loc-Schlüssel, z. B. "timetable.apply"
+    public Action Clicked;            // null = nur schließen
+    public DialogButtonRole Role;
+    public bool IsDefault;            // Enter löst ihn aus (Regel in DialogRules)
+    public bool IsCancel;             // Esc löst ihn aus
+}
+
+internal sealed class DialogOptions
+{
+    public string Name;               // UXML-Name wie bisher ("timetable-dialog"), Prüfargumente und Tests brauchen ihn
+    public string TitleKey;
+    public string DescriptionKey;     // optional
+    public DialogWidth Width = DialogWidth.Standard;
+    public bool BodyScrolls = true;   // Body ist eine ScrollView mit max-height in Prozent
+    public bool CloseOnBackdrop;      // Standard falsch (Frage 3)
+    public IList<DialogButton> Buttons;
+    public Action Closed;             // wie der dritte Parameter von RegisterOverlay
+}
+
+internal sealed class ModalDialog
+{
+    public VisualElement Overlay { get; }   // was die Registry sieht
+    public VisualElement Body { get; }      // Inhalt kommt hierher
+    public Label Title { get; }
+    public Label Description { get; }
+    public Button Primary { get; }          // Text und Sperre ändern (Updates)
+    public IReadOnlyList<Button> Buttons { get; }
+    public bool IsShown { get; }
+    public static ModalDialog Create(DialogOptions options);  // baut Overlay, Titel, Beschreibung, Body, Knopfzeile
+    public void Show();   // display Flex, Fokus auf erstes .dialog-autofocus-Feld sonst Standardknopf, vorherigen Fokus merken
+    public void Hide();   // display None, Fokus zurück
+}
+```
+
+Anschluss: In `EditorShellBootstrap` entsteht `private ModalDialog NewDialog(DialogOptions options)`, das `ModalDialog.Create`, `rootElement.Add` und `RegisterOverlay(dialog.Overlay, true, options.Closed)` in einem Zug erledigt; ein Dialog kann dann nicht mehr gebaut, aber nicht angemeldet werden (Anlass von M3). Formdialoge (Nr. 4 bis 6) setzen ihre Form in `Body` und verlieren Overlay-Name, `AddToClassList("dialog")` und Knopfzeile; Zustände (Updates ändert Text und Wirkung des primären Knopfes) laufen über `Primary`/`Buttons`.
+
+**Verhalten, das die Fabrik allein trägt** (heute verstreut oder fehlend):
+
+- **Esc:** unverändert über `OverlayRegistry`; zusätzlich löst Esc den `IsCancel`-Knopf aus, damit ein „Abbrechen“ mit Aufräum-Logik nicht umgangen wird. „Alle auf einmal schließen“ bleibt, bis es zwei modale Dialoge zugleich gibt (heute nie); Entscheidung in Schritt 6.
+- **Enter:** `IsDefault`-Knopf, wenn der Fokus nicht in einem mehrzeiligen Feld und nicht auf einem anderen Knopf steht (Frage 2); Regel in `DialogRules.EnterActivates(...)`, getestet.
+- **Fokus:** `Show` setzt den Fokus, `Hide` gibt ihn zurück (Standard Karte); Tab bleibt im Dialog (Fokusfalle am Overlay).
+- **Scroll:** `Body` ist eine `ScrollView` mit `max-height` in Prozent des Overlays; Titel und Knopfzeile bleiben stehen; kein Dialog setzt `maxHeight` mehr inline.
+- **Breite als Klasse:** `.dialog-narrow/-standard/-wide/-form` in `EditorShell.uss`, alle mit `max-width: 94 %` (Werte nach Frage 4).
+- **Knopfrollen:** `Primary` = `.dialog-primary`, `Danger` = Rot, `Secondary` = `.map-control-button`; höchstens ein Primär je Dialog (Test).
+- **Texte:** `LocBindings` für Titel, Beschreibung und Knöpfe (Sprachwechsel zur Laufzeit).
+
+**USS-Klassen statt Inline-Größen** (neu in `EditorShell.uss`, mit den `--mf-space-*`-Tokens): `.form-row`, `.form-row-label` (120 px, schrumpft nicht), `.form-row-field`, `.form-cell-flex` (`flex: 1 1 0; min-width: 0`), `.form-small-button` (26 px), `.form-narrow-field` (60 px), `.form-section-title`, `.form-footnote`. Sie ersetzen die 106 Inline-Werte der Dialogdateien.
+
+**Einordnung Luftbild-Fenster:** Es ist nicht modal, schwebt neben der Karte, ist verschiebbar (`FloatingWindow.MakeMovable`), hat Reiter, eigene Größe und Fußzeile; die Tasten bleiben bei der Karte (`EditorShellBootstrap.cs:6635`). Es wird deshalb **nicht** in die Fabrik gezwungen, sondern als „Werkzeugfenster“ ausdrücklich dokumentiert (ADR-098-Nachtrag M7, Architecture.md) und behält `RegisterOverlay(…, false, …)`. Straßentyp- und Ampel-Fenster bleiben auf `FloatingWindowFrame`. Ob Luftbild-Fenster und `FloatingWindowFrame` eine gemeinsame Kopfzeile bauen können, wird in Schritt 6 geprüft (Frage 6).
+
+## Arbeitsplan
+
+Dateibesitz: ein Bearbeiter (frontend) für `EditorShell.uss`, `EditorShell.uxml` und `DialogFactory.cs`; `EditorShellBootstrap.cs` ändern nur die Schritte 0, 5 und 6 an kleinen Stellen. Reihenfolge: Prüfgrundlage, Fabrik mit Tests (kein sichtbarer Wandel), einfache Dialoge, die zwei großen, UXML-Dialoge, Sonderform und Aufräumen. Jeder Schritt bekommt einen Player-Build im Hintergrund (vorher ansagen), Vorher-/Nachher-Bilder mit `-language en-US` bei 1100 × 700 und 1600 × 900, mit `-uiScale 1` und `-uiScale 2`. Argumente zum Auslösen (gegen den Code geprüft; Testprojekt auf Grundorf mit Arbeitskopie nötig, wo vermerkt):
+
+| Dialog | Argument |
+|---|---|
+| Fahrplan | `-timetable [Linie]` (`EditorShellTimetable.cs:609`; Projekt, bearbeitbar), dazu `-timetableShift`, `-timetableSeries`, `-timetableApply` |
+| Fahrzeuge | `-vehicles [Gruppe]` (`EditorShellVehicles.cs:487`; Projekt, bearbeitbar) |
+| Parkliste | `-parkList` (`EditorShellParkList.cs:174`) |
+| Tageskurven | `-trafficCurves`, `-trafficCurveSet`, `-trafficCurvesApply` (`EditorShellTrafficCurves.cs:143`) |
+| Karteneinstellungen | `-mapSettings` (`EditorShellMapSettings.cs:69`; Projekt) |
+| Ordnerwahl | `-contentFolders` (`EditorShellContentFolders.cs:281`) |
+| Einstellungen | `-openSettings` (`EditorShellLocalization.cs:156`) |
+| Neue Karte | `-newMap [Vorlage]` (`EditorShellBootstrap.cs:1077`; nur ohne geöffnete Karte) |
+| Fehlerbericht | `-bugReport` (`:1052`) |
+| Updates | `-checkUpdates` (`EditorShellUpdates.cs:113`; braucht Netz, sonst Fehlerzustand als Bild) |
+| Kartenprüfung | `-check [-checkTopic Titel]` (`:1370`) |
+| Luftbild-Fenster | `-satellite` mit `-satelliteTab`, `-satelliteClose` (`EditorShellAerial.cs:1389`, `EditorShellPlacement.cs:263`) |
+| Export | nur `-exportMap` (öffnet und führt aus, `:1359`); **kein** Argument, das den Dialog nur zeigt |
+| Einstiegsname, Ampel-Hinweis | **kein** Argument |
+
+Es fehlen also drei Argumente für die Prüfung: `-exportDialog`, `-entryNameDialog`, `-signalNotice` (zeigen den Dialog ohne Wirkung). Sie kommen in Schritt 0 und in `CommandLine.md`.
+
+| Schritt | Inhalt | Umfang | Dateien | Prüfung und Akzeptanz |
+|---|---|---|---|---|
+| 0 | **Prüfgrundlage.** Vorher-Bilder aller 13 Dialoge (100 % und 200 %, 1100 × 700); die drei fehlenden Argumente; Test `DialogCodeRulesTests` (liest die `*.cs` in `Scripts/UI`, zählt `dialog-overlay` außerhalb der Fabrik und Inline-Größen; anfangs rot, danach Schranke); offene Fragen der Bestandsaufnahme klären (Esc gegen Abbrechen in Fahrplan und Fahrzeugen; Fokus nach dem Schließen) | S | `Tests/Editor/DialogCodeRulesTests.cs` (neu), `EditorShellBootstrap.cs` (3 Argumente), `CommandLine.md` | 13 Bilder vorhanden und angesehen; Test zeigt 13 und 172; Befunde in den Plan zurückgetragen |
+| 1 | **Fabrik und Regeln.** `DialogFactory.cs`, `DialogRules`, USS-Klassen `.dialog-narrow/-standard/-wide/-form` und `.form-*`, `NewDialog` im Gerüst; **noch kein Dialog umgestellt** | M | `DialogFactory.cs`, `EditorShellOverlays.cs`, `EditorShell.uss`, `Tests/Editor/DialogRulesTests.cs` | Unit-Tests für Enter-Regel, Rollen (höchstens ein Primär), Fokusrückgabe; Build ohne Warnung; Bilder unverändert |
+| 2 | **Einfache Dialoge:** Ampel-Hinweis (kleinster, erste Probe), Einstiegsname (Enter und Aufräum-Aktion), Parkliste, Ordnerwahl. Die Klasse `.content-folders` als Farbumweg fällt weg (Farbe kommt aus `.dialog`) | M | `EditorShellSignalNotice.cs`, `EditorShellEntryPoints.cs`, `EditorShellParkList.cs`, `EditorShellContentFolders.cs`, `EditorShell.uss` | Bilder `-parkList`, `-contentFolders` vorher/nachher gleich bis auf Textfarbe; Einstiegsname und Hinweis von Hand (Enter, Esc, Fokus); Tests grün |
+| 3 | **Verkehrskurven und Fahrzeuge.** Breite 640/620 auf Klasse, Zeilenbau (Fahrzeuge 39, Kurven 7) auf `.form-*`; `maxHeight = 520` fällt zugunsten der prozentualen Rolle | M | `EditorShellTrafficCurves.cs`, `EditorShellVehicles.cs`, `EditorShell.uss` | `-trafficCurves`, `-vehicles`, `-vehicles <Gruppe>` bei 100/200 %, 1100 und 1600 px: nichts abgeschnitten, Knopfzeile sichtbar; `-trafficCurvesApply` im Log unverändert |
+| 4 | **Fahrplan (riskantester Schritt).** `EditorShellTimetable.cs` (32) und `EditorShellTimetableManage.cs` (24) bauen Zeilen für viele Zustände (Linien, Fahrten, Serien, Verschieben, Umbenennen, Löschen, neue Linie). **Zwei Stufen:** (a) nur Rahmen auf die Fabrik, Inhalt unverändert; (b) Inline-Werte in `.form-*`, Zeile für Zeile mit Bild | L | beide Dateien, `EditorShell.uss` | `-timetable`, `-timetable <Linie>`, `-timetableShift`, `-timetableSeries`, `-timetableApply`; Bilder je Zustand vor/nach in 100/200 %; die geschriebenen Fahrplandateien im Testprojekt bytegleich zum Vorher-Lauf |
+| 5 | **UXML- und Formdialoge:** Export, Einstellungen, Kartenprüfung, Neue Karte/Karteneinstellungen, Fehlerbericht, Updates. Die sechs UXML-Overlays fallen weg, die Fabrik baut sie in den `SetUp…`-Methoden; Formklassen behalten Inhalt, verlieren Overlay-Name und Knopfzeile; Schalter der Einstellungen im Stil der übrigen | L | `EditorShell.uxml`, `EditorShellBootstrap.cs`, `EditorShellSettings.cs`, `EditorShellBugReport.cs`, `EditorShellUpdates.cs`, `NewMapDialog.cs`, `BugReportDialog.cs`, `UpdateDialog.cs` | `-newMap`, `-mapSettings`, `-openSettings`, `-check`, `-bugReport`, `-checkUpdates`, `-exportDialog` vorher/nachher; Sprachwechsel zur Laufzeit; Elementnamen unverändert (Test) |
+| 6 | **Sonderform und Aufräumen.** Luftbild-Fenster und `FloatingWindowFrame` als Sonderform dokumentiert (Architecture.md, ADR-098-Nachtrag „M7“); `.dialog-overlay` nur noch in Fabrik und USS; tote Klassen und Inline-Werte entfernen; die übrigen 66 Inline-Größen klassifizieren (berechnet mit Kommentar oder in USS); Test auf die Akzeptanz scharf stellen | M | `SatelliteWindow.cs`, `FloatingWindowFrame.cs`, Dokumentation, `DialogCodeRulesTests.cs` | Test grün; Bilder aller Dialoge bei 100/150/200 %; Review durch reviewer; Validierungsstand in `DevelopmentSetup.md` |
+| 7 | **Abschluss.** Reviewer gegen diese Tabelle; ADR 098 Nachtrag „M7“, Roadmap (Häkchen), README, Architecture, `CommandLine.md`; „Record Reviewed Player Assets“ (durch den Nutzer) | S | Dokumentation, `PlayerAssetReview.txt` | Akzeptanz unten |
+
+**Akzeptanz M7:** (1) Keine von Hand gebaute `dialog-overlay` außerhalb der Fabrik (UXML und Code; Test). (2) Unter 20 Inline-Größen in `Scripts/UI` nach der in Frage 5 gewählten Zählung. (3) Jeder der 13 Dialoge: Esc schließt, Enter wirkt wie festgelegt, Fokus beim Öffnen gesetzt und beim Schließen zurückgegeben, Tab bleibt im Dialog. (4) Bilder bei 100/150/200 % ohne Abschneiden und ohne Knopfzeile unter dem Rand. (5) Alle EditMode-Tests grün, `LocaleCheck --strict` 0/0. (6) Das Luftbild-Fenster ist als Sonderform dokumentiert.
+
+### Risiken
+
+- **Fahrplan-Dialog (Schritt 4):** größter und zustandsreichster Dialog (56 Inline-Werte, Zeilenbau je Zustand in zwei Dateien, Umbenennen und Löschen mit Rückfragen, Änderungen im Dialog vor dem Anwenden). Fehler zeigen sich nur in seltenen Zuständen. Gegenmaßnahme: zwei Stufen, Bild je Zustand, Byte-Vergleich der geschriebenen Dateien.
+- **Esc schließt alle Überlagerungen zugleich** (`OverlayRegistry.CloseAllShown`): bei einem späteren zweiten modalen Dialog (Rückfrage über einem Dialog) wäre das falsch. Heute nie zwei zugleich; Test und Entscheidung in Schritt 6.
+- **Fokusfalle:** UI Toolkit hat keine eingebaute; ein Tab-Umlauf per `KeyDownEvent` am Overlay kann mit `EditorShellFocusRing.cs` kollidieren. In Schritt 1 an einem Dialog prüfen, bevor sie überall gilt.
+- **Elementnamen:** Prüfargumente, Tests und Bindungen suchen nach Namen (`export-dialog`, `settings-dialog`, `timetable-dialog` …). `DialogOptions.Name` hält sie; ein Test in Schritt 0 hält die 13 Namen fest.
+- **Sprachwechsel zur Laufzeit** der heute in der UXML mit Text gebauten Dialoge (Export, Einstellungen, Kartenprüfung): die Fabrik bindet über `LocBindings`; LocaleCheck und `TooltipTextTests` zeigen verwaiste Schlüssel.
+- **Player-Asset-Review (harte Regel 3):** `EditorShell.uss` und `EditorShell.uxml` stehen in `PlayerAssetReview.txt`; jede Änderung warnt im normalen Build und stoppt `BuildRelease`, bis der Nutzer „Record Reviewed Player Assets“ ausgeführt hat (Schritt 7).
+- **Viel Fläche, wenig sichtbarer Gewinn** (Roadmap): sichtbar werden vor allem einheitliche Breiten und Knopfzeilen; die Vorher-/Nachher-Bilder dokumentieren es.
+- **Tests brauchen Unity:** wie bei M6 laufen die neuen Tests in der Projektkopie im Scratchpad; `DialogRules` bleibt rein.
+
+## Entscheidungsfragen an den Projektinhaber
+
+1. **Reihenfolge und Beschriftung der Knöpfe.** Heute steht überall der abbrechende Knopf links und der primäre rechts, die Beschriftung des primären ist frei (Apply, OK, Create, Export, Send, Close). (A) So lassen, in der Fabrik festschreiben (Abbrechen links, Primär rechts; Ein-Knopf-Dialoge „Close“, Hinweise „OK“). (B) Wie A, plus einheitlich „OK“ und „Cancel“, außer bei Aktionen mit eigenem Namen (Export, Create, Send). (C) Primär links (Windows-Stil „OK, Cancel“). **Empfehlung A:** nichts ändert sich für den Nutzer, die Fabrik hält es fest; B kostet Texte in acht Sprachen ohne Gewinn.
+2. **Enter-Verhalten.** Heute bestätigt nur der Einstiegsname mit Enter. (A) Enter löst überall den primären Knopf aus, außer im mehrzeiligen Feld und auf einem anderen Knopf. (B) Enter nur in Dialogen mit genau einem Textfeld (Einstiegsname, Fehlerbericht), sonst nicht. (C) Enter nie, nur Maus und Tab. **Empfehlung B:** kein versehentliches „Apply“ im Fahrplan oder bei der Ordnerwahl, deckt aber die Fälle, in denen man tippt und bestätigt.
+3. **Schließen per Klick neben den Dialog.** Heute schließt kein Dialog so. (A) Nie, nur Knopf oder Esc. (B) Nur bei Dialogen ohne Eingaben (Hinweis, Kartenprüfung, Updates). (C) Bei allen außer denen mit Änderungen im Dialog (Fahrplan, Fahrzeuge, Kurven, Neue Karte). **Empfehlung A:** ein Fehlklick darf keine Eingaben verwerfen; Esc und Knopf reichen.
+4. **Einheitliche Breiten.** Heute 560 (Standard), 640 (Kurven), 620 und 560 als Mindestbreite (Fahrzeuge, Fahrplan), 880 (Karte). (A) Vier Klassen: Schmal 420 (Hinweis, Einstiegsname), Standard 560, Breit 720 (Fahrplan, Fahrzeuge, Kurven), Formular 880 (Karte, Karteneinstellungen); alle mit `max-width: 94 %`. (B) Drei Klassen ohne Schmal (560/720/880). (C) Alles 560 außer der Karte mit 880 (Fahrplan rollt mehr). **Empfehlung A:** kleine Dialoge wirken sonst verloren breit, die großen behalten, was sie haben; sichtbar ändern sich nur Hinweis, Einstiegsname und Kurven.
+5. **Zählung der „Inline-Größen“ für die Akzeptanz „unter 20“.** Enge Zählung (nur Breite/Höhe/min/max) heute 66, mit Abständen 129, mit Flex 172. (A) Breite Zählung (172); rechnerische Werte (Fortschrittsbalken in Prozent, Einrückung nach Tiefe, Geometrie von Kreuzungsschnitt und Fenstern beim Ziehen) sind begründete Ausnahmen mit Kommentar `// computed` und vom Test ausgenommen. (B) Enge Zählung (66 auf unter 20): leichter, aber Abstände und Flex blieben inline. (C) Alles ohne Ausnahme: unter 20 nur mit Umbau von Kreuzungsschnitt und Fenstergeometrie, die nicht zu M7 gehören. **Empfehlung A:** das ist, was M7 meint (keine gestalterischen Werte im Code); die Ausnahmen sind im Test sichtbar.
+6. **Reichweite.** (A) Nur die 13 modalen Dialoge; Luftbild-, Straßentyp- und Ampel-Fenster bleiben dokumentierte Sonderform. (B) Zusätzlich die Rückfrage im Ampel- und Straßentyp-Fenster (`FloatingWindowFrame`) auf dieselben Knopfrollen und denselben Fokusbaustein. (C) Zusätzlich das Luftbild-Fenster auf die Kopfzeile des `FloatingWindowFrame`. **Empfehlung A**, B und C als Folgeschritt, wenn Schritt 6 zeigt, dass es ohne Risiko geht: Die Fenster sind abgenommen und haben eigenes Verhalten (Verschieben, Größe, Rückfrage vor dem Verlassen).
+
+Nicht gefragt (steht fest): Dialoge bleiben modal mit gesperrten Tastenkürzeln (M3); Esc schließt weiter; Texte in acht Sprachen, `LocaleCheck --strict` bleibt Pflicht; keine neuen Farben, nur `--mf-*`-Tokens.
+
+## Entscheidungen des Projektinhabers (22. November 2026)
+
+| Nr. | Frage | Entscheidung |
+|---|---|---|
+| 1 | Reihenfolge und Beschriftung der Knöpfe | **A.** Wie heute: Abbrechen links, Primär rechts; in der Fabrik festschreiben. Ein-Knopf-Dialoge „Close“, Hinweise „OK“. |
+| 2 | Enter-Verhalten | **B.** Enter bestätigt nur in Dialogen mit genau einem Textfeld (Einstiegsname, Fehlerbericht), sonst nicht. |
+| 3 | Klick neben den Dialog | **A.** Schließt nie; nur Knopf oder Esc. |
+| 4 | Breiten | **A.** Vier Klassen: Schmal 420 / Standard 560 / Breit 720 / Formular 880, alle mit `max-width: 94 %`. |
+| 5 | Zählung der Inline-Größen | **A.** Breite Zählung (172, Ziel unter 20); berechnete Werte als `// computed`-Ausnahmen, vom Test ausgenommen. |
+| 6 | Reichweite | **A.** Nur die 13 modalen Dialoge; Luftbild-, Straßentyp- und Ampel-Fenster bleiben dokumentierte Sonderform. |
+
+## M7 Schritt 0 – Befunde (22. November 2026)
+
+- **Esc gegen Abbrechen (Fahrplan, Fahrzeuge):** Dasselbe. Fahrplan: „Cancel“ ruft `CloseTimetable` = `HidePopup`; Esc ruft `OverlayRegistry.CloseAllShown` = `Hide` je Überlagerung. Der Fahrplan-Entwurf (`timetableLines`, `timetableTrips`, `timetableDirty*`) wird beim nächsten `OpenTimetable` geleert; geschrieben wird nur über „Apply“. Fahrzeuge: Änderungen wirken sofort als Undo-Schritte (`ChangeVehicles`), „Close“ ruft `HidePopup`, Esc dasselbe; es gibt nichts zu verwerfen. Keiner der beiden meldet eine `Closed`-Aktion an. Auch beim Einstiegsnamen (Antwort verwerfen, Fokus an die Karte) und bei Updates (`CloseUpdates` bricht die Prüfung ab) tun Esc (über `Closed`) und Knopf dasselbe. Folge für die Fabrik (Schritt 1): Esc muss den Abbrechen-Knopf nicht eigens auslösen, solange jede Aufräumarbeit als `Closed` angemeldet ist; ein Test soll das für alle 13 Dialoge festhalten.
+- **Prüfargumente:** `-exportDialog`, `-entryNameDialog` (mit Projekt), `-signalNotice` sind umgesetzt (`EditorShellBootstrap.cs`, `CommandLine.md`).
+- **Test `DialogCodeRulesTests`:** zwei Obergrenzen (13 `dialog-overlay`-Konstruktionen, 172 Inline-Größen in `Scripts/UI`); Zeilen mit `// computed` sind ausgenommen.

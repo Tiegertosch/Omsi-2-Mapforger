@@ -16,7 +16,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 
 | Ort | Inhalt | Fundstelle |
 |---|---|---|
-| Menü File | New map, Open project, Save project as, Export, Open OMSI map, Settings, Object and spline folders | `EditorShell.uxml:68–78` |
+| Menü File | New map, Open project, Save project as, Export, Open OMSI map, Settings | `EditorShell.uxml:68–78` |
 | Menü Edit | Place object, Delete selection, Fit terrain to built roads again, Test-/T-/Kreuzung aus Profil, Undo, Redo | `EditorShell.uxml:79–89` |
 | Menü Tools | Inspector, Satellite and terrain, Road builder, Check map | `EditorShell.uxml:90–96` |
 | Menü Help | Bedienhilfe, Check for updates, Report a bug | `EditorShell.uxml:97–111` |
@@ -34,7 +34,7 @@ Wie jede Funktion von MapWorks in der Oberfläche nach ADR 098 erreichbar ist un
 | Karte/Projekt öffnen, speichern, neue Karte, Export | Menü File; Startbildschirm (`Bootstrap:351–376`, `:495`) | alt | – | vom Rework nicht berührt |
 | Karte ohne Projekt ansehen | Open OMSI map | **Lücke** | – | Objektauswahl wirft eine Ausnahme (Audit 5.1, am Player belegt) |
 | Programm-Einstellungen, Sprache | File › Settings (`EditorShellSettings.cs:55`) | teilweise | offen | neuer Schalter „Hide DLC content“; kein Prüfargument für den Dialog |
-| Objekt- und Spline-Ordner | File › Object and spline folders (`EditorShellContentFolders.cs:32`) | **Lücke** | offen | Ordner-Knopf im Katalog entfiel; Hinweis „N Ordner ausgelassen“ fehlt |
+| Objekt- und Spline-Ordner | Settings › Content › Object and spline folders (`EditorShellContentFolders.cs`, seit M7 Schritt 2 nicht mehr im Menü File) | **Lücke** | offen | Ordner-Knopf im Katalog entfiel; Hinweis „N Ordner ausgelassen“ fehlt |
 | Kartenprüfung | Tools › Check map (`Bootstrap:754`) | voll (Menü), Dialog alt | offen | früherer Knopf *Tools* entfiel |
 | Updates, Fehlerbericht | Menü Help | alt | – | |
 | Modus der Karte (nur lesen, Variante, geändert) | – | Abzeichen an der Projektpille, Zahl geänderter Dateien im Tooltip (seit 12. November 2026, M2) | – | `EditorShellBottomBar.cs` (`UpdateProjectModeBadge`), `UpdateMapStateLabel` |

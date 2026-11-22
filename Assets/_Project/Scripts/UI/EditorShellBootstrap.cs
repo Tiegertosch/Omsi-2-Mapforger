@@ -764,6 +764,7 @@ namespace OmsiMapEditor.UI
             // Shortcuts work anywhere except inside a text field, which keeps its own text undo and Delete key.
             root.RegisterCallback<KeyDownEvent>(OnShortcut, TrickleDown.TrickleDown);
             RegisterContextMenuNavigation(root);
+            AttachModalGuard(root);
             EditorShellFocusRing.Attach(root);
 
             CreateBackgroundCamera();
@@ -1363,6 +1364,42 @@ namespace OmsiMapEditor.UI
                     ExportMap();
                 Debug.Log("Export: " + statusLabel?.text);
             }
+
+            // -exportDialog, -entryNameDialog and -signalNotice only show the dialog (for screenshots); nothing is exported, placed or applied.
+            if (Array.IndexOf(args, "-exportDialog") >= 0)
+                OpenExportDialog();
+            if (Array.IndexOf(args, "-entryNameDialog") >= 0 && session != null && currentSummary != null)
+                OpenEntryNameDialog("Entry", false, null);
+            if (Array.IndexOf(args, "-signalNotice") >= 0)
+                ShowSignalDraftDroppedNotice();
+            // -pressEscape (after one of the dialog arguments): after 1.5 s sends Esc to the focused element, as the keyboard does, and logs
+            // what had the focus and whether a dialog is still shown ("Esc check:"). The only way to see Esc with the focus in a dialog without a hand.
+            // -clickMap [x y]: after 1 s presses the left button at that point (default: the middle of the window) as the pointer does:
+            // the element the panel picks gets a PointerDownEvent. Logs "Click check:" with the picked element, whether the map or a
+            // dialog took the focus and whether a dialog is still shown; a modal dialog must keep the click from the map (M7).
+            if (Array.IndexOf(args, "-clickMap") >= 0 && rootElement != null)
+                rootElement.schedule.Execute(RunClickMapCheck).StartingIn(1000);
+            if (Array.IndexOf(args, "-pressEscape") >= 0 && rootElement != null)
+                rootElement.schedule.Execute(() =>
+                {
+                    var focusedElement = rootElement.panel?.focusController?.focusedElement as VisualElement;
+                    var before = AnyModalDialogShown();
+                    // -blurFirst: nothing has the focus, so the key targets the panel root, as it does after a click on a spot that takes no focus.
+                    var blurred = Array.IndexOf(args, "-blurFirst") >= 0;
+                    if (blurred)
+                    {
+                        focusedElement?.Blur();
+                        focusedElement = null;
+                    }
+                    var keyTarget = blurred ? rootElement.panel.visualTree : (focusedElement ?? rootElement);
+                    using (var press = KeyDownEvent.GetPooled('\0', KeyCode.Escape, EventModifiers.None))
+                    {
+                        press.target = keyTarget;
+                        keyTarget.SendEvent(press);
+                    }
+                    Debug.Log("Esc check: focus on " + (focusedElement == null ? "nothing" : focusedElement.GetType().Name + " '" + focusedElement.name + "'") +
+                              ", dialog shown before " + before + ", after " + AnyModalDialogShown());
+                }).StartingIn(1500);
 
             if (Array.IndexOf(args, "-plain") >= 0 && groundRenderer != null && mapCanvas != null && !mapCanvas.ThreeDimensional)
                 SetTextures(false);

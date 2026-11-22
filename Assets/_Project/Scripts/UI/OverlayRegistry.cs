@@ -76,6 +76,51 @@ namespace OmsiMapEditor.UI
             return false;
         }
 
+        /// <summary>Whether the element is, or lies inside, a modal overlay that is shown.</summary>
+        public bool IsInsideShownModal(VisualElement element)
+        {
+            for (var current = element; current != null; current = current.parent)
+                foreach (var entry in entries)
+                    if (entry.Modal && ReferenceEquals(entry.Element, current) && IsShown(current))
+                        return true;
+            return false;
+        }
+
+        /// <summary>The modal overlay that is shown and stands highest in its parent (the one on top), or null.</summary>
+        public VisualElement TopShownModal()
+        {
+            VisualElement top = null;
+            var topIndex = -1;
+            foreach (var entry in entries)
+            {
+                if (!entry.Modal || !IsShown(entry.Element) || entry.Element.parent == null)
+                    continue;
+                var index = entry.Element.parent.IndexOf(entry.Element);
+                if (index > topIndex)
+                {
+                    top = entry.Element;
+                    topIndex = index;
+                }
+            }
+            return top;
+        }
+
+        /// <summary>
+        /// If a modal overlay is shown: hides only the one on top (<see cref="TopShownModal"/>), runs its clean-up and returns true; the
+        /// windows beside the map and any modal dialog below stay. Otherwise does nothing and returns false.
+        /// </summary>
+        public bool CloseTopModal()
+        {
+            var top = TopShownModal();
+            if (top == null)
+                return false;
+            Hide(top);
+            foreach (var entry in entries)
+                if (ReferenceEquals(entry.Element, top))
+                    entry.Closed?.Invoke();
+            return true;
+        }
+
         /// <summary>
         /// If any overlay is shown: hides every registered overlay, then runs the clean-up of those that were shown, in the order
         /// they registered, and returns true. Otherwise does nothing and returns false.
