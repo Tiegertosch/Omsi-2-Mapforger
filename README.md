@@ -45,6 +45,7 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 
 ## Current status
 
+- **Interface rework complete:** The interface rework is finished, with unified dialogs and cleaner bars and menus.
 - **Readable at any size:** The interface follows the Windows display scale and has an **Interface size** setting (90 to 200 %) in Settings. Dialogs, menus and toolbars keep to the window at 100, 150 and 200 %.
 - **Clearer text and controls:** Text and panel contrast were raised, and the keyboard focus ring shows only when you navigate with the keyboard.
 - **Consistent colours on the map:** Orange marks the active tile, light with a dark rim the selection, violet rail paths; red means only errors, yellow only warnings.

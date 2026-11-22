@@ -30,7 +30,7 @@ Vorschlag auf Grundlage von [ui-rework-audit.md](ui-rework-audit.md), [ui-rework
 | M5 | Kontextmenü, zweite Etappe (**erledigt**, 21. November 2026) | P1 | M | M3 | frontend + backend |
 | M6 | Lesbarkeit und Bedienbarkeit (Design-Review) (**erledigt**, 22. November 2026, Schritte 0 bis 7 vom Projektinhaber getestet und gepusht) | P1/P2 | M | M4 | frontend |
 | M7 | Dialoge vereinheitlichen (**erledigt**, 22. November 2026, Schritte 0 bis 7 vom Projektinhaber getestet und gepusht) | P2 | L | M3 | frontend |
-| M8 | Aufräumen und Abschluss | P3 | S | alle | reviewer + testing |
+| M8 | Aufräumen und Abschluss (**erledigt**, 22. November 2026) | P3 | S | alle | reviewer + testing |
 
 ```
 M0 → M1 ─┬→ M2 → M4 → M6 ─┐
@@ -152,6 +152,8 @@ M2 und M3 berühren verschiedene Stellen (Statuszeile und Pille gegen `SetTool`,
 - **Abschluss (22. November 2026):** M7 ist abgeschlossen. Der Projektinhaber hat die Schritte 0 bis 7 getestet und gepusht (`98038b6`, `5ab8976`, `7c61f22`, `dfde4b4`, `21dc0e9`, `311aeb8`). Ergebnis: alle 13 modalen Dialoge kommen aus `DialogFactory.cs`, `dialog-overlay` nur noch dort (Test), Inline-Größen in `Scripts/UI`: 0 unmarkiert, 31 nach USS verschoben, 33 mit `// computed` (Akzeptanz „unter 20“ ist damit erfüllt). Esc schließt nur den obersten Dialog, Enter bestätigt nur bei genau einem Textfeld, Klick daneben schließt nicht, die Karte ist hinter offenen Dialogen gesperrt. Die Sonderform der Werkzeugfenster (Luftbild, Straßentyp, Ampel) steht in `Architecture.md` und ADR 098. Offene Punkte für M8: ungenutzte USS-Klassen aus früheren Meilensteinen (Liste in ADR 098, Nachtrag „M7 Schritt 6“).
 
 ## M8 – Aufräumen und Abschluss (P3, S)
+
+**Abschluss (22. November 2026): erledigt.** Schritte 0 bis 6 sind umgesetzt und vom Projektinhaber getestet. Der Rework ist damit abgeschlossen; der Zweig wird per Merge-Commit „UI-Rework“ nach `main` zusammengeführt, ohne Release. Offen bleibt der Punkt „Record Reviewed Player Assets“ vor dem Release und der Lauf von `BuildRelease`, der im Repo noch nicht stattfand. Restpunkte stehen in [Roadmap.md](Roadmap.md), Abschnitt „UI-Rework: nach dem Rework und Release 1.2.0“.
 
 - **Ziel:** Keine Reste; Rework dokumentiert und freigabefähig.
 - **Aufgaben:** tote USS-Klassen und versteckte Labels entfernen (`MapToolbar` baut dann keine Labels und Tastenkappen mehr); verwaiste Textschlüssel; UXML-Namen (`view-menu-button`, `project-collapse-button`) und `RenderProjectBrowser` umbenennen; verwaiste Schlüssel als Testfehler; Architecture.md, CommandLine.md, DevelopmentSetup.md, CLAUDE.md nachziehen; ADR 098 abschließen; „Record Reviewed Player Assets“; Zusammenführen nach `main`; Wiki nach dem Release. *(Umbenennungen erledigt in M8 Schritt 4.)*
