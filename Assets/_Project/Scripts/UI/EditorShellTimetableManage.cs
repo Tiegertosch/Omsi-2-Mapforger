@@ -51,17 +51,16 @@ namespace OmsiMapEditor.UI
                 if (change.target == fold)
                     timetableManageOpen = change.newValue;
             });
-            fold.style.marginBottom = 6;
+            fold.AddToClassList("form-button-bottom");
             if (timetableLine != null)
             {
                 var line = timetableLine;
                 var name = new TextField { value = manageLineName.Length > 0 ? manageLineName : line, isDelayed = false };
                 name.AddToClassList("picker-field");
-                name.style.width = StyleKeyword.Auto;
+                name.AddToClassList("form-field-grow");
                 name.RegisterValueChangedCallback(change => manageLineName = change.newValue);
                 var row = new VisualElement();
-                row.style.flexDirection = FlexDirection.Row;
-                name.style.flexGrow = 1;
+                row.AddToClassList("form-inline-row");
                 row.Add(name);
                 row.Add(SmallButton("timetable.manage.rename", "timetable.manage.rename.tooltip", () =>
                 {
@@ -91,11 +90,10 @@ namespace OmsiMapEditor.UI
                 var trip = manageTrip;
                 var tripName = new TextField { value = manageTripName, isDelayed = false };
                 tripName.AddToClassList("picker-field");
-                tripName.style.width = StyleKeyword.Auto;
-                tripName.style.flexGrow = 1;
+                tripName.AddToClassList("form-field-grow");
                 tripName.RegisterValueChangedCallback(change => manageTripName = change.newValue);
                 var tripRow = new VisualElement();
-                tripRow.style.flexDirection = FlexDirection.Row;
+                tripRow.AddToClassList("form-inline-row");
                 tripRow.Add(tripName);
                 tripRow.Add(SmallButton("timetable.manage.rename", "timetable.manage.rename.trip.tooltip", () =>
                 {
@@ -112,7 +110,7 @@ namespace OmsiMapEditor.UI
                     CloseTimetable();
                     BeginEditTripStops(trip);
                 });
-                stopsButton.style.marginLeft = 0;
+                stopsButton.AddToClassList("form-button-flush");
                 AddManageRow(fold, "timetable.manage.stops", stopsButton);
             }
             timetableBody.Add(fold);
@@ -147,22 +145,18 @@ namespace OmsiMapEditor.UI
                 });
                 var hint = new Label(Loc.T("timetable.stoptimes.hint"));
                 hint.AddToClassList("panel-info");
-                hint.style.whiteSpace = WhiteSpace.Normal;
                 fold.Add(hint);
                 var settings = tripFile.GetStopSettings(profile);
                 var header = new VisualElement();
-                header.style.flexDirection = FlexDirection.Row;
+                header.AddToClassList("form-header-row");
                 var spacer = new VisualElement();
-                spacer.style.flexGrow = 1;
-                spacer.style.flexBasis = 0;
-                spacer.style.flexShrink = 1;
+                spacer.AddToClassList("form-cell-flex");
                 header.Add(spacer);
                 foreach (var labelKey in new[] { "timetable.stoptimes.arrival", "timetable.stoptimes.departure", "timetable.stoptimes.stopping" })
                 {
                     var label = LocBindings.NewLabel(labelKey); // i18n:keys
                     label.AddToClassList("popup-description");
-                    label.style.width = 84;
-                    label.style.marginLeft = 4;
+                    label.AddToClassList("form-stop-col");
                     header.Add(label);
                 }
                 fold.Add(header);
@@ -174,23 +168,17 @@ namespace OmsiMapEditor.UI
                 {
                     var stop = stopIndex;
                     var row = new VisualElement();
-                    row.style.flexDirection = FlexDirection.Row;
-                    row.style.alignItems = Align.Center;
-                    row.style.marginBottom = 2;
+                    row.AddToClassList("form-trip-row");
                     var name = timetableStopNames.TryGetValue(ids[stop], out var known) ? known : ids[stop].ToString(CultureInfo.InvariantCulture);
                     var label = new Label(Loc.T("timetable.stoptimes.stop", ("number", stop + 1), ("name", name)));
                     label.AddToClassList("popup-description");
-                    label.style.flexGrow = 1;
-                    label.style.flexBasis = 0;
-                    label.style.flexShrink = 1;
-                    label.style.minWidth = 0;
+                    label.AddToClassList("form-cell-flex");
                     row.Add(label);
                     row.Add(StopTimeField(settings.Arrivals, stop, minutes => tripFile.SetArrival(profile, stop, minutes), tripName));
                     row.Add(StopTimeField(settings.Departures, stop, minutes => tripFile.SetDeparture(profile, stop, minutes), tripName));
                     var kind = new DropdownField(kinds, settings.Stopping.TryGetValue(stop, out var current) ? Mathf.Clamp(current, 0, 4) : 0);
                     kind.AddToClassList("new-map-dropdown");
-                    kind.style.width = 84;
-                    kind.style.marginLeft = 4;
+                    kind.AddToClassList("form-stop-col");
                     kind.RegisterValueChangedCallback(change =>
                     {
                         var chosen = kinds.IndexOf(change.newValue);
@@ -209,8 +197,7 @@ namespace OmsiMapEditor.UI
         {
             var field = new TextField { value = values.TryGetValue(stop, out var minutes) ? minutes.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty, isDelayed = true };
             field.AddToClassList("picker-field");
-            field.style.width = 84;
-            field.style.marginLeft = 4;
+            field.AddToClassList("form-stop-col");
             field.RegisterValueChangedCallback(change =>
             {
                 var text = change.newValue.Trim().Replace(',', '.');
@@ -228,16 +215,19 @@ namespace OmsiMapEditor.UI
 
         private static void AddManageRow(VisualElement parent, string labelKey, VisualElement control)
         {
+            AddFormRow(parent, labelKey, control);
+        }
+
+        /// <summary>A label and its control in one row, in the timetable body and in the fold of the manage rows.</summary>
+        internal static void AddFormRow(VisualElement parent, string labelKey, VisualElement control)
+        {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 3;
+            row.AddToClassList("form-trip-row");
             var label = LocBindings.NewLabel(labelKey); // i18n:keys
             label.AddToClassList("popup-description");
-            label.style.width = 120;
-            label.style.flexShrink = 0;
+            label.AddToClassList("form-row-label");
             row.Add(label);
-            control.style.flexGrow = 1;
+            control.AddToClassList("form-row-grow");
             row.Add(control);
             parent.Add(row);
         }

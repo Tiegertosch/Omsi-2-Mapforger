@@ -17,8 +17,9 @@ namespace OmsiMapEditor.UI
     /// </summary>
     public sealed partial class EditorShellBootstrap
     {
-        private VisualElement timetableDialog;
-        private ScrollView timetableBody;
+        private ModalDialog timetableDialog;
+        private VisualElement timetableBody;
+        private ScrollView timetableScroll;
         private readonly Dictionary<string, OmsiLineFile> timetableLines = new Dictionary<string, OmsiLineFile>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, OmsiTripFile> timetableTrips = new Dictionary<string, OmsiTripFile>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> timetableDirtyLines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -39,36 +40,23 @@ namespace OmsiMapEditor.UI
 
         private void SetUpTimetable(VisualElement root)
         {
-            timetableDialog = new VisualElement { name = "timetable-dialog" };
-            timetableDialog.AddToClassList("dialog-overlay");
-            timetableDialog.style.display = DisplayStyle.None;
-            RegisterOverlay(timetableDialog, true);
-            var dialog = new VisualElement();
-            dialog.AddToClassList("dialog");
-            dialog.AddToClassList("content-folders");
-            dialog.style.minWidth = 560;
-            var title = LocBindings.NewLabel("timetable.title");
-            title.AddToClassList("popup-title");
-            dialog.Add(title);
-            var description = LocBindings.NewLabel("timetable.description");
-            description.AddToClassList("popup-description");
-            dialog.Add(description);
-            timetableBody = new ScrollView(ScrollViewMode.Vertical);
-            timetableBody.AddToClassList("content-folders-list");
-            timetableBody.style.maxHeight = 520;
-            dialog.Add(timetableBody);
-            var buttons = new VisualElement();
-            buttons.AddToClassList("dialog-buttons");
-            var cancel = LocBindings.NewButton("timetable.cancel", CloseTimetable);
-            cancel.AddToClassList("map-control-button");
-            buttons.Add(cancel);
-            var apply = LocBindings.NewButton("timetable.apply", ApplyTimetable);
-            apply.AddToClassList("map-control-button");
-            apply.AddToClassList("dialog-primary");
-            buttons.Add(apply);
-            dialog.Add(buttons);
-            timetableDialog.Add(dialog);
-            root.Add(timetableDialog);
+            // Enter is off: the dialog has many fields and its primary action writes the timetable files. Esc and Cancel leave the draft,
+            // which the next opening discards.
+            timetableDialog = NewDialog(new DialogOptions
+            {
+                Name = "timetable-dialog",
+                TitleKey = "timetable.title",
+                DescriptionKey = "timetable.description",
+                Width = DialogWidth.Wide,
+                EnterPressesPrimary = false,
+                Buttons = new[]
+                {
+                    new DialogButton { TextKey = "timetable.cancel", Role = DialogButtonRole.Cancel },
+                    new DialogButton { TextKey = "timetable.apply", Role = DialogButtonRole.Primary, Clicked = ApplyTimetable, Closes = false }
+                }
+            });
+            timetableBody = timetableDialog.Body;
+            timetableScroll = timetableBody.GetFirstAncestorOfType<ScrollView>();
         }
 
         /// <summary>The button in the Lines tab.</summary>
@@ -76,7 +64,7 @@ namespace OmsiMapEditor.UI
         {
             var button = new Button(() => OpenTimetable(highlightedLine)) { text = Loc.T("timetable.open"), tooltip = Loc.T("timetable.open.tooltip") };
             button.AddToClassList("map-control-button");
-            button.style.marginBottom = 6;
+            button.AddToClassList("form-button-bottom");
             return button;
         }
 
@@ -114,12 +102,12 @@ namespace OmsiMapEditor.UI
             timetableTour = 0;
             seriesTrip = null;
             RefreshTimetable();
-            timetableDialog.style.display = DisplayStyle.Flex;
+            timetableDialog.Show();
         }
 
         private void CloseTimetable()
         {
-            HidePopup(timetableDialog);
+            timetableDialog.Hide();
         }
 
         private OmsiLineFile TimetableLineFile()
@@ -153,7 +141,7 @@ namespace OmsiMapEditor.UI
 
         private void RefreshTimetable()
         {
-            var scroll = timetableBody.scrollOffset;
+            var scroll = timetableScroll.scrollOffset;
             timetableBody.Clear();
             AddNewLineAndTripRow();
             AddManageRows();
@@ -191,13 +179,11 @@ namespace OmsiMapEditor.UI
 
             var tourNames = tours.Select((tour, index) => Loc.T("timetable.tour_item", ("name", tour.Number), ("group", tour.VehicleGroup), ("count", tour.Trips.Count))).ToList();
             var tourRow = new VisualElement();
-            tourRow.style.flexDirection = FlexDirection.Row;
-            tourRow.style.flexGrow = 1;
+            tourRow.AddToClassList("form-inline-row");
             if (tourNames.Count > 0)
             {
                 var tourChoice = new DropdownField(tourNames, timetableTour);
                 tourChoice.AddToClassList("new-map-dropdown");
-                tourChoice.style.flexGrow = 1;
                 tourChoice.RegisterValueChangedCallback(change =>
                 {
                     timetableTour = tourNames.IndexOf(change.newValue);
@@ -224,8 +210,7 @@ namespace OmsiMapEditor.UI
             var current = tours[timetableTour];
             var name = new TextField { value = current.Number, isDelayed = true };
             name.AddToClassList("picker-field");
-            name.style.width = StyleKeyword.Auto;
-            name.style.flexGrow = 1;
+            name.AddToClassList("form-field-grow");
             name.RegisterValueChangedCallback(change =>
             {
                 file.SetTour(timetableTour, change.newValue, current.VehicleGroup);
@@ -234,8 +219,7 @@ namespace OmsiMapEditor.UI
             AddTimetableRow("timetable.tour.name", name);
             var group = new TextField { value = current.VehicleGroup, isDelayed = true };
             group.AddToClassList("picker-field");
-            group.style.width = StyleKeyword.Auto;
-            group.style.flexGrow = 1;
+            group.AddToClassList("form-field-grow");
             group.RegisterValueChangedCallback(change =>
             {
                 file.SetTour(timetableTour, current.Number, change.newValue);
@@ -244,8 +228,7 @@ namespace OmsiMapEditor.UI
             AddTimetableRow("timetable.tour.group", group);
 
             var days = new VisualElement();
-            days.style.flexDirection = FlexDirection.Row;
-            days.style.flexWrap = Wrap.Wrap;
+            days.AddToClassList("form-days");
             days.tooltip = Loc.T("timetable.days.tooltip");
             var dayKeys = new[] { "timetable.day.1", "timetable.day.2", "timetable.day.3", "timetable.day.4", "timetable.day.5", "timetable.day.6", "timetable.day.7",
                 "timetable.day.holiday", "timetable.day.term", "timetable.day.vacation" };
@@ -253,7 +236,7 @@ namespace OmsiMapEditor.UI
             {
                 var mask = 1 << bit;
                 var toggle = new Toggle(Loc.T(dayKeys[bit])) { value = current.DayMask >= 0 && (current.DayMask & mask) != 0 }; // i18n:keys
-                toggle.style.marginRight = 8;
+                toggle.AddToClassList("form-day-toggle");
                 toggle.RegisterValueChangedCallback(change =>
                 {
                     var now = file.Tours[timetableTour].DayMask;
@@ -265,7 +248,7 @@ namespace OmsiMapEditor.UI
             AddTimetableRow("timetable.days", days);
 
             var shiftRow = new VisualElement();
-            shiftRow.style.flexDirection = FlexDirection.Row;
+            shiftRow.AddToClassList("form-inline-row");
             var shiftField = new FloatField { value = (float)shiftMinutes, isDelayed = true };
             shiftField.AddToClassList("picker-field");
             shiftField.RegisterValueChangedCallback(change => shiftMinutes = change.newValue);
@@ -281,27 +264,26 @@ namespace OmsiMapEditor.UI
 
             var heading = new Label(Loc.T("timetable.trips", ("count", current.Trips.Count)));
             heading.AddToClassList("inspector-group-title");
-            heading.style.marginTop = 8;
+            heading.AddToClassList("form-heading-gap");
             timetableBody.Add(heading);
             for (var index = 0; index < current.Trips.Count; index++)
                 timetableBody.Add(TripRow(file, current.Trips[index], index));
 
             AddRunningTimes(current);
-            timetableBody.schedule.Execute(() => timetableBody.scrollOffset = scroll);
+            timetableScroll.schedule.Execute(() => timetableScroll.scrollOffset = scroll);
         }
 
         /// <summary>The buttons for a new line and a new trip above the tours, and the small form of a new line.</summary>
         private void AddNewLineAndTripRow()
         {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.marginBottom = 6;
+            row.AddToClassList("form-toolbar");
             var line = SmallButton("timetable.newline", "timetable.newline.tooltip", () =>
             {
                 timetableNewLineOpen = !timetableNewLineOpen;
                 RefreshTimetable();
             });
-            line.style.marginLeft = 0;
+            line.AddToClassList("form-button-flush");
             row.Add(line);
             row.Add(SmallButton("timetable.newtrip", "timetable.newtrip.tooltip", () =>
             {
@@ -313,7 +295,7 @@ namespace OmsiMapEditor.UI
                 return;
             var name = new TextField { value = timetableNewLineName, isDelayed = true };
             name.AddToClassList("picker-field");
-            name.style.width = StyleKeyword.Auto;
+            name.AddToClassList("form-field-grow");
             name.RegisterValueChangedCallback(change => timetableNewLineName = change.newValue);
             AddTimetableRow("timetable.newline.name", name);
             var groups = session.ReadAiGroups();
@@ -330,7 +312,7 @@ namespace OmsiMapEditor.UI
             {
                 var group = new TextField { value = timetableNewLineGroup ?? string.Empty, isDelayed = true };
                 group.AddToClassList("picker-field");
-                group.style.width = StyleKeyword.Auto;
+                group.AddToClassList("form-field-grow");
                 group.RegisterValueChangedCallback(change => timetableNewLineGroup = change.newValue);
                 AddTimetableRow("timetable.newline.group", group);
             }
@@ -361,7 +343,7 @@ namespace OmsiMapEditor.UI
                 SetStatusT("timetable.status.line_created", ("name", lineName));
                 RefreshTimetable();
             });
-            create.style.marginLeft = 0;
+            create.AddToClassList("form-button-flush");
             timetableBody.Add(create);
         }
 
@@ -369,7 +351,7 @@ namespace OmsiMapEditor.UI
         {
             var heading = new Label(Loc.T("timetable.series"));
             heading.AddToClassList("inspector-group-title");
-            heading.style.marginTop = 8;
+            heading.AddToClassList("form-heading-gap");
             timetableBody.Add(heading);
             var tripChoices = timetableTripNames;
             if (seriesTrip == null || !tripChoices.Contains(seriesTrip))
@@ -386,17 +368,17 @@ namespace OmsiMapEditor.UI
             profile.RegisterValueChangedCallback(change => seriesProfile = Math.Max(0, change.newValue));
             AddTimetableRow("timetable.series.profile", profile);
             var times = new VisualElement();
-            times.style.flexDirection = FlexDirection.Row;
+            times.AddToClassList("form-inline-row");
             var from = new TextField { value = seriesFrom, isDelayed = true };
             from.AddToClassList("picker-field");
             from.RegisterValueChangedCallback(change => seriesFrom = change.newValue);
             var to = new TextField { value = seriesTo, isDelayed = true };
             to.AddToClassList("picker-field");
-            to.style.marginLeft = 6;
+            to.AddToClassList("form-cell-gap");
             to.RegisterValueChangedCallback(change => seriesTo = change.newValue);
             var every = new FloatField { value = (float)seriesEvery, isDelayed = true };
             every.AddToClassList("picker-field");
-            every.style.marginLeft = 6;
+            every.AddToClassList("form-cell-gap");
             every.RegisterValueChangedCallback(change => seriesEvery = change.newValue);
             times.Add(from);
             times.Add(to);
@@ -419,9 +401,7 @@ namespace OmsiMapEditor.UI
         private VisualElement TripRow(OmsiLineFile file, OmsiLineTrip trip, int index)
         {
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 2;
+            row.AddToClassList("form-trip-row");
             var time = new TextField { value = FormatClock(trip.DepartureMinutes), isDelayed = true, tooltip = Loc.T("timetable.trip.time.tooltip") };
             time.AddToClassList("picker-field");
             time.RegisterValueChangedCallback(change =>
@@ -438,12 +418,11 @@ namespace OmsiMapEditor.UI
             row.Add(time);
             var label = new Label(trip.Trip) { tooltip = trip.Trip };
             label.AddToClassList("popup-description");
-            label.style.flexGrow = 1;
-            label.style.marginLeft = 8;
+            label.AddToClassList("form-trip-label");
             row.Add(label);
             var profile = new IntegerField { value = trip.Profile, isDelayed = true, tooltip = Loc.T("timetable.trip.profile.tooltip") };
             profile.AddToClassList("picker-field");
-            profile.style.width = 44;
+            profile.AddToClassList("form-trip-profile");
             profile.RegisterValueChangedCallback(change =>
             {
                 file.SetProfile(timetableTour, index, Math.Max(0, change.newValue));
@@ -456,7 +435,7 @@ namespace OmsiMapEditor.UI
                 TimetableChanged();
             }) { text = "×", tooltip = Loc.T("timetable.trip.remove.tooltip") };
             remove.AddToClassList("map-control-button");
-            remove.style.marginLeft = 4;
+            remove.AddToClassList("form-inline-button");
             row.Add(remove);
             return row;
         }
@@ -484,7 +463,7 @@ namespace OmsiMapEditor.UI
                 {
                     var heading = new Label(Loc.T("timetable.running"));
                     heading.AddToClassList("inspector-group-title");
-                    heading.style.marginTop = 8;
+                    heading.AddToClassList("form-heading-gap");
                     timetableBody.Add(heading);
                     var hint = new Label(Loc.T("timetable.running.hint"));
                     hint.AddToClassList("panel-info");
@@ -497,9 +476,7 @@ namespace OmsiMapEditor.UI
                     var profileIndex = index;
                     var captured = tripName;
                     var row = new VisualElement();
-                    row.style.flexDirection = FlexDirection.Row;
-                    row.style.alignItems = Align.Center;
-                    row.style.marginBottom = 2;
+                    row.AddToClassList("form-trip-row");
                     var minutes = new FloatField { value = (float)profiles[index].Value, isDelayed = true };
                     minutes.AddToClassList("picker-field");
                     minutes.RegisterValueChangedCallback(change =>
@@ -511,7 +488,7 @@ namespace OmsiMapEditor.UI
                     row.Add(minutes);
                     var label = new Label(Loc.T("timetable.running.profile", ("trip", tripName), ("index", index), ("name", profiles[index].Key)));
                     label.AddToClassList("popup-description");
-                    label.style.marginLeft = 8;
+                    label.AddToClassList("form-label-gap");
                     row.Add(label);
                     timetableBody.Add(row);
                 }
@@ -521,25 +498,14 @@ namespace OmsiMapEditor.UI
 
         private void AddTimetableRow(string labelKey, VisualElement control)
         {
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 3;
-            var label = LocBindings.NewLabel(labelKey); // i18n:keys
-            label.AddToClassList("popup-description");
-            label.style.width = 120;
-            label.style.flexShrink = 0;
-            row.Add(label);
-            control.style.flexGrow = 1;
-            row.Add(control);
-            timetableBody.Add(row);
+            AddFormRow(timetableBody, labelKey, control);
         }
 
         private static Button SmallButton(string textKey, string tooltipKey, Action clicked)
         {
             var button = new Button(clicked) { text = Loc.T(textKey), tooltip = Loc.T(tooltipKey) }; // i18n:keys
             button.AddToClassList("map-control-button");
-            button.style.marginLeft = 4;
+            button.AddToClassList("form-inline-button");
             return button;
         }
 

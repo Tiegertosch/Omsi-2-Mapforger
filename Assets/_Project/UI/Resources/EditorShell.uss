@@ -950,6 +950,22 @@
 .form-hour-tick { font-size: var(--mf-font-mark); margin-top: 0; margin-bottom: 0; }
 .traffic-curve { height: 150px; min-height: 150px; flex-shrink: 0; margin-top: var(--mf-space-1); margin-bottom: 2px; }
 
+/* Timetable and its manage rows (M7 step 4). Compound selectors win over .picker-field, .popup-description and .map-control-button, which
+   come earlier in this file. */
+.form-inline-row { flex-direction: row; }
+.form-days { flex-direction: row; flex-wrap: wrap; }
+.unity-toggle.form-day-toggle { margin-right: var(--mf-space-2); }
+.form-heading-gap { margin-top: var(--mf-space-2); }
+.form-row-grow { flex-grow: 1; }
+.map-control-button.form-inline-button { margin-left: var(--mf-space-1); }
+.map-control-button.form-button-flush { margin-left: 0; }
+.picker-field.form-cell-gap { margin-left: 6px; }
+.form-trip-row { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: 2px; }
+.popup-description.form-trip-label { flex-grow: 1; margin-left: var(--mf-space-2); }
+.picker-field.form-trip-profile { width: 44px; }
+.popup-description.form-label-gap { margin-left: var(--mf-space-2); }
+.picker-field.form-stop-col, .new-map-dropdown.form-stop-col, .popup-description.form-stop-col { width: 84px; margin-left: var(--mf-space-1); }
+
 /* Status bar */
 /* The status line is a dark strip in the lower row of the bottom bar */
 .status-bar { height: 28px; min-height: 28px; flex-shrink: 0; flex-direction: row; align-items: center; justify-content: center; margin: 0 var(--mf-space-3) 6px var(--mf-space-3); padding-left: var(--mf-space-3); padding-right: var(--mf-space-3); background-color: var(--mf-color-status-glass); border-width: 1px; border-color: var(--mf-color-border-glass); border-radius: 14px; color: var(--mf-color-text-secondary); font-size: 12px; }
