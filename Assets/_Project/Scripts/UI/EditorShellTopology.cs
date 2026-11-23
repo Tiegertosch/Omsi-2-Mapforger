@@ -35,6 +35,9 @@ namespace OmsiMapEditor.UI
         private bool topologyFlatPending;
         private int topologyFlatFrame;
         private int topologyShownTenths = int.MinValue;
+        private Vector2? topologyPoint;
+        private int topologyPointVersion;
+        private int terrainHereVersion;
         private static Texture2D topologyBandTexture;
 
         private OmsiContourSettings TopologySettings => groundRenderer != null ? groundRenderer.ContourSettings : null;
@@ -131,6 +134,25 @@ namespace OmsiMapEditor.UI
                 if (!report)
                     ShowTopologyHeight(null);
             }
+            // The ground changed (undo, redo, a brush) while the pointer stood still: read the height there again.
+            if (topologyPointVersion != groundRenderer.TerrainVersion)
+            {
+                topologyPointVersion = groundRenderer.TerrainVersion;
+                if (topologyPoint.HasValue && report)
+                {
+                    OnTopologyPointer(topologyPoint);
+                    // Check runs with -topologyHere read the new value from the log.
+                    if (Array.IndexOf(Environment.GetCommandLineArgs(), "-topologyHere") >= 0)
+                        Debug.Log("Topology height: " + topologyHeightLabel?.text);
+                }
+            }
+            // The terrain tool names the ground under the pointer in its panel: read it again after undo, redo or a brush as well.
+            if (terrainHereVersion != groundRenderer.TerrainVersion)
+            {
+                terrainHereVersion = groundRenderer.TerrainVersion;
+                if (activeTool == EditorTool.Terrain)
+                    ShowTerrainBrush();
+            }
             if (topologyFlatPending && Time.frameCount >= topologyFlatFrame && !groundRenderer.IsLoading)
             {
                 topologyFlatPending = false;
@@ -154,6 +176,8 @@ namespace OmsiMapEditor.UI
 
         private void OnTopologyPointer(Vector2? point)
         {
+            topologyPoint = point;
+            topologyPointVersion = groundRenderer != null ? groundRenderer.TerrainVersion : 0;
             if (!point.HasValue || groundRenderer == null || !groundRenderer.TryHeightAt(point.Value, out var height))
             {
                 ShowTopologyHeight(null);

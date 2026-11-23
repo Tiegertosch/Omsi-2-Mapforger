@@ -1883,15 +1883,41 @@ namespace OmsiMapEditor.UI
                 }
                 else
                 {
+                    // A map check, chrono overlay or map opening reading in the background blocks editing (CanEdit); the stroke would
+                    // silently not start, so wait for them first.
+                    var editWait = Time.realtimeSinceStartup;
+                    while (ReadingMapInBackground && Time.realtimeSinceStartup - editWait < 300f)
+                        yield return null;
+                    var stepsBefore = undoSteps.Count;
+                    terrainTickCount = 0;
+                    terrainTouchedCount = 0;
                     PressTerrain(terrainAt.X, terrainAt.Y);
+                    if (terrainStroke == null && !terrainOptions.Painting)
+                        Debug.Log("Terrain stroke not started: " + (!CanEdit ? "editing is not possible (read-only or still reading in the background)"
+                            : terrainOptions == null || !terrainOptions.Mode.HasValue ? "no brush mode" : "the stroke could not begin") + "; status: " + statusLabel?.text);
                     var held = double.TryParse(Argument("-terrainSeconds", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var heldSeconds) ? heldSeconds : 1.0;
                     var pressed = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - pressed < held)
+                    {
+                        // Mouse movement over the map (the real pointer of the test machine) moves the brush; keep it where the argument put it.
+                        roadPointer = terrainAt;
                         yield return null;
+                    }
                     ReleaseTerrain();
+                    // Read now: later status messages (object outlines and the like) overwrite this one.
+                    var shapedStatus = statusLabel?.text;
+                    var kept = undoSteps.Count > stepsBefore && undoSteps[undoSteps.Count - 1].TerrainChange != null;
+                    Debug.Log("Terrain stroke " + (kept ? "kept (" + undoSteps[undoSteps.Count - 1].TerrainChange.Tiles.Count + " tile(s))"
+                        : "changed nothing (" + terrainTickCount + " brush step(s), " + terrainTouchedCount + " tile touch(es); no ground under the brush if 0 touches)") + ": " + shapedStatus);
                 }
                 ShowTerrainBrush();
                 Debug.Log("Terrain: " + statusLabel?.text);
+
+                // -terrainUndo [n] / -terrainRedo [n]: undo and then redo n steps after the stroke, the way Ctrl+Z and Ctrl+Y do.
+                if (Array.IndexOf(args, "-terrainUndo") >= 0)
+                    yield return StepTerrainHistory(true, int.TryParse(Argument("-terrainUndo", 1), out var terrainUndoCount) ? terrainUndoCount : 1);
+                if (Array.IndexOf(args, "-terrainRedo") >= 0)
+                    yield return StepTerrainHistory(false, int.TryParse(Argument("-terrainRedo", 1), out var terrainRedoCount) ? terrainRedoCount : 1);
             }
 
             // -terrainTab <terrain|paint|heightmap>: opens that tab of the terrain window (with -paintTexture, -paintMode, -paintHardness,
@@ -5802,9 +5828,15 @@ namespace OmsiMapEditor.UI
                 ReleaseTerrain();
                 return;
             }
+            terrainTickCount++;
+            terrainTouchedCount += touched.Count;
             if (touched.Count > 0)
                 RefreshGround(touched);
         }
+
+        // Steps the brush worked and tiles it touched since the last check line; the -terrain check argument logs them.
+        private int terrainTickCount;
+        private int terrainTouchedCount;
 
         /// <summary>The button let go: the stroke is kept as one step.</summary>
         private void ReleaseTerrain()
@@ -6892,6 +6924,29 @@ namespace OmsiMapEditor.UI
                 StepHistory(redoSteps, undoSteps, false);
                 evt.StopPropagation();
             }
+        }
+
+        /// <summary>For the check arguments -terrainUndo and -terrainRedo: steps the history, waits for the ground to be drawn again, logs it.</summary>
+        private IEnumerator StepTerrainHistory(bool undo, int count)
+        {
+            var tiles = 0;
+            var done = 0;
+            for (; done < count; done++)
+            {
+                var from = undo ? undoSteps : redoSteps;
+                if (from.Count == 0)
+                    break;
+                var change = from[from.Count - 1].TerrainChange;
+                StepHistory(from, undo ? redoSteps : undoSteps, undo);
+                if (change != null)
+                    tiles += change.Tiles.Count;
+            }
+            var waitStarted = Time.realtimeSinceStartup;
+            yield return null;
+            while (groundRenderer != null && groundRenderer.IsLoading && Time.realtimeSinceStartup - waitStarted < 300f)
+                yield return null;
+            Debug.Log((undo ? "Undo" : "Redo") + " after terrain: " + done + " step(s), " + tiles + " tile(s); undo steps left " + undoSteps.Count +
+                      ", redo steps left " + redoSteps.Count + "; status: " + statusLabel?.text);
         }
 
         private void StepHistory(List<ObjectEditStep> from, List<ObjectEditStep> to, bool undo)

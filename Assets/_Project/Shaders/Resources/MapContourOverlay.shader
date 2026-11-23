@@ -109,20 +109,31 @@ Shader "Mapforge/ContourOverlay"
                 if (w > 0.0001)
                 {
                     float every = max(_MajorEvery, 1.0);
-                    float minorDistance = LineDistance(h, w);
-                    float majorDistance = LineDistance(h / every, w / every);
-                    // Lines closer than 3 px are gone and those up to 6 px fade in, so steep slopes do not turn into moire;
-                    // a major line (n times the spacing) stays while the minor ones are gone.
-                    float minorFade = saturate((1.0 / w - 3.0) / 3.0);
-                    float majorFade = saturate((every / w - 3.0) / 3.0);
-                    float minorWidth = _LineWidth;
-                    float majorWidth = _LineWidth * _MajorFactor;
-                    float minorLine = Coverage(minorDistance, minorWidth) * minorFade;
-                    float majorLine = Coverage(majorDistance, majorWidth) * majorFade;
-                    float minorHalo = Coverage(minorDistance, minorWidth + 2.0) * minorFade;
-                    float majorHalo = Coverage(majorDistance, majorWidth + 2.0) * majorFade;
-                    lineAlpha = max(minorLine, majorLine);
-                    haloAlpha = max(minorHalo, majorHalo);
+                    // Levels of lines: the base spacing and every n-th, n^2-th and n^3-th multiple of it. Lines closer than 3 px
+                    // are gone and those up to 6 px fade in, so steep slopes do not turn into moire. When a level is gone the
+                    // next one takes its place: with the base spacing hidden, the n-fold lines are the minor ones and the
+                    // n^2-fold ones the major ones. A level coarser by two steps than a fully visible one is not drawn.
+                    float previousFade = 0.0;
+                    float beforePreviousFade = 0.0;
+                    float scale = 1.0;
+                    [unroll]
+                    for (int level = 0; level < 4; level++)
+                    {
+                        float fade = saturate((scale / w - 3.0) / 3.0);
+                        float show = fade;
+                        if (level >= 2)
+                            show *= 1.0 - beforePreviousFade;
+                        // Minor width, major width once the next finer level shows; level 0 is always minor.
+                        float width = _LineWidth;
+                        if (level >= 1)
+                            width = lerp(_LineWidth, _LineWidth * _MajorFactor, previousFade);
+                        float lineDistance = LineDistance(h / scale, w / scale);
+                        lineAlpha = max(lineAlpha, Coverage(lineDistance, width) * show);
+                        haloAlpha = max(haloAlpha, Coverage(lineDistance, width + 2.0) * show);
+                        beforePreviousFade = previousFade;
+                        previousFade = fade;
+                        scale *= every;
+                    }
                 }
 
                 // The light line on a dark halo: readable on the dark map, on textures and on a light aerial picture.
