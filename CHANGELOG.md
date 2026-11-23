@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.2.0
+
+A new look and a lot more to edit: a reworked main view, traffic lights and pedestrian crossings, a full timetable editor, road type templates, an objects list and contour lines.
+
+### A new main view
+
+- **Map without borders.** The map fills the window. A bottom bar holds the views, zoom, the tile button, the project name, the tools and round buttons for the lists of the map (tiles, objects and more); the lists open as popups above the bar.
+- **Right-click menu.** Right-click an element to see what you can do with it: edit it, open the junction tools, traffic lights or rows, delete it. The inspector opens next to the selected element only when you ask for it.
+- **Readable at any display scale.** The interface follows the Windows display scale and has its own interface size setting. Text and glass panels have more contrast, small text is larger, and windows, menus and dialogs stay inside the window.
+- **One kind of dialog.** Export, settings, map check, new map, bug report, update, timetable, traffic curves and vehicles all use the same dialog frame. The map stays still behind an open dialog, and Esc closes only the top one.
+- **Tooltips with a title and key** appear above the pointer, and the status line keeps to one sentence.
+- **Tool menus** share one layout with icon tabs, pickers and a global DLC switch. The Help menu is reduced to updates, bug report and wiki.
+- **Pick and edit in 3D.** Select, box-select, delete and edit roads and rails in the 3D view.
+- **Safer editing.** Undo, redo and edits stay consistent with the files when writing fails; moving or turning many objects at once is fast; revert tile edits can be undone and asks first.
+
+### Objects list and contour lines
+
+- **Objects list.** A new popup next to the tiles list finds every placed object by type, tile or name.
+- **Contour lines.** Switch on the terrain view to see the shape of the ground as contour lines and the height under the pointer, in the view from above and in 3D. The lines stay readable on steep slopes and the heights refresh after undo.
+
+### Roads
+
+- **Road type window.** Edit road types in a movable window with a clickable cross-section, with its own undo history. Pick a template from a grid with previews, and save, save as new or delete road types.
+- **Spline profiles** are read and drawn completely: lanes of path_2, chain texture offset, skew, mirrored textures and patchwork chains.
+- **Roads follow a junction** made here that you lift, lower or tilt. Open road ends are closed so no sky shows through.
+- **Traffic rules tool.** Drag signs onto junction arms, and speed limits or overtaking bans onto roads.
+
+### Traffic lights and crossings
+
+- **Traffic light editor.** Read and write the programs of crossing objects without loss. Show the movements by signal group, paint the timing of each group on a timeline, check conflicts with a matrix and manual exceptions, and preview a program with a clock.
+- **Assistant and templates.** Propose signal groups, a basic program and heads on masts, and choose from a library of program templates that are checked before they are applied. The Signals tool is a free window you can move over the map.
+- **Pedestrian crossings.** Add a crossing per arm at junctions made here, paint a zebra crossing with the stop line before it, cut a crossing piece into any road, and give crossings lights of their own. Draw paths with OMSI's invisible splines that snap to existing paths.
+
+### Timetables, lines and traffic
+
+- **Timetable editor.** Edit departures, tours with their days, trips at an interval and running times per profile. Rename and delete lines, trips and stops, change the stops of a trip, give single stops times, and make tracks and trips for trains and trams.
+- **Line tool.** Click bus stops, check the route and save the line. The timetable files are checked right after saving. The Line window has a stop strip to reorder, select and rename stops.
+- **Vehicles.** Edit the vehicle groups of a map: depots with their buses and plain groups.
+- **Traffic curves.** Set the daily density of cars and passengers per hour with draggable curves.
+- **Parking.** Put rows of parking spaces along roads where cars can park in and pull out, edit the parking lists, and check parking spaces in the map check.
+- **Bus stops** can be named on the object itself, and unused bus stops are deleted with their timetable entries.
+
+### Terrain, textures and objects
+
+- **Paint ground textures** with a brush from 1 m, erase and soften with a soft edge, and cover or clear a tile. The terrain window has a Paint tab with texture tiles.
+- **Edit labels in place** with named fields, and place entry points from the object browser with a name prompt.
+- **Objects, Markings and Lanes windows** are rebuilt with icon options; objects can be placed from rows in the Objects window.
+
+### Good to know
+
+- Projects, maps and settings from 1.1.5 open as before.
+- The release packages carry only the language files, no hidden folders.
+- Czech, French, Italian, Polish, Portuguese and Spanish remain machine translations that native speakers are welcome to correct.
+
 ## 1.1.5
 
 Choose which object and spline folders MapWorks reads, so that large installations with many add-ons stay quick and the menus show only what you need.

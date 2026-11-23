@@ -283,7 +283,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 
 Stand 22. November 2026 (ADR 098, M8-Entscheidungen 2B und 3B). M8 endet mit dem Merge, ohne Release. Release 1.2.0 folgt erst zusammen mit den zwei Funktionen unten; `bundleVersion` bleibt bis dahin 1.1.5, das Wiki folgt nach dem Release. Zeilen mit Fundstellen: `ui-rework-feature-matrix.md`.
 
-- [ ] Release 1.2.0 (Entscheidung 3B): erst mit diesen zwei Funktionen
+- [x] Release 1.2.0 (Entscheidung 3B, 23. November 2026, Tag `v1.2.0`): erst mit diesen zwei Funktionen
   - [x] Objekt-Popup in der unteren Leiste neben dem Kachel-Popup: Liste aller auf der Karte platzierten Objekte (ADR 102, Commit `3e2de32` auf `feature/objects-popup`, vom Projektinhaber getestet; per Merge-Commit `b295505` in `main`)
     - [ ] Objekt-Liste: angehängte Objekte (`[attachObj]`) und Reihen (ADR 102, Entscheidungen 8B und 8C) als Nachschritt
     - [ ] Objekt-Liste: „Alle dieser Art wählen“ an der Gruppenzeile (ADR 102, Entscheidung 6B), erst nach Messung der Massenauswahl
