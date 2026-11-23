@@ -56,6 +56,7 @@ Abhängigkeitsrichtung: UI → OMSI → Core; OMSI kennt UI nicht. Größte Date
 - **Lesen:** `OmsiMapReader` → `OmsiMapSummary` (u. a. `TileSizeMeters`), `OmsiTerrain` (61 × 61 Höhen), `OmsiMapGeometry`, `OmsiSplineTileIndex`, `OmsiSplineContinuity`.
 - **Bearbeiten:** `IOmsiFileSource` / `OmsiFolderSource` / `OmsiMapWorkspace` (Arbeitskopie über Original), `OmsiMapSession` (`PlaceObject`, `DeleteObject`, `TransferObject`, `OmsiObjectChange` für Undo; Straßen in `OmsiMapSessionSplines.cs`: `CreateRoad`, `DeleteSpline`, `OmsiSplineChange`, `OmsiSplineEnd`), `OmsiRoadPlanner` (Bogen, Stücke, Höhenmodi, Befunde), `OmsiTerrainSampler` (Gelände über Kachelgrenzen, außerhalb = ungültig), `OmsiTileEditing` (strukturelle Änderungen), `OmsiReferenceIndex` (kartenweite ID-Verweise), `OmsiIdAllocator` (`[NextIDCode]`), `OmsiMapExporter`.
 - **Modelle/Texturen:** `OmsiSceneryObject` (`.sco`), `OmsiLabelSchema` (Beschriftungsfelder je Objektart, ADR 100), `OmsiO3dMesh` (`.o3d`, mit Entwürfelung), `OmsiXMesh` (Text-`.x`), `OmsiObjectModel` (`OmsiObjectModelCatalog`), `OmsiFootprintTracer` (Umrisse), `OmsiImage` (BMP/TGA/DDS DXT1/3/5), `OmsiGroundTextures`, `OmsiSplineProfile` (`.sli`), `OmsiSplineAttachmentLayout` (Spline-Anhängungen, Reihen).
+- **Höhenlinien (ADR 103):** `OmsiContourRules` (Linienabstand, Höhenbereich, flache Karte), `OmsiContourSettings` (Sitzungszustand); Überzug in `MapGroundRendererContours.cs`, Shader `MapContourOverlay`.
 - **Objektliste (ADR 102):** `OmsiPlacedObjectIndex` (Gruppen, Suche und Zeilen der Objekt-Liste, ohne Unity; Oberfläche `EditorShellObjectList.cs`).
 - **Gelände und Luftbilder:** `OmsiTerrainBrush`/`OmsiTerrainGrid` (Pinsel, kartenweites Raster), `OmsiHeightMap`, `OmsiPng`, `OmsiTiff`, `OmsiGeo` (Verortung, Quellen, `OmsiGeoSettings` in `Mapforge\geo.txt`, `OmsiImageryPreferences` mit Schlüsseln nur auf dem Rechner), `OmsiAerial` (Kachelspeicher, Mosaik, `OmsiAerialJob`), `OmsiOsmMap` mit `OmsiCanvas` (Vektorgrafik) und `OmsiTrueTypeFont`, `OmsiOwnPictures`, `OmsiJson`.
 
@@ -123,7 +124,7 @@ OMSI-2-Installation: `D:\SteamLibrary\steamapps\common\OMSI 2\maps` – **Grundo
 
 - `Documentation/Architecture.md` – Module und Datenfluss im Detail
 - `Documentation/Internationalisierung.md` – Abschluss der Mehrsprachigkeit: Technik, Architektur, Ausnahmen, neue Sprache anlegen
-- `Documentation/Decisions.md` – ADR 001–101
+- `Documentation/Decisions.md` – ADR 001–103
 - `Documentation/DevelopmentSetup.md` – Werkzeuge, Kommandozeile, Validierungsstand
 - `Documentation/Roadmap.md` – erledigt `[x]` und offen
 - `Documentation/ProjectStatus.md` – laufender Stand, Releases, Zweige, offene Nutzertests

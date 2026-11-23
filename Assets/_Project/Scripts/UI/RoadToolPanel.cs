@@ -48,6 +48,7 @@ namespace OmsiMapEditor.UI
         private readonly TextField pieceLengthField;
         private readonly TextField gradientField;
         private readonly Toggle fitTerrainToggle;
+        private readonly Toggle topographyToggle;
         private readonly Toggle junctionsToggle;
         private readonly Toggle crossingToggle;
         private readonly Toggle parkingToggle;
@@ -178,6 +179,11 @@ namespace OmsiMapEditor.UI
             pieceLengthField.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
             gradientField = OptionControls.Value(piecesRow, "triangle-alert", "10", "%", "roadtool.warn", "roadtool.warn.tooltip");
             gradientField.RegisterValueChangedCallback(_ => SettingsChanged?.Invoke());
+
+            // The contour lines of the topology view, the same switch as the button of the bottom bar (topology plan, decision 5B).
+            var topographyRow = OptionControls.Row(options, "roadtool.topography");
+            topographyToggle = OptionControls.Switch(topographyRow, "mountain", "roadtool.topography", "roadtool.topography.tooltip", false);
+            topographyToggle.RegisterValueChangedCallback(change => TopographyChanged?.Invoke(change.newValue));
             Add(options);
 
             // The catalog beside them.
@@ -204,6 +210,15 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The panel wants to close the road tool, or to end choosing a profile.</summary>
         public event Action CloseRequested;
+
+        /// <summary>The user switched the contour lines on or off here; the shell keeps this switch and the bar button in step.</summary>
+        public event Action<bool> TopographyChanged;
+
+        /// <summary>Shows the state of the contour lines without raising <see cref="TopographyChanged"/>.</summary>
+        public void ShowTopography(bool on)
+        {
+            topographyToggle.SetValueWithoutNotify(on);
+        }
 
         /// <summary>What the road under the pointer would be, or the next step; the shell shows it in the status bar, a problem in the warning colour.</summary>
         public event Action<string, bool> HintChanged

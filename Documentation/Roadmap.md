@@ -288,7 +288,9 @@ Stand 22. November 2026 (ADR 098, M8-Entscheidungen 2B und 3B). M8 endet mit dem
     - [ ] Objekt-Liste: angehängte Objekte (`[attachObj]`) und Reihen (ADR 102, Entscheidungen 8B und 8C) als Nachschritt
     - [ ] Objekt-Liste: „Alle dieser Art wählen“ an der Gruppenzeile (ADR 102, Entscheidung 6B), erst nach Messung der Massenauswahl
     - [ ] Objekt-Liste: Zählung des Reiters „In map“ nach Löschen und Rückgängig (heute veraltet, `UpdateObjectsCatalog` wird dort nicht gerufen; Zählung aus dem Index)
-  - [ ] Ansicht „Topologie“ am rechten Rand der Leiste: Höhenlinien über dem Gelände zum Planen von Straßen (ADR 098 als spätere eigene Funktion; in der Skizze heißt der Knopf „Topology View“, `Decisions.md` ADR 098)
+  - [x] Ansicht „Topologie“ am rechten Rand der Leiste: Höhenlinien über dem Gelände zum Planen von Straßen (ADR 103, Commits `03fae4e` und `1f99d33` auf `feature/topology`, vom Projektinhaber getestet; Merge nach `main` steht aus; ADR 098 als spätere eigene Funktion; in der Skizze heißt der Knopf „Topology View“)
+    - [ ] Topologie: Hauptlinien mit Höhenzahlen beschriften (ADR 103, Entscheidung 3B; nach Test des Projektinhabers)
+    - [ ] Topologie: Farbe nach Neigung mit der Warnschwelle des Straßenbaus (optional)
 - [ ] Größere Reste der Funktionsmatrix nach dem Rework (Entscheidung 2B)
   - [x] Dialoge und Fenster im neuen Stil: Karteneinstellungen, Parkliste, Verkehrskurven, Fahrplan- und Fahrzeug-Dialog, Kartenprüfung (alle 13 modalen Dialoge aus `DialogFactory.cs`, M7, vom Projektinhaber getestet); Luftbild-Fenster und eigene Bilder als Sonderform nach Entscheidung 6A (nicht modal, Optionszeilen seit M4). Die Zeile stand hier fälschlich offen (M8 Schritt 5, Rest 4, 22. November 2026)
   - [x] Werkzeug-Optionen im neuen Stil: Geländepinsel, Markierungen, Vorfahrt, Spuren, Reihen, Linie, Zufallsdrehung, Überweg und Parkreihe über `OptionControls` (M3/M4, vom Projektinhaber getestet). Ebenfalls fälschlich offen geführt

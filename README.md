@@ -51,6 +51,7 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 - **Consistent colours on the map:** Orange marks the active tile, light with a dark rim the selection, violet rail paths; red means only errors, yellow only warnings.
 - **Consistent dialogs:** All dialogs share one layout, with Cancel on the left and the main button on the right. Esc closes only the top dialog, Enter confirms only in a dialog with a single text field, and a click beside a dialog does not close it. The map stays still behind open dialogs. The object and spline folders are in Settings under Content.
 - **Objects list in the bottom bar:** A button beside the tile button lists every object placed on the map, grouped by object type, by tile or flat, with a search and a filter for base game, DLC and other content. A click selects the object and centres the map on it.
+- **Contour lines (topology view):** A button at the right of the bottom bar draws contour lines over the terrain, in the top view and in 3D. The spacing is automatic for the zoom and the terrain or fixed from 0.25 to 10 m, a colour band by height is optional, a legend shows the height range, and the height under the pointer appears in the status bar. A switch in the road tool shows the same state.
 - **Simpler Help menu:** It offers Check for updates, Report a bug and the wiki.
 
 ## Current limitations

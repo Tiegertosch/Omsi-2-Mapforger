@@ -414,7 +414,12 @@ namespace OmsiMapEditor.UI
             generateVisualContent += Draw;
             RegisterCallback<PointerDownEvent>(OnPointerDown);
             RegisterCallback<PointerMoveEvent>(OnPointerMove);
-            RegisterCallback<PointerLeaveEvent>(_ => hoverPosition = null);
+            RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                hoverPosition = null;
+                if (ReportGroundPointer)
+                    GroundPointerMoved?.Invoke(null);
+            });
             RegisterCallback<PointerUpEvent>(OnPointerUp);
             RegisterCallback<PointerCaptureOutEvent>(_ => CancelDrag());
             RegisterCallback<PointerLeaveEvent>(_ =>
@@ -859,6 +864,21 @@ namespace OmsiMapEditor.UI
         /// without a model keep them, and the selection is drawn as always.
         /// </summary>
         public bool TexturedView { get; set; }
+
+        /// <summary>
+        /// True while the contour lines of the topology view are on screen: the view then leaves the tiles unfilled also
+        /// without textures, so the lines, which the ground camera draws below the view, show on the dark background.
+        /// </summary>
+        public bool ContourLinesBelow { get; set; }
+
+        /// <summary>
+        /// When on, <see cref="GroundPointerMoved"/> reports where the pointer is on the ground (all tools, 2D and 3D). Off by
+        /// default so the pointer costs nothing while no view needs it.
+        /// </summary>
+        public bool ReportGroundPointer { get; set; }
+
+        /// <summary>The pointer is at a map-relative ground position, or null once it left the view or points past the ground (3D).</summary>
+        public event Action<Vector2?> GroundPointerMoved;
 
         /// <summary>Tells whether the textured view draws a model for an object file; null when no models are known.</summary>
         public Func<string, bool> HasModel
@@ -1697,7 +1717,7 @@ namespace OmsiMapEditor.UI
             foreach (var tile in summary.Tiles)
             {
                 var rect = TileRect(tile);
-                if (!rect.Overlaps(visible) || tile.IsAvailable && TexturedView)
+                if (!rect.Overlaps(visible) || tile.IsAvailable && (TexturedView || ContourLinesBelow))
                     continue;
                 painter.fillColor = tile.IsAvailable ? tileColor : missingTileColor;
                 painter.BeginPath();
@@ -4115,6 +4135,16 @@ namespace OmsiMapEditor.UI
             hoverPosition = position;
             if (pointerBadge != null && pointerBadgeIcon != null)
                 MovePointerBadge(position);
+            if (ReportGroundPointer && GroundPointerMoved != null)
+            {
+                if (!ThreeDimensional)
+                    GroundPointerMoved(ScreenToMap(position));
+                else if (hasView && summary != null)
+                {
+                    var under = GroundPoint(OrbitCamera().RayThrough(position));
+                    GroundPointerMoved(under.HasValue ? new Vector2(under.Value.x, under.Value.z) : (Vector2?)null);
+                }
+            }
             if (dragMode == DragMode.None || evt.pointerId != dragPointerId)
             {
                 if (roadMode && !ThreeDimensional)
