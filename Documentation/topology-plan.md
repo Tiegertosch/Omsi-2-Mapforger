@@ -1,6 +1,6 @@
 # Plan: Ansicht „Topologie“ (Höhenlinien) für Release 1.2.0
 
-Stand: 22. November 2026, Zweig `feature/topology` (von `main` b295505). Bestandsaufnahme und Plan; Schritte 1 bis 3 umgesetzt (siehe Abschnitt 7). Auftrag des Projektinhabers: „Am rechten Rand die Ansicht Topologie, damit man Höhenlinien sehen kann bei Terrain, um so besser Straßen planen zu können.“ (Roadmap, Abschnitt „UI-Rework: nach dem Rework und Release 1.2.0“; ADR 098 nannte sie „später“). Nach Abschluss kommt ein ADR 103.
+Stand: 23. November 2026, Zweig `feature/topology` (von `main` b295505), per Merge-Commit `8be5aab` in `main` übernommen; der Zweig ist gelöscht. Bestandsaufnahme und Plan; Schritte 1 bis 3 umgesetzt (siehe Abschnitt 7). Auftrag des Projektinhabers: „Am rechten Rand die Ansicht Topologie, damit man Höhenlinien sehen kann bei Terrain, um so besser Straßen planen zu können.“ (Roadmap, Abschnitt „UI-Rework: nach dem Rework und Release 1.2.0“; ADR 098 nannte sie „später“). Nach Abschluss kommt ein ADR 103.
 
 ## 1. Ist-Stand mit Belegen
 

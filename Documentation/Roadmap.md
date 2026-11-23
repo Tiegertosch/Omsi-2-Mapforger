@@ -284,11 +284,11 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 Stand 22. November 2026 (ADR 098, M8-Entscheidungen 2B und 3B). M8 endet mit dem Merge, ohne Release. Release 1.2.0 folgt erst zusammen mit den zwei Funktionen unten; `bundleVersion` bleibt bis dahin 1.1.5, das Wiki folgt nach dem Release. Zeilen mit Fundstellen: `ui-rework-feature-matrix.md`.
 
 - [ ] Release 1.2.0 (Entscheidung 3B): erst mit diesen zwei Funktionen
-  - [x] Objekt-Popup in der unteren Leiste neben dem Kachel-Popup: Liste aller auf der Karte platzierten Objekte (ADR 102, Commit `3e2de32` auf `feature/objects-popup`, vom Projektinhaber getestet; Merge nach `main` steht aus)
+  - [x] Objekt-Popup in der unteren Leiste neben dem Kachel-Popup: Liste aller auf der Karte platzierten Objekte (ADR 102, Commit `3e2de32` auf `feature/objects-popup`, vom Projektinhaber getestet; per Merge-Commit `b295505` in `main`)
     - [ ] Objekt-Liste: angehängte Objekte (`[attachObj]`) und Reihen (ADR 102, Entscheidungen 8B und 8C) als Nachschritt
     - [ ] Objekt-Liste: „Alle dieser Art wählen“ an der Gruppenzeile (ADR 102, Entscheidung 6B), erst nach Messung der Massenauswahl
     - [ ] Objekt-Liste: Zählung des Reiters „In map“ nach Löschen und Rückgängig (heute veraltet, `UpdateObjectsCatalog` wird dort nicht gerufen; Zählung aus dem Index)
-  - [x] Ansicht „Topologie“ am rechten Rand der Leiste: Höhenlinien über dem Gelände zum Planen von Straßen (ADR 103, Commits `03fae4e` und `1f99d33` auf `feature/topology`, vom Projektinhaber getestet; Merge nach `main` steht aus; ADR 098 als spätere eigene Funktion; in der Skizze heißt der Knopf „Topology View“)
+  - [x] Ansicht „Topologie“ am rechten Rand der Leiste: Höhenlinien über dem Gelände zum Planen von Straßen (ADR 103, Commits `03fae4e` und `1f99d33`, per Merge-Commit `8be5aab` in `main` (23. November 2026), vom Projektinhaber getestet; ADR 098 als spätere eigene Funktion; in der Skizze heißt der Knopf „Topology View“)
     - [ ] Topologie: Hauptlinien mit Höhenzahlen beschriften (ADR 103, Entscheidung 3B; nach Test des Projektinhabers)
     - [ ] Topologie: Farbe nach Neigung mit der Warnschwelle des Straßenbaus (optional)
 - [ ] Größere Reste der Funktionsmatrix nach dem Rework (Entscheidung 2B)

@@ -2125,7 +2125,7 @@ M7 abgeschlossen (22. November 2026): Schritte 0–7 vom Projektinhaber getestet
 
 ## ADR 102: Objekt-Liste in der unteren Leiste
 
-**Datum:** 22. November 2026 · **Status:** Umgesetzt (Commit `3e2de32` auf `feature/objects-popup`, vom Projektinhaber getestet; Merge nach `main` steht aus). Plan und Messwerte: `Documentation/objects-popup-plan.md`.
+**Datum:** 22. November 2026 · **Status:** Umgesetzt (Commit `3e2de32` auf `feature/objects-popup`, vom Projektinhaber getestet; per Merge-Commit `b295505` in `main`). Plan und Messwerte: `Documentation/objects-popup-plan.md`.
 
 **Anlass:** Der Projektinhaber wünscht für Release 1.2.0 eine Liste, in der man alle auf der Karte platzierten Objekte einsehen kann. Eine solche Liste gab es nie: Das Project-Fenster zeigte Objekte nur als Zahl je Kachel (`N obj`), der Reiter „In map“ des Objekte-Fensters zeigt Objektarten (.sco-Dateien) als Katalog zum Platzieren, nicht die einzelnen Objekte mit ID und Kachel. Die Liste ist ein Suchwerkzeug, kein Ersatz für den Katalog.
 
@@ -2161,7 +2161,7 @@ M7 abgeschlossen (22. November 2026): Schritte 0–7 vom Projektinhaber getestet
 
 ## ADR 103: Höhenlinien (Topologie) als Ansicht über dem Gelände
 
-**Datum:** 23. November 2026 · **Status:** Umgesetzt auf `feature/topology` (Commits `03fae4e` und `1f99d33`, vom Projektinhaber getestet; Merge nach `main` steht aus). Plan, Bestandsaufnahme und Messwerte: `Documentation/topology-plan.md`.
+**Datum:** 23. November 2026 · **Status:** Umgesetzt und vom Projektinhaber getestet; per Merge-Commit `8be5aab` in `main` übernommen (23. November 2026, Commits `03fae4e` und `1f99d33` auf `feature/topology`, Zweig danach gelöscht). Release 1.2.0 folgt. Plan, Bestandsaufnahme und Messwerte: `Documentation/topology-plan.md`.
 
 **Anlass:** Der Projektinhaber wünscht für Release 1.2.0 eine Ansicht „Topologie“ am rechten Rand der unteren Leiste, damit man Höhenlinien über dem Gelände sieht und Straßen besser planen kann (ADR 098 hatte den Platz bewusst frei gelassen; die Skizze zeigt dort den Knopf „Topology View“). Die Ansicht ist ein Planungswerkzeug, kein Ersatz für das Gelände-Werkzeug.
 
