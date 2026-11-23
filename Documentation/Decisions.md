@@ -2158,3 +2158,40 @@ M7 abgeschlossen (22. November 2026): Schritte 0–7 vom Projektinhaber getestet
 - „Alle dieser Art wählen“ (6B) bleibt offen, bis die Massenauswahl gemessen ist.
 - Randbefund: Der Reiter „In map“ zählt nach Löschen und Rückgängig veraltet, weil `UpdateObjectsCatalog` dort nicht aufgerufen wird. Der Index liefert die Zählung später mit; das ist ein eigener, kleiner Schritt.
 - Handtest: alle sieben Handtest-Punkte vom Projektinhaber am 22. November 2026 bestätigt (Öffnen und Scrollen in Spandau ohne Ruckeln, auch schnelles Scrollen; Klick wählt und zentriert; Strg+Klick; Tastatur inkl. Esc; Suche, Herkunft und Gliederung; Karte zur Liste rollt; Änderungen bei offener Liste).
+
+## ADR 103: Höhenlinien (Topologie) als Ansicht über dem Gelände
+
+**Datum:** 23. November 2026 · **Status:** Umgesetzt auf `feature/topology` (Commits `03fae4e` und `1f99d33`, vom Projektinhaber getestet; Merge nach `main` steht aus). Plan, Bestandsaufnahme und Messwerte: `Documentation/topology-plan.md`.
+
+**Anlass:** Der Projektinhaber wünscht für Release 1.2.0 eine Ansicht „Topologie“ am rechten Rand der unteren Leiste, damit man Höhenlinien über dem Gelände sieht und Straßen besser planen kann (ADR 098 hatte den Platz bewusst frei gelassen; die Skizze zeigt dort den Knopf „Topology View“). Die Ansicht ist ein Planungswerkzeug, kein Ersatz für das Gelände-Werkzeug.
+
+**Entscheidungen des Projektinhabers (22. und 23. November 2026, `topology-plan.md` Abschnitt 6):**
+1. **Darstellung (B):** Linien, die Hauptlinie kräftiger; ein Farbband nach Höhe ist im Popup zuschaltbar, Standard ist nur Linien.
+2. **Linienabstand (C):** Automatisch nach Zoom und Gelände, im Popup einstellbar von 0,25 bis 10 m.
+3. **Beschriftung (A):** Keine Zahlen an den Linien. Die Höhe unter dem Zeiger steht in der Statuszeile, dazu gibt es eine Legende (bestätigt am 23. November 2026).
+4. **In 3D (A):** Die Linien liegen auch in der 3D-Ansicht auf dem Gelände.
+5. **Platz des Knopfs (B):** Knopf `mountain` in der rechten Gruppe der Leiste, vorletzter Knopf wie in der Skizze, zusätzlich ein Schalter „Topography“ im Straßen-Fenster; beide zeigen denselben Zustand.
+6. **Live beim Geländepinsel (A):** Die Linien laufen beim Pinseln, bei Rückgängig und Wiederholen mit.
+7. **Merken (A):** Nur für die Sitzung, beim Start aus. Die Einstellung steht nicht in der Projektdatei.
+
+**Umsetzung:**
+- Reine Logik in `Editor.OMSI` ohne Unity: `OmsiContourRules.cs` (Höhenbereich, „flach“ unter 0,1 m Spanne, automatischer Abstand aus 0,25 bis 10 m, Hauptlinie jede fünfte Stufe, Klemmung) und `OmsiContourSettings.cs` (Sitzungszustand). `OmsiTerrain.TryGetRange` liest den Höhenbereich je Kachel einmal. Tests in `OmsiContourRulesTests.cs`.
+- Darstellung als Überzug nach dem Muster der Luftbilder: Shader `MapContourOverlay` (Float-Uniforms, keine Shader-Keywords, Queue 3095, `Offset -1, -1` gegen Z-Kampf in 3D) und `MapGroundRendererContours.cs` (Teil von `MapGroundRenderer`). Der Überzug teilt die Mesh des Bodens und wird in `RefreshTerrain` mit ausgetauscht, deshalb folgt er dem Pinsel, Undo und Redo ohne eigene Neuberechnung.
+- Linienstufen: Der Grundabstand wird im Shader je Pixel geprüft. Liegt eine Stufe unter 3 px Bildschirmabstand (weich bis 6 px), wird sie ausgeblendet und die nächste Stufe, ×5, rückt als Nebenlinie nach, dann ×25 und ×125 als Hauptlinie. So bleiben Steilhänge ohne Moiré und ohne dunkle Flächen durch den Halo.
+- Flache Bereiche (Spanne unter 0,1 m) bekommen keine Linie. Das schützt Karten wie Stadtückheim, die fast nur aus Höhe 0 bestehen.
+- Bedienung in `EditorShellTopology.cs` (Teil von `EditorShellBootstrap`): Linksklick am Knopf schaltet um, Rechtsklick (bzw. Menütaste oder Umschalt+F10) öffnet das Einstellungs-Popup mit Abstand, Farbband und Legende. Der Aktivzustand kommt aus `OmsiContourSettings`, nicht aus dem Popup-Zustand der Leiste. Die Höhe unter dem Zeiger wird über `MapCanvasElement.GroundPointerMoved` in der Statuszeile gezeigt; sie wird auch nach Pinsel, Undo und Redo neu gelesen.
+- Texte in `locales/*/topology.json` (22 Schlüssel, acht Sprachen). Kommandozeile `-topology`, `-topologyPopup`, `-topologyHere` (`CommandLine.md`).
+- Abstimmung mit dem Rest der Oberfläche: Der Knopf läuft nicht über `barButtons` und `UpdateBarButtons`, damit er das Popup der Listen nicht berührt.
+
+**Messwerte (Player, Mono, Berlin-Spandau, 23. November 2026):**
+- Bildzeit beim Anzeigen der Karte: kein messbarer Mehraufwand mit `-topology` gegenüber ohne.
+- Laden des Bodens: etwa 0,2 bis 0,3 s länger, weil die Linien-Mesh mitgebaut wird.
+- Die 50-ms-Meldung der Vektorebene tritt nicht neu auf; die Linien liegen auf dem Shader, nicht in der Vektorebene.
+- EditMode 1467 von 1467 grün; Player-Build ok (`MapContourOverlay.shader` ist die einzige neue Player-Datei und in `PlayerAssetReview.txt` freigegeben).
+
+**Folgen und Offenes:**
+- Die Linien sind pixelgenau, aber in jedem Dreieck linear: Bei sehr großem Zoom wirken sie leicht eckig. Eine glattere Lösung über eine Höhentextur je Kachel bleibt als späterer Schritt offen.
+- Beschriftung der Hauptlinien mit Zahlen (Option 3B der Entscheidungsvorlage) ist als Folgeschritt vorgesehen, nicht Teil von 1.2.0.
+- Farbe nach Neigung mit der Warnschwelle des Straßenbaus und ein Wasserstand als eigene Linie sind optional und offen.
+- Die Einstellung wird nicht gespeichert; ein Merken in `editor-settings.json` ist nachrüstbar.
+- Offene Prüfpunkte aus dem Handtest: Rechtsklick und Tastatur am Knopf sowie der Straßenbau mit Linien sind nicht automatisch geprüft, sondern nur im Handtest.
