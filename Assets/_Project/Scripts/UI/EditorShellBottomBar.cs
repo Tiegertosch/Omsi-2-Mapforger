@@ -79,7 +79,12 @@ namespace OmsiMapEditor.UI
             left.Add(projectPill);
 
             foreach (var (tab, icon, tooltipKey) in RightBarButtons)
+            {
+                // The topology button stands left of the map settings, the second last button of the bar (UI Research/Skitze.png).
+                if (tab == ProjectTab.Map)
+                    right.Add(CreateTopologyButton());
                 right.Add(BarButton(tab, icon, tooltipKey)); // i18n:keys
+            }
 
             // No media queries in USS: a narrow window gets a compact bar (shorter name pill, smaller round buttons).
             bottomBar.RegisterCallback<GeometryChangedEvent>(evt =>
@@ -111,6 +116,8 @@ namespace OmsiMapEditor.UI
                 inspectorFrame.style.bottom = popupBottom;
             if (barPopup != null)
                 barPopup.style.bottom = popupBottom;
+            if (topologyPopup != null)
+                topologyPopup.style.bottom = popupBottom;
             if (objectsPanelHost != null)
                 objectsPanelHost.style.bottom = toolBottom;
             if (imageryAttribution != null)
@@ -189,6 +196,8 @@ namespace OmsiMapEditor.UI
         private void ShowBarPopup(bool show)
         {
             barPopupOpen = show && currentSummary != null;
+            if (barPopupOpen)
+                ShowTopologyPopup(false); // both open at the right edge: one at a time
             if (barPopup != null)
                 barPopup.style.display = barPopupOpen ? DisplayStyle.Flex : DisplayStyle.None;
             RenderBarPopup();
@@ -213,6 +222,7 @@ namespace OmsiMapEditor.UI
                 pair.Value.SetEnabled(loaded && ProjectTabAvailable(pair.Key));
                 pair.Value.EnableInClassList("bar-button-active", barPopupOpen && projectTab == pair.Key);
             }
+            UpdateTopologyButton();
         }
 
         /// <summary>

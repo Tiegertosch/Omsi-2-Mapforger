@@ -710,6 +710,10 @@
 .option-slider > .option-slider-control { flex-grow: 1; margin: 0 var(--mf-space-1) 0 0; }
 .option-slider-value { width: 44px; margin: 0; padding: 0; -unity-text-align: middle-right; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); }
 .option-heading { margin: var(--mf-space-1) 0 var(--mf-space-1); font-size: var(--mf-font-secondary); -unity-font: url("Fonts/Inter-SemiBold.ttf"); color: var(--mf-color-text-secondary); }
+/* The colour band of the topology view: its lowest height, the band as the shader draws it, its highest height. */
+.topology-scale { flex-direction: row; align-items: center; margin-top: var(--mf-space-2); }
+.topology-scale-bar { flex-grow: 1; flex-shrink: 1; height: 10px; margin: 0 var(--mf-space-2); border-radius: 5px; border-width: 1px; border-color: var(--mf-color-border); }
+.topology-scale-value { flex-shrink: 0; margin: 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-secondary); }
 /* The route strip of the line tool (ADR 098, M4): the window beside its options, a thick track with a node for each stop, the stop's name aslant under
    the node, and above the node the two buttons that move it one place left or right. */
 .line-panel { background-color: var(--mf-color-panel-glass); }

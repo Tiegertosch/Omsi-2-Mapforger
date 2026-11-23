@@ -22,6 +22,40 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Height at grid point (column, row); column 0 is the west edge and row 0 the south edge.</summary>
         public float this[int column, int row] => heights[row * Resolution + column];
 
+        private float lowest;
+        private float highest;
+        private bool rangeRead;
+        private bool rangeValid;
+
+        /// <summary>
+        /// The lowest and highest height of the tile, ignoring values that are not a number; false when there is none.
+        /// Read once, the heights of a terrain never change.
+        /// </summary>
+        public bool TryGetRange(out float minimum, out float maximum)
+        {
+            if (!rangeRead)
+            {
+                var low = float.MaxValue;
+                var high = float.MinValue;
+                foreach (var height in heights)
+                {
+                    if (float.IsNaN(height) || float.IsInfinity(height))
+                        continue;
+                    if (height < low)
+                        low = height;
+                    if (height > high)
+                        high = height;
+                }
+                rangeValid = low <= high;
+                lowest = rangeValid ? low : 0f;
+                highest = rangeValid ? high : 0f;
+                rangeRead = true;
+            }
+            minimum = lowest;
+            maximum = highest;
+            return rangeValid;
+        }
+
         /// <summary>A copy of the 61 × 61 heights, row by row from the south edge.</summary>
         public float[] CopyHeights()
         {

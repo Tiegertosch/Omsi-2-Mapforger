@@ -18,7 +18,7 @@ namespace OmsiMapEditor.World
     /// below the UI. The masks of the ground textures are read only for tiles near the view and dropped again for tiles
     /// long out of it, so large maps load fast and keep a bounded amount of them in memory.
     /// </summary>
-    public sealed class MapGroundRenderer : MonoBehaviour
+    public sealed partial class MapGroundRenderer : MonoBehaviour
     {
         /// <summary>Layer of the ground meshes; only the ground camera renders it.</summary>
         public const int GroundLayer = 8;
@@ -284,6 +284,7 @@ namespace OmsiMapEditor.World
             splineShader = Resources.Load<Shader>("MapSplineSurface");
             if (splineShader == null)
                 Debug.LogError("MapSplineSurface.shader was not found in Resources.");
+            LoadContourShader();
 
             var cameraObject = new GameObject("Map Ground Camera");
             cameraObject.transform.SetParent(transform, false);
@@ -460,6 +461,7 @@ namespace OmsiMapEditor.World
             groundRoot = null;
             foreach (var key in new List<long>(imagerySurfaces.Keys))
                 RemoveImagerySurface(key);
+            ClearContours();
             foreach (var item in owned)
                 Destroy(item);
             owned.Clear();
@@ -563,6 +565,7 @@ namespace OmsiMapEditor.World
                     Destroy(state.Mesh);
                 }
                 state.Mesh = mesh;
+                EnsureContourSurface(state);
             }
         }
 
@@ -686,6 +689,22 @@ namespace OmsiMapEditor.World
                 : 0f;
         }
 
+        /// <summary>Like <see cref="HeightAt"/>, but false where no terrain was read (outside the tiles or on a tile without terrain).</summary>
+        public bool TryHeightAt(Vector2 mapPosition, out float height)
+        {
+            height = 0f;
+            if (tileSize <= 0)
+                return false;
+            var worldX = mapPosition.x + originX;
+            var worldY = mapPosition.y + originY;
+            var tileX = (int)Math.Floor(worldX / tileSize);
+            var tileY = (int)Math.Floor(worldY / tileSize);
+            if (!terrains.TryGetValue(TileKey(tileX, tileY), out var terrain))
+                return false;
+            height = (float)terrain.HeightAt(worldX - tileX * tileSize, worldY - tileY * tileSize, tileSize);
+            return true;
+        }
+
         private static long TileKey(int x, int y)
         {
             return ((long)x << 32) ^ (uint)y;
@@ -714,6 +733,7 @@ namespace OmsiMapEditor.World
             orbitDistance = distance;
             viewIsOrbit = true;
             hasViewForMasks = true;
+            SetViewScale(2.0 * distance * Math.Tan(OrbitFieldOfView * 0.5 * Math.PI / 180.0) / screenRect.height);
             var rotation = Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
             groundCamera.transform.SetPositionAndRotation(target - rotation * Vector3.forward * distance, rotation);
         }
@@ -742,11 +762,13 @@ namespace OmsiMapEditor.World
             viewHalfSize = new Vector2(viewHeightMeters * 0.5f * screenRect.width / screenRect.height, viewHeightMeters * 0.5f);
             viewIsOrbit = false;
             hasViewForMasks = true;
+            SetViewScale(viewHeightMeters / screenRect.height);
             groundCamera.transform.SetPositionAndRotation(new Vector3(center.x, CameraHeight, center.y), Quaternion.Euler(90f, 0f, 0f));
         }
 
         private void Update()
         {
+            UpdateContours();
             if (loading != null && loading.IsCompleted)
             {
                 var task = loading;
@@ -1267,6 +1289,7 @@ namespace OmsiMapEditor.World
                 renderers.Add(AddQuad("Tile " + tile.X + ", " + tile.Y, position, baseMaterial, mesh));
             tileStates[key] = new TileState { Key = key, X = tile.X, Y = tile.Y, Position = position, Mesh = mesh, MaskPaths = tile.MaskPaths };
             AddImagerySurface(tileStates[key]);
+            EnsureContourSurface(tileStates[key]);
             if (tile.Holes != null)
                 ApplyHoles(key, renderers, tile.Holes);
             foreach (var batch in tile.Splines)
