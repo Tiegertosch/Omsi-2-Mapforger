@@ -1215,6 +1215,8 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - **Kein Rückgängig-Schritt:** Wie bei den Tagen einer Chrono-Variante; man stellt die Werte wieder zurück. „Revert“ der ganzen Karte gibt es ohnehin.
 - **Kommandozeile:** `-mapSettings` öffnet den Dialog (für Screenshots), `-mapSettingsApply Name left|right ErstesJahr LetztesJahr Autos Fahrgäste` schreibt diese Einstellungen; „Map settings:“ im Player-Log; nur mit Projekt.
 
+**Nachtrag „Dialog liest die Arbeitskopie“ (25. November 2026, Zweig `feature/parity-quick-wins`, nicht committet):** Fehler behoben: `EditorShellMapSettings.OpenMapSettings` las `global.cfg` aus der Originalkarte statt aus der Arbeitskopie. Beim Wiederöffnen erschienen deshalb die alten Werte (Jahreszeiten, aber auch Jahre, Fahrtseite, Geld und die übrigen Felder seit ADR 076), und ein zweites „Apply“ schrieb sie zurück. Jetzt liest der Dialog über `session.Workspace.ReadAllBytes` (dieselbe Quelle wie `-mapSettingsApply`), die Originalkarte bleibt unberührt. Prüfung: `OmsiMapSettingsTests.OptionsReadFromTheProjectCopyKeepTheSavedValuesAndApplyingThemAgainChangesNothing`.
+
 **Grenzen:** Größe und Bodenhöhe der Karte, Kacheln und die Tageskurven selbst bleiben bei den Werkzeugen für Kacheln und Gelände. Eine Änderung der Fahrtseite (`[LHT]`) schreibt nur den Schalter; vorhandene Straßen und KI-Pfade ändert sie nicht. Die Jahreszeiten gibt es als Vorlagen (wie jetzt, vier mit Schnee, milder Winter, nur Sommer), nicht einzeln.
 
 **Prüfung:** `OmsiMapSettingsTests` (Name, Beschreibung, Fahrtseite, Jahre und Tageskurve werden geschrieben, alles andere und die Originaldatei bleiben, dieselben Werte ändern nichts, Name Pflicht, Abschnittsnamen und rückwärtslaufende Jahre werden abgelehnt).
@@ -1513,6 +1515,18 @@ Unsere Straßenanpassung (ADR 022) rechnet nach jeder Straßenänderung neu. Ihr
 - Der Fußpfad über die Straße läuft auf Fahrbahnhöhe plus Restkante statt auf Gehweghöhe.
 - Nicht übernommen: die Absenkung an Kreuzungen der Schritte 1 bis 3 (dort liegen die Überwege an den Armen, deren Gehwege aus dem Straßenprofil kommen).
 - Geprüft: Test `TheKerbOfACrossingPieceIsLoweredAtTheCrossingAndRisesAgainBeforeAndAfter` (Höhen an Kante und Rand, in der Rampe, am Stückende; Pfadhöhe) und die 3D-Ansicht im Player (Kante sinkt zum Zebra, Gehweg läuft sanft hinunter).
+
+**Nachtrag „Ampel am Überweg-Stück“ (23. November 2026, Zweig `feature/parity-quick-wins`, nicht committet; schließt „offen: Ampel am Überweg-Stück“ der Feature-Parity-Liste, Punkt E; ergänzt ADR 085 und ADR 086; Test in openOMSI durch den Nutzer steht aus):**
+- **Befund (Korrektur, openOMSI-Quelltext):** Fußgänger drücken die Anforderung an ihrem Überweg selbst (`ai_traffic/tick.rs`, `walker_requests`), Fahrzeuge fordern ihr eigenes Licht an (`traffic/lights.rs`, `stop_active`). Ein Haltepunkt am Fahrzeuglicht hätte deshalb ein wartendes Auto selbst Rot auslösen lassen. Der Haltepunkt liegt jetzt auf der Fußgängergruppe.
+- **Fahrspuren als Wege:** Jede Fahrspur eines Arms mit Überweg ist ein eigener Weg (`OmsiJunctionLayout.Connect(fromArm, toArm, kind, asWays)`, Schlüssel über `OmsiLaneConnections.Key`, `WaysThrough`), damit der Ampel-Editor sie binden kann. Vorher waren Fahrspuren und Fußpfade nur Teile der Verbindung. Stücke ohne Ampel bleiben byte-gleich (2.778 Stücke geprüft).
+- **Rolle der Fußgänger:** `OmsiSignalRole.Pedestrians` (Arm -1, Turn `Pedestrian`, `IsPedestrian`). Eine Vorlagenrolle mit Arm -1 ist nur für Fußgänger gültig; andere Rollen müssen einen Arm haben.
+- **Vorlage „Crossing on request“:** Umlauf 45 s. Fahrzeuge Grün 0 bis 20 s, Gelb 20 bis 23 s, Rot 23 bis 44 s, Rot-Gelb 44 bis 45 s. Fußgänger (Gruppe „Crossing 1“, Name aus `signals.wizard.group_foot`) Grün 25 bis 41 s. Haltepunkt 10 s „ifNoRequest“ auf dem Fußgängerlicht.
+- **Passung (`OmsiSignalTemplateMatch.Match`, Parameter `crossingFootpaths`):** Fußwege mit eigenem Weg binden an die Fußgängergruppe; Nutzer-Overrides werden vor der Fußgängerrolle geprüft. Ohne bindbaren Fußweg wird die Fußgängergruppe in `IdleLights` statt `EmptyLights` geführt, die Passung bleibt (`Fits`), und `AdaptHolds` verlegt den Haltepunkt auf das Fahrzeuglicht wie früher. Der Umlauf ist in beiden Fällen der neue.
+- **Format:** Eine Nutzervorlage mit Fußgängerrolle wird als `formatVersion` 2 geschrieben, sonst wie bisher als 1 (`ToText`). Der Leser nimmt bis 2 an; 1.2.0 lehnt 2 ab: Die Vorlage wird mit Grund gemeldet (Statuszeile und Log) und übersprungen, wie jede zu neue Vorlage (ADR 085, Meilenstein 6).
+- **Bestehende Programme:** Bereits angewendete Programme in vorhandenen `.sco` bleiben unverändert, also mit dem alten Haltepunkt auf Licht 0. Nur neu angewendete Vorlagen bekommen den neuen Aufbau.
+- **Grenzen und Offenes:** Es gibt noch keinen Schalter „mit Ampel“ beim Einsetzen des Überwegs; die Haltelinie wird nicht gemalt (der Halt liegt 4 m vor dem Zebra bei 3 m Breite). Die Phasenseite zeigt das Programm mit Haltepunkt auf der Fußgängergruppe als „kann nicht als Phasen gezeigt werden“. Test durch den Nutzer in openOMSI offen.
+- **Prüfung:** `OmsiCrossingPieceSignalTests` (8: Wege je Fahrspur, Stück ohne Überweg und ohne Ampel, Passung der Vorlage mit Fahrzeug- und Fußgängergruppe, Ausweichen ohne bindbaren Fußweg, Vorrang der Nutzerwahl, Schreiben und Lesen, Vorlage aus einer Kreuzung mit Ampel). `OmsiSignalTemplateTests` (14) decken die bestehenden Vorlagen ab; `ATemplateWithAPedestrianGroupIsWrittenAsVersionTwoAndOthersStayVersionOne` prüft das Format 2: Vorlage mit Fußgängergruppe wird als Version 2 geschrieben und gelesen, andere Vorlagen bleiben Version 1, Version 3 wird abgelehnt.
+- **Endlauf (23. November 2026):** volle EditMode-Suite 1492 von 1492 grün auf dem Endstand, Player-Build erfolgreich. Sichtprüfung am Player: Dialog „Map settings...“ mit der Jahreszeitenliste (Grundorf, 5 Einträge, 0–38 … 324–370); Überweg-Stück #8980 mit Vorlage `pedestrian_request` (2 Gruppen, Umlauf 45 s), Prüfseite „No errors or warnings“.
 
 ## ADR 087: Parkreihen entlang von Straßen
 
@@ -2195,3 +2209,29 @@ M7 abgeschlossen (22. November 2026): Schritte 0–7 vom Projektinhaber getestet
 - Farbe nach Neigung mit der Warnschwelle des Straßenbaus und ein Wasserstand als eigene Linie sind optional und offen.
 - Die Einstellung wird nicht gespeichert; ein Merken in `editor-settings.json` ist nachrüstbar.
 - Offene Prüfpunkte aus dem Handtest: Rechtsklick und Tastatur am Knopf sowie der Straßenbau mit Linien sind nicht automatisch geprüft, sondern nur im Handtest.
+
+## ADR 104: Einzelne Jahreszeiten bearbeiten (`[addseason]`-Liste)
+
+**Datum:** 23. November 2026 · **Status:** Umgesetzt auf `feature/parity-quick-wins`, nicht committet; Handtest des Projektinhabers steht aus. Schließt den Punkt „Umgebungs-/Jahreszeitenoptionen bearbeiten“ (Parity I), der bisher nur die Vorlagen kannte.
+
+**Anlass:** ADR 032 und ADR 076 bieten drei Vorlagen (Schneewinter, milder Winter, nur Sommer). Eine Karte mit eigener Abfolge ließ sich nicht von Hand ändern; der Nutzer musste `global.cfg` bearbeiten.
+
+**Befund (installierte Karten):**
+- `[addseason]` hat drei Felder: Art, erster Tag, letzter Tag. Die Tage zählen 0 bis 370, so wie in allen installierten Karten (Grundorf endet den Winter am 370).
+- Art 1 Frühling, 2 Herbst, 3 Winter, 4 Schneewinter. Sommer ist der Standard jedes Tages ohne Eintrag; OMSIs Editor schreibt dafür 0.
+- Art 0 und 5 (trockener Sommer) stammen aus dem Bestandscode und sind in keiner installierten Karte belegt. Unbekannte Arten bleiben in der Liste erhalten und heißen dort „Kind n“.
+- Ein gemeinsamer Grenztag zweier aufeinanderfolgender Bereiche (etwa 38 und 38) ist keine Überlappung. Überlappungen über mehr als einen Tag warnt der Editor.
+
+**Entscheidung:**
+- **Logik ohne Unity** in `OmsiSeasons` (`Editor.OMSI`): `Read` (Einträge in Reihenfolge; ein Datensatz, der nicht aus drei ganzen Zahlen besteht, wird übersprungen), `Check` (Befunde je Eintrag: negative Art, unbekannte Art, Tag außerhalb 0 bis 370, letzter Tag vor erstem als Fehler; Überlappung als Warnung), `FirstError` und `Apply`.
+- **Sperre:** Fehler sperren „Apply“ im Dialog und `OmsiNewMapOptions.Check`; Warnungen werden nur gezeigt.
+- **Verlustfrei:** `Apply` ändert nur, was sich unterscheidet. Zuordnung der Einträge zu den vorhandenen Datensätzen über die längste gemeinsame Teilfolge, damit ein Löschen aus der Mitte genau den richtigen Datensatz entfernt. Geänderte Einträge bekommen die geänderten Felder und einen neuen Kommentar (`Winter (snow):` und dergleichen). Neue Einträge stehen nach dem letzten `[addseason]`, sonst nach `[groundtex]`, sonst vor `[trafficdensity*]`. Löschen entfernt nur den Eintrag und seinen eigenen Kommentar; leere Zeilen und fremde Kommentare bleiben und rücken zum Vorgänger.
+- **Oberfläche:** `SeasonListEditor` (`Scripts/UI`) ist Teil des Dialogs `NewMapDialog`, also des Dialogs „New map“ und des Dialogs „Map settings...“ (ADR 076), im Abschnitt Seasons: eine Zeile je Eintrag mit Art, erstem und letztem Tag und einem Knopf zum Löschen, dazu „Add season“. Ein neuer Eintrag beginnt am Tag nach dem letzten Bereich. Die Vorlagenknöpfe füllen die Liste; danach bleibt sie frei bearbeitbar, und der Vorlagenknopf ist aktiv, solange die Liste ihr gleicht.
+- **Übernahme:** `OmsiNewMapOptions.SeasonEntries` trägt die Liste. `FromTemplate` liest sie aus der `global.cfg`; unverändert bleibt die Datei unberührt. `OmsiNewMap.PresetSeasons` liefert die Einträge der Vorlagen.
+- **Kein neues Argument** auf der Kommandozeile.
+
+**Grenzen:**
+- Nur der `[addseason]`-Teil der `global.cfg` der bearbeiteten Karte.
+- Die Tage werden nur auf 0 bis 370 geprüft, nicht gegen einen Kalender oder openOMSIs Tagesrechnung.
+
+**Prüfung:** `OmsiSeasonsTests` (15: Lesen, byte-genaues Schreiben, Ändern nur der Felder und des Kommentars, Hinzufügen und Löschen mit Kommentar, fremde Kommentare, Einfügeorte, Grenztag ohne Überlappung, Fehler und Warnungen, unbekannte Art, Optionen mit den Einträgen der Datei). Dialog und Sprachdateien `locales/*/seasons.json` in acht Sprachen. Sichtprüfung im Player: erledigt am 23. November 2026 (Endlauf 1492 von 1492 grün, Validierungsstand in `DevelopmentSetup.md`).

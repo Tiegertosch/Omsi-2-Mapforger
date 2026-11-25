@@ -1,0 +1,22 @@
+{
+  "@seasons.list.empty": "Seasons editor in the map settings (global.cfg [addseason]). {number}, {max}, {first}, {second} and {kind} are numbers.",
+  "seasons.list.empty": "Sin estaciones: verano todo el año.",
+  "seasons.add": "Añadir estación",
+  "seasons.add.tooltip": "Añade una estación después del último día que cubren las demás",
+  "seasons.remove.tooltip": "Quita esta estación",
+  "seasons.kind.tooltip": "El tipo de estación",
+  "seasons.first.tooltip": "Primer día del año de esta estación (0 a {max})",
+  "seasons.last.tooltip": "Último día del año de esta estación (0 a {max})",
+  "seasons.kind.summer": "Verano",
+  "seasons.kind.spring": "Primavera",
+  "seasons.kind.autumn": "Otoño",
+  "seasons.kind.winter": "Invierno",
+  "seasons.kind.snow": "Invierno con nieve",
+  "seasons.kind.dry": "Verano seco",
+  "seasons.kind.other": "Tipo {kind}",
+  "seasons.problem.number": "Estación {number}: el primer y el último día deben ser números enteros.",
+  "seasons.problem.range": "Estación {number}: los días están entre 0 y {max}.",
+  "seasons.problem.order": "Estación {number}: el último día es anterior al primero.",
+  "seasons.problem.kind": "Estación {number}: el tipo no puede ser negativo.",
+  "seasons.warning.overlap": "Las estaciones {first} y {second} se solapan."
+}

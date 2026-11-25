@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Eigene Linksabbieger",
   "signals.template.separate_left.desc": "Arme 1 und 3 fahren, dann ihre Linksabbieger aus eigenen Spuren, dann Arme 2 und 4 mit ihren Linksabbiegern. Für eine Kreuzung mit Linksabbiegespuren.",
   "signals.template.pedestrian_request": "Überweg auf Anforderung",
-  "signals.template.pedestrian_request.desc": "Zwei Arme: Grün, bis jemand anfordert (Anforderungspunkt), dann Gelb, Rot zum Überqueren und wieder Grün. Fußwege lassen sich an kein Licht binden.",
+  "signals.template.pedestrian_request.desc": "Zwei Arme und ein Überweg: Der Verkehr bleibt grün, bis jemand den Taster drückt (Anforderungspunkt), dann Gelb und Rot, Grün für die Fußgänger und wieder Grün für den Verkehr.",
   "signals.templates.heads": "Köpfe für Gruppen ohne setzen",
   "signals.templates.heads.tooltip": "Setzt für jede Gruppe ohne Kopf einen Ampelkopf, mit Kopftyp, Höhe und Mast des Assistenten. Aus: Köpfe bleiben, wie sie sind.",
   "signals.wizard.group_foot": "Überweg {n}",

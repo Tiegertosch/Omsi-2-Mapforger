@@ -33,7 +33,11 @@ namespace OmsiMapEditor.UI
                 SetStatus(ReadOnlyMessage("readonly.action.map_settings"));
                 return;
             }
-            newMapForm.OpenForSettings(currentSummary.GlobalConfigPath, currentSummary.FriendlyName, currentSummary.Description);
+            // The values come from the project copy, which holds what earlier changes wrote; the original map stays as it was.
+            OmsiRecordFile current = null;
+            if (session.Workspace != null)
+                current = OmsiRecordFile.Parse(session.Workspace.ReadAllBytes(Path.GetFileName(currentSummary.GlobalConfigPath)), OmsiGlobalConfigLayouts.Instance);
+            newMapForm.OpenForSettings(currentSummary.GlobalConfigPath, currentSummary.FriendlyName, currentSummary.Description, current);
             newMapDialog.Show();
         }
 

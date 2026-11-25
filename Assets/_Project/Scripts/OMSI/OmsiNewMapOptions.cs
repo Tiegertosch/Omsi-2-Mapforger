@@ -61,6 +61,12 @@ namespace OmsiMapEditor.OMSI
 
         public OmsiSeasonPreset Seasons { get; set; } = OmsiSeasonPreset.Template;
 
+        /// <summary>
+        /// The [addseason] entries the map is to have (feature parity I); <see cref="FromTemplate(OmsiRecordFile)"/> fills it with the file's
+        /// own, null leaves the file's entries alone. A <see cref="Seasons"/> preset other than Template takes precedence.
+        /// </summary>
+        public List<OmsiSeasonEntry> SeasonEntries { get; set; }
+
         /// <summary>The texture of the base ground layer, the first [groundtex]; the template's detail texture stays.</summary>
         public string GroundTexture { get; set; } = string.Empty;
 
@@ -78,7 +84,8 @@ namespace OmsiMapEditor.OMSI
                 RealRail = Find(config, "realrail") != null,
                 MoneySystem = Find(config, "moneysystem")?.GetField(0)?.Trim() ?? string.Empty,
                 TicketPack = Find(config, "ticketpack")?.GetField(0)?.Trim() ?? string.Empty,
-                GroundTexture = Find(config, "groundtex")?.GetField(0)?.Trim() ?? string.Empty
+                GroundTexture = Find(config, "groundtex")?.GetField(0)?.Trim() ?? string.Empty,
+                SeasonEntries = OmsiSeasons.Read(config)
             };
             var years = Find(config, "years");
             if (years != null && years.TryGetInt(0, out var first) && years.TryGetInt(1, out var last))
@@ -104,6 +111,8 @@ namespace OmsiMapEditor.OMSI
                 return "The year offset must lie between -500 and 500.";
             if (CarTraffic < 0.0 || CarTraffic > 10.0 || PassengerTraffic < 0.0 || PassengerTraffic > 10.0)
                 return "Traffic factors lie between 0 and 10.";
+            if (SeasonEntries != null && OmsiSeasons.FirstError(SeasonEntries) is string seasonProblem)
+                return seasonProblem;
             foreach (var value in new[] { Description, MoneySystem, TicketPack, GroundTexture })
                 if (value != null && value.IndexOf('[') >= 0 && value.IndexOf(']') > value.IndexOf('['))
                     return "Names and texts must not contain a section name in brackets.";

@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 102 · Teilweise 6 · Prüfen 0 · Offen 7 von 115 Punkten. Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 103 · Teilweise 5 · Prüfen 0 · Offen 7 von 115 Punkten (103 + 5 + 0 + 7; die 7 Offen sind die Detailstufen, bewusst nicht gebaut, und 6 Signal- und Chrono-Punkte) (Stand 23. November 2026: Punkte I und E aktualisiert, ADR 104 und ADR 086 Nachtrag). Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -82,7 +82,7 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 - [x] Vorfahrtsregeln an Kreuzungen — Vorhanden
 - [x] KI-Fahrpfade manuell erstellen und bearbeiten — Vorhanden (Zeichnen mit `invis_street` im Pfadmodus samt Einrasten, Breite und Richtung als eigener Pfadtyp, Start und Ende mit der Fahrtrichtung der Spur, ADR 086 und 089; Punkte eines vorhandenen Pfades nur wie bei einem Spline)
 - [x] Fahrstreifenverbindungen definieren — Vorhanden
-- [x] Fußgängerpfade erstellen und verbinden — Vorhanden (Überwege an Kreuzungen mit Zebra, Ampeln und Köpfen, Überweg-Stück mit abgesenktem Bordstein in jede Straße, Pfadmodus mit `invis_sidewalk` und Einrasten auf Pfadlinien; ADR 086, seit 11. November 2026; offen: Ampel am Überweg-Stück)
+- [x] Fußgängerpfade erstellen und verbinden — Vorhanden (Überwege an Kreuzungen mit Zebra, Ampeln und Köpfen, Überweg-Stück mit abgesenktem Bordstein in jede Straße und mit Ampel (Vorlage „Crossing on request“, ADR 086 Nachtrag), Pfadmodus mit `invis_sidewalk` und Einrasten auf Pfadlinien; ADR 086, seit 11. November 2026)
 - [x] Ampeln und Signalphasen bearbeiten — Vorhanden für im Editor erzeugte Kreuzungen (Werkzeug „Signals“: Zeitleiste, Phasen, Assistent, Vorlagen, Prüfung, ADR 085; Fußgängerampeln ADR 086); an OMSIs eigenen Kreuzungen nur Gruppen der Köpfe
 - [x] Ampelgruppen und Kreuzungszuordnung — Vorhanden (Bewegungen und Köpfe den Gruppen zuordnen, ADR 085)
 - [ ] Parkplätze / KI-Parkpfade konfigurieren — Teilweise: Es gibt keine KI-Parkpfade; ein Parkplatz ist ein Objekt (`car_park.sco`, ADR 087). Parkreihen entlang von Straßen und die Parkliste der Karte (Dialog) sind da, dazu Listennummern und die Prüfung unbrauchbarer Plätze in der Kartenprüfung
@@ -129,7 +129,7 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 - [x] Rückgängig und Wiederholen — Vorhanden
 - [x] Kartenfehler und fehlende Dateien prüfen — Vorhanden
 - [x] Kachel- und Objektinformationen anzeigen — Vorhanden
-- [ ] Umgebungs-/Jahreszeitenoptionen bearbeiten — Teilweise (Jahre, Jahresversatz und Jahreszeiten-Vorlagen unter „Map settings...“, einzelne Jahreszeiten nicht)
+- [x] Umgebungs-/Jahreszeitenoptionen bearbeiten — Vorhanden (Jahre, Jahresversatz und Jahreszeiten unter „Map settings...“: Vorlagen und einzelne Einträge mit Art und Tagen, ADR 104; Nutzertest am 25. November 2026 bestanden)
 - [x] Debug-Informationen und Pfadverbindungen anzeigen — Vorhanden
 - [x] Originale OMSI-Datensätze verlustfrei erhalten — Vorhanden (ADR 008; unbekannte Datensätze bleiben als Text erhalten)
 - [ ] Karte im originalen OMSI 2 testen — Teilweise (im Oktober geprüft, seither nur in openOMSI)

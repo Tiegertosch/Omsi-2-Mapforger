@@ -18,7 +18,8 @@ namespace OmsiMapEditor.OMSI
     /// <summary>
     /// What a signal group of a template controls, without any object ID: the movements that come in by arm <see cref="Arm"/>
     /// (counted from 0 as the crossing numbers its approaches) and turn <see cref="Turn"/>, optionally only those from a
-    /// left-turn lane of their own or only the others.
+    /// left-turn lane of their own or only the others. A role for footpaths (<see cref="Pedestrians"/>) has no arm: it
+    /// names the crossings over the arms that can be bound to a light.
     /// </summary>
     public readonly struct OmsiSignalRole : IEquatable<OmsiSignalRole>
     {
@@ -32,6 +33,11 @@ namespace OmsiMapEditor.OMSI
         public int Arm { get; }
         public OmsiMovementTurn Turn { get; }
         public OmsiSignalRoleLane Lane { get; }
+
+        /// <summary>The role of the footpaths across the arms (pedestrian crossings), which have no approach.</summary>
+        public static OmsiSignalRole Pedestrians => new OmsiSignalRole(-1, OmsiMovementTurn.Pedestrian);
+
+        public bool IsPedestrian => Turn == OmsiMovementTurn.Pedestrian;
 
         public bool Matches(OmsiSignalMovement movement, bool ownLane)
         {
@@ -52,7 +58,11 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public sealed class OmsiSignalTemplate
     {
-        public const int FormatVersion = 1;
+        /// <summary>
+        /// The newest format version this program reads. Version 2 adds the role of the pedestrians (arm -1, turn
+        /// pedestrian); a template without it is written as version 1, so that 1.2.0 and older still read it.
+        /// </summary>
+        public const int FormatVersion = 2;
 
         /// <summary>The id of a built-in template (its texts come from the locales), or null for a template of the user.</summary>
         public string Id { get; set; }
@@ -97,14 +107,14 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidDataException(exception.Message);
             }
             foreach (var role in Roles.SelectMany(roles => roles))
-                if (role.Arm < 0 || role.Turn == OmsiMovementTurn.Pedestrian)
+                if (role.IsPedestrian ? role.Arm != -1 || role.Lane != OmsiSignalRoleLane.Any : role.Arm < 0)
                     throw new InvalidDataException("A signal group names a movement that cannot be bound.");
         }
 
         /// <summary>
         /// A template from the program of a crossing as it is: what each light controls, by arm, turn and lane kind. The
         /// second value counts movements the roles cannot tell apart from others of the same arm and turn (they then share
-        /// the group of the first); footpaths cannot be bound and are left out.
+        /// the group of the first). A light that footpaths obey gets the role of the pedestrian crossings.
         /// </summary>
         public static (OmsiSignalTemplate Template, int Imprecise) FromCrossing(string name, string description, OmsiSignalProgram program,
             OmsiSignalIntersection crossing, ICollection<int> ownLaneMovements)
@@ -138,6 +148,8 @@ namespace OmsiMapEditor.OMSI
                         imprecise += mine.Count;
                     }
                 }
+                if (crossing.Movements.Any(movement => movement.Turn == OmsiMovementTurn.Pedestrian && movement.Light == light))
+                    roles.Add(OmsiSignalRole.Pedestrians);
                 template.Roles.Add(roles.OrderBy(role => role.Arm).ThenBy(role => role.Turn).ThenBy(role => role.Lane).ToList());
             }
             return (template, imprecise);
@@ -149,7 +161,7 @@ namespace OmsiMapEditor.OMSI
         public string ToText()
         {
             var text = new StringBuilder();
-            text.Append("{\n  \"formatVersion\": ").Append(FormatVersion).Append(",\n");
+            text.Append("{\n  \"formatVersion\": ").Append(Roles.Any(roles => roles.Any(role => role.IsPedestrian)) ? 2 : 1).Append(",\n");
             text.Append("  \"name\": ").Append(Quote(Name)).Append(",\n");
             text.Append("  \"description\": ").Append(Quote(Description)).Append(",\n");
             text.Append("  \"cycle\": ").Append(Number(Program.CycleSeconds ?? 0)).Append(",\n  \"lights\": [\n");
@@ -365,29 +377,40 @@ namespace OmsiMapEditor.OMSI
         }
 
         /// <summary>
-        /// A crossing of two arms for a footpath across the road: the traffic has green until someone asks (a stop point that
-        /// holds while nobody asks, after 10 s of green so that the traffic is not stopped at once), then yellow, red for the
-        /// people to cross, red and yellow, and green again. The footpath itself has no light: footpaths cannot be bound.
+        /// A crossing of two arms for a footpath across the road (ADR 086): the traffic has green until somebody asks, then
+        /// yellow and red, the people green while the traffic stands, red again, red and yellow for the traffic, and green
+        /// again. The stop point holds the clock in the traffic's green, after 10 s so that it is not stopped at once, while
+        /// nobody asks at the people's light: openOMSI's pedestrians press its button when they come to the crossing
+        /// (<c>walker_requests</c>), and vehicles, which ask at their own light, do not stop the traffic.
         /// </summary>
         private static OmsiSignalTemplate PedestrianTemplate()
         {
             var template = new OmsiSignalTemplate { Id = PedestrianRequest };
-            var roles = Arms(0, 1);
-            template.Roles.Add(roles);
+            template.Roles.Add(Arms(0, 1));
             template.Program.AddLight("Arm 1+2");
+            template.Roles.Add(new List<OmsiSignalRole> { OmsiSignalRole.Pedestrians });
+            template.Program.AddLight("Crossing 1");
             var green = OmsiSignalAspects.StateOf(OmsiSignalAspect.Green);
             var yellow = OmsiSignalAspects.StateOf(OmsiSignalAspect.Yellow);
             var red = OmsiSignalAspects.StateOf(OmsiSignalAspect.Red);
             var redYellow = OmsiSignalAspects.StateOf(OmsiSignalAspect.RedYellow);
-            template.Program.CycleSeconds = 35;
+            // Traffic red from 23 s; the people walk from 25 s to 41 s, enough for 18 m at the check's pace (1.2 m/s, and a second
+            // to start), and the traffic gets green 4 s after theirs ends, the check's shortest intergreen.
+            template.Program.CycleSeconds = 45;
             OmsiSignalTimeline.SetSegments(template.Program, 0, new List<OmsiSignalSegment>
             {
                 new OmsiSignalSegment { Start = 0, End = 20, State = green },
                 new OmsiSignalSegment { Start = 20, End = 23, State = yellow },
-                new OmsiSignalSegment { Start = 23, End = 34, State = red },
-                new OmsiSignalSegment { Start = 34, End = 35, State = redYellow }
+                new OmsiSignalSegment { Start = 23, End = 44, State = red },
+                new OmsiSignalSegment { Start = 44, End = 45, State = redYellow }
             });
-            template.Program.Holds.Add(new OmsiSignalHold { Light = 0, Seconds = 10, IfNoRequest = true });
+            OmsiSignalTimeline.SetSegments(template.Program, 1, new List<OmsiSignalSegment>
+            {
+                new OmsiSignalSegment { Start = 0, End = 25, State = red },
+                new OmsiSignalSegment { Start = 25, End = 41, State = green },
+                new OmsiSignalSegment { Start = 41, End = 45, State = red }
+            });
+            template.Program.Holds.Add(new OmsiSignalHold { Light = 1, Seconds = 10, IfNoRequest = true });
             return template;
         }
 
@@ -495,6 +518,9 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Lights of the template that no movement of the crossing obeys.</summary>
         public List<int> EmptyLights { get; } = new List<int>();
 
+        /// <summary>Groups only for the pedestrians at a crossing without footpaths to bind; they stay dark and do not stop a fit.</summary>
+        public List<int> IdleLights { get; } = new List<int>();
+
         /// <summary>Movements two lights claim; the first light has them.</summary>
         public List<int> Contested { get; } = new List<int>();
 
@@ -502,8 +528,12 @@ namespace OmsiMapEditor.OMSI
         public bool Fits => MissingArms.Count == 0 && Unlit.Count == 0 && EmptyLights.Count == 0;
 
         /// <param name="overrides">Lights the user chose for movements instead (index of the movement; light, or -1 for none).</param>
+        /// <param name="crossingFootpaths">
+        /// The footpaths across arms that can be bound to a light (the crossings of a junction made here), which the role of
+        /// the pedestrians claims; null for none. Other footpaths never get a light.
+        /// </param>
         public static OmsiSignalTemplateMatch Match(OmsiSignalTemplate template, OmsiSignalIntersection crossing, ICollection<int> ownLaneMovements,
-            IReadOnlyDictionary<int, int> overrides = null)
+            IReadOnlyDictionary<int, int> overrides = null, ICollection<int> crossingFootpaths = null)
         {
             if (template == null)
                 throw new ArgumentNullException(nameof(template));
@@ -513,13 +543,22 @@ namespace OmsiMapEditor.OMSI
             for (var arm = 0; arm < template.ArmsNeeded; arm++)
                 if (arm >= crossing.Approaches.Count && template.Roles.Any(roles => roles.Any(role => role.Arm == arm)))
                     match.MissingArms.Add(arm);
+            var walks = template.Roles.FindIndex(roles => roles.Any(role => role.IsPedestrian));
             foreach (var movement in crossing.Movements)
             {
-                if (movement.Approach < 0 || movement.Turn == OmsiMovementTurn.Pedestrian)
+                var footpath = movement.Turn == OmsiMovementTurn.Pedestrian;
+                var bindable = footpath && crossingFootpaths != null && crossingFootpaths.Contains(movement.Index);
+                if (footpath && !bindable || !footpath && movement.Approach < 0)
                     continue;
+                // What the user chose comes first, for the footpaths that can be bound as for the vehicles.
                 if (overrides != null && overrides.TryGetValue(movement.Index, out var chosen))
                 {
                     match.MovementLights[movement.Index] = chosen >= 0 && chosen < template.Program.Lights.Count ? chosen : -1;
+                    continue;
+                }
+                if (bindable)
+                {
+                    match.MovementLights[movement.Index] = walks;
                     continue;
                 }
                 var own = ownLaneMovements != null && ownLaneMovements.Contains(movement.Index);
@@ -532,10 +571,39 @@ namespace OmsiMapEditor.OMSI
             foreach (var movement in crossing.Movements)
                 if (movement.Approach >= 0 && movement.Turn != OmsiMovementTurn.Pedestrian && match.MovementLights[movement.Index] < 0)
                     match.Unlit.Add(movement.Index);
+            // Without a footpath to bind, a group only for the pedestrians stays idle rather than empty: the template still
+            // fits such a crossing, as it did before footpaths could be bound, and only its traffic groups work.
+            var anyFootpath = crossingFootpaths != null && crossing.Movements.Any(movement =>
+                movement.Turn == OmsiMovementTurn.Pedestrian && crossingFootpaths.Contains(movement.Index));
             for (var light = 0; light < template.Program.Lights.Count; light++)
-                if (!match.MovementLights.Contains(light))
+            {
+                if (match.MovementLights.Contains(light))
+                    continue;
+                if (!anyFootpath && template.Roles[light].Count > 0 && template.Roles[light].All(role => role.IsPedestrian))
+                    match.IdleLights.Add(light);
+                else
                     match.EmptyLights.Add(light);
+            }
             return match;
+        }
+
+        /// <summary>
+        /// Moves the stop points of idle groups (<see cref="IdleLights"/>) to the first group that controls vehicles, so that
+        /// the clock holds where vehicles ask, as the template did before footpaths could be bound; a stop point at a light
+        /// nobody obeys would never be asked at.
+        /// </summary>
+        public void AdaptHolds(OmsiSignalProgram program)
+        {
+            if (program == null)
+                throw new ArgumentNullException(nameof(program));
+            if (IdleLights.Count == 0)
+                return;
+            var vehicles = MovementLights.Where(light => light >= 0 && !IdleLights.Contains(light)).DefaultIfEmpty(-1).Min();
+            if (vehicles < 0)
+                return;
+            foreach (var hold in program.Holds)
+                if (IdleLights.Contains(hold.Light))
+                    hold.Light = vehicles;
         }
     }
 }

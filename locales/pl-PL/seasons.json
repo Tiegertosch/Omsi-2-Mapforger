@@ -1,0 +1,22 @@
+{
+  "@seasons.list.empty": "Seasons editor in the map settings (global.cfg [addseason]). {number}, {max}, {first}, {second} and {kind} are numbers.",
+  "seasons.list.empty": "Brak pór roku: lato przez cały rok.",
+  "seasons.add": "Dodaj porę roku",
+  "seasons.add.tooltip": "Dodaje porę roku po ostatnim dniu, który pokrywają pozostałe",
+  "seasons.remove.tooltip": "Usuwa tę porę roku",
+  "seasons.kind.tooltip": "Rodzaj pory roku",
+  "seasons.first.tooltip": "Pierwszy dzień roku tej pory roku (0 do {max})",
+  "seasons.last.tooltip": "Ostatni dzień roku tej pory roku (0 do {max})",
+  "seasons.kind.summer": "Lato",
+  "seasons.kind.spring": "Wiosna",
+  "seasons.kind.autumn": "Jesień",
+  "seasons.kind.winter": "Zima",
+  "seasons.kind.snow": "Zima ze śniegiem",
+  "seasons.kind.dry": "Suche lato",
+  "seasons.kind.other": "Rodzaj {kind}",
+  "seasons.problem.number": "Pora roku {number}: pierwszy i ostatni dzień muszą być liczbami całkowitymi.",
+  "seasons.problem.range": "Pora roku {number}: dni mieszczą się między 0 a {max}.",
+  "seasons.problem.order": "Pora roku {number}: ostatni dzień jest przed pierwszym.",
+  "seasons.problem.kind": "Pora roku {number}: rodzaj nie może być ujemny.",
+  "seasons.warning.overlap": "Pory roku {first} i {second} nakładają się."
+}

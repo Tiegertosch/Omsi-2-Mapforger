@@ -197,15 +197,25 @@ namespace OmsiMapEditor.Tests
                 clock.Advance(0.1);
             Assert.IsTrue(clock.Held);
             Assert.AreEqual(OmsiSignalAspects.StateOf(OmsiSignalAspect.Green), clock.StateOf(0));
+            // Passing traffic asks at its own light and does not stop itself; somebody at the crossing's button does.
             clock.Requests[0] = true;
+            for (var step = 0; step < 110; step++)
+                clock.Advance(0.1);
+            Assert.IsTrue(clock.Held, "traffic at its own light keeps the green");
+            Assert.AreEqual(OmsiSignalAspects.StateOf(OmsiSignalAspect.Red), clock.StateOf(1), "the people wait at red");
+            clock.Requests[0] = false;
+            clock.Requests[1] = true;
             for (var step = 0; step < 110; step++)
                 clock.Advance(0.1);
             Assert.AreEqual(OmsiSignalAspects.StateOf(OmsiSignalAspect.Yellow), clock.StateOf(0), "after the request the traffic gets yellow, time " + clock.Time);
             for (var step = 0; step < 40; step++)
                 clock.Advance(0.1);
             Assert.AreEqual(OmsiSignalAspects.StateOf(OmsiSignalAspect.Red), clock.StateOf(0), "then red for the people to cross");
-            clock.Requests[0] = false;
-            for (var step = 0; step < 120; step++)
+            for (var step = 0; step < 20; step++)
+                clock.Advance(0.1);
+            Assert.AreEqual(OmsiSignalAspects.StateOf(OmsiSignalAspect.Green), clock.StateOf(1), "the people get green while the traffic stands, time " + clock.Time);
+            clock.Requests[1] = false;
+            for (var step = 0; step < 190; step++)
                 clock.Advance(0.1);
             Assert.AreEqual(OmsiSignalAspects.StateOf(OmsiSignalAspect.Green), clock.StateOf(0), "green again after the red");
             for (var step = 0; step < 300; step++)
@@ -321,6 +331,21 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual("___", OmsiSignalTemplates.FileNameOf(nameless.Name));
             nameless.Name = "   ";
             Assert.Throws<ArgumentException>(() => OmsiSignalTemplates.Save(Path.GetTempPath(), nameless));
+        }
+
+        [Test]
+        public void ATemplateWithAPedestrianGroupIsWrittenAsVersionTwoAndOthersStayVersionOne()
+        {
+            var request = OmsiSignalTemplates.Find(OmsiSignalTemplates.PedestrianRequest).Copy();
+            request.Id = null;
+            StringAssert.Contains("\"formatVersion\": 2,", request.ToText());
+            Assert.AreEqual(OmsiSignalRole.Pedestrians, OmsiSignalTemplate.FromText(request.ToText()).Roles[1][0]);
+            var plain = OmsiSignalTemplates.Find(OmsiSignalTemplates.TwoPhase).Copy();
+            plain.Id = null;
+            StringAssert.Contains("\"formatVersion\": 1,", plain.ToText());
+            Assert.DoesNotThrow(() => OmsiSignalTemplate.FromText(plain.ToText()));
+            var future = Assert.Throws<InvalidDataException>(() => OmsiSignalTemplate.FromText("{ \"formatVersion\": 3, \"lights\": [] }"));
+            StringAssert.Contains("format version 3", future.Message);
         }
     }
 }

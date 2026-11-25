@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Viragens à esquerda separadas",
   "signals.template.separate_left.desc": "Seguem os braços 1 e 3, depois as suas viragens à esquerda de vias próprias, depois os braços 2 e 4 e as suas viragens. Para um cruzamento com vias de viragem à esquerda.",
   "signals.template.pedestrian_request": "Passagem a pedido",
-  "signals.template.pedestrian_request.desc": "Dois braços: verde até alguém pedir (um ponto de pedido), depois amarelo, vermelho para atravessar e verde outra vez. Os caminhos de peões não se ligam a uma luz.",
+  "signals.template.pedestrian_request.desc": "Dois braços e uma passadeira: o trânsito fica verde até alguém carregar no botão (um ponto de pedido), depois amarelo e vermelho, verde para os peões atravessarem e verde outra vez para o trânsito.",
   "signals.templates.heads": "Colocar cabeças para grupos sem elas",
   "signals.templates.heads.tooltip": "Coloca uma cabeça para cada grupo que não tenha, com o tipo, a altura e o poste do assistente. Desligado: as cabeças não mudam.",
   "signals.wizard.group_foot": "Passadeira {n}",

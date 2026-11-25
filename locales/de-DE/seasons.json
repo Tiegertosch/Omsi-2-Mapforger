@@ -1,0 +1,22 @@
+{
+  "@seasons.list.empty": "Seasons editor in the map settings (global.cfg [addseason]). {number}, {max}, {first}, {second} and {kind} are numbers.",
+  "seasons.list.empty": "Keine Jahreszeiten: das ganze Jahr Sommer.",
+  "seasons.add": "Jahreszeit hinzufügen",
+  "seasons.add.tooltip": "Fügt eine Jahreszeit nach dem letzten Tag an, den die anderen abdecken",
+  "seasons.remove.tooltip": "Entfernt diese Jahreszeit",
+  "seasons.kind.tooltip": "Die Art der Jahreszeit",
+  "seasons.first.tooltip": "Erster Tag des Jahres dieser Jahreszeit (0 bis {max})",
+  "seasons.last.tooltip": "Letzter Tag des Jahres dieser Jahreszeit (0 bis {max})",
+  "seasons.kind.summer": "Sommer",
+  "seasons.kind.spring": "Frühling",
+  "seasons.kind.autumn": "Herbst",
+  "seasons.kind.winter": "Winter",
+  "seasons.kind.snow": "Winter mit Schnee",
+  "seasons.kind.dry": "Trockener Sommer",
+  "seasons.kind.other": "Art {kind}",
+  "seasons.problem.number": "Jahreszeit {number}: Erster und letzter Tag müssen ganze Zahlen sein.",
+  "seasons.problem.range": "Jahreszeit {number}: Die Tage liegen zwischen 0 und {max}.",
+  "seasons.problem.order": "Jahreszeit {number}: Der letzte Tag liegt vor dem ersten.",
+  "seasons.problem.kind": "Jahreszeit {number}: Die Art darf nicht negativ sein.",
+  "seasons.warning.overlap": "Die Jahreszeiten {first} und {second} überlappen sich."
+}

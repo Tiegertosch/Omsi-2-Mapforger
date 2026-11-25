@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Giros a la izquierda separados",
   "signals.template.separate_left.desc": "Van los brazos 1 y 3, luego sus giros a la izquierda desde carriles propios, luego los brazos 2 y 4 y sus giros. Para un cruce con carriles de giro a la izquierda.",
   "signals.template.pedestrian_request": "Cruce a petición",
-  "signals.template.pedestrian_request.desc": "Dos brazos: verde hasta que alguien lo pide (un punto de petición), luego amarillo, rojo para cruzar y verde otra vez. Los pasos de peatones no se pueden asignar a una luz.",
+  "signals.template.pedestrian_request.desc": "Dos brazos y un paso de peatones: el tráfico sigue en verde hasta que alguien pulsa el botón (un punto de petición), luego amarillo y rojo, verde para que crucen los peatones y otra vez verde para el tráfico.",
   "signals.templates.heads": "Colocar cabezales para grupos sin ellos",
   "signals.templates.heads.tooltip": "Coloca un cabezal para cada grupo que no lo tenga, con el tipo, la altura y el mástil del asistente. Desactivado: los cabezales no cambian.",
   "signals.wizard.group_foot": "Paso {n}",

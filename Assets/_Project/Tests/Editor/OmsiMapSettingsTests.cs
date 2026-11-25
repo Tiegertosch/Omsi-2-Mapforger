@@ -75,6 +75,56 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ChangingTheSeasonEntriesWritesThemIntoTheProjectCopyOnly()
+        {
+            var summary = session.Read();
+            var options = CurrentOptions(summary);
+            Assert.AreEqual(0, options.SeasonEntries.Count);
+            options.SeasonEntries.Add(new OmsiSeasonEntry(OmsiSeasonKind.SnowyWinter, 0, 38));
+            options.SeasonEntries.Add(new OmsiSeasonEntry(OmsiSeasonKind.Spring, 76, 134));
+
+            Assert.IsTrue(session.UpdateMapSettings(summary, "Old name", options));
+
+            var text = OmsiTextFile.Decode(session.Workspace.ReadAllBytes("global.cfg"));
+            StringAssert.Contains("Winter (snow):", text);
+            StringAssert.Contains("[addseason]\r\n4\r\n0\r\n38\r\n", text);
+            StringAssert.Contains("[addseason]\r\n1\r\n76\r\n134\r\n", text);
+            CollectionAssert.AreEqual(originalConfig, File.ReadAllBytes(Path.Combine(original, "global.cfg")), "The original map is not changed.");
+            Assert.IsFalse(session.UpdateMapSettings(summary, "Old name", CurrentOptions(summary)), "The same seasons again change nothing.");
+
+            options = CurrentOptions(summary);
+            options.SeasonEntries[1] = new OmsiSeasonEntry(OmsiSeasonKind.Spring, 90, 40);
+            Assert.Throws<ArgumentException>(() => session.UpdateMapSettings(summary, "Old name", options));
+        }
+
+        [Test]
+        public void OptionsReadFromTheProjectCopyKeepTheSavedValuesAndApplyingThemAgainChangesNothing()
+        {
+            var summary = session.Read();
+            var options = CurrentOptions(summary);
+            options.SeasonEntries.Add(new OmsiSeasonEntry(OmsiSeasonKind.SnowyWinter, 0, 38));
+            options.SeasonEntries.Add(new OmsiSeasonEntry(OmsiSeasonKind.Spring, 76, 134));
+            Assert.IsTrue(session.UpdateMapSettings(summary, "Old name", options));
+
+            options = CurrentOptions(summary);
+            options.SeasonEntries.RemoveAt(1);
+            options.FirstYear = 1995;
+            Assert.IsTrue(session.UpdateMapSettings(summary, "Old name", options));
+            var savedCopy = session.Workspace.ReadAllBytes("global.cfg");
+
+            // What the settings dialog does: read the project copy, not the original map.
+            var reopened = OmsiNewMapOptions.FromTemplate(OmsiRecordFile.Parse(session.Workspace.ReadAllBytes("global.cfg"), OmsiGlobalConfigLayouts.Instance));
+            reopened.Description = (summary.Description ?? string.Empty).Trim();
+            Assert.AreEqual(1, reopened.SeasonEntries.Count);
+            Assert.AreEqual(OmsiSeasonKind.SnowyWinter, reopened.SeasonEntries[0].Kind);
+            Assert.AreEqual(1995, reopened.FirstYear);
+
+            Assert.IsFalse(session.UpdateMapSettings(summary, "Old name", reopened));
+            CollectionAssert.AreEqual(savedCopy, session.Workspace.ReadAllBytes("global.cfg"), "The project copy is unchanged.");
+            CollectionAssert.AreEqual(originalConfig, File.ReadAllBytes(Path.Combine(original, "global.cfg")), "The original map is not changed.");
+        }
+
+        [Test]
         public void ANameIsRequiredAndSectionNamesAreRefused()
         {
             var summary = session.Read();
