@@ -1,0 +1,22 @@
+{
+  "@seasons.list.empty": "Seasons editor in the map settings (global.cfg [addseason]). {number}, {max}, {first}, {second} and {kind} are numbers.",
+  "seasons.list.empty": "Žádná roční období: léto po celý rok.",
+  "seasons.add": "Přidat roční období",
+  "seasons.add.tooltip": "Přidá roční období za poslední den, který ostatní pokrývají",
+  "seasons.remove.tooltip": "Odebere toto roční období",
+  "seasons.kind.tooltip": "Druh ročního období",
+  "seasons.first.tooltip": "První den roku tohoto ročního období (0 až {max})",
+  "seasons.last.tooltip": "Poslední den roku tohoto ročního období (0 až {max})",
+  "seasons.kind.summer": "Léto",
+  "seasons.kind.spring": "Jaro",
+  "seasons.kind.autumn": "Podzim",
+  "seasons.kind.winter": "Zima",
+  "seasons.kind.snow": "Zima se sněhem",
+  "seasons.kind.dry": "Suché léto",
+  "seasons.kind.other": "Druh {kind}",
+  "seasons.problem.number": "Roční období {number}: první a poslední den musí být celá čísla.",
+  "seasons.problem.range": "Roční období {number}: dny leží mezi 0 a {max}.",
+  "seasons.problem.order": "Roční období {number}: poslední den leží před prvním.",
+  "seasons.problem.kind": "Roční období {number}: druh nesmí být záporný.",
+  "seasons.warning.overlap": "Roční období {first} a {second} se překrývají."
+}

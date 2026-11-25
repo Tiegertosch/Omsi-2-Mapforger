@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Tourne-à-gauche séparés",
   "signals.template.separate_left.desc": "Les branches 1 et 3 passent, puis leurs tourne-à-gauche depuis des voies propres, puis les branches 2 et 4 et leurs tourne-à-gauche. Pour un carrefour avec voies de tourne-à-gauche.",
   "signals.template.pedestrian_request": "Traversée sur demande",
-  "signals.template.pedestrian_request.desc": "Deux branches : vert jusqu’à ce que quelqu’un demande (un point de demande), puis jaune, rouge pour traverser et vert à nouveau. Les chemins piétons ne peuvent pas être liés à un feu.",
+  "signals.template.pedestrian_request.desc": "Deux branches et un passage piéton : la circulation reste au vert jusqu’à ce que quelqu’un appuie sur le bouton (un point de demande), puis jaune et rouge, vert pour que les piétons traversent, et de nouveau vert pour la circulation.",
   "signals.templates.heads": "Placer des têtes pour les groupes sans",
   "signals.templates.heads.tooltip": "Place une tête pour chaque groupe qui n’en a pas, avec le type, la hauteur et le mât de l’assistant. Désactivé : les têtes ne changent pas.",
   "signals.wizard.group_foot": "Passage {n}",

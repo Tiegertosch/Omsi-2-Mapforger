@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Svolte a sinistra separate",
   "signals.template.separate_left.desc": "Vanno i bracci 1 e 3, poi le loro svolte a sinistra da corsie proprie, poi i bracci 2 e 4 e le loro svolte. Per un incrocio con corsie di svolta a sinistra.",
   "signals.template.pedestrian_request": "Attraversamento a richiesta",
-  "signals.template.pedestrian_request.desc": "Due bracci: verde finché qualcuno lo chiede (un punto di richiesta), poi giallo, rosso per attraversare e di nuovo verde. I percorsi pedonali non si possono legare a una luce.",
+  "signals.template.pedestrian_request.desc": "Due bracci e un attraversamento pedonale: il traffico resta verde finché qualcuno preme il pulsante (un punto di richiesta), poi giallo e rosso, verde per i pedoni e di nuovo verde per il traffico.",
   "signals.templates.heads": "Posiziona teste per i gruppi senza",
   "signals.templates.heads.tooltip": "Posiziona una testa per ogni gruppo che ne è privo, con tipo, altezza e palo dell’assistente. Disattivato: le teste non cambiano.",
   "signals.wizard.group_foot": "Attraversamento {n}",

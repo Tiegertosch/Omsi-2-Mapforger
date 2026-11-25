@@ -1,0 +1,22 @@
+{
+  "@seasons.list.empty": "Seasons editor in the map settings (global.cfg [addseason]). {number}, {max}, {first}, {second} and {kind} are numbers.",
+  "seasons.list.empty": "No seasons: summer all year.",
+  "seasons.add": "Add season",
+  "seasons.add.tooltip": "Adds a season after the last day the others cover",
+  "seasons.remove.tooltip": "Removes this season",
+  "seasons.kind.tooltip": "The kind of season",
+  "seasons.first.tooltip": "First day of the year of this season (0 to {max})",
+  "seasons.last.tooltip": "Last day of the year of this season (0 to {max})",
+  "seasons.kind.summer": "Summer",
+  "seasons.kind.spring": "Spring",
+  "seasons.kind.autumn": "Autumn",
+  "seasons.kind.winter": "Winter",
+  "seasons.kind.snow": "Winter with snow",
+  "seasons.kind.dry": "Dry summer",
+  "seasons.kind.other": "Kind {kind}",
+  "seasons.problem.number": "Season {number}: the first and last day must be whole numbers.",
+  "seasons.problem.range": "Season {number}: the days lie between 0 and {max}.",
+  "seasons.problem.order": "Season {number}: the last day lies before the first.",
+  "seasons.problem.kind": "Season {number}: the kind must not be negative.",
+  "seasons.warning.overlap": "Seasons {first} and {second} overlap."
+}

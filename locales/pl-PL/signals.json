@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Osobne skręty w lewo",
   "signals.template.separate_left.desc": "Jadą wloty 1 i 3, potem ich skręty w lewo z własnych pasów, potem wloty 2 i 4 i ich skręty. Dla skrzyżowania z pasami do skrętu w lewo.",
   "signals.template.pedestrian_request": "Przejście na żądanie",
-  "signals.template.pedestrian_request.desc": "Dwa wloty: zielone, dopóki ktoś nie zażąda (punkt żądania), potem żółte, czerwone na przejście i znów zielone. Ścieżek dla pieszych nie można powiązać ze światłem.",
+  "signals.template.pedestrian_request.desc": "Dwa wloty i przejście dla pieszych: ruch ma zielone, dopóki ktoś nie naciśnie przycisku (punkt żądania), potem żółte i czerwone, zielone dla pieszych i znów zielone dla ruchu.",
   "signals.templates.heads": "Ustaw głowice dla grup bez nich",
   "signals.templates.heads.tooltip": "Ustawia głowicę dla każdej grupy, która jej nie ma, z typem, wysokością i słupem z asystenta. Wyłączone: głowice zostają bez zmian.",
   "signals.wizard.group_foot": "Przejście {n}",

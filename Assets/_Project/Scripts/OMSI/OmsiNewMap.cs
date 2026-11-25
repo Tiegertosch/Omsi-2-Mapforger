@@ -65,6 +65,30 @@ namespace OmsiMapEditor.OMSI
 
         private static readonly int[,] MildYear = { { 3, 0, 75 }, { 1, 76, 134 }, { 2, 260, 323 }, { 3, 324, 370 } };
 
+        /// <summary>The entries a season preset writes; Template has none of its own (null), SummerOnly an empty list.</summary>
+        public static List<OmsiSeasonEntry> PresetSeasons(OmsiSeasonPreset preset)
+        {
+            int[,] source;
+            switch (preset)
+            {
+                case OmsiSeasonPreset.FourWithSnow:
+                    source = SnowyYear;
+                    break;
+                case OmsiSeasonPreset.MildWinter:
+                    source = MildYear;
+                    break;
+                case OmsiSeasonPreset.SummerOnly:
+                    source = new int[0, 3];
+                    break;
+                default:
+                    return null;
+            }
+            var result = new List<OmsiSeasonEntry>();
+            for (var index = 0; index < source.GetLength(0); index++)
+                result.Add(new OmsiSeasonEntry(source[index, 0], source[index, 1], source[index, 2]));
+            return result;
+        }
+
         /// <summary>
         /// Marker file of a map folder made by OMSI MapWorks. Such a map is the user's own: its project may be made without
         /// asking and its export may replace the folder itself (ADR 052).
@@ -345,6 +369,8 @@ namespace OmsiMapEditor.OMSI
                 ReplaceSeasons(config, MildYear);
             else if (options.Seasons == OmsiSeasonPreset.SummerOnly)
                 ReplaceSeasons(config, new int[0, 3]);
+            else if (options.SeasonEntries != null)
+                OmsiSeasons.Apply(config, options.SeasonEntries);
             ScaleCurve(config, "trafficdensity_road", options.CarTraffic, StandardCarCurve);
             ScaleCurve(config, "trafficdensity_passenger", options.PassengerTraffic, StandardPassengerCurve);
         }

@@ -116,7 +116,7 @@ namespace OmsiMapEditor.UI
             signalTemplateDeleting = null;
             if (signalTemplateChosen == null)
                 ChooseSignalTemplate(OmsiSignalTemplates.BuiltIn.FirstOrDefault(template =>
-                    OmsiSignalTemplateMatch.Match(template, signalCrossing, SignalOwnLaneMovements()).Fits) ?? OmsiSignalTemplates.BuiltIn[0]);
+                    OmsiSignalTemplateMatch.Match(template, signalCrossing, SignalOwnLaneMovements(), null, SignalCrossingFootpaths()).Fits) ?? OmsiSignalTemplates.BuiltIn[0]);
             ShowSignalTab(SignalTab.Templates);
         }
 
@@ -128,6 +128,14 @@ namespace OmsiMapEditor.UI
                 Debug.LogWarning("Signal templates: " + problem.File + ": " + problem.Problem);
             if (problems.Count > 0)
                 SetStatusT("signals.templates.status.load_problems", ("count", problems.Count), ("folder", SignalTemplatesFolder()));
+        }
+
+        /// <summary>The footpaths across arms that a template's pedestrian group can bind: those with a way of their own (ADR 086).</summary>
+        private HashSet<int> SignalCrossingFootpaths()
+        {
+            return signalCrossing == null
+                ? new HashSet<int>()
+                : new HashSet<int>(signalCrossing.Movements.Where(movement => movement.Turn == OmsiMovementTurn.Pedestrian && WayOf(movement) != null).Select(movement => movement.Index));
         }
 
         /// <summary>The movements that start in a left-turn lane of their own; only a junction made here knows its lanes.</summary>
@@ -177,9 +185,16 @@ namespace OmsiMapEditor.UI
             program.PathLights.Clear();
             if (!template.BuiltIn)
                 return program;
+            var footNumber = 0;
             for (var light = 0; light < program.Lights.Count; light++)
             {
                 var roles = template.Roles[light];
+                // The group of the pedestrian crossings is named as the assistant names it.
+                if (roles.Count > 0 && roles.All(role => role.IsPedestrian))
+                {
+                    program.Lights[light].Name = Loc.T("signals.wizard.group_foot", ("n", ++footNumber));
+                    continue;
+                }
                 var arms = string.Join("+", roles.Select(role => role.Arm + 1).Distinct().OrderBy(arm => arm).Select(arm => arm.ToString(CultureInfo.InvariantCulture)));
                 program.Lights[light].Name = Loc.T(roles.Count > 0 && roles.All(role => role.Lane == OmsiSignalRoleLane.OwnLane) ? "signals.wizard.group_left" : "signals.wizard.group", ("arms", arms)); // i18n:keys
             }
@@ -188,7 +203,7 @@ namespace OmsiMapEditor.UI
 
         private OmsiSignalTemplateMatch SignalTemplateMatch()
         {
-            return OmsiSignalTemplateMatch.Match(signalTemplateChosen, signalCrossing, SignalOwnLaneMovements(), signalTemplateOverrides);
+            return OmsiSignalTemplateMatch.Match(signalTemplateChosen, signalCrossing, SignalOwnLaneMovements(), signalTemplateOverrides, SignalCrossingFootpaths());
         }
 
         private void RenderSignalTemplates()
@@ -296,7 +311,7 @@ namespace OmsiMapEditor.UI
                 lines.Add(Loc.T("signals.templates.fit.contested", ("count", match.Contested.Count)));
             if (match.Unlit.Count > 0)
                 lines.Add(Loc.T("signals.templates.fit.unlit", ("count", match.Unlit.Count)));
-            if (signalCrossing.Movements.Any(movement => movement.Turn == OmsiMovementTurn.Pedestrian))
+            if (signalCrossing.Movements.Any(movement => movement.Turn == OmsiMovementTurn.Pedestrian && match.MovementLights[movement.Index] < 0))
                 lines.Add(Loc.T("signals.templates.fit.footpaths"));
             var report = new Label(string.Join("\n", lines));
             report.AddToClassList("panel-info");
@@ -396,7 +411,10 @@ namespace OmsiMapEditor.UI
             }
             signalTemplateConfirm = false;
             var signals = new OmsiJunctionSignals();
-            signals.SetProgram(SignalTemplateProgram(signalTemplateChosen));
+            var templateProgram = SignalTemplateProgram(signalTemplateChosen);
+            // Without footpaths to bind, the pedestrians' stop point goes to the traffic's light, where vehicles ask.
+            match.AdaptHolds(templateProgram);
+            signals.SetProgram(templateProgram);
             var unbound = 0;
             foreach (var movement in signalCrossing.Movements)
             {

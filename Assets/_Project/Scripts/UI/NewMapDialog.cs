@@ -48,6 +48,8 @@ namespace OmsiMapEditor.UI
         private readonly List<VisualElement> creationOnly = new List<VisualElement>();
         private readonly List<VisualElement> trafficRows = new List<VisualElement>();
         private Button seasonKeepButton;
+        private readonly SeasonListEditor seasonEditor = new SeasonListEditor();
+        private List<OmsiSeasonEntry> templateSeasons = new List<OmsiSeasonEntry>();
 
         private readonly Dictionary<string, VisualElement> swatchByTexture = new Dictionary<string, VisualElement>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> moneyPaths = new List<string>();
@@ -177,6 +179,12 @@ namespace OmsiMapEditor.UI
             AddSeason(seasons, OmsiSeasonPreset.FourWithSnow, "newmap.season.snow", "newmap.season.snow.tooltip");
             AddSeason(seasons, OmsiSeasonPreset.MildWinter, "newmap.season.mild", "newmap.season.mild.tooltip");
             AddSeason(seasons, OmsiSeasonPreset.SummerOnly, "newmap.season.summer", "newmap.season.summer.tooltip");
+            seasonEditor.Changed += () =>
+            {
+                MarkSeasonPreset();
+                UpdateTarget();
+            };
+            right.Add(seasonEditor);
 
             // The ground texture across both columns.
             Section(body, "newmap.section.ground");
@@ -210,6 +218,7 @@ namespace OmsiMapEditor.UI
             else
                 ChooseGround(options.GroundTexture);
             SetSize(options.Size);
+            seasonEditor.RefreshTexts();
             UpdateTarget();
         }
 
@@ -234,10 +243,10 @@ namespace OmsiMapEditor.UI
         /// Shows the settings of the open map for changing (ADR 076): the same fields as a new map has, without template, folder, size and
         /// height, each with the value global.cfg has now; the daily curves of cars and passengers are multiplied by the factor chosen.
         /// </summary>
-        public void OpenForSettings(string globalConfigPath, string friendlyName, string description)
+        public void OpenForSettings(string globalConfigPath, string friendlyName, string description, OmsiRecordFile current = null)
         {
             SetMode(true);
-            SetTemplate(globalConfigPath);
+            SetTemplate(globalConfigPath, current);
             nameField.SetValueWithoutNotify(friendlyName ?? string.Empty);
             descriptionField.SetValueWithoutNotify(description ?? string.Empty);
             UpdateTarget();
@@ -276,12 +285,18 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Reads the template's settings into the fields; without a template they show the defaults.</summary>
-        private void SetTemplate(string path)
+        /// <param name="current">The file's contents when they differ from the disk (the project copy of the open map), or null.</param>
+        private void SetTemplate(string path, OmsiRecordFile current = null)
         {
             templatePath = path != null && File.Exists(path) ? path : null;
             OmsiRecordFile config = null;
             options = new OmsiNewMapOptions();
-            if (templatePath != null)
+            if (current != null)
+            {
+                config = current;
+                options = OmsiNewMapOptions.FromTemplate(config);
+            }
+            else if (templatePath != null)
             {
                 try
                 {
@@ -313,6 +328,7 @@ namespace OmsiMapEditor.UI
                 options.MoneySystem);
             FillDropdown(ticketField, ticketPaths, installationRoot == null ? new List<string>() : OmsiNewMapContent.Files(installationRoot, "TicketPacks", ".otp"),
                 options.TicketPack);
+            templateSeasons = options.SeasonEntries ?? new List<OmsiSeasonEntry>();
             SetSeasons(OmsiSeasonPreset.Template);
             FillSwatches(installationRoot == null ? new List<string>() : OmsiNewMapContent.GroundTextures(installationRoot, config), options.GroundTexture);
         }
@@ -349,11 +365,26 @@ namespace OmsiMapEditor.UI
             leftButton.EnableInClassList("panel-tab-active", leftHand);
         }
 
+        /// <summary>A preset fills the list of seasons; the list is what is written, so it can be edited further.</summary>
         private void SetSeasons(OmsiSeasonPreset preset)
         {
-            options.Seasons = preset;
+            seasonEditor.SetEntries(preset == OmsiSeasonPreset.Template ? templateSeasons : OmsiNewMap.PresetSeasons(preset));
+            MarkSeasonPreset();
+            UpdateTarget();
+        }
+
+        /// <summary>Lights the preset whose seasons the list shows now, if any.</summary>
+        private void MarkSeasonPreset()
+        {
+            var shown = seasonEditor.ReadEntries(out _);
             foreach (var pair in seasonButtons)
-                pair.Value.EnableInClassList("panel-tab-active", pair.Key == preset);
+            {
+                var preset = pair.Key == OmsiSeasonPreset.Template ? templateSeasons : OmsiNewMap.PresetSeasons(pair.Key);
+                var same = shown != null && shown.Count == preset.Count;
+                for (var index = 0; same && index < preset.Count; index++)
+                    same = shown[index].Equals(preset[index]);
+                pair.Value.EnableInClassList("panel-tab-active", same);
+            }
         }
 
         private void AddSeason(VisualElement parent, OmsiSeasonPreset preset, string textKey, string tooltipKey)
@@ -517,6 +548,9 @@ namespace OmsiMapEditor.UI
                 problem = Loc.T("newmap.problem.numbers");
                 return null;
             }
+            problem = seasonEditor.Problem();
+            if (problem != null)
+                return null;
             var result = new OmsiNewMapOptions
             {
                 Description = descriptionField.value ?? string.Empty,
@@ -531,7 +565,8 @@ namespace OmsiMapEditor.UI
                 YearOffset = offset,
                 MoneySystem = Chosen(moneyField, moneyPaths),
                 TicketPack = Chosen(ticketField, ticketPaths),
-                Seasons = options.Seasons,
+                Seasons = OmsiSeasonPreset.Template,
+                SeasonEntries = seasonEditor.ReadEntries(out _),
                 GroundTexture = options.GroundTexture
             };
             problem = result.Check();

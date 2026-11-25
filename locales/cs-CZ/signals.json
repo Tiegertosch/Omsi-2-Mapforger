@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Samostatné odbočení vlevo",
   "signals.template.separate_left.desc": "Jedou větve 1 a 3, pak jejich odbočení vlevo z vlastních pruhů, pak větve 2 a 4 a jejich odbočení. Pro křižovatku s pruhy pro odbočení vlevo.",
   "signals.template.pedestrian_request": "Přechod na požádání",
-  "signals.template.pedestrian_request.desc": "Dvě větve: zelená, dokud někdo nepožádá (bod požadavku), pak žlutá, červená pro přechod a znovu zelená. Chodníky nelze vázat na světlo.",
+  "signals.template.pedestrian_request.desc": "Dvě větve a přechod: provoz má zelenou, dokud někdo nestiskne tlačítko (bod požadavku), pak žlutá a červená, zelená pro chodce a znovu zelená pro provoz.",
   "signals.templates.heads": "Umístit hlavice pro skupiny bez nich",
   "signals.templates.heads.tooltip": "Umístí hlavici pro každou skupinu, která žádnou nemá, s typem, výškou a stožárem z asistenta. Vypnuto: hlavice se nemění.",
   "signals.wizard.group_foot": "Přechod {n}",

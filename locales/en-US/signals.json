@@ -245,7 +245,7 @@
   "signals.template.separate_left": "Separate left turns",
   "signals.template.separate_left.desc": "Arms 1 and 3 go, then their left turns from lanes of their own, then arms 2 and 4 and their left turns. For a crossroads with left-turn lanes.",
   "signals.template.pedestrian_request": "Crossing on request",
-  "signals.template.pedestrian_request.desc": "Two arms: green until somebody asks (a request point), then yellow, red for people to cross, and green again. Footpaths cannot be bound to a light.",
+  "signals.template.pedestrian_request.desc": "Two arms and a pedestrian crossing: the traffic stays green until somebody presses the button (a request point), then yellow and red, green for the people to cross, and green again for the traffic.",
   "signals.templates.heads": "Place heads for groups without",
   "signals.templates.heads.tooltip": "Places a head for each group that has none, with the head type, height and mast of the assistant. Off: heads stay as they are.",
   "signals.wizard.group_foot": "Crossing {n}",

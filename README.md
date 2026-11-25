@@ -52,6 +52,8 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 - **Consistent dialogs:** All dialogs share one layout, with Cancel on the left and the main button on the right. Esc closes only the top dialog, Enter confirms only in a dialog with a single text field, and a click beside a dialog does not close it. The map stays still behind open dialogs. The object and spline folders are in Settings under Content.
 - **Objects list in the bottom bar:** A button beside the tile button lists every object placed on the map, grouped by object type, by tile or flat, with a search and a filter for base game, DLC and other content. A click selects the object and centres the map on it.
 - **Contour lines (topology view):** A button at the right of the bottom bar draws contour lines over the terrain, in the top view and in 3D. The spacing is automatic for the zoom and the terrain or fixed from 0.25 to 10 m, a colour band by height is optional, a legend shows the height range, and the height under the pointer appears in the status bar. A switch in the road tool shows the same state.
+- **Seasons:** The map settings and the New map dialog list each `[addseason]` entry with its kind (spring, autumn, winter, snowy winter, summer) and its first and last day. The presets fill the list, and you can add, change or remove single seasons; comments that belong to other parts of the file stay.
+- **Crossing lights:** A pedestrian crossing on a road piece can get a light: the "Crossing on request" template gives the vehicles and the people their own groups, and the stop point holds the traffic only while somebody asks at the crossing.
 - **Simpler Help menu:** It offers Check for updates, Report a bug and the wiki.
 
 ## Current limitations

@@ -782,12 +782,14 @@ namespace OmsiMapEditor.OMSI
                 Strip(pavement, kerb, section, roadRight, outerRight, roadHeights, pavementHeights, kerbHeights);
             }
 
-            // Lanes and footpaths both ways, each to the nearest on the other side, and every one on the other side reached.
-            Connect(Arms[0], Arms[1], 0);
-            Connect(Arms[1], Arms[0], 0);
+            // Lanes and footpaths both ways, each to the nearest on the other side, and every one on the other side reached. With
+            // a crossing each lane is a way through of its own, so the signals tool can bind it to a light: vehicles then stop at
+            // its start, the end of the piece, before the crossing.
+            Connect(0, 1, 0, crossingPlans[0] != null);
+            Connect(1, 0, 0, crossingPlans[0] != null);
             if (crossingPlans[0] == null)
             {
-                Connect(Arms[0], Arms[1], 1);
+                Connect(0, 1, 1, false);
                 return;
             }
             // With a crossing the footpaths run straight on, cut in the middle where the crossing's path joins them.
@@ -878,8 +880,14 @@ namespace OmsiMapEditor.OMSI
         /// one way, from each lane in to the nearest lane out and into every lane out from the nearest lane in; footpaths
         /// (kind 1) once, walked both ways.
         /// </summary>
-        private void Connect(OmsiJunctionArm from, OmsiJunctionArm to, int kind)
+        /// <param name="asWays">
+        /// True to make each connection a way through (<see cref="WaysThrough"/>, its first arc starting the way), as the
+        /// lanes of a crossing piece are; the paths themselves stay the same.
+        /// </param>
+        private void Connect(int fromArm, int toArm, int kind, bool asWays)
         {
+            var from = Arms[fromArm];
+            var to = Arms[toArm];
             // Lanes in on the first arm and out on the second, side by side across the second arm.
             var incoming = from.Profile.Lanes.FindAll(lane => lane.Kind == kind && (kind == 1 || lane.Direction != 0));
             var outgoing = to.Profile.Lanes.FindAll(lane => lane.Kind == kind && (kind == 1 || lane.Direction != 1));
@@ -892,8 +900,18 @@ namespace OmsiMapEditor.OMSI
                 if (!pairs.Exists(pair => pair.Value == lane))
                     pairs.Add(new KeyValuePair<OmsiSplineLane, OmsiSplineLane>(Nearest(incoming, -lane.X), lane));
             foreach (var pair in pairs)
+            {
+                var first = Paths.Count;
                 AddArcs(Point.Along(from, from.Length, pair.Key.X), from.HeadingDegrees + 180.0, Point.Along(to, to.Length, pair.Value.X), to.HeadingDegrees,
                     pair.Key.Height, kind, pair.Key.Width, kind == 1 ? 2 : 0, 0);
+                if (!asWays || Paths.Count == first)
+                    continue;
+                var key = OmsiLaneConnections.Key(fromArm, from.Profile.Lanes.IndexOf(pair.Key), toArm, to.Profile.Lanes.IndexOf(pair.Value));
+                for (var index = first; index < Paths.Count; index++)
+                    Paths[index].WayThrough = key;
+                Paths[first].StartsWay = true;
+                WaysThrough.Add(key);
+            }
         }
 
         private static OmsiSplineLane Nearest(List<OmsiSplineLane> lanes, double x)

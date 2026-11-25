@@ -1007,6 +1007,14 @@
 .settings-language-slot { width: 220px; flex-grow: 0; flex-shrink: 0; margin: 0 8px; }
 .settings-dropdown { width: 100%; flex-grow: 0; }
 .new-map-seasons { margin: 0 var(--mf-space-2); }
+.season-editor { margin: var(--mf-space-1) var(--mf-space-2) 0; }
+.season-row { flex-direction: row; align-items: center; height: 30px; margin-bottom: 2px; padding: 0 2px; border-radius: var(--mf-radius-sm); border-width: 1px; border-color: var(--mf-color-clear); }
+.season-row-problem { border-color: var(--mf-color-error); background-color: var(--mf-color-error-tint); }
+.season-kind { min-width: 90px; }
+.season-day { width: 52px; margin: 0; }
+.season-empty { margin-left: 0; }
+.season-findings { margin-left: 0; color: var(--mf-color-warning); }
+.season-add { margin-top: var(--mf-space-1); }
 .new-map-swatches { height: 108px; flex-shrink: 0; margin: 0 var(--mf-space-2); }
 .new-map-swatches-content { flex-direction: row; }
 .new-map-swatch { width: 80px; margin: 0 var(--mf-space-2) 0 0; padding: 4px; align-items: center; background-color: var(--mf-color-panel); border-width: 2px; border-color: var(--mf-color-clear); border-radius: var(--mf-radius-md); }
