@@ -1,5 +1,7 @@
 using System;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using OmsiMapEditor.OMSI;
 
@@ -62,9 +64,11 @@ namespace OmsiMapEditor.Tests
             StringAssert.Contains("[LHT]", text);
             StringAssert.Contains("[years]\r\n1990\r\n2030\r\n", text);
             StringAssert.Contains("[NextIDCode]\r\n20\r\n", text);
-            // The daily curve of cars is doubled, in every point.
-            StringAssert.Contains("[trafficdensity_road]\r\n0\r\n1.000\r\n", text);
-            StringAssert.Contains("[trafficdensity_road]\r\n12\r\n2.000\r\n", text);
+            // The cars are at 2.00 times the standard day now; the curve keeps its own shape, its second point twice its first.
+            var road = Curve(session.Workspace.ReadAllBytes("global.cfg"), "trafficdensity_road");
+            Assert.AreEqual(2, road.Length);
+            Assert.AreEqual(2.0, road[1] / road[0], 0.01);
+            Assert.AreEqual(2.0, CurrentOptions(summary).CarTraffic);
             Assert.AreEqual("New name", summary.FriendlyName);
             Assert.AreEqual("New text", summary.Description);
             CollectionAssert.AreEqual(originalConfig, File.ReadAllBytes(Path.Combine(original, "global.cfg")), "The original map is not changed.");
@@ -134,6 +138,90 @@ namespace OmsiMapEditor.Tests
             options.FirstYear = 2040;
             Assert.Throws<ArgumentException>(() => session.UpdateMapSettings(summary, "Fine", options), "The years must run forward.");
             Assert.AreEqual("Old name", summary.FriendlyName);
+        }
+
+        private static double[] Curve(byte[] config, string name)
+        {
+            var file = OmsiRecordFile.Parse(config, OmsiGlobalConfigLayouts.Instance);
+            return file.Records.Where(record => record.Name == name).Select(record => record.TryGetDouble(1, out var value) ? value : double.NaN).ToArray();
+        }
+
+        private static OmsiRecordFile Config(string curves)
+        {
+            return OmsiRecordFile.Parse(OmsiTextFile.Encode("[name]\r\nTestmap\r\n\r\n[NextIDCode]\r\n20\r\n\r\n" + curves, OmsiTextEncoding.Utf16LittleEndian),
+                OmsiGlobalConfigLayouts.Instance);
+        }
+
+        private static readonly double[] StandardHours = { 0, 4, 6, 7, 8, 10, 15, 16, 17, 20, 24 };
+        private static readonly double[] StandardCars = { 0.1, 0, 1, 1.5, 1, 0.5, 0.6, 1, 1.5, 0.4, 0.1 };
+
+        private static string CarCurve(Func<int, double> density)
+        {
+            var text = string.Empty;
+            for (var point = 0; point < StandardHours.Length; point++)
+                text += "[trafficdensity_road]\r\n" + StandardHours[point].ToString(CultureInfo.InvariantCulture) + "\r\n" +
+                        density(point).ToString("0.000", CultureInfo.InvariantCulture) + "\r\n\r\n";
+            return text;
+        }
+
+        [Test]
+        public void TrafficFactorsAreReadOnTheStandardDay()
+        {
+            Assert.AreEqual(1.0, OmsiNewMap.CarTrafficFactor(Config(CarCurve(point => StandardCars[point]))));
+            Assert.AreEqual(1.5, OmsiNewMap.CarTrafficFactor(Config(CarCurve(point => StandardCars[point] * 1.5))));
+            Assert.AreEqual(1.0, OmsiNewMap.CarTrafficFactor(Config(string.Empty)), "Without a curve OMSI has the standard day.");
+            Assert.AreEqual(1.0, OmsiNewMap.PassengerTrafficFactor(Config(CarCurve(point => StandardCars[point] * 1.5))), "Each curve on its own.");
+            Assert.AreEqual(0.0, OmsiNewMap.CarTrafficFactor(Config(CarCurve(point => 0.0))));
+            Assert.AreEqual(2.0, OmsiNewMap.CarTrafficFactor(Config("[trafficdensity_road]\r\n12\r\n5\r\n")), "Kept within the slider's range.");
+        }
+
+        [Test]
+        public void ATrafficFactorIsSetOnTheStandardDayAndDoesNotMultiplyUp()
+        {
+            var config = Config(CarCurve(point => StandardCars[point]));
+            var options = OmsiNewMapOptions.FromTemplate(config);
+            Assert.AreEqual(1.0, options.CarTraffic);
+            Assert.AreEqual(1.0, options.PassengerTraffic);
+            options.CarTraffic = 1.5;
+            OmsiNewMap.EditGlobalConfig(config, "Test", null, options);
+            var read = OmsiNewMapOptions.FromTemplate(config);
+            Assert.AreEqual(1.5, read.CarTraffic);
+            Assert.AreEqual(1.0, read.PassengerTraffic);
+            Assert.IsFalse(config.Records.Any(record => record.Name == "trafficdensity_passenger"), "No passenger curve is written at the standard factor.");
+
+            var written = config.ToBytes();
+            OmsiNewMap.EditGlobalConfig(config, "Test", null, read);
+            CollectionAssert.AreEqual(written, config.ToBytes(), "The factor read back changes nothing.");
+
+            read.CarTraffic = 1.0;
+            OmsiNewMap.EditGlobalConfig(config, "Test", null, read);
+            var curve = Curve(config.ToBytes(), "trafficdensity_road");
+            for (var point = 0; point < StandardCars.Length; point++)
+                Assert.AreEqual(StandardCars[point], curve[point], 0.002, "Back at 1: the standard day, not 1.5 times it.");
+            Assert.AreEqual(1.0, OmsiNewMapOptions.FromTemplate(config).CarTraffic);
+        }
+
+        [Test]
+        public void AnOwnCurveKeepsItsShapeAndAZeroCurveGetsTheStandardDay()
+        {
+            var config = Config("[trafficdensity_road]\r\n0\r\n0.2\r\n\r\n[trafficdensity_road]\r\n9\r\n2\r\n\r\n[trafficdensity_road]\r\n18\r\n0.8\r\n\r\n");
+            var options = OmsiNewMapOptions.FromTemplate(config);
+            var before = Curve(config.ToBytes(), "trafficdensity_road");
+            options.CarTraffic = options.CarTraffic > 1.0 ? 0.5 : 1.8;
+            var wanted = options.CarTraffic;
+            OmsiNewMap.EditGlobalConfig(config, "Test", null, options);
+            var after = Curve(config.ToBytes(), "trafficdensity_road");
+            Assert.AreEqual(3, after.Length);
+            Assert.AreEqual(before[1] / before[0], after[1] / after[0], 0.05);
+            Assert.AreEqual(before[2] / before[0], after[2] / after[0], 0.05);
+            Assert.AreEqual(wanted, OmsiNewMapOptions.FromTemplate(config).CarTraffic, 0.011);
+
+            var zero = Config(CarCurve(point => 0.0));
+            var zeroOptions = OmsiNewMapOptions.FromTemplate(zero);
+            zeroOptions.CarTraffic = 0.8;
+            OmsiNewMap.EditGlobalConfig(zero, "Test", null, zeroOptions);
+            Assert.AreEqual(0.8, OmsiNewMapOptions.FromTemplate(zero).CarTraffic);
+            Assert.AreEqual(StandardCars.Length, Curve(zero.ToBytes(), "trafficdensity_road").Length);
         }
     }
 }

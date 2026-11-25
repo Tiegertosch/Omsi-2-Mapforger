@@ -316,10 +316,10 @@ namespace OmsiMapEditor.UI
             SetSize(1);
             heightField.SetValueWithoutNotify("0");
             SetLeftHand(options.LeftHandTraffic);
-            carSlider.SetValueWithoutNotify(1f);
-            passengerSlider.SetValueWithoutNotify(1f);
-            ShowFactor(carLabel, 1f);
-            ShowFactor(passengerLabel, 1f);
+            carSlider.SetValueWithoutNotify((float)options.CarTraffic);
+            passengerSlider.SetValueWithoutNotify((float)options.PassengerTraffic);
+            ShowFactor(carLabel, (float)options.CarTraffic);
+            ShowFactor(passengerLabel, (float)options.PassengerTraffic);
             railToggle.SetValueWithoutNotify(options.RealRail);
             firstYearField.SetValueWithoutNotify(options.FirstYear.ToString(CultureInfo.InvariantCulture));
             lastYearField.SetValueWithoutNotify(options.LastYear.ToString(CultureInfo.InvariantCulture));

@@ -44,7 +44,7 @@ namespace OmsiMapEditor.OMSI
         /// <summary>Trams and trains follow their tracks' switches: [realrail].</summary>
         public bool RealRail { get; set; }
 
-        /// <summary>Factors on the template's daily curves of cars and passengers; 1 keeps them.</summary>
+        /// <summary>Factors of the daily curves of cars and passengers on OMSI's standard day (ADR 076, addendum); 1 is the standard day.</summary>
         public double CarTraffic { get; set; } = 1.0;
         public double PassengerTraffic { get; set; } = 1.0;
 
@@ -85,7 +85,9 @@ namespace OmsiMapEditor.OMSI
                 MoneySystem = Find(config, "moneysystem")?.GetField(0)?.Trim() ?? string.Empty,
                 TicketPack = Find(config, "ticketpack")?.GetField(0)?.Trim() ?? string.Empty,
                 GroundTexture = Find(config, "groundtex")?.GetField(0)?.Trim() ?? string.Empty,
-                SeasonEntries = OmsiSeasons.Read(config)
+                SeasonEntries = OmsiSeasons.Read(config),
+                CarTraffic = OmsiNewMap.CarTrafficFactor(config),
+                PassengerTraffic = OmsiNewMap.PassengerTrafficFactor(config)
             };
             var years = Find(config, "years");
             if (years != null && years.TryGetInt(0, out var first) && years.TryGetInt(1, out var last))
