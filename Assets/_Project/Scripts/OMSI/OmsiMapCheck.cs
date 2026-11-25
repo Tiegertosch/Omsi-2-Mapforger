@@ -122,7 +122,36 @@ namespace OmsiMapEditor.OMSI
             var variants = OmsiChrono.ReadVariants(source);
             report.Sections.Add(Timetable(summary, source, variants));
             report.Sections.Add(Chrono(summary, source, variants));
+            report.Sections.Add(SignalRoutes(summary, source, installationRoot));
             return report;
+        }
+
+        /// <summary>signalroutes.cfg laid onto the map (ADR 105): unknown signals and track pieces, wrong tiles and stale path numbers.</summary>
+        private static OmsiCheckSection SignalRoutes(OmsiMapSummary summary, IOmsiFileSource source, string installationRoot)
+        {
+            var section = new OmsiCheckSection("Signal routes", Loc.T("mapcheck.title.signalroutes"));
+            var routes = OmsiSignalRoutes.Read(source);
+            var counter = !string.IsNullOrEmpty(installationRoot) && Directory.Exists(installationRoot) ? new OmsiAssetPathCounter(installationRoot) : null;
+            var map = OmsiSignalRouteMap.Resolve(routes, summary, source, counter != null ? counter.Count : (Func<string, int?>)null);
+            foreach (var problem in map.Problems)
+                Add(section, problem.Message);
+            foreach (var route in map.Resolved)
+                foreach (var entry in route.Entries)
+                    if (!entry.IsConsistent && entry.Element != null)
+                    {
+                        section.Tile = section.Tile ?? summary.Tiles[entry.Element.TileIndex];
+                        break;
+                    }
+            var entries = 0;
+            foreach (var route in routes.Routes)
+                entries += route.Entries.Count;
+            section.Status = map.Problems.Count > 0 ? OmsiCheckStatus.Problem : OmsiCheckStatus.Passed;
+            section.Summary = routes.Routes.Count == 0 && map.Problems.Count == 0
+                ? Loc.T("mapcheck.signalroutes.none")
+                : Loc.T("mapcheck.signalroutes.summary", ("routes", routes.Routes.Count), ("entries", entries), ("problems", map.Problems.Count));
+            if (counter == null && routes.Routes.Count > 0)
+                Add(section, Loc.T("mapcheck.signalroutes.nopaths"));
+            return section;
         }
 
         private static OmsiCheckSection Import(OmsiMapSummary summary)

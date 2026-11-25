@@ -37,6 +37,7 @@ namespace OmsiMapEditor.OMSI
                 throw new InvalidOperationException("The OMSI installation is needed to number the paths of a track.");
             var counter = new OmsiAssetPathCounter(installation);
             var tiles = new Dictionary<int, Dictionary<int, int>>();
+            var unknown = new Dictionary<int, string>();
             var result = new List<int>();
             foreach (var entry in entries)
             {
@@ -45,9 +46,13 @@ namespace OmsiMapEditor.OMSI
                 if (!tiles.TryGetValue(entry.TileIndex, out var numbers))
                 {
                     var file = OmsiRecordFile.Parse(workspace.ReadAllBytes(summary.Tiles[entry.TileIndex].FileName), OmsiTileRecordLayouts.Instance);
-                    tiles[entry.TileIndex] = numbers = OmsiTilePathNumbers.Of(file, counter.Count);
+                    tiles[entry.TileIndex] = numbers = OmsiTilePathNumbers.Of(file, counter.Count, out var unknownAsset);
+                    unknown[entry.TileIndex] = unknownAsset;
                 }
-                if (!numbers.TryGetValue(entry.ElementId, out var first))
+                if (!numbers.TryGetValue(entry.ElementId, out var first) && unknown[entry.TileIndex] != null)
+                    throw new InvalidOperationException("The paths of tile " + summary.Tiles[entry.TileIndex].FileName + " cannot be numbered: the number of paths of " +
+                                                        unknown[entry.TileIndex] + " is unknown.");
+                if (!numbers.ContainsKey(entry.ElementId))
                     throw new InvalidOperationException("The element " + entry.ElementId + " is not in the file of tile " + summary.Tiles[entry.TileIndex].FileName + ".");
                 result.Add(first);
             }

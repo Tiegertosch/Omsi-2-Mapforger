@@ -55,6 +55,7 @@ Paint the ground textures of a map with the terrain brush: choose one of the map
 - **Seasons:** The map settings and the New map dialog list each `[addseason]` entry with its kind (spring, autumn, winter, snowy winter, summer) and its first and last day. The presets fill the list, and you can add, change or remove single seasons; comments that belong to other parts of the file stay.
 - **Crossing lights:** A pedestrian crossing on a road piece can get a light: the "Crossing on request" template gives the vehicles and the people their own groups, and the stop point holds the traffic only while somebody asks at the crossing.
 - **Signal routes (view only):** A button at the right of the bottom bar lists the signal routes of the map (`signalroutes.cfg`) with their signal, track pieces, speed limit and the signals they announce; problems are marked in yellow. Choosing a route shows its track in orange on the map with its signal, distant signal and next signal told apart by shape, and the context menu of a signal (an object or a row along a road) opens the list for that signal. Editing routes comes later.
+- **Signal routes stay consistent:** Deleting a track piece or signal a route uses is refused with the route's number. Deleting, retyping or moving an element into another tile updates the tile and path numbers of the routes in the same undo step; moving within a tile leaves `signalroutes.cfg` alone. The map check has a "Signal routes" topic.
 - **Simpler Help menu:** It offers Check for updates, Report a bug and the wiki.
 
 ## Current limitations

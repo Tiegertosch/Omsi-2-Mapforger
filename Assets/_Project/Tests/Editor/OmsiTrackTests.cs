@@ -32,13 +32,18 @@ namespace OmsiMapEditor.Tests
                 "[object]\r\n0\r\nSceneryobjects\\a.sco\r\n8\r\n[object]\r\n0\r\nSceneryobjects\\none.sco\r\n9\r\n[spline]\r\n0\r\nSplines\\b.sli\r\n10\r\n"), null);
             Func<string, int?> counts = asset => asset.EndsWith("a.sco") ? 2 : asset.EndsWith("b.sli") ? 1 : asset.EndsWith("c.sli") ? 3 : (int?)null;
             var numbers = OmsiTilePathNumbers.Of(tile, counts);
-            // 5: paths 0-1, 6: path 2, 7: paths 3-5, 8: paths 6-7, 9 has none, 10 starts at 8.
+            // 5: paths 0-1, 6: path 2, 7: paths 3-5, 8: paths 6-7, 9 starts at 8 with an unknown number, so 10 cannot be numbered.
             Assert.AreEqual(0, numbers[5]);
             Assert.AreEqual(2, numbers[6]);
             Assert.AreEqual(3, numbers[7]);
             Assert.AreEqual(6, numbers[8]);
             Assert.AreEqual(8, numbers[9]);
-            Assert.AreEqual(8, numbers[10]);
+            Assert.IsFalse(numbers.ContainsKey(10));
+            OmsiTilePathNumbers.Of(tile, counts, out var unknownAsset);
+            Assert.AreEqual("Sceneryobjects\\none.sco", unknownAsset);
+            var known = OmsiTilePathNumbers.Of(tile, asset => counts(asset) ?? 0, out unknownAsset);
+            Assert.IsNull(unknownAsset);
+            Assert.AreEqual(8, known[10]);
         }
 
         [Test]

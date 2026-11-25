@@ -51,6 +51,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The path number the tile gives the entry's path, or null when it was not checked.</summary>
         public int? ExpectedTilePath { get; internal set; }
 
+        /// <summary>
+        /// True when the path number could not be checked because a file before the element in its tile has an unknown number of paths; then
+        /// <see cref="ExpectedTilePath"/> is null and <see cref="IsConsistent"/> only says the other checks passed (ADR 105, review of M2).
+        /// </summary>
+        public bool PathNumberUnchecked { get; internal set; }
+
         /// <summary>True when the element stands on the named tile and no check found a problem.</summary>
         public bool IsConsistent { get; internal set; }
     }
@@ -76,6 +82,7 @@ namespace OmsiMapEditor.OMSI
     public sealed class OmsiSignalRouteMap
     {
         private readonly Dictionary<int, OmsiMapElementPlace> elements = new Dictionary<int, OmsiMapElementPlace>();
+        private readonly Dictionary<int, string> unknownAssets = new Dictionary<int, string>();
 
         public OmsiSignalRoutes Routes { get; private set; }
         public List<OmsiResolvedSignalRoute> Resolved { get; } = new List<OmsiResolvedSignalRoute>();
@@ -182,13 +189,19 @@ namespace OmsiMapEditor.OMSI
             {
                 var tile = summary.Tiles[entry.TileIndex];
                 numbers = null;
+                string unknownAsset = null;
                 if (tile.IsAvailable && source.FileExists(tile.FileName))
-                    numbers = OmsiTilePathNumbers.Of(OmsiRecordFile.Parse(source.ReadAllBytes(tile.FileName), OmsiTileRecordLayouts.Instance), pathCount);
+                    numbers = OmsiTilePathNumbers.Of(OmsiRecordFile.Parse(source.ReadAllBytes(tile.FileName), OmsiTileRecordLayouts.Instance), pathCount, out unknownAsset);
                 tileNumbers[entry.TileIndex] = numbers;
+                unknownAssets[entry.TileIndex] = unknownAsset;
             }
             if (numbers == null || !numbers.TryGetValue(entry.ElementId, out var first))
-                // Attachments have no paths of their own in the tile's count.
+            {
+                // Behind a file with an unknown number of paths nothing can be told; attachments have no paths of their own in the tile's count.
+                item.PathNumberUnchecked = numbers != null && unknownAssets[entry.TileIndex] != null && place.Kind != OmsiMapElementKind.AttachedObject &&
+                                           place.Kind != OmsiMapElementKind.SplineAttachment;
                 return true;
+            }
             item.ExpectedTilePath = first + entry.Path;
             if (item.ExpectedTilePath.Value == entry.TilePath)
                 return true;

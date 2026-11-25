@@ -14,11 +14,21 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public static class OmsiTilePathNumbers
     {
-        /// <summary>The number of the first path of each element of a tile, by element ID.</summary>
+        /// <summary>
+        /// The number of the first path of each element of a tile, by element ID. An element whose file has an unknown number of paths (missing or
+        /// unreadable) still gets its number, but every element after it is left out: its number cannot be known (ADR 105, review of M2).
+        /// </summary>
         /// <param name="tile">The tile file, read without a layout or with the tile layouts.</param>
-        /// <param name="pathCount">How many paths the object or spline file of an asset path has; null when it has none or is unknown.</param>
+        /// <param name="pathCount">How many paths the object or spline file of an asset path has (0 for none); null when it is unknown.</param>
         public static Dictionary<int, int> Of(OmsiRecordFile tile, Func<string, int?> pathCount)
         {
+            return Of(tile, pathCount, out _);
+        }
+
+        /// <param name="unknownAsset">The first file whose number of paths is unknown, after which no element is numbered; null when all are known.</param>
+        public static Dictionary<int, int> Of(OmsiRecordFile tile, Func<string, int?> pathCount, out string unknownAsset)
+        {
+            unknownAsset = null;
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
             if (pathCount == null)
@@ -36,7 +46,13 @@ namespace OmsiMapEditor.OMSI
                     continue;
                 if (!result.ContainsKey(id))
                     result[id] = number;
-                number += pathCount(values[1]) ?? 0;
+                var count = pathCount(values[1]);
+                if (!count.HasValue)
+                {
+                    unknownAsset = values[1];
+                    break;
+                }
+                number += count.Value;
             }
             return result;
         }

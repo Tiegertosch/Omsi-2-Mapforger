@@ -320,7 +320,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
                 throw new OmsiStepRefusedException("The revert is already applied.");
-            ApplyFiles(change.Files, false);
+            ReplayFiles(change.Files, false);
             change.IsApplied = true;
             SwapRevertedTile(summary, change, false);
         }
@@ -337,7 +337,7 @@ namespace OmsiMapEditor.OMSI
             }
             catch (Exception failure)
             {
-                RollBackAfter(failure, () => ApplyFiles(change.Files, !undo));
+                RollBackAfter(failure, () => ReplayFiles(change.Files, !undo));
                 // The files are back as before the call, and so is the flag.
                 change.IsApplied = undo;
                 throw;
@@ -635,7 +635,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied != undo)
                 throw new OmsiStepRefusedException(undo ? "The tile step is already taken back." : "The tile step is already done.");
-            ApplyFiles(change.Files, undo);
+            ReplayFiles(change.Files, undo);
             change.IsApplied = !undo;
         }
 
@@ -777,9 +777,20 @@ namespace OmsiMapEditor.OMSI
         /// files written so far are put back and the failure is thrown as it was, so the workspace is as before the call; when putting
         /// them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
         /// </summary>
-        private void ApplyFiles(List<OmsiObjectChange.FileState> files, bool undo)
+        /// <param name="keepSignalRoutes">
+        /// False for steps that only change values in place, such as moving objects within their tile: they cannot change the path numbers of
+        /// signal routes; and for undo and redo, which <see cref="ReplayFiles"/> writes.
+        /// </param>
+        private void ApplyFiles(List<OmsiObjectChange.FileState> files, bool undo, bool keepSignalRoutes = true)
         {
             var workspace = RequireWorkspace();
+            // A step done for the first time takes signalroutes.cfg along when it changes the track a route names (ADR 105); undo and redo find it in the files.
+            if (!undo && keepSignalRoutes)
+            {
+                var refusals = KeepSignalRoutes(files);
+                if (refusals.Count > 0)
+                    throw new OmsiStepRefusedException(string.Join(" ", refusals));
+            }
             foreach (var file in files)
             {
                 var expected = undo ? file.After : file.Before;
@@ -802,6 +813,15 @@ namespace OmsiMapEditor.OMSI
                 RollBackAfter(failure, () => PutBack(workspace, touched, undo));
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Writes the stored files of a step again, for undo and redo: exactly the states the step's first run kept, signalroutes.cfg included
+        /// when it took it along, so a redo never works the routes out anew (ADR 105, review of M2).
+        /// </summary>
+        private void ReplayFiles(List<OmsiObjectChange.FileState> files, bool undo)
+        {
+            ApplyFiles(files, undo, false);
         }
 
         /// <summary>
