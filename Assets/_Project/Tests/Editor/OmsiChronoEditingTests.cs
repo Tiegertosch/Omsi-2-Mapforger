@@ -20,7 +20,7 @@ namespace OmsiMapEditor.Tests
             testRoot = Path.Combine(Path.GetTempPath(), "mapforge-chrono-" + Guid.NewGuid().ToString("N"));
             original = Path.Combine(testRoot, "OMSI 2", "maps", "Testmap");
             Directory.CreateDirectory(Path.Combine(original, "TTData"));
-            Write(original, "global.cfg", "[name]", "Testmap", "", "[NextIDCode]", "20", "", "[map]", "0", "0", "tile_0_0.map", "");
+            Write(original, "global.cfg", "[name]", "Testmap", "", "[friendlyname]", "Test Map", "", "[NextIDCode]", "20", "", "[map]", "0", "0", "tile_0_0.map", "");
             // Object 5 is a bus stop with a rule and sign 8 hanging on it; object 6 stands beside it.
             Write(original, "tile_0_0.map", "[version]", "14", "",
                 "[object]", "0", "stop.sco", "5", "10", "20", "0", "0", "0", "0", "0", "",
@@ -61,6 +61,39 @@ namespace OmsiMapEditor.Tests
             session.DeleteChronoVariant(made);
             CollectionAssert.AreEqual(new[] { "0100_Works" }, OmsiChrono.ReadVariants(session.Workspace).Select(v => v.Name));
             Assert.Throws<InvalidOperationException>(() => session.DeleteChronoVariant(OmsiChrono.ReadVariants(session.Workspace)[0]));
+        }
+
+        [Test]
+        public void ExportCarriesNewAndEditedChronoVariantsAndLeavesDeletedOnesOut()
+        {
+            var kept = session.CreateChronoVariant("Kept works", new DateTime(1993, 5, 1), null);
+            var dropped = session.CreateChronoVariant("Dropped works", new DateTime(1994, 1, 1), null);
+            var workspace = session.Workspace;
+            // An edited change list of the original map and a tile in the new variant.
+            var editedTile = Path.Combine("Chrono", "0100_Works", "tile_0_0.map");
+            workspace.Save(editedTile, OmsiTextFile.Encode("[version]\r\n14\r\n\r\n[selobject]\r\n6\r\n\r\n[rule]\r\n0\r\ntrafficdensity\r\n0.500\r\n0\r\n", OmsiTextEncoding.Windows1252));
+            var newTile = Path.Combine(kept.Folder, "tile_0_0.map");
+            workspace.Save(newTile, OmsiTextFile.Encode("[version]\r\n14\r\n", OmsiTextEncoding.Windows1252));
+            session.DeleteChronoVariant(dropped);
+            var originalTileBefore = File.ReadAllBytes(Path.Combine(original, editedTile));
+            var originalFilesBefore = Directory.GetFiles(original, "*", SearchOption.AllDirectories).Length;
+
+            var target = Path.Combine(testRoot, "OMSI 2", "maps", "Testmap (Mapforge)");
+            OmsiMapExporter.Export(workspace, target, "Testmap (Mapforge)");
+
+            foreach (var file in new[] { "Chrono.cfg", "Chrono_ENG.dsc", "tile_0_0.map" })
+            {
+                var exported = Path.Combine(target, kept.Folder, file);
+                Assert.IsTrue(File.Exists(exported), exported);
+                CollectionAssert.AreEqual(workspace.ReadAllBytes(Path.Combine(kept.Folder, file)), File.ReadAllBytes(exported), file);
+            }
+            CollectionAssert.AreEqual(workspace.ReadAllBytes(editedTile), File.ReadAllBytes(Path.Combine(target, editedTile)));
+            Assert.IsTrue(File.Exists(Path.Combine(target, "Chrono", "0100_Works", "Chrono.cfg")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(target, dropped.Folder)));
+            // The original map stays as it was.
+            CollectionAssert.AreEqual(originalTileBefore, File.ReadAllBytes(Path.Combine(original, editedTile)));
+            Assert.IsFalse(Directory.Exists(Path.Combine(original, kept.Folder)));
+            Assert.AreEqual(originalFilesBefore, Directory.GetFiles(original, "*", SearchOption.AllDirectories).Length);
         }
 
         [Test]
