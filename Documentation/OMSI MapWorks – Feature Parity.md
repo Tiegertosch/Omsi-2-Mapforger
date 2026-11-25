@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 103 · Teilweise 5 · Prüfen 0 · Offen 7 von 115 Punkten (103 + 5 + 0 + 7; die 7 Offen sind die Detailstufen, bewusst nicht gebaut, und 6 Signal- und Chrono-Punkte) (Stand 23. November 2026: Punkte I und E aktualisiert, ADR 104 und ADR 086 Nachtrag). Die Fassung vor dem Abgleich liegt daneben („Original vor Abgleich“). Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 104 · Teilweise 4 · Prüfen 0 · Offen 7 von 115 Punkten (104 + 4 + 0 + 7; die 7 Offen sind die Detailstufen, bewusst nicht gebaut, und 6 Signal- und Chrono-Punkte) (Stand 25. November 2026: „Chrono-Varianten vollständig exportieren“ ist Vorhanden; davor 23. November 2026: Punkte I und E aktualisiert, ADR 104 und ADR 086 Nachtrag). Eine Fassung vor dem Abgleich gibt es nicht als Datei; der Verlauf steht in der Git-Historie. Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -121,7 +121,7 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 - [x] Verkehrsregeln in Chrono ändern — Vorhanden (seit 1.1.1, Regeln und Vorfahrt)
 - [x] Linien zeitabhängig deaktivieren — Vorhanden (seit 1.1.1)
 - [ ] Chrono-Fahrpläne bearbeiten — Offen (bewusst nicht: Stationsverbindungen bräuchten eine Wegsuche)
-- [ ] Chrono-Varianten vollständig exportieren — Teilweise
+- [x] Chrono-Varianten vollständig exportieren — Vorhanden (Der Export kopiert den ganzen Chrono-Ordner und legt alle Änderungen der Arbeitskopie darüber, auch neu angelegte und gelöschte eigene Varianten; IDs und Verweise bleiben über Allocator und Verweis-Index konsistent; Fahrpläne bewusst ausgenommen (ADR 067); Test `ExportCarriesNewAndEditedChronoVariantsAndLeavesDeletedOnesOut`, seit 25. November 2026)
 
 ## I. Umgebung, Werkzeuge und Diagnose
 - [x] 2D- und 3D-Kartenansicht — Vorhanden
