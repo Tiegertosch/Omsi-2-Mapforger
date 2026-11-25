@@ -21,7 +21,8 @@ namespace OmsiMapEditor.UI
             Chrono,
             Lines,
             Paths,
-            Objects
+            Objects,
+            SignalRoutes
         }
 
         private ProjectTab projectTab = ProjectTab.Tiles;

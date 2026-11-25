@@ -1694,6 +1694,8 @@ namespace OmsiMapEditor.UI
             DrawTileAdders(painter);
             var objectsDone = watch.Elapsed.TotalMilliseconds;
             DrawSelection(painter);
+            // Over the selection, so the signal of a route stays in view when it is the object selected.
+            DrawSignalRoutes(painter, visible);
             DrawArrows(painter);
             DrawPlacement(painter);
             DrawBox(painter);
@@ -3884,6 +3886,7 @@ namespace OmsiMapEditor.UI
             DrawRoad3D(painter, camera);
             DrawPlacementPoints3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
+            DrawSignalRoutes(painter, default, camera);
             DrawSignalMovements(painter, camera);
             DrawTrafficHighlight(painter, camera);
             DrawPriorityHandles(painter, camera);

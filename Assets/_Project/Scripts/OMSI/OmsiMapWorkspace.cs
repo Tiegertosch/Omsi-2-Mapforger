@@ -42,7 +42,7 @@ namespace OmsiMapEditor.OMSI
         internal int ReadCount => System.Threading.Volatile.Read(ref readCount);
 
         /// <summary>How many saves, reverts and deletions were asked for, for tests of how often a step writes.</summary>
-        internal int WriteCount => System.Threading.Volatile.Read(ref writeCount);
+        public int WriteCount => System.Threading.Volatile.Read(ref writeCount);
 
         /// <summary>Workspace folder for a project file: <c>Name.omproj</c> uses <c>Name.workspace</c> next to it.</summary>
         public static string FolderForProject(string projectFilePath)

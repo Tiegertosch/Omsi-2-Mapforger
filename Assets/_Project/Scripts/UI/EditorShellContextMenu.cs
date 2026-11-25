@@ -304,6 +304,7 @@ namespace OmsiMapEditor.UI
                 CanEdit = CanEdit,
                 CanEditObjects = CanEditObjects,
                 PathsGroupShown = PathsGroupShown,
+                HasSignalRoutes = SignalHasRoutes(item.Id),
                 IsEntryPoint = entryPoint != null,
                 IsBusStop = !EditingVariant && session != null && session.IsBusStop(currentSummary, holdingTile, item),
                 IsMadeJunction = MadeJunction(item.AssetPath) != null,
@@ -323,6 +324,7 @@ namespace OmsiMapEditor.UI
                     case ContextMenuAction.ChangeType: return () => PickElementType(holdingTile, item);
                     case ContextMenuAction.EditLabels: return () => OpenInspector(InspectorTab.Selection, "object-type");
                     case ContextMenuAction.OpenPaths: return OpenPathsFromMenu;
+                    case ContextMenuAction.OpenSignalRoutes: return () => ShowSignalRoutes(item.Id);
                     // The junction is the selection; each tool begins on the one selected object (the same as choosing its button).
                     case ContextMenuAction.OpenMarkings: return () => SetTool(EditorTool.Markings);
                     case ContextMenuAction.OpenTrafficRules: return () => SetTool(EditorTool.Priorities);
@@ -431,11 +433,14 @@ namespace OmsiMapEditor.UI
         private void FillRowMenu(VisualElement menu, KeyValuePair<OmsiTileSummary, OmsiSplineAttachmentRecord> row, OmsiMapPoint clickedAt)
         {
             AddContextHeader(menu, Loc.T("context.row", ("id", row.Value.Id), ("name", Path.GetFileName(row.Value.AssetPath ?? string.Empty))));
-            var state = new ContextMenuState { CanEdit = CanEdit };
+            // A signal standing as a row has the ID of its record in the routes; one record is one ID, so the list is limited to that one.
+            var state = new ContextMenuState { CanEdit = CanEdit, HasSignalRoutes = SignalHasRoutes(row.Value.Id) };
             AddContextEntries(menu, ContextMenuEntries.For(ContextMenuKind.Row, state), action =>
             {
                 if (action == ContextMenuAction.EditRow)
                     return () => EditRowFromMenu(row, clickedAt);
+                if (action == ContextMenuAction.OpenSignalRoutes)
+                    return () => ShowSignalRoutes(row.Value.Id);
                 return () => DeleteRowFromMenu(row);
             });
         }

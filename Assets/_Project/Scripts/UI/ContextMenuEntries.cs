@@ -31,6 +31,8 @@ namespace OmsiMapEditor.UI
         ChangeType,
         EditLabels,
         OpenPaths,
+        /// <summary>A signal with routes: opens the list of signal routes filtered to this signal.</summary>
+        OpenSignalRoutes,
         Copy,
         Duplicate,
         LevelGround,
@@ -91,6 +93,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The inspector has the group of AI paths (<c>PathsGroupShown</c>).</summary>
         public bool PathsGroupShown;
+
+        /// <summary>The object is a signal that has routes in signalroutes.cfg (ADR 105).</summary>
+        public bool HasSignalRoutes;
 
         /// <summary>The object is an entry point (never while a variant is edited).</summary>
         public bool IsEntryPoint;
@@ -180,6 +185,8 @@ namespace OmsiMapEditor.UI
             }
             if (state.PathsGroupShown)
                 Item(entries, ContextMenuAction.OpenPaths, "context.paths");
+            if (state.HasSignalRoutes)
+                Item(entries, ContextMenuAction.OpenSignalRoutes, "context.signal_routes");
             AddJunctionTools(entries, state);
             if (!state.CanEditObjects)
             {
@@ -240,10 +247,15 @@ namespace OmsiMapEditor.UI
         {
             if (!state.CanEdit)
             {
+                // Showing the routes of a signal changes nothing, so a read-only map offers it too.
+                if (state.HasSignalRoutes)
+                    Item(entries, ContextMenuAction.OpenSignalRoutes, "context.signal_routes");
                 Note(entries);
                 return;
             }
             Item(entries, ContextMenuAction.EditRow, "context.edit_row");
+            if (state.HasSignalRoutes)
+                Item(entries, ContextMenuAction.OpenSignalRoutes, "context.signal_routes");
             Divider(entries);
             Item(entries, ContextMenuAction.DeleteRow, "context.delete_row", null, true);
         }

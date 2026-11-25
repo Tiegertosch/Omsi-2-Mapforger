@@ -109,9 +109,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 ## Signalrouten und Weichen (Parity-Block G, ADR 105)
 
 - [x] M0 – Kachellöschen: Signalbegriff bleibt, die Kachel eines Signals ist gesperrt (ADR 031, Nachtrag)
-- [ ] M1 – Signalrouten anzeigen: Signale markiert, gewählte Route hebt ihre Gleisstücke hervor, Liste als Popup
+- [x] M1 – Signalrouten anzeigen: Signale markiert, gewählte Route hebt ihre Gleisstücke hervor, Liste als Popup – vom Projektinhaber am 25. November 2026 getestet
   - [x] Logik: `OmsiSignalRoutes` (verlustfrei lesen, Befunde) und `OmsiSignalRouteMap` (Auflösung gegen die Karte, Prüfung von Kachel- und Pfadnummern), Probe an Grundorf und Berlin-Spandau
-  - [ ] Oberfläche
+  - [x] Oberfläche: runder Knopf „Signal routes“ in der unteren Leiste mit Popup (Nummer, Signal, Gleisstücke, Tempolimit, Vor- und nächstes Signal, Befunde gelb), gewählte Route orange auf der Karte, Kontextmenü „Signal routes…“ am Signal (Objekt und Spline-Anhängung/Reihe), Kommandozeile `-signalRoutes`/`-signalRoute`/`-signalRouteSignal` (Nutzertest in openOMSI und OMSI 2 offen)
 - [ ] M2 – Prüfung und Verweise: Kartenprüfung, Löschen von Gleis oder Signal mit Verweis verweigern, `TransferObject` und Kachellöschen ziehen Kachel- und Pfadnummern nach
 - [ ] M3 – Routen bearbeiten und löschen (Begriff, Vor- und nächstes Signal, Geschwindigkeit, Art), Undo
 - [ ] M4 – Routen erstellen mit Wegsuche über das Schienennetz
