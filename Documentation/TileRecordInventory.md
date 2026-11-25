@@ -201,6 +201,21 @@ Die erste Bodentextur bedeckt die ganze Karte und hat keine Maske. Jede weitere 
 
 Weitere Dateien je Kachel neben der Karte: `tile_x_y.map.LM.bmp` ist eine 256 × 256 große Nacht-Lightmap mit dem Licht der Laternen. `texture\map\tile_x_y.map.roadmap.bmp` ist OMSIs schematische Karte für die Kartenanzeige im Spiel. Mapforge verwendet beide nicht.
 
+## signalroutes.cfg (ADR 105)
+
+Befund vom 25. November 2026 an Grundorf (2 Routen, 5 Einträge), Berlin-Spandau (49 Routen, 39 Signale, 644 Einträge) und Stadtückheim (nur Kopf). Windows-1252/ASCII ohne BOM, CRLF. Der Kopf ist Freitext (`Signal Routes File`, `Created with Omsi Version …`, `Date: …`). Vor jeder Route steht `   n:` als laufende Nummer; sie ist nur Kommentar. Leerzeilen zwischen den Abschnitten sind unregelmäßig.
+
+| Abschnitt | Felder | Bedeutung |
+|---|---|---|
+| `[signalroute]` | 1 | Art 0 oder 1 (Bedeutung offen) |
+| `[signal]` | 2 | ID des Signalobjekts; Begriff (1 Fahrt, 2 Fahrt mit `[speedlimit]`), **kein** Kachelindex |
+| `[entry]` (0 bis n) | 4 | Element-ID (Spline oder Objekt, z. B. Weiche); Pfad im Element ab 0; Kachelindex der `[map]`-Liste; Pfadnummer in der Kachel = erste Pfadnummer des Elements + Pfad (`OmsiTilePathNumbers`, ADR 097; 644 von 644 und 5 von 5 Treffern) |
+| `[distsignal]` | 1 | Vorsignal, das den Begriff wiederholt (meist das Signal selbst) |
+| `[nextsignal]` | 1 | nächstes Hauptsignal, dessen Begriff das Signal ankündigt |
+| `[speedlimit]` | 1 | km/h mit drei Nachkommastellen (`40.000`) |
+
+Signale stehen als `[object]` oder als Spline-Anhängung (Spandau: 30 und 9). Leser: `OmsiSignalRoutes`, Auflösung: `OmsiSignalRouteMap`. Berlin-Spandaus `signalroutes0.cfg` ist ein älterer Stand und bleibt als unbekannte Datei unberührt.
+
 ## Zahlenformat
 
 Der OMSI-Editor schreibt Kommazahlen mit höchstens 15 gültigen Ziffern und invarianter Kultur. Sehr kleine Werte schreibt er wissenschaftlich mit kurzem Exponenten, zum Beispiel `1.33514401335476E-5` oder `-3.59590604939723E-6`. Ganze Werte stehen ohne Nachkommastellen, etwa `300`. Diese Regel reproduziert 243.482 von 243.487 Kommazahlen der drei Karten zeichengenau. Die fünf Ausnahmen haben einen zweistelligen Exponenten wie `1.024455E-06` und stammen von einem anderen Werkzeug. `OmsiNumberFormat` setzt diese Regel um.

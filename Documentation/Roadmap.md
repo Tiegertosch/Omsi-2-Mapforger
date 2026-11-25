@@ -106,6 +106,18 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Fahrplan abschließen – Linien, Fahrten und Haltestellen umbenennen und löschen, Halte vorhandener Fahrten ändern, Zeiten und Haltemodus je Halt (ADR 096; vom Nutzer in openOMSI getestet)
 - [x] Fahrwege (`.ttr`) und Fahrten mit `[station]` für Züge und Straßenbahnen – Schalter „Rail“ im Linien-Werkzeug (ADR 097; vom Nutzer in openOMSI getestet)
 
+## Signalrouten und Weichen (Parity-Block G, ADR 105)
+
+- [x] M0 – Kachellöschen: Signalbegriff bleibt, die Kachel eines Signals ist gesperrt (ADR 031, Nachtrag)
+- [ ] M1 – Signalrouten anzeigen: Signale markiert, gewählte Route hebt ihre Gleisstücke hervor, Liste als Popup
+  - [x] Logik: `OmsiSignalRoutes` (verlustfrei lesen, Befunde) und `OmsiSignalRouteMap` (Auflösung gegen die Karte, Prüfung von Kachel- und Pfadnummern), Probe an Grundorf und Berlin-Spandau
+  - [ ] Oberfläche
+- [ ] M2 – Prüfung und Verweise: Kartenprüfung, Löschen von Gleis oder Signal mit Verweis verweigern, `TransferObject` und Kachellöschen ziehen Kachel- und Pfadnummern nach
+- [ ] M3 – Routen bearbeiten und löschen (Begriff, Vor- und nächstes Signal, Geschwindigkeit, Art), Undo
+- [ ] M4 – Routen erstellen mit Wegsuche über das Schienennetz
+- [ ] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen
+- [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten)
+
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen

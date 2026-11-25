@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -38,6 +39,48 @@ namespace OmsiMapEditor.OMSI
                 number += pathCount(values[1]) ?? 0;
             }
             return result;
+        }
+    }
+
+    /// <summary>How many paths the object or spline file of an asset has, read once for each from the installation.</summary>
+    public sealed class OmsiAssetPathCounter
+    {
+        private readonly string installation;
+        private readonly OmsiSplineProfileCatalog profiles;
+        private readonly Dictionary<string, int?> counts = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
+
+        public OmsiAssetPathCounter(string installation)
+        {
+            this.installation = installation;
+            profiles = new OmsiSplineProfileCatalog(installation);
+        }
+
+        public int? Count(string asset)
+        {
+            if (string.IsNullOrWhiteSpace(asset))
+                return null;
+            if (counts.TryGetValue(asset, out var known))
+                return known;
+            int? count = null;
+            try
+            {
+                if (asset.EndsWith(".sli", StringComparison.OrdinalIgnoreCase))
+                {
+                    count = profiles.Get(asset)?.Lanes.Count;
+                }
+                else
+                {
+                    var path = OmsiRelativePath.Resolve(installation, asset);
+                    if (File.Exists(path))
+                        count = OmsiSceneryObject.Parse(File.ReadAllBytes(path)).Paths.Count;
+                }
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is FormatException || exception is ArgumentException)
+            {
+                // An unreadable file counts no paths.
+            }
+            counts[asset] = count;
+            return count;
         }
     }
 

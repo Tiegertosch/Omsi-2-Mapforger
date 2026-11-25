@@ -2239,3 +2239,36 @@ M7 abgeschlossen (22. November 2026): Schritte 0–7 vom Projektinhaber getestet
 - Die Tage werden nur auf 0 bis 370 geprüft, nicht gegen einen Kalender oder openOMSIs Tagesrechnung.
 
 **Prüfung:** `OmsiSeasonsTests` (15: Lesen, byte-genaues Schreiben, Ändern nur der Felder und des Kommentars, Hinzufügen und Löschen mit Kommentar, fremde Kommentare, Einfügeorte, Grenztag ohne Überlappung, Fehler und Warnungen, unbekannte Art, Optionen mit den Einträgen der Datei). Dialog und Sprachdateien `locales/*/seasons.json` in acht Sprachen. Sichtprüfung im Player: erledigt am 23. November 2026 (Endlauf 1492 von 1492 grün, Validierungsstand in `DevelopmentSetup.md`).
+
+## ADR 105: Signalrouten (Fahrstraßen)
+
+**Datum:** 25. November 2026 · **Status:** M0 (Kachellöschen, ADR 031 Nachtrag) und die Logik von M1 umgesetzt auf `feature/signal-routes`, M1-Logik nicht committet; Oberfläche von M1 sowie M2 bis M6 offen. Parity-Block G.
+
+**Anlass:** MapWorks las `signalroutes.cfg` bisher nur beim Kachellöschen und behandelte dabei den Signalbegriff als Kachelindex (M0). Es gab keinen Leser, keine Anzeige und keine Prüfung der Fahrstraßen von Bahn- und Straßenbahnsignalen.
+
+**Format** (Befund an Grundorf und Berlin-Spandau, Abschnitt „signalroutes.cfg“ in `TileRecordInventory.md`):
+- Windows-1252/ASCII ohne BOM, CRLF, Freitext-Kopf („Signal Routes File“, „Created with …“, „Date: …“), vor jeder Route eine Kommentarzeile `   n:` (laufende Nummer, nicht ausgewertet), unregelmäßige Leerzeilen.
+- `[signalroute]` Art (0/1, Bedeutung offen); `[signal]` Signal-ID, Begriff (1 Fahrt, 2 Fahrt mit Geschwindigkeitsbeschränkung auf den Originalkarten); je Gleisstück `[entry]` Element-ID, Pfad im Element, Kachelindex der `[map]`-Liste, Pfadnummer in der Kachel (Zählung wie `OmsiTilePathNumbers`, ADR 097); optional `[distsignal]` (Vorsignal), `[nextsignal]` (nächstes Hauptsignal), `[speedlimit]` (km/h, `40.000`).
+- Weichen erscheinen als mehrere Einträge mit derselben ID und verschiedenen Pfaden.
+
+**Was openOMSI nutzt:** Signal-ID, Eintrags-IDs, `[distsignal]`, `[nextsignal]` und nur das Vorhandensein von `[speedlimit]` (Begriff 2). Art, Begriff und die Felder 2 bis 4 der Einträge liest openOMSI, wertet sie aber nicht aus; MapWorks führt sie trotzdem korrekt (OMSI 2, openMapper). Weichen stellen die Züge selbst (`[switchdir]` der `.sco`), nicht die Fahrstraße.
+
+**Entscheidung:**
+- **Verlustfrei** über `OmsiRecordFile` mit `OmsiSignalRouteLayouts` (feste Feldanzahlen `signalroute 1`, `signal 2`, `entry 4`, `distsignal 1`, `nextsignal 1`, `speedlimit 1`). Die `   n:`-Zeilen bleiben im Nachspann des vorigen Datensatzes, unbekannte Abschnitte bleiben Freitext. Unverändert gelesen ist die Datei byte-identisch.
+- **Nur lesende Sicht** `OmsiSignalRoutes` (`Editor.OMSI`, ohne Unity): Routen mit Nummer, Art, Signal, Begriff, Einträgen und optionalen Feldern sowie den zugehörigen `OmsiRecord`s für die spätere Bearbeitung (M3). Fehlende Datei = keine Routen. Was nicht liest (Abschnitt vor der ersten Route, keine Zahl, Datei endet im Abschnitt, doppelter Abschnitt, Route ohne Signal), wird ein Befund und nicht verschluckt.
+- **Auflösung gegen die Karte** `OmsiSignalRouteMap.Resolve(routes, summary, source, pathCount)`: ID-Index über Objekte, angehängte Objekte, Spline-Anhängungen und Splines aller Kacheln aus `OmsiMapSummary`; je Route Signal, Vor- und nächstes Signal und je Eintrag das Element (Kachel, Art, Punkt, bei Splines der Datensatz zum Zeichnen). Befunde: unbekannte IDs, unbekannte Kachel, Element auf anderer Kachel, Pfad außerhalb der Pfade der `.sco`/`.sli`, Pfadnummer passt nicht zur Zählung der Kachel. Ohne Installation (`pathCount` null) entfallen die Pfadprüfungen.
+- `OmsiAssetPathCounter` (vorher privat in `OmsiMapSessionRail.cs`) ist öffentlich und zählt die Pfade einer `.sco`/`.sli` einmal je Datei.
+- **openOMSIs `switches.cfg`/`signals.cfg`** (Blöcke im Transport-Ordner) werden vorerst nur unverändert erhalten, nicht gelesen oder geschrieben (M6, optional).
+
+**Meilensteine:**
+- M0: Kachellöschen zählt den Begriff nicht mehr als Kachelindex; die Kachel eines Signals ist gesperrt (erledigt, ADR 031 Nachtrag).
+- M1: Lesen, Auflösen, Befunde (Logik erledigt); Anzeige: Signale markiert, gewählte Route hebt ihre Gleisstücke hervor, Liste als Popup (offen).
+- M2: Prüfung in der Kartenprüfung; Löschen von Gleis oder Signal mit Verweis verweigern (Regel 4); `TransferObject` und Kachellöschen ziehen Kachel- und Pfadnummern nach; `OmsiReferenceIndex` erweitern.
+- M3: Bearbeiten (Begriff, Vor- und nächstes Signal, Geschwindigkeit, Art), Route löschen, Undo über Dateistand.
+- M4: Routen erstellen mit Wegsuche über das Schienennetz (`OmsiPathNetwork`, Art 2), Kachel- und Pfadnummern automatisch.
+- M5: Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen.
+- M6 (optional): openOMSIs `switches.cfg`/`signals.cfg`.
+
+**Grenzen und offene Fragen:** Bedeutung der Art 0/1; Begriffe über 2; ob OMSI 2 bei Splines nach Objekten (MapWorks hängt neue Splines am Kachelende an) dieselbe Pfadzählung nutzt; doppelte IDs in zusammengesetzten Karten (die Auflösung bevorzugt das Element auf der genannten Kachel). Ein angehängtes Signal wird am Ort seines Elternobjekts markiert, eine Spline-Anhängung am ersten Objekt ihrer Reihe.
+
+**Prüfung:** `OmsiSignalRoutesTests` (6: Roundtrip byte-identisch mit Kopf, Nummernzeilen, Leerzeilen, CRLF und LF; alle Felder; fehlende und leere Datei; Befunde beim Lesen; Auflösung; Befunde der Auflösung). Probe an den Originalkarten (nur lesend): Grundorf 2 Routen, 2 Signale, 5 Einträge; Berlin-Spandau 49 Routen, 39 Signale, 644 Einträge (30 Signale als Objekt, 9 als Spline-Anhängung; Einträge 459 Splines, 185 Objekte); beide byte-identisch, keine Befunde, alle Pfadnummern geprüft; Auflösung in Spandau 358 ms beim ersten Mal (mit Lesen der `.sco`), 108 ms danach.

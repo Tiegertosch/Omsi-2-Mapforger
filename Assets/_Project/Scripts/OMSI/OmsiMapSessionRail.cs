@@ -28,48 +28,6 @@ namespace OmsiMapEditor.OMSI
             return OmsiTrackPlanner.Plan(stops, rails, (x, y) => summary.Tiles.FindIndex(tile => tile.X == x && tile.Y == y));
         }
 
-        /// <summary>How many paths the object or spline file of an asset has, read once for each from the installation.</summary>
-        private sealed class AssetPathCounter
-        {
-            private readonly string installation;
-            private readonly OmsiSplineProfileCatalog profiles;
-            private readonly Dictionary<string, int?> counts = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
-
-            public AssetPathCounter(string installation)
-            {
-                this.installation = installation;
-                profiles = new OmsiSplineProfileCatalog(installation);
-            }
-
-            public int? Count(string asset)
-            {
-                if (string.IsNullOrWhiteSpace(asset))
-                    return null;
-                if (counts.TryGetValue(asset, out var known))
-                    return known;
-                int? count = null;
-                try
-                {
-                    if (asset.EndsWith(".sli", StringComparison.OrdinalIgnoreCase))
-                    {
-                        count = profiles.Get(asset)?.Lanes.Count;
-                    }
-                    else
-                    {
-                        var path = OmsiRelativePath.Resolve(installation, asset);
-                        if (File.Exists(path))
-                            count = OmsiSceneryObject.Parse(File.ReadAllBytes(path)).Paths.Count;
-                    }
-                }
-                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is FormatException || exception is ArgumentException)
-                {
-                    // An unreadable file counts no paths.
-                }
-                counts[asset] = count;
-                return count;
-            }
-        }
-
         /// <summary>The number OMSI keeps for each entry's path in its tile: where the element's first path stands in the tile's list, plus the path's place in the element.</summary>
         private List<int> TileNumbersOf(OmsiMapSummary summary, IList<OmsiPathEntry> entries)
         {
@@ -77,7 +35,7 @@ namespace OmsiMapEditor.OMSI
             var installation = OmsiObjectOutlineCatalog.InstallationRootOfMap(Path.GetDirectoryName(Path.GetFullPath(GlobalConfigPath)));
             if (string.IsNullOrEmpty(installation))
                 throw new InvalidOperationException("The OMSI installation is needed to number the paths of a track.");
-            var counter = new AssetPathCounter(installation);
+            var counter = new OmsiAssetPathCounter(installation);
             var tiles = new Dictionary<int, Dictionary<int, int>>();
             var result = new List<int>();
             foreach (var entry in entries)
