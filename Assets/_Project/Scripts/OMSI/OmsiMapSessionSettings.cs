@@ -11,8 +11,8 @@ namespace OmsiMapEditor.OMSI
     {
         /// <summary>
         /// Writes new settings into global.cfg of the project copy, keeping everything they do not name, and gives <paramref name="summary"/> the
-        /// new name and description. <see cref="OmsiNewMapOptions.CarTraffic"/> and <see cref="OmsiNewMapOptions.PassengerTraffic"/> multiply the
-        /// daily curves as they are now; 1 leaves them. Size and ground height are not used. Returns false when the file already said so.
+        /// new name and description. <see cref="OmsiNewMapOptions.CarTraffic"/> and <see cref="OmsiNewMapOptions.PassengerTraffic"/> set the
+        /// daily curves as factors on the standard day; the factor the file has now leaves them. Size and ground height are not used. Returns false when the file already said so.
         /// </summary>
         public bool UpdateMapSettings(OmsiMapSummary summary, string friendlyName, OmsiNewMapOptions options)
         {

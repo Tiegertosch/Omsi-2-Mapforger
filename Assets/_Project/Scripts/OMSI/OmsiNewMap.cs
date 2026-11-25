@@ -390,32 +390,65 @@ namespace OmsiMapEditor.OMSI
             config.InsertRecord(index >= 0 ? index + 1 : IndexAfter(config, "NextIDCode"), config.CreateRecord(name, new string[0]));
         }
 
+        /// <summary>The factor of the cars' daily curve of a global.cfg on OMSI's standard day (ADR 076, addendum), as the dialog shows it.</summary>
+        public static double CarTrafficFactor(OmsiRecordFile config)
+        {
+            return RoundFactor(CurveFactor(config, "trafficdensity_road", StandardCarCurve));
+        }
+
+        /// <summary>The factor of the passengers' daily curve of a global.cfg on OMSI's standard day.</summary>
+        public static double PassengerTrafficFactor(OmsiRecordFile config)
+        {
+            return RoundFactor(CurveFactor(config, "trafficdensity_passenger", StandardPassengerCurve));
+        }
+
+        /// <summary>Rounded to two places and kept within the dialog's range of 0 to 2.</summary>
+        private static double RoundFactor(double factor)
+        {
+            return Math.Max(0.0, Math.Min(2.0, Math.Round(factor, 2, MidpointRounding.AwayFromZero)));
+        }
+
         /// <summary>
-        /// Multiplies the densities of a daily curve; a template without the curve keeps none at factor 1 and otherwise
-        /// gets the standard day, multiplied.
+        /// The least-squares factor of a curve on the standard day: the curve, read as openOMSI reads it
+        /// (<see cref="OmsiTrafficCurve.ValueAt"/>), at the hours of the standard day. A file without the curve has the standard day: 1.
+        /// </summary>
+        private static double CurveFactor(OmsiRecordFile config, string name, double[,] standard)
+        {
+            var points = OmsiTrafficCurve.Read(config, name);
+            if (points.Count == 0)
+                return 1.0;
+            double both = 0.0, square = 0.0;
+            for (var index = 0; index < standard.GetLength(0); index++)
+            {
+                var value = standard[index, 1];
+                both += OmsiTrafficCurve.ValueAt(points, standard[index, 0]) * value;
+                square += value * value;
+            }
+            return square > 0.0 ? both / square : 1.0;
+        }
+
+        /// <summary>
+        /// Sets a daily curve to <paramref name="factor"/> on the standard day (ADR 076, addendum). A factor equal to the one the file has now
+        /// (within rounding) leaves the lines alone; otherwise the points are scaled so the curve keeps its shape. A curve of zeros and a
+        /// file without the curve get the standard day times the factor.
         /// </summary>
         private static void ScaleCurve(OmsiRecordFile config, string name, double factor, double[,] standard)
         {
-            if (Math.Abs(factor - 1.0) < 1e-9)
+            var present = CurveFactor(config, name, standard);
+            if (Math.Abs(factor - RoundFactor(present)) < 0.005)
                 return;
             var points = config.Records.FindAll(record => string.Equals(record.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (points.Count == 0)
+            if (points.Count > 0 && present > 1e-9)
             {
-                var insertAt = config.Records.FindLastIndex(record => record.Name.StartsWith("trafficdensity", StringComparison.OrdinalIgnoreCase) ||
-                                                                      string.Equals(record.Name, "addseason", StringComparison.OrdinalIgnoreCase) ||
-                                                                      string.Equals(record.Name, "groundtex", StringComparison.OrdinalIgnoreCase)) + 1;
-                if (insertAt == 0)
-                    insertAt = config.Records.Count;
-                for (var point = 0; point < standard.GetLength(0); point++)
-                    config.InsertRecord(insertAt + point, config.CreateRecord(name, new[]
-                    {
-                        OmsiNewMapContent.Number(standard[point, 0]), OmsiNewMapContent.Number(standard[point, 1] * factor)
-                    }));
+                foreach (var point in points)
+                    if (point.Fields.Count >= 2 && point.TryGetDouble(1, out var density))
+                        point.SetField(1, OmsiNewMapContent.Number(density * factor / present));
                 return;
             }
-            foreach (var point in points)
-                if (point.Fields.Count == 2 && point.TryGetDouble(1, out var density))
-                    point.SetField(1, OmsiNewMapContent.Number(density * factor));
+            var day = new List<KeyValuePair<double, double>>();
+            for (var point = 0; point < standard.GetLength(0); point++)
+                day.Add(new KeyValuePair<double, double>(standard[point, 0], standard[point, 1] * factor));
+            OmsiTrafficCurve.Write(config, name, day);
         }
 
         /// <summary>
