@@ -589,8 +589,13 @@ namespace OmsiMapEditor.OMSI
                 {
                     if (string.Equals(record.Name, "entry", StringComparison.OrdinalIgnoreCase))
                         ShiftValue(record, 2, deleted, blockers, "A signal route runs over this tile.");
-                    else if (string.Equals(record.Name, "signal", StringComparison.OrdinalIgnoreCase))
-                        ShiftValue(record, 1, deleted, blockers, "A signal of a signal route stands on this tile.");
+                    else if ((string.Equals(record.Name, "signal", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(record.Name, "distsignal", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(record.Name, "nextsignal", StringComparison.OrdinalIgnoreCase)) &&
+                             int.TryParse(ValueAt(record, 0)?.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var signal) &&
+                             ids.Contains(signal))
+                        // The signal's object id; [signal]'s second value is its aspect, not a tile index.
+                        AddBlocker(blockers, "A signal of a signal route stands on this tile.");
                 }
             }
 
@@ -685,14 +690,19 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The same for the value at a position among a record's fields and following lines, as records without a layout hold them.</summary>
         private static void ShiftValue(OmsiRecord record, int position, int deleted, List<string> blockers, string blocker)
         {
-            var line = position < record.Fields.Count ? record.Fields[position]
-                : position - record.Fields.Count < record.Trailer.Count ? record.Trailer[position - record.Fields.Count] : null;
+            var line = ValueAt(record, position);
             if (line == null || !int.TryParse(line.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
                 return;
             if (index == deleted)
                 AddBlocker(blockers, blocker);
             else if (index > deleted)
                 line.Text = (index - 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static OmsiLine ValueAt(OmsiRecord record, int position)
+        {
+            return position < record.Fields.Count ? record.Fields[position]
+                : position - record.Fields.Count < record.Trailer.Count ? record.Trailer[position - record.Fields.Count] : null;
         }
 
         private static void AddBlocker(List<string> blockers, string blocker)

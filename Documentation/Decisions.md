@@ -332,6 +332,8 @@ Angepasste Straßen tragen wie bei OMSIs eigenem Editor `[spline_terrain_align_2
 - Ein fortgesetztes Gelände lässt neue Kacheln ohne Stufe an die Karte anschließen; ein Höhensprung am Rand wäre im Spiel eine Wand.
 - Die Zusammenfassungen der Karte hängen an Kachelobjekten, die nach dem Neulesen nicht mehr gelten; ältere Schritte lassen sich danach nicht sicher zurücknehmen, wie schon nach **Revert tile edits**.
 
+**Nachtrag (25. November 2026, Zweig `feature/signal-routes`): `[signal]` in `signalroutes.cfg` nennt keinen Kachelindex.** Aufbau: `[signalroute]` Art; `[signal]` Signalobjekt-ID, Signalbegriff (1 oder 2, 2 genau dann, wenn die Route `[speedlimit]` hat); `[entry]` Element-ID, Pfad im Element, Kachelindex (Stelle in der `[map]`-Liste), Pfadnummer in der Kachel; optional `[distsignal]` ID, `[nextsignal]` ID, `[speedlimit]` Wert. Bisher zählte das Kachellöschen den zweiten Wert von `[signal]` als Kachelindex herunter (in Spandau passt das bei 0 von 49 Routen): Löschen von Kachel 0 verfälschte Begriffe, Kacheln 1 und 2 waren fälschlich gesperrt. Jetzt verschiebt das Löschen nur noch Feld 2 von `[entry]`; der Begriff bleibt unverändert. Gesperrt wird stattdessen, wenn die ID aus `[signal]`, `[distsignal]` oder `[nextsignal]` ein Element der zu löschenden Kachel ist („A signal of a signal route stands on this tile.“).
+
 ## ADR 032: Dialog für neue Karten mit allen Grundeinstellungen
 
 **Status:** Angenommen, 24. Oktober 2026, auf Wunsch des Nutzers („ziemlich rudimentär und viele Optionen fehlen noch“, Vorbild: der Dialog „New map“ von openMapper, nicht eins zu eins nachgebaut).
