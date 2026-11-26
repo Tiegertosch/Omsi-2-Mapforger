@@ -324,17 +324,27 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The number of a "   n:" line, the last non-blank line before a route.</summary>
         private static int? CommentNumber(IList<OmsiLine> lines)
         {
+            var index = CommentLineIndex(lines);
+            if (index < 0)
+                return null;
+            var text = lines[index].Text.Trim();
+            return int.Parse(text.Substring(0, text.Length - 1), NumberStyles.None, CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>The place of the "   n:" line in the lines before a route, or -1 when the last non-blank line is no such comment.</summary>
+        internal static int CommentLineIndex(IList<OmsiLine> lines)
+        {
             for (var index = lines.Count - 1; index >= 0; index--)
             {
                 var text = lines[index].Text.Trim();
                 if (text.Length == 0)
                     continue;
                 if (text.Length >= 2 && text[text.Length - 1] == ':' &&
-                    int.TryParse(text.Substring(0, text.Length - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var number))
-                    return number;
-                return null;
+                    int.TryParse(text.Substring(0, text.Length - 1), NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                    return index;
+                return -1;
             }
-            return null;
+            return -1;
         }
     }
 }

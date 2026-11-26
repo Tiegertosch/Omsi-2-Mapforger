@@ -114,6 +114,8 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Oberfläche: runder Knopf „Signal routes“ in der unteren Leiste mit Popup (Nummer, Signal, Gleisstücke, Tempolimit, Vor- und nächstes Signal, Befunde gelb), gewählte Route orange auf der Karte, Kontextmenü „Signal routes…“ am Signal (Objekt und Spline-Anhängung/Reihe), Kommandozeile `-signalRoutes`/`-signalRoute`/`-signalRouteSignal` (Nutzertest in openOMSI und OMSI 2 offen)
 - [x] M2 – Prüfung und Verweise: Kartenprüfung, Löschen von Gleis oder Signal mit Verweis verweigern, `TransferObject` und Kachellöschen ziehen Kachel- und Pfadnummern nach – umgesetzt am 25. November 2026 (Löschschutz über `OmsiReferenceIndex`, Pfadnummern im selben Undo-Schritt, Typwechsel, Thema „Signal routes“ der Kartenprüfung); vom Projektinhaber am 26. November 2026 getestet (auch openOMSI)
 - [ ] M3 – Routen bearbeiten und löschen (Begriff, Vor- und nächstes Signal, Geschwindigkeit, Art), Undo
+  - [x] Logik umgesetzt (26. November 2026): `UpdateSignalRoute`, `DeleteSignalRoute`, `OmsiSignalRouteChange` mit Undo/Redo über den Dateistand, Begriff folgt dem Tempolimit, Nummernzeilen fortlaufend (ADR 105, Nachtrag M3-Logik)
+  - [ ] Oberfläche
 - [ ] M4 – Routen erstellen mit Wegsuche über das Schienennetz
 - [ ] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen
 - [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten)
