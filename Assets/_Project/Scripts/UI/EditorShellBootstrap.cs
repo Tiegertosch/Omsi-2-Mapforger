@@ -50,6 +50,9 @@ namespace OmsiMapEditor.UI
             /// <summary>Ground shaped with the terrain tool.</summary>
             public OmsiTerrainChange TerrainChange;
 
+            /// <summary>A signal route edited or deleted (ADR 105, M3); signalroutes.cfg before and after.</summary>
+            public OmsiSignalRouteChange SignalRouteChange;
+
             /// <summary>A road type of the road builder changed or deleted in the installation (ADR 049).</summary>
             public OmsiRoadTypeChange RoadTypeChange;
 
@@ -1609,6 +1612,9 @@ namespace OmsiMapEditor.UI
                               (before != null && before.Signals.Count > 0 ? before.Signals[0].World.X.ToString("0.0", CultureInfo.InvariantCulture) + "," +
                               before.Signals[0].World.Y.ToString("0.0", CultureInfo.InvariantCulture) : "none") + ")");
                 }
+
+                // -signalRouteEdit field value, -signalRoutePick, -signalRouteDelete, -signalRouteUndo: the edit of the chosen route (ADR 105, M3 interface).
+                yield return RunSignalRouteEditArguments(args);
             }
 
             if (Array.IndexOf(args, "-paths") >= 0)
@@ -5239,7 +5245,7 @@ namespace OmsiMapEditor.UI
         {
             if (tile == null || item == null)
                 return;
-            if (CompleteVarParentPick(item))
+            if (CompleteVarParentPick(item) || CompleteSignalRoutePick(item))
                 return;
 
             selection.Clear();
@@ -5291,6 +5297,7 @@ namespace OmsiMapEditor.UI
             if (tile == null || currentSummary == null)
                 return;
             EndVarParentPick(true);
+            EndSignalRoutePick(true);
 
             selection.Clear();
             ClearSelectedSpline();
@@ -6803,6 +6810,7 @@ namespace OmsiMapEditor.UI
                 FocusInObjectLibrary = objectsPanel != null && focused != null && objectsPanel.Contains(focused),
                 PickingElementType = PickingElementType,
                 PickingVarParent = PickingVarParent,
+                PickingSignalRoute = PickingSignalRoute,
                 PickingSplineType = PickingSplineType,
                 PlacementAssetChosen = placementAsset != null,
                 MapPlacing = mapCanvas != null && mapCanvas.IsPlacing,
@@ -6840,6 +6848,9 @@ namespace OmsiMapEditor.UI
                     return EscapeActiveTool();
                 case EscapeAction.EndVarParentPick:
                     EndVarParentPick(true);
+                    return true;
+                case EscapeAction.EndSignalRoutePick:
+                    EndSignalRoutePick(true);
                     return true;
                 case EscapeAction.EndElementTypePick:
                     EndElementTypePick(null);
@@ -7143,6 +7154,8 @@ namespace OmsiMapEditor.UI
                 return;
             else if (step.TerrainChange != null)
                 states.Add(step.TerrainChange.IsApplied);
+            else if (step.SignalRouteChange != null)
+                states.Add(step.SignalRouteChange.IsApplied);
             else if (step.AttachedChange != null)
                 states.Add(step.AttachedChange.IsApplied);
             else if (step.AttachmentChange != null)
@@ -7225,6 +7238,16 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (step.SignalRouteChange != null)
+            {
+                if (undo)
+                    session.Undo(step.SignalRouteChange);
+                else
+                    session.Redo(step.SignalRouteChange);
+                AfterSignalRouteStep(step.SignalRouteChange, undo);
+                return;
+            }
+
             if (step.AttachedChange != null)
             {
                 if (undo)
@@ -7267,7 +7290,7 @@ namespace OmsiMapEditor.UI
         private static bool IsValuePart(ObjectEditStep step)
         {
             return step.Group == null && step.TileRevert == null && step.SplineChange == null && step.RoadTypeChange == null &&
-                   step.TerrainChange == null && step.AttachedChange == null && step.AttachmentChange == null && step.Change == null &&
+                   step.TerrainChange == null && step.SignalRouteChange == null && step.AttachedChange == null && step.AttachmentChange == null && step.Change == null &&
                    step.TileChange == null;
         }
 
@@ -8496,6 +8519,7 @@ namespace OmsiMapEditor.UI
             EndElementTypePick(null);
             EndSplineTypePick(null);
             EndVarParentPick(false);
+            EndSignalRoutePick(false);
             EndRowObjectPick(null);
         }
 

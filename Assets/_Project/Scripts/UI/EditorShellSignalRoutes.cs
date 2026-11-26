@@ -33,6 +33,13 @@ namespace OmsiMapEditor.UI
         private bool signalRouteRebuildPending;
         private double signalRouteResolveMilliseconds;
 
+        // The routes (their places in the file) that differ from the original map, for the yellow mark; found together with the routes laid onto the map.
+        private HashSet<int> signalRouteEdited = new HashSet<int>();
+        private OmsiSignalRoutes signalRouteOriginal;
+
+        // A route to choose once the routes are read again (after Undo of a deletion), as its place in the list is not known before.
+        private int? signalRouteSelectAfter;
+
         // What the user chose: the route (its index in the file), the signal the list is limited to, and where the list is scrolled to.
         private int signalRouteSelected = -1;
         private int? signalRouteFilter;
@@ -159,6 +166,11 @@ namespace OmsiMapEditor.UI
         /// <summary>A new map: the file, the choice and the layer of the map before are gone.</summary>
         private void ForgetSignalRoutesOfMap()
         {
+            ReleaseSignalRouteFields();
+            EndSignalRoutePick(false);
+            signalRouteEdited = new HashSet<int>();
+            signalRouteOriginal = null;
+            signalRouteSelectAfter = null;
             signalRoutesFile = null;
             signalRoutesFileMap = null;
             signalRouteSelected = -1;
@@ -174,6 +186,8 @@ namespace OmsiMapEditor.UI
         /// <summary>The popup closes or shows another list: the markers and the highlight leave the map, the choice stays for the next time.</summary>
         private void LeaveSignalRoutes()
         {
+            ReleaseSignalRouteFields();
+            EndSignalRoutePick(false);
             signalRouteBody = null;
             signalRouteRebuildPending = false;
             signalRouteButtons.Clear();
@@ -209,13 +223,19 @@ namespace OmsiMapEditor.UI
             var generation = ++signalRouteGeneration;
             signalRouteStamp = session.Workspace != null ? session.Workspace.WriteCount : 0;
             var watch = System.Diagnostics.Stopwatch.StartNew();
+            var workspace = session.Workspace;
+            HashSet<int> edited = null;
+            OmsiSignalRoutes original = null;
             var task = Task.Run(() =>
             {
                 // Without the installation the path checks are left out; the routes still show.
                 Func<string, int?> pathCount = null;
                 if (!string.IsNullOrEmpty(root))
                     pathCount = new OmsiAssetPathCounter(root).Count;
-                return OmsiSignalRouteMap.Resolve(file, summary, source, pathCount);
+                var resolved = OmsiSignalRouteMap.Resolve(file, summary, source, pathCount);
+                original = ReadOriginalSignalRoutes(workspace);
+                edited = original != null ? OmsiSignalRouteComparison.EditedRoutes(file, original) : new HashSet<int>();
+                return resolved;
             });
             signalRouteTask = task;
             // A reading over a list already shown stays unseen unless it takes long.
@@ -242,11 +262,18 @@ namespace OmsiMapEditor.UI
                     return;
                 }
                 var replaced = signalRouteMap;
+                var replacedSignature = replaced != null ? SignalRouteListSignature(replaced) : null;
                 signalRouteMap = task.Result;
+                signalRouteEdited = edited ?? new HashSet<int>();
+                signalRouteOriginal = original;
+                var selectAfter = signalRouteSelectAfter;
+                signalRouteSelectAfter = null;
                 signalRouteResolveMilliseconds = watch.Elapsed.TotalMilliseconds;
                 Debug.Log("Signal routes: " + signalRouteMap.Routes.Routes.Count + " routes at " + signalRouteMap.Signals.Count + " signals, " + signalRouteMap.Problems.Count +
                           " findings, resolved in " + signalRouteResolveMilliseconds.ToString("0", CultureInfo.InvariantCulture) + " ms" +
                           (string.IsNullOrEmpty(root) ? " (no installation: path checks left out)." : ".") + (replaced != null ? " Replaced the list shown without redrawing it." : string.Empty));
+                if (selectAfter.HasValue && !SignalRoutesOpen)
+                    signalRouteSelected = selectAfter.Value;
                 var choiceGone = signalRouteSelected >= signalRouteMap.Routes.Routes.Count;
                 if (choiceGone)
                 {
@@ -258,12 +285,14 @@ namespace OmsiMapEditor.UI
                 if (SignalRoutesOpen)
                 {
                     // The list is only drawn again when what it shows differs; the same rows leave the cards, the choice and the scroll untouched.
-                    if (replaced == null || choiceGone || SignalRouteListSignature(replaced) != SignalRouteListSignature(signalRouteMap))
+                    if (replaced == null || choiceGone || replacedSignature != SignalRouteListSignature(signalRouteMap))
                         FillSignalRouteBody();
                     else
                         RefreshSignalRouteDetail();
                     ApplySignalRouteLayer();
-                    if (signalRouteArgSelect.HasValue)
+                    if (selectAfter.HasValue)
+                        SelectSignalRoute(selectAfter.Value, false, false);
+                    else if (signalRouteArgSelect.HasValue)
                     {
                         var wanted = signalRouteArgSelect.Value;
                         signalRouteArgSelect = null;
@@ -282,13 +311,14 @@ namespace OmsiMapEditor.UI
         /// <summary>Everything the cards of the list show, as one text: equal texts mean the list need not be drawn again.</summary>
         private string SignalRouteListSignature(OmsiSignalRouteMap map)
         {
+            // The marks of the routes edited belong to the map read last, so a reading that only changes them draws the list again.
             var culture = CultureInfo.InvariantCulture;
             var text = new System.Text.StringBuilder();
             text.Append(map.Routes.SignalIds().Count).Append('|').Append(string.Join(";", OmsiSignalRouteList.FileProblems(map))).Append('\n');
             foreach (var row in OmsiSignalRouteList.Rows(map, signalRouteFilter))
                 text.Append(row.RouteIndex).Append(',').Append(row.Number).Append(',').Append(row.SignalId).Append(',').Append(row.SignalFile).Append(',').Append(row.PieceCount)
                     .Append(',').Append(row.SpeedLimit?.ToString("R", culture)).Append(',').Append(row.DistantSignalId).Append(',').Append(row.NextSignalId).Append(',')
-                    .Append(string.Join(";", row.Problems)).Append('\n');
+                    .Append(string.Join(";", row.Problems)).Append(',').Append(signalRouteEdited.Contains(row.RouteIndex)).Append('\n');
             return text.ToString();
         }
 
@@ -359,7 +389,7 @@ namespace OmsiMapEditor.UI
             signalRouteScrollView = scroll;
 
             if (signalRouteSelected >= 0 && signalRouteSelected < routes.Count)
-                signalRouteBody.Add(SignalRouteDetail(routes[signalRouteSelected]));
+                signalRouteBody.Add(SignalRouteDetail(signalRouteSelected));
         }
 
         private void AddSignalRouteProblems(List<string> fileProblems)
@@ -379,6 +409,8 @@ namespace OmsiMapEditor.UI
             card.AddToClassList("sigroute-card");
             card.EnableInClassList("sigroute-card-selected", index == signalRouteSelected);
             card.EnableInClassList("sigroute-card-problem", row.HasProblems);
+            var edited = signalRouteEdited.Contains(index);
+            card.EnableInClassList("sigroute-card-edited", edited);
             card.tooltip = Loc.T("sigroute.row.tooltip");
 
             var top = new VisualElement { pickingMode = PickingMode.Ignore };
@@ -398,6 +430,13 @@ namespace OmsiMapEditor.UI
             pieces.AddToClassList("sigroute-pieces");
             top.Add(number);
             top.Add(title);
+            if (edited)
+            {
+                var tag = LocBindings.NewLabel("sigroute.edited"); // i18n:keys
+                tag.pickingMode = PickingMode.Ignore;
+                tag.AddToClassList("sigroute-tag");
+                top.Add(tag);
+            }
             top.Add(pieces);
             card.Add(top);
 
@@ -421,15 +460,23 @@ namespace OmsiMapEditor.UI
                 card.Add(problem);
                 card.tooltip = string.Join("\n", row.Problems.Take(12));
             }
+            else if (edited)
+                card.tooltip = Loc.T("sigroute.edited.tooltip");
             signalRouteButtons[index] = card;
             return card;
         }
 
         /// <summary>Below the list: the aspect of the chosen route, how much of its track the map has, what the three shapes on the map mean and its findings.</summary>
-        private VisualElement SignalRouteDetail(OmsiSignalRoute route)
+        private VisualElement SignalRouteDetail(int routeIndex)
         {
-            var box = new VisualElement();
+            // A scroll view, so that on a small window the list above keeps some rows and the fields below scroll.
+            var box = new ScrollView(ScrollViewMode.Vertical);
+            box.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             box.AddToClassList("sigroute-detail-box");
+            // The values come from the file as it is now, so a change shows at once, before the routes are laid onto the map again.
+            var route = CurrentSignalRoute(routeIndex);
+            if (route == null)
+                return box;
             var resolved = signalRouteMap.Resolved.Count > route.Index ? signalRouteMap.Resolved[route.Index] : null;
             var number = route.Number ?? route.Index + 1;
             string aspect;
@@ -441,7 +488,19 @@ namespace OmsiMapEditor.UI
                 aspect = Loc.T("sigroute.aspect.other", ("aspect", route.Aspect ?? 0));
             var heading = new Label(Loc.T("sigroute.detail", ("number", number), ("aspect", aspect)));
             heading.AddToClassList("sigroute-detail-title");
-            box.Add(heading);
+            if (signalRouteEdited.Contains(route.Index))
+            {
+                var top = new VisualElement();
+                top.AddToClassList("sigroute-top");
+                heading.AddToClassList("sigroute-title");
+                top.Add(heading);
+                var tag = LocBindings.WithTooltip(LocBindings.NewLabel("sigroute.edited"), "sigroute.edited.tooltip"); // i18n:keys
+                tag.AddToClassList("sigroute-tag");
+                top.Add(tag);
+                box.Add(top);
+            }
+            else
+                box.Add(heading);
 
             if (resolved != null)
             {
@@ -450,6 +509,9 @@ namespace OmsiMapEditor.UI
                 track.AddToClassList("sigroute-detail");
                 box.Add(track);
             }
+
+            if (CanEdit)
+                AddSignalRouteEditor(box, route);
 
             var legend = new VisualElement();
             legend.AddToClassList("sigroute-legend");
@@ -480,6 +542,7 @@ namespace OmsiMapEditor.UI
         {
             if (signalRouteMap == null || routeIndex < 0 || routeIndex >= signalRouteMap.Resolved.Count)
                 return;
+            EndSignalRoutePick(false);
             signalRouteSelected = toggle && routeIndex == signalRouteSelected ? -1 : routeIndex;
             signalRouteShape = null;
             signalRouteShapeTask = null;
@@ -517,7 +580,7 @@ namespace OmsiMapEditor.UI
             old?.RemoveFromHierarchy();
             var routes = signalRouteMap.Routes.Routes;
             if (signalRouteSelected >= 0 && signalRouteSelected < routes.Count)
-                signalRouteBody.Add(SignalRouteDetail(routes[signalRouteSelected]));
+                signalRouteBody.Add(SignalRouteDetail(signalRouteSelected));
         }
 
         /// <summary>Reads the paths of the tiles the chosen route runs over and makes the line of each of its track pieces; the paths of the whole map are used when they were read already.</summary>
