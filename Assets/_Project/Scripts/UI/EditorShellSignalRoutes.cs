@@ -29,6 +29,7 @@ namespace OmsiMapEditor.UI
         private OmsiSignalRouteMap signalRouteMap;
         private Task<OmsiSignalRouteMap> signalRouteTask;
         private int signalRouteGeneration;
+        private int signalRouteStamp = -1; // write count of the working copy when the reading started
         private bool signalRouteRebuildPending;
         private double signalRouteResolveMilliseconds;
 
@@ -108,19 +109,37 @@ namespace OmsiMapEditor.UI
         }
 
         /// <summary>Forgets the routes laid onto the map after a change of the map (a signal may have moved or gone); with the list open they are read again.</summary>
-        private void InvalidateSignalRoutes()
+        /// <param name="force">True for a new map or summary; without it a refresh after a refused step (nothing was written) keeps the routes and the list as they are.</param>
+        private void InvalidateSignalRoutes(bool force = false)
         {
-            signalRouteMap = null;
-            signalRouteTask = null;
-            signalRouteGeneration++;
-            signalRouteShape = null;
-            signalRouteShapeTask = null;
-            signalRouteShapeGeneration++;
-            if (!SignalRoutesOpen || mapCanvas == null)
+            // A reading started or finished for the very state of the working copy is still right: no list redrawn, no flicker, no new reading.
+            var stamp = session != null && session.Workspace != null ? session.Workspace.WriteCount : 0;
+            if (!force && (signalRouteMap != null || signalRouteTask != null) && stamp == signalRouteStamp)
+            {
+                Debug.Log("Signal routes kept: the working copy did not change (write count " + stamp + ").");
                 return;
-            // The markers of the routes before are gone at once; the list says it reads again.
-            ApplySignalRouteLayer();
-            FillSignalRouteBody();
+            }
+            if (force || !SignalRoutesOpen || mapCanvas == null || signalRouteMap == null)
+            {
+                signalRouteMap = null;
+                signalRouteTask = null;
+                signalRouteGeneration++;
+                signalRouteShape = null;
+                signalRouteShapeTask = null;
+                signalRouteShapeGeneration++;
+                if (!SignalRoutesOpen || mapCanvas == null)
+                    return;
+                // A new map or a first reading: the markers of the routes before are gone at once; the list says it reads.
+                ApplySignalRouteLayer();
+                FillSignalRouteBody();
+            }
+            else
+            {
+                // A real change with the list open: list, chosen route, highlight and scroll stay as they are while the routes are resolved
+                // again in the background; the result replaces them when it arrives. A reading still running is outdated and dropped.
+                signalRouteTask = null;
+                signalRouteGeneration++;
+            }
             if (signalRouteRebuildPending)
                 return;
             // One new reading 100 ms after the last change, as the object list does. The timer sits on the map, which outlives the popup.
@@ -128,10 +147,12 @@ namespace OmsiMapEditor.UI
             mapCanvas.schedule.Execute(() =>
             {
                 signalRouteRebuildPending = false;
-                if (!SignalRoutesOpen || signalRouteMap != null || signalRouteTask != null)
+                if (!SignalRoutesOpen || signalRouteTask != null)
                     return;
                 StartSignalRouteBuild();
-                FillSignalRouteBody();
+                // The list only says it reads when there is nothing to show yet.
+                if (signalRouteMap == null)
+                    FillSignalRouteBody();
             }).ExecuteLater(100);
         }
 
@@ -145,7 +166,7 @@ namespace OmsiMapEditor.UI
             signalRouteScroll = 0f;
             signalRouteFitWhenShaped = false;
             signalRouteRebuildPending = false;
-            InvalidateSignalRoutes();
+            InvalidateSignalRoutes(true);
             mapCanvas?.SetSignalRouteMarkers(null);
             mapCanvas?.SetSignalRouteHighlight(null, null, null, null, null);
         }
@@ -186,6 +207,7 @@ namespace OmsiMapEditor.UI
             var source = session.Source;
             var root = OmsiObjectOutlineCatalog.InstallationRootOfMap(summary.RootPath);
             var generation = ++signalRouteGeneration;
+            signalRouteStamp = session.Workspace != null ? session.Workspace.WriteCount : 0;
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var task = Task.Run(() =>
             {
@@ -196,6 +218,13 @@ namespace OmsiMapEditor.UI
                 return OmsiSignalRouteMap.Resolve(file, summary, source, pathCount);
             });
             signalRouteTask = task;
+            // A reading over a list already shown stays unseen unless it takes long.
+            if (signalRouteMap != null)
+                mapCanvas.schedule.Execute(() =>
+                {
+                    if (generation == signalRouteGeneration && signalRouteTask == task && !task.IsCompleted && SignalRoutesOpen)
+                        SetStatus(Loc.T("sigroute.reading"));
+                }).ExecuteLater(1000);
             IVisualElementScheduledItem poll = null;
             poll = mapCanvas.schedule.Execute(() =>
             {
@@ -212,16 +241,27 @@ namespace OmsiMapEditor.UI
                     SetStatusT("sigroute.status.failed", ("reason", task.Exception?.GetBaseException().Message ?? string.Empty));
                     return;
                 }
+                var replaced = signalRouteMap;
                 signalRouteMap = task.Result;
                 signalRouteResolveMilliseconds = watch.Elapsed.TotalMilliseconds;
                 Debug.Log("Signal routes: " + signalRouteMap.Routes.Routes.Count + " routes at " + signalRouteMap.Signals.Count + " signals, " + signalRouteMap.Problems.Count +
                           " findings, resolved in " + signalRouteResolveMilliseconds.ToString("0", CultureInfo.InvariantCulture) + " ms" +
-                          (string.IsNullOrEmpty(root) ? " (no installation: path checks left out)." : "."));
-                if (signalRouteSelected >= signalRouteMap.Routes.Routes.Count)
+                          (string.IsNullOrEmpty(root) ? " (no installation: path checks left out)." : ".") + (replaced != null ? " Replaced the list shown without redrawing it." : string.Empty));
+                var choiceGone = signalRouteSelected >= signalRouteMap.Routes.Routes.Count;
+                if (choiceGone)
+                {
                     signalRouteSelected = -1;
+                    signalRouteShape = null;
+                    signalRouteShapeTask = null;
+                    signalRouteShapeGeneration++;
+                }
                 if (SignalRoutesOpen)
                 {
-                    FillSignalRouteBody();
+                    // The list is only drawn again when what it shows differs; the same rows leave the cards, the choice and the scroll untouched.
+                    if (replaced == null || choiceGone || SignalRouteListSignature(replaced) != SignalRouteListSignature(signalRouteMap))
+                        FillSignalRouteBody();
+                    else
+                        RefreshSignalRouteDetail();
                     ApplySignalRouteLayer();
                     if (signalRouteArgSelect.HasValue)
                     {
@@ -231,10 +271,25 @@ namespace OmsiMapEditor.UI
                     }
                     else if (signalRouteFilter.HasValue && signalRouteSelected < 0)
                         ChooseFirstRouteOfFilter(true);
-                    else if (signalRouteSelected >= 0 && signalRouteShape == null && signalRouteShapeTask == null)
-                        StartSignalRouteShape(false);
+                    else if (signalRouteSelected >= 0 && (replaced != null || (signalRouteShape == null && signalRouteShapeTask == null)))
+                        StartSignalRouteShape(false); // the track of the chosen route is found again; the line shown stays until then
+                    else if (choiceGone)
+                        ApplySignalRouteHighlight();
                 }
             }).Every(100);
+        }
+
+        /// <summary>Everything the cards of the list show, as one text: equal texts mean the list need not be drawn again.</summary>
+        private string SignalRouteListSignature(OmsiSignalRouteMap map)
+        {
+            var culture = CultureInfo.InvariantCulture;
+            var text = new System.Text.StringBuilder();
+            text.Append(map.Routes.SignalIds().Count).Append('|').Append(string.Join(";", OmsiSignalRouteList.FileProblems(map))).Append('\n');
+            foreach (var row in OmsiSignalRouteList.Rows(map, signalRouteFilter))
+                text.Append(row.RouteIndex).Append(',').Append(row.Number).Append(',').Append(row.SignalId).Append(',').Append(row.SignalFile).Append(',').Append(row.PieceCount)
+                    .Append(',').Append(row.SpeedLimit?.ToString("R", culture)).Append(',').Append(row.DistantSignalId).Append(',').Append(row.NextSignalId).Append(',')
+                    .Append(string.Join(";", row.Problems)).Append('\n');
+            return text.ToString();
         }
 
         private bool SignalRoutesReady => signalRouteMap != null && signalRouteTask == null && signalRouteShapeTask == null;

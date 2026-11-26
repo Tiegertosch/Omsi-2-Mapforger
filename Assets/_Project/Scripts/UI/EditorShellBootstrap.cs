@@ -1558,6 +1558,28 @@ namespace OmsiMapEditor.UI
                           ", redraw over 30 frames mean " + (redrawSum / 30.0).ToString("0.0", CultureInfo.InvariantCulture) + " ms, slowest " +
                           redrawMax.ToString("0.0", CultureInfo.InvariantCulture) + " ms, status: " + statusLabel?.text);
 
+                // -signalRoutesDelete: with the list open, deletes the selected objects (-select) as Delete does; a refused deletion must leave the routes,
+                // the list and the chosen route alone ("Signal routes after delete:" in the log: same map object, same choice, no reading shown).
+                if (Array.IndexOf(args, "-signalRoutesDelete") >= 0 && selection.Count > 0)
+                {
+                    var beforeDelete = signalRouteMap;
+                    var chosenBefore = signalRouteSelected;
+                    var cardsBefore = signalRouteButtons.Count;
+                    DeleteSelectedObjects();
+                    var readingSeen = signalRouteBody != null && signalRouteBody.Q<Label>(className: "muted") != null;
+                    var scrollBefore = signalRouteScroll;
+                    var bodyBefore = signalRouteBody?.childCount ?? 0;
+                    for (var frame = 0; frame < 600 && (frame < 30 || signalRouteTask != null || signalRouteRebuildPending); frame++)
+                    {
+                        readingSeen |= signalRouteBody != null && signalRouteBody.Q<Label>(className: "muted") != null;
+                        yield return null;
+                    }
+                    Debug.Log("Signal routes after delete: reread done " + (signalRouteTask == null && !signalRouteRebuildPending) + ", map replaced " + !ReferenceEquals(beforeDelete, signalRouteMap) +
+                              ", scroll " + scrollBefore + " -> " + signalRouteScroll + ", body children " + bodyBefore + " -> " + (signalRouteBody?.childCount ?? 0) +
+                              ", same map " + ReferenceEquals(beforeDelete, signalRouteMap) + ", chosen " + chosenBefore + " -> " + signalRouteSelected +
+                              ", cards " + cardsBefore + " -> " + signalRouteButtons.Count + ", reading shown " + readingSeen + ", status: " + statusLabel?.text);
+                }
+
                 // -signalRoutesMove dx dy: with the list open, moves the selected objects (-select) as -moveSelection does and waits for the new reading, so the
                 // list and the markers of the changed map can be looked at; "Signal routes after edit:" in the log.
                 if (double.TryParse(Argument("-signalRoutesMove", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var routeMoveEast) &&
@@ -2393,7 +2415,7 @@ namespace OmsiMapEditor.UI
             // Picks waiting for a click and the context menu hold records of the summary shown, which is replaced now.
             LeaveTransientModes();
             // The routes of the signals were laid onto the summary before; a new one reads them again when the list is open.
-            InvalidateSignalRoutes();
+            InvalidateSignalRoutes(true);
             // Roads, markings, right of way, signals and lanes hold records of the summary shown; another map or a chrono view ends
             // them and the spline selection (EditorToolRules.EndsOnEveryView).
             if (EditorToolRules.EndsOnEveryView(activeTool))
