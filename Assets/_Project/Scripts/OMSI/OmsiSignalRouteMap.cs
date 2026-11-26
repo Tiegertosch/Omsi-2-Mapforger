@@ -238,6 +238,24 @@ namespace OmsiMapEditor.OMSI
                         elements.Add(place.Id, place);
         }
 
+        /// <summary>Only the elements of the map by ID, without routes: to find signals and track pieces for a new route (ADR 105, M4).</summary>
+        public static OmsiSignalRouteMap ElementsOf(OmsiMapSummary summary)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            var map = new OmsiSignalRouteMap { Routes = OmsiSignalRoutes.Empty() };
+            map.IndexElements(summary);
+            return map;
+        }
+
+        /// <summary>The element with an ID on one tile of the [map] list, or null.</summary>
+        public static OmsiMapElementPlace ElementOnTile(OmsiMapSummary summary, int tileIndex, int id)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            return tileIndex >= 0 && tileIndex < summary.Tiles.Count ? FindOnTile(summary, tileIndex, id) : null;
+        }
+
         private static OmsiMapElementPlace FindOnTile(OmsiMapSummary summary, int tileIndex, int id)
         {
             foreach (var place in PlacesOf(summary, tileIndex))
