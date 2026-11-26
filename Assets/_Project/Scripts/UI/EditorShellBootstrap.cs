@@ -50,6 +50,9 @@ namespace OmsiMapEditor.UI
             /// <summary>Ground shaped with the terrain tool.</summary>
             public OmsiTerrainChange TerrainChange;
 
+            /// <summary>A signal route edited or deleted (ADR 105, M3); signalroutes.cfg before and after.</summary>
+            public OmsiSignalRouteChange SignalRouteChange;
+
             /// <summary>A road type of the road builder changed or deleted in the installation (ADR 049).</summary>
             public OmsiRoadTypeChange RoadTypeChange;
 
@@ -1535,6 +1538,85 @@ namespace OmsiMapEditor.UI
                     yield return null;
             }
 
+            // -signalRoutes / -signalRoute n / -signalRouteSignal id: the list of signal routes, a route chosen (ADR 105); "Signal routes:" in the log.
+            if (ReadSignalRouteArguments(args))
+            {
+                ShowProjectTab(ProjectTab.SignalRoutes);
+                var routesStarted = Time.realtimeSinceStartup;
+                while (!SignalRoutesReady && Time.realtimeSinceStartup - routesStarted < 120f)
+                    yield return null;
+                for (var frame = 0; frame < 10; frame++)
+                    yield return null;
+                // The redraw with the layer on: 30 frames, each repainted, the mean and the slowest.
+                double redrawSum = 0.0;
+                float redrawMax = 0f;
+                for (var frame = 0; frame < 30 && mapCanvas != null; frame++)
+                {
+                    mapCanvas.MarkDirtyRepaint();
+                    yield return null;
+                    redrawSum += mapCanvas.LastDrawMilliseconds;
+                    redrawMax = Mathf.Max(redrawMax, mapCanvas.LastDrawMilliseconds);
+                }
+                Debug.Log("Signal routes: " + (signalRouteMap == null ? "not read" : signalRouteMap.Routes.Routes.Count + " routes") + ", chosen " + signalRouteSelected +
+                          ", redraw over 30 frames mean " + (redrawSum / 30.0).ToString("0.0", CultureInfo.InvariantCulture) + " ms, slowest " +
+                          redrawMax.ToString("0.0", CultureInfo.InvariantCulture) + " ms, status: " + statusLabel?.text);
+
+                // -signalRoutesDelete: with the list open, deletes the selected objects (-select) as Delete does; a refused deletion must leave the routes,
+                // the list and the chosen route alone ("Signal routes after delete:" in the log: same map object, same choice, no reading shown).
+                if (Array.IndexOf(args, "-signalRoutesDelete") >= 0 && selection.Count > 0)
+                {
+                    var beforeDelete = signalRouteMap;
+                    var chosenBefore = signalRouteSelected;
+                    var cardsBefore = signalRouteButtons.Count;
+                    DeleteSelectedObjects();
+                    var readingSeen = signalRouteBody != null && signalRouteBody.Q<Label>(className: "muted") != null;
+                    var scrollBefore = signalRouteScroll;
+                    var bodyBefore = signalRouteBody?.childCount ?? 0;
+                    for (var frame = 0; frame < 600 && (frame < 30 || signalRouteTask != null || signalRouteRebuildPending); frame++)
+                    {
+                        readingSeen |= signalRouteBody != null && signalRouteBody.Q<Label>(className: "muted") != null;
+                        yield return null;
+                    }
+                    Debug.Log("Signal routes after delete: reread done " + (signalRouteTask == null && !signalRouteRebuildPending) + ", map replaced " + !ReferenceEquals(beforeDelete, signalRouteMap) +
+                              ", scroll " + scrollBefore + " -> " + signalRouteScroll + ", body children " + bodyBefore + " -> " + (signalRouteBody?.childCount ?? 0) +
+                              ", same map " + ReferenceEquals(beforeDelete, signalRouteMap) + ", chosen " + chosenBefore + " -> " + signalRouteSelected +
+                              ", cards " + cardsBefore + " -> " + signalRouteButtons.Count + ", reading shown " + readingSeen + ", status: " + statusLabel?.text);
+                }
+
+                // -signalRoutesMove dx dy: with the list open, moves the selected objects (-select) as -moveSelection does and waits for the new reading, so the
+                // list and the markers of the changed map can be looked at; "Signal routes after edit:" in the log.
+                if (double.TryParse(Argument("-signalRoutesMove", 1), NumberStyles.Float, CultureInfo.InvariantCulture, out var routeMoveEast) &&
+                    double.TryParse(Argument("-signalRoutesMove", 2), NumberStyles.Float, CultureInfo.InvariantCulture, out var routeMoveNorth) && selection.Count > 0)
+                {
+                    var before = signalRouteMap;
+                    var routeEdits = new List<MapObjectEdit>();
+                    foreach (var item in selection)
+                        routeEdits.Add(new MapObjectEdit
+                        {
+                            Tile = item.Tile, Record = item.Record, LocalX = item.Record.LocalX + routeMoveEast, LocalY = item.Record.LocalY + routeMoveNorth,
+                            Height = item.Record.Height, HeadingDegrees = item.Record.HeadingDegrees, PitchDegrees = item.Record.PitchDegrees,
+                            BankDegrees = item.Record.BankDegrees
+                        });
+                    CommitEdits(routeEdits);
+                    var afterStarted = Time.realtimeSinceStartup;
+                    yield return null;
+                    var readingShown = signalRouteBody != null && signalRouteBody.Q<Label>(className: "muted") != null;
+                    while (!SignalRoutesReady && Time.realtimeSinceStartup - afterStarted < 120f)
+                        yield return null;
+                    for (var frame = 0; frame < 20; frame++)
+                        yield return null;
+                    Debug.Log("Signal routes after edit: reread " + (signalRouteMap != null && !ReferenceEquals(before, signalRouteMap)) + ", reading shown meanwhile " + readingShown +
+                              ", open " + SignalRoutesOpen + ", rebuild pending " + signalRouteRebuildPending + ", cards " + signalRouteButtons.Count +
+                              ", first signal at " + (signalRouteMap != null && signalRouteMap.Signals.Count > 0 ? signalRouteMap.Signals[0].World.X.ToString("0.0", CultureInfo.InvariantCulture) +
+                              "," + signalRouteMap.Signals[0].World.Y.ToString("0.0", CultureInfo.InvariantCulture) : "none") + " (before " +
+                              (before != null && before.Signals.Count > 0 ? before.Signals[0].World.X.ToString("0.0", CultureInfo.InvariantCulture) + "," +
+                              before.Signals[0].World.Y.ToString("0.0", CultureInfo.InvariantCulture) : "none") + ")");
+                }
+
+                // -signalRouteEdit field value, -signalRoutePick, -signalRouteDelete, -signalRouteUndo: the edit of the chosen route (ADR 105, M3 interface).
+                yield return RunSignalRouteEditArguments(args);
+            }
+
             if (Array.IndexOf(args, "-paths") >= 0)
             {
                 ShowPaths(true);
@@ -2317,6 +2399,7 @@ namespace OmsiMapEditor.UI
             routes = null;
             highlightedLine = null;
             routesToggleButton?.SetEnabled(false);
+            ForgetSignalRoutesOfMap();
             PresentSummary(summary, keepView);
             LoadStoredImagery(reading.ImageryKey);
             StartRoutesBuild(summary);
@@ -2337,6 +2420,8 @@ namespace OmsiMapEditor.UI
         {
             // Picks waiting for a click and the context menu hold records of the summary shown, which is replaced now.
             LeaveTransientModes();
+            // The routes of the signals were laid onto the summary before; a new one reads them again when the list is open.
+            InvalidateSignalRoutes(true);
             // Roads, markings, right of way, signals and lanes hold records of the summary shown; another map or a chrono view ends
             // them and the spline selection (EditorToolRules.EndsOnEveryView).
             if (EditorToolRules.EndsOnEveryView(activeTool))
@@ -5160,7 +5245,7 @@ namespace OmsiMapEditor.UI
         {
             if (tile == null || item == null)
                 return;
-            if (CompleteVarParentPick(item))
+            if (CompleteVarParentPick(item) || CompleteSignalRoutePick(item))
                 return;
 
             selection.Clear();
@@ -5212,6 +5297,7 @@ namespace OmsiMapEditor.UI
             if (tile == null || currentSummary == null)
                 return;
             EndVarParentPick(true);
+            EndSignalRoutePick(true);
 
             selection.Clear();
             ClearSelectedSpline();
@@ -5658,6 +5744,7 @@ namespace OmsiMapEditor.UI
             UpdateCounts();
             UpdateObjectBadge();
             ScheduleObjectListRebuild();
+            InvalidateSignalRoutes();
             UpdateMapStateLabel();
             // Undo may have put another file of the junction back; the markings tool reads it anew.
             if (activeTool == EditorTool.Markings)
@@ -6723,6 +6810,7 @@ namespace OmsiMapEditor.UI
                 FocusInObjectLibrary = objectsPanel != null && focused != null && objectsPanel.Contains(focused),
                 PickingElementType = PickingElementType,
                 PickingVarParent = PickingVarParent,
+                PickingSignalRoute = PickingSignalRoute,
                 PickingSplineType = PickingSplineType,
                 PlacementAssetChosen = placementAsset != null,
                 MapPlacing = mapCanvas != null && mapCanvas.IsPlacing,
@@ -6760,6 +6848,9 @@ namespace OmsiMapEditor.UI
                     return EscapeActiveTool();
                 case EscapeAction.EndVarParentPick:
                     EndVarParentPick(true);
+                    return true;
+                case EscapeAction.EndSignalRoutePick:
+                    EndSignalRoutePick(true);
                     return true;
                 case EscapeAction.EndElementTypePick:
                     EndElementTypePick(null);
@@ -7063,6 +7154,8 @@ namespace OmsiMapEditor.UI
                 return;
             else if (step.TerrainChange != null)
                 states.Add(step.TerrainChange.IsApplied);
+            else if (step.SignalRouteChange != null)
+                states.Add(step.SignalRouteChange.IsApplied);
             else if (step.AttachedChange != null)
                 states.Add(step.AttachedChange.IsApplied);
             else if (step.AttachmentChange != null)
@@ -7145,6 +7238,16 @@ namespace OmsiMapEditor.UI
                 return;
             }
 
+            if (step.SignalRouteChange != null)
+            {
+                if (undo)
+                    session.Undo(step.SignalRouteChange);
+                else
+                    session.Redo(step.SignalRouteChange);
+                AfterSignalRouteStep(step.SignalRouteChange, undo);
+                return;
+            }
+
             if (step.AttachedChange != null)
             {
                 if (undo)
@@ -7187,7 +7290,7 @@ namespace OmsiMapEditor.UI
         private static bool IsValuePart(ObjectEditStep step)
         {
             return step.Group == null && step.TileRevert == null && step.SplineChange == null && step.RoadTypeChange == null &&
-                   step.TerrainChange == null && step.AttachedChange == null && step.AttachmentChange == null && step.Change == null &&
+                   step.TerrainChange == null && step.SignalRouteChange == null && step.AttachedChange == null && step.AttachmentChange == null && step.Change == null &&
                    step.TileChange == null;
         }
 
@@ -8416,6 +8519,7 @@ namespace OmsiMapEditor.UI
             EndElementTypePick(null);
             EndSplineTypePick(null);
             EndVarParentPick(false);
+            EndSignalRoutePick(false);
             EndRowObjectPick(null);
         }
 
@@ -9062,6 +9166,7 @@ namespace OmsiMapEditor.UI
             if (!barPopupOpen)
             {
                 ReleaseObjectList();
+                LeaveSignalRoutes();
                 return;
             }
 
@@ -9070,15 +9175,20 @@ namespace OmsiMapEditor.UI
                 projectTab = ProjectTab.Tiles;
             if (projectTab != ProjectTab.Objects)
                 ReleaseObjectList();
+            if (projectTab != ProjectTab.SignalRoutes)
+                LeaveSignalRoutes();
             if (barPopupTitle != null)
                 LocBindings.Text(barPopupTitle, ProjectTabTitleKey(projectTab)); // i18n:keys
             barPopup?.EnableInClassList("bar-popup-right", !BarPopupOnLeft(projectTab));
             barPopup?.EnableInClassList("bar-popup-tall", projectTab == ProjectTab.Tiles || projectTab == ProjectTab.Objects);
-            barPopup?.EnableInClassList("bar-popup-wide", projectTab == ProjectTab.Objects);
+            barPopup?.EnableInClassList("bar-popup-wide", projectTab == ProjectTab.Objects || projectTab == ProjectTab.SignalRoutes);
             switch (projectTab)
             {
                 case ProjectTab.Objects:
                     projectPanel.Add(ObjectsTab());
+                    break;
+                case ProjectTab.SignalRoutes:
+                    projectPanel.Add(SignalRoutesTab());
                     break;
                 case ProjectTab.Map:
                     projectPanel.Add(MapTab());

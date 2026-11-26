@@ -880,13 +880,13 @@ namespace OmsiMapEditor.OMSI
                 throw new OmsiStepRefusedException("The change is already applied.");
             if (change.InVariant)
             {
-                ApplyFiles(change.Files, false);
+                ReplayFiles(change.Files, false);
                 change.IsApplied = true;
                 SwapSplines(change, true);
                 ApplySplineLists(summary, change, true);
                 return;
             }
-            WriteFiles(change.Files, false);
+            ReplayFiles(change.Files, false);
             change.IsApplied = true;
             RefreshSplines(summary, change);
             ReshapeTerrain(summary, change);

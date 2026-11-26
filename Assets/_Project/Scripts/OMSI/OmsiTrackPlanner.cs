@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -13,11 +14,21 @@ namespace OmsiMapEditor.OMSI
     /// </summary>
     public static class OmsiTilePathNumbers
     {
-        /// <summary>The number of the first path of each element of a tile, by element ID.</summary>
+        /// <summary>
+        /// The number of the first path of each element of a tile, by element ID. An element whose file has an unknown number of paths (missing or
+        /// unreadable) still gets its number, but every element after it is left out: its number cannot be known (ADR 105, review of M2).
+        /// </summary>
         /// <param name="tile">The tile file, read without a layout or with the tile layouts.</param>
-        /// <param name="pathCount">How many paths the object or spline file of an asset path has; null when it has none or is unknown.</param>
+        /// <param name="pathCount">How many paths the object or spline file of an asset path has (0 for none); null when it is unknown.</param>
         public static Dictionary<int, int> Of(OmsiRecordFile tile, Func<string, int?> pathCount)
         {
+            return Of(tile, pathCount, out _);
+        }
+
+        /// <param name="unknownAsset">The first file whose number of paths is unknown, after which no element is numbered; null when all are known.</param>
+        public static Dictionary<int, int> Of(OmsiRecordFile tile, Func<string, int?> pathCount, out string unknownAsset)
+        {
+            unknownAsset = null;
             if (tile == null)
                 throw new ArgumentNullException(nameof(tile));
             if (pathCount == null)
@@ -35,9 +46,57 @@ namespace OmsiMapEditor.OMSI
                     continue;
                 if (!result.ContainsKey(id))
                     result[id] = number;
-                number += pathCount(values[1]) ?? 0;
+                var count = pathCount(values[1]);
+                if (!count.HasValue)
+                {
+                    unknownAsset = values[1];
+                    break;
+                }
+                number += count.Value;
             }
             return result;
+        }
+    }
+
+    /// <summary>How many paths the object or spline file of an asset has, read once for each from the installation.</summary>
+    public sealed class OmsiAssetPathCounter
+    {
+        private readonly string installation;
+        private readonly OmsiSplineProfileCatalog profiles;
+        private readonly Dictionary<string, int?> counts = new Dictionary<string, int?>(StringComparer.OrdinalIgnoreCase);
+
+        public OmsiAssetPathCounter(string installation)
+        {
+            this.installation = installation;
+            profiles = new OmsiSplineProfileCatalog(installation);
+        }
+
+        public int? Count(string asset)
+        {
+            if (string.IsNullOrWhiteSpace(asset))
+                return null;
+            if (counts.TryGetValue(asset, out var known))
+                return known;
+            int? count = null;
+            try
+            {
+                if (asset.EndsWith(".sli", StringComparison.OrdinalIgnoreCase))
+                {
+                    count = profiles.Get(asset)?.Lanes.Count;
+                }
+                else
+                {
+                    var path = OmsiRelativePath.Resolve(installation, asset);
+                    if (File.Exists(path))
+                        count = OmsiSceneryObject.Parse(File.ReadAllBytes(path)).Paths.Count;
+                }
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException || exception is FormatException || exception is ArgumentException)
+            {
+                // An unreadable file counts no paths.
+            }
+            counts[asset] = count;
+            return count;
         }
     }
 

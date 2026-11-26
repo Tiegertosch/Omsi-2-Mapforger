@@ -106,6 +106,9 @@ namespace OmsiMapEditor.OMSI
                 if (chronoTimetable.IndexOf(Path.DirectorySeparatorChar + "TTData" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) >= 0)
                     index.AddAll(Read(source, chronoTimetable, cache, TimetableReferences));
 
+            if (source.FileExists(OmsiSignalRoutes.FileName))
+                index.AddAll(Read(source, OmsiSignalRoutes.FileName, cache, SignalRouteReferences));
+
             return index;
         }
 
@@ -154,6 +157,30 @@ namespace OmsiMapEditor.OMSI
                             AddIfInt(references, record, 0, relative, "variable parent");
                         break;
                 }
+            }
+            return references;
+        }
+
+        /// <summary>
+        /// The signals and track pieces signalroutes.cfg names (ADR 105). The kind names the route, so a refused deletion says which route
+        /// needs the element.
+        /// </summary>
+        private static List<OmsiReference> SignalRouteReferences(IOmsiFileSource source, string relative)
+        {
+            var references = new List<OmsiReference>();
+            var routes = OmsiSignalRoutes.Parse(source.ReadAllBytes(relative));
+            foreach (var route in routes.Routes)
+            {
+                var name = OmsiSignalRoutes.Describe(route).Replace("Signal route", "signal route");
+                if (route.SignalId.HasValue)
+                    Add(references, route.SignalId.Value, relative, "signal of " + name);
+                if (route.DistantSignalId.HasValue)
+                    Add(references, route.DistantSignalId.Value, relative, "distant signal of " + name);
+                if (route.NextSignalId.HasValue)
+                    Add(references, route.NextSignalId.Value, relative, "next signal of " + name);
+                foreach (var entry in route.Entries)
+                    if (entry.IsValid)
+                        Add(references, entry.ElementId, relative, "track of " + name);
             }
             return references;
         }

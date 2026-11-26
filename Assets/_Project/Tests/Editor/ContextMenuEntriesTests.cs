@@ -272,6 +272,20 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ARowThatIsASignalOfARouteOffersTheRoutesEvenOnAReadOnlyMap()
+        {
+            var editable = Editable();
+            editable.HasSignalRoutes = true;
+            var entries = ContextMenuEntries.For(ContextMenuKind.Row, editable);
+            Assert.That(entries.Count(entry => entry.Action == ContextMenuAction.OpenSignalRoutes), Is.EqualTo(1));
+            Assert.That(entries.Last().Action, Is.EqualTo(ContextMenuAction.DeleteRow));
+
+            var readOnly = new ContextMenuState { CanEditObjects = true, HasSignalRoutes = true };
+            Assert.That(ContextMenuEntries.For(ContextMenuKind.Row, readOnly).Count(entry => entry.Action == ContextMenuAction.OpenSignalRoutes), Is.EqualTo(1));
+            Assert.That(Describe(ContextMenuKind.Row, Editable()), Does.Not.Contain("signal_routes"));
+        }
+
+        [Test]
         public void TheFocusMovesOverActiveEntriesAndSkipsTheOthers()
         {
             var active = new[] { true, false, true, true, false };

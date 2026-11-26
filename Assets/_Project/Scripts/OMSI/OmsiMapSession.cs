@@ -475,7 +475,8 @@ namespace OmsiMapEditor.OMSI
             if (configChanged)
                 states.Add(new OmsiObjectChange.FileState { RelativePath = GlobalConfigFileName, Before = configBefore, After = config.ToBytes() });
             if (states.Count > 0)
-                ApplyFiles(states, false);
+                // Values change in place: no element comes, goes or changes its file, so no path number of a signal route moves.
+                ApplyFiles(states, false, false);
             return changed;
         }
 
@@ -740,7 +741,12 @@ namespace OmsiMapEditor.OMSI
                 AddFile(change, pair.Key, workspace.ReadAllBytes(pair.Key), pair.Value.ToBytes());
                 AddFile(change, targetChronoPath, targetChronoBefore, targetChrono.ToBytes());
             }
-            WriteFiles(change, false);
+            // Signal routes over the object follow it into the new tile, or keep it where it is (ADR 105).
+            var routeRefusals = KeepSignalRoutes(change.Files);
+            if (routeRefusals.Count > 0)
+                return new OmsiObjectChangeResult(null, routeRefusals.ConvertAll(reason => new OmsiReference(record.Id, OmsiSignalRoutes.FileName, reason)));
+            // The routes are kept above; writing them is all that is left.
+            ApplyFiles(change.Files, false, false);
             MoveInSummary(change, true);
             foreach (var attached in tile.AttachedObjects.FindAll(candidate => ids.Contains(candidate.Id)))
             {
@@ -855,7 +861,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
                 throw new OmsiStepRefusedException("The change is already applied.");
-            WriteFiles(change, false);
+            ReplayFiles(change.Files, false);
             change.IsApplied = true;
             if (change.Kind == OmsiObjectChangeKind.Placement)
                 AddToSummary(summary, change);
@@ -1038,6 +1044,17 @@ namespace OmsiMapEditor.OMSI
                 }
                 if (change.Files.Count == 0)
                     return null;
+                // Signal routes over the tile's track follow the original's order of elements; a route over a piece the original lacks refuses the revert (ADR 105).
+                var routeRefusals = KeepSignalRoutes(change.Files);
+                if (routeRefusals.Count > 0)
+                    throw new OmsiStepRefusedException(string.Join(" ", routeRefusals));
+                var routeState = change.Files.Find(file => string.Equals(file.RelativePath, OmsiSignalRoutes.FileName, StringComparison.OrdinalIgnoreCase));
+                if (routeState != null)
+                {
+                    before[OmsiSignalRoutes.FileName] = routeState.Before;
+                    touched.Add(OmsiSignalRoutes.FileName);
+                    WriteState(workspace, OmsiSignalRoutes.FileName, routeState.After);
+                }
                 present = ReadRevertPresentation(summary, change);
             }
             catch (Exception failure)

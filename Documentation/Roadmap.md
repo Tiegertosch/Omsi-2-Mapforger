@@ -106,6 +106,20 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] Fahrplan abschließen – Linien, Fahrten und Haltestellen umbenennen und löschen, Halte vorhandener Fahrten ändern, Zeiten und Haltemodus je Halt (ADR 096; vom Nutzer in openOMSI getestet)
 - [x] Fahrwege (`.ttr`) und Fahrten mit `[station]` für Züge und Straßenbahnen – Schalter „Rail“ im Linien-Werkzeug (ADR 097; vom Nutzer in openOMSI getestet)
 
+## Signalrouten und Weichen (Parity-Block G, ADR 105)
+
+- [x] M0 – Kachellöschen: Signalbegriff bleibt, die Kachel eines Signals ist gesperrt (ADR 031, Nachtrag)
+- [x] M1 – Signalrouten anzeigen: Signale markiert, gewählte Route hebt ihre Gleisstücke hervor, Liste als Popup – vom Projektinhaber am 25. November 2026 getestet
+  - [x] Logik: `OmsiSignalRoutes` (verlustfrei lesen, Befunde) und `OmsiSignalRouteMap` (Auflösung gegen die Karte, Prüfung von Kachel- und Pfadnummern), Probe an Grundorf und Berlin-Spandau
+  - [x] Oberfläche: runder Knopf „Signal routes“ in der unteren Leiste mit Popup (Nummer, Signal, Gleisstücke, Tempolimit, Vor- und nächstes Signal, Befunde gelb), gewählte Route orange auf der Karte, Kontextmenü „Signal routes…“ am Signal (Objekt und Spline-Anhängung/Reihe), Kommandozeile `-signalRoutes`/`-signalRoute`/`-signalRouteSignal` (Nutzertest in openOMSI und OMSI 2 offen)
+- [x] M2 – Prüfung und Verweise: Kartenprüfung, Löschen von Gleis oder Signal mit Verweis verweigern, `TransferObject` und Kachellöschen ziehen Kachel- und Pfadnummern nach – umgesetzt am 25. November 2026 (Löschschutz über `OmsiReferenceIndex`, Pfadnummern im selben Undo-Schritt, Typwechsel, Thema „Signal routes“ der Kartenprüfung); vom Projektinhaber am 26. November 2026 getestet (auch openOMSI)
+- [x] M3 – Routen bearbeiten und löschen (Begriff, Vor- und nächstes Signal, Geschwindigkeit, Art), Undo – vom Projektinhaber am 26. November 2026 getestet (auch openOMSI)
+  - [x] Logik umgesetzt (26. November 2026): `UpdateSignalRoute`, `DeleteSignalRoute`, `OmsiSignalRouteChange` mit Undo/Redo über den Dateistand, Begriff folgt dem Tempolimit, Nummernzeilen fortlaufend (ADR 105, Nachtrag M3-Logik)
+  - [x] Oberfläche – umgesetzt und vom Projektinhaber am 26. November 2026 getestet: Felder Art, Begriff, Vor- und nächstes Signal (ID, Pipette, Entfernen), Tempolimit und roter Knopf „Delete route“ mit Frage in der Detailbox, nur bei bearbeitbarer Karte; je Änderung ein Undo-Schritt; bearbeitete Routen gelb markiert (ADR 105, Nachtrag M3-Oberfläche)
+- [ ] M4 – Routen erstellen mit Wegsuche über das Schienennetz
+- [ ] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen
+- [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten)
+
 ## Später
 
 - [x] Versioniertes Projektformat anlegen und externe OMSI-Karte aus einer gespeicherten Projektdatei wieder öffnen

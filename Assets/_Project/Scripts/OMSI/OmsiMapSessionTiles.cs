@@ -320,7 +320,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
                 throw new OmsiStepRefusedException("The revert is already applied.");
-            ApplyFiles(change.Files, false);
+            ReplayFiles(change.Files, false);
             change.IsApplied = true;
             SwapRevertedTile(summary, change, false);
         }
@@ -337,7 +337,7 @@ namespace OmsiMapEditor.OMSI
             }
             catch (Exception failure)
             {
-                RollBackAfter(failure, () => ApplyFiles(change.Files, !undo));
+                RollBackAfter(failure, () => ReplayFiles(change.Files, !undo));
                 // The files are back as before the call, and so is the flag.
                 change.IsApplied = undo;
                 throw;
@@ -589,8 +589,13 @@ namespace OmsiMapEditor.OMSI
                 {
                     if (string.Equals(record.Name, "entry", StringComparison.OrdinalIgnoreCase))
                         ShiftValue(record, 2, deleted, blockers, "A signal route runs over this tile.");
-                    else if (string.Equals(record.Name, "signal", StringComparison.OrdinalIgnoreCase))
-                        ShiftValue(record, 1, deleted, blockers, "A signal of a signal route stands on this tile.");
+                    else if ((string.Equals(record.Name, "signal", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(record.Name, "distsignal", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(record.Name, "nextsignal", StringComparison.OrdinalIgnoreCase)) &&
+                             int.TryParse(ValueAt(record, 0)?.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var signal) &&
+                             ids.Contains(signal))
+                        // The signal's object id; [signal]'s second value is its aspect, not a tile index.
+                        AddBlocker(blockers, "A signal of a signal route stands on this tile.");
                 }
             }
 
@@ -630,7 +635,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied != undo)
                 throw new OmsiStepRefusedException(undo ? "The tile step is already taken back." : "The tile step is already done.");
-            ApplyFiles(change.Files, undo);
+            ReplayFiles(change.Files, undo);
             change.IsApplied = !undo;
         }
 
@@ -685,14 +690,19 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The same for the value at a position among a record's fields and following lines, as records without a layout hold them.</summary>
         private static void ShiftValue(OmsiRecord record, int position, int deleted, List<string> blockers, string blocker)
         {
-            var line = position < record.Fields.Count ? record.Fields[position]
-                : position - record.Fields.Count < record.Trailer.Count ? record.Trailer[position - record.Fields.Count] : null;
+            var line = ValueAt(record, position);
             if (line == null || !int.TryParse(line.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
                 return;
             if (index == deleted)
                 AddBlocker(blockers, blocker);
             else if (index > deleted)
                 line.Text = (index - 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static OmsiLine ValueAt(OmsiRecord record, int position)
+        {
+            return position < record.Fields.Count ? record.Fields[position]
+                : position - record.Fields.Count < record.Trailer.Count ? record.Trailer[position - record.Fields.Count] : null;
         }
 
         private static void AddBlocker(List<string> blockers, string blocker)
@@ -767,9 +777,20 @@ namespace OmsiMapEditor.OMSI
         /// files written so far are put back and the failure is thrown as it was, so the workspace is as before the call; when putting
         /// them back fails too, <see cref="OmsiRollBackFailedException"/> reports both.
         /// </summary>
-        private void ApplyFiles(List<OmsiObjectChange.FileState> files, bool undo)
+        /// <param name="keepSignalRoutes">
+        /// False for steps that only change values in place, such as moving objects within their tile: they cannot change the path numbers of
+        /// signal routes; and for undo and redo, which <see cref="ReplayFiles"/> writes.
+        /// </param>
+        private void ApplyFiles(List<OmsiObjectChange.FileState> files, bool undo, bool keepSignalRoutes = true)
         {
             var workspace = RequireWorkspace();
+            // A step done for the first time takes signalroutes.cfg along when it changes the track a route names (ADR 105); undo and redo find it in the files.
+            if (!undo && keepSignalRoutes)
+            {
+                var refusals = KeepSignalRoutes(files);
+                if (refusals.Count > 0)
+                    throw new OmsiStepRefusedException(string.Join(" ", refusals));
+            }
             foreach (var file in files)
             {
                 var expected = undo ? file.After : file.Before;
@@ -792,6 +813,15 @@ namespace OmsiMapEditor.OMSI
                 RollBackAfter(failure, () => PutBack(workspace, touched, undo));
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Writes the stored files of a step again, for undo and redo: exactly the states the step's first run kept, signalroutes.cfg included
+        /// when it took it along, so a redo never works the routes out anew (ADR 105, review of M2).
+        /// </summary>
+        private void ReplayFiles(List<OmsiObjectChange.FileState> files, bool undo)
+        {
+            ApplyFiles(files, undo, false);
         }
 
         /// <summary>

@@ -119,6 +119,45 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual("It is the only tile of the map.", session.DeleteTile(session.Read(), session.Read().Tiles[0]).Blockers.Single());
         }
 
+        [Test]
+        public void DeletingATileKeepsSignalAspectsAndRefusesTheTileOfASignal()
+        {
+            // Four tiles in a row; the signal object 135 stands on tile index 3.
+            WriteUtf16("global.cfg", "[NextIDCode]", "200", "",
+                "[map]", "0", "0", "tile_0_0.map", "", "[map]", "1", "0", "tile_1_0.map", "",
+                "[map]", "2", "0", "tile_2_0.map", "", "[map]", "3", "0", "tile_3_0.map", "");
+            WriteUtf16("tile_2_0.map", "[version]", "14", "");
+            WriteUtf16("tile_3_0.map", "[version]", "14", "",
+                "[object]", "0", @"Sceneryobjects\signal.sco", "135", "150", "150", "0", "0", "0", "0", "0", "");
+            WriteTerrain("tile_2_0.map.terrain", 2);
+            WriteTerrain("tile_3_0.map.terrain", 3);
+            // [signal] id, aspect (2 with a speed limit); [entry] element, path, tile index, path number.
+            const string head = "Signal Routes File\r\n\r\n[signalroute]\r\n0\r\n\r\n[signal]\r\n135\r\n2\r\n\r\n";
+            const string tail = "[speedlimit]\r\n50\r\n\r\n";
+            File.WriteAllText(Path.Combine(mapFolder, "signalroutes.cfg"),
+                head + "[entry]\r\n30\r\n0\r\n3\r\n0\r\n\r\n[entry]\r\n31\r\n0\r\n1\r\n1\r\n\r\n" + tail);
+
+            var session = OpenProject();
+            var summary = session.Read();
+            // Tile index 2 holds neither the route nor the signal: aspect 2 is no tile index.
+            var free = session.DeleteTile(summary, summary.Tiles[2]);
+            Assert.IsTrue(free.Succeeded, string.Join("; ", free.Blockers));
+            session.ApplyTileChange(free.Change, true);
+            Assert.IsFalse(session.Workspace.IsModified("signalroutes.cfg"));
+            summary = session.Read();
+            // The tile of the signal stays.
+            var refused = session.DeleteTile(summary, summary.Tiles[3]);
+            Assert.IsFalse(refused.Succeeded);
+            Assert.That(refused.Blockers, Has.Some.EqualTo("A signal of a signal route stands on this tile."));
+            Assert.IsFalse(session.Workspace.IsModified("signalroutes.cfg"));
+
+            var result = session.DeleteTile(summary, summary.Tiles[0]);
+
+            Assert.IsTrue(result.Succeeded, string.Join("; ", result.Blockers));
+            Assert.AreEqual(head + "[entry]\r\n30\r\n0\r\n2\r\n0\r\n\r\n[entry]\r\n31\r\n0\r\n0\r\n1\r\n\r\n" + tail,
+                Encoding.ASCII.GetString(session.Workspace.ReadAllBytes("signalroutes.cfg")));
+        }
+
         private OmsiMapSession OpenProject()
         {
             var project = Path.Combine(Directory.GetParent(Directory.GetParent(mapFolder).FullName).FullName, "Projects", "Tiles.omproj");

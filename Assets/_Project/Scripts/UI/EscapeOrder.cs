@@ -13,6 +13,8 @@ namespace OmsiMapEditor.UI
         /// <summary>The object search field handles the key itself.</summary>
         LeaveToSearchField,
         EndVarParentPick,
+        /// <summary>Stops picking a signal of a signal route from the map (the pipette of the signal routes list).</summary>
+        EndSignalRoutePick,
         EndElementTypePick,
         EndSplineTypePick,
         /// <summary>Esc of the active tool (the tool table), if the tool has something to end.</summary>
@@ -93,6 +95,8 @@ namespace OmsiMapEditor.UI
         public bool FocusInObjectLibrary;
         public bool PickingElementType;
         public bool PickingVarParent;
+        /// <summary>A signal of a signal route waits to be clicked in the map.</summary>
+        public bool PickingSignalRoute;
         public bool PickingSplineType;
         /// <summary>An object file is chosen for placing (the placement asset is set).</summary>
         public bool PlacementAssetChosen;
@@ -128,6 +132,12 @@ namespace OmsiMapEditor.UI
             if (state.ContextMenuOpen)
             {
                 order.Add(EscapeAction.CloseContextMenu);
+                return order;
+            }
+            // The pipette of the signal routes list comes before the popup it belongs to, which Esc would close otherwise.
+            if (state.PickingSignalRoute && !state.ModalDialogShown)
+            {
+                order.Add(EscapeAction.EndSignalRoutePick);
                 return order;
             }
             order.Add(EscapeAction.CloseTopOverlay);

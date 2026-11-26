@@ -793,7 +793,7 @@ namespace OmsiMapEditor.OMSI
                 throw new ArgumentNullException(nameof(change));
             if (change.IsApplied)
                 throw new OmsiStepRefusedException("The change is already applied.");
-            ApplyFiles(change.Files, false);
+            ReplayFiles(change.Files, false);
             change.IsApplied = true;
             if (!change.Painted)
             {
