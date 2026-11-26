@@ -118,7 +118,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
   - [x] Oberfläche – umgesetzt und vom Projektinhaber am 26. November 2026 getestet: Felder Art, Begriff, Vor- und nächstes Signal (ID, Pipette, Entfernen), Tempolimit und roter Knopf „Delete route“ mit Frage in der Detailbox, nur bei bearbeitbarer Karte; je Änderung ein Undo-Schritt; bearbeitete Routen gelb markiert (ADR 105, Nachtrag M3-Oberfläche)
 - [ ] M4 – Routen erstellen mit Wegsuche über das Schienennetz
   - [x] Logik umgesetzt (26. November 2026, nicht committet): `OmsiSignalRouteFinder` (Start am Signal, Ziel Signal, Gleisstück oder nächstes Signal, mehrere Wege kürzester zuerst, Gründe ohne Weg), `CreateSignalRoute` mit Undo/Redo und neuer Datei, `ReplaceSignalRouteTrack`; Nachbildung der 49 Spandau-Routen 33 exakt, 42 mit Wahl erreichbar (ADR 105, Nachtrag M4-Logik)
-  - [ ] Oberfläche
+  - [x] Oberfläche umgesetzt (26. November 2026, nicht committet, **Nutzertest offen**): „New route...“ im Popup und im Menü eines Signals, Pipette für Signal und Ziel, mehrere Wege als Liste (gewählter orange, andere dünn), Start automatisch oder von Hand, Durchrutschweg 0–3 (Standard 1), Vorbelegung nächstes Signal und Vorsignal, Create/Cancel, Esc, Undo/Redo (ADR 105, Nachtrag M4-Oberfläche); in der Logik `OverlapPieces` und `NextSignalCandidates` (`[nextsignal]` an Spandau 27 von 27)
 - [ ] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen
 - [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten)
 

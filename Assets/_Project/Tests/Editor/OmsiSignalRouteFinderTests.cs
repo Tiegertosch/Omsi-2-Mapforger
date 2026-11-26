@@ -150,5 +150,97 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(30.0, meters, 1e-6);
             Assert.AreEqual(100.0, length, 1e-6);
         }
+
+        [Test]
+        public void TheNearestLaneIsTheOneAClickIsClosestToWithinReach()
+        {
+            var rails = Switch();
+            Assert.AreEqual(1, OmsiSignalRouteFinder.NearestLane(rails, new OmsiMapPoint(50, 1.5), 3.0).Path.ElementId);
+            var branch = OmsiSignalRouteFinder.NearestLane(rails, new OmsiMapPoint(125, 6.5), 3.0);
+            Assert.AreEqual(10, branch.Path.ElementId);
+            Assert.AreEqual(1, branch.Path.PathIndex);
+            Assert.IsNull(OmsiSignalRouteFinder.NearestLane(rails, new OmsiMapPoint(50, 20), 3.0));
+        }
+
+        [Test]
+        public void TheOverlapRunsOnPastTheTargetSignalAsFarAsTheTrackGoes()
+        {
+            var rails = Line();
+            var start = new OmsiSignalPose(7, new OmsiMapPoint(95, -3), 90.0);
+            var target = OmsiSignalRouteTarget.Signal(new OmsiSignalPose(8, new OmsiMapPoint(195, -3), 90.0));
+            Assert.AreEqual("2/0", Text(OmsiSignalRouteFinder.Find(rails, start, target, TileIndex).Ways.Single()));
+
+            var one = OmsiSignalRouteFinder.Find(rails, start, target, TileIndex, new OmsiSignalRouteSearchOptions { OverlapPieces = 1 }).Ways.Single();
+            Assert.AreEqual("2/0 3/0", Text(one));
+            Assert.AreEqual(1, one.OverlapEntries);
+            Assert.AreEqual(200.0, one.LengthMeters, 1e-3);
+            Assert.AreEqual(2, one.Lanes.Count);
+            Assert.AreEqual(8, one.EndSignalId);
+
+            // The track ends after rail 3: more overlap adds nothing more.
+            var three = OmsiSignalRouteFinder.Find(rails, start, target, TileIndex, new OmsiSignalRouteSearchOptions { OverlapPieces = 3 }).Ways.Single();
+            Assert.AreEqual("2/0 3/0", Text(three));
+            Assert.AreEqual(1, three.OverlapEntries);
+
+            // A target path ends exactly where it is told to, with no overlap.
+            var track = OmsiSignalRouteFinder.Find(rails, start, OmsiSignalRouteTarget.TrackAt(0, 0, 2, 0), TileIndex, new OmsiSignalRouteSearchOptions { OverlapPieces = 2 });
+            Assert.AreEqual("2/0", Text(track.Ways.Single()));
+        }
+
+        [Test]
+        public void TheOverlapTakesTheShorterBranchAtASwitch()
+        {
+            var rails = Switch();
+            var start = new OmsiSignalPose(7, new OmsiMapPoint(10, -3), 90.0);
+            var target = OmsiSignalRouteTarget.Signal(new OmsiSignalPose(8, new OmsiMapPoint(95, -3), 90.0));
+            var one = OmsiSignalRouteFinder.Find(rails, start, target, TileIndex, new OmsiSignalRouteSearchOptions { OverlapPieces = 1 }).Ways.Single();
+            Assert.AreEqual("1/0 10/0", Text(one), "path 0 of the switch is the shorter branch");
+            var two = OmsiSignalRouteFinder.Find(rails, start, target, TileIndex, new OmsiSignalRouteSearchOptions { OverlapPieces = 2 }).Ways.Single();
+            Assert.AreEqual("1/0 10/0 4/0", Text(two));
+            Assert.AreEqual(2, two.OverlapEntries);
+        }
+
+        [Test]
+        public void TheWaysAreSortedAndMeasuredUpToTheTargetWithoutTheOverlap()
+        {
+            // The straight branch reaches its signal first but runs on over a long rail; the left branch is longer to its signal, its overlap short.
+            var rails = OmsiPathNetwork.Build(new[]
+            {
+                Rail(1, 0, 0, 0, 100, 0), Rail(10, 0, 100, 0, 150, 0, false), Rail(10, 1, 100, 0, 150, 10, false),
+                Rail(4, 0, 150, 0, 250, 0), Rail(6, 0, 250, 0, 550, 0), Rail(5, 0, 150, 10, 270, 10), Rail(7, 0, 270, 10, 290, 10)
+            }, 2);
+            var signal = new OmsiSignalPose(7, new OmsiMapPoint(95, -3), 90.0);
+            var signals = new[] { new OmsiSignalPose(21, new OmsiMapPoint(245, -3), 90.0), new OmsiSignalPose(22, new OmsiMapPoint(265, 7), 90.0), signal };
+            var search = OmsiSignalRouteFinder.Find(rails, signal, OmsiSignalRouteTarget.NextSignal(signals), TileIndex, new OmsiSignalRouteSearchOptions { OverlapPieces = 1 });
+            Assert.AreEqual(2, search.Ways.Count, search.Message);
+            Assert.AreEqual("10/0 4/0 6/0", Text(search.Ways[0]));
+            Assert.AreEqual("10/1 5/0 7/0", Text(search.Ways[1]));
+
+            // Up to the target the straight way is shorter; with its overlap it would be the longer one.
+            Assert.AreEqual(150.0, search.Ways[0].RouteLengthMeters, 1e-3);
+            Assert.AreEqual(2, search.Ways[0].RouteEntryCount);
+            Assert.AreEqual(1, search.Ways[0].OverlapEntries);
+            Assert.AreEqual(450.0, search.Ways[0].LengthMeters, 1e-3);
+            Assert.Less(search.Ways[0].RouteLengthMeters, search.Ways[1].RouteLengthMeters);
+            Assert.Greater(search.Ways[0].LengthMeters, search.Ways[1].LengthMeters);
+            Assert.AreEqual(2, search.Ways[1].RouteEntryCount);
+        }
+
+        [Test]
+        public void TheNextSignalSearchCanSkipSignalsThatAreNotCandidates()
+        {
+            var rails = Switch();
+            var signal = new OmsiSignalPose(7, new OmsiMapPoint(95, -3), 90.0);
+            var signals = new[] { new OmsiSignalPose(21, new OmsiMapPoint(245, -3), 90.0), new OmsiSignalPose(22, new OmsiMapPoint(245, 34), 73.3), signal };
+            var only22 = OmsiSignalRouteFinder.Find(rails, signal, OmsiSignalRouteTarget.NextSignal(signals), TileIndex,
+                new OmsiSignalRouteSearchOptions { NextSignalCandidates = new System.Collections.Generic.HashSet<int> { 22 } });
+            Assert.AreEqual("10/1 5/0", Text(only22.Ways.Single()));
+            Assert.AreEqual(22, only22.Ways[0].EndSignalId);
+
+            // A signal behind a skipped one is reached over its track: 21 skipped, 22 not a candidate either: nothing.
+            var none = OmsiSignalRouteFinder.Find(rails, signal, OmsiSignalRouteTarget.NextSignal(signals), TileIndex,
+                new OmsiSignalRouteSearchOptions { NextSignalCandidates = new System.Collections.Generic.HashSet<int>() });
+            Assert.IsFalse(none.Found);
+        }
     }
 }

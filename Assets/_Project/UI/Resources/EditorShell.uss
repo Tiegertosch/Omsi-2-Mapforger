@@ -1178,3 +1178,14 @@
 .sigroute-aspect-choices > .option-icon { height: auto; min-height: 28px; max-width: 100%; margin-bottom: 2px; white-space: normal; -unity-text-align: middle-left; }
 .sigroute-edit-note { margin: 0 0 var(--mf-space-1) 0; padding: 0; font-size: var(--mf-font-caption); color: var(--mf-color-text-secondary); white-space: normal; }
 .map-control-button.sigroute-delete { align-self: flex-start; margin: var(--mf-space-2) 0 0 0; color: var(--mf-color-error); }
+.sigroute-header { flex-direction: row; align-items: center; flex-shrink: 0; margin-bottom: var(--mf-space-1); }
+.sigroute-header-text { flex-grow: 1; flex-shrink: 1; min-width: 0; margin: 0; }
+.sigroute-new-button { flex-shrink: 0; margin: 0 0 0 var(--mf-space-2); }
+.sigroute-new { flex-grow: 1; min-height: 0; }
+.sigroute-new-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.sigroute-new-value { flex-grow: 1; flex-shrink: 1; min-width: 0; margin: 0 var(--mf-space-1) 0 0; padding: 0; font-size: var(--mf-font-secondary); color: var(--mf-color-text-primary); white-space: normal; -unity-text-align: middle-left; }
+.sigroute-new-choices { flex-direction: row; flex-wrap: wrap; align-items: flex-start; flex-grow: 1; flex-shrink: 1; min-width: 0; }
+.sigroute-new-choices > .option-icon { height: auto; min-height: 28px; max-width: 100%; margin-bottom: 2px; white-space: normal; -unity-text-align: middle-left; }
+.sigroute-way-detail { margin-left: 0; }
+.sigroute-new-buttons { flex-direction: row; flex-shrink: 0; margin-top: var(--mf-space-2); padding-top: var(--mf-space-2); border-top-width: 1px; border-top-color: var(--mf-color-border-subtle); }
+.sigroute-new-buttons > .option-icon { margin-right: var(--mf-space-2); }

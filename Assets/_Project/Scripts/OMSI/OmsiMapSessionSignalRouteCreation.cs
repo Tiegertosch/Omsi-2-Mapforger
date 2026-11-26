@@ -48,15 +48,53 @@ namespace OmsiMapEditor.OMSI
         /// (<see cref="IsSignalAsset"/>).
         /// </summary>
         /// <param name="rails">The rails, e.g. from <see cref="SignalRouteRails"/>; null reads them.</param>
+        /// <param name="signalsWithRoutes">The signals a next-signal search stops at first (<see cref="SignalIdsWithRoutes"/>); null reads signalroutes.cfg. A caller that searches on a worker thread passes it.</param>
         /// <exception cref="OmsiStepRefusedException">The rails cannot be read without the OMSI installation.</exception>
         public OmsiSignalRouteSearch FindSignalRouteWays(int signalId, OmsiSignalRouteTarget target, OmsiMapSummary summary = null, OmsiPathNetwork rails = null,
-            OmsiSignalRouteSearchOptions options = null)
+            OmsiSignalRouteSearchOptions options = null, ISet<int> signalsWithRoutes = null)
         {
             summary = summary ?? Read();
             rails = rails ?? SignalRouteRails(summary);
             if (rails == null)
                 throw new OmsiStepRefusedException("Finding the way of a signal route needs the OMSI installation's object and spline files.");
+            if (target == null || target.Kind != OmsiSignalRouteTargetKind.NextSignal || target.Signals != null || (options != null && options.NextSignalCandidates != null))
+                return OmsiSignalRouteFinder.Find(summary, rails, signalId, target, IsSignalAsset, options);
+
+            // The next signal is the next one that has a route of its own: OMSI's routes on Berlin-Spandau stop at those, not at a main signal that no train is
+            // routed past. A map without such a signal, or a search that finds nothing this way, takes every signal.
+            var withRoutes = signalsWithRoutes ?? SignalIdsWithRoutes();
+            if (withRoutes.Count > 0)
+            {
+                var narrowed = CopyOf(options);
+                narrowed.NextSignalCandidates = withRoutes;
+                var search = OmsiSignalRouteFinder.Find(summary, rails, signalId, target, IsSignalAsset, narrowed);
+                if (search.Found || search.Problem == OmsiSignalRouteSearchProblem.UnknownSignal || search.Problem == OmsiSignalRouteSearchProblem.NoTrackAtSignal)
+                    return search;
+            }
             return OmsiSignalRouteFinder.Find(summary, rails, signalId, target, IsSignalAsset, options);
+        }
+
+        /// <summary>The IDs of the signals that have a route in signalroutes.cfg as it is now.</summary>
+        public HashSet<int> SignalIdsWithRoutes()
+        {
+            var result = new HashSet<int>();
+            var workspace = RequireWorkspace();
+            if (!workspace.FileExists(OmsiSignalRoutes.FileName))
+                return result;
+            foreach (var id in OmsiSignalRoutes.Parse(workspace.ReadAllBytes(OmsiSignalRoutes.FileName)).SignalIds())
+                result.Add(id);
+            return result;
+        }
+
+        private static OmsiSignalRouteSearchOptions CopyOf(OmsiSignalRouteSearchOptions options)
+        {
+            options = options ?? new OmsiSignalRouteSearchOptions();
+            return new OmsiSignalRouteSearchOptions
+            {
+                StartOnSignalTrack = options.StartOnSignalTrack, SignalReachMeters = options.SignalReachMeters, MaximumWays = options.MaximumWays,
+                MaximumLengthMeters = options.MaximumLengthMeters, MaximumEntries = options.MaximumEntries, MaximumSteps = options.MaximumSteps,
+                OverlapPieces = options.OverlapPieces, NextSignalCandidates = options.NextSignalCandidates
+            };
         }
 
         /// <summary>

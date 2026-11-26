@@ -15,6 +15,8 @@ namespace OmsiMapEditor.UI
         EndVarParentPick,
         /// <summary>Stops picking a signal of a signal route from the map (the pipette of the signal routes list).</summary>
         EndSignalRoutePick,
+        /// <summary>Ends picking a signal or target for a new signal route if one is picked, else drops the new route being planned.</summary>
+        CancelSignalRouteNew,
         EndElementTypePick,
         EndSplineTypePick,
         /// <summary>Esc of the active tool (the tool table), if the tool has something to end.</summary>
@@ -97,6 +99,8 @@ namespace OmsiMapEditor.UI
         public bool PickingVarParent;
         /// <summary>A signal of a signal route waits to be clicked in the map.</summary>
         public bool PickingSignalRoute;
+        /// <summary>A new signal route is being planned in the popup (M4 interface), with or without a point waiting to be clicked.</summary>
+        public bool PlanningSignalRoute;
         public bool PickingSplineType;
         /// <summary>An object file is chosen for placing (the placement asset is set).</summary>
         public bool PlacementAssetChosen;
@@ -138,6 +142,12 @@ namespace OmsiMapEditor.UI
             if (state.PickingSignalRoute && !state.ModalDialogShown)
             {
                 order.Add(EscapeAction.EndSignalRoutePick);
+                return order;
+            }
+            // So does planning a new route: Esc stops a pick first and then drops the plan, and does not close the popup that shows it.
+            if (state.PlanningSignalRoute && !state.ModalDialogShown)
+            {
+                order.Add(EscapeAction.CancelSignalRouteNew);
                 return order;
             }
             order.Add(EscapeAction.CloseTopOverlay);

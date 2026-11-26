@@ -286,6 +286,23 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void ASignalOnAnEditableMapOffersANewRouteAndOtherElementsDoNot()
+        {
+            var signal = Editable();
+            signal.IsSignal = true;
+            foreach (var kind in new[] { ContextMenuKind.Object, ContextMenuKind.Row })
+            {
+                Assert.That(ContextMenuEntries.For(kind, signal).Count(entry => entry.Action == ContextMenuAction.NewSignalRoute), Is.EqualTo(1), kind.ToString());
+                Assert.That(ContextMenuEntries.For(kind, Editable()).Count(entry => entry.Action == ContextMenuAction.NewSignalRoute), Is.EqualTo(0), kind.ToString());
+            }
+
+            // Creating a route writes signalroutes.cfg: a map that cannot be edited offers nothing of the kind.
+            var readOnly = new ContextMenuState { CanEditObjects = true, IsSignal = true };
+            foreach (var kind in new[] { ContextMenuKind.Object, ContextMenuKind.Row })
+                Assert.That(ContextMenuEntries.For(kind, readOnly).Count(entry => entry.Action == ContextMenuAction.NewSignalRoute), Is.EqualTo(0), kind.ToString());
+        }
+
+        [Test]
         public void TheFocusMovesOverActiveEntriesAndSkipsTheOthers()
         {
             var active = new[] { true, false, true, true, false };

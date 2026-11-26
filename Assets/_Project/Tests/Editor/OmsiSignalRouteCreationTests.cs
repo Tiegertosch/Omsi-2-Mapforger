@@ -244,6 +244,25 @@ namespace OmsiMapEditor.Tests
             Assert.AreEqual(3, OmsiSignalRoutes.Read(session.Workspace).Routes.Count);
         }
 
+        [Test]
+        public void TheNextSignalIsOneWithARouteOfItsOwnElseAnySignal()
+        {
+            var session = OpenProject();
+            var rails = OmsiPathNetwork.Build(new[] { Rail(10, 50, 0, 50, 100), Rail(20, 50, 100, 50, 200) }, 2);
+            // The signals with a route (12 and 13) stand off the rails: the search finds nothing among them and takes every signal, so 14 is the next one.
+            Assert.AreEqual(2, session.SignalIdsWithRoutes().Count);
+            var any = session.FindSignalRouteWays(16, OmsiSignalRouteTarget.NextSignal(), null, rails);
+            Assert.IsTrue(any.Found, any.Message);
+            Assert.AreEqual(14, any.Ways[0].EndSignalId);
+
+            // Once 14 has a route of its own it is a candidate on the first try; the options of the caller are not changed.
+            session.CreateSignalRoute(14, Draft(20), null, rails);
+            var options = new OmsiSignalRouteSearchOptions { OverlapPieces = 1 };
+            var again = session.FindSignalRouteWays(16, OmsiSignalRouteTarget.NextSignal(), null, rails, options);
+            Assert.AreEqual(14, again.Ways[0].EndSignalId);
+            Assert.IsNull(options.NextSignalCandidates);
+        }
+
         private static OmsiMapPath Rail(int id, double x0, double y0, double x1, double y1)
         {
             return new OmsiMapPath

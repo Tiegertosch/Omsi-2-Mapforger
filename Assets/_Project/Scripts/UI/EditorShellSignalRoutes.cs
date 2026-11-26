@@ -168,6 +168,7 @@ namespace OmsiMapEditor.UI
         {
             ReleaseSignalRouteFields();
             EndSignalRoutePick(false);
+            CancelNewSignalRoute(false);
             signalRouteEdited = new HashSet<int>();
             signalRouteOriginal = null;
             signalRouteSelectAfter = null;
@@ -188,6 +189,7 @@ namespace OmsiMapEditor.UI
         {
             ReleaseSignalRouteFields();
             EndSignalRoutePick(false);
+            CancelNewSignalRoute(false);
             signalRouteBody = null;
             signalRouteRebuildPending = false;
             signalRouteButtons.Clear();
@@ -331,6 +333,12 @@ namespace OmsiMapEditor.UI
                 return;
             signalRouteBody.Clear();
             signalRouteButtons.Clear();
+            if (newRouteActive)
+            {
+                // Planning a new route replaces the list; it comes back when the plan ends.
+                signalRouteBody.Add(NewRoutePanel());
+                return;
+            }
             if (signalRouteMap == null)
             {
                 var reading = new Label(Loc.T("sigroute.reading"));
@@ -349,13 +357,25 @@ namespace OmsiMapEditor.UI
                 var hint = new Label(Loc.T("sigroute.empty.hint"));
                 hint.AddToClassList("panel-info");
                 signalRouteBody.Add(hint);
+                if (CanEdit)
+                    signalRouteBody.Add(NewRouteButton());
                 AddSignalRouteProblems(fileProblems);
                 return;
             }
 
             var summary = new Label(Loc.T("sigroute.summary", ("count", routes.Count), ("signals", signalRouteMap.Routes.SignalIds().Count)));
             summary.AddToClassList("objlist-summary");
-            signalRouteBody.Add(summary);
+            if (CanEdit)
+            {
+                var header = new VisualElement();
+                header.AddToClassList("sigroute-header");
+                summary.AddToClassList("sigroute-header-text");
+                header.Add(summary);
+                header.Add(NewRouteButton());
+                signalRouteBody.Add(header);
+            }
+            else
+                signalRouteBody.Add(summary);
             AddSignalRouteProblems(fileProblems);
 
             if (signalRouteFilter.HasValue)
@@ -399,6 +419,15 @@ namespace OmsiMapEditor.UI
             var banner = new Label(Loc.T("sigroute.file_problems", ("count", fileProblems.Count))) { tooltip = string.Join("\n", fileProblems.Take(20)) };
             banner.AddToClassList("sigroute-problem");
             signalRouteBody.Add(banner);
+        }
+
+        /// <summary>"New route...": plans a new route (only offered where the map can be edited).</summary>
+        private Button NewRouteButton()
+        {
+            var button = OptionControls.AsTextChoice(LocBindings.WithTooltip(LocBindings.NewButton("sigroute.new", () => BeginNewSignalRoute(null)), "sigroute.new.tooltip")); // i18n:keys
+            button.name = "signal-route-new";
+            button.AddToClassList("sigroute-new-button");
+            return button;
         }
 
         private Button MakeSignalRouteRow(OmsiSignalRouteRow row)
@@ -540,7 +569,7 @@ namespace OmsiMapEditor.UI
         /// <summary>A click on a route chooses it and brings it into view; a second click on the chosen route lets it go.</summary>
         private void SelectSignalRoute(int routeIndex, bool fit, bool toggle)
         {
-            if (signalRouteMap == null || routeIndex < 0 || routeIndex >= signalRouteMap.Resolved.Count)
+            if (newRouteActive || signalRouteMap == null || routeIndex < 0 || routeIndex >= signalRouteMap.Resolved.Count)
                 return;
             EndSignalRoutePick(false);
             signalRouteSelected = toggle && routeIndex == signalRouteSelected ? -1 : routeIndex;
@@ -665,18 +694,24 @@ namespace OmsiMapEditor.UI
         {
             if (mapCanvas == null)
                 return;
-            if (!signalRouteLayerOn || signalRouteMap == null)
+            if (!signalRouteLayerOn || (signalRouteMap == null && !newRouteActive))
             {
                 mapCanvas.SetSignalRouteMarkers(null);
                 mapCanvas.SetSignalRouteHighlight(null, null, null, null, null);
                 return;
             }
-            mapCanvas.SetSignalRouteMarkers(signalRouteMap.Signals.Select(place => place.World));
+            mapCanvas.SetSignalRouteMarkers(signalRouteMap?.Signals.Select(place => place.World));
             ApplySignalRouteHighlight();
         }
 
         private void ApplySignalRouteHighlight()
         {
+            if (newRouteActive)
+            {
+                // The ways of a route being planned own the highlight.
+                ApplyNewRouteHighlight();
+                return;
+            }
             if (mapCanvas == null || !signalRouteLayerOn || signalRouteMap == null)
                 return;
             var resolved = signalRouteSelected >= 0 && signalRouteSelected < signalRouteMap.Resolved.Count ? signalRouteMap.Resolved[signalRouteSelected] : null;
@@ -702,13 +737,7 @@ namespace OmsiMapEditor.UI
                 places.Add(resolved.NextSignal.World);
             if (!OmsiSignalRouteList.Bounds(shape, places, out var min, out var max))
                 return;
-            // A little room round it, so a route of one signal does not come up to the pixel.
-            const double room = 25.0;
-            var insets = FreeMapInsets();
-            if (barPopup != null && barPopupOpen && mapCanvas.worldBound.width > 0f && barPopup.worldBound.width > 0f)
-                insets.z = Mathf.Max(insets.z, mapCanvas.worldBound.xMax - barPopup.worldBound.xMin);
-            mapCanvas.ShowWorldBox(new OmsiMapPoint(min.X - room, min.Y - room), new OmsiMapPoint(max.X + room, max.Y + room), insets);
-            UpdateZoomLabel();
+            ShowSignalRouteBox(min, max);
         }
 
         /// <summary>
@@ -723,7 +752,7 @@ namespace OmsiMapEditor.UI
                 return at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
             }
 
-            var any = Array.IndexOf(args, "-signalRoutes") >= 0;
+            var any = Array.IndexOf(args, "-signalRoutes") >= 0 || Array.IndexOf(args, "-signalRouteNew") >= 0;
             signalRouteArgFit = Array.IndexOf(args, "-view") < 0;
             if (int.TryParse(Value("-signalRouteSignal"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var signal))
             {

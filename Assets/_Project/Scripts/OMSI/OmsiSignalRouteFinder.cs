@@ -116,6 +116,20 @@ namespace OmsiMapEditor.OMSI
         /// </summary>
         public bool? StartOnSignalTrack { get; set; }
 
+        /// <summary>
+        /// How many track pieces a way to a signal runs on beyond the piece that signal stands beside (a kind of overlap, as 12 of the 27 routes with a next signal
+        /// on Berlin-Spandau have one). Only for the targets <see cref="OmsiSignalRouteTargetKind.Signal"/> and <see cref="OmsiSignalRouteTargetKind.NextSignal"/>.
+        /// Where the track goes straight on that is the way; at a switch the shorter piece, a lower path of the element first, as the search takes it between equal ways.
+        /// Fewer pieces are added where the track ends. 0 adds none.
+        /// </summary>
+        public int OverlapPieces { get; set; }
+
+        /// <summary>
+        /// The signals a next-signal search may stop at, by ID; null stops at every signal facing the same way. <see cref="OmsiMapSession.FindSignalRouteWays"/>
+        /// fills it with the signals that have a route of their own, as OMSI's routes stop at those (Berlin-Spandau).
+        /// </summary>
+        public ISet<int> NextSignalCandidates { get; set; }
+
         /// <summary>How far a signal may stand beside its track, in metres.</summary>
         public double SignalReachMeters { get; set; } = 6.0;
 
@@ -185,6 +199,15 @@ namespace OmsiMapEditor.OMSI
 
         /// <summary>The length of all its pieces as OMSI counts them, in metres.</summary>
         public double LengthMeters { get; internal set; }
+
+        /// <summary>The length up to the target, without the overlap; the ways are sorted by it.</summary>
+        public double RouteLengthMeters { get; internal set; }
+
+        /// <summary>How many of the last entries are overlap beyond the target (<see cref="OmsiSignalRouteSearchOptions.OverlapPieces"/>).</summary>
+        public int OverlapEntries { get; internal set; }
+
+        /// <summary>How many entries lead up to the target, without the overlap.</summary>
+        public int RouteEntryCount => Entries.Count - OverlapEntries;
 
         /// <summary>The signal the way ends before (target signal or next signal), or null for a target path.</summary>
         public int? EndSignalId { get; internal set; }
@@ -393,7 +416,7 @@ namespace OmsiMapEditor.OMSI
                     SignalTrack(rails, signal, options.SignalReachMeters, out var ownAlong, out _);
                     foreach (var other in target.Signals)
                     {
-                        if (other == null || other.Id == signal.Id)
+                        if (other == null || other.Id == signal.Id || (options.NextSignalCandidates != null && !options.NextSignalCandidates.Contains(other.Id)))
                             continue;
                         var track = SignalTrack(rails, other, options.SignalReachMeters, out var along, out _);
                         // A signal beside the own piece counts only ahead of the own signal; one at the same place (a distant signal on the same post) does not.
@@ -404,7 +427,7 @@ namespace OmsiMapEditor.OMSI
                     break;
             }
 
-            Search(rails, starts, goals, options, tileIndexOf, search);
+            Search(rails, starts, goals, options, tileIndexOf, search, target.Kind == OmsiSignalRouteTargetKind.Track ? 0 : Math.Max(0, Math.Min(options.OverlapPieces, 8)));
             return search;
         }
 
@@ -466,6 +489,27 @@ namespace OmsiMapEditor.OMSI
             return best;
         }
 
+        /// <summary>The lane whose line passes nearest to a position within reach (for a click on a rail in the map), or null when none does.</summary>
+        public static OmsiLane NearestLane(OmsiPathNetwork rails, OmsiMapPoint position, double reachMeters)
+        {
+            if (rails == null)
+                throw new ArgumentNullException(nameof(rails));
+            OmsiLane best = null;
+            var bestDistance = double.MaxValue;
+            foreach (var lane in rails.LanesAround(position, reachMeters))
+            {
+                Project(lane.Geometry, position, out _, out var distance, out _, out _, out _);
+                if (distance > reachMeters)
+                    continue;
+                if (distance < bestDistance - 1e-9 || (Math.Abs(distance - bestDistance) <= 1e-9 && best != null && lane.Index < best.Index))
+                {
+                    bestDistance = distance;
+                    best = lane;
+                }
+            }
+            return best;
+        }
+
         private sealed class Step
         {
             public int Lane;
@@ -479,7 +523,7 @@ namespace OmsiMapEditor.OMSI
         private const double PathTieBreak = 1e-4;
 
         private static void Search(OmsiPathNetwork rails, List<OmsiLane> starts, Dictionary<int, int?> goals, OmsiSignalRouteSearchOptions options,
-            Func<int, int, int> tileIndexOf, OmsiSignalRouteSearch search)
+            Func<int, int, int> tileIndexOf, OmsiSignalRouteSearch search, int overlap)
         {
             var lanes = rails.Lanes;
             var visits = new Dictionary<int, int>();
@@ -513,7 +557,9 @@ namespace OmsiMapEditor.OMSI
 
                 if (goals.TryGetValue(step.Lane, out var endSignal))
                 {
-                    ways.Add(Way(step, lanes, tileIndexOf, endSignal));
+                    var way = Way(step, lanes, tileIndexOf, endSignal);
+                    Overlap(rails, way, overlap, tileIndexOf);
+                    ways.Add(way);
                     if (ways.Count >= maximumWays)
                     {
                         search.MoreWaysPossible = queue.Count > 0;
@@ -558,6 +604,40 @@ namespace OmsiMapEditor.OMSI
             }
         }
 
+        /// <summary>Runs a way on over the pieces after its end: the only piece, or at a switch the shorter one (a lower path first), never a piece the way has.</summary>
+        private static void Overlap(OmsiPathNetwork rails, OmsiSignalRouteWay way, int pieces, Func<int, int, int> tileIndexOf)
+        {
+            for (var count = 0; count < pieces && way.Lanes.Count > 0; count++)
+            {
+                OmsiLane best = null;
+                var bestCost = double.MaxValue;
+                foreach (var next in rails.NextOf(way.Lanes[way.Lanes.Count - 1]))
+                {
+                    var used = false;
+                    foreach (var lane in way.Lanes)
+                        if (ReferenceEquals(lane.Path, next.Path))
+                        {
+                            used = true;
+                            break;
+                        }
+                    if (used)
+                        continue;
+                    var cost = next.LengthMeters + next.Path.PathIndex * PathTieBreak;
+                    if (cost < bestCost - 1e-12 || (Math.Abs(cost - bestCost) <= 1e-12 && best != null && next.Index < best.Index))
+                    {
+                        best = next;
+                        bestCost = cost;
+                    }
+                }
+                if (best == null)
+                    return;
+                way.Lanes.Add(best);
+                way.Entries.Add(new OmsiSignalRouteDraftEntry(best.Path.ElementId, best.Path.PathIndex, tileIndexOf(best.Path.TileX, best.Path.TileY)));
+                way.LengthMeters += best.LengthMeters;
+                way.OverlapEntries++;
+            }
+        }
+
         private static bool Contains(Step step, OmsiMapPath path, IReadOnlyList<OmsiLane> lanes)
         {
             for (var each = step; each != null; each = each.Before)
@@ -579,6 +659,7 @@ namespace OmsiMapEditor.OMSI
                 way.Entries.Add(new OmsiSignalRouteDraftEntry(lane.Path.ElementId, lane.Path.PathIndex, tileIndexOf(lane.Path.TileX, lane.Path.TileY)));
                 way.LengthMeters += lane.LengthMeters;
             }
+            way.RouteLengthMeters = way.LengthMeters;
             return way;
         }
 
