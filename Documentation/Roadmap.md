@@ -122,7 +122,7 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen – vom Projektinhaber am 27. November 2026 getestet (13 Prüfpunkte, Kartenprüfung in Spandau und Grundorf, deutsche Oberfläche; openOMSI optional)
   - [x] Logik umgesetzt (27. November 2026): `[switch]` und `[switchdir]` werden gelesen (`OmsiSceneryObject`, `OmsiMapPath.SwitchPosition`); `OmsiRailCheck` prüft P3 und P4 (Fehler) sowie P1, P2, P6 und P7 (Warnungen) im Abschnitt „Rail paths“ der Kartenprüfung (ADR 105, Nachtrag M5-Logik)
   - [x] Oberfläche umgesetzt (27. November 2026): Zweige und Stellungsschilder bei gewählter Weiche (2D und 3D, in 3D am Objektrahmen), Ring und Schild „switch → n“ an passierten Weichen der gewählten Route (2D Schild, 3D Ring), Zeile „Switch: n positions“ im Inspector (ADR 105, Nachtrag M5-Oberfläche)
-- [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten)
+- [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten): **zurückgestellt** am 27. November 2026 (Entscheidung des Projektinhabers, ADR 105, Nachtrag „M6 zurückgestellt“); wieder öffnen, sobald Karten die Dateien nutzen. Block G ist damit abgeschlossen.
 
 ## Später
 

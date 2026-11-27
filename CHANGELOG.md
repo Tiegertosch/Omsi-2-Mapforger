@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.2.1
+
+Signal routes on the map: read, list, check, edit, delete and create them, with switches and rail paths checked along the way. Plus single seasons, a signal for pedestrian crossings and a clearer traffic setting.
+
+### Signal routes
+
+- **Signal routes list.** The Signal routes popup in the bottom bar lists every route of the map. Choose one to move the map there and highlight its track, signal, distant signal and next signal. Signals with routes offer "Signal routes..." in the right-click menu.
+- **Kept in step with the map.** Track and signals of a route cannot be deleted while a route uses them. Path numbers and tile indices of routes follow when pieces move, change type or tiles are deleted or reverted, and deleting a tile keeps the signal aspects of the routes.
+- **Edit and delete with undo.** Change a route's kind, aspect, distant and next signal and speed limit, or delete a route. Each change is one undo step.
+- **New signal routes.** Pick a signal and an end (the next signal, another signal or a track piece), then choose one of the ways found along the rails. The list shows each way with its length, the overlap past the end (0 to 3 pieces) and the start piece. "New signal route..." on a signal in the right-click menu starts the same plan.
+
+### Switches and rail paths
+
+- **Switch branches.** Select a switch to see its branches and the position each one takes, in the view from above and in 3D. A selected route marks the switches it passes, with the position it needs.
+- **Map check "Rail paths".** Finds open rail ends on routes, open switch branches, switch data errors, routes that use two positions of one switch and branches without a switch object.
+
+### Map settings and new maps
+
+- **Single seasons.** Add, remove and edit seasons one by one in New map and Map settings, not only through the templates.
+- **Traffic as a factor.** Cars and Passengers show how busy the map is compared with OMSI's standard daily curve. Apply sets exactly that factor instead of multiplying the curve again.
+- **Project copy.** Map settings reads the project copy, so saved values reappear and are not overwritten.
+
+### Traffic lights and crossings
+
+- **Signal for crossing pieces.** Crossing pieces get a "Crossing on request" signal template with its own pedestrian group.
+
+### Exports
+
+- **Chrono variants.** Exports carry all new, edited and deleted chrono variants.
+
 ## 1.2.0
 
 A new look and a lot more to edit: a reworked main view, traffic lights and pedestrian crossings, a full timetable editor, road type templates, an objects list and contour lines.
