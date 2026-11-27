@@ -119,7 +119,9 @@ Grundorf wurde als erste Beispielkarte untersucht. Ein schreibgeschützter Impor
 - [x] M4 – Routen erstellen mit Wegsuche über das Schienennetz – vom Projektinhaber am 27. November 2026 getestet (13 Prüfpunkte, auch openOMSI mit `OMSI_DEBUG_SIGNALS=1`)
   - [x] Logik umgesetzt (26. November 2026, nicht committet): `OmsiSignalRouteFinder` (Start am Signal, Ziel Signal, Gleisstück oder nächstes Signal, mehrere Wege kürzester zuerst, Gründe ohne Weg), `CreateSignalRoute` mit Undo/Redo und neuer Datei, `ReplaceSignalRouteTrack`; Nachbildung der 49 Spandau-Routen 33 exakt, 42 mit Wahl erreichbar (ADR 105, Nachtrag M4-Logik)
   - [x] Oberfläche umgesetzt (26. November 2026, committet in `ad553c9`, vom Projektinhaber am 27. November 2026 getestet): „New route...“ im Popup und im Menü eines Signals, Pipette für Signal und Ziel, mehrere Wege als Liste (gewählter orange, andere dünn), Start automatisch oder von Hand, Durchrutschweg 0–3 (Standard 1), Vorbelegung nächstes Signal und Vorsignal, Create/Cancel, Esc, Undo/Redo (ADR 105, Nachtrag M4-Oberfläche); in der Logik `OverlapPieces` und `NextSignalCandidates` (`[nextsignal]` an Spandau 27 von 27)
-- [ ] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen
+- [x] M5 – Weichen: Zweige und `[switchdir]` anzeigen, Schienenpfade prüfen – vom Projektinhaber am 27. November 2026 getestet (13 Prüfpunkte, Kartenprüfung in Spandau und Grundorf, deutsche Oberfläche; openOMSI optional)
+  - [x] Logik umgesetzt (27. November 2026): `[switch]` und `[switchdir]` werden gelesen (`OmsiSceneryObject`, `OmsiMapPath.SwitchPosition`); `OmsiRailCheck` prüft P3 und P4 (Fehler) sowie P1, P2, P6 und P7 (Warnungen) im Abschnitt „Rail paths“ der Kartenprüfung (ADR 105, Nachtrag M5-Logik)
+  - [x] Oberfläche umgesetzt (27. November 2026): Zweige und Stellungsschilder bei gewählter Weiche (2D und 3D, in 3D am Objektrahmen), Ring und Schild „switch → n“ an passierten Weichen der gewählten Route (2D Schild, 3D Ring), Zeile „Switch: n positions“ im Inspector (ADR 105, Nachtrag M5-Oberfläche)
 - [ ] M6 (optional) – openOMSIs `switches.cfg`/`signals.cfg` (bis dahin nur erhalten)
 
 ## Später

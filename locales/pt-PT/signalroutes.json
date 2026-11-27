@@ -134,5 +134,8 @@
   "sigroute.new.status.stale": "O mapa mudou desde que os percursos foram encontrados. São procurados de novo. Veja-os e prima Criar itinerário.",
   "sigroute.new.status.created": "Itinerário {number} criado. Desfazer recupera-o.",
   "sigroute.new.status.failed": "Itinerário não criado: {reason}",
-  "sigroute.step.create": "o novo itinerário {number}"
+  "sigroute.step.create": "o novo itinerário {number}",
+  "sigroute.switch_mark": "agulha → {position}",
+  "inspector.switch": "Agulha",
+  "inspector.switch.value": "{count} posições"
 }

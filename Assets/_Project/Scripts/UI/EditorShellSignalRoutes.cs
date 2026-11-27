@@ -721,6 +721,7 @@ namespace OmsiMapEditor.UI
             else if (signalRouteFilter.HasValue)
                 signal = signalRouteMap.FindElement(signalRouteFilter.Value)?.World;
             mapCanvas.SetSignalRouteHighlight(signalRouteShape?.Lines, signalRouteShape?.Points, signal, resolved?.DistantSignal?.World, resolved?.NextSignal?.World);
+            mapCanvas.SetRouteSwitchMarks(signalRouteShape?.SwitchMarks, signalRouteShape?.SwitchMarkAhead);
         }
 
         /// <summary>Brings the route into the part of the map the popup and the inspector leave free: its signals first, then, with the track known, all of it.</summary>

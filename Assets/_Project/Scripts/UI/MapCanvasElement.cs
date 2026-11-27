@@ -1281,6 +1281,9 @@ namespace OmsiMapEditor.UI
             BuildCaches();
             // Routes are relative to the origin of the map they were built for.
             SetRoutes(null);
+            // So are the switch branches and marks; the shell draws them again for the new map.
+            switchBranches.Clear();
+            routeSwitchMarks.Clear();
             objectsByTileOutdated = true;
             if (!keepView || !hasView)
                 FitToMap();
@@ -1664,6 +1667,7 @@ namespace OmsiMapEditor.UI
             if (ThreeDimensional)
             {
                 Draw3D(context.painter2D);
+                DrawSwitchTexts3D(context);
                 return;
             }
 
@@ -1696,6 +1700,9 @@ namespace OmsiMapEditor.UI
             DrawSelection(painter);
             // Over the selection, so the signal of a route stays in view when it is the object selected.
             DrawSignalRoutes(painter, visible);
+            DrawSwitchBranches(painter);
+            DrawRouteSwitchMarks(painter);
+            DrawSwitchTexts(context);
             DrawArrows(painter);
             DrawPlacement(painter);
             DrawBox(painter);
@@ -3887,6 +3894,8 @@ namespace OmsiMapEditor.UI
             DrawPlacementPoints3D(painter, camera);
             DrawJunctionMarkers3D(painter, camera);
             DrawSignalRoutes(painter, default, camera);
+            DrawSwitchBranches(painter, camera);
+            DrawRouteSwitchMarks(painter, camera);
             DrawSignalMovements(painter, camera);
             DrawTrafficHighlight(painter, camera);
             DrawPriorityHandles(painter, camera);

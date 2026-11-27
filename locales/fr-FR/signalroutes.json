@@ -134,5 +134,8 @@
   "sigroute.new.status.stale": "La carte a changé depuis la recherche des parcours. Ils sont recherchés à nouveau. Regardez-les, puis appuyez sur Créer l'itinéraire.",
   "sigroute.new.status.created": "Itinéraire {number} créé. Annuler le retire.",
   "sigroute.new.status.failed": "Itinéraire non créé : {reason}",
-  "sigroute.step.create": "le nouvel itinéraire {number}"
+  "sigroute.step.create": "le nouvel itinéraire {number}",
+  "sigroute.switch_mark": "aiguillage → {position}",
+  "inspector.switch": "Aiguillage",
+  "inspector.switch.value": "{count} positions"
 }

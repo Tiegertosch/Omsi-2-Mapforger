@@ -134,5 +134,8 @@
   "sigroute.new.status.stale": "Mapa se od nalezení tras změnila. Hledají se znovu. Prohlédněte si je a pak stiskněte Vytvořit jízdní cestu.",
   "sigroute.new.status.created": "Jízdní cesta {number} vytvořena. Zpět ji vrátí.",
   "sigroute.new.status.failed": "Jízdní cesta nevytvořena: {reason}",
-  "sigroute.step.create": "novou jízdní cestu {number}"
+  "sigroute.step.create": "novou jízdní cestu {number}",
+  "sigroute.switch_mark": "výhybka → {position}",
+  "inspector.switch": "Výhybka",
+  "inspector.switch.value": "{count} poloh"
 }

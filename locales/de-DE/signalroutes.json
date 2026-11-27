@@ -134,5 +134,8 @@
   "sigroute.new.status.stale": "Die Karte hat sich geändert, seit die Wege gefunden wurden. Sie werden neu gesucht. Sieh sie dir an und drücke dann Fahrstraße anlegen.",
   "sigroute.new.status.created": "Fahrstraße {number} angelegt. Rückgängig nimmt sie zurück.",
   "sigroute.new.status.failed": "Fahrstraße nicht angelegt: {reason}",
-  "sigroute.step.create": "die neue Fahrstraße {number}"
+  "sigroute.step.create": "die neue Fahrstraße {number}",
+  "sigroute.switch_mark": "Weiche → {position}",
+  "inspector.switch": "Weiche",
+  "inspector.switch.value": "{count} Stellungen"
 }

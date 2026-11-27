@@ -134,5 +134,8 @@
   "sigroute.new.status.stale": "The map changed since the ways were found. They are found again. Look at them, then press Create route.",
   "sigroute.new.status.created": "Route {number} created. Undo takes it back.",
   "sigroute.new.status.failed": "Route not created: {reason}",
-  "sigroute.step.create": "the new signal route {number}"
+  "sigroute.step.create": "the new signal route {number}",
+  "sigroute.switch_mark": "switch → {position}",
+  "inspector.switch": "Switch",
+  "inspector.switch.value": "{count} positions"
 }

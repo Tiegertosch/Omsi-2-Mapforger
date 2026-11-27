@@ -134,5 +134,8 @@
   "sigroute.new.status.stale": "Mapa zmieniła się od czasu znalezienia tras. Są szukane na nowo. Obejrzyj je, a potem naciśnij Utwórz drogę przebiegu.",
   "sigroute.new.status.created": "Droga przebiegu {number} utworzona. Cofnij ją przywraca.",
   "sigroute.new.status.failed": "Droga przebiegu nie utworzona: {reason}",
-  "sigroute.step.create": "nową drogę przebiegu {number}"
+  "sigroute.step.create": "nową drogę przebiegu {number}",
+  "sigroute.switch_mark": "rozjazd → {position}",
+  "inspector.switch": "Rozjazd",
+  "inspector.switch.value": "{count} położeń"
 }

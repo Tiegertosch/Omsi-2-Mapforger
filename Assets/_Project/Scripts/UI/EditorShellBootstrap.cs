@@ -9422,6 +9422,7 @@ namespace OmsiMapEditor.UI
             // The traffic rules editor marks its lanes again when it shows.
             mapCanvas?.SetHighlightedPaths(null);
             RefreshJunctionMarkers();
+            RefreshSwitchBranches();
 
             // A hidden inspector is not built: it is drawn when it opens (ShowInspector). Building it for every right-click cost 1 to 120 ms
             // on Berlin-Spandau for an inspector nobody sees (ADR 098, M5 step 2).
@@ -9463,7 +9464,10 @@ namespace OmsiMapEditor.UI
                 if (selection.Count > 1)
                     AddSelectionSummary(records);
                 else if (selectedObject != null)
+                {
                     AddObjectEditor(records, selectedObject);
+                    AddSwitchInspectorLine(records);
+                }
                 else if (selectedSpline != null && InspectorShowsSumOnly)
                     AddSplineSummary(records);
                 else if (selectedSpline != null)

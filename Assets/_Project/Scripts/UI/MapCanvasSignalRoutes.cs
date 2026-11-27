@@ -36,6 +36,7 @@ namespace OmsiMapEditor.UI
         {
             signalRouteLines.Clear();
             signalRoutePoints.Clear();
+            routeSwitchMarks.Clear();
             // Taking the whole highlight off takes the ways of a route being planned with it.
             if (lines == null && points == null && !signal.HasValue && !distant.HasValue && !next.HasValue)
                 signalRouteAlternatives.Clear();
