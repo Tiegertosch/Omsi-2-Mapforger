@@ -89,7 +89,7 @@ namespace OmsiMapEditor.OMSI
     /// Checks a map for what the format study suggests: import warnings, spline connections, map-wide unique IDs and the
     /// ID counter, entry points on their object, attachments on existing parents and splines, variable parents that
     /// exist, object and spline files the installation has, the connection points of junction objects, the timetable and
-    /// the selections of the chrono variants.
+    /// the selections of the chrono variants, signal routes, and rail paths and switches.
     /// Reads the map files again, so it belongs on a worker thread; nothing is written.
     /// </summary>
     public static class OmsiMapCheck
@@ -118,6 +118,7 @@ namespace OmsiMapEditor.OMSI
                 report.Sections.Add(Files(summary, installationRoot));
                 report.Sections.Add(Junctions(summary, installationRoot));
                 report.Sections.Add(Parking(summary, source, installationRoot));
+                report.Sections.Add(Rail(summary, source, installationRoot));
             }
             var variants = OmsiChrono.ReadVariants(source);
             report.Sections.Add(Timetable(summary, source, variants));
@@ -152,6 +153,129 @@ namespace OmsiMapEditor.OMSI
             if (counter == null && routes.Routes.Count > 0)
                 Add(section, Loc.T("mapcheck.signalroutes.nopaths"));
             return section;
+        }
+
+        /// <summary>
+        /// Rail paths and switches (ADR 105, M5): the [switch] and [switchdir] of switch objects, open ends of track signal routes
+        /// run over, switches whose branches no track joins, routes through two positions of a switch and branches without a switch.
+        /// The paths of the map are built once for all of them.
+        /// </summary>
+        private static OmsiCheckSection Rail(OmsiMapSummary summary, IOmsiFileSource source, string installationRoot)
+        {
+            var section = new OmsiCheckSection("Rail paths", Loc.T("mapcheck.title.rail"));
+            var scenery = new Dictionary<string, OmsiSceneryObject>(StringComparer.OrdinalIgnoreCase);
+            var assets = new List<string>();
+            Func<string, OmsiSceneryObject> sceneryOf = asset =>
+            {
+                if (string.IsNullOrEmpty(asset))
+                    return null;
+                if (!scenery.TryGetValue(asset, out var found))
+                {
+                    found = null;
+                    try
+                    {
+                        var file = OmsiRelativePath.Resolve(installationRoot, asset);
+                        if (File.Exists(file))
+                            found = OmsiSceneryObject.Parse(File.ReadAllBytes(file));
+                    }
+                    catch (Exception exception) when (exception is IOException || exception is ArgumentException || exception is UnauthorizedAccessException ||
+                                                      exception is FormatException)
+                    {
+                        // Unreadable objects have no paths; the files section names missing ones.
+                    }
+                    scenery[asset] = found;
+                    assets.Add(asset);
+                }
+                return found;
+            };
+            var profiles = new OmsiSplineProfileCatalog(installationRoot);
+            var paths = new List<OmsiMapPath>();
+            foreach (var tile in summary.Tiles)
+                if (tile != null && tile.IsAvailable)
+                    paths.AddRange(OmsiMapPaths.OfTile(summary, tile, sceneryOf, profiles.Get));
+
+            var findings = new List<OmsiRailFinding>();
+            var switches = 0;
+            foreach (var asset in assets)
+            {
+                var sceneryObject = scenery[asset];
+                if (sceneryObject == null)
+                    continue;
+                if (sceneryObject.IsSwitch)
+                    switches++;
+                OmsiRailCheck.CheckSceneryObject(asset, sceneryObject, findings);
+            }
+            findings.AddRange(OmsiRailCheck.CheckTrack(summary, paths, OmsiSignalRoutes.Read(source)));
+
+            var rails = 0;
+            foreach (var path in paths)
+                if (path.Kind == OmsiRailCheck.RailKind)
+                    rails++;
+            var errors = 0;
+            foreach (var finding in findings)
+            {
+                if (finding.IsError)
+                    errors++;
+                else if (section.Tile == null)
+                    section.Tile = TileAt(summary, finding.TileX, finding.TileY);
+                Add(section, RailText(finding));
+            }
+            section.Status = errors > 0 ? OmsiCheckStatus.Problem : findings.Count > 0 ? OmsiCheckStatus.Note : OmsiCheckStatus.Passed;
+            section.Summary = rails == 0 && findings.Count == 0
+                ? Loc.T("mapcheck.rail.none")
+                : Loc.T("mapcheck.rail.summary", ("paths", rails), ("switches", switches), ("errors", errors), ("warnings", findings.Count - errors));
+            return section;
+        }
+
+        private static string RailText(OmsiRailFinding finding)
+        {
+            switch (finding.Kind)
+            {
+                case OmsiRailFindingKind.SwitchPositionCount:
+                    var outOfRange = finding.Numbers.Exists(position => position < 0 || position >= finding.Count);
+                    return Loc.T("mapcheck.rail.switch_count", ("file", finding.AssetPath), ("count", finding.Count), ("positions", finding.Numbers.Count),
+                        ("high", outOfRange ? "yes" : "no"));
+                case OmsiRailFindingKind.SwitchCountUnreadable:
+                    return Loc.T("mapcheck.rail.switch_count_unreadable", ("file", finding.AssetPath));
+                case OmsiRailFindingKind.SwitchDirectionBeforePath:
+                    return Loc.T("mapcheck.rail.switchdir_first", ("file", finding.AssetPath), ("count", finding.Count));
+                case OmsiRailFindingKind.OpenRailEnd:
+                    return finding.NearestMeters.HasValue
+                        ? Loc.T("mapcheck.rail.open_gap", ("element", Element(finding.OnSpline, finding.ElementId)), ("path", finding.PathIndex), ("x", finding.TileX),
+                            ("y", finding.TileY), ("px", finding.LocalX), ("py", finding.LocalY), ("route", finding.RouteIndex), ("meters", finding.NearestMeters.Value),
+                            ("other", Element(finding.Nearest.OnSpline, finding.Nearest.ElementId)))
+                        : Loc.T("mapcheck.rail.open_end", ("element", Element(finding.OnSpline, finding.ElementId)), ("path", finding.PathIndex), ("x", finding.TileX),
+                            ("y", finding.TileY), ("px", finding.LocalX), ("py", finding.LocalY), ("route", finding.RouteIndex));
+                case OmsiRailFindingKind.OpenSwitchBranch:
+                    return Loc.T("mapcheck.rail.switch_open", ("id", finding.ElementId), ("name", Path.GetFileNameWithoutExtension(finding.AssetPath ?? string.Empty)),
+                        ("x", finding.TileX), ("y", finding.TileY), ("count", finding.Count), ("px", finding.LocalX), ("py", finding.LocalY));
+                case OmsiRailFindingKind.RouteInTwoPositions:
+                    return Loc.T("mapcheck.rail.route_positions", ("route", finding.RouteIndex), ("id", finding.ElementId), ("x", finding.TileX), ("y", finding.TileY),
+                        ("positions", string.Join(", ", finding.Numbers)));
+                default:
+                    var branches = new List<string>();
+                    foreach (var branch in finding.Branches)
+                        branches.Add(Element(branch.OnSpline, branch.ElementId));
+                    var from = Element(finding.From.OnSpline, finding.From.ElementId);
+                    return finding.StartOffsetMeters > OmsiRailCheck.OffsetMeters
+                        ? Loc.T("mapcheck.rail.branch_offset", ("px", finding.LocalX), ("py", finding.LocalY), ("x", finding.TileX), ("y", finding.TileY), ("from", from),
+                            ("to", string.Join(", ", branches)), ("meters", finding.StartOffsetMeters))
+                        : Loc.T("mapcheck.rail.branch", ("px", finding.LocalX), ("py", finding.LocalY), ("x", finding.TileX), ("y", finding.TileY), ("from", from),
+                            ("to", string.Join(", ", branches)));
+            }
+        }
+
+        private static string Element(bool onSpline, int id)
+        {
+            return Loc.T("mapcheck.rail.element", ("kind", onSpline ? "spline" : "object"), ("id", id));
+        }
+
+        private static OmsiTileSummary TileAt(OmsiMapSummary summary, int x, int y)
+        {
+            foreach (var tile in summary.Tiles)
+                if (tile != null && tile.X == x && tile.Y == y)
+                    return tile;
+            return null;
         }
 
         private static OmsiCheckSection Import(OmsiMapSummary summary)

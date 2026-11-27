@@ -367,9 +367,11 @@ namespace OmsiMapEditor.UI
         private void AfterSignalRouteStep(OmsiSignalRouteChange change, bool undo)
         {
             EndSignalRoutePick(false);
-            if (change.Kind == OmsiSignalRouteChangeKind.Deletion)
+            // A deleted route that is undone and a created route that is redone are in the file again; the other two directions take a route out of it.
+            var comesBack = change.Kind == OmsiSignalRouteChangeKind.Deletion ? undo : change.Kind == OmsiSignalRouteChangeKind.Creation && !undo;
+            if (change.Kind == OmsiSignalRouteChangeKind.Deletion || change.Kind == OmsiSignalRouteChangeKind.Creation)
             {
-                if (undo)
+                if (comesBack)
                 {
                     // The route is back in the file at once, and the box below the list reads the file: the choice moves to it now (what stood at or after
                     // that place moved up by one). The list, the markers and the highlight follow when the routes are read again.

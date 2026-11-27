@@ -17,6 +17,12 @@ namespace OmsiMapEditor.OMSI
 
         public bool OnSpline { get; internal set; }
 
+        /// <summary>True for a path of an object with [switch]: its element is the switch that sets which branch trains take (ADR 105, M5).</summary>
+        public bool OnSwitch { get; internal set; }
+
+        /// <summary>The switch position in which trains take this path ([switchdir] of the .sco), or null for a path without one.</summary>
+        public int? SwitchPosition { get; internal set; }
+
         /// <summary>Its place among the [path]s of the profile or object, as [rule]s name it.</summary>
         public int PathIndex { get; internal set; }
 
@@ -112,7 +118,8 @@ namespace OmsiMapEditor.OMSI
                     var path = new OmsiMapPath
                     {
                         TileX = tile.X, TileY = tile.Y, ElementId = record.Id, PathIndex = index, Kind = objectPath.Kind, Direction = objectPath.Direction,
-                        Blinker = objectPath.Blinker, Width = objectPath.WidthMeters, LengthMeters = objectPath.LengthMeters, Points = ObjectLane(tile, record, objectPath, summary.TileSizeMeters)
+                        Blinker = objectPath.Blinker, Width = objectPath.WidthMeters, LengthMeters = objectPath.LengthMeters, Points = ObjectLane(tile, record, objectPath, summary.TileSizeMeters),
+                        OnSwitch = sceneryObject.IsSwitch, SwitchPosition = objectPath.SwitchPosition
                     };
                     path.Rules.AddRange(record.Rules.FindAll(rule => rule.PathIndex == index));
                     paths.Add(path);
@@ -188,20 +195,32 @@ namespace OmsiMapEditor.OMSI
         /// <summary>A [path] of an object in world metres: in the object frame (x right, y forward) like a spline from its start, then turned with the object.</summary>
         public static OmsiMapPoint[] ObjectLane(OmsiTileSummary tile, OmsiObjectRecord record, OmsiObjectPath path, double tileSize)
         {
+            var heading = record.HeadingDegrees * Math.PI / 180.0;
+            var cos = Math.Cos(heading);
+            var sin = Math.Sin(heading);
+            var points = ObjectLaneLocal(path);
+            for (var index = 0; index < points.Length; index++)
+            {
+                var local = points[index];
+                points[index] = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, record.LocalX + local.X * cos + local.Y * sin, record.LocalY - local.X * sin + local.Y * cos,
+                    tileSize);
+            }
+            return points;
+        }
+
+        /// <summary>A [path] of an object in the object frame (x right, y forward), unturned; the same points as <see cref="ObjectLane"/>.</summary>
+        public static OmsiMapPoint[] ObjectLaneLocal(OmsiObjectPath path)
+        {
             var lane = new OmsiSplineRecord
             {
                 LocalX = path.X, LocalY = path.Y, HeadingDegrees = path.HeadingDegrees, LengthMeters = path.LengthMeters, RadiusMeters = path.RadiusMeters
             };
-            var heading = record.HeadingDegrees * Math.PI / 180.0;
-            var cos = Math.Cos(heading);
-            var sin = Math.Sin(heading);
             var count = SegmentCount(path.LengthMeters);
             var points = new OmsiMapPoint[count + 1];
             for (var index = 0; index <= count; index++)
             {
                 OmsiMapGeometry.GetLocalFrameAt(lane, path.LengthMeters * index / count, out var local, out _);
-                points[index] = OmsiMapGeometry.TileLocalToWorld(tile.X, tile.Y, record.LocalX + local.X * cos + local.Y * sin, record.LocalY - local.X * sin + local.Y * cos,
-                    tileSize);
+                points[index] = local;
             }
             return points;
         }

@@ -567,6 +567,7 @@ namespace OmsiMapEditor.UI
                 mapCanvas = new MapCanvasElement();
                 mapCanvas.PlacementSnapper = SnapPlacement;
                 mapCanvas.ObjectSelected += (tile, item) => SelectObject(tile, item, false);
+                mapCanvas.PointPicked += NewRoutePointPicked;
                 mapCanvas.TileClicked += tile => SelectTile(tile, false);
                 mapCanvas.ContextRequested += ShowContextMenu;
                 mapCanvas.TileAddRequested += AddTile;
@@ -1615,6 +1616,9 @@ namespace OmsiMapEditor.UI
 
                 // -signalRouteEdit field value, -signalRoutePick, -signalRouteDelete, -signalRouteUndo: the edit of the chosen route (ADR 105, M3 interface).
                 yield return RunSignalRouteEditArguments(args);
+
+                // -signalRouteNew id [next|signal id|track ...] [way n] [overlap n] [create]: planning a new route (ADR 105, M4 interface).
+                yield return RunSignalRouteNewArguments(args);
             }
 
             if (Array.IndexOf(args, "-paths") >= 0)
@@ -2420,6 +2424,8 @@ namespace OmsiMapEditor.UI
         {
             // Picks waiting for a click and the context menu hold records of the summary shown, which is replaced now.
             LeaveTransientModes();
+            // A plan for a new signal route holds the rails, signals and ways of the summary shown (and a chrono view cannot be edited): it is dropped.
+            CancelNewSignalRoute(false);
             // The routes of the signals were laid onto the summary before; a new one reads them again when the list is open.
             InvalidateSignalRoutes(true);
             // Roads, markings, right of way, signals and lanes hold records of the summary shown; another map or a chrono view ends
@@ -6811,6 +6817,7 @@ namespace OmsiMapEditor.UI
                 PickingElementType = PickingElementType,
                 PickingVarParent = PickingVarParent,
                 PickingSignalRoute = PickingSignalRoute,
+                PlanningSignalRoute = PlanningSignalRoute,
                 PickingSplineType = PickingSplineType,
                 PlacementAssetChosen = placementAsset != null,
                 MapPlacing = mapCanvas != null && mapCanvas.IsPlacing,
@@ -6851,6 +6858,9 @@ namespace OmsiMapEditor.UI
                     return true;
                 case EscapeAction.EndSignalRoutePick:
                     EndSignalRoutePick(true);
+                    return true;
+                case EscapeAction.CancelSignalRouteNew:
+                    EscapeSignalRouteNew();
                     return true;
                 case EscapeAction.EndElementTypePick:
                     EndElementTypePick(null);
@@ -8520,6 +8530,7 @@ namespace OmsiMapEditor.UI
             EndSplineTypePick(null);
             EndVarParentPick(false);
             EndSignalRoutePick(false);
+            EndNewRoutePick(false);
             EndRowObjectPick(null);
         }
 
@@ -9411,6 +9422,7 @@ namespace OmsiMapEditor.UI
             // The traffic rules editor marks its lanes again when it shows.
             mapCanvas?.SetHighlightedPaths(null);
             RefreshJunctionMarkers();
+            RefreshSwitchBranches();
 
             // A hidden inspector is not built: it is drawn when it opens (ShowInspector). Building it for every right-click cost 1 to 120 ms
             // on Berlin-Spandau for an inspector nobody sees (ADR 098, M5 step 2).
@@ -9452,7 +9464,10 @@ namespace OmsiMapEditor.UI
                 if (selection.Count > 1)
                     AddSelectionSummary(records);
                 else if (selectedObject != null)
+                {
                     AddObjectEditor(records, selectedObject);
+                    AddSwitchInspectorLine(records);
+                }
                 else if (selectedSpline != null && InspectorShowsSumOnly)
                     AddSplineSummary(records);
                 else if (selectedSpline != null)

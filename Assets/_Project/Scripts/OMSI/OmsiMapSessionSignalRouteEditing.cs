@@ -56,10 +56,12 @@ namespace OmsiMapEditor.OMSI
     public enum OmsiSignalRouteChangeKind
     {
         Edit,
-        Deletion
+        Deletion,
+        /// <summary>A new route, added at the end of the file (ADR 105, M4).</summary>
+        Creation
     }
 
-    /// <summary>An edited or deleted signal route as one step: signalroutes.cfg before and after, for undo and redo.</summary>
+    /// <summary>An edited, deleted or created signal route as one step: signalroutes.cfg before and after, for undo and redo.</summary>
     public sealed class OmsiSignalRouteChange
     {
         internal OmsiSignalRouteChange(OmsiSignalRouteChangeKind kind, int routeIndex)
@@ -253,7 +255,8 @@ namespace OmsiMapEditor.OMSI
 
         private OmsiSignalRouteChange WriteSignalRoutes(OmsiSignalRouteChangeKind kind, int routeIndex, byte[] before, byte[] after)
         {
-            if (SameBytes(before, after))
+            // A new file (before is null) is always a change.
+            if (before != null && SameBytes(before, after))
                 return null;
             var change = new OmsiSignalRouteChange(kind, routeIndex);
             change.Files.Add(new OmsiObjectChange.FileState { RelativePath = OmsiSignalRoutes.FileName, Before = before, After = after });
@@ -410,8 +413,12 @@ namespace OmsiMapEditor.OMSI
             {
                 if (string.IsNullOrWhiteSpace(asset))
                     return null;
-                if (known.TryGetValue(asset, out var cached))
-                    return cached;
+                // A search for the next signal asks from a worker thread while the map thread may ask as well.
+                lock (known)
+                {
+                    if (known.TryGetValue(asset, out var cached))
+                        return cached;
+                }
                 bool? result = null;
                 try
                 {
@@ -428,7 +435,8 @@ namespace OmsiMapEditor.OMSI
                 {
                     // An unreadable file leaves only the ID to check.
                 }
-                known[asset] = result;
+                lock (known)
+                    known[asset] = result;
                 return result;
             };
         }

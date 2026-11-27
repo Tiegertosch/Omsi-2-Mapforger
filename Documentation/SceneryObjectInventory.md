@@ -134,6 +134,28 @@ Ein Profilstück hat mindestens zwei Punkte, von links nach rechts. Die Bedeutun
 
 Die übrigen 378 Splines in Berlin-Spandau sind Freileitungen, Fahrdraht, Quertragwerke und Zäune. Sie bestehen nur aus senkrechten oder sehr schmalen Flächen und sind von oben nicht zu sehen. Gleise wie `rail_concrete_01.sli` zeigen Schotterbett, Schwellen und die Oberseiten der Schienenköpfe, die etwa 5 cm breit sind. Nicht ausgewertet sind `[length]`, `[scaleTexByLength]`, `[patchwork_chain]`, `[heightprofile]` und `[path]`; sie betreffen das Fahrverhalten, die Gelände-Anpassung oder seltene Texturvarianten.
 
+## Weichen: `[switch]` und `[switchdir]` (ADR 105, M5)
+
+Stand 27. November 2026, Befund an der Installation (nur lesend) und openOMSI-Quelltext (Commit 7bbeb88).
+
+- **Ort:** Die Stellung steht in der `.sco` der Weiche, nicht in den Kacheln. Eine Weiche ist in der Kachel ein gewöhnliches `[object]`; die Kacheln von Grundorf und Berlin-Spandau enthalten keinen `[switchdir]`.
+- **Aufbau:** `[switch] n` nennt die Zahl der Stellungen. `[path]` und `[path_2]` bilden die Pfade; ein `[switchdir] k` hinter einem Pfad gibt die Stellung an, in der ein Zug den Pfad nimmt. Pfade ohne `[switchdir]` (Folgestücke, gerade Anschlüsse) haben keine Stellung.
+- **Zuordnung (Annahme):** `[switchdir]` gehört zum `[path]` oder `[path_2]` davor, nicht zum folgenden. openOMSI liest es so (`crates/omsi-scenery/src/sco.rs:354-358`). Beispiel `Sceneryobjects/Railroad_RUE/EW190_L_Beton.sco`:
+
+  ```
+  [switch] 2
+  [path] 0 0 0.445 0 0 27.017 0 0 2 2.5 2 0      <- gerade, Art 2 (Schiene)
+  [switchdir] 0                                   <- gehört zum Pfad davor
+  [path] 0 0 0.445 0 -189.977 21.022 0 0 2 2.5 2 0  <- Bogen R=190
+  [switchdir] 1
+  [path] -1.162 20.979 0.445 -6.34 0 5.977 0 0 2 2.5 2 0  <- Folgestück, kein [switchdir]
+  ```
+
+  Die Zuordnung ist in OMSI 2 noch nicht bestätigt.
+- **Bestand:** Die Installation hat 18 Weichen-`.sco`, alle `Railroad_RUE/EW190_{L,R}_{Beton,Klp,S49}_*`. Überall `[switch] 2`, `[switchdir]` mit den Werten 0 und 1. In den Fahrstraßen nennen die Klp-Varianten auch die Pfadindizes 3 und 4. Grundorf hat keine Weiche. Berlin-Spandau hat 130 Weichenobjekte und 44 Weichen in den Fahrstraßen (182 Einträge); häufig sind `EW190_R_S49_0_0` (13 Routen) und `EW190_L_S49_0_0` (11).
+- **Lesen in MapWorks:** `OmsiSceneryObject` liest `[switch]` (`SwitchPositions`) und `[switchdir]` je Pfad (`SwitchPosition`); `[switchdir]` ohne Pfad davor zählt `StraySwitchDirections`. Die Kartenprüfung meldet Abweichungen (P3, P4), siehe ADR 105, Nachtrag M5-Logik.
+- **Nicht gelesen:** `switches.cfg` (openOMSI, Grund- und Antriebsstellung) wird weder gelesen noch geschrieben (M6, optional).
+
 ## Grenzen
 
 - **Raster:** Die Kontur ist auf etwa eine Zelle genau, also 0,2 m bei Objekten bis 200 m. Überstehende Dächer zählen zur Fläche, weil die Draufsicht sie zeigt.

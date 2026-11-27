@@ -83,6 +83,13 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The indicator a vehicle sets on it: 0 none, 2 left, 3 right.</summary>
         public int Blinker { get; internal set; }
 
+        /// <summary>
+        /// [switchdir] after the path: the position of the object's switch (its script variable Switch) in which a train takes
+        /// this path, or null for a path every position uses, such as the piece after a branch. openOMSI gives a [switchdir]
+        /// to the [path] before it (omsi-scenery sco.rs); ADR 105, M5.
+        /// </summary>
+        public int? SwitchPosition { get; internal set; }
+
         /// <summary>The point <paramref name="along"/> metres from where it is defined to start, in the object frame.</summary>
         public OmsiMapPoint PointAt(double along)
         {
@@ -174,6 +181,15 @@ namespace OmsiMapEditor.OMSI
         /// <summary>[passengercabin]: the file with the places of people waiting at the object, or null.</summary>
         public string PassengerCabin { get; internal set; }
 
+        /// <summary>[switch]: the number of positions of the object's switch, 0 when the number is missing, does not read or is not above 0 (openOMSI then reads 0 too); null when the object is no switch.</summary>
+        public int? SwitchPositions { get; internal set; }
+
+        /// <summary>True for a switch: an object with [switch], whatever kind a later keyword gives it.</summary>
+        public bool IsSwitch => SwitchPositions.HasValue;
+
+        /// <summary>How many [switchdir] come before the first [path], so that they belong to no path.</summary>
+        public int StraySwitchDirections { get; internal set; }
+
         public static OmsiSceneryObject Parse(byte[] bytes)
         {
             var file = OmsiRecordFile.Parse(bytes, null);
@@ -182,6 +198,9 @@ namespace OmsiMapEditor.OMSI
             var lodLevels = 0;
             OmsiSceneryMesh lastMesh = null;
             OmsiSceneryMaterial lastMaterial = null;
+            // The path a [switchdir] belongs to: the last [path] read; null after a [path] whose numbers do not read.
+            OmsiObjectPath lastPath = null;
+            var pathSeen = false;
             foreach (var record in file.Records)
             {
                 var values = record.AllValues();
@@ -259,8 +278,10 @@ namespace OmsiMapEditor.OMSI
                         break;
                     case "path":
                     case "path_2":
+                        pathSeen = true;
+                        lastPath = null;
                         if (TryNumbers(values, 10, out var path))
-                            result.Paths.Add(new OmsiObjectPath
+                            result.Paths.Add(lastPath = new OmsiObjectPath
                             {
                                 X = path[0], Y = path[1], Height = path[2], HeadingDegrees = path[3], RadiusMeters = path[4], LengthMeters = path[5],
                                 Kind = (int)path[8], WidthMeters = path[9],
@@ -290,6 +311,17 @@ namespace OmsiMapEditor.OMSI
                         break;
                     case "switch":
                         result.Kind = OmsiSceneryObjectKind.Switch;
+                        result.SwitchPositions = values.Count > 0 && int.TryParse(values[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var positions) &&
+                                                 positions > 0
+                            ? positions
+                            : 0;
+                        break;
+                    case "switchdir":
+                        if (!pathSeen)
+                            result.StraySwitchDirections++;
+                        else if (lastPath != null && values.Count > 0 &&
+                                 int.TryParse(values[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var switchPosition))
+                            lastPath.SwitchPosition = switchPosition;
                         break;
                     case "helparrow":
                         result.Kind = OmsiSceneryObjectKind.HelpArrow;

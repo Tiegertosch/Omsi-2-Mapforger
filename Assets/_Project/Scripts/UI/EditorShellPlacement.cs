@@ -110,6 +110,8 @@ namespace OmsiMapEditor.UI
             }
             if (which == 0 && !HasPlacement(out _))
                 return;
+            // The pipette of a new signal route shares the map's one click: only one of the two waits.
+            EndNewRoutePick(false);
             placementPickFor = which;
             mapCanvas.BeginPointPick();
             satelliteWindow?.ShowPicking(which);
@@ -122,8 +124,11 @@ namespace OmsiMapEditor.UI
         private void PlacementPointPicked(double x, double y)
         {
             var which = placementPickFor;
+            // A point picked for a new signal route is not this window's: leave the pick on.
+            if (which < 0)
+                return;
             EndPlacementPick();
-            if (which < 0 || currentSummary == null)
+            if (currentSummary == null)
                 return;
             if (which == 0)
             {

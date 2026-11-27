@@ -16,6 +16,7 @@ namespace OmsiMapEditor.UI
         private readonly List<Vector2> signalRouteMarkers = new List<Vector2>();
         private readonly List<Vector2[]> signalRouteLines = new List<Vector2[]>();
         private readonly List<Vector2> signalRoutePoints = new List<Vector2>();
+        private readonly List<Vector2[]> signalRouteAlternatives = new List<Vector2[]>();
         private Vector2? signalRouteSignal;
         private Vector2? signalRouteDistant;
         private Vector2? signalRouteNext;
@@ -35,6 +36,10 @@ namespace OmsiMapEditor.UI
         {
             signalRouteLines.Clear();
             signalRoutePoints.Clear();
+            routeSwitchMarks.Clear();
+            // Taking the whole highlight off takes the ways of a route being planned with it.
+            if (lines == null && points == null && !signal.HasValue && !distant.HasValue && !next.HasValue)
+                signalRouteAlternatives.Clear();
             signalRouteSignal = signalRouteDistant = signalRouteNext = null;
             if (summary != null)
             {
@@ -56,8 +61,23 @@ namespace OmsiMapEditor.UI
             MarkDirtyRepaint();
         }
 
+        /// <summary>The ways of a route being planned that are not the one chosen, drawn thin and dim; null or empty removes them. Call after <see cref="SetSignalRouteHighlight"/>.</summary>
+        public void SetSignalRouteAlternatives(IEnumerable<OmsiMapPoint[]> lines)
+        {
+            signalRouteAlternatives.Clear();
+            if (lines != null && summary != null)
+                foreach (var line in lines)
+                {
+                    var map = new Vector2[line.Length];
+                    for (var index = 0; index < map.Length; index++)
+                        map[index] = WorldToMap(line[index]);
+                    signalRouteAlternatives.Add(map);
+                }
+            MarkDirtyRepaint();
+        }
+
         /// <summary>True while anything of the signal routes layer is set.</summary>
-        public bool ShowsSignalRoutes => signalRouteMarkers.Count > 0 || signalRouteLines.Count > 0 || signalRoutePoints.Count > 0 || signalRouteSignal.HasValue;
+        public bool ShowsSignalRoutes => signalRouteMarkers.Count > 0 || signalRouteLines.Count > 0 || signalRouteAlternatives.Count > 0 || signalRoutePoints.Count > 0 || signalRouteSignal.HasValue;
 
         /// <summary>
         /// Brings a box in world metres into view, keeping out of the strips the windows take (left, top, right and bottom, in pixels): from above at the
@@ -105,55 +125,22 @@ namespace OmsiMapEditor.UI
             painter.lineJoin = LineJoin.Round;
             painter.lineCap = LineCap.Round;
 
+            // The other ways of a route being planned: thin and dim, under the way chosen.
+            if (signalRouteAlternatives.Count > 0)
+            {
+                // Light, so that it stands out from the rails of the map, which are drawn in the accent family.
+                var dim = (Color)routeColor;
+                dim.a = 0.75f;
+                StrokeRouteLines(painter, signalRouteAlternatives, dim, 3f, threeDimensional, camera);
+            }
+
             // The track of the route chosen: a wide soft stroke under a narrow bright one.
             if (signalRouteLines.Count > 0)
             {
                 var halo = (Color)splineColor;
                 halo.a = 0.35f;
-                var core = (Color)splineColor;
-                foreach (var pass in new[] { 0, 1 })
-                {
-                    painter.strokeColor = pass == 0 ? halo : core;
-                    painter.lineWidth = pass == 0 ? 11f : 4f;
-                    painter.BeginPath();
-                    var segments = 0;
-                    foreach (var line in signalRouteLines)
-                    {
-                        if (!threeDimensional)
-                        {
-                            for (var index = 0; index < line.Length; index++)
-                            {
-                                var at = MapToScreen(line[index]);
-                                if (index == 0)
-                                    painter.MoveTo(at);
-                                else
-                                    painter.LineTo(at);
-                            }
-                            segments += line.Length - 1;
-                        }
-                        else
-                        {
-                            var started = false;
-                            for (var index = 0; index < line.Length; index++)
-                            {
-                                if (!HandleScreen(line[index], float.NaN, camera, out var at))
-                                {
-                                    started = false;
-                                    continue;
-                                }
-                                if (!started)
-                                    painter.MoveTo(at);
-                                else
-                                    painter.LineTo(at);
-                                started = true;
-                                segments++;
-                            }
-                        }
-                        segments = FlushStroke(painter, segments);
-                    }
-                    if (segments > 0)
-                        painter.Stroke();
-                }
+                StrokeRouteLines(painter, signalRouteLines, halo, 11f, threeDimensional, camera);
+                StrokeRouteLines(painter, signalRouteLines, splineColor, 4f, threeDimensional, camera);
             }
 
             // Pieces that have no line (an object without paths): a ring each.
@@ -192,6 +179,50 @@ namespace OmsiMapEditor.UI
             if (signalRouteSignal.HasValue && HandleScreen(signalRouteSignal.Value, float.NaN, camera, out var signalAt))
                 DrawRouteSignalShape(painter, signalAt, 2, splineColor);
             painter.lineCap = LineCap.Butt;
+        }
+
+        private void StrokeRouteLines(Painter2D painter, List<Vector2[]> lines, Color color, float width, bool threeDimensional, MapOrbitCamera? camera)
+        {
+            painter.strokeColor = color;
+            painter.lineWidth = width;
+            painter.BeginPath();
+            var segments = 0;
+            foreach (var line in lines)
+            {
+                if (!threeDimensional)
+                {
+                    for (var index = 0; index < line.Length; index++)
+                    {
+                        var at = MapToScreen(line[index]);
+                        if (index == 0)
+                            painter.MoveTo(at);
+                        else
+                            painter.LineTo(at);
+                    }
+                    segments += line.Length - 1;
+                }
+                else
+                {
+                    var started = false;
+                    for (var index = 0; index < line.Length; index++)
+                    {
+                        if (!HandleScreen(line[index], float.NaN, camera, out var at))
+                        {
+                            started = false;
+                            continue;
+                        }
+                        if (!started)
+                            painter.MoveTo(at);
+                        else
+                            painter.LineTo(at);
+                        started = true;
+                        segments++;
+                    }
+                }
+                segments = FlushStroke(painter, segments);
+            }
+            if (segments > 0)
+                painter.Stroke();
         }
 
         /// <summary>0 a square outline, 1 a diamond outline, 2 a filled disc; each with a white outer ring so it stands out on any ground.</summary>

@@ -43,6 +43,12 @@ namespace OmsiMapEditor.OMSI
         /// <summary>The places of pieces that have no line to draw (an object without paths, or without its file), as markers.</summary>
         public List<OmsiMapPoint> Points { get; } = new List<OmsiMapPoint>();
 
+        /// <summary>Where the route passes a switch object (ADR 105, M5): the middle of the branch it takes and the switch position it needs there.</summary>
+        public List<KeyValuePair<OmsiMapPoint, int>> SwitchMarks { get; } = new List<KeyValuePair<OmsiMapPoint, int>>();
+
+        /// <summary>For each entry of <see cref="SwitchMarks"/> a second point of the same branch, so the map can tell which way the track runs there.</summary>
+        public List<OmsiMapPoint> SwitchMarkAhead { get; } = new List<OmsiMapPoint>();
+
         /// <summary>The entries the map has no element for.</summary>
         public int Missing { get; internal set; }
 
@@ -151,6 +157,12 @@ namespace OmsiMapEditor.OMSI
                             path.OnSpline != (place.Kind == OmsiMapElementKind.Spline) || path.Points == null || path.Points.Length < 2)
                             continue;
                         shape.Lines.Add(path.Points);
+                        if (path.OnSwitch && path.SwitchPosition.HasValue)
+                        {
+                            var middle = path.Points.Length / 2;
+                            shape.SwitchMarks.Add(new KeyValuePair<OmsiMapPoint, int>(path.Points[middle], path.SwitchPosition.Value));
+                            shape.SwitchMarkAhead.Add(path.Points[middle + 1 < path.Points.Length ? middle + 1 : middle - 1]);
+                        }
                         found = true;
                     }
                 if (found)

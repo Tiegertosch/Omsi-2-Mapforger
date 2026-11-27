@@ -216,6 +216,8 @@ Befund vom 25. November 2026 an Grundorf (2 Routen, 5 Einträge), Berlin-Spandau
 
 Signale stehen als `[object]` oder als Spline-Anhängung (Spandau: 30 und 9). Leser: `OmsiSignalRoutes`, Auflösung: `OmsiSignalRouteMap`. Berlin-Spandaus `signalroutes0.cfg` ist ein älterer Stand und bleibt als unbekannte Datei unberührt.
 
+Befund vom 26. November 2026 (ADR 105, Nachtrag M4-Logik), alle 49 Routen von Spandau gegen das Schienennetz: Die `[entry]` folgen in Fahrtrichtung aufeinander, jeder Pfad einer Weiche als eigener Eintrag in der Reihenfolge der Fahrt (z. B. Pfade 3, 2, 1 derselben Weiche). Fahrtrichtung = Ausrichtung des Signals (Objekt-Heading; bei Spline-Anhängungen Richtung des Splines plus Heading der Anhängung). Das Signal steht 1,6 bis 4,3 m meist rechts neben dem Gleis; der erste Eintrag ist das Gleisstück am Signal, wenn das Signal in dessen erster Hälfte steht, sonst das folgende. Das Ende ist frei: meist ein Stück über das Gleisstück des nächsten Signals hinaus. 5 der 49 Routen sind nicht lückenlos; OMSI prüft den Zusammenhang nicht.
+
 ## Zahlenformat
 
 Der OMSI-Editor schreibt Kommazahlen mit höchstens 15 gültigen Ziffern und invarianter Kultur. Sehr kleine Werte schreibt er wissenschaftlich mit kurzem Exponenten, zum Beispiel `1.33514401335476E-5` oder `-3.59590604939723E-6`. Ganze Werte stehen ohne Nachkommastellen, etwa `300`. Diese Regel reproduziert 243.482 von 243.487 Kommazahlen der drei Karten zeichengenau. Die fünf Ausnahmen haben einen zweistelligen Exponenten wie `1.024455E-06` und stammen von einem anderen Werkzeug. `OmsiNumberFormat` setzt diese Regel um.

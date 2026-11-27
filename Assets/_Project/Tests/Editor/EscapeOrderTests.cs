@@ -90,6 +90,21 @@ namespace OmsiMapEditor.Tests
         }
 
         [Test]
+        public void PlanningANewSignalRouteTakesEscBeforeThePopupItIsShownIn()
+        {
+            var state = new EscapeState { PlanningSignalRoute = true, SelectionNotEmpty = true, MapPlacing = true };
+            Assert.That(Order(state), Is.EqualTo(new[] { EscapeAction.CancelSignalRouteNew }));
+            state.TypingInField = true;
+            Assert.That(Order(state), Is.EqualTo(new[] { EscapeAction.CancelSignalRouteNew }), "a field is no reason to keep the plan");
+            // A question on screen and an open context menu come first.
+            state.ModalDialogShown = true;
+            Assert.That(Order(state), Is.EqualTo(new[] { EscapeAction.CloseTopOverlay, EscapeAction.None }));
+            Assert.That(Order(new EscapeState { PlanningSignalRoute = true, ContextMenuOpen = true }), Is.EqualTo(new[] { EscapeAction.CloseContextMenu }));
+            Assert.IsFalse(EscapeOrder.CanDecline(EscapeAction.CancelSignalRouteNew));
+            Assert.IsTrue(EscapeOrder.StopsPropagation(EscapeAction.CancelSignalRouteNew));
+        }
+
+        [Test]
         public void WithCtrlThePicksTheToolAndTheRestIgnoreTheKey()
         {
             var state = new EscapeState

@@ -33,6 +33,8 @@ namespace OmsiMapEditor.UI
         OpenPaths,
         /// <summary>A signal with routes: opens the list of signal routes filtered to this signal.</summary>
         OpenSignalRoutes,
+        /// <summary>A signal on a map that can be edited: starts a new signal route from this signal (ADR 105, M4).</summary>
+        NewSignalRoute,
         Copy,
         Duplicate,
         LevelGround,
@@ -96,6 +98,9 @@ namespace OmsiMapEditor.UI
 
         /// <summary>The object is a signal that has routes in signalroutes.cfg (ADR 105).</summary>
         public bool HasSignalRoutes;
+
+        /// <summary>The object (or row) is a signal: its file has [signal]. With <see cref="CanEdit"/> the menu offers a new route from it.</summary>
+        public bool IsSignal;
 
         /// <summary>The object is an entry point (never while a variant is edited).</summary>
         public bool IsEntryPoint;
@@ -187,6 +192,8 @@ namespace OmsiMapEditor.UI
                 Item(entries, ContextMenuAction.OpenPaths, "context.paths");
             if (state.HasSignalRoutes)
                 Item(entries, ContextMenuAction.OpenSignalRoutes, "context.signal_routes");
+            if (state.IsSignal && state.CanEdit)
+                Item(entries, ContextMenuAction.NewSignalRoute, "context.new_signal_route");
             AddJunctionTools(entries, state);
             if (!state.CanEditObjects)
             {
@@ -256,6 +263,8 @@ namespace OmsiMapEditor.UI
             Item(entries, ContextMenuAction.EditRow, "context.edit_row");
             if (state.HasSignalRoutes)
                 Item(entries, ContextMenuAction.OpenSignalRoutes, "context.signal_routes");
+            if (state.IsSignal)
+                Item(entries, ContextMenuAction.NewSignalRoute, "context.new_signal_route");
             Divider(entries);
             Item(entries, ContextMenuAction.DeleteRow, "context.delete_row", null, true);
         }

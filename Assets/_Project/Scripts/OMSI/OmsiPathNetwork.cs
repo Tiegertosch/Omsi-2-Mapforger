@@ -72,6 +72,16 @@ namespace OmsiMapEditor.OMSI
         {
             if (summary == null)
                 throw new ArgumentNullException(nameof(summary));
+            return ForTiles(summary, installationRoot, summary.Tiles, kind);
+        }
+
+        /// <summary>The lanes of some tiles of a map only, such as the tiles a signal route runs over (ADR 105, M4).</summary>
+        public static OmsiPathNetwork ForTiles(OmsiMapSummary summary, string installationRoot, IEnumerable<OmsiTileSummary> tiles, int kind = 0)
+        {
+            if (summary == null)
+                throw new ArgumentNullException(nameof(summary));
+            if (tiles == null)
+                throw new ArgumentNullException(nameof(tiles));
             if (string.IsNullOrEmpty(installationRoot))
                 throw new ArgumentException("The OMSI installation is needed for the lanes of objects and splines.", nameof(installationRoot));
             var profiles = new OmsiSplineProfileCatalog(installationRoot);
@@ -96,8 +106,8 @@ namespace OmsiMapEditor.OMSI
                 return sceneryObject;
             };
             var paths = new List<OmsiMapPath>();
-            foreach (var tile in summary.Tiles)
-                if (tile.IsAvailable)
+            foreach (var tile in tiles)
+                if (tile != null && tile.IsAvailable)
                     paths.AddRange(OmsiMapPaths.OfTile(summary, tile, scenery, profiles.Get));
             return Build(paths, kind);
         }
@@ -212,6 +222,37 @@ namespace OmsiMapEditor.OMSI
         private static string PathKey(int tileX, int tileY, int elementId, int pathIndex)
         {
             return tileX + "/" + tileY + "/" + elementId + "/" + pathIndex;
+        }
+
+        /// <summary>Every lane with a point in a cell of the grid within <paramref name="reach"/> metres of a position, each once; callers measure the distance.</summary>
+        internal List<OmsiLane> LanesAround(OmsiMapPoint position, double reach)
+        {
+            var result = new List<OmsiLane>();
+            var cells = (int)Math.Ceiling(reach / PlaceCell) + 1;
+            var cellX = (long)Math.Floor(position.X / PlaceCell);
+            var cellY = (long)Math.Floor(position.Y / PlaceCell);
+            var tried = new HashSet<int>();
+            for (var dx = -cells; dx <= cells; dx++)
+                for (var dy = -cells; dy <= cells; dy++)
+                {
+                    if (!places.TryGetValue(((cellX + dx) << 32) ^ (uint)(int)(cellY + dy), out var list))
+                        continue;
+                    foreach (var index in list)
+                        if (tried.Add(index))
+                            result.Add(lanes[index]);
+                }
+            return result;
+        }
+
+        /// <summary>The lanes a lane of this network leads on to.</summary>
+        public IReadOnlyList<OmsiLane> NextOf(OmsiLane lane)
+        {
+            if (lane == null)
+                throw new ArgumentNullException(nameof(lane));
+            var result = new List<OmsiLane>(lane.Next.Count);
+            foreach (var index in lane.Next)
+                result.Add(lanes[index]);
+            return result;
         }
 
         /// <summary>The lanes of one path of the map (one for each way it is driven); empty when the network has none.</summary>
