@@ -1,6 +1,6 @@
 # OMSI MapWorks – Feature Parity
 
-Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 104 · Teilweise 4 · Prüfen 0 · Offen 7 von 115 Punkten (104 + 4 + 0 + 7; die 7 Offen sind die Detailstufen, bewusst nicht gebaut, und 6 Signal- und Chrono-Punkte) (Stand 25. November 2026: „Chrono-Varianten vollständig exportieren“ ist Vorhanden; davor 23. November 2026: Punkte I und E aktualisiert, ADR 104 und ADR 086 Nachtrag). Eine Fassung vor dem Abgleich gibt es nicht als Datei; der Verlauf steht in der Git-Historie. Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
+Stand: 27. November 2026 (Block G nach den Meilensteinen M0 bis M5 abgeglichen, M6 zurückgestellt), zuvor 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fahrpläne, Fahrzeuggruppen, Fahrwege). Vorhanden 106 · Teilweise 5 · Prüfen 0 · Offen 4 von 115 Punkten (106 + 5 + 0 + 4; die 4 Offen sind die Detailstufen, bewusst nicht gebaut, und 3 Signal- und Chrono-Punkte) (Stand 27. November 2026: Signalrouten erstellen und bearbeiten sind Vorhanden, Fahrstraßen und Weichen sowie Schienenpfade Teilweise; Stand 25. November 2026: „Chrono-Varianten vollständig exportieren“ ist Vorhanden; davor 23. November 2026: Punkte I und E aktualisiert, ADR 104 und ADR 086 Nachtrag). Eine Fassung vor dem Abgleich gibt es nicht als Datei; der Verlauf steht in der Git-Historie. Hinweise in Klammern stammen vom Abgleich. „Kartenübersicht / Roadmap generieren“ wurde am 9. November 2026 auf Wunsch des Nutzers gestrichen (war versehentlich in die Liste geraten).
 
 ## A. Kartenverwaltung und Grundeinstellungen
 - [x] Neue Karte erstellen — Vorhanden
@@ -102,12 +102,12 @@ Stand: 11. November 2026, abgeglichen mit dem Code nach dem Abschluss von F (Fah
 - [x] TTData vollständig schreiben und validieren — Vorhanden (Busstops.cfg, StnLinks.cfg, .ttp, .ttl werden geschrieben; die Kartenprüfung prüft sie, und nach dem Speichern einer Linie läuft dieselbe Prüfung und meldet Befunde sofort)
 
 ## G. Signalrouten, Prioritäten und Bahnverkehr
-- [ ] Signalrouten erstellen — Offen
-- [ ] Signalrouten bearbeiten und löschen — Offen
-- [ ] Fahrstraßen und Weichen zuordnen — Offen
+- [x] Signalrouten erstellen — Vorhanden (Fahrstraßen aus einem Signal über das Schienennetz: Weg wählen, Start, Durchrutschweg, Ende am Signal oder Gleisstück; ADR 105, M4; vom Nutzer am 27. November 2026 getestet)
+- [x] Signalrouten bearbeiten und löschen — Vorhanden (Art, Begriff, Vor- und nächstes Signal, Tempolimit, Löschen, je ein Undo-Schritt; ADR 105, M3)
+- [ ] Fahrstraßen und Weichen zuordnen — Teilweise (passierte Weichen mit Ring und Stellung bei gewählter Route; Stellungen lassen sich nicht ändern, `[switchdir]` steht in fremden Objekten; ADR 105, M5)
 - [ ] Signalabhängigkeiten konfigurieren — Offen
 - [x] Prioritätsregeln für KI-Pfade bearbeiten — Vorhanden (Vorfahrt-Werkzeug (V), seit dem 15. November 2026 „Traffic rules“ mit Schildern, Tempolimits und Überholverbot, ADR 099; auch in Chrono-Varianten)
-- [ ] Schienenpfade und Weichenverbindungen prüfen — Teilweise
+- [ ] Schienenpfade und Weichenverbindungen prüfen — Teilweise (Kartenprüfung „Rail paths“, ADR 105, M5; die Höhen- und Winkelprüfung P8 fehlt noch)
 - [ ] Bahn- und Straßenbahnsignale konfigurieren — Offen
 
 ## H. Chrono und zeitabhängige Varianten
